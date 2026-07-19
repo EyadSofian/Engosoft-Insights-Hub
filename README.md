@@ -13,7 +13,7 @@ invoiced revenue, and reports full-funnel performance with an AI assistant on to
 | Styling | Tailwind CSS v4, custom token layer |
 | Charts | Recharts |
 | Data | Google Sheets CSV (gviz), parsed with papaparse, cached in memory |
-| Scheduling | node-cron, in-process |
+| Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
 | AI | OpenAI (isolated in the chat route, swappable) |
 
 No database. The sheet is the source of truth.
@@ -175,6 +175,14 @@ Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 `startScheduler()` runs at server boot and is idempotent, so route modules being
 re-imported per request in dev cannot register duplicate jobs. It returns early unless
 both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set.
+
+Scheduling uses a 20-second interval against a hand-rolled cron matcher rather than a
+package. `node-cron` resolves its background daemon through `__dirname`, which is
+undefined once Nitro bundles the server to ESM — the container crashed on boot while
+`npm run build` passed, because building never executes the bundle. **Verify server
+changes by running `npm run build && npm run start` and hitting `/api/filters`, not by
+building alone.** Wall-clock time is read fresh in `Africa/Cairo` on every tick, so
+Egypt's DST transitions are handled.
 
 To enable the on-demand commands, point Telegram at the webhook:
 
