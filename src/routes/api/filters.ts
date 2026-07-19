@@ -74,6 +74,9 @@ export const Route = createFileRoute("/api/filters")({
             revenueDateMax: data.revenueDateMax,
           },
           syncedAt: data.syncedAt,
+          oldestSyncedAt: data.oldestSyncedAt,
+          tabSyncs: data.tabSyncs,
+          // When this app last pulled the sheet — the only one Refresh moves.
           fetchedAt: new Date(data.fetchedAt).toISOString(),
           health: data.health,
           fetchErrors: data.fetchErrors,

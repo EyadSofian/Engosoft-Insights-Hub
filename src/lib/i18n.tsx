@@ -46,7 +46,9 @@ export const DICT = {
   filters: { ar: "الفلاتر", en: "Filters" },
   apply: { ar: "تطبيق", en: "Apply" },
   reset: { ar: "إعادة تعيين", en: "Reset" },
-  data_freshness: { ar: "آخر مزامنة", en: "Last synced" },
+  // The badge shows when this app last pulled the sheet, which the Refresh
+  // button moves — not when the sync jobs last wrote the sheet, which it cannot.
+  data_freshness: { ar: "آخر تحديث", en: "Last refresh" },
   live: { ar: "مباشر", en: "Live" },
   stale: { ar: "قديم", en: "Stale" },
   theme: { ar: "المظهر", en: "Theme" },

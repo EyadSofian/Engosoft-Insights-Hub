@@ -28,7 +28,11 @@ export interface FiltersResp {
     revenueDateMin: string;
     revenueDateMax: string;
   };
+  /** Freshest upstream sync. Written by the sync jobs — Refresh cannot move it. */
   syncedAt: string;
+  oldestSyncedAt: string;
+  tabSyncs: { key: string; label: string; syncedAt: string }[];
+  /** When this app last pulled the sheet. This is what Refresh updates. */
   fetchedAt: string;
   health: DataHealth;
   fetchErrors: string[];
@@ -91,8 +95,6 @@ export function TopBar({ title }: { title?: string }) {
     }
   };
 
-  const syncedMs = data?.syncedAt ? Date.parse(data.syncedAt) : NaN;
-  const stale = isFinite(syncedMs) && Date.now() - syncedMs > 2 * 3600_000;
 
   return (
     <>
@@ -109,7 +111,7 @@ export function TopBar({ title }: { title?: string }) {
           </div>
 
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
-            <SyncBadge syncedAt={data?.syncedAt} stale={stale} />
+            <SyncBadge data={data} />
 
             <button
               onClick={() => setSheetOpen(true)}
@@ -186,20 +188,81 @@ export function TopBar({ title }: { title?: string }) {
   );
 }
 
-function SyncBadge({ syncedAt, stale }: { syncedAt?: string; stale: boolean }) {
+const HOUR = 3600_000;
+/** Upstream jobs run a few times a day, so hours behind is normal; a day is not. */
+const STALE_AFTER_H = 12;
+const VERY_STALE_AFTER_H = 24;
+
+/**
+ * Two different clocks used to be collapsed into one badge, which is why
+ * pressing Refresh never turned it green: the time shown was `__synced_at`, the
+ * moment an upstream job last wrote the *sheet*. Nothing in this app can move
+ * that. What Refresh actually controls is when we last pulled the sheet.
+ *
+ * So the headline is now the pull time — it updates on every refresh and proves
+ * the button worked — while the dot reflects the real question, how old the
+ * underlying data is, and the tooltip names which tab is lagging.
+ */
+function SyncBadge({ data }: { data?: FiltersResp }) {
   const { t, lang } = useI18n();
-  if (!syncedAt) return null;
+  if (!data?.fetchedAt) return null;
+
+  const tabSyncs = data.tabSyncs ?? [];
+  const ageH = (iso: string) => (Date.now() - Date.parse(iso)) / HOUR;
+  const oldest = data.oldestSyncedAt ? ageH(data.oldestSyncedAt) : NaN;
+
+  const level = !isFinite(oldest)
+    ? "ok"
+    : oldest > VERY_STALE_AFTER_H
+      ? "bad"
+      : oldest > STALE_AFTER_H
+        ? "warn"
+        : "ok";
+
+  const color =
+    level === "bad" ? "var(--danger)" : level === "warn" ? "var(--warning)" : "var(--success)";
+
+  const fmtAge = (h: number) =>
+    h < 1
+      ? lang === "ar"
+        ? `${Math.max(1, Math.round(h * 60))} د`
+        : `${Math.max(1, Math.round(h * 60))}m`
+      : lang === "ar"
+        ? `${h.toFixed(1)} س`
+        : `${h.toFixed(1)}h`;
+
+  const tooltip = [
+    `${lang === "ar" ? "آخر سحب للبيانات من الشيت" : "Dashboard last pulled the sheet"}: ${fmtDateTime(data.fetchedAt, lang)}`,
+    "",
+    lang === "ar"
+      ? "آخر تحديث لكل مصدر داخل الشيت (يكتبها سكربت المزامنة، وزر التحديث لا يغيّرها):"
+      : "When each tab was last written by its sync job (Refresh cannot change these):",
+    ...tabSyncs
+      .slice()
+      .sort((a, b) => a.syncedAt.localeCompare(b.syncedAt))
+      .map((s) => `• ${s.label}: ${fmtDateTime(s.syncedAt, lang)} — ${fmtAge(ageH(s.syncedAt))}`),
+  ].join("\n");
+
+  const lagging = tabSyncs
+    .slice()
+    .sort((a, b) => a.syncedAt.localeCompare(b.syncedAt))[0];
+
   return (
     <span
       className="hidden md:inline-flex items-center gap-1.5 text-[11px] px-2.5 h-10 rounded-lg bg-surface-2 border border-border whitespace-nowrap"
-      title={`${t("data_freshness")}: ${fmtDateTime(syncedAt, lang)}`}
+      title={tooltip}
     >
       <span
-        className={`w-1.5 h-1.5 rounded-full ${stale ? "" : "pulse-ring"}`}
-        style={{ background: stale ? "var(--warning)" : "var(--success)" }}
+        className={`w-1.5 h-1.5 rounded-full ${level === "ok" ? "pulse-ring" : ""}`}
+        style={{ background: color }}
       />
-      <span className="text-text-muted">{stale ? t("stale") : t("live")}</span>
-      <span className="num text-text font-medium">{fmtDateTime(syncedAt, lang)}</span>
+      <span className="text-text-muted">{t("data_freshness")}</span>
+      <span className="num text-text font-medium">{fmtDateTime(data.fetchedAt, lang)}</span>
+      {level !== "ok" && lagging && (
+        <span className="num" style={{ color }} title={tooltip}>
+          · {lagging.label} {fmtAge(ageH(lagging.syncedAt))}
+        </span>
+      )}
     </span>
   );
 }

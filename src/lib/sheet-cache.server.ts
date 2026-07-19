@@ -31,6 +31,13 @@ const TAB = {
   lost: "Lost Analysis",
 } as const;
 
+export interface SourceFreshness {
+  key: string;
+  label: string;
+  /** ISO time the upstream job last wrote this tab. */
+  syncedAt: string;
+}
+
 export interface AccountInfo {
   name: string;
   id: string;
@@ -68,7 +75,12 @@ export interface Snapshot {
   campaigns: Map<string, CampaignMeta>;
   /** Display casing for each normalized source key, e.g. "uchat" → "UChat". */
   sourceLabels: Map<string, string>;
+  /** Freshest upstream sync across all tabs. Written by the sync jobs, not here. */
   syncedAt: string;
+  /** Oldest upstream sync — the one that actually decides how stale the data is. */
+  oldestSyncedAt: string;
+  /** Per-tab sync times, so a lagging source can be named. */
+  tabSyncs: SourceFreshness[];
   adsDateMin: string;
   adsDateMax: string;
   crmDateMin: string;
@@ -678,8 +690,47 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     }
     const years = [...yearSet].filter((y) => y > 2000).sort();
 
+    /* -- per-source freshness ---------------------------------------------- */
+    // Each tab is filled by its own upstream job, and they run on different
+    // schedules — the ads sync can be hours behind while Odoo is minutes old.
+    // Reporting one blended "last synced" hid that: the badge read the ads tabs
+    // only and called the whole dashboard stale while CRM was 24 minutes fresh.
+    //
+    // Note these timestamps describe when the *sheet* was last filled from the
+    // sources. Nothing in this app can move them; the Refresh button only
+    // controls how recently we pulled the sheet itself (`fetchedAt`).
+    const maxOf = (rows: Raw[], col: string): string => {
+      let max = "";
+      for (const r of rows) {
+        const v = str(r[col]);
+        if (v && v > max) max = v;
+      }
+      return max;
+    };
+    // Odoo exports a local-looking "YYYY-MM-DD HH:MM:SS" with no zone marker;
+    // it is UTC, so it is normalised here rather than being read as local time.
+    const asIso = (v: string): string => {
+      if (!v) return "";
+      if (v.includes("T")) return v;
+      const d = Date.parse(v.replace(" ", "T") + "Z");
+      return isFinite(d) ? new Date(d).toISOString() : "";
+    };
+
+    const tabSyncs: SourceFreshness[] = [
+      { key: "meta", label: TAB.meta, syncedAt: maxOf(metaRaw, "__synced_at") },
+      { key: "snap", label: TAB.snap, syncedAt: maxOf(snapRaw, "__synced_at") },
+      { key: "crm", label: TAB.crm, syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")) },
+      { key: "invoiced", label: TAB.invoiced, syncedAt: asIso(maxOf(invRaw, "__odoo_write_date")) },
+      { key: "sales", label: TAB.sales, syncedAt: asIso(maxOf(salesRaw, "__odoo_write_date")) },
+      { key: "lost", label: TAB.lost, syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")) },
+    ].filter((s) => !!s.syncedAt);
+
+    // The headline stays the freshest source, but `sources` carries the detail so
+    // a single lagging tab can be named instead of condemning everything.
     let syncedAt = "";
-    for (const a of ads) if (a.syncedAt && a.syncedAt > syncedAt) syncedAt = a.syncedAt;
+    for (const s of tabSyncs) if (s.syncedAt > syncedAt) syncedAt = s.syncedAt;
+    let oldestSyncedAt = "";
+    for (const s of tabSyncs) if (!oldestSyncedAt || s.syncedAt < oldestSyncedAt) oldestSyncedAt = s.syncedAt;
 
     /* -- health ------------------------------------------------------------- */
     const adCampaignKeys = new Set(ads.map((a) => a.campaignKey).filter(Boolean));
@@ -758,6 +809,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       campaigns,
       sourceLabels,
       syncedAt,
+      oldestSyncedAt,
+      tabSyncs,
       adsDateMin: adsRange.min,
       adsDateMax: adsRange.max,
       crmDateMin: crmRange.min,
