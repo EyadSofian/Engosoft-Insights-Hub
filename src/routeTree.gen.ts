@@ -34,6 +34,7 @@ import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
+import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -161,6 +162,11 @@ const ApiTelegramSendDailyRoute = ApiTelegramSendDailyRouteImport.update({
   path: '/api/telegram/send-daily',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelegramSetupRoute = ApiTelegramSetupRouteImport.update({
+  id: '/api/telegram/setup',
+  path: '/api/telegram/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
   id: '/api/telegram/webhook',
   path: '/api/telegram/webhook',
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -280,6 +289,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
+    | '/api/telegram/setup'
     | '/api/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
+    | '/api/telegram/setup'
     | '/api/telegram/webhook'
   id:
     | '__root__'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
+    | '/api/telegram/setup'
     | '/api/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -365,6 +377,7 @@ export interface RootRouteChildren {
   ApiYoyRoute: typeof ApiYoyRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
+  ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
 }
 
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramSendDailyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/telegram/setup': {
+      id: '/api/telegram/setup'
+      path: '/api/telegram/setup'
+      fullPath: '/api/telegram/setup'
+      preLoaderRoute: typeof ApiTelegramSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram/webhook': {
       id: '/api/telegram/webhook'
       path: '/api/telegram/webhook'
@@ -581,6 +601,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiYoyRoute: ApiYoyRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
+  ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport

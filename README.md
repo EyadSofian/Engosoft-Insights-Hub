@@ -180,6 +180,8 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `GET /api/telegram/preview` | The exact report text, without sending |
 | `POST /api/telegram/send-daily` | Broadcasts to every subscriber (`?days=7` for weekly) |
 | `POST /api/telegram/webhook` | Handles `/start`, `/stop`, `/report`, `/week`, `/status` |
+| `GET /api/telegram/setup` | Whether the webhook is registered, subscriber count, schedule state |
+| `POST /api/telegram/setup` | Points Telegram at this deployment. Required once before the bot works |
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 
@@ -212,11 +214,18 @@ included as a fallback.
 | `/status` | Whether you're subscribed, and the subscriber count |
 | `/stop` | Unsubscribe |
 
-Register the webhook so the commands reach the app:
+**The webhook must be registered once, or nothing works.** Until it is, Telegram
+has nowhere to deliver messages: `/start` reaches nothing, the sender is
+never subscribed, and no error appears anywhere. Register it by calling the app
+itself, which derives its own URL from the request:
 
+```bash
+curl -X POST https://<your-app>/api/telegram/setup
 ```
-https://api.telegram.org/bot<TOKEN>/setWebhook?url=<APP_URL>/api/telegram/webhook
-```
+
+`GET /api/telegram/setup` reports whether the webhook is registered, how many
+subscribers exist and whether the schedule is armed — the first place to look
+when the bot seems silent.
 
 The webhook always answers 200, because Telegram retries any non-2xx response and
 a failing command would otherwise re-run in a loop.

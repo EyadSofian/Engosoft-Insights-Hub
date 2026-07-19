@@ -13,4 +13,13 @@ export const PLATFORM_GAPS: Record<Platform, string[]> = {
   snapchat: ["linkClicks", "ctrLink", "platformLeads"],
 };
 
-export const DASHBOARD_URL = "https://engosoft-insights-hub.up.railway.app";
+/**
+ * Public URL of this deployment, used for the link at the end of each report.
+ * Read from the environment because it is deployment-specific — a hardcoded
+ * guess shipped a dead link in every message. When unset the link is omitted
+ * rather than pointing somewhere that 404s.
+ */
+export function dashboardUrl(): string {
+  const raw = process.env.PUBLIC_APP_URL || process.env.DASHBOARD_URL || "";
+  return raw.trim().replace(/\/+$/, "");
+}

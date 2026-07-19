@@ -4,7 +4,7 @@
 // response body, or included in an error message.
 import { getFiltered, computeTotals, computePerf, bestCampaign, moneyLeak, div } from "./metrics.server";
 import { loadAllData } from "./sheet-cache.server";
-import { DASHBOARD_URL } from "./constants";
+import { dashboardUrl } from "./constants";
 import type { Maybe, PerfRow, Totals } from "./types";
 
 const API = "https://api.telegram.org";
@@ -188,7 +188,8 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
     L.push("");
   }
 
-  L.push(`[${esc("افتح لوحة التحليلات")}](${DASHBOARD_URL})`);
+  const url = dashboardUrl();
+  if (url) L.push(`[${esc("افتح لوحة التحليلات")}](${url})`);
 
   return L.join("\n");
 }
