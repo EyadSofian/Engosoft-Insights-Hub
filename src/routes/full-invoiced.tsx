@@ -1,168 +1,162 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { DollarSign, Receipt, Package, GraduationCap } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import {
-  BarList,
-  Card,
-  ErrorState,
-  KpiCard,
-  SectionTitle,
-  Segmented,
-  Skeleton,
-} from "@/components/ui-bits";
-import { DataTable, type Col } from "@/components/DataTable";
-import { DonutChart, HBarChart } from "@/components/charts";
-import { fmtDate, fmtNum, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
-import type { Grouped, InvoicedRow } from "@/lib/types";
+import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { BarList, Card, ErrorState, KpiCard, PageHeader, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { AdSetOriginBadge } from "@/components/metric-bits";
+import { DataTable, type Col } from "@/components/DataTable";
+import type { AdSetOrigin, DataHealth, Grouped, Totals } from "@/lib/types";
 
-export const Route = createFileRoute("/full-invoiced")({ component: FullInvoicedPage });
+export const Route = createFileRoute("/full-invoiced")({ component: FullInvoiced });
 
-interface Resp {
-  total: number;
-  count: number;
-  orders: number;
-  avgOrder: number;
-  byCourse: Grouped[];
-  byCategory: Grouped[];
-  byTeam: Grouped[];
-  byCampaign: Grouped[];
-  bySource: Grouped[];
-  rows: InvoicedRow[];
-  truncated: boolean;
-  missingDate: number;
+interface InvRow {
+  orderRef: string;
+  revenueDate: string;
+  invoiceDate: string;
+  customer: string;
+  product: string;
+  course: string;
+  campaign: string;
+  adName: string;
+  adset: string;
+  adsetOrigin: AdSetOrigin;
+  salesperson: string;
+  salesTeam: string;
+  source: string;
+  usdSales: number;
 }
 
-type GroupBy = "campaign" | "course" | "team";
+interface Resp {
+  totals: Totals;
+  byCampaign: Grouped[];
+  byCourse: Grouped[];
+  byTeam: Grouped[];
+  bySalesperson: Grouped[];
+  bySource: Grouped[];
+  byMonth: Grouped[];
+  attribution: {
+    withCampaign: { rows: number; revenue: number };
+    withoutCampaign: { rows: number; revenue: number };
+  };
+  detail: { rows: InvRow[]; total: number; truncated: boolean };
+  health: DataHealth;
+}
 
-function FullInvoicedPage() {
+function FullInvoiced() {
   const { t, lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/full-invoiced");
-  const [groupBy, setGroupBy] = useState<GroupBy>("campaign");
 
-  const cols: Col<InvoicedRow>[] = [
+  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+
+  const cols: Col<InvRow>[] = [
+    { key: "orderRef", header: t("order_ref"), sticky: true, width: "110px", sortValue: (r) => r.orderRef, render: (r) => r.orderRef || "—" },
+    { key: "revenueDate", header: t("date"), sortValue: (r) => r.revenueDate, render: (r) => fmtDate(r.revenueDate, lang) },
+    { key: "customer", header: t("customer"), sortValue: (r) => r.customer, render: (r) => <span className="truncate block max-w-[180px]" title={r.customer}>{r.customer || "—"}</span> },
+    { key: "product", header: t("product"), sortValue: (r) => r.product, render: (r) => <span className="truncate block max-w-[200px]" title={r.product}>{r.product || "—"}</span> },
+    { key: "course", header: t("course"), sortValue: (r) => r.course, render: (r) => r.course || "—" },
+    { key: "campaign", header: t("campaign"), sortValue: (r) => r.campaign, render: (r) => <span className="truncate block max-w-[170px]" title={r.campaign}>{r.campaign || <span className="text-text-subtle">—</span>}</span> },
     {
-      key: "orderRef",
-      header: t("order_ref"),
-      sticky: true,
-      width: "130px",
+      key: "adset",
+      header: t("ad_set"),
+      sortValue: (r) => r.adset,
       render: (r) => (
-        <span className="block truncate max-w-[130px]" title={r.orderRef}>
-          {r.orderRef || "—"}
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <span className="truncate max-w-[130px]" title={r.adset}>{r.adset || "—"}</span>
+          <AdSetOriginBadge origin={r.adsetOrigin} />
         </span>
       ),
-      sortValue: (r) => r.orderRef,
     },
+    { key: "salesperson", header: t("salesperson"), sortValue: (r) => r.salesperson, render: (r) => <span className="truncate block max-w-[150px]" title={r.salesperson}>{r.salesperson || "—"}</span> },
     {
-      key: "revenueDate",
-      header: t("date"),
-      render: (r) => <span className="num">{fmtDate(r.revenueDate, lang)}</span>,
-      sortValue: (r) => r.revenueDate,
+      key: "usdSales",
+      header: t("revenue"),
+      align: "right",
+      sortValue: (r) => r.usdSales,
+      // Negative lines are refunds and credit notes — real money, kept visible.
+      render: (r) => <span style={r.usdSales < 0 ? { color: "var(--danger)" } : undefined}>{fmtUSDFull(r.usdSales)}</span>,
     },
-    { key: "customer", header: t("customer"), render: (r) => <span className="block truncate max-w-[160px]" title={r.customer}>{r.customer || "—"}</span>, sortValue: (r) => r.customer },
-    { key: "product", header: t("product"), render: (r) => <span className="block truncate max-w-[180px]" title={r.product}>{r.product || "—"}</span>, sortValue: (r) => r.product },
-    { key: "campaignName", header: t("campaign"), render: (r) => <span className="block truncate max-w-[160px] text-text-muted" title={r.campaignName}>{r.campaignName || "—"}</span>, sortValue: (r) => r.campaignName },
-    { key: "adName", header: t("ad_name"), render: (r) => <span className="block truncate max-w-[140px] text-text-muted" title={r.adName}>{r.adName || "—"}</span>, sortValue: (r) => r.adName },
-    { key: "course", header: t("course"), render: (r) => r.course || "—", sortValue: (r) => r.course },
-    { key: "mainCategory", header: t("main_category"), render: (r) => <span className="text-text-muted">{r.mainCategory || "—"}</span>, sortValue: (r) => r.mainCategory },
-    { key: "salesTeam", header: t("sales_team"), render: (r) => r.salesTeam || "—", sortValue: (r) => r.salesTeam },
-    { key: "source", header: t("source"), render: (r) => r.cleanedSource || r.source || "—", sortValue: (r) => r.cleanedSource || r.source },
-    { key: "localTotal", header: t("order_total"), align: "right", render: (r) => fmtNum(r.localTotal), sortValue: (r) => r.localTotal },
-    { key: "usdSales", header: t("revenue"), align: "right", render: (r) => fmtUSDFull(r.usdSales), sortValue: (r) => r.usdSales },
   ];
 
-  const grouped: Grouped[] =
-    groupBy === "campaign" ? (data?.byCampaign ?? [])
-    : groupBy === "course" ? (data?.byCourse ?? [])
-    : (data?.byTeam ?? []);
-
   return (
-    <AppShell title={t("full_invoiced")}>
-      {error ? (
-        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
-        <div className="space-y-4">
-          <Skeleton className="h-[104px]" />
-          <Skeleton className="h-[280px]" />
-          <Skeleton className="h-[400px]" />
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("full_invoiced")}
+        subtitle={
+          lang === "ar"
+            ? "تُنسب الإيرادات إلى عمود Date لأن Invoice Date فارغ في أغلب الصفوف."
+            : "Revenue is attributed to the Date column, because Invoice Date is blank on most rows."
+        }
+      />
+
+      {isLoading || !data ? (
+        <>
+          <Skeleton className="h-28" />
+          <Skeleton className="h-96" />
+        </>
       ) : (
-        <div className="space-y-4">
+        <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} hero label={t("revenue")} value={fmtUSD(data.total)} icon={<DollarSign size={14} />} />
-            <KpiCard index={1} label={t("orders")} value={fmtNum(data.orders)} sub={`${fmtNum(data.count)} ${t("rows")}`} icon={<Receipt size={14} />} />
-            <KpiCard index={2} label={t("avg_order")} value={fmtUSD(data.avgOrder)} icon={<Package size={14} />} />
-            <KpiCard
-              index={3}
-              label={t("course")}
-              value={data.byCourse[0]?.label ?? "—"}
-              sub={data.byCourse[0] ? fmtUSD(data.byCourse[0].value) : undefined}
-              icon={<GraduationCap size={14} />}
-            />
+            <KpiCard index={0} label={t("revenue")} value={fmtUSD(data.totals.revenue)} hero />
+            <KpiCard index={1} label={t("orders")} value={fmtNum(data.totals.orders)} />
+            <KpiCard index={2} label={t("aov")} value={fmtUSD(data.totals.avgOrder)} />
+            <KpiCard index={3} label={t("attributed_revenue")} value={fmtUSD(data.totals.attributedRevenue)} sub={t("attributed_note")} />
           </div>
 
           <Card>
             <SectionTitle
               hint={
                 lang === "ar"
-                  ? "إجمالي الإيراد مع عدد الأسطر في كل مجموعة."
-                  : "Revenue subtotals with the line count in each group."
-              }
-              action={
-                <Segmented
-                  value={groupBy}
-                  onChange={setGroupBy}
-                  options={[
-                    { value: "campaign", label: t("campaign") },
-                    { value: "course", label: t("course") },
-                    { value: "team", label: t("team") },
-                  ]}
-                />
+                  ? "الجزء غير المرتبط بحملة يظل معروضاً بدل حذفه، حتى لا يبدو الإيراد أصغر مما هو."
+                  : "The unattributed side stays visible rather than being dropped, so revenue never reads smaller than it is."
               }
             >
-              {t("by_campaign")}
+              {t("revenue_coverage")}
             </SectionTitle>
-            <BarList
-              items={grouped.slice(0, 12).map((g) => ({
-                label: g.label,
-                value: g.value,
-                meta: (
-                  <span className="flex items-center gap-2">
-                    <span className="num text-text-muted text-[11px]">
-                      {fmtNum(g.count)} {t("rows")}
-                    </span>
-                    <span className="num">{fmtUSD(g.value)}</span>
-                  </span>
-                ),
-              }))}
-              format={fmtUSD}
-              color="var(--chart-2)"
-            />
+            <div className="grid sm:grid-cols-2 gap-4">
+              {(
+                [
+                  { key: "with", label: t("from_campaigns"), v: data.attribution.withCampaign, tone: "var(--success)" },
+                  { key: "without", label: t("other_sources"), v: data.attribution.withoutCampaign, tone: "var(--text-subtle)" },
+                ] as const
+              ).map((b) => (
+                <div key={b.key} className="rounded-xl border border-border p-4">
+                  <div className="text-sm font-semibold mb-2">{b.label}</div>
+                  <div className="num text-2xl font-semibold" style={{ color: b.tone }}>
+                    {fmtUSD(b.v.revenue)}
+                  </div>
+                  <div className="text-[12px] text-text-muted mt-1">
+                    {fmtNum(b.v.rows)} {lang === "ar" ? "صف" : "rows"} ·{" "}
+                    {fmtPct(
+                      data.totals.revenue !== 0 ? (b.v.revenue / data.totals.revenue) * 100 : null,
+                      1,
+                    )}{" "}
+                    {lang === "ar" ? "من الإيراد" : "of revenue"}
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <SectionTitle>{t("by_category")}</SectionTitle>
-              <HBarChart data={data.byCategory.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))} />
-            </Card>
-            <Card>
-              <SectionTitle>{t("by_source")}</SectionTitle>
-              <DonutChart data={data.bySource.map((d) => ({ label: d.label, value: d.value }))} format={fmtUSD} />
-            </Card>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Money title={t("by_course")} rows={data.byCourse} />
+            <Money title={t("by_campaign")} rows={data.byCampaign} />
+            <Money title={t("by_salesperson")} rows={data.bySalesperson} />
+            <Money title={t("by_source")} rows={data.bySource} />
+            <Money title={t("by_month")} rows={data.byMonth} sorted />
+            <Money title={t("by_team")} rows={data.byTeam} />
           </div>
 
           <DataTable
-            rows={data.rows}
+            rows={data.detail.rows}
             cols={cols}
-            searchable={(r) => `${r.orderRef} ${r.customer} ${r.product} ${r.campaignName} ${r.course}`}
+            searchable={(r) => `${r.orderRef} ${r.customer} ${r.product} ${r.course} ${r.campaign} ${r.salesperson}`}
             initialSort={{ key: "revenueDate", dir: -1 }}
-            csvFilename="engosoft-full-invoiced"
+            csvFilename="engosoft-invoiced"
+            maxHeight={620}
             truncatedNote={
-              data.truncated
+              data.detail.truncated
                 ? lang === "ar"
-                  ? "معروض أول ٣٠٠٠ صف فقط. ضيّق الفترة لعرض تفاصيل أدق."
-                  : "Showing the first 3,000 rows. Narrow the period for full detail."
+                  ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف.`
+                  : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
                 : undefined
             }
             csvRow={(r) => ({
@@ -171,18 +165,42 @@ function FullInvoicedPage() {
               invoice_date: r.invoiceDate,
               customer: r.customer,
               product: r.product,
-              campaign: r.campaignName,
-              ad_name: r.adName,
               course: r.course,
-              main_category: r.mainCategory,
+              campaign: r.campaign,
+              ad_name: r.adName,
+              ad_set: r.adset,
+              ad_set_origin: r.adsetOrigin,
+              salesperson: r.salesperson,
               sales_team: r.salesTeam,
-              source: r.cleanedSource || r.source,
-              local_total: r.localTotal.toFixed(2),
+              source: r.source,
               usd_sales: r.usdSales.toFixed(2),
             })}
           />
-        </div>
+        </>
       )}
-    </AppShell>
+    </div>
+  );
+}
+
+function Money({ title, rows, sorted }: { title: string; rows: Grouped[]; sorted?: boolean }) {
+  const items = (sorted ? rows : [...rows].sort((a, b) => b.value - a.value)).slice(0, 8);
+  return (
+    <Card>
+      <SectionTitle>{title}</SectionTitle>
+      <BarList
+        items={items.map((g) => ({
+          label: g.label,
+          value: g.value,
+          meta: (
+            <span>
+              <span className="num">{fmtUSD(g.value)}</span>
+              <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
+            </span>
+          ),
+        }))}
+        format={fmtUSD}
+        color="var(--chart-2)"
+      />
+    </Card>
   );
 }

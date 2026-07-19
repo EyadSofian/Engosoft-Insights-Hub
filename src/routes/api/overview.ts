@@ -7,13 +7,17 @@ export const Route = createFileRoute("/api/overview")({
         const {
           getFiltered,
           computeTotals,
-          computeCampaigns,
+          computePerf,
           computeCourses,
+          computeFunnel,
+          computeLeadOrigin,
           bestCampaign,
           moneyLeak,
           bestCPL,
+          topLeaks,
           dailyTrend,
           previousPeriod,
+          isPreviousComparable,
           computeDeltas,
           execSummary,
         } = await import("@/lib/metrics.server");
@@ -22,58 +26,47 @@ export const Route = createFileRoute("/api/overview")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const totals = computeTotals(data);
-        const campaigns = computeCampaigns(data);
-        const trend = dailyTrend(data);
+        const campaigns = computePerf(data, "campaign");
 
-        // Previous equal-length window, for the WoW deltas on each KPI.
+        // Previous equal-length window, for the delta on each KPI card. Skipped
+        // entirely when that window predates the data — see isPreviousComparable.
         const prevRange = previousPeriod(filters.from, filters.to);
-        const prevData = prevRange
-          ? await getFiltered({ ...filters, ...prevRange })
-          : null;
-        const prevTotals = prevData ? computeTotals(prevData) : null;
-        const deltas = prevTotals ? computeDeltas(totals, prevTotals) : {};
-
-        const best = bestCampaign(campaigns);
-        const leak = moneyLeak(campaigns);
-        const cpl = bestCPL(campaigns);
-        const courses = computeCourses(data, prevData ?? undefined);
+        const prevComparable = await isPreviousComparable(prevRange);
+        const prevData = prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
+        const deltas = prevData ? computeDeltas(totals, computeTotals(prevData)) : {};
 
         const spending = campaigns.filter((c) => c.spend >= 50);
-        const topLeaks = [...spending].sort((a, b) => a.roas - b.roas).slice(0, 5);
+        const health = data.snapshot.health;
 
         return json({
           totals,
           deltas,
           prevRange,
-          trend,
-          best,
-          leak,
-          bestCPL: cpl,
-          topLeaks,
-          topByROAS: [...spending].sort((a, b) => b.roas - a.roas).slice(0, 6),
-          bottomByROAS: [...spending].sort((a, b) => a.roas - b.roas).slice(0, 6),
-          topCourses: courses.slice(0, 6),
-          summary: execSummary(totals, campaigns, deltas, filters),
+          prevComparable,
+          trend: dailyTrend(data),
+          funnel: computeFunnel(totals),
+          origin: computeLeadOrigin(data),
+          best: bestCampaign(campaigns),
+          leak: moneyLeak(campaigns),
+          bestCPL: bestCPL(campaigns),
+          topLeaks: topLeaks(campaigns, 5),
+          topByROAS: [...spending].sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0)).slice(0, 6),
+          topSpend: [...campaigns].sort((a, b) => b.spend - a.spend).slice(0, 6),
+          topCourses: computeCourses(data, prevData ?? undefined).slice(0, 6),
+          accounts: data.snapshot.accounts,
+          summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,
-          metaDateMin: data.metaDateMin,
-          metaDateMax: data.metaDateMax,
-          revenueDateMin: data.revenueDateMin,
-          revenueDateMax: data.revenueDateMax,
-          syncedAt: data.syncedAt,
-          matchRate: data.matchRate,
-          unmatchedCampaigns: data.unmatchedCampaigns.length,
-          unmatchedRevenueCampaigns: data.unmatchedRevenueCampaigns.length,
-          dateMismatch: data.dateMismatch,
-          dataQuality: data.dataQuality,
-          fetchErrors: data.fetchErrors,
-          funnel: {
-            impressions: totals.impressions,
-            clicks: totals.clicksAll,
-            metaLeads: totals.metaLeads,
-            crmLeads: totals.crmLeads,
-            won: totals.won,
-            revenue: totals.revenue,
+          coverage: {
+            adsDateMin: data.snapshot.adsDateMin,
+            adsDateMax: data.snapshot.adsDateMax,
+            crmDateMin: data.snapshot.crmDateMin,
+            crmDateMax: data.snapshot.crmDateMax,
+            revenueDateMin: data.snapshot.revenueDateMin,
+            revenueDateMax: data.snapshot.revenueDateMax,
           },
+          syncedAt: data.snapshot.syncedAt,
+          health,
+          fetchErrors: data.snapshot.fetchErrors,
         });
       },
     },

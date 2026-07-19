@@ -1,142 +1,152 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DollarSign, Receipt, Package, CalendarDays } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { Card, ErrorState, KpiCard, SectionTitle, Skeleton } from "@/components/ui-bits";
-import { DataTable, type Col } from "@/components/DataTable";
-import { HBarChart, VBarChart, DonutChart } from "@/components/charts";
-import { fmtDate, fmtNum, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { Info } from "lucide-react";
 import { useApi } from "@/lib/use-api";
-import type { Grouped, SalesRow } from "@/lib/types";
+import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { BarList, Card, ErrorState, KpiCard, Notice, PageHeader, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DataTable, type Col } from "@/components/DataTable";
+import { SpendRevenueChart } from "@/components/charts";
+import type { DataHealth, Grouped, Totals } from "@/lib/types";
 
-export const Route = createFileRoute("/sales")({ component: SalesPage });
+export const Route = createFileRoute("/sales")({ component: Sales });
+
+interface SaleRow {
+  paymentDate: string;
+  invoiceDate: string;
+  orderRef: string;
+  partner: string;
+  course: string;
+  category: string;
+  salesperson: string;
+  teamLeader: string;
+  salesTeam: string;
+  eventStage: string;
+  usdSales: number;
+}
 
 interface Resp {
-  total: number;
-  count: number;
-  avgOrder: number;
+  totals: Totals;
+  salesTotal: number;
+  salesRows: number;
+  salesOrders: number;
+  invoicedTotal: number;
   byCourse: Grouped[];
   byCategory: Grouped[];
   byTeam: Grouped[];
+  byTeamLeader: Grouped[];
   bySalesperson: Grouped[];
   byMonth: Grouped[];
-  rows: SalesRow[];
-  truncated: boolean;
+  byDay: { date: string; revenue: number }[];
+  detail: { rows: SaleRow[]; total: number; truncated: boolean };
+  health: DataHealth;
 }
 
-function SalesPage() {
+function Sales() {
   const { t, lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/sales");
 
-  const cols: Col<SalesRow>[] = [
-    {
-      key: "paymentDate",
-      header: t("date"),
-      sticky: true,
-      width: "120px",
-      render: (r) => <span className="num">{fmtDate(r.paymentDate, lang)}</span>,
-      sortValue: (r) => r.paymentDate,
-    },
-    { key: "course", header: t("course"), render: (r) => r.course || "—", sortValue: (r) => r.course },
-    { key: "category", header: t("category"), render: (r) => <span className="text-text-muted">{r.category || "—"}</span>, sortValue: (r) => r.category },
-    { key: "partner", header: t("partner"), render: (r) => r.partner || "—", sortValue: (r) => r.partner },
-    { key: "salesperson", header: t("salesperson"), render: (r) => r.salesperson || "—", sortValue: (r) => r.salesperson },
-    { key: "salesTeam", header: t("sales_team"), render: (r) => <span className="text-text-muted">{r.salesTeam || "—"}</span>, sortValue: (r) => r.salesTeam },
-    { key: "usdSales", header: t("revenue"), align: "right", render: (r) => fmtUSDFull(r.usdSales), sortValue: (r) => r.usdSales },
+  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+
+  const cols: Col<SaleRow>[] = [
+    { key: "paymentDate", header: lang === "ar" ? "تاريخ الدفع" : "Payment date", sticky: true, width: "120px", sortValue: (r) => r.paymentDate, render: (r) => fmtDate(r.paymentDate, lang) },
+    { key: "orderRef", header: t("order_ref"), sortValue: (r) => r.orderRef, render: (r) => r.orderRef || "—" },
+    { key: "partner", header: t("partner"), sortValue: (r) => r.partner, render: (r) => <span className="truncate block max-w-[180px]" title={r.partner}>{r.partner || "—"}</span> },
+    { key: "course", header: t("course"), sortValue: (r) => r.course, render: (r) => r.course || "—" },
+    { key: "salesperson", header: t("salesperson"), sortValue: (r) => r.salesperson, render: (r) => <span className="truncate block max-w-[150px]" title={r.salesperson}>{r.salesperson || "—"}</span> },
+    { key: "salesTeam", header: t("sales_team"), sortValue: (r) => r.salesTeam, render: (r) => <span className="truncate block max-w-[160px]" title={r.salesTeam}>{r.salesTeam || "—"}</span> },
+    { key: "usdSales", header: t("revenue"), align: "right", sortValue: (r) => r.usdSales, render: (r) => fmtUSDFull(r.usdSales) },
   ];
 
-  const topMonth = data?.byMonth.length
-    ? [...data.byMonth].sort((a, b) => b.value - a.value)[0]
-    : null;
-
   return (
-    <AppShell title={t("sales")}>
-      {error ? (
-        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
-        <div className="space-y-4">
-          <Skeleton className="h-[104px]" />
-          <Skeleton className="h-[280px]" />
-          <Skeleton className="h-[400px]" />
-        </div>
+    <div className="space-y-5">
+      <PageHeader title={t("sales")} />
+
+      {isLoading || !data ? (
+        <>
+          <Skeleton className="h-28" />
+          <Skeleton className="h-96" />
+        </>
       ) : (
-        <div className="space-y-4">
+        <>
+          <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
+            {lang === "ar"
+              ? `تبويب «المبيعات» يسجّل بنود الدفع (${fmtUSD(data.salesTotal)} على ${fmtNum(data.salesRows)} صف) بينما تبويب الفواتير يسجّل بنود الطلب (${fmtUSD(data.invoicedTotal)}). الرقمان يصفان مالاً متقارباً لا متطابقاً، ولذلك يُعرضان منفصلين.`
+              : `The Sales tab records payment lines (${fmtUSD(data.salesTotal)} across ${fmtNum(data.salesRows)} rows) while Full Invoiced records order lines (${fmtUSD(data.invoicedTotal)}). They describe overlapping-but-different money, so both are shown rather than blended.`}
+          </Notice>
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} hero label={t("revenue")} value={fmtUSD(data.total)} icon={<DollarSign size={14} />} />
-            <KpiCard index={1} label={t("orders")} value={fmtNum(data.count)} icon={<Receipt size={14} />} />
-            <KpiCard index={2} label={t("avg_order")} value={fmtUSD(data.avgOrder)} icon={<Package size={14} />} />
-            <KpiCard
-              index={3}
-              label={t("by_month")}
-              value={topMonth?.label ?? "—"}
-              sub={topMonth ? fmtUSD(topMonth.value) : undefined}
-              icon={<CalendarDays size={14} />}
-            />
+            <KpiCard index={0} label={t("revenue")} value={fmtUSD(data.salesTotal)} hero sub={lang === "ar" ? "من تبويب المبيعات" : "from the Sales tab"} />
+            <KpiCard index={1} label={t("orders")} value={fmtNum(data.salesOrders)} />
+            <KpiCard index={2} label={t("aov")} value={fmtUSD(data.salesOrders > 0 ? data.salesTotal / data.salesOrders : null)} />
+            <KpiCard index={3} label={t("full_invoiced")} value={fmtUSD(data.invoicedTotal)} sub={lang === "ar" ? "من تبويب الفواتير" : "from Full Invoiced"} />
           </div>
 
           <Card>
-            <SectionTitle
-              hint={lang === "ar" ? "الإيراد المُحصّل حسب تاريخ الدفع." : "Revenue collected, by payment date."}
-            >
-              {t("by_month")}
-            </SectionTitle>
-            <VBarChart
-              data={data.byMonth.map((m) => ({ label: m.label, value: m.value }))}
-              color="var(--chart-2)"
-            />
+            <SectionTitle>{t("by_day")}</SectionTitle>
+            <SpendRevenueChart data={data.byDay.map((d) => ({ date: d.date, spend: 0, revenue: d.revenue }))} />
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <SectionTitle>{t("by_course")}</SectionTitle>
-              <HBarChart data={data.byCourse.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))} />
-            </Card>
-            <Card>
-              <SectionTitle>{t("by_salesperson")}</SectionTitle>
-              <HBarChart
-                data={data.bySalesperson.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))}
-                color="var(--chart-4)"
-              />
-            </Card>
-            <Card>
-              <SectionTitle>{t("by_team")}</SectionTitle>
-              <DonutChart data={data.byTeam.map((d) => ({ label: d.label, value: d.value }))} format={fmtUSD} />
-            </Card>
-            <Card>
-              <SectionTitle>{t("by_category")}</SectionTitle>
-              <HBarChart
-                data={data.byCategory.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))}
-                color="var(--chart-3)"
-              />
-            </Card>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Money title={t("by_course")} rows={data.byCourse} />
+            <Money title={t("by_category")} rows={data.byCategory} />
+            <Money title={t("by_team")} rows={data.byTeam} />
+            <Money title={t("by_salesperson")} rows={data.bySalesperson} />
+            <Money title={lang === "ar" ? "حسب قائد الفريق" : "By team leader"} rows={data.byTeamLeader} />
+            <Money title={t("by_month")} rows={data.byMonth} sorted />
           </div>
 
           <DataTable
-            rows={data.rows}
+            rows={data.detail.rows}
             cols={cols}
-            searchable={(r) => `${r.course} ${r.salesperson} ${r.partner} ${r.salesTeam}`}
+            searchable={(r) => `${r.orderRef} ${r.partner} ${r.course} ${r.salesperson} ${r.salesTeam}`}
             initialSort={{ key: "paymentDate", dir: -1 }}
             csvFilename="engosoft-sales"
+            maxHeight={620}
             truncatedNote={
-              data.truncated
+              data.detail.truncated
                 ? lang === "ar"
-                  ? "معروض أول ٣٠٠٠ صف فقط. ضيّق الفترة لعرض تفاصيل أدق."
-                  : "Showing the first 3,000 rows. Narrow the period for full detail."
+                  ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف.`
+                  : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
                 : undefined
             }
             csvRow={(r) => ({
               payment_date: r.paymentDate,
               invoice_date: r.invoiceDate,
+              order_ref: r.orderRef,
+              partner: r.partner,
               course: r.course,
               category: r.category,
-              partner: r.partner,
               salesperson: r.salesperson,
               team_leader: r.teamLeader,
               sales_team: r.salesTeam,
+              event_stage: r.eventStage,
               usd_sales: r.usdSales.toFixed(2),
             })}
           />
-        </div>
+        </>
       )}
-    </AppShell>
+    </div>
+  );
+}
+
+function Money({ title, rows, sorted }: { title: string; rows: Grouped[]; sorted?: boolean }) {
+  const items = (sorted ? rows : [...rows].sort((a, b) => b.value - a.value)).slice(0, 8);
+  return (
+    <Card>
+      <SectionTitle>{title}</SectionTitle>
+      <BarList
+        items={items.map((g) => ({
+          label: g.label,
+          value: g.value,
+          meta: (
+            <span>
+              <span className="num">{fmtUSD(g.value)}</span>
+              <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
+            </span>
+          ),
+        }))}
+        format={fmtUSD}
+        color="var(--chart-2)"
+      />
+    </Card>
   );
 }

@@ -3,8 +3,23 @@ import type { DatePreset, GlobalFilters } from "./types";
 
 type Listener = () => void;
 
+/** Dimensions that count toward the "N filters active" badge. */
+const DIMENSIONS = [
+  "platform",
+  "account",
+  "campaign",
+  "adset",
+  "ad",
+  "source",
+  "course",
+  "mainCategory",
+  "salesTeam",
+  "salesperson",
+] as const;
+
 let state: GlobalFilters = {};
-let preset: DatePreset = "meta";
+/** Year to date. Ad spend now covers the whole year, so this is the honest default. */
+let preset: DatePreset = "year";
 const listeners = new Set<Listener>();
 
 const emit = () => {
@@ -16,6 +31,8 @@ const prune = () => {
     if (!state[k]) delete state[k];
   }
 };
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export const filterStore = {
   get: (): GlobalFilters => state,
@@ -31,18 +48,21 @@ export const filterStore = {
   setDates(from?: string, to?: string) {
     state = { ...state, from, to };
     delete state.range;
-    preset = "meta";
     prune();
     emit();
   },
 
-  setPreset(next: DatePreset, metaWindow?: { from: string; to: string }) {
+  /**
+   * `latest` is the newest date present in the sheet. Presets anchor to it
+   * rather than to the browser clock, so a stale sheet can't produce an empty
+   * "last 7 days" window.
+   */
+  setPreset(next: DatePreset, latest?: string) {
     preset = next;
-    const today = new Date();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const anchor = latest ? new Date(latest + "T00:00:00Z") : new Date();
     const back = (days: number) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - (days - 1));
+      const d = new Date(anchor);
+      d.setUTCDate(d.getUTCDate() - (days - 1));
       return iso(d);
     };
 
@@ -51,22 +71,20 @@ export const filterStore = {
         // Explicitly opt out of the server's default window.
         state = { ...state, from: undefined, to: undefined, range: "all" };
         break;
-      case "meta":
-        // Empty dates → server applies the Meta window itself.
-        state = { ...state, from: metaWindow?.from, to: metaWindow?.to, range: undefined };
-        break;
       case "7d":
-        state = { ...state, from: back(7), to: iso(today), range: undefined };
+        state = { ...state, from: back(7), to: iso(anchor), range: undefined };
         break;
       case "30d":
-        state = { ...state, from: back(30), to: iso(today), range: undefined };
-        break;
-      case "90d":
-        state = { ...state, from: back(90), to: iso(today), range: undefined };
+        state = { ...state, from: back(30), to: iso(anchor), range: undefined };
         break;
       case "month": {
-        const first = new Date(today.getFullYear(), today.getMonth(), 1);
-        state = { ...state, from: iso(first), to: iso(today), range: undefined };
+        const first = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+        state = { ...state, from: iso(first), to: iso(anchor), range: undefined };
+        break;
+      }
+      case "year": {
+        const first = new Date(Date.UTC(anchor.getUTCFullYear(), 0, 1));
+        state = { ...state, from: iso(first), to: iso(anchor), range: undefined };
         break;
       }
     }
@@ -74,17 +92,17 @@ export const filterStore = {
     emit();
   },
 
-  /** Clears dimension filters but keeps the chosen period. */
+  /** Clears dimension filters but keeps the chosen period and metric options. */
   resetDimensions() {
-    const { from, to, range } = state;
-    state = { from, to, range };
+    const { from, to, range, includeNonLead, cpaBasis } = state;
+    state = { from, to, range, includeNonLead, cpaBasis };
     prune();
     emit();
   },
 
   reset() {
     state = {};
-    preset = "meta";
+    preset = "year";
     emit();
   },
 
@@ -97,26 +115,15 @@ export const filterStore = {
 };
 
 export function useFilters(): GlobalFilters {
-  return useSyncExternalStore(
-    filterStore.subscribe,
-    filterStore.get,
-    filterStore.get,
-  );
+  return useSyncExternalStore(filterStore.subscribe, filterStore.get, filterStore.get);
 }
 
 export function usePreset(): DatePreset {
-  return useSyncExternalStore(
-    filterStore.subscribe,
-    filterStore.getPreset,
-    filterStore.getPreset,
-  );
+  return useSyncExternalStore(filterStore.subscribe, filterStore.getPreset, filterStore.getPreset);
 }
 
-/** Count of active dimension filters, for the mobile "Filters" badge. */
 export function activeDimensionCount(f: GlobalFilters): number {
-  return (["account", "campaign", "source", "mainCategory", "salesTeam"] as const).filter(
-    (k) => !!f[k],
-  ).length;
+  return DIMENSIONS.filter((k) => !!f[k]).length;
 }
 
 export function buildQuery(f: GlobalFilters): string {

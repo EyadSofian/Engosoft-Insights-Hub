@@ -2,6 +2,11 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { startScheduler } from "./lib/scheduler.server";
+
+// Registered once at module load. `startScheduler` is idempotent and returns
+// early unless both Telegram variables are present.
+startScheduler();
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;

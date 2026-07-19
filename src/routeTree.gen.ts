@@ -10,13 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdsRouteImport } from './routes/ads'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
-import { Route as MetaRouteImport } from './routes/meta'
 import { Route as SalesRouteImport } from './routes/sales'
+import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as YoyRouteImport } from './routes/yoy'
+import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
@@ -24,14 +27,23 @@ import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
-import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
+import { Route as ApiTeamsRouteImport } from './routes/api/teams'
+import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
+import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
+import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdsRoute = AdsRouteImport.update({
+  id: '/ads',
+  path: '/ads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CampaignsRoute = CampaignsRouteImport.update({
@@ -59,14 +71,24 @@ const LostRoute = LostRouteImport.update({
   path: '/lost',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MetaRoute = MetaRouteImport.update({
-  id: '/meta',
-  path: '/meta',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SalesRoute = SalesRouteImport.update({
   id: '/sales',
   path: '/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsRoute = TeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YoyRoute = YoyRouteImport.update({
+  id: '/yoy',
+  path: '/yoy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdsRoute = ApiAdsRouteImport.update({
+  id: '/api/ads',
+  path: '/api/ads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCampaignsRoute = ApiCampaignsRouteImport.update({
@@ -104,11 +126,6 @@ const ApiLostRoute = ApiLostRouteImport.update({
   path: '/api/lost',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMetaRoute = ApiMetaRouteImport.update({
-  id: '/api/meta',
-  path: '/api/meta',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiOverviewRoute = ApiOverviewRouteImport.update({
   id: '/api/overview',
   path: '/api/overview',
@@ -124,16 +141,44 @@ const ApiSalesRoute = ApiSalesRouteImport.update({
   path: '/api/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTeamsRoute = ApiTeamsRouteImport.update({
+  id: '/api/teams',
+  path: '/api/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiYoyRoute = ApiYoyRouteImport.update({
+  id: '/api/yoy',
+  path: '/api/yoy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramPreviewRoute = ApiTelegramPreviewRouteImport.update({
+  id: '/api/telegram/preview',
+  path: '/api/telegram/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramSendDailyRoute = ApiTelegramSendDailyRouteImport.update({
+  id: '/api/telegram/send-daily',
+  path: '/api/telegram/send-daily',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
+  id: '/api/telegram/webhook',
+  path: '/api/telegram/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
-  '/meta': typeof MetaRoute
   '/sales': typeof SalesRoute
+  '/teams': typeof TeamsRoute
+  '/yoy': typeof YoyRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -141,20 +186,27 @@ export interface FileRoutesByFullPath {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
-  '/api/meta': typeof ApiMetaRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/teams': typeof ApiTeamsRoute
+  '/api/yoy': typeof ApiYoyRoute
+  '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
-  '/meta': typeof MetaRoute
   '/sales': typeof SalesRoute
+  '/teams': typeof TeamsRoute
+  '/yoy': typeof YoyRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -162,21 +214,28 @@ export interface FileRoutesByTo {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
-  '/api/meta': typeof ApiMetaRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/teams': typeof ApiTeamsRoute
+  '/api/yoy': typeof ApiYoyRoute
+  '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
-  '/meta': typeof MetaRoute
   '/sales': typeof SalesRoute
+  '/teams': typeof TeamsRoute
+  '/yoy': typeof YoyRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -184,22 +243,29 @@ export interface FileRoutesById {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
-  '/api/meta': typeof ApiMetaRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/teams': typeof ApiTeamsRoute
+  '/api/yoy': typeof ApiYoyRoute
+  '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
+  '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ads'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/leads'
     | '/lost'
-    | '/meta'
     | '/sales'
+    | '/teams'
+    | '/yoy'
+    | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -207,20 +273,27 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/leads'
     | '/api/lost'
-    | '/api/meta'
     | '/api/overview'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/teams'
+    | '/api/yoy'
+    | '/api/telegram/preview'
+    | '/api/telegram/send-daily'
+    | '/api/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ads'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/leads'
     | '/lost'
-    | '/meta'
     | '/sales'
+    | '/teams'
+    | '/yoy'
+    | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -228,20 +301,27 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/leads'
     | '/api/lost'
-    | '/api/meta'
     | '/api/overview'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/teams'
+    | '/api/yoy'
+    | '/api/telegram/preview'
+    | '/api/telegram/send-daily'
+    | '/api/telegram/webhook'
   id:
     | '__root__'
     | '/'
+    | '/ads'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/leads'
     | '/lost'
-    | '/meta'
     | '/sales'
+    | '/teams'
+    | '/yoy'
+    | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -249,21 +329,28 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/leads'
     | '/api/lost'
-    | '/api/meta'
     | '/api/overview'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/teams'
+    | '/api/yoy'
+    | '/api/telegram/preview'
+    | '/api/telegram/send-daily'
+    | '/api/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdsRoute: typeof AdsRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
-  MetaRoute: typeof MetaRoute
   SalesRoute: typeof SalesRoute
+  TeamsRoute: typeof TeamsRoute
+  YoyRoute: typeof YoyRoute
+  ApiAdsRoute: typeof ApiAdsRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
@@ -271,10 +358,14 @@ export interface RootRouteChildren {
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
-  ApiMetaRoute: typeof ApiMetaRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
+  ApiTeamsRoute: typeof ApiTeamsRoute
+  ApiYoyRoute: typeof ApiYoyRoute
+  ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
+  ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
+  ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -284,6 +375,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ads': {
+      id: '/ads'
+      path: '/ads'
+      fullPath: '/ads'
+      preLoaderRoute: typeof AdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns': {
@@ -321,18 +419,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LostRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/meta': {
-      id: '/meta'
-      path: '/meta'
-      fullPath: '/meta'
-      preLoaderRoute: typeof MetaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sales': {
       id: '/sales'
       path: '/sales'
       fullPath: '/sales'
       preLoaderRoute: typeof SalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams': {
+      id: '/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/yoy': {
+      id: '/yoy'
+      path: '/yoy'
+      fullPath: '/yoy'
+      preLoaderRoute: typeof YoyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ads': {
+      id: '/api/ads'
+      path: '/api/ads'
+      fullPath: '/api/ads'
+      preLoaderRoute: typeof ApiAdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/campaigns': {
@@ -384,13 +496,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLostRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/meta': {
-      id: '/api/meta'
-      path: '/api/meta'
-      fullPath: '/api/meta'
-      preLoaderRoute: typeof ApiMetaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/overview': {
       id: '/api/overview'
       path: '/api/overview'
@@ -412,18 +517,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/teams': {
+      id: '/api/teams'
+      path: '/api/teams'
+      fullPath: '/api/teams'
+      preLoaderRoute: typeof ApiTeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/yoy': {
+      id: '/api/yoy'
+      path: '/api/yoy'
+      fullPath: '/api/yoy'
+      preLoaderRoute: typeof ApiYoyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram/preview': {
+      id: '/api/telegram/preview'
+      path: '/api/telegram/preview'
+      fullPath: '/api/telegram/preview'
+      preLoaderRoute: typeof ApiTelegramPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram/send-daily': {
+      id: '/api/telegram/send-daily'
+      path: '/api/telegram/send-daily'
+      fullPath: '/api/telegram/send-daily'
+      preLoaderRoute: typeof ApiTelegramSendDailyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram/webhook': {
+      id: '/api/telegram/webhook'
+      path: '/api/telegram/webhook'
+      fullPath: '/api/telegram/webhook'
+      preLoaderRoute: typeof ApiTelegramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdsRoute: AdsRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
-  MetaRoute: MetaRoute,
   SalesRoute: SalesRoute,
+  TeamsRoute: TeamsRoute,
+  YoyRoute: YoyRoute,
+  ApiAdsRoute: ApiAdsRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiCoursesRoute: ApiCoursesRoute,
@@ -431,10 +574,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
-  ApiMetaRoute: ApiMetaRoute,
   ApiOverviewRoute: ApiOverviewRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
+  ApiTeamsRoute: ApiTeamsRoute,
+  ApiYoyRoute: ApiYoyRoute,
+  ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
+  ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
+  ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

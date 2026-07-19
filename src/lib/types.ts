@@ -1,58 +1,117 @@
 // Shared types (client + server-safe)
 
+export type Platform = "meta" | "snapchat";
+
+/** Why an ad account spends. Traffic/unknown accounts poison efficiency metrics. */
+export type CampaignObjective = "leads" | "traffic" | "unknown";
+
+/** How an ad-set value was obtained for a CRM/invoice row. */
+export type AdSetOrigin =
+  /** Ad id matched an ad in the ads tabs — exact, one ad belongs to one ad set. */
+  | "exact"
+  /** Ad name matched a single ad set — safe. */
+  | "derived"
+  /** Ad name maps to several ad sets; the modal one was picked. Show a warning. */
+  | "ambiguous"
+  /** Row carries an ad but nothing in the ads tabs matches it. */
+  | "unknown"
+  /** Row carries no ad at all. */
+  | "none";
+
 export interface GlobalFilters {
   from?: string; // YYYY-MM-DD
   to?: string;
+  platform?: Platform;
   account?: string;
   campaign?: string;
+  adset?: string;
+  ad?: string;
   source?: string;
+  course?: string;
   mainCategory?: string;
   salesTeam?: string;
-  /** "all" opts out of the default Meta-window range. */
+  salesperson?: string;
+  /** "all" opts out of the default year-to-date range. */
   range?: "all";
+  /** Include traffic/unknown ad accounts in efficiency denominators. */
+  includeNonLead?: "1";
+  /** CPA denominator: won leads (default) or distinct invoices. */
+  cpaBasis?: "won" | "invoices";
 }
 
-export type DatePreset = "meta" | "7d" | "30d" | "90d" | "month" | "all";
+export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
 
-export interface MetaRow {
-  date: string; // ISO
+/* --- normalized rows ------------------------------------------------------ */
+
+/**
+ * One ad × day, from either platform. Snapchat genuinely has no link-click and
+ * no lead columns, so those are `null` — never `0`, or Snapchat would drag every
+ * blended average down toward zero.
+ */
+export interface AdRow {
+  platform: Platform;
+  date: string;
   account: string;
+  accountId: string;
+  objective: CampaignObjective;
   campaign: string;
   campaignId: string;
-  adsetName: string;
-  adName: string;
+  campaignKey: string;
+  adset: string;
+  adsetId: string;
+  ad: string;
+  adId: string;
   spend: number;
   impressions: number;
-  linkClicks: number;
   clicksAll: number;
-  metaLeads: number;
+  linkClicks: number | null;
+  platformLeads: number | null;
+  viewCompletions: number | null;
   syncedAt: string;
 }
 
 export interface CrmLeadRow {
+  id: string;
   createdAt: string;
+  closedAt: string;
+  /** Days from creation to close. Only meaningful when `closedAt` is set. */
+  daysToClose: number | null;
   campaignName: string;
   campaignId: string;
+  campaignKey: string;
   adName: string;
+  adId: string;
+  adset: string;
+  adsetOrigin: AdSetOrigin;
   contact: string;
   salesperson: string;
+  /** Parent team, e.g. "Operation Team". */
   salesTeam: string;
+  /** Sub-team, e.g. "Resale - Operation ( asmaa )". */
+  subTeam: string;
   stage: string;
   cleanedStage: string;
+  isWon: boolean;
+  isLost: boolean;
   source: string;
-  cleanedSource: string;
+  /** Case-normalized source key. `uchat` and `UChat` collapse to one. */
+  sourceKey: string;
   course: string;
   mainCategory: string;
   priority: string;
-  month: string;
-  orderTotal: number;
+  /** True when the lead carries a campaign name or id. */
+  fromCampaign: boolean;
 }
 
 export interface InvoicedRow {
   orderRef: string;
   campaignName: string;
   campaignId: string;
+  campaignKey: string;
   adName: string;
+  adId: string;
+  adset: string;
+  adsetOrigin: AdSetOrigin;
   product: string;
   customer: string;
   course: string;
@@ -60,16 +119,15 @@ export interface InvoicedRow {
   salesTeam: string;
   salesperson: string;
   source: string;
-  cleanedSource: string;
-  /** Displayed invoice date. Only ~7% of rows have this populated in the sheet. */
+  sourceKey: string;
+  /** Displayed invoice date — populated on only ~8% of rows in the sheet. */
   invoiceDate: string;
   /**
-   * The date this revenue is attributed to for all filtering/trending.
-   * Sourced from the sheet's `Date` column (100% populated) and falls back to
-   * `Invoice Date`. Using `Invoice Date` alone drops ~93% of revenue.
+   * The date this revenue is attributed to for all filtering and trending.
+   * Sourced from the `Date` column (100% populated). Using `Invoice Date` alone
+   * drops ~92% of revenue.
    */
   revenueDate: string;
-  month: string;
   localTotal: number;
   usdSales: number;
 }
@@ -77,6 +135,7 @@ export interface InvoicedRow {
 export interface SalesRow {
   paymentDate: string;
   invoiceDate: string;
+  orderRef: string;
   course: string;
   category: string;
   partner: string;
@@ -89,64 +148,86 @@ export interface SalesRow {
   month: string;
 }
 
+/**
+ * A lead that carries a loss reason. This population is NOT the same as CRM rows
+ * with `Cleaned Stage = Lost` — the two exports share no odoo ids and differ in
+ * size (6,550 vs 4,276). Use this tab for reason analysis, CRM for lost rate.
+ */
 export interface LostRow {
+  id: string;
   campaignName: string;
+  campaignId: string;
+  campaignKey: string;
+  adName: string;
+  adId: string;
   lossReason: string;
   course: string;
   mainCategory: string;
   salesTeam: string;
-  cleanedSource: string;
-  month: string;
+  salesperson: string;
+  source: string;
+  sourceKey: string;
+  stage: string;
   createdAt: string;
 }
 
-export interface CampaignAgg {
-  campaign: string;
-  campaignId: string;
-  spend: number;
-  impressions: number;
-  clicksAll: number;
-  linkClicks: number;
-  ctrAll: number;
-  ctrLink: number;
-  cpm: number;
-  cpc: number;
-  metaLeads: number;
-  crmLeads: number;
-  won: number;
-  revenue: number;
-  cpl: number;
-  cac: number;
-  roas: number;
-  winRate: number;
-  topAd?: { name: string; spend: number };
-}
+/* --- aggregates ----------------------------------------------------------- */
 
-/* --- aggregate shapes shared by the server compute layer and the UI ------ */
+/** A metric that can legitimately be "not measurable" renders `null`, never 0. */
+export type Maybe = number | null;
 
 export interface Totals {
+  /* spend side */
   spend: number;
+  spendMeta: number;
+  spendSnap: number;
+  /** Spend on traffic/unknown-objective accounts, excluded from efficiency. */
+  nonLeadSpend: number;
+  /** Spend actually used as the efficiency denominator. */
+  efficiencySpend: number;
   impressions: number;
   clicksAll: number;
-  linkClicks: number;
-  ctrAll: number;
-  ctrLink: number;
-  cpm: number;
-  cpc: number;
-  metaLeads: number;
+  linkClicks: Maybe;
+  ctrAll: Maybe;
+  ctrLink: Maybe;
+  cpm: Maybe;
+  cpc: Maybe;
+  /** Leads the ad platform reported. Meta only — Snapchat reports none. */
+  platformLeads: Maybe;
+
+  /* CRM side */
   crmLeads: number;
+  leadsFromCampaign: number;
+  leadsOther: number;
   won: number;
-  winRate: number;
+  lost: number;
+  conversionRate: Maybe;
+  lostRate: Maybe;
+  avgCloseDays: Maybe;
+  /** Number of leads the close-time average is computed over. */
+  closeSample: number;
+
+  /* money */
   revenue: number;
-  /** Revenue that maps to a Meta campaign — the only revenue ROAS can claim. */
+  /** Revenue traceable to a campaign present in the ads tabs. */
   attributedRevenue: number;
-  cpl: number;
-  cac: number;
-  roas: number;
-  /** ROAS computed on attributed revenue only. The honest number. */
-  attributedRoas: number;
   orders: number;
-  avgOrder: number;
+  avgOrder: Maybe;
+  revenuePerLead: Maybe;
+
+  /* efficiency */
+  cpl: Maybe;
+  /** Spend ÷ platform-reported leads. Distinct from the business CPL. */
+  platformCpl: Maybe;
+  /** Spend ÷ leads that actually carry a campaign. The honest paid CPL. */
+  attributedCpl: Maybe;
+  cpa: Maybe;
+  cpaWon: Maybe;
+  cpaInvoices: Maybe;
+  roas: Maybe;
+  attributedRoas: Maybe;
+  acos: Maybe;
+  attributedAcos: Maybe;
 }
 
 export type Deltas = Partial<Record<keyof Totals, number>>;
@@ -156,45 +237,170 @@ export interface ExecSummary {
   en: string;
 }
 
-export interface CourseAgg {
+/** One row of the campaign / ad-set / ad table. Same shape at all three grains. */
+export interface PerfRow {
+  key: string;
+  name: string;
+  platforms: Platform[];
   course: string;
-  mainCategory: string;
-  revenue: number;
-  prevRevenue: number;
-  revenueDelta: number;
-  orders: number;
-  avgOrder: number;
-  leads: number;
+  courseInferred: boolean;
+  /** Set on ad-set rows whose value came from a backfill. */
+  adsetOrigin?: AdSetOrigin;
+  objective: CampaignObjective;
+  spend: number;
+  impressions: number;
+  clicksAll: number;
+  linkClicks: Maybe;
+  ctrAll: Maybe;
+  ctrLink: Maybe;
+  cpm: Maybe;
+  cpc: Maybe;
+  platformLeads: Maybe;
+  crmLeads: number;
   won: number;
-  winRate: number;
-  spend: number;
-  roas: number;
-  cpl: number;
+  lost: number;
+  conversionRate: Maybe;
+  lostRate: Maybe;
+  revenue: number;
+  revenuePerLead: Maybe;
+  cpl: Maybe;
+  cpa: Maybe;
+  roas: Maybe;
+  acos: Maybe;
+  avgCloseDays: Maybe;
+  closeSample: number;
+  /** First and last day this row actually has spend data for. */
+  spendDateMin: string;
+  spendDateMax: string;
+  /**
+   * True when a material share of this row's revenue falls outside the days its
+   * spend data covers. Snapchat, for example, only exports the last few days,
+   * so a campaign that has run since January shows 5 days of cost against 7
+   * months of revenue — an ROAS that looks spectacular and means nothing.
+   * Rows flagged here are excluded from the best/worst spotlights.
+   */
+  partialSpend: boolean;
+  /** Share of this row's revenue that falls inside its spend window, 0–1. */
+  spendCoverage: Maybe;
 }
 
-export interface AdAgg {
-  ad: string;
-  spend: number;
-  impressions: number;
-  clicksAll: number;
-  ctrAll: number;
-  metaLeads: number;
-  cpl: number;
+export interface CourseAgg extends PerfRow {
+  mainCategory: string;
+  orders: number;
+  avgOrder: Maybe;
+  prevRevenue: number;
+  revenueDelta: Maybe;
 }
 
-export interface AdSetAgg {
-  adset: string;
-  spend: number;
-  impressions: number;
-  clicksAll: number;
-  ctrAll: number;
-  metaLeads: number;
-  cpl: number;
-  ads: AdAgg[];
+export interface TeamAgg {
+  key: string;
+  name: string;
+  parent?: string;
+  crmLeads: number;
+  won: number;
+  lost: number;
+  conversionRate: Maybe;
+  lostRate: Maybe;
+  revenue: number;
+  orders: number;
+  avgOrder: Maybe;
+  revenuePerLead: Maybe;
+  avgCloseDays: Maybe;
+  closeSample: number;
+  people?: TeamAgg[];
 }
 
 export interface Grouped {
   label: string;
   value: number;
   count: number;
+  /** Share of the grand total, 0–100. */
+  share: number;
+}
+
+export interface LostBreakdown {
+  byReason: Grouped[];
+  byCourse: Grouped[];
+  byMonth: Grouped[];
+  byTeam: Grouped[];
+  bySalesperson: Grouped[];
+  bySource: Grouped[];
+  byCampaign: Grouped[];
+  /** reason × team and reason × course, values are counts. */
+  reasonByTeam: Matrix;
+  reasonByCourse: Matrix;
+  total: number;
+  /** CRM rows at stage Lost — a different population from the Lost tab. */
+  crmLostCount: number;
+}
+
+export interface Matrix {
+  rows: string[];
+  cols: string[];
+  /** cells[rowIndex][colIndex] */
+  cells: number[][];
+  rowTotals: number[];
+  colTotals: number[];
+  total: number;
+}
+
+export interface FunnelStep {
+  key: string;
+  value: Maybe;
+  /** Explains why a step can exceed the one above it. */
+  note?: string;
+}
+
+export interface DataHealth {
+  crmRows: number;
+  invoicedRows: number;
+  salesRows: number;
+  lostRows: number;
+  adRows: number;
+  /** Ad-set backfill. */
+  adsetExact: number;
+  adsetDerived: number;
+  adsetAmbiguous: number;
+  adsetUnknown: number;
+  adsetNoAd: number;
+  adsetResolutionRate: number;
+  /** Share of CRM rows carrying an ad name/id at all. */
+  crmAdCoverage: number;
+  invoicedAdCoverage: number;
+  /** Share of invoice lines and revenue that carry a campaign. */
+  revenueCampaignCoverage: number;
+  revenueCampaignShare: number;
+  attributedRevenueShare: number;
+  campaignMatchRate: number;
+  /** Leads whose source has no spend tab in the sheet (TikTok, UChat, …). */
+  leadsWithoutSpendSource: number;
+  unpricedSources: { label: string; count: number }[];
+  closeSample: number;
+  closeCoverage: number;
+  invoicedMissingDate: number;
+  crmMissingDate: number;
+  salesMissingDate: number;
+  negativeRevenueRows: number;
+  negativeRevenue: number;
+}
+
+export interface YoyPoint {
+  key: string;
+  current: number;
+  previous: number;
+  delta: number;
+  growth: Maybe;
+}
+
+export interface YoyResult {
+  available: boolean;
+  currentYear: number;
+  previousYear: number;
+  reason?: string;
+  spend: YoyPoint[];
+  revenue: YoyPoint[];
+  leads: YoyPoint[];
+  won: YoyPoint[];
+  byCourse: (YoyPoint & { metric: string })[];
+  ytd: { metric: string; current: number; previous: number; growth: Maybe }[];
 }

@@ -24,12 +24,14 @@ export const DICT = {
   // nav
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
-  meta_tech: { ar: "بيانات ميتا", en: "Meta / Technical" },
+  ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
   leads: { ar: "العملاء المحتملون", en: "Leads (CRM)" },
   full_invoiced: { ar: "الفواتير", en: "Full Invoiced" },
   lost: { ar: "تحليل الخسائر", en: "Lost Analysis" },
   courses: { ar: "الدورات", en: "Courses" },
+  teams: { ar: "فرق المبيعات", en: "Sales Teams" },
+  yoy: { ar: "مقارنة سنوية", en: "Year over year" },
   more: { ar: "المزيد", en: "More" },
   // Short forms for the mobile bar, where five labels share one row.
   overview_short: { ar: "الرئيسية", en: "Home" },
@@ -63,14 +65,18 @@ export const DICT = {
 
   // date presets
   date_range: { ar: "الفترة الزمنية", en: "Date range" },
-  preset_meta: { ar: "فترة بيانات ميتا", en: "Meta window" },
   preset_7: { ar: "آخر ٧ أيام", en: "Last 7 days" },
   preset_30: { ar: "آخر ٣٠ يوماً", en: "Last 30 days" },
-  preset_90: { ar: "آخر ٩٠ يوماً", en: "Last 90 days" },
   preset_month: { ar: "هذا الشهر", en: "This month" },
+  preset_year: { ar: "هذا العام", en: "This year" },
   preset_all: { ar: "كل الفترات", en: "All time" },
   from: { ar: "من", en: "From" },
   to: { ar: "إلى", en: "To" },
+
+  // platform
+  platform: { ar: "المنصة", en: "Platform" },
+  all_platforms: { ar: "كل المنصات", en: "All platforms" },
+  not_reported: { ar: "لا تُبلغ عنه المنصة", en: "Not reported by this platform" },
 
   // metrics
   spend: { ar: "الإنفاق", en: "Spend" },
@@ -81,19 +87,35 @@ export const DICT = {
   ctr_link: { ar: "نسبة نقر الرابط", en: "CTR (link)" },
   cpm: { ar: "تكلفة الألف ظهور", en: "CPM" },
   cpc: { ar: "تكلفة النقرة", en: "CPC" },
-  cpl: { ar: "تكلفة العميل", en: "CPL" },
-  cac: { ar: "تكلفة الاستحواذ", en: "CAC" },
+  cpl: { ar: "تكلفة العميل المحتمل", en: "CPL" },
+  platform_cpl: { ar: "تكلفة العميل حسب المنصة", en: "Platform CPL" },
+  attributed_cpl: { ar: "تكلفة العميل المدفوع", en: "Paid CPL" },
+  cpa: { ar: "تكلفة الصفقة", en: "CPA" },
+  cpa_basis: { ar: "أساس حساب تكلفة الصفقة", en: "CPA basis" },
+  cpa_won: { ar: "الصفقات المغلقة", en: "Won leads" },
+  cpa_invoices: { ar: "عدد الفواتير", en: "Invoices" },
+  acos: { ar: "نسبة الإنفاق للإيراد", en: "ACOS" },
   crm_leads: { ar: "عملاء محتملون", en: "CRM Leads" },
-  meta_leads: { ar: "عملاء من ميتا", en: "Meta Leads" },
+  platform_leads: { ar: "عملاء حسب المنصة", en: "Platform leads" },
   won: { ar: "صفقات مغلقة", en: "Won" },
-  win_rate: { ar: "نسبة الإغلاق", en: "Win rate" },
+  lost_count: { ar: "صفقات ضائعة", en: "Lost" },
+  conversion_rate: { ar: "نسبة الإغلاق", en: "Conversion rate" },
+  lost_rate: { ar: "نسبة الضياع", en: "Lost rate" },
+  avg_close_time: { ar: "متوسط زمن الإغلاق", en: "Avg close time" },
+  days: { ar: "يوم", en: "days" },
+  based_on: { ar: "محسوب على", en: "based on" },
+  closed_leads: { ar: "صفقة مغلقة", en: "closed leads" },
   revenue: { ar: "الإيراد", en: "Revenue" },
+  revenue_per_lead: { ar: "الإيراد لكل عميل", en: "Revenue per lead" },
   attributed_revenue: { ar: "إيراد مرتبط بالحملات", en: "Attributed revenue" },
   roas: { ar: "العائد على الإنفاق", en: "ROAS" },
   attributed_roas: { ar: "العائد الحقيقي", en: "Attributed ROAS" },
   orders: { ar: "الطلبات", en: "Orders" },
   avg_order: { ar: "متوسط الطلب", en: "Avg order" },
+  aov: { ar: "متوسط قيمة الطلب", en: "AOV" },
   vs_prev: { ar: "مقارنة بالفترة السابقة", en: "vs previous period" },
+  non_lead_spend: { ar: "إنفاق لا ينتج عملاء", en: "Non-lead spend" },
+  include_non_lead: { ar: "تضمين حسابات الزيارات", en: "Include traffic accounts" },
 
   // overview
   exec_summary: { ar: "الملخص التنفيذي", en: "Executive summary" },
@@ -162,24 +184,73 @@ export const DICT = {
   send: { ar: "إرسال", en: "Send" },
   new_chat: { ar: "محادثة جديدة", en: "New chat" },
 
+  // lead origin
+  lead_origin: { ar: "مصدر العملاء", en: "Lead origin" },
+  from_campaigns: { ar: "من حملات إعلانية", en: "From campaigns" },
+  other_sources: { ar: "من مصادر أخرى", en: "Other sources" },
+  origin_note: {
+    ar: "أداء الإعلانات المدفوعة لا يُقاس على الرقم المخلوط — العملاء بلا حملة يأتون من قنوات أخرى.",
+    en: "Paid performance must not be judged on the blended number — leads with no campaign came from elsewhere.",
+  },
+
+  // ad set
+  derived: { ar: "مُستنتج", en: "Derived" },
+  ambiguous: { ar: "غير مؤكد", en: "Ambiguous" },
+  unknown_adset: { ar: "مجموعة إعلانية غير معروفة", en: "Unknown ad set" },
+  adset_derived_note: {
+    ar: "اسم المجموعة الإعلانية فارغ في تصدير أودو، لذلك يُستنتج من معرّف الإعلان.",
+    en: "Ad Set Name is empty in the Odoo export, so it is backfilled from the ad id.",
+  },
+  adset_ambiguous_note: {
+    ar: "اسم هذا الإعلان يظهر تحت أكثر من مجموعة إعلانية، فالقيمة تقديرية.",
+    en: "This ad name appears under more than one ad set, so the value is a best guess.",
+  },
+  inferred_course: { ar: "دورة مُستنتجة", en: "Inferred course" },
+
   // data quality
   data_notes: { ar: "ملاحظات على البيانات", en: "Data notes" },
+  data_health: { ar: "صحة البيانات", en: "Data health" },
   match_rate: { ar: "نسبة مطابقة الحملات", en: "Campaign match rate" },
+  adset_resolution: { ar: "نسبة استنتاج المجموعات الإعلانية", en: "Ad-set resolution" },
+  revenue_coverage: { ar: "تغطية الحملات على الإيراد", en: "Revenue campaign coverage" },
+  coverage: { ar: "التغطية", en: "Coverage" },
   unmatched: { ar: "غير مطابق", en: "Unmatched" },
-  window_note_title: { ar: "الفترة موحّدة مع بيانات ميتا", en: "Range aligned to Meta data" },
-  window_note: {
-    ar: "بيانات الإنفاق متاحة فقط ضمن هذه الفترة، لذلك تُحسب النسب عليها حتى تبقى دقيقة.",
-    en: "Spend data only exists inside this window, so metrics are scoped to it to stay accurate.",
+  upstream_fix: { ar: "الإصلاح الحقيقي في المصدر", en: "The real fix is upstream" },
+  upstream_adset: {
+    ar: "املأ عمود Ad Set Name في تصدير أودو ليصبح ربط المجموعات الإعلانية دقيقاً بدل استنتاجه.",
+    en: "Populate Ad Set Name in the Odoo export so ad-set joins become exact instead of inferred.",
   },
-  mismatch_title: { ar: "تنبيه: الفترات غير متطابقة", en: "Heads up: ranges don't match" },
-  mismatch_body: {
-    ar: "الإيراد يغطي فترة أوسع من إنفاق ميتا، لذلك قد يظهر العائد على الإنفاق أعلى من الحقيقة.",
-    en: "Revenue covers a wider period than Meta spend, so ROAS may read higher than reality.",
+  no_spend_source: {
+    ar: "عملاء من مصادر بلا بيانات إنفاق",
+    en: "Leads from sources with no spend data",
+  },
+  no_spend_source_note: {
+    ar: "تيك توك ويوشات وواتساب والترشيحات تُنتج عملاء لكن لا يوجد لها إنفاق في الملف، لذلك تظهر تكلفة العميل الإجمالية أرخص من الحقيقة.",
+    en: "TikTok, UChat, WhatsApp and referrals produce leads but carry no spend in the sheet, so blended CPL reads cheaper than reality.",
   },
   attributed_note: {
     ar: "الجزء من الإيراد المرتبط فعلياً بحملة إعلانية.",
     en: "The share of revenue that traces back to an ad campaign.",
   },
+  lost_population_note: {
+    ar: "جدول الخسائر وتصنيف المرحلة «ضائع» في النظام مجموعتان مختلفتان من الصفوف، ولا تتطابق أعدادهما.",
+    en: "The Lost tab and CRM stage \"Lost\" are two different row populations; their counts do not match.",
+  },
+
+  // yoy
+  yoy_empty: {
+    ar: "لا توجد بيانات لعام سابق في الملف — أضف صفوف العام الماضي إلى تبويبات الإعلانات والمبيعات لتفعيل المقارنة.",
+    en: "No prior-year data in the sheet yet — backfill the ads and sales tabs with last year's rows to enable this comparison.",
+  },
+  growth: { ar: "النمو", en: "Growth" },
+  current_year: { ar: "العام الحالي", en: "Current year" },
+  previous_year: { ar: "العام السابق", en: "Previous year" },
+
+  // telegram
+  telegram: { ar: "تقرير تيليجرام", en: "Telegram report" },
+  send_now: { ar: "إرسال الآن", en: "Send now" },
+  preview: { ar: "معاينة", en: "Preview" },
+  sent: { ar: "تم الإرسال", en: "Sent" },
 } satisfies Record<string, Entry>;
 
 export type DictKey = keyof typeof DICT;

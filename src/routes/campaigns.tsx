@@ -1,177 +1,125 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { X, ChevronRight, Layers } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { Card, EmptyState, ErrorState, Pill, RoasPill, SectionTitle, Skeleton } from "@/components/ui-bits";
-import { DataTable, type Col } from "@/components/DataTable";
-import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { useState } from "react";
+import { Info } from "lucide-react";
 import { useApi } from "@/lib/use-api";
-import type { AdSetAgg, CampaignAgg } from "@/lib/types";
+import { filterStore, useFilters } from "@/lib/filter-store";
+import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { Card, ErrorState, Notice, PageHeader, Segmented, Skeleton } from "@/components/ui-bits";
+import { PerfTable } from "@/components/PerfTable";
+import { Metric } from "@/components/metric-bits";
+import type { DataHealth, PerfRow, Totals } from "@/lib/types";
 
-export const Route = createFileRoute("/campaigns")({ component: CampaignsPage });
+export const Route = createFileRoute("/campaigns")({ component: Campaigns });
+
+type Grain = "campaign" | "adset" | "ad";
 
 interface Resp {
-  campaigns: CampaignAgg[];
-  drilldown: Record<string, AdSetAgg[]>;
-  matchRate: number;
+  grain: Grain;
+  rows: PerfRow[];
+  totals: Totals;
+  unknownAdsetKey: string;
+  health: DataHealth;
 }
 
-const normalizeName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-
-function CampaignsPage() {
+function Campaigns() {
   const { t, lang } = useI18n();
-  const { data, isLoading, error, refetch } = useApi<Resp>("/api/campaigns");
-  const [selected, setSelected] = useState<CampaignAgg | null>(null);
+  const filters = useFilters();
+  const [grain, setGrain] = useState<Grain>("campaign");
+  const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
 
-  const cols: Col<CampaignAgg>[] = [
-    {
-      key: "campaign",
-      header: t("campaign"),
-      sticky: true,
-      width: "220px",
-      render: (r) => (
-        <span className="flex items-center gap-1.5 max-w-[220px]">
-          <span className="truncate" title={r.campaign}>
-            {r.campaign || "—"}
-          </span>
-          {r.spend > 0 && <ChevronRight size={13} className="text-text-subtle shrink-0 rtl:rotate-180" />}
-        </span>
-      ),
-      sortValue: (r) => r.campaign,
-    },
-    { key: "spend", header: t("spend"), align: "right", render: (r) => fmtUSD(r.spend), sortValue: (r) => r.spend },
-    { key: "impressions", header: t("impressions"), align: "right", render: (r) => fmtNum(r.impressions), sortValue: (r) => r.impressions },
-    { key: "ctr", header: t("ctr_all"), align: "right", render: (r) => fmtPct(r.ctrAll), sortValue: (r) => r.ctrAll },
-    { key: "metaLeads", header: t("meta_leads"), align: "right", render: (r) => fmtNum(r.metaLeads), sortValue: (r) => r.metaLeads },
-    { key: "crmLeads", header: t("crm_leads"), align: "right", render: (r) => fmtNum(r.crmLeads), sortValue: (r) => r.crmLeads },
-    { key: "won", header: t("won"), align: "right", render: (r) => fmtNum(r.won), sortValue: (r) => r.won },
-    { key: "revenue", header: t("revenue"), align: "right", render: (r) => fmtUSD(r.revenue), sortValue: (r) => r.revenue },
-    { key: "cpl", header: t("cpl"), align: "right", render: (r) => fmtUSD(r.cpl), sortValue: (r) => r.cpl },
-    {
-      key: "roas",
-      header: t("roas"),
-      align: "right",
-      render: (r) => (r.spend > 0 ? <RoasPill roas={r.roas} /> : <span className="text-text-subtle">—</span>),
-      sortValue: (r) => r.roas,
-    },
-  ];
+  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  const drill = selected ? data?.drilldown[normalizeName(selected.campaign)] ?? [] : [];
+  const unknownRow = data?.rows.find((r) => r.key === data.unknownAdsetKey);
 
   return (
-    <AppShell title={t("campaigns")}>
-      {error ? (
-        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
-        <Skeleton className="h-[460px]" />
-      ) : (
-        <div className="space-y-4">
-          <DataTable
-            rows={data.campaigns}
-            cols={cols}
-            searchable={(r) => r.campaign}
-            initialSort={{ key: "spend", dir: -1 }}
-            onRowClick={(r) => setSelected(r.spend > 0 ? r : null)}
-            csvFilename="engosoft-campaigns"
-            csvRow={(r) => ({
-              campaign: r.campaign,
-              spend: r.spend.toFixed(2),
-              impressions: r.impressions,
-              ctr_all: r.ctrAll.toFixed(2),
-              meta_leads: r.metaLeads,
-              crm_leads: r.crmLeads,
-              won: r.won,
-              revenue: r.revenue.toFixed(2),
-              cpl: r.cpl.toFixed(2),
-              roas: r.roas.toFixed(2),
-            })}
-            toolbar={
-              <span className="text-[11px] text-text-muted hidden sm:inline">
-                {lang === "ar" ? "اضغط على حملة لعرض التفاصيل" : "Click a campaign to drill down"}
-              </span>
-            }
-          />
+    <div className="space-y-5">
+      <PageHeader
+        title={t("campaigns")}
+        subtitle={
+          lang === "ar"
+            ? "جدول واحد بثلاثة مستويات: الحملة ← المجموعة الإعلانية ← الإعلان. اضغط صفاً للتعمق."
+            : "One table, three grains: campaign → ad set → ad. Click a row to drill down."
+        }
+      />
 
-          {selected && (
-            <Card className="animate-fade-up">
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "توزيع الإنفاق على المجموعات الإعلانية والإعلانات."
-                    : "How spend splits across ad sets and ads."
-                }
-                action={
-                  <button
-                    onClick={() => setSelected(null)}
-                    aria-label={t("close")}
-                    className="w-9 h-9 grid place-items-center rounded-lg hover:bg-surface-2 transition-colors cursor-pointer"
-                  >
-                    <X size={17} />
-                  </button>
-                }
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Layers size={16} className="text-brand" />
-                  {selected.campaign}
-                </span>
-              </SectionTitle>
+      <div className="flex flex-wrap items-center gap-3">
+        <Segmented
+          value={grain}
+          onChange={setGrain}
+          size="md"
+          options={[
+            { value: "campaign", label: t("campaign") },
+            { value: "adset", label: t("ad_set") },
+            { value: "ad", label: t("ad_name") },
+          ]}
+        />
+        {(filters.campaign || filters.adset || filters.ad) && (
+          <button
+            onClick={() => filterStore.set({ campaign: undefined, adset: undefined, ad: undefined })}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer"
+          >
+            {t("clear")}: {[filters.campaign, filters.adset, filters.ad].filter(Boolean).join(" › ")}
+          </button>
+        )}
+      </div>
 
-              {drill.length === 0 ? (
-                <EmptyState label={t("no_data")} compact />
-              ) : (
-                <div className="space-y-4">
-                  {drill.map((set, i) => (
-                    <div key={set.adset + i} className="stagger" style={{ "--i": i } as React.CSSProperties}>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className="text-[13px] font-semibold text-text truncate">{set.adset}</span>
-                        <Pill tone="brand">{fmtUSD(set.spend)}</Pill>
-                        <Pill>
-                          {t("ctr_all")} {fmtPct(set.ctrAll)}
-                        </Pill>
-                        <Pill>
-                          {fmtNum(set.metaLeads)} {t("meta_leads")}
-                        </Pill>
-                      </div>
-                      <div className="table-wrap rounded-lg border border-border">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-[11px] uppercase text-text-muted bg-surface-2">
-                              <th className="text-start font-semibold px-3 py-2">{t("ad_name")}</th>
-                              <th className="text-end font-semibold px-3 py-2">{t("spend")}</th>
-                              <th className="text-end font-semibold px-3 py-2">{t("impressions")}</th>
-                              <th className="text-end font-semibold px-3 py-2">{t("ctr_all")}</th>
-                              <th className="text-end font-semibold px-3 py-2">{t("meta_leads")}</th>
-                              <th className="text-end font-semibold px-3 py-2">{t("cpl")}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {set.ads.map((ad, j) => (
-                              <tr key={ad.ad + j} className="border-t border-border">
-                                <td className="px-3 py-2 max-w-[240px]">
-                                  <span className="block truncate" title={ad.ad}>
-                                    {ad.ad}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-end num">{fmtUSD(ad.spend)}</td>
-                                <td className="px-3 py-2 text-end num">{fmtNum(ad.impressions)}</td>
-                                <td className="px-3 py-2 text-end num">{fmtPct(ad.ctrAll)}</td>
-                                <td className="px-3 py-2 text-end num">{fmtNum(ad.metaLeads)}</td>
-                                <td className="px-3 py-2 text-end num">
-                                  {ad.metaLeads > 0 ? fmtUSD(ad.cpl) : "—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-        </div>
+      {grain === "adset" && (
+        <Notice tone="info" title={t("adset_derived_note")} icon={<Info size={16} />}>
+          {lang === "ar"
+            ? `تُستنتج المجموعة الإعلانية من معرّف الإعلان أولاً — وهو ربط دقيق — ثم من اسم الإعلان عند الحاجة. أسماء الإعلانات ليست فريدة، لذلك تُعلَّم القيم المستنتجة من الاسم بشارة «غير مؤكد». نسبة الاستنتاج الحالية ${data ? fmtPct(data.health.adsetResolutionRate * 100, 1) : "—"}.`
+            : `Ad set is resolved from the ad id first — an exact join — then from the ad name where needed. Ad names are not unique, so name-derived values carry an "ambiguous" badge. Current resolution rate: ${data ? fmtPct(data.health.adsetResolutionRate * 100, 1) : "—"}.`}
+        </Notice>
       )}
-    </AppShell>
+
+      {isLoading || !data ? (
+        <Skeleton className="h-[520px]" />
+      ) : (
+        <>
+          <Card>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+              <Metric label={t("spend")}>{fmtUSD(data.totals.spend)}</Metric>
+              <Metric label={t("revenue")}>{fmtUSD(data.totals.revenue)}</Metric>
+              <Metric label={t("crm_leads")}>{fmtNum(data.totals.crmLeads)}</Metric>
+              <Metric label={t("won")} hint={fmtPct(data.totals.conversionRate, 1)}>
+                {fmtNum(data.totals.won)}
+              </Metric>
+              <Metric label={t("lost_count")} hint={fmtPct(data.totals.lostRate, 1)}>
+                {fmtNum(data.totals.lost)}
+              </Metric>
+              <Metric label={lang === "ar" ? "عدد الصفوف" : "Rows"}>{fmtNum(data.rows.length)}</Metric>
+            </div>
+          </Card>
+
+          {unknownRow && (
+            <Notice tone="warning" title={t("unknown_adset")}>
+              {lang === "ar"
+                ? `${fmtNum(unknownRow.crmLeads)} عميلاً و${fmtUSD(unknownRow.revenue)} من الإيراد لم يُمكن ربطها بمجموعة إعلانية. تظهر كصف مستقل في الجدول بدل حذفها.`
+                : `${fmtNum(unknownRow.crmLeads)} leads and ${fmtUSD(unknownRow.revenue)} of revenue could not be tied to an ad set. They appear as their own row rather than being dropped.`}
+            </Notice>
+          )}
+
+          <PerfTable
+            rows={data.rows}
+            grain={grain}
+            unknownAdsetKey={data.unknownAdsetKey}
+            csvFilename={`engosoft-${grain}`}
+            onRowClick={(r) => {
+              // A click scopes the global filters and steps one grain deeper, so
+              // every other page re-scopes with it.
+              if (r.key === data.unknownAdsetKey) return;
+              if (grain === "campaign") {
+                filterStore.set({ campaign: r.name });
+                setGrain("adset");
+              } else if (grain === "adset") {
+                filterStore.set({ adset: r.name });
+                setGrain("ad");
+              } else {
+                filterStore.set({ ad: r.name });
+              }
+            }}
+          />
+        </>
+      )}
+    </div>
   );
 }

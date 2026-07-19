@@ -3,31 +3,43 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, SlidersHorizontal, Languages, X, Moon, Sun, Check } from "lucide-react";
 import { fmtDateTime, useI18n } from "@/lib/i18n";
 import { activeDimensionCount, filterStore, useFilters, usePreset } from "@/lib/filter-store";
-import type { DatePreset } from "@/lib/types";
+import type { CampaignObjective, DatePreset, DataHealth, Platform } from "@/lib/types";
+import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { Segmented } from "./ui-bits";
 
 export interface FiltersResp {
-  accounts: string[];
+  accounts: { name: string; platform: Platform; objective: CampaignObjective; spend: number; platformLeads: number | null }[];
+  accountNames: string[];
   campaigns: string[];
+  adsets: string[];
+  ads: string[];
   sources: string[];
   mainCategories: string[];
   salesTeams: string[];
+  salespeople: string[];
   courses: string[];
-  metaDateMin: string;
-  metaDateMax: string;
-  revenueDateMin: string;
-  revenueDateMax: string;
+  defaultRange: { from: string; to: string };
+  years: number[];
+  coverage: {
+    adsDateMin: string;
+    adsDateMax: string;
+    crmDateMin: string;
+    crmDateMax: string;
+    revenueDateMin: string;
+    revenueDateMax: string;
+  };
   syncedAt: string;
   fetchedAt: string;
-  matchRate: number;
+  health: DataHealth;
   fetchErrors: string[];
+  counts: { ads: number; crm: number; invoiced: number; sales: number; lost: number };
 }
 
-const PRESETS: { value: DatePreset; key: "preset_meta" | "preset_7" | "preset_30" | "preset_90" | "preset_month" | "preset_all" }[] = [
-  { value: "meta", key: "preset_meta" },
+const PRESETS: { value: DatePreset; key: "preset_7" | "preset_30" | "preset_month" | "preset_year" | "preset_all" }[] = [
   { value: "7d", key: "preset_7" },
   { value: "30d", key: "preset_30" },
   { value: "month", key: "preset_month" },
+  { value: "year", key: "preset_year" },
   { value: "all", key: "preset_all" },
 ];
 
@@ -43,6 +55,13 @@ export function useFiltersData() {
   });
 }
 
+/** Newest date present anywhere in the sheet — presets anchor to it, not to the clock. */
+function latestDate(data?: FiltersResp): string | undefined {
+  if (!data) return undefined;
+  const c = data.coverage;
+  return [c.adsDateMax, c.crmDateMax, c.revenueDateMax].filter(Boolean).sort().pop();
+}
+
 export function TopBar({ title }: { title: string }) {
   const { t, lang, setLang, theme, toggleTheme } = useI18n();
   const filters = useFilters();
@@ -53,6 +72,14 @@ export function TopBar({ title }: { title: string }) {
 
   const { data } = useFiltersData();
   const activeCount = activeDimensionCount(filters);
+  const latest = latestDate(data);
+
+  // The first payload tells us the sheet's real end date; re-anchor the default
+  // year-to-date window to it so the chip label and the query agree.
+  useEffect(() => {
+    if (!latest || filters.from || filters.to || filters.range) return;
+    filterStore.setPreset("year", latest);
+  }, [latest, filters.from, filters.to, filters.range]);
 
   const doRefresh = async () => {
     setRefreshing(true);
@@ -64,7 +91,6 @@ export function TopBar({ title }: { title: string }) {
     }
   };
 
-  // Data is pulled from the sheet; anything older than 2h is worth flagging.
   const syncedMs = data?.syncedAt ? Date.parse(data.syncedAt) : NaN;
   const stale = isFinite(syncedMs) && Date.now() - syncedMs > 2 * 3600_000;
 
@@ -124,17 +150,20 @@ export function TopBar({ title }: { title: string }) {
           </div>
         </div>
 
-        {/* Period chips stay visible on every screen — the most-used control. */}
+        {/* Period and platform stay visible on every screen — the most-used controls. */}
         <div className="px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none">
           <Segmented
             value={preset}
-            onChange={(v) =>
-              filterStore.setPreset(
-                v,
-                data ? { from: data.metaDateMin, to: data.metaDateMax } : undefined,
-              )
-            }
+            onChange={(v) => filterStore.setPreset(v, latest)}
             options={PRESETS.map((p) => ({ value: p.value, label: t(p.key) }))}
+          />
+          <Segmented
+            value={filters.platform ?? "all"}
+            onChange={(v) => filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })}
+            options={[
+              { value: "all", label: t("all_platforms") },
+              ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
+            ]}
           />
           {filters.from && filters.to && (
             <span className="text-[11px] text-text-muted num whitespace-nowrap ps-1">
@@ -167,19 +196,10 @@ function SyncBadge({ syncedAt, stale }: { syncedAt?: string; stale: boolean }) {
   );
 }
 
-function FilterSheet({
-  open,
-  onClose,
-  data,
-}: {
-  open: boolean;
-  onClose: () => void;
-  data?: FiltersResp;
-}) {
-  const { t } = useI18n();
+function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => void; data?: FiltersResp }) {
+  const { t, lang } = useI18n();
   const filters = useFilters();
 
-  // Escape closes, and the page must not scroll behind the sheet.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -242,7 +262,7 @@ function FilterSheet({
           <Select
             label={t("account")}
             value={filters.account}
-            options={data?.accounts ?? []}
+            options={data?.accountNames ?? []}
             onChange={(v) => filterStore.set({ account: v })}
           />
           <Select
@@ -250,6 +270,24 @@ function FilterSheet({
             value={filters.campaign}
             options={data?.campaigns ?? []}
             onChange={(v) => filterStore.set({ campaign: v })}
+          />
+          <Select
+            label={t("ad_set")}
+            value={filters.adset}
+            options={data?.adsets ?? []}
+            onChange={(v) => filterStore.set({ adset: v })}
+          />
+          <Select
+            label={t("ad_name")}
+            value={filters.ad}
+            options={data?.ads ?? []}
+            onChange={(v) => filterStore.set({ ad: v })}
+          />
+          <Select
+            label={t("course")}
+            value={filters.course}
+            options={data?.courses ?? []}
+            onChange={(v) => filterStore.set({ course: v })}
           />
           <Select
             label={t("source")}
@@ -269,6 +307,43 @@ function FilterSheet({
             options={data?.salesTeams ?? []}
             onChange={(v) => filterStore.set({ salesTeam: v })}
           />
+          <Select
+            label={t("salesperson")}
+            value={filters.salesperson}
+            options={data?.salespeople ?? []}
+            onChange={(v) => filterStore.set({ salesperson: v })}
+          />
+
+          <div className="border-t border-border pt-4 grid gap-3">
+            <Field label={t("cpa_basis")}>
+              <Segmented
+                value={filters.cpaBasis ?? "won"}
+                onChange={(v) => filterStore.set({ cpaBasis: v === "invoices" ? "invoices" : undefined })}
+                options={[
+                  { value: "won", label: t("cpa_won") },
+                  { value: "invoices", label: t("cpa_invoices") },
+                ]}
+                size="md"
+              />
+            </Field>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.includeNonLead === "1"}
+                onChange={(e) => filterStore.set({ includeNonLead: e.target.checked ? "1" : undefined })}
+                className="mt-1 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-sm">
+                <span className="block font-medium text-text">{t("include_non_lead")}</span>
+                <span className="block text-xs text-text-muted mt-0.5">
+                  {lang === "ar"
+                    ? "حسابات الزيارات تُنفق دون إنتاج عملاء، وهي مستبعدة من مؤشرات الكفاءة افتراضياً."
+                    : "Traffic accounts spend without producing leads and are excluded from efficiency metrics by default."}
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="flex gap-2 mt-6">

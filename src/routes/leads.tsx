@@ -1,171 +1,205 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Users, Target, Percent, Radio } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { Card, ErrorState, KpiCard, Pill, SectionTitle, Skeleton, BarList } from "@/components/ui-bits";
-import { DataTable, type Col } from "@/components/DataTable";
-import { DonutChart, HBarChart } from "@/components/charts";
-import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
-import type { CrmLeadRow, Grouped } from "@/lib/types";
+import { fmtDate, fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { BarList, Card, ErrorState, KpiCard, PageHeader, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { AdSetOriginBadge, CloseTime, CountPct } from "@/components/metric-bits";
+import { DataTable, type Col } from "@/components/DataTable";
+import type { AdSetOrigin, DataHealth, Grouped, Totals } from "@/lib/types";
 
-export const Route = createFileRoute("/leads")({ component: LeadsPage });
+export const Route = createFileRoute("/leads")({ component: Leads });
+
+interface LeadRow {
+  createdAt: string;
+  contact: string;
+  campaign: string;
+  adName: string;
+  adset: string;
+  adsetOrigin: AdSetOrigin;
+  course: string;
+  stage: string;
+  source: string;
+  salesperson: string;
+  salesTeam: string;
+  subTeam: string;
+  priority: string;
+  closedAt: string;
+  daysToClose: number | null;
+}
+
+interface OriginCohort {
+  key: "campaign" | "other";
+  leads: number;
+  won: number;
+  lost: number;
+  conversionRate: number | null;
+  lostRate: number | null;
+  revenue: number;
+  avgCloseDays: number | null;
+  closeSample: number;
+}
 
 interface Resp {
-  total: number;
-  won: number;
-  winRate: number;
+  totals: Totals;
+  origin: { cohorts: OriginCohort[]; otherBySource: Grouped[] };
   byStage: Grouped[];
   bySource: Grouped[];
   byCourse: Grouped[];
   byTeam: Grouped[];
+  bySubTeam: Grouped[];
   bySalesperson: Grouped[];
-  rows: CrmLeadRow[];
-  truncated: boolean;
+  byCampaign: Grouped[];
+  byPriority: Grouped[];
+  byMonth: Grouped[];
+  detail: { rows: LeadRow[]; total: number; truncated: boolean };
+  health: DataHealth;
 }
 
-const stageTone = (stage: string): "success" | "danger" | "warning" | "brand" | "neutral" => {
-  const s = stage.trim().toLowerCase();
-  if (s === "won") return "success";
-  if (s === "lost" || s === "wrong number") return "danger";
-  if (s === "interested" || s === "quotation") return "brand";
-  if (s === "new" || s === "save interest") return "warning";
-  return "neutral";
-};
-
-function LeadsPage() {
+function Leads() {
   const { t, lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/leads");
 
-  const cols: Col<CrmLeadRow>[] = [
+  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+
+  const cols: Col<LeadRow>[] = [
+    { key: "createdAt", header: t("created"), sticky: true, width: "120px", sortValue: (r) => r.createdAt, render: (r) => fmtDate(r.createdAt, lang) },
+    { key: "contact", header: t("contact"), sortValue: (r) => r.contact, render: (r) => <span className="truncate block max-w-[160px]" title={r.contact}>{r.contact || "—"}</span> },
+    { key: "stage", header: t("stage"), sortValue: (r) => r.stage, render: (r) => <Pill tone={r.stage === "Won" ? "success" : r.stage === "Lost" ? "danger" : "neutral"}>{r.stage || "—"}</Pill> },
+    { key: "course", header: t("course"), sortValue: (r) => r.course, render: (r) => r.course || "—" },
+    { key: "source", header: t("source"), sortValue: (r) => r.source, render: (r) => r.source || "—" },
+    { key: "campaign", header: t("campaign"), sortValue: (r) => r.campaign, render: (r) => <span className="truncate block max-w-[180px]" title={r.campaign}>{r.campaign || "—"}</span> },
     {
-      key: "createdAt",
-      header: t("created"),
-      sticky: true,
-      width: "120px",
-      render: (r) => <span className="num">{fmtDate(r.createdAt, lang)}</span>,
-      sortValue: (r) => r.createdAt,
+      key: "adset",
+      header: t("ad_set"),
+      sortValue: (r) => r.adset,
+      render: (r) => (
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <span className="truncate max-w-[140px]" title={r.adset}>{r.adset || "—"}</span>
+          <AdSetOriginBadge origin={r.adsetOrigin} />
+        </span>
+      ),
     },
-    { key: "contact", header: t("contact"), render: (r) => <span className="block truncate max-w-[160px]" title={r.contact}>{r.contact || "—"}</span>, sortValue: (r) => r.contact },
-    { key: "campaignName", header: t("campaign"), render: (r) => <span className="block truncate max-w-[160px] text-text-muted" title={r.campaignName}>{r.campaignName || "—"}</span>, sortValue: (r) => r.campaignName },
-    { key: "cleanedSource", header: t("source"), render: (r) => r.cleanedSource || r.source || "—", sortValue: (r) => r.cleanedSource || r.source },
-    { key: "course", header: t("course"), render: (r) => r.course || "—", sortValue: (r) => r.course },
-    { key: "mainCategory", header: t("main_category"), render: (r) => <span className="text-text-muted">{r.mainCategory || "—"}</span>, sortValue: (r) => r.mainCategory },
-    { key: "salesTeam", header: t("sales_team"), render: (r) => r.salesTeam || "—", sortValue: (r) => r.salesTeam },
-    { key: "salesperson", header: t("salesperson"), render: (r) => <span className="block truncate max-w-[140px]" title={r.salesperson}>{r.salesperson || "—"}</span>, sortValue: (r) => r.salesperson },
+    { key: "salesperson", header: t("salesperson"), sortValue: (r) => r.salesperson, render: (r) => <span className="truncate block max-w-[150px]" title={r.salesperson}>{r.salesperson || "—"}</span> },
+    { key: "salesTeam", header: t("sales_team"), sortValue: (r) => r.salesTeam, render: (r) => r.salesTeam || "—" },
     {
-      key: "cleanedStage",
-      header: t("stage"),
-      render: (r) => (r.cleanedStage ? <Pill tone={stageTone(r.cleanedStage)}>{r.cleanedStage}</Pill> : "—"),
-      sortValue: (r) => r.cleanedStage,
+      key: "daysToClose",
+      header: t("avg_close_time"),
+      align: "right",
+      sortValue: (r) => r.daysToClose ?? -1,
+      render: (r) => (r.daysToClose === null ? <span className="text-text-subtle">—</span> : `${r.daysToClose} ${t("days")}`),
     },
-    { key: "priority", header: t("priority"), render: (r) => r.priority || "—", sortValue: (r) => r.priority },
-    { key: "orderTotal", header: t("order_total"), align: "right", render: (r) => fmtNum(r.orderTotal), sortValue: (r) => r.orderTotal },
   ];
 
   return (
-    <AppShell title={t("leads")}>
-      {error ? (
-        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
-        <div className="space-y-4">
-          <Skeleton className="h-[104px]" />
-          <Skeleton className="h-[280px]" />
-          <Skeleton className="h-[400px]" />
-        </div>
+    <div className="space-y-5">
+      <PageHeader title={t("leads")} />
+
+      {isLoading || !data ? (
+        <>
+          <Skeleton className="h-28" />
+          <Skeleton className="h-96" />
+        </>
       ) : (
-        <div className="space-y-4">
+        <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("crm_leads")} value={fmtNum(data.total)} icon={<Users size={14} />} />
-            <KpiCard index={1} label={t("won")} value={fmtNum(data.won)} icon={<Target size={14} />} />
-            <KpiCard index={2} hero label={t("win_rate")} value={fmtPct(data.winRate, 1)} icon={<Percent size={14} />} />
-            <KpiCard index={3} label={t("by_source")} value={fmtNum(data.bySource.length)} icon={<Radio size={14} />} />
+            <KpiCard index={0} label={t("crm_leads")} value={fmtNum(data.totals.crmLeads)} />
+            <KpiCard index={1} label={t("won")} value={fmtNum(data.totals.won)} sub={fmtPct(data.totals.conversionRate, 1)} />
+            <KpiCard index={2} label={t("lost_count")} value={fmtNum(data.totals.lost)} sub={fmtPct(data.totals.lostRate, 1)} />
+            <KpiCard
+              index={3}
+              label={t("avg_close_time")}
+              value={data.totals.avgCloseDays === null ? "—" : data.totals.avgCloseDays.toFixed(1)}
+              sub={data.totals.closeSample ? `${t("based_on")} ${fmtNum(data.totals.closeSample)}` : undefined}
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "توزيع العملاء على مراحل الـ CRM."
-                    : "How leads distribute across CRM stages."
-                }
-              >
-                {t("by_stage")}
-              </SectionTitle>
-              <BarList
-                items={data.byStage.map((s) => ({
-                  label: s.label,
-                  value: s.value,
-                  meta: (
-                    <span className="flex items-center gap-2">
-                      <span className="num text-text-muted text-[11px]">
-                        {fmtPct((s.value / Math.max(data.total, 1)) * 100, 1)}
-                      </span>
-                      <span className="num">{fmtNum(s.value)}</span>
-                    </span>
-                  ),
-                }))}
-                format={fmtNum}
-              />
-            </Card>
+          <Card>
+            <SectionTitle hint={t("origin_note")}>{t("lead_origin")}</SectionTitle>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {data.origin.cohorts.map((c) => (
+                <div key={c.key} className="rounded-xl border border-border p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold">{c.key === "campaign" ? t("from_campaigns") : t("other_sources")}</span>
+                    <Pill tone={c.key === "campaign" ? "brand" : "neutral"}>{fmtNum(c.leads)}</Pill>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-y-2 text-[13px]">
+                    <dt className="text-text-muted">{t("won")}</dt>
+                    <dd className="text-end"><CountPct count={c.won} pct={c.conversionRate} /></dd>
+                    <dt className="text-text-muted">{t("lost_count")}</dt>
+                    <dd className="text-end"><CountPct count={c.lost} pct={c.lostRate} /></dd>
+                    <dt className="text-text-muted">{t("revenue")}</dt>
+                    <dd className="text-end num font-medium">{fmtUSD(c.revenue)}</dd>
+                    <dt className="text-text-muted">{t("avg_close_time")}</dt>
+                    <dd className="text-end text-[12px]"><CloseTime days={c.avgCloseDays} sample={c.closeSample} /></dd>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-            <Card>
-              <SectionTitle>{t("by_source")}</SectionTitle>
-              <DonutChart
-                data={data.bySource.map((d) => ({ label: d.label, value: d.value }))}
-                format={fmtNum}
-              />
-            </Card>
-
-            <Card>
-              <SectionTitle>{t("by_course")}</SectionTitle>
-              <HBarChart
-                data={data.byCourse.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))}
-                color="var(--chart-3)"
-                format={fmtNum}
-              />
-            </Card>
-
-            <Card>
-              <SectionTitle>{t("by_team")}</SectionTitle>
-              <HBarChart
-                data={data.byTeam.slice(0, 10).map((d) => ({ label: d.label, value: d.value }))}
-                color="var(--chart-4)"
-                format={fmtNum}
-              />
-            </Card>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Breakdown title={t("by_stage")} rows={data.byStage} />
+            <Breakdown title={t("by_source")} rows={data.bySource} />
+            <Breakdown title={t("by_course")} rows={data.byCourse} />
+            <Breakdown title={t("by_team")} rows={data.byTeam} />
+            <Breakdown title={t("by_salesperson")} rows={data.bySalesperson} />
+            <Breakdown title={t("by_campaign")} rows={data.byCampaign} />
           </div>
 
           <DataTable
-            rows={data.rows}
+            rows={data.detail.rows}
             cols={cols}
-            searchable={(r) => `${r.contact} ${r.campaignName} ${r.course} ${r.salesperson} ${r.cleanedStage}`}
+            searchable={(r) => `${r.contact} ${r.campaign} ${r.course} ${r.salesperson} ${r.source}`}
             initialSort={{ key: "createdAt", dir: -1 }}
             csvFilename="engosoft-leads"
+            maxHeight={620}
             truncatedNote={
-              data.truncated
+              data.detail.truncated
                 ? lang === "ar"
-                  ? "معروض أول ٣٠٠٠ صف فقط. ضيّق الفترة لعرض تفاصيل أدق."
-                  : "Showing the first 3,000 rows. Narrow the period for full detail."
+                  ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف. صدِّر CSV للحصول على الكل ضمن الحد.`
+                  : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
                 : undefined
             }
             csvRow={(r) => ({
               created: r.createdAt,
               contact: r.contact,
-              campaign: r.campaignName,
-              ad: r.adName,
-              source: r.cleanedSource || r.source,
+              stage: r.stage,
               course: r.course,
-              category: r.mainCategory,
-              sales_team: r.salesTeam,
+              source: r.source,
+              campaign: r.campaign,
+              ad_name: r.adName,
+              ad_set: r.adset,
+              ad_set_origin: r.adsetOrigin,
               salesperson: r.salesperson,
-              stage: r.cleanedStage,
+              sales_team: r.salesTeam,
+              sub_team: r.subTeam,
               priority: r.priority,
-              order_total: r.orderTotal,
+              closed_at: r.closedAt,
+              days_to_close: r.daysToClose ?? "",
             })}
           />
-        </div>
+        </>
       )}
-    </AppShell>
+    </div>
+  );
+}
+
+function Breakdown({ title, rows }: { title: string; rows: Grouped[] }) {
+  return (
+    <Card>
+      <SectionTitle>{title}</SectionTitle>
+      <BarList
+        items={rows.slice(0, 8).map((g) => ({
+          label: g.label,
+          value: g.count,
+          meta: (
+            <span>
+              <span className="num">{fmtNum(g.count)}</span>
+              <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
+            </span>
+          ),
+        }))}
+        format={fmtNum}
+      />
+    </Card>
   );
 }

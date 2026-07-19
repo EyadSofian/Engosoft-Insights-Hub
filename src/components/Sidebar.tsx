@@ -6,9 +6,11 @@ import {
   BarChart3,
   Receipt,
   Users,
+  UsersRound,
   FileText,
   TrendingDown,
   GraduationCap,
+  CalendarRange,
   MoreHorizontal,
   X,
   type LucideIcon,
@@ -25,14 +27,15 @@ interface NavItem {
   shortKey?: DictKey;
 }
 
-/** Grouped so eight destinations still scan as three ideas. */
+/** Grouped so ten destinations still scan as three ideas. */
 const GROUPS: { label: { ar: string; en: string }; items: NavItem[] }[] = [
   {
     label: { ar: "الأداء", en: "Performance" },
     items: [
       { to: "/", key: "overview", icon: LayoutDashboard, exact: true },
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
-      { to: "/meta", key: "meta_tech", icon: BarChart3 },
+      { to: "/ads", key: "ads_tech", icon: BarChart3 },
+      { to: "/yoy", key: "yoy", icon: CalendarRange },
     ],
   },
   {
@@ -49,6 +52,7 @@ const GROUPS: { label: { ar: string; en: string }; items: NavItem[] }[] = [
     label: { ar: "العملاء", en: "Pipeline" },
     items: [
       { to: "/leads", key: "leads", icon: Users },
+      { to: "/teams", key: "teams", icon: UsersRound },
       { to: "/lost", key: "lost", icon: TrendingDown },
     ],
   },

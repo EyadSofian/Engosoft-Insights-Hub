@@ -1,32 +1,54 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const ROW_CAP = 3000;
-
 export const Route = createFileRoute("/api/leads")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, groupSum } = await import("@/lib/metrics.server");
-        const { parseFilters, json } = await import("@/lib/api.server");
+        const { getFiltered, computeTotals, computeLeadOrigin, groupBy } = await import(
+          "@/lib/metrics.server"
+        );
+        const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
-        const rows = data.crm;
-        const won = rows.filter((r) => r.cleanedStage.trim().toLowerCase() === "won").length;
-        const count = <T,>(list: T[], key: (r: T) => string) => groupSum(list, key, () => 1);
+        const labels = data.snapshot.sourceLabels;
+
+        const detail = capped(
+          data.crm.map((c) => ({
+            createdAt: c.createdAt,
+            contact: c.contact,
+            campaign: c.campaignName,
+            adName: c.adName,
+            adset: c.adset,
+            adsetOrigin: c.adsetOrigin,
+            course: c.course,
+            stage: c.cleanedStage,
+            source: labels.get(c.sourceKey) ?? c.source,
+            salesperson: c.salesperson,
+            salesTeam: c.salesTeam,
+            subTeam: c.subTeam,
+            priority: c.priority,
+            closedAt: c.closedAt,
+            daysToClose: c.daysToClose,
+          })),
+        );
 
         return json({
-          total: rows.length,
-          won,
-          winRate: rows.length > 0 ? (won / rows.length) * 100 : 0,
-          orderTotal: rows.reduce((s, r) => s + r.orderTotal, 0),
-          byStage: count(rows, (r) => r.cleanedStage),
-          bySource: count(rows, (r) => r.cleanedSource || r.source),
-          byCourse: count(rows, (r) => r.course).slice(0, 20),
-          byTeam: count(rows, (r) => r.salesTeam),
-          bySalesperson: count(rows, (r) => r.salesperson).slice(0, 15),
-          rows: rows.slice(0, ROW_CAP),
-          truncated: rows.length > ROW_CAP,
+          totals: computeTotals(data),
+          origin: computeLeadOrigin(data),
+          byStage: groupBy(data.crm, (c) => c.cleanedStage || "—"),
+          bySource: groupBy(data.crm, (c) => labels.get(c.sourceKey) ?? c.source ?? "—"),
+          byCourse: groupBy(data.crm, (c) => c.course || "—"),
+          byTeam: groupBy(data.crm, (c) => c.salesTeam || "—"),
+          bySubTeam: groupBy(data.crm, (c) => c.subTeam || "—"),
+          bySalesperson: groupBy(data.crm, (c) => c.salesperson || "—"),
+          byCampaign: groupBy(data.crm.filter((c) => c.fromCampaign), (c) => c.campaignName || "—"),
+          byPriority: groupBy(data.crm, (c) => c.priority || "—"),
+          byMonth: groupBy(data.crm, (c) => (c.createdAt ? c.createdAt.slice(0, 7) : "—")).sort((a, b) =>
+            a.label.localeCompare(b.label),
+          ),
+          detail,
+          health: data.snapshot.health,
           appliedFilters: filters,
         });
       },
