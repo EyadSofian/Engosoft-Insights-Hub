@@ -58,7 +58,7 @@ function Yoy() {
           </Card>
 
           <Card>
-            <SectionTitle hint={lang === "ar" ? "ما هو موجود فعلاً في الملف لكل عام" : "What the sheet actually holds per year"}>
+            <SectionTitle hint={lang === "ar" ? "تغطية البيانات المتاحة لكل عام" : "Available data coverage per year"}>
               {lang === "ar" ? "تغطية البيانات" : "Data coverage"}
             </SectionTitle>
             <div className="overflow-x-auto">

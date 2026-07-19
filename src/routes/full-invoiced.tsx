@@ -82,8 +82,8 @@ function FullInvoiced() {
         title={t("full_invoiced")}
         subtitle={
           lang === "ar"
-            ? "تُنسب الإيرادات إلى عمود Date لأن Invoice Date فارغ في أغلب الصفوف."
-            : "Revenue is attributed to the Date column, because Invoice Date is blank on most rows."
+            ? "تفاصيل الطلبات المُفوترة، مؤرَّخة بتاريخ الطلب."
+            : "Invoiced order lines, dated by order date."
         }
       />
 

@@ -120,11 +120,7 @@ function Overview() {
       )}
 
       <Card>
-        <SectionTitle
-          hint={lang === "ar" ? "محسوب من البيانات مباشرة، بلا ذكاء اصطناعي" : "Computed directly from the data, no LLM"}
-        >
-          {t("exec_summary")}
-        </SectionTitle>
+        <SectionTitle>{t("exec_summary")}</SectionTitle>
         <p className="text-[13px] sm:text-sm leading-relaxed text-text-muted">
           {lang === "ar" ? data.summary.ar : data.summary.en}
         </p>
