@@ -1,0 +1,413 @@
+@import "tailwindcss" source(none);
+@source "../src";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Engosoft Insights Hub — design tokens
+   Navy + blue brand, one orange accent reserved for the hero metric.
+   Every surface has a light and a dark value; nothing is hardcoded in a
+   component. Spacing follows a 4px rhythm, radii a 4-step scale.
+--------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-navy: var(--navy);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-electric: var(--electric);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  /* shadcn compatibility — the ui/ primitives read these names */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--text-inverse);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-muted);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--text-inverse);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+
+  --font-sans: "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+
+  --navy: #001e3c;
+
+  --bg: #f4f6fa;
+  --bg-subtle: #eef1f7;
+  --surface: #ffffff;
+  --surface-2: #f2f5f9;
+  --surface-3: #e8edf4;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text: #0b1f38;
+  --text-muted: #5a6b81;
+  --text-subtle: #8494a8;
+  --text-inverse: #ffffff;
+
+  --brand: #1656a0;
+  --brand-hover: #124a8c;
+  --brand-soft: #e8f0fa;
+  --electric: #0050dc;
+
+  --accent: #ff9100;
+  --accent-soft: #fff3e2;
+  --accent-ink: #a75f00;
+
+  --success: #2f7a2f;
+  --success-soft: #e8f5e9;
+  --warning: #b26a00;
+  --warning-soft: #fff4e5;
+  --danger: #b3261e;
+  --danger-soft: #fdecea;
+
+  --chart-1: #0050dc;
+  --chart-2: #ff9100;
+  --chart-3: #00a3a3;
+  --chart-4: #7c4dff;
+  --chart-5: #e5484d;
+  --chart-6: #3aa655;
+
+  --shadow-xs: 0 1px 2px rgba(11, 31, 56, 0.05);
+  --shadow-sm: 0 1px 3px rgba(11, 31, 56, 0.07), 0 1px 2px rgba(11, 31, 56, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(11, 31, 56, 0.09), 0 2px 6px -2px rgba(11, 31, 56, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
+  --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
+
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --sidebar-w: 248px;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --bg: #070f1c;
+  --bg-subtle: #0a1626;
+  --surface: #0f1c2f;
+  --surface-2: #16263c;
+  --surface-3: #1e3149;
+  --border: #1f3149;
+  --border-strong: #2c4362;
+
+  --text: #e8eef7;
+  --text-muted: #94a6bd;
+  --text-subtle: #6b809a;
+  --text-inverse: #06111f;
+
+  --brand: #3b82f6;
+  --brand-hover: #5b9bff;
+  --brand-soft: #14263f;
+  --electric: #4c8dff;
+
+  --accent: #ffa733;
+  --accent-soft: #2e1f0c;
+  --accent-ink: #ffc178;
+
+  --success: #4ea75c;
+  --success-soft: #12241a;
+  --warning: #d9903b;
+  --warning-soft: #2a1f10;
+  --danger: #f0645c;
+  --danger-soft: #2c1414;
+
+  --chart-1: #4c8dff;
+  --chart-2: #ffa733;
+  --chart-3: #2fd4c8;
+  --chart-4: #a78bfa;
+  --chart-5: #f0645c;
+  --chart-6: #56cc74;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 14px 36px -10px rgba(0, 0, 0, 0.65);
+  --shadow-xl: 0 26px 60px -14px rgba(0, 0, 0, 0.7);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Arabic needs a touch more leading and no synthetic letter-spacing. */
+  [dir="rtl"] body {
+    letter-spacing: 0;
+    line-height: 1.75;
+  }
+
+  h1, h2, h3, h4 {
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: -0.011em;
+  }
+  [dir="rtl"] :is(h1, h2, h3, h4) {
+    letter-spacing: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 24%, transparent);
+  }
+
+  /* Figures must never jitter as values update. */
+  .num,
+  table :is(td, th) {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Latin numerals inside Arabic copy still read left-to-right. */
+  [dir="rtl"] .num {
+    direction: ltr;
+    unicode-bidi: embed;
+  }
+
+  input[type="date"] {
+    min-height: 40px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* --- surfaces ------------------------------------------------------------ */
+
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+@utility card-hover {
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid color-mix(in oklab, var(--text) 8%, transparent);
+  box-shadow: var(--shadow-lg);
+}
+
+@utility glass-navy {
+  background: color-mix(in oklab, var(--navy) 86%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* --- motion -------------------------------------------------------------- */
+
+@keyframes engo-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes engo-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes engo-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes engo-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes engo-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes engo-pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 45%, transparent); }
+  70% { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@utility animate-fade-up {
+  animation: engo-fade-up var(--dur-slow) var(--ease-out) both;
+}
+
+@utility animate-fade-in {
+  animation: engo-fade var(--dur-base) var(--ease-out) both;
+}
+
+@utility animate-scale-in {
+  animation: engo-scale-in var(--dur-base) var(--ease-out) both;
+}
+
+@utility animate-slide-up {
+  animation: engo-slide-up var(--dur-slow) var(--ease-out) both;
+}
+
+@utility pulse-ring {
+  animation: engo-pulse-ring 2.4s var(--ease-out) infinite;
+}
+
+/* Entrance stagger — set --i on the child to order it. */
+@utility stagger {
+  animation: engo-fade-up var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@utility shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--surface) 70%, transparent),
+      transparent
+    );
+    animation: engo-shimmer 1.6s infinite;
+  }
+}
+
+/* --- data tables --------------------------------------------------------- */
+
+@utility table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Keeps the label column readable while scrolling a wide table sideways. */
+@utility sticky-col {
+  position: sticky;
+  inset-inline-start: 0;
+  background: var(--surface);
+  z-index: 1;
+}
