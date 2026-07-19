@@ -62,7 +62,7 @@ function latestDate(data?: FiltersResp): string | undefined {
   return [c.adsDateMax, c.crmDateMax, c.revenueDateMax].filter(Boolean).sort().pop();
 }
 
-export function TopBar({ title }: { title: string }) {
+export function TopBar({ title }: { title?: string }) {
   const { t, lang, setLang, theme, toggleTheme } = useI18n();
   const filters = useFilters();
   const preset = usePreset();
@@ -98,7 +98,15 @@ export function TopBar({ title }: { title: string }) {
     <>
       <header className="sticky top-0 z-30 glass border-b border-border">
         <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
-          <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">{title}</h1>
+          {/* Desktop shows the logo in the sidebar; mobile needs branding here.
+              The page title itself lives in each page's PageHeader, so the bar
+              stays a controls strip and never repeats the heading. */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="lg:hidden font-semibold text-[15px] tracking-tight text-text">ENGOSOFT</span>
+            {title && (
+              <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">{title}</h1>
+            )}
+          </div>
 
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
             <SyncBadge syncedAt={data?.syncedAt} stale={stale} />

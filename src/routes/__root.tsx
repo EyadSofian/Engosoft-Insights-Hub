@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "@/lib/i18n";
 import { FloatingChat } from "@/components/FloatingChat";
+import { AppShell } from "@/components/AppShell";
 
 /**
  * Applies the stored language and theme before first paint. Without this the
@@ -138,7 +139,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <Outlet />
+        {/* The shell wraps every page: sidebar, top bar, mobile nav. Mounted
+            here (not per page) so it persists across navigation. */}
+        <AppShell>
+          <Outlet />
+        </AppShell>
         {/* Mounted once, so the conversation survives navigation. */}
         <FloatingChat />
       </I18nProvider>
