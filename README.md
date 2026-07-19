@@ -41,7 +41,8 @@ Copy `.env.example` to `.env`:
 | `SHEET_ID` | No | Google Sheet id. Falls back to the Engosoft sheet. |
 | `OPENAI_API_KEY` | No | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
 | `TELEGRAM_BOT_TOKEN` | No | Enables the daily report. Never logged or returned in a response. |
-| `TELEGRAM_CHAT_ID` | No | Target chat for the scheduled report. |
+| `TELEGRAM_CHAT_ID` | No | Optional fallback recipient, always included alongside `/start` subscribers. |
+| `TELEGRAM_SUBSCRIBERS_FILE` | No | Where the subscriber list is stored. Point at a mounted volume on Railway. |
 | `REPORT_CRON` | No | Cron expression in Africa/Cairo. Default `0 9 * * *`. |
 | `REPORT_LANG` | No | `ar` (default) or `en`. |
 | `PORT` | No | Set by Railway automatically. |
@@ -118,11 +119,23 @@ requires a real prior year across ads *and* CRM *and* invoices.
 They share no odoo ids and differ in size (6,550 vs 4,276). Loss *reasons* come from the
 tab; lost *rate* comes from the CRM. They are never mixed.
 
-**12. CTR is never averaged.** It is recomputed as `Σ clicks / Σ impressions`.
+**12. The gviz endpoint is served through Google's CDN.**
+It caches the CSV and ignores a `no-cache` request header, so Refresh kept
+returning the same stale copy. Each load appends a unique `_cb` parameter to force
+a fresh pull. A forced reload also bypasses any in-flight fetch — that request was
+sent with an older token, so waiting on it returned exactly the stale data the
+user was trying to escape.
 
-**13. `$ Sales` is already USD.** Never apply the `Value to dolar` rates to it.
+**13. `fetchedAt` is never bumped on a failed pull.**
+When every tab fails the previous snapshot keeps serving, but bumping its
+timestamp made stale data report itself as freshly loaded. `lastAttemptAt` drives
+the retry backoff instead.
 
-**14. Prefer `attributedRoas` over `roas`.** Only ~42% of revenue carries a campaign at
+**14. CTR is never averaged.** It is recomputed as `Σ clicks / Σ impressions`.
+
+**15. `$ Sales` is already USD.** Never apply the `Value to dolar` rates to it.
+
+**16. Prefer `attributedRoas` over `roas`.** Only ~42% of revenue carries a campaign at
 all, and only ~26% maps to a campaign present in the ads tabs.
 
 ## Metric definitions
@@ -162,11 +175,11 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `GET /api/sales` | Revenue from the Sales tab (payment lines) |
 | `GET /api/yoy` | Year-over-year, or an honest empty state |
 | `GET /api/filters` | Distinct filter values, coverage, sync status, data health |
-| `POST /api/refresh` | Drops the cache and re-pulls the sheet |
+| `POST /api/refresh` | Drops the cache and re-pulls the sheet; returns row counts so a no-op refresh is visible |
 | `POST /api/chat` | AI assistant |
 | `GET /api/telegram/preview` | The exact report text, without sending |
-| `POST /api/telegram/send-daily` | Builds and sends the report (`?days=7` for weekly) |
-| `POST /api/telegram/webhook` | Handles `/report` and `/week` |
+| `POST /api/telegram/send-daily` | Broadcasts to every subscriber (`?days=7` for weekly) |
+| `POST /api/telegram/webhook` | Handles `/start`, `/stop`, `/report`, `/week`, `/status` |
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 
@@ -184,11 +197,40 @@ changes by running `npm run build && npm run start` and hitting `/api/filters`, 
 building alone.** Wall-clock time is read fresh in `Africa/Cairo` on every tick, so
 Egypt's DST transitions are handled.
 
-To enable the on-demand commands, point Telegram at the webhook:
+### Who receives it
+
+The bot is open: **anyone who sends `/start` is subscribed** and gets the daily
+report, plus the current report immediately so `/start` is useful right away.
+`TELEGRAM_CHAT_ID` is no longer required — if set, that chat is simply always
+included as a fallback.
+
+| Command | Effect |
+| --- | --- |
+| `/start` | Subscribe, and receive yesterday's report now |
+| `/report` | Yesterday's report on demand |
+| `/week` | Last 7 days |
+| `/status` | Whether you're subscribed, and the subscriber count |
+| `/stop` | Unsubscribe |
+
+Register the webhook so the commands reach the app:
 
 ```
 https://api.telegram.org/bot<TOKEN>/setWebhook?url=<APP_URL>/api/telegram/webhook
 ```
+
+The webhook always answers 200, because Telegram retries any non-2xx response and
+a failing command would otherwise re-run in a loop.
+
+**Subscribers are stored in a JSON file, and Railway's container filesystem is
+wiped on every redeploy.** Attach a volume and set `TELEGRAM_SUBSCRIBERS_FILE` to
+a path on it (e.g. `/data/telegram-subscribers.json`), or the list resets on each
+deploy and everyone has to `/start` again. Writes go through a temp file and a
+rename, so a crash mid-write cannot leave a truncated file that wipes the list.
+
+Chats that block the bot or get deleted are unsubscribed automatically. That check
+matches only Telegram's "blocked / chat not found / deactivated / kicked"
+responses — an invalid token returns a plain "Not Found", which deliberately does
+not match, so a misconfigured token cannot wipe every subscriber.
 
 ## AI assistant
 

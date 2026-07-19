@@ -30,13 +30,16 @@ export interface SchedulerStatus {
 
 export function schedulerStatus(): SchedulerStatus {
   const expression = process.env.REPORT_CRON || DEFAULT_CRON;
-  const enabled = !!process.env.TELEGRAM_BOT_TOKEN && !!process.env.TELEGRAM_CHAT_ID;
+  // Only the token is required now. Recipients come from whoever sent /start, so
+  // demanding TELEGRAM_CHAT_ID up front would leave the schedule disarmed even
+  // with a room full of subscribers.
+  const enabled = !!process.env.TELEGRAM_BOT_TOKEN;
   return {
     enabled,
     scheduled,
     expression,
     timezone: TZ,
-    reason: enabled ? undefined : "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set",
+    reason: enabled ? undefined : "TELEGRAM_BOT_TOKEN is not set",
     lastRunAt,
     lastResult,
   };
@@ -47,7 +50,9 @@ async function fire() {
   try {
     const { sendDaily } = await import("./telegram.server");
     const res = await sendDaily(1);
-    lastResult = res.ok ? "sent" : `failed: ${res.error}`;
+    lastResult = res.ok
+      ? `sent to ${res.sent}${res.failed ? `, ${res.failed} failed` : ""}${res.removed.length ? `, ${res.removed.length} unsubscribed` : ""}`
+      : `failed: ${res.error}`;
     if (!res.ok) console.error("[telegram] daily report failed:", res.error);
   } catch (e) {
     lastResult = `failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -70,9 +75,7 @@ export function startScheduler(): SchedulerStatus {
   if (scheduled) return schedulerStatus();
 
   const expression = process.env.REPORT_CRON || DEFAULT_CRON;
-  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
-    return schedulerStatus();
-  }
+  if (!process.env.TELEGRAM_BOT_TOKEN) return schedulerStatus();
   if (!isValidCron(expression)) {
     lastResult = `invalid REPORT_CRON expression: ${expression}`;
     console.error("[telegram]", lastResult);

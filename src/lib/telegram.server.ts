@@ -199,7 +199,7 @@ export async function sendMessage(text: string, to?: string): Promise<{ ok: bool
   const token = botToken();
   const target = to || chatId();
   if (!token) return { ok: false, error: "TELEGRAM_BOT_TOKEN is not set" };
-  if (!target) return { ok: false, error: "TELEGRAM_CHAT_ID is not set" };
+  if (!target) return { ok: false, error: "no recipient: nobody has sent /start and TELEGRAM_CHAT_ID is not set" };
 
   try {
     const res = await fetch(`${API}/bot${token}/sendMessage`, {
@@ -224,8 +224,68 @@ export async function sendMessage(text: string, to?: string): Promise<{ ok: bool
   }
 }
 
-export async function sendDaily(days = 1): Promise<{ ok: boolean; error?: string; text: string }> {
+export interface BroadcastResult {
+  ok: boolean;
+  error?: string;
+  text: string;
+  sent: number;
+  failed: number;
+  /** Chats that no longer accept messages and were dropped from the list. */
+  removed: string[];
+}
+
+/**
+ * Builds the report once and sends it to every subscriber.
+ *
+ * A user who blocks the bot or deletes the chat makes Telegram return 403
+ * forever. Those chats are unsubscribed automatically, otherwise the failure
+ * count grows every day and real delivery problems get lost in the noise.
+ */
+export async function sendDaily(days = 1): Promise<BroadcastResult> {
+  const { recipients, unsubscribe } = await import("./subscribers.server");
+
   const text = await buildReport({ days });
-  const result = await sendMessage(text);
-  return { ...result, text };
+  const chats = await recipients();
+
+  if (!botToken()) return { ok: false, error: "TELEGRAM_BOT_TOKEN is not set", text, sent: 0, failed: 0, removed: [] };
+  if (!chats.length) {
+    return {
+      ok: false,
+      error: "no subscribers yet — send /start to the bot, or set TELEGRAM_CHAT_ID",
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+    };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const removed: string[] = [];
+  const errors: string[] = [];
+
+  for (const chat of chats) {
+    const res = await sendMessage(text, chat);
+    if (res.ok) {
+      sent++;
+      continue;
+    }
+    failed++;
+    const reason = res.error ?? "";
+    if (/blocked|chat not found|deactivated|kicked|user is deactivated/i.test(reason)) {
+      await unsubscribe(chat);
+      removed.push(chat);
+    } else {
+      errors.push(reason);
+    }
+  }
+
+  return {
+    ok: sent > 0,
+    error: sent > 0 ? undefined : errors[0] || "delivery failed for every subscriber",
+    text,
+    sent,
+    failed,
+    removed,
+  };
 }

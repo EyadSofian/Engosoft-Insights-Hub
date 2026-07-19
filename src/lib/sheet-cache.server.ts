@@ -53,7 +53,12 @@ export interface CampaignMeta {
 }
 
 export interface Snapshot {
+  /** When the sheet was last pulled *successfully*. Never bumped on failure, so
+   *  it cannot report stale data as fresh. */
   fetchedAt: number;
+  /** When a pull was last attempted. Drives the TTL, so a sheet that keeps
+   *  failing is not re-fetched on every single request. */
+  lastAttemptAt: number;
   ads: AdRow[];
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
@@ -179,14 +184,21 @@ const SOURCES_WITHOUT_SPEND = new Set([
 
 /* --- fetch ---------------------------------------------------------------- */
 
-function csvUrl(sheetId: string, tab: string): string {
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+function csvUrl(sheetId: string, tab: string, bust: number): string {
+  // gviz serves through Google's CDN, which caches the CSV and ignores a
+  // no-cache request header — so a plain refresh keeps returning the old data.
+  // A unique query param per fetch forces a fresh copy. gviz ignores unknown
+  // params, so this is safe.
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_cb=${bust}`;
 }
 
 type Raw = Record<string, string>;
 
-async function fetchTab(sheetId: string, tab: string): Promise<Raw[]> {
-  const res = await fetch(csvUrl(sheetId, tab), { headers: { "cache-control": "no-cache" } });
+async function fetchTab(sheetId: string, tab: string, bust: number): Promise<Raw[]> {
+  const res = await fetch(csvUrl(sheetId, tab, bust), {
+    headers: { "cache-control": "no-cache", pragma: "no-cache" },
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tab}": ${res.status}`);
   const text = await res.text();
   const parsed = Papa.parse<Raw>(text, {
@@ -307,15 +319,21 @@ class AdSetIndex {
 /* --- load ----------------------------------------------------------------- */
 
 export async function loadAllData(force = false): Promise<Snapshot> {
-  if (!force && cache && Date.now() - cache.fetchedAt < TTL_MS) return cache;
-  if (inflight) return inflight;
+  if (!force && cache && Date.now() - cache.lastAttemptAt < TTL_MS) return cache;
+  // A forced reload must never be handed an in-flight fetch: that request was
+  // already sent with an older cache-busting token, so the Refresh button would
+  // wait on it and return exactly the stale data the user was trying to escape.
+  if (inflight && !force) return inflight;
 
   const sheetId = process.env.SHEET_ID || DEFAULT_SHEET_ID;
 
   inflight = (async () => {
     const fetchErrors: string[] = [];
+    // One token for the whole load, so all six tabs come from the same fresh
+    // pull and bypass Google's CDN cache together.
+    const bust = Date.now();
     const safeFetch = (tab: string) =>
-      fetchTab(sheetId, tab).catch((e: unknown) => {
+      fetchTab(sheetId, tab, bust).catch((e: unknown) => {
         fetchErrors.push(`${tab}: ${e instanceof Error ? e.message : String(e)}`);
         return [] as Raw[];
       });
@@ -730,6 +748,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     return {
       fetchedAt: Date.now(),
+      lastAttemptAt: Date.now(),
       ads,
       crm,
       invoiced,
@@ -758,7 +777,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // stale one rather than blanking the dashboard.
     const empty = !next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length;
     if (empty && previous) {
-      previous.fetchedAt = Date.now();
+      // Back off before retrying, but leave `fetchedAt` alone — bumping it here
+      // is what made a failed reload report the old snapshot as freshly loaded.
+      previous.lastAttemptAt = Date.now();
       return previous;
     }
     cache = next;

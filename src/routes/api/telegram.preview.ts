@@ -7,6 +7,7 @@ export const Route = createFileRoute("/api/telegram/preview")({
       GET: async ({ request }) => {
         const { buildReport } = await import("@/lib/telegram.server");
         const { schedulerStatus } = await import("@/lib/scheduler.server");
+        const { subscriberCount } = await import("@/lib/subscribers.server");
         const { json } = await import("@/lib/api.server");
 
         const p = new URL(request.url).searchParams;
@@ -14,7 +15,13 @@ export const Route = createFileRoute("/api/telegram/preview")({
         const to = p.get("to") || undefined;
 
         const text = await buildReport({ days, to });
-        return json({ text, days, scheduler: schedulerStatus() });
+        return json({
+          text,
+          days,
+          scheduler: schedulerStatus(),
+          subscribers: await subscriberCount(),
+          fallbackChat: !!process.env.TELEGRAM_CHAT_ID,
+        });
       },
     },
   },
