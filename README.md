@@ -230,6 +230,23 @@ when the bot seems silent.
 The webhook always answers 200, because Telegram retries any non-2xx response and
 a failing command would otherwise re-run in a loop.
 
+### If the report never arrives at its scheduled time
+
+The schedule is an in-process timer, so it only fires while the container is
+awake. If the Railway service is configured to sleep on idle, nothing runs at
+09:00 and no error appears — the process simply was not running.
+
+The durable fix is an external trigger. Point Railway Cron (or any uptime
+pinger) at:
+
+```
+POST https://<your-app>/api/telegram/send-daily?once=1
+```
+
+`once=1` sends at most one report per Cairo day, so running this alongside the
+in-process timer is safe: whichever fires first sends, the other is a no-op.
+Without it you would get two reports a day.
+
 **Subscribers are stored in a JSON file, and Railway's container filesystem is
 wiped on every redeploy.** Attach a volume and set `TELEGRAM_SUBSCRIBERS_FILE` to
 a path on it (e.g. `/data/telegram-subscribers.json`), or the list resets on each

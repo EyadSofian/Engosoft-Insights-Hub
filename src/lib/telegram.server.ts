@@ -242,8 +242,20 @@ export interface BroadcastResult {
  * forever. Those chats are unsubscribed automatically, otherwise the failure
  * count grows every day and real delivery problems get lost in the noise.
  */
-export async function sendDaily(days = 1): Promise<BroadcastResult> {
-  const { recipients, unsubscribe } = await import("./subscribers.server");
+export async function sendDaily(
+  days = 1,
+  opts: { once?: boolean } = {},
+): Promise<BroadcastResult & { skipped?: boolean }> {
+  const { recipients, unsubscribe, claimReportDay, reportDay } = await import("./subscribers.server");
+
+  // `once` is used by the scheduled trigger so that an external scheduler can
+  // safely cover for a sleeping container without producing two reports.
+  if (opts.once) {
+    const day = reportDay();
+    if (!(await claimReportDay(day))) {
+      return { ok: true, skipped: true, text: "", sent: 0, failed: 0, removed: [] };
+    }
+  }
 
   const text = await buildReport({ days });
   const chats = await recipients();

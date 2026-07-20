@@ -49,11 +49,13 @@ async function fire() {
   lastRunAt = new Date().toISOString();
   try {
     const { sendDaily } = await import("./telegram.server");
-    const res = await sendDaily(1);
-    lastResult = res.ok
-      ? `sent to ${res.sent}${res.failed ? `, ${res.failed} failed` : ""}${res.removed.length ? `, ${res.removed.length} unsubscribed` : ""}`
-      : `failed: ${res.error}`;
-    if (!res.ok) console.error("[telegram] daily report failed:", res.error);
+    const res = await sendDaily(1, { once: true });
+    lastResult = res.skipped
+      ? "skipped: already sent today"
+      : res.ok
+        ? `sent to ${res.sent}${res.failed ? `, ${res.failed} failed` : ""}${res.removed.length ? `, ${res.removed.length} unsubscribed` : ""}`
+        : `failed: ${res.error}`;
+    if (!res.ok && !res.skipped) console.error("[telegram] daily report failed:", res.error);
   } catch (e) {
     lastResult = `failed: ${e instanceof Error ? e.message : String(e)}`;
     console.error("[telegram] daily report threw:", e);

@@ -15,6 +15,8 @@ const DEFAULT_FILE = "./.data/telegram-subscribers.json";
 
 interface Stored {
   chats: Record<string, { since: string; name?: string }>;
+  /** Cairo date (YYYY-MM-DD) the daily report was last delivered for. */
+  lastSentDay?: string;
 }
 
 let loaded: Stored | null = null;
@@ -96,6 +98,42 @@ export async function recipients(): Promise<string[]> {
 export async function subscriberCount(): Promise<number> {
   const store = await load();
   return Object.keys(store.chats).length;
+}
+
+/* --- once-per-day guard ---------------------------------------------------- */
+
+/**
+ * Today's date in Cairo, which is the calendar the schedule runs on.
+ */
+export function reportDay(now = new Date()): string {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return p; // en-CA formats as YYYY-MM-DD
+}
+
+/**
+ * Records that the report went out for `day`, returning false if it already had.
+ *
+ * The in-process timer cannot fire while Railway has the container asleep, so
+ * the durable fallback is an external scheduler hitting the send endpoint. This
+ * guard makes running both safe: whichever trigger arrives first sends, and the
+ * other is a no-op instead of a duplicate report.
+ */
+export async function claimReportDay(day: string): Promise<boolean> {
+  const store = await load();
+  if (store.lastSentDay === day) return false;
+  store.lastSentDay = day;
+  await persist();
+  return true;
+}
+
+export async function lastSentDay(): Promise<string | undefined> {
+  const store = await load();
+  return store.lastSentDay;
 }
 
 /** Test seam — drops the in-memory copy so the next read hits disk. */
