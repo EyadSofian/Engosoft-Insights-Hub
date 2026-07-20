@@ -29,6 +29,7 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bits";
+import { TelegramPanel } from "@/components/TelegramPanel";
 import { HBarChart, SpendRevenueChart } from "@/components/charts";
 import type {
   DataHealth,
@@ -359,6 +360,7 @@ function Overview() {
       </Card>
 
       <DataHealthPanel health={health} />
+      <TelegramPanel />
     </div>
   );
 }
