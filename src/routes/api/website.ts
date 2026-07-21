@@ -9,8 +9,9 @@ export const Route = createFileRoute("/api/website")({
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
 
-        // This page is deliberately a Website cohort. Ad-platform, account and
-        // creative filters must not silently turn it into a Meta/Snap cohort.
+        // Website leads come from Odoo CRM Source=Website. Website revenue comes
+        // only from the dedicated Odoo sale.order dataset (Website=Engosoft,
+        // state=sale). Meta/Snap filters never participate in this endpoint.
         const websiteFilters = {
           from: filters.from,
           to: filters.to,
@@ -21,12 +22,6 @@ export const Route = createFileRoute("/api/website")({
           salesperson: filters.salesperson,
         };
         const data = await getFiltered(websiteFilters);
-        const identityData = await getFiltered({
-          ...websiteFilters,
-          from: undefined,
-          to: undefined,
-          range: "all",
-        });
 
         const uniqueById = <T extends { id: string }>(rows: T[]): T[] => {
           const seen = new Set<string>();
@@ -73,17 +68,26 @@ export const Route = createFileRoute("/api/website")({
           })
           .sort((a, b) => b.daysWaiting - a.daysWaiting);
 
-        const orderTokens = (value: string): string[] =>
-          value
-            .split(/[,;|\n]+/)
-            .map((part) => normalizeName(part))
-            .filter(Boolean);
-        const websiteOrders = new Set(
-          identityData.invoiced.flatMap((row) => orderTokens(row.orderRef)),
-        );
-        const websiteSales = data.sales.filter((row) =>
-          orderTokens(row.orderRef).some((ref) => websiteOrders.has(ref)),
-        );
+        const equals = (left: string, right?: string) =>
+          !right || normalizeName(left) === normalizeName(right);
+        const inDateRange = (date: string) => {
+          if (!filters.from && !filters.to) return true;
+          if (!date) return false;
+          if (filters.from && date < filters.from) return false;
+          if (filters.to && date > filters.to) return false;
+          return true;
+        };
+
+        const websiteSales = uniqueById(data.snapshot.websiteSales).filter((row) => {
+          if (normalizeName(row.website) !== "engosoft") return false;
+          if (!["sale", "sales order"].includes(normalizeName(row.status))) return false;
+          if (!inDateRange(row.orderDate)) return false;
+          if (!equals(row.course, filters.course)) return false;
+          if (!equals(row.mainCategory, filters.mainCategory)) return false;
+          if (!equals(row.salesTeam, filters.salesTeam)) return false;
+          if (!equals(row.salesperson, filters.salesperson)) return false;
+          return true;
+        });
 
         type Specialty = {
           specialty: string;
@@ -93,6 +97,7 @@ export const Route = createFileRoute("/api/website")({
           open: number;
           notContacted: number;
           sales: number;
+          quantity: number;
           salesOrders: Set<string>;
         };
         const specialties = new Map<string, Specialty>();
@@ -109,6 +114,7 @@ export const Route = createFileRoute("/api/website")({
               open: 0,
               notContacted: 0,
               sales: 0,
+              quantity: 0,
               salesOrders: new Set(),
             };
             specialties.set(key, row);
@@ -129,9 +135,10 @@ export const Route = createFileRoute("/api/website")({
         }
         for (const lead of notContacted) touch(lead.course).notContacted++;
         for (const sale of websiteSales) {
-          const row = touch(sale.course);
+          const row = touch(sale.course || sale.product);
           row.sales += sale.usdSales;
-          for (const ref of orderTokens(sale.orderRef)) row.salesOrders.add(ref);
+          row.quantity += sale.quantity;
+          if (sale.orderRef) row.salesOrders.add(normalizeName(sale.orderRef));
         }
 
         const specialtyRows = [...specialties.values()]
@@ -145,9 +152,30 @@ export const Route = createFileRoute("/api/website")({
             conversionRate: row.total ? (row.won / row.total) * 100 : null,
             lostRate: row.total ? (row.lost / row.total) * 100 : null,
             sales: row.sales,
+            quantity: row.quantity,
             salesOrders: row.salesOrders.size,
           }))
           .sort((a, b) => b.total - a.total || b.sales - a.sales);
+
+        const soldCourses = specialtyRows
+          .filter((row) => row.salesOrders > 0)
+          .sort((a, b) => b.sales - a.sales)
+          .map((row) => ({
+            label: row.specialty,
+            value: row.sales,
+            orders: row.salesOrders,
+            quantity: row.quantity,
+          }));
+        const unsoldCourses = specialtyRows
+          .filter((row) => row.specialty !== "—" && row.total > 0 && row.salesOrders === 0)
+          .sort((a, b) => b.total - a.total || b.open - a.open)
+          .map((row) => ({
+            label: row.specialty,
+            leads: row.total,
+            open: row.open,
+            lost: row.lost,
+            notContacted: row.notContacted,
+          }));
 
         const buckets = [
           { label: "0", min: 0, max: 0, count: 0 },
@@ -159,12 +187,18 @@ export const Route = createFileRoute("/api/website")({
         ];
         for (const lead of notContacted) {
           const bucket = buckets.find(
-            (b) => lead.daysWaiting >= b.min && lead.daysWaiting <= b.max,
+            (candidate) => lead.daysWaiting >= candidate.min && lead.daysWaiting <= candidate.max,
           );
           if (bucket) bucket.count++;
         }
 
         const salesTotal = websiteSales.reduce((sum, row) => sum + row.usdSales, 0);
+        const orderCount = new Set(
+          websiteSales.map((row) => normalizeName(row.orderRef)).filter(Boolean),
+        ).size;
+        const conversionRate =
+          crm.length + lost.length ? (won.length / (crm.length + lost.length)) * 100 : null;
+
         return json({
           totals: {
             leads: crm.length + lost.length,
@@ -173,14 +207,21 @@ export const Route = createFileRoute("/api/website")({
             open: open.length,
             notContacted: notContacted.length,
             sales: salesTotal,
-            salesOrders: new Set(websiteSales.flatMap((row) => orderTokens(row.orderRef))).size,
+            salesOrders: orderCount,
+            soldCourses: soldCourses.length,
+            unsoldCourses: unsoldCourses.length,
+            averageOrder: orderCount ? salesTotal / orderCount : null,
           },
           specialties: specialtyRows,
           waitingBuckets: buckets.map(({ label, count }) => ({ label, count })),
-          salesByCourse: specialtyRows
-            .filter((row) => row.sales !== 0)
-            .sort((a, b) => b.sales - a.sales)
-            .map((row) => ({ label: row.specialty, value: row.sales, orders: row.salesOrders })),
+          soldCourses,
+          unsoldCourses,
+          insights: {
+            bestSellingCourse: soldCourses[0] || null,
+            highestDemandUnsoldCourse: unsoldCourses[0] || null,
+            conversionRate,
+            averageOrder: orderCount ? salesTotal / orderCount : null,
+          },
           detail: capped(
             notContacted.map((lead) => ({
               createdAt: lead.createdAt,
@@ -195,7 +236,8 @@ export const Route = createFileRoute("/api/website")({
             })),
           ),
           asOf,
-          salesDateBasis: "payment_date",
+          salesSource: "odoo_sale_order.website_id=Engosoft,state=sale",
+          salesDateBasis: "order_date",
           contactAgeBasis: "last_stage_update_fallback_created_at",
           appliedFilters: websiteFilters,
         });

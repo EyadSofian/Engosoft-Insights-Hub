@@ -148,6 +148,32 @@ export interface SalesRow {
   month: string;
 }
 
+/** One confirmed Odoo website sales-order line (Website = Engosoft, state = sale). */
+export interface WebsiteSaleRow {
+  id: string;
+  writeDate: string;
+  orderRef: string;
+  orderDate: string;
+  website: string;
+  status: string;
+  customer: string;
+  salesperson: string;
+  salesTeam: string;
+  currency: string;
+  product: string;
+  productCategory: string;
+  course: string;
+  mainCategory: string;
+  quantity: number;
+  untaxedTotal: number;
+  localTotal: number;
+  usdSales: number;
+  opportunityId: string;
+  opportunitySource: string;
+  invoiceStatus: string;
+  paymentDate: string;
+}
+
 /** A confirmed lost lead from the archived CRM population (`active=false`, probability=0). */
 export interface LostRow {
   id: string;

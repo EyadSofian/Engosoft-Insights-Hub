@@ -17,6 +17,7 @@ import type {
   LostRow,
   Platform,
   SalesRow,
+  WebsiteSaleRow,
 } from "./types";
 
 const DEFAULT_SHEET_ID = "14kv8Xkv8SeFhF9roekDI0OKmpZBU29YQOlMj03LOKT0";
@@ -28,6 +29,7 @@ const TAB = {
   crm: "CRM Leads",
   invoiced: "Full Invoiced Orders",
   sales: "Sales",
+  websiteSales: "Website Sales",
   lost: "Lost Analysis",
 } as const;
 
@@ -70,6 +72,7 @@ export interface Snapshot {
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
   sales: SalesRow[];
+  websiteSales: WebsiteSaleRow[];
   lost: LostRow[];
   accounts: AccountInfo[];
   campaigns: Map<string, CampaignMeta>;
@@ -353,7 +356,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
   inflight = (async () => {
     const fetchErrors: string[] = [];
-    // One token for the whole load, so all six tabs come from the same fresh
+    // One token for the whole load, so all tabs come from the same fresh
     // pull and bypass Google's CDN cache together.
     const bust = Date.now();
     const safeFetch = (tab: string) =>
@@ -362,14 +365,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         return [] as Raw[];
       });
 
-    const [metaRaw, snapRaw, crmRaw, invRaw, salesRaw, lostRaw] = await Promise.all([
-      safeFetch(TAB.meta),
-      safeFetch(TAB.snap),
-      safeFetch(TAB.crm),
-      safeFetch(TAB.invoiced),
-      safeFetch(TAB.sales),
-      safeFetch(TAB.lost),
-    ]);
+    const [metaRaw, snapRaw, crmRaw, invRaw, salesRaw, websiteSalesRaw, lostRaw] =
+      await Promise.all([
+        safeFetch(TAB.meta),
+        safeFetch(TAB.snap),
+        safeFetch(TAB.crm),
+        safeFetch(TAB.invoiced),
+        safeFetch(TAB.sales),
+        safeFetch(TAB.websiteSales),
+        safeFetch(TAB.lost),
+      ]);
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
     const keys = new CampaignKeyResolver();
@@ -571,6 +576,34 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         };
       });
 
+    /* -- website sales (Odoo sale.order, never Meta attribution) ----------- */
+    const websiteSales: WebsiteSaleRow[] = websiteSalesRaw
+      .filter((r) => str(r["__odoo_id"]))
+      .map((r) => ({
+        id: str(r["__odoo_id"]),
+        writeDate: str(r["__odoo_write_date"]),
+        orderRef: str(r["Order #"]),
+        orderDate: parseDate(r["Order Date"]),
+        website: str(r["Website"]),
+        status: str(r["Status"]),
+        customer: str(r["Customer"]),
+        salesperson: str(r["Salesperson"]),
+        salesTeam: str(r["Sales Team"]),
+        currency: str(r["Currency"]),
+        product: str(r["Product"]),
+        productCategory: str(r["Product Category"]),
+        course: str(r["Course"]) || str(r["Product"]),
+        mainCategory: str(r["Main Category"]),
+        quantity: num(r["Quantity"]),
+        untaxedTotal: num(r["Untaxed Total"]),
+        localTotal: num(r["Total in Currency"]),
+        usdSales: usdValue(r["$ Sales"], r["Total in Currency"], r["Currency"]),
+        opportunityId: str(r["Opportunity ID"]),
+        opportunitySource: str(r["Opportunity Source"]),
+        invoiceStatus: str(r["Invoice Status"]),
+        paymentDate: parseDate(r["Payment Date"]),
+      }));
+
     /* -- lost -------------------------------------------------------------- */
     const lost: LostRow[] = lostRaw
       .filter((r) => str(r["__odoo_id"]))
@@ -721,6 +754,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       ...crm.map((c) => c.createdAt),
       ...invoiced.map((i) => i.revenueDate),
       ...sales.map((s) => s.paymentDate),
+      ...websiteSales.map((s) => s.orderDate),
     ]) {
       if (d) yearSet.add(+d.slice(0, 4));
     }
@@ -758,6 +792,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       { key: "crm", label: TAB.crm, syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")) },
       { key: "invoiced", label: TAB.invoiced, syncedAt: asIso(maxOf(invRaw, "__odoo_write_date")) },
       { key: "sales", label: TAB.sales, syncedAt: asIso(maxOf(salesRaw, "__odoo_write_date")) },
+      {
+        key: "websiteSales",
+        label: TAB.websiteSales,
+        syncedAt: asIso(maxOf(websiteSalesRaw, "__odoo_write_date")),
+      },
       { key: "lost", label: TAB.lost, syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")) },
     ].filter((s) => !!s.syncedAt);
 
@@ -847,6 +886,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       crm,
       invoiced,
       sales,
+      websiteSales,
       lost,
       accounts,
       campaigns,

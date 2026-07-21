@@ -26,6 +26,7 @@ interface SpecialtyRow {
   conversionRate: number | null;
   lostRate: number | null;
   sales: number;
+  quantity: number;
   salesOrders: number;
 }
 
@@ -50,10 +51,26 @@ interface Resp {
     notContacted: number;
     sales: number;
     salesOrders: number;
+    soldCourses: number;
+    unsoldCourses: number;
+    averageOrder: number | null;
   };
   specialties: SpecialtyRow[];
   waitingBuckets: { label: string; count: number }[];
-  salesByCourse: { label: string; value: number; orders: number }[];
+  soldCourses: { label: string; value: number; orders: number; quantity: number }[];
+  unsoldCourses: {
+    label: string;
+    leads: number;
+    open: number;
+    lost: number;
+    notContacted: number;
+  }[];
+  insights: {
+    bestSellingCourse: { label: string; value: number; orders: number } | null;
+    highestDemandUnsoldCourse: { label: string; leads: number; open: number } | null;
+    conversionRate: number | null;
+    averageOrder: number | null;
+  };
   detail: { rows: ContactRow[]; total: number; truncated: boolean };
   asOf: string;
 }
@@ -61,6 +78,46 @@ interface Resp {
 function Website() {
   const { t, lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/website");
+  const copy =
+    lang === "ar"
+      ? {
+          subtitle: "تحليل ليدز ومبيعات موقع Engosoft من Odoo فقط",
+          sourceNote:
+            "المصدر: ليدز الموقع من CRM (Source = Website)، والمبيعات من Sales Orders المؤكدة (Website = Engosoft وStatus = Sales Order). بيانات Meta وSnap غير مستخدمة هنا.",
+          orders: "أوامر بيع",
+          quickAnalysis: "ملخص تنفيذي",
+          bestSelling: "الأكثر مبيعًا",
+          unsoldDemand: "أعلى طلب بدون بيع",
+          averageOrder: "متوسط أمر البيع",
+          noData: "لا توجد بيانات كافية في الفترة المحددة",
+          soldCourses: "الكورسات المباعة من الموقع",
+          soldHint: "حسب Order Date وقيمة أمر البيع المؤكد في Odoo",
+          unsoldCourses: "كورسات عليها طلب ولم تُبع",
+          unsoldHint: "وصلت لها Website Leads في الفترة، لكن لا يوجد لها Sales Order مؤكد",
+          leads: "ليد",
+          open: "مفتوح",
+          lost: "مفقود",
+          specialtyNote: "يجمع ليدز CRM ومبيعات Odoo للموقع حسب الكورس",
+        }
+      : {
+          subtitle: "Engosoft website leads and sales, sourced only from Odoo",
+          sourceNote:
+            "Source: CRM leads where Source = Website, and confirmed Odoo sales orders where Website = Engosoft and Status = Sales Order. Meta and Snap are not used here.",
+          orders: "sales orders",
+          quickAnalysis: "Executive summary",
+          bestSelling: "Best-selling course",
+          unsoldDemand: "Highest demand without a sale",
+          averageOrder: "Average sales order",
+          noData: "Not enough data in the selected period",
+          soldCourses: "Courses sold on the website",
+          soldHint: "Based on Odoo Order Date and confirmed sales-order value",
+          unsoldCourses: "Courses with demand but no sale",
+          unsoldHint: "Website leads exist in the period, but no confirmed sales order exists",
+          leads: "leads",
+          open: "open",
+          lost: "lost",
+          specialtyNote: "Combines Odoo CRM website leads and website sales by course",
+        };
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -173,7 +230,7 @@ function Website() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={t("website")} subtitle={t("website_subtitle")} />
+      <PageHeader title={t("website")} subtitle={copy.subtitle} />
 
       {isLoading || !data ? (
         <>
@@ -183,7 +240,7 @@ function Website() {
       ) : (
         <>
           <div className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-xs text-text-muted leading-relaxed">
-            {t("website_filter_note")}
+            {copy.sourceNote}
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -230,10 +287,51 @@ function Website() {
               hero
               label={t("website_sales")}
               value={fmtUSD(data.totals.sales)}
-              sub={`${fmtNum(data.totals.salesOrders)} ${t("orders")}`}
+              sub={`${fmtNum(data.totals.salesOrders)} ${copy.orders}`}
               icon={<Banknote size={18} />}
             />
           </div>
+
+          <Card>
+            <SectionTitle>{copy.quickAnalysis}</SectionTitle>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+                <div className="text-xs text-text-muted">{copy.bestSelling}</div>
+                <div className="mt-1 font-semibold text-text">
+                  {data.insights.bestSellingCourse?.label || copy.noData}
+                </div>
+                {data.insights.bestSellingCourse && (
+                  <div className="mt-1 text-xs text-success">
+                    {fmtUSD(data.insights.bestSellingCourse.value)} ·{" "}
+                    {fmtNum(data.insights.bestSellingCourse.orders)} {copy.orders}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+                <div className="text-xs text-text-muted">{copy.unsoldDemand}</div>
+                <div className="mt-1 font-semibold text-text">
+                  {data.insights.highestDemandUnsoldCourse?.label || copy.noData}
+                </div>
+                {data.insights.highestDemandUnsoldCourse && (
+                  <div className="mt-1 text-xs text-warning">
+                    {fmtNum(data.insights.highestDemandUnsoldCourse.leads)} {copy.leads} ·{" "}
+                    {fmtNum(data.insights.highestDemandUnsoldCourse.open)} {copy.open}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+                <div className="text-xs text-text-muted">{copy.averageOrder}</div>
+                <div className="mt-1 font-semibold text-text">
+                  {data.insights.averageOrder === null
+                    ? copy.noData
+                    : fmtUSD(data.insights.averageOrder)}
+                </div>
+                <div className="mt-1 text-xs text-text-muted">
+                  {fmtNum(data.totals.salesOrders)} {copy.orders}
+                </div>
+              </div>
+            </div>
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -264,29 +362,51 @@ function Website() {
             </Card>
           </div>
 
-          <Card>
-            <SectionTitle hint={t("website_sales_payment_note")}>
-              {t("website_sales_by_specialty")}
-            </SectionTitle>
-            <BarList
-              items={data.salesByCourse.slice(0, 12).map((row) => ({
-                label: row.label,
-                value: row.value,
-                meta: (
-                  <span>
-                    {fmtUSD(row.value)} · {fmtNum(row.orders)} {t("orders")}
-                  </span>
-                ),
-              }))}
-              format={fmtUSD}
-              color="var(--success)"
-            />
-          </Card>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <SectionTitle hint={copy.soldHint}>{copy.soldCourses}</SectionTitle>
+              {data.soldCourses.length ? (
+                <BarList
+                  items={data.soldCourses.slice(0, 12).map((row) => ({
+                    label: row.label,
+                    value: row.value,
+                    meta: (
+                      <span>
+                        {fmtUSD(row.value)} · {fmtNum(row.orders)} {copy.orders}
+                      </span>
+                    ),
+                  }))}
+                  format={fmtUSD}
+                  color="var(--success)"
+                />
+              ) : (
+                <p className="text-sm text-text-muted">{copy.noData}</p>
+              )}
+            </Card>
+            <Card>
+              <SectionTitle hint={copy.unsoldHint}>{copy.unsoldCourses}</SectionTitle>
+              {data.unsoldCourses.length ? (
+                <BarList
+                  items={data.unsoldCourses.slice(0, 12).map((row) => ({
+                    label: row.label,
+                    value: row.leads,
+                    meta: (
+                      <span>
+                        {fmtNum(row.open)} {copy.open} · {fmtNum(row.lost)} {copy.lost}
+                      </span>
+                    ),
+                  }))}
+                  format={fmtNum}
+                  color="var(--warning)"
+                />
+              ) : (
+                <p className="text-sm text-text-muted">{copy.noData}</p>
+              )}
+            </Card>
+          </div>
 
           <div>
-            <SectionTitle hint={t("website_specialty_note")}>
-              {t("website_by_specialty")}
-            </SectionTitle>
+            <SectionTitle hint={copy.specialtyNote}>{t("website_by_specialty")}</SectionTitle>
             <DataTable
               rows={data.specialties}
               cols={specialtyCols}
