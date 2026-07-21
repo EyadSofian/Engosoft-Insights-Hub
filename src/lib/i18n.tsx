@@ -73,6 +73,7 @@ export const DICT = {
   preset_month: { ar: "هذا الشهر", en: "This month" },
   preset_year: { ar: "هذا العام", en: "This year" },
   preset_all: { ar: "كل الفترات", en: "All time" },
+  custom_range: { ar: "فترة مخصصة", en: "Custom range" },
   from: { ar: "من", en: "From" },
   to: { ar: "إلى", en: "To" },
 

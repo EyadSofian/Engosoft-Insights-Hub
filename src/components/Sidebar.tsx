@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useI18n, type DictKey } from "@/lib/i18n";
+import { useModalGuard } from "@/lib/ui-store";
 import logoImg from "@/assets/engosoft-logo.png";
 
 interface NavItem {
@@ -136,6 +137,7 @@ export function MobileNav() {
   const { t, lang } = useI18n();
   const isActive = useIsActive();
   const [moreOpen, setMoreOpen] = useState(false);
+  useModalGuard(moreOpen);
 
   const secondary = ALL_ITEMS.filter((i) => !MOBILE_PRIMARY.some((p) => p.to === i.to));
   const secondaryActive = secondary.some(isActive);

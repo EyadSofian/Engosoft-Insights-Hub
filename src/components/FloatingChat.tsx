@@ -3,6 +3,7 @@ import { X, Send, Sparkles, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useI18n } from "@/lib/i18n";
 import { useFilters } from "@/lib/filter-store";
+import { useAnyModalOpen } from "@/lib/ui-store";
 
 interface Msg {
   role: "user" | "assistant";
@@ -14,6 +15,7 @@ const STORAGE = "engo_chat_v2";
 export function FloatingChat() {
   const { t, lang, dir } = useI18n();
   const filters = useFilters();
+  const anyModalOpen = useAnyModalOpen();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -96,10 +98,10 @@ export function FloatingChat() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("ai_assistant")}
         aria-expanded={open}
-        className={`fixed z-50 bottom-24 lg:bottom-6 ${
+        className={`fixed z-40 bottom-24 lg:bottom-6 ${
           dir === "rtl" ? "start-5" : "end-5"
         } w-14 h-14 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
-          open ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
+          open || anyModalOpen ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
         }`}
         style={{
           background: "linear-gradient(140deg, var(--brand), var(--electric))",

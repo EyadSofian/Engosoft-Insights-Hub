@@ -34,6 +34,42 @@ const prune = () => {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+/**
+ * The from/to window a named preset resolves to. Anchored to `latest` (the
+ * newest date present in the sheet) rather than the browser clock, so a stale
+ * sheet can't produce an empty "last 7 days". Exported so the date picker can
+ * tell which preset — if any — the current range corresponds to.
+ */
+export function presetWindow(
+  next: DatePreset,
+  latest?: string,
+): { from?: string; to?: string; range?: "all" } {
+  const anchor = latest ? new Date(latest + "T00:00:00Z") : new Date();
+  const back = (days: number) => {
+    const d = new Date(anchor);
+    d.setUTCDate(d.getUTCDate() - (days - 1));
+    return iso(d);
+  };
+
+  switch (next) {
+    case "all":
+      // Explicitly opt out of the server's default window.
+      return { from: undefined, to: undefined, range: "all" };
+    case "7d":
+      return { from: back(7), to: iso(anchor) };
+    case "30d":
+      return { from: back(30), to: iso(anchor) };
+    case "month": {
+      const first = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+      return { from: iso(first), to: iso(anchor) };
+    }
+    case "year": {
+      const first = new Date(Date.UTC(anchor.getUTCFullYear(), 0, 1));
+      return { from: iso(first), to: iso(anchor) };
+    }
+  }
+}
+
 export const filterStore = {
   get: (): GlobalFilters => state,
   getPreset: (): DatePreset => preset,
@@ -59,35 +95,8 @@ export const filterStore = {
    */
   setPreset(next: DatePreset, latest?: string) {
     preset = next;
-    const anchor = latest ? new Date(latest + "T00:00:00Z") : new Date();
-    const back = (days: number) => {
-      const d = new Date(anchor);
-      d.setUTCDate(d.getUTCDate() - (days - 1));
-      return iso(d);
-    };
-
-    switch (next) {
-      case "all":
-        // Explicitly opt out of the server's default window.
-        state = { ...state, from: undefined, to: undefined, range: "all" };
-        break;
-      case "7d":
-        state = { ...state, from: back(7), to: iso(anchor), range: undefined };
-        break;
-      case "30d":
-        state = { ...state, from: back(30), to: iso(anchor), range: undefined };
-        break;
-      case "month": {
-        const first = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
-        state = { ...state, from: iso(first), to: iso(anchor), range: undefined };
-        break;
-      }
-      case "year": {
-        const first = new Date(Date.UTC(anchor.getUTCFullYear(), 0, 1));
-        state = { ...state, from: iso(first), to: iso(anchor), range: undefined };
-        break;
-      }
-    }
+    const w = presetWindow(next, latest);
+    state = { ...state, from: w.from, to: w.to, range: w.range };
     prune();
     emit();
   },

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, SlidersHorizontal, Languages, X, Moon, Sun, Check } from "lucide-react";
 import { fmtDateTime, useI18n } from "@/lib/i18n";
-import { activeDimensionCount, filterStore, useFilters, usePreset } from "@/lib/filter-store";
-import type { CampaignObjective, DatePreset, DataHealth, Platform } from "@/lib/types";
+import { activeDimensionCount, filterStore, useFilters } from "@/lib/filter-store";
+import { useModalGuard } from "@/lib/ui-store";
+import type { CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { Segmented } from "./ui-bits";
+import { DateFilter, DateRangePanel } from "./DateFilter";
 
 export interface FiltersResp {
   accounts: { name: string; platform: Platform; objective: CampaignObjective; spend: number; platformLeads: number | null }[];
@@ -39,14 +42,6 @@ export interface FiltersResp {
   counts: { ads: number; crm: number; invoiced: number; sales: number; lost: number };
 }
 
-const PRESETS: { value: DatePreset; key: "preset_7" | "preset_30" | "preset_month" | "preset_year" | "preset_all" }[] = [
-  { value: "7d", key: "preset_7" },
-  { value: "30d", key: "preset_30" },
-  { value: "month", key: "preset_month" },
-  { value: "year", key: "preset_year" },
-  { value: "all", key: "preset_all" },
-];
-
 export function useFiltersData() {
   return useQuery<FiltersResp>({
     queryKey: ["filters"],
@@ -69,7 +64,6 @@ function latestDate(data?: FiltersResp): string | undefined {
 export function TopBar({ title }: { title?: string }) {
   const { t, lang, setLang, theme, toggleTheme } = useI18n();
   const filters = useFilters();
-  const preset = usePreset();
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -160,13 +154,11 @@ export function TopBar({ title }: { title?: string }) {
           </div>
         </div>
 
-        {/* Period and platform stay visible on every screen — the most-used controls. */}
+        {/* Period and platform stay visible on every screen — the most-used controls.
+            The date control is now a single button that opens a preset + calendar
+            picker, so custom ranges no longer hide inside the filter sheet. */}
         <div className="px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <Segmented
-            value={preset}
-            onChange={(v) => filterStore.setPreset(v, latest)}
-            options={PRESETS.map((p) => ({ value: p.value, label: t(p.key) }))}
-          />
+          <DateFilter latest={latest} />
           <Segmented
             value={filters.platform ?? "all"}
             onChange={(v) => filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })}
@@ -175,11 +167,6 @@ export function TopBar({ title }: { title?: string }) {
               ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
             ]}
           />
-          {filters.from && filters.to && (
-            <span className="text-[11px] text-text-muted num whitespace-nowrap ps-1">
-              {filters.from} → {filters.to}
-            </span>
-          )}
         </div>
       </header>
 
@@ -270,6 +257,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
 function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => void; data?: FiltersResp }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
+  useModalGuard(open);
 
   useEffect(() => {
     if (!open) return;
@@ -283,9 +271,11 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  // Portal out of the sticky z-30 header, otherwise the sheet can't stack above
+  // the fixed bottom nav and the FAB.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center animate-fade-in"
       style={{ background: "rgba(4, 12, 24, 0.5)" }}
@@ -311,23 +301,9 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
         </div>
 
         <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t("from")}>
-              <input
-                type="date"
-                value={filters.from ?? ""}
-                onChange={(e) => filterStore.setDates(e.target.value, filters.to)}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm min-h-[44px]"
-              />
-            </Field>
-            <Field label={t("to")}>
-              <input
-                type="date"
-                value={filters.to ?? ""}
-                onChange={(e) => filterStore.setDates(filters.from, e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm min-h-[44px]"
-              />
-            </Field>
+          <div>
+            <span className="block text-xs font-medium text-text-muted mb-2">{t("date_range")}</span>
+            <DateRangePanel latest={latestDate(data)} collapsibleCalendar />
           </div>
 
           <Select
@@ -434,7 +410,8 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -101,6 +101,23 @@ export function TelegramPanel() {
 
   if (isLoading || !data) return null;
 
+  // The setup endpoint returns an error shape (no `scheduler`) when the bot
+  // isn't configured for this deployment. Surface that instead of letting the
+  // missing field throw and white-screen the whole overview page.
+  if (!data.scheduler) {
+    return (
+      <Card>
+        <SectionTitle>{t("telegram")}</SectionTitle>
+        <Notice tone="warning" icon={<AlertTriangle size={16} />}>
+          {data.error ??
+            (ar
+              ? "تقرير تيليجرام غير مُهيأ على هذا الخادم."
+              : "Telegram report is not configured on this deployment.")}
+        </Notice>
+      </Card>
+    );
+  }
+
   const tokenSet = data.scheduler.enabled;
   const webhookOk = data.registered && data.matchesThisDeployment;
 
