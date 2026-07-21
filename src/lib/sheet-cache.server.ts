@@ -111,6 +111,18 @@ function num(v: unknown): number {
   return isFinite(n) ? n : 0;
 }
 
+const USD_RATE: Record<string, number> = {
+  EGP: 0.02054,
+  SAR: 0.267,
+  AED: 0.27,
+  USD: 1,
+};
+
+function usdValue(explicit: unknown, totalInCurrency: unknown, currency: unknown): number {
+  if (str(explicit) !== "") return num(explicit);
+  return num(totalInCurrency) * (USD_RATE[str(currency).toUpperCase()] ?? 0);
+}
+
 /**
  * The export mixes ISO timestamps with US slash dates. `Closing Date` arrives as
  * `5/21/2026` and `Date` as `7/13/2026` — month first. Reading those as D/M/Y
@@ -444,132 +456,147 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const ads = [...meta, ...snap];
 
     /* -- CRM --------------------------------------------------------------- */
-    const crm: CrmLeadRow[] = crmRaw.map((r) => {
-      const createdAt = parseDate(r["أنشئ في"]);
-      const closedAt = parseDate(r["التاريخ المقفل"]) || parseDate(r["Closing Date"]);
-      const adName = str(r["Ad Name"]);
-      const adId = str(r["Ad ID"]);
-      const { adset, origin } = adsets.resolve(adId, adName);
-      const campaignName = str(r["Campaign Name"]);
-      const campaignId = str(r["Campaign ID"]);
-      const cleanedStage = str(r["Cleaned Stage"]);
-      const source = str(r["cleaned Source"]) || str(r["Source"]);
-      return {
-        id: str(r["__odoo_id"]),
-        createdAt,
-        closedAt,
-        daysToClose: closedAt ? daysBetween(createdAt, closedAt) : null,
-        campaignName,
-        campaignId,
-        campaignKey: keys.key(campaignId, campaignName),
-        adName,
-        adId,
-        adset,
-        adsetOrigin: origin,
-        contact: str(r["اسم جهة الاتصال"]),
-        salesperson: str(r["Salesperson"]),
-        salesTeam: str(r["Sales Team"]),
-        subTeam: str(r["فريق المبيعات"]),
-        stage: str(r["Stage"]),
-        cleanedStage,
-        lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
-        callingReply: str(r["Calling reply?"]),
-        isWon: cleanedStage.toLowerCase() === "won",
-        isLost: cleanedStage.toLowerCase() === "lost",
-        source,
-        sourceKey: normalizeSource(source),
-        course: str(r["Course"]),
-        mainCategory: str(r["Main Category"]),
-        priority: str(r["Priority"]),
-        fromCampaign: !!campaignName || !!campaignId,
-      };
-    });
+    const crm: CrmLeadRow[] = crmRaw
+      .filter((r) => str(r["__odoo_id"]))
+      .map((r) => {
+        const createdAt = parseDate(r["أنشئ في"]);
+        const closedAt = parseDate(r["التاريخ المقفل"]) || parseDate(r["Closing Date"]);
+        const adName = str(r["Ad Name"]);
+        const adId = str(r["Ad ID"]);
+        const resolvedAdset = adsets.resolve(adId, adName);
+        const directAdset = str(r["Ad Set Name"]);
+        const adset = directAdset || resolvedAdset.adset;
+        const origin: AdSetOrigin = directAdset ? "exact" : resolvedAdset.origin;
+        const campaignName = str(r["Campaign Name"]);
+        const campaignId = str(r["Campaign ID"]);
+        const cleanedStage = str(r["Cleaned Stage"]) || str(r["Stage"]);
+        const source = str(r["cleaned Source"]) || str(r["Source"]);
+        return {
+          id: str(r["__odoo_id"]),
+          createdAt,
+          closedAt,
+          daysToClose: closedAt ? daysBetween(createdAt, closedAt) : null,
+          campaignName,
+          campaignId,
+          campaignKey: keys.key(campaignId, campaignName),
+          adName,
+          adId,
+          adset,
+          adsetOrigin: origin,
+          contact: str(r["اسم جهة الاتصال"]),
+          salesperson: str(r["Salesperson"]),
+          salesTeam: str(r["Sales Team"]) || str(r["فريق المبيعات"]),
+          subTeam: str(r["فريق المبيعات"]),
+          stage: str(r["Stage"]),
+          cleanedStage,
+          lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
+          callingReply: str(r["Calling reply?"]),
+          isWon: cleanedStage.toLowerCase() === "won",
+          isLost: cleanedStage.toLowerCase() === "lost",
+          source,
+          sourceKey: normalizeSource(source),
+          course: str(r["Course"]) || str(r["Course Categories"]),
+          mainCategory: str(r["Main Category"]),
+          priority: str(r["Priority"]),
+          fromCampaign: !!campaignName || !!campaignId,
+        };
+      });
 
     /* -- invoiced ---------------------------------------------------------- */
-    const invoiced: InvoicedRow[] = invRaw.map((r) => {
-      const invoiceDate = parseDate(r["Invoice Date"]);
-      // `Invoice Date` is populated on ~8% of rows; `Date` on 100%. Filtering on
-      // `Invoice Date` silently drops most of the revenue, so `Date` is the
-      // attribution date.
-      const revenueDate =
-        parseDate(r["Date"]) || parseDate(r["بنود الطلب /أنشئ في"]) || invoiceDate;
-      const campaignName = str(r["Campaign Name"]) || str(r["الفرصة /Campaign Name"]);
-      const campaignId = str(r["الفرصة /Campaign ID"]) || str(r["Campaign ID"]);
-      const adName = str(r["AD Name"]) || str(r["الفرصة /Ad Name"]);
-      const adId = str(r["الفرصة /Ad ID"]);
-      const { adset, origin } = adsets.resolve(adId, adName);
-      const source = str(r["Cleaned Source"]) || str(r["Source"]);
-      return {
-        orderRef: str(r["بنود الطلب /مرجع الطلب"]),
-        campaignName,
-        campaignId,
-        campaignKey: keys.key(campaignId, campaignName),
-        adName,
-        adId,
-        adset,
-        adsetOrigin: origin,
-        product: str(r["بنود الطلب /المنتج"]),
-        customer: str(r["بنود الطلب /العميل"]),
-        course: str(r["Course"]),
-        mainCategory: str(r["Main Category"]),
-        // Only ~16% of rows carry a team, so this must never be used as a
-        // revenue filter on its own — see health.revenueTeamCoverage.
-        salesTeam: str(r["Sales Team"]) || str(r["Team"]),
-        salesperson: str(r["بنود الطلب /مندوب المبيعات"]),
-        source,
-        sourceKey: normalizeSource(source),
-        invoiceDate,
-        revenueDate,
-        localTotal: num(r["بنود الطلب /الإجمالي"]),
-        // Already USD. The `Value to dolar` tab must never be applied to it.
-        usdSales: num(r["$ Sales"]),
-      };
-    });
+    const invoiced: InvoicedRow[] = invRaw
+      .filter((r) => str(r["__odoo_id"]))
+      .map((r) => {
+        const invoiceDate = parseDate(r["Invoice Date"]);
+        // `Invoice Date` is populated on ~8% of rows; `Date` on 100%. Filtering on
+        // `Invoice Date` silently drops most of the revenue, so `Date` is the
+        // attribution date.
+        const revenueDate =
+          parseDate(r["Date"]) || parseDate(r["بنود الطلب /أنشئ في"]) || invoiceDate;
+        const campaignName = str(r["Campaign Name"]) || str(r["الفرصة /Campaign Name"]);
+        const campaignId = str(r["الفرصة /Campaign ID"]) || str(r["Campaign ID"]);
+        const adName = str(r["AD Name"]) || str(r["الفرصة /Ad Name"]);
+        const adId = str(r["الفرصة /Ad ID"]);
+        const resolvedAdset = adsets.resolve(adId, adName);
+        const directAdset = str(r["AD Set Name"]) || str(r["الفرصة /Ad Set Name"]);
+        const adset = directAdset || resolvedAdset.adset;
+        const origin: AdSetOrigin = directAdset ? "exact" : resolvedAdset.origin;
+        const source = str(r["Cleaned Source"]) || str(r["Source"]) || str(r["الفرصة /المصدر"]);
+        return {
+          orderRef: str(r["بنود الطلب /مرجع الطلب"]),
+          campaignName,
+          campaignId,
+          campaignKey: keys.key(campaignId, campaignName),
+          adName,
+          adId,
+          adset,
+          adsetOrigin: origin,
+          product: str(r["بنود الطلب /المنتج"]),
+          customer: str(r["بنود الطلب /العميل"]),
+          course: str(r["Course"]) || str(r["الفرصة /Course Categories"]),
+          mainCategory: str(r["Main Category"]),
+          // Only ~16% of rows carry a team, so this must never be used as a
+          // revenue filter on its own — see health.revenueTeamCoverage.
+          salesTeam: str(r["Sales Team"]) || str(r["Team"]),
+          salesperson: str(r["بنود الطلب /مندوب المبيعات"]),
+          source,
+          sourceKey: normalizeSource(source),
+          invoiceDate,
+          revenueDate,
+          localTotal: num(r["بنود الطلب /الإجمالي"]),
+          // The workflow writes USD directly. The currency-rate calculation is a
+          // guard for a partially refreshed sheet where that derived cell is blank.
+          usdSales: usdValue(r["$ Sales"], r["بنود الطلب /الإجمالي"], r["بنود الطلب /العملة"]),
+        };
+      });
 
     /* -- sales ------------------------------------------------------------- */
-    const sales: SalesRow[] = salesRaw.map((r) => {
-      const paymentDate = parseDate(r["Payment Date"]);
-      return {
-        paymentDate,
-        invoiceDate: parseDate(r["تاريخ الفاتورة"]),
-        orderRef: str(r["Sales Order #"]),
-        course: str(r["Course Name"]),
-        category: str(r["فئة المنتج"]),
-        partner: str(r["الشريك"]),
-        salesperson: str(r["Salesperson"]),
-        teamLeader: str(r["Team Leader"]),
-        salesTeam: str(r["فريق المبيعات"]),
-        usdSales: num(r["$ Sales"]),
-        currency: str(r["العملة"]),
-        eventStage: str(r["Event Stage"]),
-        month: paymentDate ? paymentDate.slice(0, 7) : "",
-      };
-    });
+    const sales: SalesRow[] = salesRaw
+      .filter((r) => str(r["__odoo_id"]))
+      .map((r) => {
+        const paymentDate = parseDate(r["Payment Date"]);
+        return {
+          paymentDate,
+          invoiceDate: parseDate(r["تاريخ الفاتورة"]),
+          orderRef: str(r["Sales Order #"]),
+          course: str(r["Course Name"]) || str(r["فئة المنتج"]),
+          category: str(r["فئة المنتج"]),
+          partner: str(r["الشريك"]),
+          salesperson: str(r["Salesperson"]),
+          teamLeader: str(r["Team Leader"]),
+          salesTeam: str(r["فريق المبيعات"]),
+          usdSales: usdValue(r["$ Sales"], r["الإجمالي بالعملة"], r["العملة"]),
+          currency: str(r["العملة"]),
+          eventStage: str(r["Event Stage"]),
+          month: paymentDate ? paymentDate.slice(0, 7) : "",
+        };
+      });
 
     /* -- lost -------------------------------------------------------------- */
-    const lost: LostRow[] = lostRaw.map((r) => {
-      const campaignName = str(r["Campaign Name"]);
-      const campaignId = str(r["Campaign ID"]);
-      const source = str(r["cleaned Source"]) || str(r["المصدر"]);
-      return {
-        id: str(r["__odoo_id"]),
-        contact: str(r["اسم جهة الاتصال"]),
-        campaignName,
-        campaignId,
-        campaignKey: keys.key(campaignId, campaignName),
-        adName: str(r["Ad Name"]),
-        adId: str(r["Ad ID"]),
-        lossReason: str(r["سبب الضياع"]),
-        course: str(r["Course"]),
-        mainCategory: str(r["Main Category"]),
-        salesTeam: str(r["فريق المبيعات"]),
-        salesperson: str(r["مندوب المبيعات"]),
-        source,
-        sourceKey: normalizeSource(source),
-        stage: str(r["Cleaned Stage"]),
-        createdAt: parseDate(r["أنشئ في"]),
-      };
-    });
+    const lost: LostRow[] = lostRaw
+      .filter((r) => str(r["__odoo_id"]))
+      .map((r) => {
+        const campaignName = str(r["Campaign Name"]);
+        const campaignId = str(r["Campaign ID"]);
+        const source = str(r["cleaned Source"]) || str(r["المصدر"]);
+        return {
+          id: str(r["__odoo_id"]),
+          contact: str(r["اسم جهة الاتصال"]),
+          campaignName,
+          campaignId,
+          campaignKey: keys.key(campaignId, campaignName),
+          adName: str(r["Ad Name"]),
+          adId: str(r["Ad ID"]),
+          lossReason: str(r["سبب الضياع"]),
+          course: str(r["Course"]) || str(r["Course Categories"]),
+          mainCategory: str(r["Main Category"]),
+          salesTeam: str(r["فريق المبيعات"]),
+          salesperson: str(r["مندوب المبيعات"]),
+          source,
+          sourceKey: normalizeSource(source),
+          stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
+          createdAt: parseDate(r["أنشئ في"]),
+        };
+      });
 
     /* -- accounts ---------------------------------------------------------- */
     const acctMap = new Map<string, AccountInfo>();
