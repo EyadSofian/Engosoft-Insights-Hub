@@ -27,6 +27,7 @@ export const DICT = {
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
   leads: { ar: "العملاء المحتملون", en: "Leads (CRM)" },
+  website: { ar: "أداء الموقع", en: "Website performance" },
   full_invoiced: { ar: "الفواتير", en: "Full Invoiced" },
   lost: { ar: "تحليل الخسائر", en: "Lost Analysis" },
   courses: { ar: "الدورات", en: "Courses" },
@@ -156,6 +157,42 @@ export const DICT = {
   team: { ar: "الفريق", en: "Team" },
   partner: { ar: "الشريك", en: "Partner" },
 
+  // website cohort
+  website_subtitle: {
+    ar: "ليدز ومبيعات الموقع فقط، مع حالة التواصل والتخصص",
+    en: "Website-only leads and paid sales, with contact status and specialty",
+  },
+  website_filter_note: {
+    ar: "اختيار «من / إلى» بالأعلى يفلتر الليدز بتاريخ الإنشاء ومبيعات الموقع بتاريخ الدفع. بيانات ميتا وسناب لا تدخل في هذه الصفحة.",
+    en: "The From / To selector filters leads by creation date and website sales by payment date. Meta and Snapchat data are excluded from this page.",
+  },
+  website_leads: { ar: "إجمالي ليدز الموقع", en: "Website leads" },
+  open_leads: { ar: "ليدز مفتوحة", en: "Open leads" },
+  not_contacted: { ar: "لم يتم الوصول إليهم", en: "Not reached" },
+  website_sales: { ar: "مبيعات الموقع", en: "Website sales" },
+  website_pipeline: { ar: "حالة ليدز الموقع", en: "Website lead status" },
+  waiting_age: { ar: "مدة الانتظار دون تواصل ناجح", en: "Age without successful contact" },
+  as_of: { ar: "حتى", en: "As of" },
+  today: { ar: "اليوم", en: "Today" },
+  website_sales_by_specialty: { ar: "مبيعات الموقع حسب التخصص", en: "Website sales by specialty" },
+  website_sales_payment_note: {
+    ar: "تُنسب المبيعات للموقع من رقم أمر البيع، وتُعرض في الفترة حسب Payment Date.",
+    en: "Sales are attributed to Website through the sales-order reference and shown by Payment Date.",
+  },
+  website_by_specialty: { ar: "ليدز الموقع حسب التخصص", en: "Website leads by specialty" },
+  website_specialty_note: {
+    ar: "الأرقام تجمع الليدز النشطة مع الـ Lost المؤكد من الأرشيف دون خلط مصادر أخرى.",
+    en: "Counts combine active leads with confirmed archived-lost leads, without mixing other sources.",
+  },
+  not_contacted_detail: { ar: "الليدز التي تحتاج متابعة", en: "Leads needing follow-up" },
+  contact_age_note: {
+    ar: "مدة الانتظار تُحسب من آخر تحديث للمرحلة، أو من تاريخ الإنشاء عندما لا يتوفر التحديث.",
+    en: "Waiting age uses the last stage update, falling back to creation date when unavailable.",
+  },
+  waiting_since: { ar: "منتظر منذ", en: "Waiting since" },
+  waiting_days: { ar: "مدة الانتظار", en: "Waiting days" },
+  calling_reply: { ar: "نتيجة المكالمة", en: "Calling reply" },
+
   // courses
   top_performing: { ar: "الأفضل أداءً", en: "Top performing" },
   underperforming: { ar: "الأضعف أداءً", en: "Underperforming" },
@@ -236,7 +273,7 @@ export const DICT = {
   },
   lost_population_note: {
     ar: "جدول الخسائر وتصنيف المرحلة «ضائع» في النظام مجموعتان مختلفتان من الصفوف، ولا تتطابق أعدادهما.",
-    en: "The Lost tab and CRM stage \"Lost\" are two different row populations; their counts do not match.",
+    en: 'The Lost tab and CRM stage "Lost" are two different row populations; their counts do not match.',
   },
 
   // yoy

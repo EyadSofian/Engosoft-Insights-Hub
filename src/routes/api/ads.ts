@@ -5,7 +5,8 @@ export const Route = createFileRoute("/api/ads")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, computeTotals, computePerf, div } = await import("@/lib/metrics.server");
+        const { getFiltered, computeTotals, computePerf, div } =
+          await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { PLATFORMS } = await import("@/lib/constants");
 
@@ -17,11 +18,13 @@ export const Route = createFileRoute("/api/ads")({
           const spend = rows.reduce((s, r) => s + r.spend, 0);
           const impressions = rows.reduce((s, r) => s + r.impressions, 0);
           const clicksAll = rows.reduce((s, r) => s + r.clicksAll, 0);
-          // Snapchat reports neither link clicks nor leads; `null` keeps those
-          // columns honest instead of showing a zero the platform never sent.
+          // Availability is row-driven: the corrected Snapchat feed reports
+          // native leads but still has no link-click metric.
           const reportsLinks = rows.some((r) => r.linkClicks !== null);
           const reportsLeads = rows.some((r) => r.platformLeads !== null);
-          const linkClicks = reportsLinks ? rows.reduce((s, r) => s + (r.linkClicks ?? 0), 0) : null;
+          const linkClicks = reportsLinks
+            ? rows.reduce((s, r) => s + (r.linkClicks ?? 0), 0)
+            : null;
           const platformLeads = reportsLeads
             ? rows.reduce((s, r) => s + (r.platformLeads ?? 0), 0)
             : null;
@@ -45,8 +48,17 @@ export const Route = createFileRoute("/api/ads")({
             cpc: div(spend, clicksAll),
             platformCpl: platformLeads === null ? null : div(spend, platformLeads),
             accounts: [...new Set(rows.map((r) => r.account))],
-            dateMin: rows.map((r) => r.date).filter(Boolean).sort()[0] ?? "",
-            dateMax: rows.map((r) => r.date).filter(Boolean).sort().pop() ?? "",
+            dateMin:
+              rows
+                .map((r) => r.date)
+                .filter(Boolean)
+                .sort()[0] ?? "",
+            dateMax:
+              rows
+                .map((r) => r.date)
+                .filter(Boolean)
+                .sort()
+                .pop() ?? "",
           };
         }).filter((p) => p.rows > 0);
 

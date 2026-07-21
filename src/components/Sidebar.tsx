@@ -11,6 +11,7 @@ import {
   TrendingDown,
   GraduationCap,
   CalendarRange,
+  Globe2,
   MoreHorizontal,
   X,
   type LucideIcon,
@@ -51,6 +52,7 @@ const GROUPS: { label: { ar: string; en: string }; items: NavItem[] }[] = [
     // for the leads-and-losses pair without sounding translated.
     label: { ar: "العملاء", en: "Pipeline" },
     items: [
+      { to: "/website", key: "website", icon: Globe2 },
       { to: "/leads", key: "leads", icon: Users },
       { to: "/teams", key: "teams", icon: UsersRound },
       { to: "/lost", key: "lost", icon: TrendingDown },
@@ -70,8 +72,7 @@ const MOBILE_PRIMARY: NavItem[] = [
 
 function useIsActive() {
   const loc = useLocation();
-  return (it: NavItem) =>
-    it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
+  return (it: NavItem) => (it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to));
 }
 
 export function Sidebar() {
@@ -136,9 +137,7 @@ export function MobileNav() {
   const isActive = useIsActive();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const secondary = ALL_ITEMS.filter(
-    (i) => !MOBILE_PRIMARY.some((p) => p.to === i.to),
-  );
+  const secondary = ALL_ITEMS.filter((i) => !MOBILE_PRIMARY.some((p) => p.to === i.to));
   const secondaryActive = secondary.some(isActive);
 
   return (

@@ -43,11 +43,7 @@ export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
 
 /* --- normalized rows ------------------------------------------------------ */
 
-/**
- * One ad × day, from either platform. Snapchat genuinely has no link-click and
- * no lead columns, so those are `null` — never `0`, or Snapchat would drag every
- * blended average down toward zero.
- */
+/** One ad × day, from either platform. Unsupported metrics stay `null`. */
 export interface AdRow {
   platform: Platform;
   date: string;
@@ -91,6 +87,10 @@ export interface CrmLeadRow {
   subTeam: string;
   stage: string;
   cleanedStage: string;
+  /** Last time the lead moved stage in Odoo; used as a conservative contact-age proxy. */
+  lastStageUpdate: string;
+  /** Raw Odoo "Calling reply?" value when that custom field is available. */
+  callingReply: string;
   isWon: boolean;
   isLost: boolean;
   source: string;
@@ -148,13 +148,10 @@ export interface SalesRow {
   month: string;
 }
 
-/**
- * A lead that carries a loss reason. This population is NOT the same as CRM rows
- * with `Cleaned Stage = Lost` — the two exports share no odoo ids and differ in
- * size (6,550 vs 4,276). Use this tab for reason analysis, CRM for lost rate.
- */
+/** A confirmed lost lead from the archived CRM population (`active=false`, probability=0). */
 export interface LostRow {
   id: string;
+  contact: string;
   campaignName: string;
   campaignId: string;
   campaignKey: string;
@@ -192,7 +189,7 @@ export interface Totals {
   ctrLink: Maybe;
   cpm: Maybe;
   cpc: Maybe;
-  /** Leads the ad platform reported. Meta only — Snapchat reports none. */
+  /** Leads reported by the ad platform (Meta form leads or Snapchat native leads). */
   platformLeads: Maybe;
 
   /* CRM side */

@@ -6,15 +6,15 @@ invoiced revenue, and reports full-funnel performance with an AI assistant on to
 
 ## Stack
 
-| Layer | Choice |
-| --- | --- |
-| Framework | TanStack Start (React 19, SSR) |
-| Build | Vite 8, Nitro (`node-server` preset) |
-| Styling | Tailwind CSS v4, custom token layer |
-| Charts | Recharts |
-| Data | Google Sheets CSV (gviz), parsed with papaparse, cached in memory |
+| Layer      | Choice                                                                     |
+| ---------- | -------------------------------------------------------------------------- |
+| Framework  | TanStack Start (React 19, SSR)                                             |
+| Build      | Vite 8, Nitro (`node-server` preset)                                       |
+| Styling    | Tailwind CSS v4, custom token layer                                        |
+| Charts     | Recharts                                                                   |
+| Data       | Google Sheets CSV (gviz), parsed with papaparse, cached in memory          |
 | Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
-| AI | OpenAI (isolated in the chat route, swappable) |
+| AI         | OpenAI (isolated in the chat route, swappable)                             |
 
 No database. The sheet is the source of truth.
 
@@ -36,16 +36,16 @@ npm run start        # serves .output/server/index.mjs on $PORT
 
 Copy `.env.example` to `.env`:
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `SHEET_ID` | No | Google Sheet id. Falls back to the Engosoft sheet. |
-| `OPENAI_API_KEY` | No | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
-| `TELEGRAM_BOT_TOKEN` | No | Enables the daily report. Never logged or returned in a response. |
-| `TELEGRAM_CHAT_ID` | No | Optional fallback recipient, always included alongside `/start` subscribers. |
-| `TELEGRAM_SUBSCRIBERS_FILE` | No | Where the subscriber list is stored. Point at a mounted volume on Railway. |
-| `REPORT_CRON` | No | Cron expression in Africa/Cairo. Default `0 9 * * *`. |
-| `REPORT_LANG` | No | `ar` (default) or `en`. |
-| `PORT` | No | Set by Railway automatically. |
+| Variable                    | Required | Purpose                                                                                |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `SHEET_ID`                  | No       | Google Sheet id. Falls back to the Engosoft sheet.                                     |
+| `OPENAI_API_KEY`            | No       | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
+| `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
+| `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |
+| `TELEGRAM_SUBSCRIBERS_FILE` | No       | Where the subscriber list is stored. Point at a mounted volume on Railway.             |
+| `REPORT_CRON`               | No       | Cron expression in Africa/Cairo. Default `0 9 * * *`.                                  |
+| `REPORT_LANG`               | No       | `ar` (default) or `en`.                                                                |
+| `PORT`                      | No       | Set by Railway automatically.                                                          |
 
 The sheet must be shared as **anyone with the link can view**. The app only ever reads it.
 
@@ -90,9 +90,9 @@ pass leaks all-time revenue into a filtered window.
 name-only match is a guess. Ad id is exact; name is a flagged fallback (`ambiguous`).
 Unresolved rows go to an explicit "Unknown ad set" bucket, never dropped.
 
-**6. Snapchat reports neither link clicks nor leads.**
-Those fields are `null`, not `0`. A zero would drag blended link-CTR down and invent
-leads Snapchat never claimed. Link-CTR's denominator excludes Snapchat impressions.
+**6. Snapchat reports native leads, but not link clicks in this export.**
+The corrected feed writes `native_leads` to `Leads (Native)`. Link clicks stay `null`,
+not `0`, and link-CTR's denominator excludes Snapchat impressions.
 
 **7. Not every lead source has spend data.**
 TikTok, UChat, WhatsApp and referrals produce ~6,600 leads with no cost anywhere in the
@@ -113,11 +113,11 @@ cost against 7 months of revenue — an 18× ROAS that means nothing. Such rows 
 The default year-to-date window's predecessor starts mid-2025, where the sheet holds 109
 stray invoice rows and nothing else — enough to report "+5,959% revenue". Deltas are
 suppressed entirely when the previous window predates complete data, and year-over-year
-requires a real prior year across ads *and* CRM *and* invoices.
+requires a real prior year across ads _and_ CRM _and_ invoices.
 
-**11. The Lost tab and CRM stage "Lost" are different populations.**
-They share no odoo ids and differ in size (6,550 vs 4,276). Loss *reasons* come from the
-tab; lost *rate* comes from the CRM. They are never mixed.
+**11. Lost Analysis is the confirmed archived-lost population.**
+The Odoo sync requires both `active = false` and `probability = 0`. This excludes
+ordinary/manual archives that are not actually lost. Loss reasons come from this tab.
 
 **12. The gviz endpoint is served through Google's CDN.**
 It caches the CSV and ignores a `no-cache` request header, so Refresh kept
@@ -143,18 +143,18 @@ all, and only ~26% maps to a campaign present in the ads tabs.
 Every ratio goes through `div()`, which returns `null` when the denominator is zero.
 `null` renders as an em dash — never `0`, `NaN` or `Infinity`.
 
-| Metric | Formula |
-| --- | --- |
-| CPL | efficiency spend ÷ CRM leads |
-| Platform CPL | efficiency spend ÷ platform-reported leads (Meta only) |
-| Paid CPL | efficiency spend ÷ leads carrying a campaign |
-| CPA | efficiency spend ÷ won leads **or** ÷ distinct invoices (toggle) |
-| ACOS | (efficiency spend ÷ revenue) × 100 |
-| ROAS | revenue ÷ efficiency spend |
-| Conversion rate | (won ÷ CRM leads) × 100, always shown with the count |
-| Lost rate | (lost ÷ CRM leads) × 100 |
-| Avg close time | mean of `Closing Date − أنشئ في`, always shown with its sample size |
-| AOV | revenue ÷ distinct order refs |
+| Metric          | Formula                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| CPL             | efficiency spend ÷ CRM leads                                                    |
+| Platform CPL    | efficiency spend ÷ platform-reported leads (Meta forms + Snapchat native leads) |
+| Paid CPL        | efficiency spend ÷ leads carrying a campaign                                    |
+| CPA             | efficiency spend ÷ won leads **or** ÷ distinct invoices (toggle)                |
+| ACOS            | (efficiency spend ÷ revenue) × 100                                              |
+| ROAS            | revenue ÷ efficiency spend                                                      |
+| Conversion rate | (won ÷ CRM leads) × 100, always shown with the count                            |
+| Lost rate       | (lost ÷ CRM leads) × 100                                                        |
+| Avg close time  | mean of `Closing Date − أنشئ في`, always shown with its sample size             |
+| AOV             | revenue ÷ distinct order refs                                                   |
 
 ## API
 
@@ -162,26 +162,26 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 `account`, `campaign`, `adset`, `ad`, `source`, `course`, `mainCategory`, `salesTeam`,
 `salesperson`, `range`, `includeNonLead`, `cpaBasis`).
 
-| Endpoint | Returns |
-| --- | --- |
-| `GET /api/overview` | KPI totals, deltas, funnel, trend, lead origin, spotlights, data health |
-| `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains |
-| `GET /api/ads` | Per-platform metrics, daily spend, ad and ad-set breakdowns |
-| `GET /api/courses` | Course leaderboard, inferred spend, optional `?detail=` drilldown |
-| `GET /api/teams` | Teams with nested salespeople, leaderboard, needs-attention list |
-| `GET /api/leads` | CRM breakdowns, lead-origin cohorts, detail rows |
-| `GET /api/lost` | Loss reasons with shares, reason × team/course matrices, per-team lost rate |
-| `GET /api/full-invoiced` | Order lines, subtotals, attributed-vs-unattributed split |
-| `GET /api/sales` | Revenue from the Sales tab (payment lines) |
-| `GET /api/yoy` | Year-over-year, or an honest empty state |
-| `GET /api/filters` | Distinct filter values, coverage, sync status, data health |
-| `POST /api/refresh` | Drops the cache and re-pulls the sheet; returns row counts so a no-op refresh is visible |
-| `POST /api/chat` | AI assistant |
-| `GET /api/telegram/preview` | The exact report text, without sending |
-| `POST /api/telegram/send-daily` | Broadcasts to every subscriber (`?days=7` for weekly) |
-| `POST /api/telegram/webhook` | Handles `/start`, `/stop`, `/report`, `/week`, `/status` |
-| `GET /api/telegram/setup` | Whether the webhook is registered, subscriber count, schedule state |
-| `POST /api/telegram/setup` | Points Telegram at this deployment. Required once before the bot works |
+| Endpoint                                       | Returns                                                                                  |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /api/overview`                            | KPI totals, deltas, funnel, trend, lead origin, spotlights, data health                  |
+| `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains                                             |
+| `GET /api/ads`                                 | Per-platform metrics, daily spend, ad and ad-set breakdowns                              |
+| `GET /api/courses`                             | Course leaderboard, inferred spend, optional `?detail=` drilldown                        |
+| `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                         |
+| `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                         |
+| `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate              |
+| `GET /api/full-invoiced`                       | Order lines, subtotals, attributed-vs-unattributed split                                 |
+| `GET /api/sales`                               | Revenue from the Sales tab (payment lines)                                               |
+| `GET /api/yoy`                                 | Year-over-year, or an honest empty state                                                 |
+| `GET /api/filters`                             | Distinct filter values, coverage, sync status, data health                               |
+| `POST /api/refresh`                            | Drops the cache and re-pulls the sheet; returns row counts so a no-op refresh is visible |
+| `POST /api/chat`                               | AI assistant                                                                             |
+| `GET /api/telegram/preview`                    | The exact report text, without sending                                                   |
+| `POST /api/telegram/send-daily`                | Broadcasts to every subscriber (`?days=7` for weekly)                                    |
+| `POST /api/telegram/webhook`                   | Handles `/start`, `/stop`, `/report`, `/week`, `/status`                                 |
+| `GET /api/telegram/setup`                      | Whether the webhook is registered, subscriber count, schedule state                      |
+| `POST /api/telegram/setup`                     | Points Telegram at this deployment. Required once before the bot works                   |
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 
@@ -206,13 +206,13 @@ report, plus the current report immediately so `/start` is useful right away.
 `TELEGRAM_CHAT_ID` is no longer required — if set, that chat is simply always
 included as a fallback.
 
-| Command | Effect |
-| --- | --- |
-| `/start` | Subscribe, and receive yesterday's report now |
-| `/report` | Yesterday's report on demand |
-| `/week` | Last 7 days |
+| Command   | Effect                                              |
+| --------- | --------------------------------------------------- |
+| `/start`  | Subscribe, and receive yesterday's report now       |
+| `/report` | Yesterday's report on demand                        |
+| `/week`   | Last 7 days                                         |
 | `/status` | Whether you're subscribed, and the subscriber count |
-| `/stop` | Unsubscribe |
+| `/stop`   | Unsubscribe                                         |
 
 **The webhook must be registered once, or nothing works.** Until it is, Telegram
 has nowhere to deliver messages: `/start` reaches nothing, the sender is

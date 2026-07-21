@@ -2,7 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApi } from "@/lib/use-api";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
-import { Card, ErrorState, PageHeader, Pill, SectionTitle, Segmented, Skeleton } from "@/components/ui-bits";
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  Pill,
+  SectionTitle,
+  Segmented,
+  Skeleton,
+} from "@/components/ui-bits";
 import { NotReported } from "@/components/metric-bits";
 import { PerfTable } from "@/components/PerfTable";
 import { MultiLineChart } from "@/components/charts";
@@ -72,7 +80,9 @@ function Ads() {
           </div>
 
           <Card>
-            <SectionTitle hint={lang === "ar" ? "الإنفاق اليومي لكل منصة" : "Daily spend per platform"}>
+            <SectionTitle
+              hint={lang === "ar" ? "الإنفاق اليومي لكل منصة" : "Daily spend per platform"}
+            >
               {t("by_day")}
             </SectionTitle>
             <MultiLineChart
@@ -114,13 +124,25 @@ function PlatformCard({ block }: { block: PlatformBlock }) {
     { label: t("spend"), value: fmtUSDFull(block.spend) },
     { label: t("impressions"), value: fmtNum(block.impressions) },
     { label: t("clicks"), value: fmtNum(block.clicksAll) },
-    { label: t("link_clicks"), value: block.linkClicks === null ? <NotReported /> : fmtNum(block.linkClicks) },
+    {
+      label: t("link_clicks"),
+      value: block.linkClicks === null ? <NotReported /> : fmtNum(block.linkClicks),
+    },
     { label: t("ctr_all"), value: fmtPct(block.ctrAll, 2) },
-    { label: t("ctr_link"), value: block.ctrLink === null ? <NotReported /> : fmtPct(block.ctrLink, 2) },
+    {
+      label: t("ctr_link"),
+      value: block.ctrLink === null ? <NotReported /> : fmtPct(block.ctrLink, 2),
+    },
     { label: t("cpm"), value: fmtUSDFull(block.cpm) },
     { label: t("cpc"), value: fmtUSDFull(block.cpc) },
-    { label: t("platform_leads"), value: block.platformLeads === null ? <NotReported /> : fmtNum(block.platformLeads) },
-    { label: t("platform_cpl"), value: block.platformCpl === null ? <NotReported /> : fmtUSDFull(block.platformCpl) },
+    {
+      label: t("platform_leads"),
+      value: block.platformLeads === null ? <NotReported /> : fmtNum(block.platformLeads),
+    },
+    {
+      label: t("platform_cpl"),
+      value: block.platformCpl === null ? <NotReported /> : fmtUSDFull(block.platformCpl),
+    },
   ];
   if (block.viewCompletions !== null) {
     rows.push({
@@ -133,7 +155,11 @@ function PlatformCard({ block }: { block: PlatformBlock }) {
     <Card>
       <SectionTitle
         hint={`${block.dateMin} → ${block.dateMax} · ${fmtNum(block.rows)} ${lang === "ar" ? "صف" : "rows"}`}
-        action={<Pill tone={block.platform === "meta" ? "brand" : "warning"}>{PLATFORM_LABEL[block.platform][lang]}</Pill>}
+        action={
+          <Pill tone={block.platform === "meta" ? "brand" : "warning"}>
+            {PLATFORM_LABEL[block.platform][lang]}
+          </Pill>
+        }
       >
         {PLATFORM_LABEL[block.platform][lang]}
       </SectionTitle>
@@ -154,8 +180,8 @@ function PlatformCard({ block }: { block: PlatformBlock }) {
       {block.platformLeads === null && (
         <p className="text-[11px] text-text-muted mt-2 leading-relaxed">
           {lang === "ar"
-            ? "سناب شات لا يُصدّر أعمدة العملاء المحتملين ولا نقرات الرابط، فأعداد عملائه تأتي من النظام فقط عبر المصدر «Snapchat»."
-            : "Snapchat exports no lead or link-click columns, so its lead counts come only from the CRM via the \"Snapchat\" source."}
+            ? "هذا الملف لا يحتوي على مقياس العملاء الأصليين لهذه المنصة؛ نقرات الرابط ما زالت غير متاحة في تصدير سناب الحالي."
+            : "This export does not contain the platform-native lead metric; link clicks also remain unavailable in the current Snapchat export."}
         </p>
       )}
     </Card>

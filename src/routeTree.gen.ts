@@ -18,6 +18,7 @@ import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
@@ -31,6 +32,7 @@ import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
+import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
@@ -80,6 +82,11 @@ const SalesRoute = SalesRouteImport.update({
 const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WebsiteRoute = WebsiteRouteImport.update({
+  id: '/website',
+  path: '/website',
   getParentRoute: () => rootRouteImport,
 } as any)
 const YoyRoute = YoyRouteImport.update({
@@ -147,6 +154,11 @@ const ApiTeamsRoute = ApiTeamsRouteImport.update({
   path: '/api/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebsiteRoute = ApiWebsiteRouteImport.update({
+  id: '/api/website',
+  path: '/api/website',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiYoyRoute = ApiYoyRouteImport.update({
   id: '/api/yoy',
   path: '/api/yoy',
@@ -183,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/lost': typeof LostRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
+  '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
@@ -196,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -212,6 +226,7 @@ export interface FileRoutesByTo {
   '/lost': typeof LostRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
+  '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
@@ -225,6 +240,7 @@ export interface FileRoutesByTo {
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -242,6 +258,7 @@ export interface FileRoutesById {
   '/lost': typeof LostRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
+  '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
@@ -255,6 +272,7 @@ export interface FileRoutesById {
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -273,6 +291,7 @@ export interface FileRouteTypes {
     | '/lost'
     | '/sales'
     | '/teams'
+    | '/website'
     | '/yoy'
     | '/api/ads'
     | '/api/campaigns'
@@ -286,6 +305,7 @@ export interface FileRouteTypes {
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
+    | '/api/website'
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -302,6 +322,7 @@ export interface FileRouteTypes {
     | '/lost'
     | '/sales'
     | '/teams'
+    | '/website'
     | '/yoy'
     | '/api/ads'
     | '/api/campaigns'
@@ -315,6 +336,7 @@ export interface FileRouteTypes {
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
+    | '/api/website'
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -331,6 +353,7 @@ export interface FileRouteTypes {
     | '/lost'
     | '/sales'
     | '/teams'
+    | '/website'
     | '/yoy'
     | '/api/ads'
     | '/api/campaigns'
@@ -344,6 +367,7 @@ export interface FileRouteTypes {
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
+    | '/api/website'
     | '/api/yoy'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -361,6 +385,7 @@ export interface RootRouteChildren {
   LostRoute: typeof LostRoute
   SalesRoute: typeof SalesRoute
   TeamsRoute: typeof TeamsRoute
+  WebsiteRoute: typeof WebsiteRoute
   YoyRoute: typeof YoyRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
@@ -374,6 +399,7 @@ export interface RootRouteChildren {
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
+  ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiYoyRoute: typeof ApiYoyRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
@@ -444,6 +470,13 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof TeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/website': {
+      id: '/website'
+      path: '/website'
+      fullPath: '/website'
+      preLoaderRoute: typeof WebsiteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/yoy': {
@@ -537,6 +570,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/website': {
+      id: '/api/website'
+      path: '/api/website'
+      fullPath: '/api/website'
+      preLoaderRoute: typeof ApiWebsiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/yoy': {
       id: '/api/yoy'
       path: '/api/yoy'
@@ -585,6 +625,7 @@ const rootRouteChildren: RootRouteChildren = {
   LostRoute: LostRoute,
   SalesRoute: SalesRoute,
   TeamsRoute: TeamsRoute,
+  WebsiteRoute: WebsiteRoute,
   YoyRoute: YoyRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
@@ -598,6 +639,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
   ApiTeamsRoute: ApiTeamsRoute,
+  ApiWebsiteRoute: ApiWebsiteRoute,
   ApiYoyRoute: ApiYoyRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,

@@ -106,7 +106,7 @@ function num(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
   const s = String(v)
     .replace(/[,\s$%]/g, "")
-    .replace(/[^\d.\-]/g, "");
+    .replace(/[^\d.-]/g, "");
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
 }
@@ -414,6 +414,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const snap: AdRow[] = snapRaw.map((r) => {
       const account = str(r["اسم الحساب الإعلاني"]) || str(r["__account_name"]);
       const objective = classifyAccount(account);
+      const snapLeads = str(r["Leads (Native)"]) || str(r["Leads"]) || str(r["On-Facebook leads"]);
       objectiveByAccount.set(account, objective);
       return {
         platform: "snapchat" as Platform,
@@ -431,11 +432,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         spend: num(r["Spend (Cost)"]),
         impressions: num(r["Impressions"]),
         clicksAll: num(r["Clicks (all)"]),
-        // Snapchat's export carries neither column. `null` keeps it out of the
-        // numerator AND the denominator; a 0 would understate blended link-CTR
-        // and invent leads Snapchat never claimed.
+        // Snap reports native lead-form submissions as `native_leads`. Older
+        // reference exports called the same measure simply `Leads`.
         linkClicks: null,
-        platformLeads: null,
+        platformLeads: snapLeads ? num(snapLeads) : null,
         viewCompletions: num(r["View Completions"]),
         syncedAt: str(r["__synced_at"]),
       };
@@ -472,6 +472,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         subTeam: str(r["فريق المبيعات"]),
         stage: str(r["Stage"]),
         cleanedStage,
+        lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
+        callingReply: str(r["Calling reply?"]),
         isWon: cleanedStage.toLowerCase() === "won",
         isLost: cleanedStage.toLowerCase() === "lost",
         source,
@@ -489,7 +491,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       // `Invoice Date` is populated on ~8% of rows; `Date` on 100%. Filtering on
       // `Invoice Date` silently drops most of the revenue, so `Date` is the
       // attribution date.
-      const revenueDate = parseDate(r["Date"]) || parseDate(r["بنود الطلب /أنشئ في"]) || invoiceDate;
+      const revenueDate =
+        parseDate(r["Date"]) || parseDate(r["بنود الطلب /أنشئ في"]) || invoiceDate;
       const campaignName = str(r["Campaign Name"]) || str(r["الفرصة /Campaign Name"]);
       const campaignId = str(r["الفرصة /Campaign ID"]) || str(r["Campaign ID"]);
       const adName = str(r["AD Name"]) || str(r["الفرصة /Ad Name"]);
@@ -550,6 +553,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       const source = str(r["cleaned Source"]) || str(r["المصدر"]);
       return {
         id: str(r["__odoo_id"]),
+        contact: str(r["اسم جهة الاتصال"]),
         campaignName,
         campaignId,
         campaignKey: keys.key(campaignId, campaignName),
@@ -578,12 +582,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           platform: a.platform,
           objective: a.objective,
           spend: 0,
-          platformLeads: a.platform === "meta" ? 0 : null,
+          platformLeads: null,
         };
         acctMap.set(a.account, e);
       }
       e.spend += a.spend;
-      if (a.platformLeads !== null && e.platformLeads !== null) e.platformLeads += a.platformLeads;
+      if (a.platformLeads !== null) e.platformLeads = (e.platformLeads ?? 0) + a.platformLeads;
     }
     const accounts = [...acctMap.values()].sort((x, y) => y.spend - x.spend);
 
@@ -685,7 +689,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const revRange = range(invoiced.map((i) => i.revenueDate));
 
     const yearSet = new Set<number>();
-    for (const d of [...ads.map((a) => a.date), ...crm.map((c) => c.createdAt), ...invoiced.map((i) => i.revenueDate), ...sales.map((s) => s.paymentDate)]) {
+    for (const d of [
+      ...ads.map((a) => a.date),
+      ...crm.map((c) => c.createdAt),
+      ...invoiced.map((i) => i.revenueDate),
+      ...sales.map((s) => s.paymentDate),
+    ]) {
       if (d) yearSet.add(+d.slice(0, 4));
     }
     const years = [...yearSet].filter((y) => y > 2000).sort();
@@ -730,13 +739,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     let syncedAt = "";
     for (const s of tabSyncs) if (s.syncedAt > syncedAt) syncedAt = s.syncedAt;
     let oldestSyncedAt = "";
-    for (const s of tabSyncs) if (!oldestSyncedAt || s.syncedAt < oldestSyncedAt) oldestSyncedAt = s.syncedAt;
+    for (const s of tabSyncs)
+      if (!oldestSyncedAt || s.syncedAt < oldestSyncedAt) oldestSyncedAt = s.syncedAt;
 
     /* -- health ------------------------------------------------------------- */
     const adCampaignKeys = new Set(ads.map((a) => a.campaignKey).filter(Boolean));
 
     const countOrigin = (o: AdSetOrigin) =>
-      crm.filter((c) => c.adsetOrigin === o).length + invoiced.filter((i) => i.adsetOrigin === o).length;
+      crm.filter((c) => c.adsetOrigin === o).length +
+      invoiced.filter((i) => i.adsetOrigin === o).length;
     const adsetExact = countOrigin("exact");
     const adsetDerived = countOrigin("derived");
     const adsetAmbiguous = countOrigin("ambiguous");
@@ -778,14 +789,19 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       adsetAmbiguous,
       adsetUnknown,
       adsetNoAd,
-      adsetResolutionRate: adBearing > 0 ? (adsetExact + adsetDerived + adsetAmbiguous) / adBearing : 0,
+      adsetResolutionRate:
+        adBearing > 0 ? (adsetExact + adsetDerived + adsetAmbiguous) / adBearing : 0,
       crmAdCoverage: crm.length > 0 ? crm.filter((c) => c.adName || c.adId).length / crm.length : 0,
       invoicedAdCoverage:
-        invoiced.length > 0 ? invoiced.filter((i) => i.adName || i.adId).length / invoiced.length : 0,
-      revenueCampaignCoverage: invoiced.length > 0 ? campaignRevenueRows.length / invoiced.length : 0,
+        invoiced.length > 0
+          ? invoiced.filter((i) => i.adName || i.adId).length / invoiced.length
+          : 0,
+      revenueCampaignCoverage:
+        invoiced.length > 0 ? campaignRevenueRows.length / invoiced.length : 0,
       revenueCampaignShare: totalRevenue > 0 ? campaignRevenue / totalRevenue : 0,
       attributedRevenueShare: totalRevenue > 0 ? attributedRevenue / totalRevenue : 0,
-      campaignMatchRate: crmWithCampaign.length > 0 ? crmMatched.length / crmWithCampaign.length : 0,
+      campaignMatchRate:
+        crmWithCampaign.length > 0 ? crmMatched.length / crmWithCampaign.length : 0,
       leadsWithoutSpendSource: [...unpricedCounts.values()].reduce((a, b) => a + b, 0),
       unpricedSources,
       closeSample: closable.length,
@@ -828,7 +844,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const next = await inflight;
     // If every tab failed but a good snapshot is still held, keep serving the
     // stale one rather than blanking the dashboard.
-    const empty = !next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length;
+    const empty =
+      !next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length;
     if (empty && previous) {
       // Back off before retrying, but leave `fetchedAt` alone — bumping it here
       // is what made a failed reload report the old snapshot as freshly loaded.

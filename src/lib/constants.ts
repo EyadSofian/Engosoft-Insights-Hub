@@ -10,7 +10,7 @@ export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
 /** Metrics a platform genuinely does not report, so the UI can say so. */
 export const PLATFORM_GAPS: Record<Platform, string[]> = {
   meta: [],
-  snapchat: ["linkClicks", "ctrLink", "platformLeads"],
+  snapchat: ["linkClicks", "ctrLink"],
 };
 
 /**

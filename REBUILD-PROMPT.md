@@ -37,6 +37,7 @@ Google Sheet id in `SHEET_ID`. Read every tab as CSV via the gviz endpoint.
 Never write to the sheet.
 
 ### `Meta Ads Daily` — grain: ad × day
+
 `التاريخ`, `اسم الحساب الإعلاني`, `اسم الكامبين`, `Ad set name`, `Ad Name`,
 `Spend (Cost)`, `العملة`, `Impressions`, `Link Clicks`, `Clicks (all)`,
 `CTR (all)`, `CTR (link)`, `Leads (on facebook Leads)`, `Leads (Website/Pixel)`,
@@ -44,16 +45,17 @@ Never write to the sheet.
 `__account_id`, `__synced_at`
 
 ### `Snap Ads Daily` — grain: ad × day — **different shape, do not assume Meta's**
+
 `التاريخ`, `اسم الحساب الإعلاني`, `اسم الكامبين`, `Ad set name`, `Ad Name`,
 `Spend (Cost)`, `العملة`, `Impressions`, `Clicks (all)`, `CTR (all)`,
-`View Completions`, `__snap_key`, `__account_id`, `__campaign_id`, `__adset_id`,
+`View Completions`, `Leads (Native)`, `__snap_key`, `__account_id`, `__campaign_id`, `__adset_id`,
 `__ad_id`, `__synced_at`
 
 Differences that will break naive code:
+
 - **No `Link Clicks`, no `CTR (link)`** → link-CTR must render `—` for Snapchat.
-- **No leads columns at all** → Snapchat platform leads are `null`, not `0`.
-  Snapchat lead counts come only from CRM (`cleaned Source = Snapchat`, 730 leads
-  currently). Never sum a `0` for Snapchat into "platform leads".
+- **Native leads are available** → sum `Leads (Native)` for platform leads.
+  Missing link clicks remain `null`, not `0`.
 - Ids are UUIDs, not numeric.
 - Current data: 39 rows, 2026-07-13 → 2026-07-19, $191 spend, one account
   (`Engosoft Global Self Service`).
@@ -64,6 +66,7 @@ must aggregate across both platforms, with a platform filter in the UI and a
 per-platform split on the ads page.
 
 ### `CRM Leads` — grain: one lead (18,184 rows, 2026 only)
+
 Key columns: `أنشئ في` (created), `التاريخ المقفل` / `Closing Date` (closed),
 `أيام الإقفال` (days to close), `Campaign Name`, `Campaign ID`, `Ad Name`,
 `Ad ID`, `Ad Set Name`, `Ad Set ID`, `Salesperson`, `Sales Team`,
@@ -72,6 +75,7 @@ Key columns: `أنشئ في` (created), `التاريخ المقفل` / `Closing
 `عدد عروض الأسعار`, `سبب الضياع`
 
 ### `Full Invoiced Orders` — grain: order line (6,919 rows)
+
 `بنود الطلب /مرجع الطلب`, `Campaign Name`, `الفرصة /Campaign ID`, `AD Name`,
 `AD Set Name`, `الفرصة /Ad ID`, `بنود الطلب /المنتج`, `بنود الطلب /العميل`,
 `بنود الطلب /الإجمالي`, `بنود الطلب /مندوب المبيعات`, `$ Sales` (already USD),
@@ -82,15 +86,18 @@ Key columns: `أنشئ في` (created), `التاريخ المقفل` / `Closing
 This is already fixed in the repo; do not regress it.
 
 ### `Sales` — grain: invoice/payment line (7,583 rows)
+
 `Payment Date`, `تاريخ الفاتورة`, `Course Name`, `فئة المنتج`, `الشريك`,
 `Salesperson`, `Team Leader`, `فريق المبيعات`, `$ Sales`, `Event Stage`
 
 ### `Lost Analysis` — grain: lost lead (6,567 rows)
+
 `Campaign Name`, `Campaign ID`, `Ad Name`, `Ad Set Name`, `سبب الضياع`, `Course`,
 `Main Category`, `فريق المبيعات`, `مندوب المبيعات`, `cleaned Source`, `Month`,
 `أنشئ في`, `Cleaned Stage`
 
 ### Lookups
+
 `Sales Team`, `Stages`, `Courses`, `Value to dolar` (reference only — `$ Sales`
 is already USD, never re-convert).
 
@@ -101,26 +108,26 @@ is already USD, never re-convert).
 Guard every division against zero and render `—` (never `0`, never `NaN`,
 never `Infinity`).
 
-| Metric | Formula | Notes |
-| --- | --- | --- |
-| **Spend** | `Σ Spend (Cost)` across selected platforms | |
-| **Total leads (ads)** | `Σ Leads (on facebook Leads)` (Meta only) | Snapchat has none |
-| **Total leads (CRM)** | count of CRM rows in window | the denominator the manager means |
-| **CPL** | `Spend ÷ CRM leads` | **Business definition: total spend ÷ total leads that entered the CRM.** Also expose `platformCPL = Spend ÷ platform leads` separately on the ads page, labelled distinctly. |
-| **ACOS** | `(Spend ÷ Revenue) × 100` | shown as a %; lower is better; the inverse of ROAS |
-| **ROAS** | `Revenue ÷ Spend` | shown as `×`; green ≥ 2, amber 1–2, red < 1 |
-| **CPA** | `Spend ÷ acquisitions` | **acquisitions is user-selectable: invoices count OR won leads count.** Ship a toggle on the KPI card and in filters; default = won leads. Show both in the tooltip. |
-| **CTR (all)** | `(Σ Clicks(all) ÷ Σ Impressions) × 100` | recomputed from sums; never average the column |
-| **CTR (link)** | `(Σ Link Clicks ÷ Σ Impressions) × 100` | Meta only; `—` for Snapchat |
-| **CPM** | `(Spend ÷ Impressions) × 1000` | |
-| **CPC** | `Spend ÷ Clicks(all)` | |
-| **Won** | CRM rows where `Cleaned Stage = Won` | |
-| **Conversion rate** | `(Won ÷ CRM leads) × 100` | show **count and %** side by side everywhere |
-| **Lost rate** | `(Lost ÷ CRM leads) × 100` | Lost = `Cleaned Stage = Lost` |
-| **Avg close time** | mean of `Closing Date − أنشئ في` in days | **only over leads that actually have a closing date; always print the sample size next to it** (see §8c) |
-| **Revenue** | `Σ $ Sales` | from Full Invoiced Orders for campaign-level; from Sales tab for the revenue page |
-| **Revenue per lead** | `Revenue ÷ CRM leads` | |
-| **AOV** | `Revenue ÷ distinct order refs` | |
+| Metric                | Formula                                     | Notes                                                                                                                                                                        |
+| --------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Spend**             | `Σ Spend (Cost)` across selected platforms  |                                                                                                                                                                              |
+| **Total leads (ads)** | Meta form leads + Snapchat `Leads (Native)` | keep unavailable metrics as null                                                                                                                                             |
+| **Total leads (CRM)** | count of CRM rows in window                 | the denominator the manager means                                                                                                                                            |
+| **CPL**               | `Spend ÷ CRM leads`                         | **Business definition: total spend ÷ total leads that entered the CRM.** Also expose `platformCPL = Spend ÷ platform leads` separately on the ads page, labelled distinctly. |
+| **ACOS**              | `(Spend ÷ Revenue) × 100`                   | shown as a %; lower is better; the inverse of ROAS                                                                                                                           |
+| **ROAS**              | `Revenue ÷ Spend`                           | shown as `×`; green ≥ 2, amber 1–2, red < 1                                                                                                                                  |
+| **CPA**               | `Spend ÷ acquisitions`                      | **acquisitions is user-selectable: invoices count OR won leads count.** Ship a toggle on the KPI card and in filters; default = won leads. Show both in the tooltip.         |
+| **CTR (all)**         | `(Σ Clicks(all) ÷ Σ Impressions) × 100`     | recomputed from sums; never average the column                                                                                                                               |
+| **CTR (link)**        | `(Σ Link Clicks ÷ Σ Impressions) × 100`     | Meta only; `—` for Snapchat                                                                                                                                                  |
+| **CPM**               | `(Spend ÷ Impressions) × 1000`              |                                                                                                                                                                              |
+| **CPC**               | `Spend ÷ Clicks(all)`                       |                                                                                                                                                                              |
+| **Won**               | CRM rows where `Cleaned Stage = Won`        |                                                                                                                                                                              |
+| **Conversion rate**   | `(Won ÷ CRM leads) × 100`                   | show **count and %** side by side everywhere                                                                                                                                 |
+| **Lost rate**         | `(Lost ÷ CRM leads) × 100`                  | Lost = `Cleaned Stage = Lost`                                                                                                                                                |
+| **Avg close time**    | mean of `Closing Date − أنشئ في` in days    | **only over leads that actually have a closing date; always print the sample size next to it** (see §8c)                                                                     |
+| **Revenue**           | `Σ $ Sales`                                 | from Full Invoiced Orders for campaign-level; from Sales tab for the revenue page                                                                                            |
+| **Revenue per lead**  | `Revenue ÷ CRM leads`                       |                                                                                                                                                                              |
+| **AOV**               | `Revenue ÷ distinct order refs`             |                                                                                                                                                                              |
 
 Keep `attributedRevenue` / `attributedRoas` (revenue traceable to a campaign) as
 separate fields — the manager needs both the raw and the honest number.
@@ -131,7 +138,7 @@ separate fields — the manager needs both the raw and the honest number.
 
 **Everything must filter together.** Selecting a course, a date range, a
 campaign, an ad set, an ad, a sales team, a salesperson, a platform, or a source
-must re-scope *every* metric on *every* page — ads, CRM, invoices, lost.
+must re-scope _every_ metric on _every_ page — ads, CRM, invoices, lost.
 
 Build one join layer used by all endpoints:
 
@@ -168,6 +175,7 @@ floating AI chat, light/dark, AR/EN). Add a **platform filter** (All / Meta /
 Snapchat) next to the date presets.
 
 ### 4.1 Overview — executive summary
+
 Lead with a server-computed bilingual paragraph (no LLM) plus:
 
 KPI cards: Total leads · Won · Lost · Conversion rate (count + %) · Lost rate ·
@@ -181,22 +189,26 @@ top-5 budget leaks; lead-origin split (§7); data-health panel.
 ### 4.2 Campaigns — the big table (§5)
 
 ### 4.3 Ads / Technical
+
 Per-platform breakdown. Meta and Snapchat side by side, then by day and by ad.
 Show which metrics are unavailable per platform rather than showing zeros.
 
 ### 4.4 Courses
+
 Per course: leads, won, lost, conversion rate, lost rate, revenue, spend
 (inferred), ROAS, ACOS, CPL, CPA, avg close time, revenue per lead. Top vs
 underperforming lists with a ranking-metric toggle. Course detail drawer with its
 campaigns, monthly trend, and top salesperson/team.
 
 ### 4.5 Sales team & salesperson
+
 Two levels, same metric set: leads in, won, lost, conversion rate, lost rate,
 revenue, AOV, avg close time, revenue per lead. Team table drills into its
 salespeople. Include a leaderboard and a "needs attention" list (high lead volume,
 low conversion).
 
 ### 4.6 Leads (CRM) — detail table + breakdowns by stage, source, course, team,
+
 salesperson, campaign-vs-other.
 
 ### 4.7 Lost analysis — **percentage-first** (§6)
@@ -241,6 +253,7 @@ manager can see which reason dominates which team.
 ## 7. Lead origin: campaign vs non-campaign
 
 Split every lead metric by whether the lead carries a campaign:
+
 - **From campaigns:** `Campaign Name` or `Campaign ID` present → currently 13,854
 - **Other sources:** neither present → currently 4,330
 
@@ -263,6 +276,7 @@ The column exists but is never populated by the Odoo export. **You cannot join
 leads or revenue to an ad set directly.**
 
 Required approach:
+
 1. Build an `adName → adSetName` lookup from the ads tabs (Meta + Snap have both).
 2. Backfill ad-set on CRM/FIO rows through their `Ad Name`. This currently
    resolves **79%** (9,662 of 12,234 CRM rows that have an ad name).
@@ -285,8 +299,8 @@ All sources are 2026-only: Meta 8,762 rows (2026), CRM 18,184 (2026), Sales 7,58
 
 Build the YoY page and comparison logic fully (by month, by year, by course, for
 both spend and revenue, with growth %), but when the prior period has no data
-render an explicit empty state: *"No 2025 data in the sheet yet — backfill
-`Meta Ads Daily` and `Sales` with last year's rows to enable this comparison."*
+render an explicit empty state: _"No 2025 data in the sheet yet — backfill
+`Meta Ads Daily` and `Sales` with last year's rows to enable this comparison."_
 **Never render a growth % against a zero baseline.**
 
 ### 8c. Close time is only measurable on 6.7% of leads
@@ -308,14 +322,14 @@ with counts on both sides.
 
 ### 8e. Accounts that spend without producing leads
 
-| Account | Spend | Platform leads |
-| --- | --- | --- |
-| Engosoft 2021 | $42,933 | 9,786 |
-| Engosoft Ezzat | $13,176 | 2,785 |
-| **Engo soft website** | **$2,661** | **131** |
-| Engosoft ISLAM SAAD | $2,238 | 409 |
-| engo 2026 leads | $682 | 237 |
-| **114732099069544** (unnamed) | **$146** | **0** |
+| Account                       | Spend      | Platform leads |
+| ----------------------------- | ---------- | -------------- |
+| Engosoft 2021                 | $42,933    | 9,786          |
+| Engosoft Ezzat                | $13,176    | 2,785          |
+| **Engo soft website**         | **$2,661** | **131**        |
+| Engosoft ISLAM SAAD           | $2,238     | 409            |
+| engo 2026 leads               | $682       | 237            |
+| **114732099069544** (unnamed) | **$146**   | **0**          |
 
 `Engo soft website` runs traffic campaigns to the website, not to a specific
 course — it legitimately spends without generating CRM leads. `114732099069544`
@@ -333,6 +347,7 @@ still visible. Otherwise they silently poison every efficiency metric.
 ## 9. Year-over-year comparison
 
 Compare, for spend / leads / revenue / won:
+
 - month vs same month last year
 - year to date vs same period last year
 - per course, per campaign, per platform
@@ -350,6 +365,7 @@ New service in the same app. Runs on a schedule and posts to a Telegram chat.
 Never log the token.
 
 **Endpoints:**
+
 - `POST /api/telegram/send-daily` — builds and sends the report; used by the cron
   and by a "Send now" button in the dashboard.
 - `GET /api/telegram/preview` — returns the exact message text without sending,
@@ -369,8 +385,8 @@ read it:
 7. **Worst campaign / biggest leak** — name, spend, revenue, ROAS, plus a one-line
    reason ("spent X and returned nothing").
 8. **CPL / CPA / ACOS / ROAS** for the day.
-9. One or two plain-language notes, e.g. *"CPL rose 30% versus yesterday, mostly
-   from campaign X"*.
+9. One or two plain-language notes, e.g. _"CPL rose 30% versus yesterday, mostly
+   from campaign X"_.
 10. Link back to the dashboard.
 
 Formatting: Telegram MarkdownV2, escaped properly. Keep it under ~35 lines.
@@ -389,8 +405,8 @@ already always-on), guarded so only one instance schedules it.
 
 - Default range is year-to-date; the old Meta-window default and mismatch warning
   are gone.
-- Snapchat spend appears in all ads totals; Snapchat link-CTR and platform leads
-  render `—`, never `0`.
+- Snapchat spend and native leads appear in ads totals; Snapchat link-CTR renders
+  `—`, never `0`.
 - Selecting a course re-scopes ads, CRM, invoices and lost together; same for
   date, campaign, ad set, ad, team, salesperson, platform, source.
 - Campaign table works at campaign / ad set / ad grain, with derived ad-set values
