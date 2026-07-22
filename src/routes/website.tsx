@@ -1,5 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Banknote, CircleCheckBig, CircleDot, CircleX, Clock3, Globe2 } from "lucide-react";
+import {
+  Banknote,
+  CircleCheckBig,
+  CircleDot,
+  CircleX,
+  Clock3,
+  GitMerge,
+  Globe2,
+} from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
   BarList,
@@ -42,6 +50,24 @@ interface ContactRow {
   daysWaiting: number;
 }
 
+interface SalesOrderRow {
+  orderRef: string;
+  saleDate: string;
+  customer: string;
+  courses: string;
+  salesperson: string;
+  currency: string;
+  localTotal: number;
+  usdSales: number;
+  source: string;
+  externalPrice: number;
+  externalCurrency: string;
+  externalSalesSource: string;
+  externalPhone: string;
+  reconciliationStatus: string;
+  priceDifference: number | null;
+}
+
 interface Resp {
   totals: {
     leads: number;
@@ -71,9 +97,21 @@ interface Resp {
     conversionRate: number | null;
     averageOrder: number | null;
   };
+  reconciliation: {
+    totalOrders: number;
+    odooOnlyOrders: number;
+    matchedOrders: number;
+    externalOnlyOrders: number;
+    discrepancyOrders: number;
+    externalOnlySales: number;
+  };
+  salesDetail: { rows: SalesOrderRow[]; total: number; truncated: boolean };
   detail: { rows: ContactRow[]; total: number; truncated: boolean };
   asOf: string;
 }
+
+const fmtAmount = (value: number) =>
+  value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 function Website() {
   const { t, lang } = useI18n();
@@ -81,9 +119,9 @@ function Website() {
   const copy =
     lang === "ar"
       ? {
-          subtitle: "تحليل ليدز ومبيعات موقع Engosoft من Odoo فقط",
+          subtitle: "تحليل ليدز الموقع ومبيعاته الموحّدة من Odoo وشيت المبيعات الإضافي",
           sourceNote:
-            "المصدر: ليدز الموقع من CRM (Source = Website)، والمبيعات من Sales Orders المؤكدة (Website = Engosoft وStatus = Sales Order). بيانات Meta وSnap غير مستخدمة هنا.",
+            "المصدر: ليدز الموقع من Odoo CRM. المبيعات تُدمج حسب Order ID بين Odoo وشيت Website Sales الخارجي؛ الأوردر المتطابق لا يُحسب مرتين، والجديد فقط يُضاف للإيراد. بيانات Meta وSnap غير مستخدمة هنا.",
           orders: "أوامر بيع",
           quickAnalysis: "ملخص تنفيذي",
           bestSelling: "الأكثر مبيعًا",
@@ -91,18 +129,31 @@ function Website() {
           averageOrder: "متوسط أمر البيع",
           noData: "لا توجد بيانات كافية في الفترة المحددة",
           soldCourses: "الكورسات المباعة من الموقع",
-          soldHint: "حسب Order Date وقيمة أمر البيع المؤكد في Odoo",
+          soldHint: "حسب تاريخ الدفع عند توفره، وإلا تاريخ المصدر/الأوردر، بعد منع تكرار Order ID",
           unsoldCourses: "كورسات عليها طلب ولم تُبع",
           unsoldHint: "وصلت لها Website Leads في الفترة، لكن لا يوجد لها Sales Order مؤكد",
           leads: "ليد",
           open: "مفتوح",
           lost: "مفقود",
-          specialtyNote: "يجمع ليدز CRM ومبيعات Odoo للموقع حسب الكورس",
+          specialtyNote: "يجمع ليدز CRM ومبيعات الموقع الموحّدة حسب الكورس",
+          reconciliation: "مطابقة مصادر المبيعات",
+          reconciliationHint: "Odoo + شيت Website Sales الخارجي حسب Order ID",
+          matchedOrders: "متطابق بين المصدرين",
+          externalOnlyOrders: "إضافي من الشيت",
+          discrepancyOrders: "يحتاج مراجعة",
+          salesDetails: "تفاصيل أوردرات مبيعات الموقع",
+          salesDetailsHint: "صف واحد لكل أوردر بعد الدمج ومنع التكرار",
+          source: "مصدر السجل",
+          externalReference: "مرجع الشيت الخارجي",
+          reconciliationStatus: "حالة المطابقة",
+          localAmount: "المبلغ بالعملة",
+          orderId: "رقم الأوردر",
         }
       : {
-          subtitle: "Engosoft website leads and sales, sourced only from Odoo",
+          subtitle:
+            "Engosoft website leads and reconciled sales from Odoo and the external sales sheet",
           sourceNote:
-            "Source: CRM leads where Source = Website, and confirmed Odoo sales orders where Website = Engosoft and Status = Sales Order. Meta and Snap are not used here.",
+            "Source: Odoo CRM website leads. Sales are reconciled by Order ID across Odoo and the external Website Sales sheet; matched orders are never counted twice, and only external-only orders add revenue. Meta and Snap are not used here.",
           orders: "sales orders",
           quickAnalysis: "Executive summary",
           bestSelling: "Best-selling course",
@@ -110,13 +161,26 @@ function Website() {
           averageOrder: "Average sales order",
           noData: "Not enough data in the selected period",
           soldCourses: "Courses sold on the website",
-          soldHint: "Based on Odoo Order Date and confirmed sales-order value",
+          soldHint:
+            "Payment date when available, otherwise source/order date, after Order-ID deduplication",
           unsoldCourses: "Courses with demand but no sale",
           unsoldHint: "Website leads exist in the period, but no confirmed sales order exists",
           leads: "leads",
           open: "open",
           lost: "lost",
-          specialtyNote: "Combines Odoo CRM website leads and website sales by course",
+          specialtyNote: "Combines Odoo CRM website leads and reconciled website sales by course",
+          reconciliation: "Sales-source reconciliation",
+          reconciliationHint: "Odoo + external Website Sales sheet matched by Order ID",
+          matchedOrders: "Matched across both sources",
+          externalOnlyOrders: "Added from external sheet",
+          discrepancyOrders: "Needs review",
+          salesDetails: "Website sales-order details",
+          salesDetailsHint: "One row per order after source reconciliation and deduplication",
+          source: "Record source",
+          externalReference: "External-sheet reference",
+          reconciliationStatus: "Reconciliation status",
+          localAmount: "Amount in currency",
+          orderId: "Order ID",
         };
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -228,6 +292,91 @@ function Website() {
     },
   ];
 
+  const salesCols: Col<SalesOrderRow>[] = [
+    {
+      key: "saleDate",
+      header: t("date"),
+      width: "120px",
+      sortValue: (r) => r.saleDate,
+      render: (r) => fmtDate(r.saleDate, lang),
+    },
+    {
+      key: "orderRef",
+      header: copy.orderId,
+      sticky: true,
+      sortValue: (r) => r.orderRef,
+      render: (r) => r.orderRef || "—",
+    },
+    {
+      key: "customer",
+      header: t("partner"),
+      sortValue: (r) => r.customer,
+      render: (r) => r.customer || "—",
+    },
+    {
+      key: "courses",
+      header: t("course"),
+      sortValue: (r) => r.courses,
+      render: (r) => r.courses || "—",
+    },
+    {
+      key: "salesperson",
+      header: t("salesperson"),
+      sortValue: (r) => r.salesperson,
+      render: (r) => r.salesperson || "—",
+    },
+    {
+      key: "localTotal",
+      header: copy.localAmount,
+      align: "right",
+      sortValue: (r) => r.localTotal,
+      render: (r) => `${fmtAmount(r.localTotal)} ${r.currency}`,
+    },
+    {
+      key: "usdSales",
+      header: t("website_sales"),
+      align: "right",
+      sortValue: (r) => r.usdSales,
+      render: (r) => fmtUSD(r.usdSales),
+    },
+    {
+      key: "source",
+      header: copy.source,
+      sortValue: (r) => r.source,
+      render: (r) => (
+        <Pill
+          tone={
+            r.source === "External Google Sheet"
+              ? "brand"
+              : r.source === "Odoo + External Google Sheet"
+                ? "success"
+                : "neutral"
+          }
+        >
+          {r.source || "Odoo"}
+        </Pill>
+      ),
+    },
+    {
+      key: "externalPrice",
+      header: copy.externalReference,
+      align: "right",
+      sortValue: (r) => r.externalPrice,
+      render: (r) =>
+        r.externalPrice ? `${fmtAmount(r.externalPrice)} ${r.externalCurrency}` : "—",
+    },
+    {
+      key: "reconciliationStatus",
+      header: copy.reconciliationStatus,
+      sortValue: (r) => r.reconciliationStatus,
+      render: (r) => (
+        <Pill tone={/mismatch/i.test(r.reconciliationStatus) ? "danger" : "neutral"}>
+          {r.reconciliationStatus || "—"}
+        </Pill>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <PageHeader title={t("website")} subtitle={copy.subtitle} />
@@ -294,7 +443,7 @@ function Website() {
 
           <Card>
             <SectionTitle>{copy.quickAnalysis}</SectionTitle>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="text-xs text-text-muted">{copy.bestSelling}</div>
                 <div className="mt-1 font-semibold text-text">
@@ -330,6 +479,26 @@ function Website() {
                   {fmtNum(data.totals.salesOrders)} {copy.orders}
                 </div>
               </div>
+              <div className="rounded-lg border border-brand/20 bg-brand-soft/50 p-3">
+                <div className="flex items-center gap-2 text-xs text-text-muted">
+                  <GitMerge size={15} className="text-brand" />
+                  {copy.reconciliation}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Pill tone="success">
+                    {fmtNum(data.reconciliation.matchedOrders)} {copy.matchedOrders}
+                  </Pill>
+                  <Pill tone="brand">
+                    {fmtNum(data.reconciliation.externalOnlyOrders)} {copy.externalOnlyOrders}
+                  </Pill>
+                  <Pill tone={data.reconciliation.discrepancyOrders ? "danger" : "neutral"}>
+                    {fmtNum(data.reconciliation.discrepancyOrders)} {copy.discrepancyOrders}
+                  </Pill>
+                </div>
+                <div className="mt-2 text-xs text-text-muted">
+                  {fmtUSD(data.reconciliation.externalOnlySales)} · {copy.reconciliationHint}
+                </div>
+              </div>
             </div>
           </Card>
 
@@ -360,6 +529,42 @@ function Website() {
                 color="var(--warning)"
               />
             </Card>
+          </div>
+
+          <div>
+            <SectionTitle hint={copy.salesDetailsHint}>{copy.salesDetails}</SectionTitle>
+            <DataTable
+              rows={data.salesDetail.rows}
+              cols={salesCols}
+              searchable={(r) =>
+                `${r.orderRef} ${r.customer} ${r.courses} ${r.salesperson} ${r.source} ${r.externalSalesSource} ${r.externalPhone} ${r.reconciliationStatus}`
+              }
+              initialSort={{ key: "saleDate", dir: -1 }}
+              csvFilename="engosoft-website-sales-reconciled"
+              maxHeight={640}
+              truncatedNote={
+                data.salesDetail.truncated
+                  ? `${t("showing")} ${fmtNum(data.salesDetail.rows.length)} ${t("of")} ${fmtNum(data.salesDetail.total)}`
+                  : undefined
+              }
+              csvRow={(r) => ({
+                sale_date: r.saleDate,
+                order_id: r.orderRef,
+                customer: r.customer,
+                courses: r.courses,
+                salesperson: r.salesperson,
+                local_total: r.localTotal,
+                currency: r.currency,
+                sales_usd: r.usdSales,
+                record_source: r.source,
+                external_price: r.externalPrice,
+                external_currency: r.externalCurrency,
+                external_sales_source: r.externalSalesSource,
+                external_phone: r.externalPhone,
+                reconciliation_status: r.reconciliationStatus,
+                price_difference: r.priceDifference ?? "",
+              })}
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">

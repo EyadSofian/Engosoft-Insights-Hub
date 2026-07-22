@@ -602,6 +602,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         opportunitySource: str(r["Opportunity Source"]),
         invoiceStatus: str(r["Invoice Status"]),
         paymentDate: parseDate(r["Payment Date"]),
+        recordSource: str(r["Record Source"]) || "Odoo",
+        revenueBasis: str(r["Revenue Basis"]) || "Odoo line total",
+        externalSheetPrice: num(r["External Sheet Price"]),
+        externalCurrency: str(r["External Currency"]),
+        externalSalesSource: str(r["External Sales Source"]),
+        externalPhone: str(r["External Phone"]),
+        externalSourceDate: parseDate(r["External Source Date"]),
+        reconciliationStatus: str(r["Reconciliation Status"]) || "Odoo only",
+        priceDifference: str(r["Price Difference"]) === "" ? null : num(r["Price Difference"]),
       }));
 
     /* -- lost -------------------------------------------------------------- */

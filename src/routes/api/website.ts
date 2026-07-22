@@ -9,9 +9,10 @@ export const Route = createFileRoute("/api/website")({
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
 
-        // Website leads come from Odoo CRM Source=Website. Website revenue comes
-        // only from the dedicated Odoo sale.order dataset (Website=Engosoft,
-        // state=sale). Meta/Snap filters never participate in this endpoint.
+        // Website leads come from Odoo CRM Source=Website. Website revenue is
+        // reconciled by Order ID across Odoo and the approved external Website
+        // Sales sheet. Matching orders keep Odoo line revenue; only external-only
+        // orders add revenue. Meta/Snap never participate in this endpoint.
         const websiteFilters = {
           from: filters.from,
           to: filters.to,
@@ -81,13 +82,89 @@ export const Route = createFileRoute("/api/website")({
         const websiteSales = uniqueById(data.snapshot.websiteSales).filter((row) => {
           if (normalizeName(row.website) !== "engosoft") return false;
           if (!["sale", "sales order"].includes(normalizeName(row.status))) return false;
-          if (!inDateRange(row.orderDate)) return false;
+          const saleDate = row.paymentDate || row.externalSourceDate || row.orderDate;
+          if (!inDateRange(saleDate)) return false;
           if (!equals(row.course, filters.course)) return false;
           if (!equals(row.mainCategory, filters.mainCategory)) return false;
           if (!equals(row.salesTeam, filters.salesTeam)) return false;
           if (!equals(row.salesperson, filters.salesperson)) return false;
           return true;
         });
+
+        type WebsiteOrder = {
+          orderRef: string;
+          saleDate: string;
+          customer: string;
+          courses: Set<string>;
+          salespeople: Set<string>;
+          currency: string;
+          localTotal: number;
+          usdSales: number;
+          source: string;
+          externalPrice: number;
+          externalCurrency: string;
+          externalSalesSource: string;
+          externalPhone: string;
+          reconciliationStatus: string;
+          priceDifference: number | null;
+        };
+        const sourceRank = (source: string) =>
+          source === "External Google Sheet"
+            ? 3
+            : source === "Odoo + External Google Sheet"
+              ? 2
+              : 1;
+        const websiteOrdersByKey = new Map<string, WebsiteOrder>();
+        for (const sale of websiteSales) {
+          const key = normalizeName(sale.orderRef) || sale.id;
+          let order = websiteOrdersByKey.get(key);
+          if (!order) {
+            order = {
+              orderRef: sale.orderRef,
+              saleDate: sale.paymentDate || sale.externalSourceDate || sale.orderDate,
+              customer: sale.customer,
+              courses: new Set(),
+              salespeople: new Set(),
+              currency: sale.currency,
+              localTotal: 0,
+              usdSales: 0,
+              source: sale.recordSource || "Odoo",
+              externalPrice: sale.externalSheetPrice,
+              externalCurrency: sale.externalCurrency,
+              externalSalesSource: sale.externalSalesSource,
+              externalPhone: sale.externalPhone,
+              reconciliationStatus: sale.reconciliationStatus,
+              priceDifference: sale.priceDifference,
+            };
+            websiteOrdersByKey.set(key, order);
+          }
+          if (sale.course || sale.product) order.courses.add(sale.course || sale.product);
+          if (sale.salesperson) order.salespeople.add(sale.salesperson);
+          order.localTotal += sale.localTotal;
+          order.usdSales += sale.usdSales;
+          if (sourceRank(sale.recordSource) > sourceRank(order.source)) {
+            order.source = sale.recordSource;
+          }
+          if (!order.externalPrice && sale.externalSheetPrice) {
+            order.externalPrice = sale.externalSheetPrice;
+          }
+          order.externalCurrency ||= sale.externalCurrency;
+          order.externalSalesSource ||= sale.externalSalesSource;
+          order.externalPhone ||= sale.externalPhone;
+          order.reconciliationStatus ||= sale.reconciliationStatus;
+          if (order.priceDifference === null && sale.priceDifference !== null) {
+            order.priceDifference = sale.priceDifference;
+          }
+        }
+        const websiteOrders = [...websiteOrdersByKey.values()]
+          .map((order) => ({
+            ...order,
+            courses: [...order.courses].join(", "),
+            salesperson: [...order.salespeople].join(", "),
+          }))
+          .sort(
+            (a, b) => b.saleDate.localeCompare(a.saleDate) || b.orderRef.localeCompare(a.orderRef),
+          );
 
         type Specialty = {
           specialty: string;
@@ -192,10 +269,20 @@ export const Route = createFileRoute("/api/website")({
           if (bucket) bucket.count++;
         }
 
-        const salesTotal = websiteSales.reduce((sum, row) => sum + row.usdSales, 0);
-        const orderCount = new Set(
-          websiteSales.map((row) => normalizeName(row.orderRef)).filter(Boolean),
-        ).size;
+        const salesTotal = websiteOrders.reduce((sum, row) => sum + row.usdSales, 0);
+        const orderCount = websiteOrders.length;
+        const matchedOrders = websiteOrders.filter(
+          (order) => order.source === "Odoo + External Google Sheet",
+        );
+        const externalOnlyOrders = websiteOrders.filter(
+          (order) => order.source === "External Google Sheet",
+        );
+        const discrepancyOrders = websiteOrders.filter((order) =>
+          /mismatch/i.test(order.reconciliationStatus),
+        );
+        const odooOnlyOrders = websiteOrders.filter(
+          (order) => order.source === "Odoo" || !order.source,
+        );
         const conversionRate =
           crm.length + lost.length ? (won.length / (crm.length + lost.length)) * 100 : null;
 
@@ -222,6 +309,33 @@ export const Route = createFileRoute("/api/website")({
             conversionRate,
             averageOrder: orderCount ? salesTotal / orderCount : null,
           },
+          reconciliation: {
+            totalOrders: orderCount,
+            odooOnlyOrders: odooOnlyOrders.length,
+            matchedOrders: matchedOrders.length,
+            externalOnlyOrders: externalOnlyOrders.length,
+            discrepancyOrders: discrepancyOrders.length,
+            externalOnlySales: externalOnlyOrders.reduce((sum, order) => sum + order.usdSales, 0),
+          },
+          salesDetail: capped(
+            websiteOrders.map((order) => ({
+              orderRef: order.orderRef,
+              saleDate: order.saleDate,
+              customer: order.customer,
+              courses: order.courses,
+              salesperson: order.salesperson,
+              currency: order.currency,
+              localTotal: order.localTotal,
+              usdSales: order.usdSales,
+              source: order.source || "Odoo",
+              externalPrice: order.externalPrice,
+              externalCurrency: order.externalCurrency,
+              externalSalesSource: order.externalSalesSource,
+              externalPhone: order.externalPhone,
+              reconciliationStatus: order.reconciliationStatus,
+              priceDifference: order.priceDifference,
+            })),
+          ),
           detail: capped(
             notContacted.map((lead) => ({
               createdAt: lead.createdAt,
@@ -236,8 +350,9 @@ export const Route = createFileRoute("/api/website")({
             })),
           ),
           asOf,
-          salesSource: "odoo_sale_order.website_id=Engosoft,state=sale",
-          salesDateBasis: "order_date",
+          salesSource:
+            "Order-ID reconciliation: Odoo sale.order website_id=Engosoft,state=sale + approved external Website Sales Google Sheet",
+          salesDateBasis: "payment_date_fallback_external_date_fallback_order_date",
           contactAgeBasis: "last_stage_update_fallback_created_at",
           appliedFilters: websiteFilters,
         });

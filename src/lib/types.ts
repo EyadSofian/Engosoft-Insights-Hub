@@ -172,6 +172,17 @@ export interface WebsiteSaleRow {
   opportunitySource: string;
   invoiceStatus: string;
   paymentDate: string;
+  /** Canonical source after Order-ID reconciliation. Blank legacy values are normalized to Odoo. */
+  recordSource: string;
+  revenueBasis: string;
+  externalSheetPrice: number;
+  externalCurrency: string;
+  externalSalesSource: string;
+  externalPhone: string;
+  externalSourceDate: string;
+  reconciliationStatus: string;
+  /** Null when the currencies are not comparable. */
+  priceDifference: number | null;
 }
 
 /** A confirmed lost lead from the archived CRM population (`active=false`, probability=0). */
