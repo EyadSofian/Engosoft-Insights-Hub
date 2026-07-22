@@ -8,6 +8,10 @@ export const Route = createFileRoute("/api/website")({
         const { normalizeName } = await import("@/lib/sheet-cache.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
+        const isUnclassifiedCourse = (label: string) => {
+          const key = normalizeName(label);
+          return !key || key === "other" || key === "unclassified" || key === "unknown";
+        };
 
         // Website leads come from Odoo CRM Source=Website. Website revenue is
         // reconciled by Order ID across Odoo and the approved external Website
@@ -243,8 +247,11 @@ export const Route = createFileRoute("/api/website")({
             orders: row.salesOrders,
             quantity: row.quantity,
           }));
+        const unclassifiedCourse = specialtyRows.find((row) => isUnclassifiedCourse(row.specialty));
         const unsoldCourses = specialtyRows
-          .filter((row) => row.specialty !== "—" && row.total > 0 && row.salesOrders === 0)
+          .filter(
+            (row) => !isUnclassifiedCourse(row.specialty) && row.total > 0 && row.salesOrders === 0,
+          )
           .sort((a, b) => b.total - a.total || b.open - a.open)
           .map((row) => ({
             label: row.specialty,
@@ -306,6 +313,13 @@ export const Route = createFileRoute("/api/website")({
           insights: {
             bestSellingCourse: soldCourses[0] || null,
             highestDemandUnsoldCourse: unsoldCourses[0] || null,
+            unclassifiedCourse: unclassifiedCourse
+              ? {
+                  leads: unclassifiedCourse.total,
+                  open: unclassifiedCourse.open,
+                  lost: unclassifiedCourse.lost,
+                }
+              : null,
             conversionRate,
             averageOrder: orderCount ? salesTotal / orderCount : null,
           },

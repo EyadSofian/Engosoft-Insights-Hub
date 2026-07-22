@@ -94,6 +94,7 @@ interface Resp {
   insights: {
     bestSellingCourse: { label: string; value: number; orders: number } | null;
     highestDemandUnsoldCourse: { label: string; leads: number; open: number } | null;
+    unclassifiedCourse: { leads: number; open: number; lost: number } | null;
     conversionRate: number | null;
     averageOrder: number | null;
   };
@@ -132,6 +133,8 @@ function Website() {
           soldHint: "حسب تاريخ الدفع عند توفره، وإلا تاريخ المصدر/الأوردر، بعد منع تكرار Order ID",
           unsoldCourses: "كورسات عليها طلب ولم تُبع",
           unsoldHint: "وصلت لها Website Leads في الفترة، لكن لا يوجد لها Sales Order مؤكد",
+          unclassifiedLabel: "غير محدد (مسجل كـ Other)",
+          unclassifiedNote: "ليد مسجل الكورس لها Other في Odoo؛ لذلك لا تدخل في ترتيب الكورسات",
           leads: "ليد",
           open: "مفتوح",
           lost: "مفقود",
@@ -165,6 +168,9 @@ function Website() {
             "Payment date when available, otherwise source/order date, after Order-ID deduplication",
           unsoldCourses: "Courses with demand but no sale",
           unsoldHint: "Website leads exist in the period, but no confirmed sales order exists",
+          unclassifiedLabel: "Unclassified (recorded as Other)",
+          unclassifiedNote:
+            "leads have Course=Other in Odoo, so they are excluded from the course ranking",
           leads: "leads",
           open: "open",
           lost: "lost",
@@ -185,13 +191,16 @@ function Website() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
+  const displayCourse = (label: string) =>
+    label.trim().toLowerCase() === "other" ? copy.unclassifiedLabel : label;
+
   const specialtyCols: Col<SpecialtyRow>[] = [
     {
       key: "specialty",
       header: t("course"),
       sticky: true,
       sortValue: (r) => r.specialty,
-      render: (r) => r.specialty,
+      render: (r) => displayCourse(r.specialty),
     },
     {
       key: "total",
@@ -447,7 +456,9 @@ function Website() {
               <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="text-xs text-text-muted">{copy.bestSelling}</div>
                 <div className="mt-1 font-semibold text-text">
-                  {data.insights.bestSellingCourse?.label || copy.noData}
+                  {data.insights.bestSellingCourse
+                    ? displayCourse(data.insights.bestSellingCourse.label)
+                    : copy.noData}
                 </div>
                 {data.insights.bestSellingCourse && (
                   <div className="mt-1 text-xs text-success">
@@ -459,12 +470,22 @@ function Website() {
               <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="text-xs text-text-muted">{copy.unsoldDemand}</div>
                 <div className="mt-1 font-semibold text-text">
-                  {data.insights.highestDemandUnsoldCourse?.label || copy.noData}
+                  {data.insights.highestDemandUnsoldCourse
+                    ? displayCourse(data.insights.highestDemandUnsoldCourse.label)
+                    : copy.noData}
                 </div>
                 {data.insights.highestDemandUnsoldCourse && (
                   <div className="mt-1 text-xs text-warning">
                     {fmtNum(data.insights.highestDemandUnsoldCourse.leads)} {copy.leads} ·{" "}
                     {fmtNum(data.insights.highestDemandUnsoldCourse.open)} {copy.open}
+                  </div>
+                )}
+                {data.insights.unclassifiedCourse && (
+                  <div className="mt-2 border-t border-border pt-2 text-[11px] leading-relaxed text-text-muted">
+                    <span className="font-semibold text-text">
+                      {fmtNum(data.insights.unclassifiedCourse.leads)}
+                    </span>{" "}
+                    {copy.unclassifiedNote}
                   </div>
                 )}
               </div>
@@ -573,7 +594,7 @@ function Website() {
               {data.soldCourses.length ? (
                 <BarList
                   items={data.soldCourses.slice(0, 12).map((row) => ({
-                    label: row.label,
+                    label: displayCourse(row.label),
                     value: row.value,
                     meta: (
                       <span>
@@ -593,7 +614,7 @@ function Website() {
               {data.unsoldCourses.length ? (
                 <BarList
                   items={data.unsoldCourses.slice(0, 12).map((row) => ({
-                    label: row.label,
+                    label: displayCourse(row.label),
                     value: row.leads,
                     meta: (
                       <span>
