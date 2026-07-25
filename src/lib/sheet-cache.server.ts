@@ -33,6 +33,8 @@ const TAB = {
   lost: "Lost Analysis",
 } as const;
 
+const LOST_SHEET_GID = "1314891021";
+
 export interface SourceFreshness {
   key: string;
   label: string;
@@ -212,6 +214,14 @@ const SOURCES_WITHOUT_SPEND = new Set([
 /* --- fetch ---------------------------------------------------------------- */
 
 function csvUrl(sheetId: string, tab: string, bust: number): string {
+  // The Google Visualization endpoint omits rows hidden by a sheet filter.
+  // Lost Analysis is an audit population, so it must include every sheet row.
+  // The standard CSV export includes hidden rows and reconciles with the
+  // authenticated Google Sheets API used by n8n.
+  if (tab === TAB.lost) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${LOST_SHEET_GID}&_cb=${bust}`;
+  }
+
   // gviz serves through Google's CDN, which caches the CSV and ignores a
   // no-cache request header — so a plain refresh keeps returning the old data.
   // A unique query param per fetch forces a fresh copy. gviz ignores unknown
