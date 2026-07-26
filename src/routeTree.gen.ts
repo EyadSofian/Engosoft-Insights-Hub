@@ -26,6 +26,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
@@ -124,6 +125,11 @@ const ApiFullInvoicedRoute = ApiFullInvoicedRouteImport.update({
   path: '/api/full-invoiced',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLeadsRoute = ApiLeadsRouteImport.update({
   id: '/api/leads',
   path: '/api/leads',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/api/courses': typeof ApiCoursesRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/api/courses': typeof ApiCoursesRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/api/courses': typeof ApiCoursesRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/courses'
     | '/api/filters'
     | '/api/full-invoiced'
+    | '/api/health'
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/api/courses'
     | '/api/filters'
     | '/api/full-invoiced'
+    | '/api/health'
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/api/courses'
     | '/api/filters'
     | '/api/full-invoiced'
+    | '/api/health'
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
@@ -393,6 +405,7 @@ export interface RootRouteChildren {
   ApiCoursesRoute: typeof ApiCoursesRoute
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
@@ -528,6 +541,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFullInvoicedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/leads': {
       id: '/api/leads'
       path: '/api/leads'
@@ -633,6 +653,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCoursesRoute: ApiCoursesRoute,
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
   ApiOverviewRoute: ApiOverviewRoute,
