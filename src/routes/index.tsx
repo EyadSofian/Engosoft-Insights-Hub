@@ -13,7 +13,7 @@ import {
   Timer,
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
-import { filterStore, useFilters } from "@/lib/filter-store";
+import { useFilters } from "@/lib/filter-store";
 import { fmtCompact, fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import {
   Card,
@@ -74,6 +74,7 @@ interface OverviewResp {
   health: DataHealth;
   syncedAt: string;
   fetchErrors: string[];
+  staleTabs: string[];
 }
 
 const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
@@ -116,7 +117,29 @@ function Overview() {
           title={lang === "ar" ? "تعذّر تحميل بعض التبويبات" : "Some tabs failed to load"}
           icon={<AlertTriangle size={16} />}
         >
-          {data.fetchErrors.join(" · ")}
+          {lang === "ar"
+            ? `الأرقام أدناه لا تشمل هذه المصادر: ${data.fetchErrors.join(" · ")}`
+            : `The numbers below exclude these sources: ${data.fetchErrors.join(" · ")}`}
+        </Notice>
+      )}
+
+      {data.staleTabs?.length > 0 && (
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "تبويبات معروضة من آخر نسخة سليمة" : "Tabs served from the last good copy"}
+          icon={<AlertTriangle size={16} />}
+        >
+          {lang === "ar"
+            ? `تعذّر سحب نسخة حديثة من: ${data.staleTabs.join(" · ")}. تُعرض آخر نسخة ناجحة بدلاً من أصفار، وقد لا تشمل أحدث الصفوف.`
+            : `A fresh pull failed for: ${data.staleTabs.join(" · ")}. The last successful copy is shown instead of zeros, so the newest rows may be missing.`}
+        </Notice>
+      )}
+
+      {T.lostArchived > 0 && (
+        <Notice tone="info" icon={<Info size={16} />}>
+          {lang === "ar"
+            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة. أي صف Stage=Lost في CRM مستبعد تماماً.`
+            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived deals. CRM Stage=Lost rows are completely excluded.`}
         </Notice>
       )}
 
@@ -131,16 +154,26 @@ function Overview() {
         <KpiCard
           index={0}
           label={t("crm_leads")}
-          value={fmtNum(T.crmLeads)}
-          delta={deltas.crmLeads}
+          value={fmtNum(T.totalLeads)}
+          delta={deltas.totalLeads}
           icon={<Users size={15} />}
-          sub={`${fmtNum(T.leadsFromCampaign)} ${lang === "ar" ? "من حملات" : "from campaigns"}`}
+          sub={
+            `${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "تحليل الضياع" : "Lost Analysis"} ${fmtNum(T.lost)}`
+          }
         />
         <KpiCard index={1} label={t("won")} value={fmtNum(T.won)} delta={deltas.won} icon={<Award size={15} />} sub={fmtPct(T.conversionRate, 1)} />
-        <KpiCard index={2} label={t("lost_count")} value={fmtNum(T.lost)} delta={deltas.lost} deltaInvert icon={<TrendingDown size={15} />} sub={fmtPct(T.lostRate, 1)} />
-        <KpiCard index={3} label={t("conversion_rate")} value={fmtPct(T.conversionRate, 2)} delta={deltas.conversionRate} icon={<Percent size={15} />} sub={`${fmtNum(T.won)} / ${fmtNum(T.crmLeads)}`} />
+        <KpiCard
+          index={2}
+          label={t("lost_count")}
+          value={fmtNum(T.lost)}
+          delta={deltas.lost}
+          deltaInvert
+          icon={<TrendingDown size={15} />}
+          sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
+        />
+        <KpiCard index={3} label={t("conversion_rate")} value={fmtPct(T.conversionRate, 2)} delta={deltas.conversionRate} icon={<Percent size={15} />} sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`} />
 
-        <KpiCard index={4} label={t("lost_rate")} value={fmtPct(T.lostRate, 2)} delta={deltas.lostRate} deltaInvert icon={<Percent size={15} />} sub={`${fmtNum(T.lost)} / ${fmtNum(T.crmLeads)}`} />
+        <KpiCard index={4} label={t("lost_rate")} value={fmtPct(T.lostRate, 2)} delta={deltas.lostRate} deltaInvert icon={<Percent size={15} />} sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`} />
         <KpiCard
           index={5}
           label={t("avg_close_time")}
@@ -164,12 +197,16 @@ function Overview() {
           delta={deltas.revenue}
           hero
           icon={<TrendingUp size={15} />}
-          sub={`${fmtUSD(T.attributedRevenue)} ${lang === "ar" ? "مرتبط بحملة" : "attributed"}`}
+          sub={
+            lang === "ar"
+              ? `Sales.$ Sales حسب Payment Date · أوامر حملات استرشادية ${fmtUSD(T.attributedRevenue)}`
+              : `Sales.$ Sales by Payment Date · advisory campaign orders ${fmtUSD(T.attributedRevenue)}`
+          }
         />
 
-        <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={`${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
-        <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "أقل = أفضل" : "lower is better"} />
-        <KpiCard index={10} label={t("cpl")} value={fmtUSDFull(T.cpl)} delta={deltas.cpl} deltaInvert icon={<DollarSign size={15} />} sub={`${t("attributed_cpl")} ${fmtUSDFull(T.attributedCpl)}`} />
+        <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={lang === "ar" ? `إيراد Sales ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}` : `Sales revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
+        <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "الإنفاق ÷ إيراد Sales" : "Spend ÷ Sales revenue"} />
+        <KpiCard index={10} label={t("cpl")} value={fmtUSDFull(T.cpl)} delta={deltas.cpl} deltaInvert icon={<DollarSign size={15} />} sub={lang === "ar" ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية` : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`} />
         <CpaCard totals={T} />
       </div>
 
@@ -184,26 +221,14 @@ function Overview() {
       {T.nonLeadSpend > 0 && (
         <Notice tone="warning" title={t("non_lead_spend")} icon={<Info size={16} />}>
           {lang === "ar"
-            ? `${fmtUSDFull(T.nonLeadSpend)} أُنفقت على حسابات زيارات أو حسابات بلا اسم لا تُنتج عملاء في النظام. هذه المبالغ مستبعدة من تكلفة العميل والصفقة والعائد على الإنفاق حتى تبقى المؤشرات صحيحة، لكنها تظل ظاهرة هنا.`
-            : `${fmtUSDFull(T.nonLeadSpend)} ran on traffic or unnamed accounts that produce no CRM leads. It is excluded from CPL, CPA and ROAS so those stay meaningful, but the money stays visible here.`}
-          <button
-            onClick={() => filterStore.set({ includeNonLead: filters.includeNonLead === "1" ? undefined : "1" })}
-            className="block mt-2 underline underline-offset-2 cursor-pointer font-medium"
-          >
-            {filters.includeNonLead === "1"
-              ? lang === "ar"
-                ? "استبعدها من المؤشرات"
-                : "Exclude from metrics"
-              : lang === "ar"
-                ? "ضمّها إلى المؤشرات"
-                : "Include in metrics"}
-          </button>
+            ? `${fmtUSDFull(T.nonLeadSpend)} أُنفقت على حسابات زيارات أو حسابات بلا اسم. المبلغ داخل إجمالي الإنفاق وكل معادلات الكفاءة طبقاً لتعريف الإدارة.`
+            : `${fmtUSDFull(T.nonLeadSpend)} ran on traffic or unnamed accounts. It remains included in total spend and every efficiency formula by the approved management definition.`}
         </Notice>
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <SectionTitle hint={lang === "ar" ? "الإنفاق بتاريخ الإعلان، الإيراد بتاريخ الطلب" : "Spend by ad date, revenue by order date"}>
+          <SectionTitle hint={lang === "ar" ? "الإنفاق بتاريخ الإعلان، الإيراد بتاريخ الدفع" : "Spend by ad date, revenue by Payment Date"}>
             {t("spend_vs_revenue")}
           </SectionTitle>
           <SpendRevenueChart data={data.trend} />
@@ -320,7 +345,11 @@ function Overview() {
 
       <Card>
         <SectionTitle
-          hint={lang === "ar" ? "الحسابات المُعلّمة «زيارات» أو «غير معروف» مستبعدة من مؤشرات الكفاءة" : "Accounts marked traffic or unknown are excluded from efficiency metrics"}
+          hint={
+            lang === "ar"
+              ? "كل الحسابات، بما فيها «زيارات» و«غير معروف»، داخلة في إجمالي الإنفاق ومعادلات الكفاءة"
+              : "Every account, including traffic and unknown, is included in total spend and efficiency formulas"
+          }
         >
           {t("account")}
         </SectionTitle>
@@ -365,31 +394,20 @@ function Overview() {
   );
 }
 
-/** CPA carries a basis toggle; both denominators stay visible in the sub-line. */
 function CpaCard({ totals }: { totals: Totals }) {
   const { t, lang } = useI18n();
-  const filters = useFilters();
-  const basis = filters.cpaBasis === "invoices" ? "invoices" : "won";
 
   return (
     <div className="card stagger p-4 sm:p-5 relative overflow-hidden" style={{ "--i": 11 } as React.CSSProperties}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted truncate">{t("cpa")}</span>
-        <button
-          onClick={() => filterStore.set({ cpaBasis: basis === "won" ? "invoices" : undefined })}
-          className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:text-text transition-colors cursor-pointer whitespace-nowrap"
-          title={lang === "ar" ? "تبديل أساس الحساب" : "Switch basis"}
-        >
-          {basis === "won" ? t("cpa_won") : t("cpa_invoices")}
-        </button>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted whitespace-nowrap">{t("cpa_won")}</span>
       </div>
       <div className="num mt-2 font-semibold leading-none text-[22px] sm:text-[27px] text-text">
         {fmtUSDFull(totals.cpa)}
       </div>
       <div className="mt-2 text-[11px] text-text-muted leading-snug">
-        {t("cpa_won")}: <span className="num">{fmtUSDFull(totals.cpaWon)}</span>
-        {" · "}
-        {t("cpa_invoices")}: <span className="num">{fmtUSDFull(totals.cpaInvoices)}</span>
+        {lang === "ar" ? `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} صفقة Won` : `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} won deals`}
       </div>
     </div>
   );

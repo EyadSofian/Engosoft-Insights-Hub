@@ -101,7 +101,18 @@ function Leads() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("crm_leads")} value={fmtNum(data.totals.crmLeads)} />
+            {/* Headline = clean CRM population plus authoritative Lost Analysis.
+                The table below deliberately lists only non-lost CRM rows. */}
+            <KpiCard
+              index={0}
+              label={t("crm_leads")}
+              value={fmtNum(data.totals.totalLeads)}
+              sub={
+                data.totals.archivedLeads > 0
+                  ? `${fmtNum(data.totals.crmLeads)} ${lang === "ar" ? "CRM بدون Lost" : "non-lost CRM"} · ${fmtNum(data.totals.archivedLeads)} ${lang === "ar" ? "من Lost Analysis" : "from Lost Analysis"}`
+                  : undefined
+              }
+            />
             <KpiCard index={1} label={t("won")} value={fmtNum(data.totals.won)} sub={fmtPct(data.totals.conversionRate, 1)} />
             <KpiCard index={2} label={t("lost_count")} value={fmtNum(data.totals.lost)} sub={fmtPct(data.totals.lostRate, 1)} />
             <KpiCard

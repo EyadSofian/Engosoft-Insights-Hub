@@ -95,10 +95,20 @@ export interface Snapshot {
   years: number[];
   health: DataHealth;
   fetchErrors: string[];
+  /** Tabs served from the last good copy because this pull failed or came back
+   *  empty. The numbers are usable but not current for these tabs. */
+  staleTabs: string[];
 }
 
 let cache: Snapshot | null = null;
 let inflight: Promise<Snapshot> | null = null;
+/**
+ * Last successful raw rows per tab. A tab that fails or comes back empty is
+ * served from here rather than as an empty array, so one bad read cannot blank
+ * a page. Raw rather than parsed, because the parse depends on rows from other
+ * tabs (campaign ids, ad-set names) and must be redone for the whole workbook.
+ */
+const lastGoodRaw = new Map<string, Raw[]>();
 
 /* --- primitives ----------------------------------------------------------- */
 
@@ -231,12 +241,18 @@ function csvUrl(sheetId: string, tab: string, bust: number): string {
 
 type Raw = Record<string, string>;
 
-async function fetchTab(sheetId: string, tab: string, bust: number): Promise<Raw[]> {
+/** Attempts per tab. Google drops roughly one request in a burst of seven. */
+const FETCH_ATTEMPTS = 3;
+const RETRY_BASE_MS = 400;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchOnce(sheetId: string, tab: string, bust: number): Promise<Raw[]> {
   const res = await fetch(csvUrl(sheetId, tab, bust), {
     headers: { "cache-control": "no-cache", pragma: "no-cache" },
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Failed to fetch tab "${tab}": ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
   const parsed = Papa.parse<Raw>(text, {
     header: true,
@@ -246,6 +262,30 @@ async function fetchTab(sheetId: string, tab: string, bust: number): Promise<Raw
     transformHeader: (h) => h.trim(),
   });
   return parsed.data.filter((r) => r && Object.keys(r).length > 0);
+}
+
+/**
+ * Google serves these CSVs best-effort. Pulling seven tabs at once reliably
+ * loses one to a dropped connection or a rate limit, and a single lost tab used
+ * to blank a whole page for the length of the cache TTL. Each tab now gets its
+ * own retries with a widening gap; only a tab that fails every attempt is
+ * reported as failed.
+ */
+async function fetchTab(sheetId: string, tab: string, bust: number): Promise<Raw[]> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      return await fetchOnce(sheetId, tab, bust + attempt);
+    } catch (e) {
+      lastError = e;
+      if (attempt < FETCH_ATTEMPTS) await sleep(RETRY_BASE_MS * attempt);
+    }
+  }
+  throw new Error(
+    `Failed to fetch tab "${tab}" after ${FETCH_ATTEMPTS} attempts: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+  );
 }
 
 /* --- account classification ----------------------------------------------- */
@@ -366,25 +406,63 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
   inflight = (async () => {
     const fetchErrors: string[] = [];
+    const staleTabs: string[] = [];
     // One token for the whole load, so all tabs come from the same fresh
     // pull and bypass Google's CDN cache together.
     const bust = Date.now();
-    const safeFetch = (tab: string) =>
-      fetchTab(sheetId, tab, bust).catch((e: unknown) => {
-        fetchErrors.push(`${tab}: ${e instanceof Error ? e.message : String(e)}`);
-        return [] as Raw[];
-      });
 
-    const [metaRaw, snapRaw, crmRaw, invRaw, salesRaw, websiteSalesRaw, lostRaw] =
-      await Promise.all([
-        safeFetch(TAB.meta),
-        safeFetch(TAB.snap),
-        safeFetch(TAB.crm),
-        safeFetch(TAB.invoiced),
-        safeFetch(TAB.sales),
-        safeFetch(TAB.websiteSales),
-        safeFetch(TAB.lost),
-      ]);
+    /**
+     * A tab is only allowed to reach the parser as empty when it has *never*
+     * held rows. Otherwise an empty read is treated as a failed read and the
+     * last good copy is served instead.
+     *
+     * Both failure modes this guards against are real and observed: a dropped
+     * request (the tab throws) and a read that lands while the upstream job is
+     * mid-rewrite — it clears the tab, writes the new snapshot, and anything
+     * fetched in between returns 200 with zero rows. Without this, one unlucky
+     * read blanked a page for the full 30-minute TTL.
+     */
+    const safeFetch = async (tab: string): Promise<Raw[]> => {
+      // Keyed by workbook too: pointing SHEET_ID at a different sheet must not
+      // resurrect rows from the previous one.
+      const cacheKey = `${sheetId}::${tab}`;
+      const previous = lastGoodRaw.get(cacheKey);
+      try {
+        const rows = await fetchTab(sheetId, tab, bust);
+        if (rows.length > 0) {
+          lastGoodRaw.set(cacheKey, rows);
+          return rows;
+        }
+        if (previous?.length) {
+          staleTabs.push(tab);
+          return previous;
+        }
+        return rows;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (previous?.length) {
+          staleTabs.push(tab);
+          return previous;
+        }
+        fetchErrors.push(`${tab}: ${message}`);
+        return [];
+      }
+    };
+
+    // Seven simultaneous requests to one document is what triggers Google's
+    // rate limiting in the first place. Two smaller waves cost a few hundred
+    // milliseconds and remove the burst.
+    const [metaRaw, snapRaw, crmRaw, invRaw] = await Promise.all([
+      safeFetch(TAB.meta),
+      safeFetch(TAB.snap),
+      safeFetch(TAB.crm),
+      safeFetch(TAB.invoiced),
+    ]);
+    const [salesRaw, websiteSalesRaw, lostRaw] = await Promise.all([
+      safeFetch(TAB.sales),
+      safeFetch(TAB.websiteSales),
+      safeFetch(TAB.lost),
+    ]);
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
     const keys = new CampaignKeyResolver();
@@ -515,7 +593,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           priority: str(r["Priority"]),
           fromCampaign: !!campaignName || !!campaignId,
         };
-      });
+      })
+      // Lost Analysis is the only authoritative source for lost opportunities.
+      // Keeping CRM-stage Lost here double-counts them and pollutes every stage
+      // breakdown, so the dashboard is protected even while an upstream rebuild
+      // is still removing those rows physically from the sheet.
+      .filter((row) => !row.isLost);
 
     /* -- invoiced ---------------------------------------------------------- */
     const invoiced: InvoicedRow[] = invRaw
@@ -570,6 +653,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       .map((r) => {
         const paymentDate = parseDate(r["Payment Date"]);
         return {
+          movement: str(r["حركة"]),
           paymentDate,
           invoiceDate: parseDate(r["تاريخ الفاتورة"]),
           orderRef: str(r["Sales Order #"]),
@@ -629,6 +713,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       .map((r) => {
         const campaignName = str(r["Campaign Name"]);
         const campaignId = str(r["Campaign ID"]);
+        const adName = str(r["Ad Name"]);
+        const adId = str(r["Ad ID"]);
+        const resolvedAdset = adsets.resolve(adId, adName);
         const source = str(r["cleaned Source"]) || str(r["المصدر"]);
         return {
           id: str(r["__odoo_id"]),
@@ -636,8 +723,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),
-          adName: str(r["Ad Name"]),
-          adId: str(r["Ad ID"]),
+          adName,
+          adId,
+          adset: str(r["Ad Set Name"]) || resolvedAdset.adset,
           lossReason: str(r["سبب الضياع"]),
           course: str(r["Course"]) || str(r["Course Categories"]),
           mainCategory: str(r["Main Category"]),
@@ -765,7 +853,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
     const adsRange = range(ads.map((a) => a.date));
     const crmRange = range(crm.map((c) => c.createdAt));
-    const revRange = range(invoiced.map((i) => i.revenueDate));
+    // Headline revenue is accounting revenue and follows Payment Date.
+    const revRange = range(sales.map((s) => s.paymentDate));
 
     const yearSet = new Set<number>();
     for (const d of [
@@ -840,7 +929,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const adsetNoAd = countOrigin("none");
     const adBearing = adsetExact + adsetDerived + adsetAmbiguous + adsetUnknown;
 
-    const totalRevenue = invoiced.reduce((s, r) => s + r.usdSales, 0);
+    const totalRevenue = sales.reduce((s, r) => s + r.usdSales, 0);
     const campaignRevenueRows = invoiced.filter((r) => !!r.campaignKey);
     const campaignRevenue = campaignRevenueRows.reduce((s, r) => s + r.usdSales, 0);
     const attributedRevenue = invoiced
@@ -861,7 +950,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       .sort((a, b) => b.count - a.count);
 
     const closable = crm.filter((c) => c.daysToClose !== null && c.daysToClose >= 0);
-    const negativeRows = invoiced.filter((r) => r.usdSales < 0);
+    const negativeRows = sales.filter((r) => r.usdSales < 0);
 
     const health: DataHealth = {
       crmRows: crm.length,
@@ -922,16 +1011,30 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       years,
       health,
       fetchErrors,
+      staleTabs,
     };
   })();
 
   const previous = cache;
   try {
     const next = await inflight;
-    // If every tab failed but a good snapshot is still held, keep serving the
-    // stale one rather than blanking the dashboard.
+    // If a tab came back empty but a good snapshot is still held, keep serving
+    // the stale one rather than blanking the dashboard.
+    //
+    // This used to test only ads/crm/invoiced/sales, so a wiped Website Sales or
+    // Lost Analysis tab passed as a healthy load and cached zeros for the full
+    // TTL — the Website Analysis page reading empty was exactly this. Any tab
+    // that previously carried rows and now carries none fails the check.
+    const emptied = (rows: unknown[], key: string) =>
+      !rows.length && !!previous && (previous[key as keyof Snapshot] as unknown[]).length > 0;
     const empty =
-      !next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length;
+      (!next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length) ||
+      emptied(next.websiteSales, "websiteSales") ||
+      emptied(next.lost, "lost") ||
+      emptied(next.crm, "crm") ||
+      emptied(next.invoiced, "invoiced") ||
+      emptied(next.sales, "sales") ||
+      emptied(next.ads, "ads");
     if (empty && previous) {
       // Back off before retrying, but leave `fetchedAt` alone — bumping it here
       // is what made a failed reload report the old snapshot as freshly loaded.

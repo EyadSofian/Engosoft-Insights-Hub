@@ -67,6 +67,7 @@ export const Route = createFileRoute("/api/overview")({
           syncedAt: data.snapshot.syncedAt,
           health,
           fetchErrors: data.snapshot.fetchErrors,
+          staleTabs: data.snapshot.staleTabs,
         });
       },
     },

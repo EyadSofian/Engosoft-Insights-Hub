@@ -75,8 +75,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("cheapest cpl", "lowest cpl", "أرخص", "ارخص") && cheap) {
             return ar
-              ? `أرخص تكلفة عميل: **${cheap.name}** بـ ${money2(cheap.cpl)} للعميل على ${cheap.crmLeads} عميل (إنفاق ${money(cheap.spend)}).`
-              : `Cheapest CPL: **${cheap.name}** at ${money2(cheap.cpl)} per lead across ${cheap.crmLeads} leads (${money(cheap.spend)} spent).`;
+              ? `أرخص تكلفة lead معلن عنها: **${cheap.name}** بـ ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} lead من المنصة (إنفاق ${money(cheap.spend)}).`
+              : `Cheapest reported CPL: **${cheap.name}** at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} platform leads (${money(cheap.spend)} spent).`;
           }
           if (has("total spend", "إجمالي الإنفاق", "اجمالي الانفاق")) {
             return ar
@@ -85,23 +85,23 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("total revenue", "إجمالي الإيراد", "اجمالي الايراد")) {
             return ar
-              ? `إجمالي الإيراد: **${money(totals.revenue)}**، منه ${money(totals.attributedRevenue)} مرتبط بحملة (العائد الحقيقي ${roas(totals.attributedRoas)}).`
-              : `Total revenue: **${money(totals.revenue)}**, of which ${money(totals.attributedRevenue)} is campaign-attributed (attributed ROAS ${roas(totals.attributedRoas)}).`;
+              ? `إجمالي الإيراد المدفوع: **${money(totals.revenue)}** من Sales.$ Sales حسب Payment Date. إيراد أوامر الحملات الاسترشادي ${money(totals.attributedRevenue)}.`
+              : `Paid-invoice revenue: **${money(totals.revenue)}** from Sales.$ Sales by Payment Date. Advisory campaign-order revenue is ${money(totals.attributedRevenue)}.`;
           }
           if (has("total leads", "إجمالي العملاء", "كم عميل")) {
             return ar
-              ? `عملاء النظام: **${totals.crmLeads}** (من حملات ${totals.leadsFromCampaign}، من مصادر أخرى ${totals.leadsOther})، ما أبلغت عنه ميتا: **${totals.platformLeads ?? EM}**، صفقات مغلقة: **${totals.won}**.`
-              : `CRM leads: **${totals.crmLeads}** (${totals.leadsFromCampaign} from campaigns, ${totals.leadsOther} other), platform-reported: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
+              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} من Lost Analysis. Leads الإعلانات حسب Meta/Snap: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
+              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} from Lost Analysis. Meta/Snap-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
           }
           if (has("cpl", "تكلفة العميل")) {
             return ar
-              ? `تكلفة العميل المحتمل: **${money2(totals.cpl)}** (الإنفاق ÷ عملاء النظام). التكلفة حسب ما تقوله المنصة: ${money2(totals.platformCpl)}. تكلفة العميل المدفوع فقط: ${money2(totals.attributedCpl)}.`
-              : `CPL: **${money2(totals.cpl)}** (spend ÷ CRM leads). Platform-reported CPL: ${money2(totals.platformCpl)}. Paid-only CPL: ${money2(totals.attributedCpl)}.`;
+              ? `تكلفة العميل المحتمل: **${money2(totals.cpl)}** = إجمالي الإنفاق ${money(totals.spend)} ÷ ${totals.platformLeads ?? EM} lead من Meta/Snap.`
+              : `CPL: **${money2(totals.cpl)}** = total spend ${money(totals.spend)} ÷ ${totals.platformLeads ?? EM} Meta/Snap leads.`;
           }
           if (has("conversion", "نسبة الإغلاق", "نسبة الاغلاق", "معدل التحويل")) {
             return ar
-              ? `نسبة الإغلاق: **${pct(totals.conversionRate)}** (${totals.won} من ${totals.crmLeads}). نسبة الضياع: ${pct(totals.lostRate)} (${totals.lost}).`
-              : `Conversion rate: **${pct(totals.conversionRate)}** (${totals.won} of ${totals.crmLeads}). Lost rate: ${pct(totals.lostRate)} (${totals.lost}).`;
+              ? `نسبة الإغلاق: **${pct(totals.conversionRate)}** (${totals.won} من ${totals.totalLeads}). نسبة الضياع: ${pct(totals.lostRate)} (${totals.lost} من Lost Analysis فقط).`
+              : `Conversion rate: **${pct(totals.conversionRate)}** (${totals.won} of ${totals.totalLeads}). Lost rate: ${pct(totals.lostRate)} (${totals.lost} from Lost Analysis only).`;
           }
           if (has("close time", "زمن الإغلاق", "مدة الإغلاق", "كم يوم")) {
             return ar
@@ -117,11 +117,14 @@ export const Route = createFileRoute("/api/chat")({
         const context = {
           window: { from: filters.from, to: filters.to },
           definitions: {
-            cpl: "spend ÷ CRM leads (business definition). platformCpl = spend ÷ platform-reported leads. attributedCpl = spend ÷ leads that carry a campaign.",
-            roas: "revenue ÷ spend. attributedRoas uses only revenue linked to a campaign and is the honest number.",
+            cpl: "total ad spend ÷ leads reported by Meta and Snapchat.",
+            cpa: "total ad spend ÷ won deals.",
+            lost: "Lost Analysis only. CRM stage Lost is excluded.",
+            revenue: "Sales.$ Sales filtered by Payment Date. Campaign-order revenue from Full Invoiced Orders is advisory.",
+            roas: "Sales.$ Sales revenue ÷ total ad spend. attributedRoas is advisory Full Invoiced Orders campaign revenue ÷ spend.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",
             nulls: "null means the metric is not measurable from this data — never report it as zero.",
-            caveats: `Only ${(health.revenueCampaignShare * 100).toFixed(0)}% of revenue carries a campaign. ${health.leadsWithoutSpendSource} leads came from sources with no spend data (TikTok, UChat, WhatsApp), so blended CPL reads cheaper than paid CPL. Close time is measured on ${health.closeSample} leads only.`,
+            caveats: `Campaign attribution is available only on Full Invoiced Orders, not on the primary Sales accounting rows. Close time is measured on ${health.closeSample} closed leads only.`,
           },
           totals,
           topCampaigns: campaigns.slice(0, 20).map((c) => ({

@@ -87,6 +87,9 @@ export interface FilteredData {
   nonLeadAccounts: string[];
   includeNonLead: boolean;
   cpaBasis: "won" | "invoices";
+  /** Sales rows do not carry ad attribution. When an ad dimension is selected,
+   * revenue falls back to Full Invoiced Orders and is explicitly advisory. */
+  attributionScoped: boolean;
 }
 
 export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> {
@@ -109,6 +112,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const includeNonLead = f.includeNonLead === "1";
   const cpaBasis = f.cpaBasis === "invoices" ? "invoices" : "won";
   const sourceKey = source ? normalizeSource(source) : "";
+  const attributionScoped = !!(platform || account || campaign || adset || ad || sourceKey);
 
   // Course lives on CRM/invoice/lost rows but never on an ad row, so a course
   // filter reaches the ads tabs through the campaign → modal-course inference.
@@ -206,6 +210,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     nonLeadAccounts: all.accounts.filter((a) => a.objective !== "leads").map((a) => a.name),
     includeNonLead,
     cpaBasis,
+    attributionScoped,
   };
 }
 
@@ -250,16 +255,36 @@ function closeStats(rows: CrmLeadRow[]): { avg: Maybe; sample: number } {
   return { avg: div(total, n), sample: n };
 }
 
+/* --- lead population -------------------------------------------------------- */
+
+/**
+ * Authoritative lost population. The business definition is archived CRM
+ * opportunities as exported to Lost Analysis; CRM stage names never define
+ * loss. Duplicate sheet rows are collapsed by Odoo id.
+ */
+function authoritativeLostLeads(data: FilteredData): LostRow[] {
+  const seen = new Set<string>();
+  return data.lost.filter((row, index) => {
+    const key = row.id || `row:${index}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /* --- totals ---------------------------------------------------------------- */
 
 export function computeTotals(data: FilteredData): Totals {
-  const { ads, crm, invoiced, includeNonLead, cpaBasis } = data;
+  const { ads, crm, invoiced, sales, cpaBasis } = data;
 
   const spend = sum(ads, (a) => a.spend);
   const spendMeta = sum(ads.filter((a) => a.platform === "meta"), (a) => a.spend);
   const spendSnap = sum(ads.filter((a) => a.platform === "snapchat"), (a) => a.spend);
   const nonLeadSpend = sum(ads.filter((a) => a.objective !== "leads"), (a) => a.spend);
-  const efficiencySpend = includeNonLead ? spend : spend - nonLeadSpend;
+  // Management's approved formulas use the complete paid-media bill. Traffic
+  // spend stays visible as a diagnostic, but is not silently removed from CPL,
+  // CPA, ROAS or ACOS.
+  const efficiencySpend = spend;
 
   const impressions = sum(ads, (a) => a.impressions);
   const clicksAll = sum(ads, (a) => a.clicksAll);
@@ -270,19 +295,39 @@ export function computeTotals(data: FilteredData): Totals {
   // clicks, so Snapchat impressions are excluded from its denominator.
   const linkImpressions = sum(ads.filter((a) => a.linkClicks !== null), (a) => a.impressions);
 
+  const archived = authoritativeLostLeads(data);
   const crmLeads = crm.length;
-  const leadsFromCampaign = crm.filter((c) => c.fromCampaign).length;
+  const archivedLeads = archived.length;
+  const totalLeads = crmLeads + archivedLeads;
+  // Archived rows keep their campaign columns, so a paid lead that was later
+  // archived as lost still belongs in the paid denominator.
+  const leadsFromCampaign =
+    crm.filter((c) => c.fromCampaign).length +
+    archived.filter((l) => !!l.campaignName || !!l.campaignId).length;
   const won = crm.filter((c) => c.isWon).length;
-  const lost = crm.filter((c) => c.isLost).length;
+  const lostInCrm = 0;
+  const lost = archivedLeads;
+  // Close time stays on CRM rows: archived rows carry no closing date, and
+  // padding the sample with zeros would drag the average toward nothing.
   const { avg: avgCloseDays, sample: closeSample } = closeStats(crm);
 
-  const revenue = sum(invoiced, (r) => r.usdSales);
+  const accountingRevenue = sum(sales, (r) => r.usdSales);
+  const orderRevenue = sum(invoiced, (r) => r.usdSales);
+  // The Sales tab is authoritative for money and is filtered by Payment Date.
+  // It has no campaign/ad columns, so an attribution-scoped view uses the
+  // secondary Full Invoiced Orders dataset rather than pretending all paid
+  // invoices belong to the selected campaign.
+  const revenue = data.attributionScoped ? orderRevenue : accountingRevenue;
   const adCampaignKeys = new Set(data.ads.map((a) => a.campaignKey).filter(Boolean));
   const attributedRevenue = sum(
     invoiced.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
     (r) => r.usdSales,
   );
-  const orders = new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
+  const accountingOrders =
+    new Set(sales.map((r) => r.orderRef || r.movement).filter(Boolean)).size || sales.length;
+  const invoicedOrders =
+    new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
+  const orders = data.attributionScoped ? invoicedOrders : accountingOrders;
 
   const cpaWon = div(efficiencySpend, won);
   const cpaInvoices = div(efficiencySpend, orders);
@@ -306,28 +351,33 @@ export function computeTotals(data: FilteredData): Totals {
     platformLeads,
 
     crmLeads,
+    archivedLeads,
+    totalLeads,
     leadsFromCampaign,
-    leadsOther: crmLeads - leadsFromCampaign,
+    leadsOther: totalLeads - leadsFromCampaign,
     won,
     lost,
-    conversionRate: pctOf(won, crmLeads),
-    lostRate: pctOf(lost, crmLeads),
+    lostInCrm,
+    lostArchived: archivedLeads,
+    conversionRate: pctOf(won, totalLeads),
+    lostRate: pctOf(lost, totalLeads),
     avgCloseDays,
     closeSample,
 
     revenue,
+    accountingRevenue,
+    orderRevenue,
     attributedRevenue,
     orders,
     avgOrder: div(revenue, orders),
-    revenuePerLead: div(revenue, crmLeads),
+    revenuePerLead: div(revenue, totalLeads),
 
-    // The manager's CPL: all spend ÷ every lead that entered the CRM.
-    cpl: div(efficiencySpend, crmLeads),
-    // What the platform itself would report.
-    platformCpl: platformLeads === null ? null : div(efficiencySpend, platformLeads),
+    // Approved CPL: total ad spend ÷ leads reported by Meta/Snap.
+    cpl: platformLeads === null ? null : div(spend, platformLeads),
+    platformCpl: platformLeads === null ? null : div(spend, platformLeads),
     // The honest paid CPL: only leads that actually carry a campaign.
-    attributedCpl: div(efficiencySpend, leadsFromCampaign),
-    cpa: cpaBasis === "invoices" ? cpaInvoices : cpaWon,
+    attributedCpl: div(spend, leadsFromCampaign),
+    cpa: cpaWon,
     cpaWon,
     cpaInvoices,
     roas: div(revenue, efficiencySpend),
@@ -457,6 +507,25 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     if (!b.course && c.course) b.course = c.course;
   }
 
+  // Lost counts and their denominators come exclusively from Lost Analysis.
+  // CRM-stage Lost rows were removed during parsing, so adding these rows here
+  // cannot double-count the same reporting population.
+  for (const l of authoritativeLostLeads(data)) {
+    const key =
+      grain === "campaign"
+        ? l.campaignKey
+        : grain === "adset"
+          ? l.adset || UNKNOWN_ADSET
+          : l.adName || "—";
+    if (!key || (grain === "campaign" && !l.campaignKey)) continue;
+    if (grain !== "campaign" && !l.adName && !l.adId) continue;
+    const label = grain === "campaign" ? l.campaignName : grain === "adset" ? l.adset : l.adName;
+    const b = touch(key, label);
+    b.crmLeads++;
+    b.lost++;
+    if (!b.course && l.course) b.course = l.course;
+  }
+
   const invKey = (i: InvoicedRow) =>
     grain === "campaign" ? i.campaignKey : grain === "adset" ? i.adset || UNKNOWN_ADSET : i.adName || "—";
   for (const i of data.invoiced) {
@@ -515,7 +584,7 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
       lostRate: pctOf(b.lost, b.crmLeads),
       revenue: b.revenue,
       revenuePerLead: div(b.revenue, b.crmLeads),
-      cpl: div(b.spend, b.crmLeads),
+      cpl: b.platformLeads === null ? null : div(b.spend, b.platformLeads),
       cpa: data.cpaBasis === "invoices" ? null : div(b.spend, b.won),
       roas: div(b.revenue, b.spend),
       acos: (() => {
@@ -579,11 +648,12 @@ export function bestCPL(rows: PerfRow[], minLeads = 20, minSpend = 50): PerfRow 
     (r) =>
       r.cpl !== null &&
       r.spend >= minSpend &&
-      r.crmLeads >= minLeads &&
+      (r.platformLeads ?? 0) >= minLeads &&
       r.objective === "leads" &&
       !r.partialSpend,
   );
-  if (!eligible.length) eligible = rows.filter((r) => r.cpl !== null && r.crmLeads >= 5 && !r.partialSpend);
+  if (!eligible.length)
+    eligible = rows.filter((r) => r.cpl !== null && (r.platformLeads ?? 0) >= 5 && !r.partialSpend);
   if (!eligible.length) return null;
   return eligible.reduce((a, b) => ((b.cpl ?? Infinity) < (a.cpl ?? Infinity) ? b : a));
 }
@@ -604,7 +674,7 @@ export function computeFunnel(t: Totals): FunnelStep[] {
     { key: "platform_leads", value: t.platformLeads, note: "meta_only" },
     // CRM holds leads from TikTok, UChat, WhatsApp and referrals that no ad tab
     // prices, so this stage can legitimately exceed the one above it.
-    { key: "crm_leads", value: t.crmLeads, note: "includes_unpaid_sources" },
+    { key: "crm_leads", value: t.totalLeads, note: "includes_unpaid_sources" },
     { key: "won", value: t.won },
   ];
 }
@@ -622,13 +692,18 @@ export function dailyTrend(
     return e;
   };
   for (const a of data.ads) if (a.date) at(a.date).spend += a.spend;
-  for (const i of data.invoiced) if (i.revenueDate) at(i.revenueDate).revenue += i.usdSales;
+  if (data.attributionScoped) {
+    for (const i of data.invoiced) if (i.revenueDate) at(i.revenueDate).revenue += i.usdSales;
+  } else {
+    for (const s of data.sales) if (s.paymentDate) at(s.paymentDate).revenue += s.usdSales;
+  }
   for (const c of data.crm) {
     if (!c.createdAt) continue;
     const e = at(c.createdAt);
     e.leads++;
     if (c.isWon) e.won++;
   }
+  for (const l of authoritativeLostLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({ date, ...v }));
@@ -689,17 +764,18 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   };
 
   const orderRefs = new Map<string, Set<string>>();
-  for (const i of data.invoiced) {
-    if (!i.course) continue;
-    const a = get(i.course, i.mainCategory);
-    a.revenue += i.usdSales;
-    if (i.orderRef) {
+  for (const sale of data.sales) {
+    if (!sale.course) continue;
+    const a = get(sale.course, sale.category);
+    a.revenue += sale.usdSales;
+    const ref = sale.orderRef || sale.movement;
+    if (ref) {
       let s = orderRefs.get(a.key);
       if (!s) {
         s = new Set();
         orderRefs.set(a.key, s);
       }
-      s.add(i.orderRef);
+      s.add(ref);
     }
   }
 
@@ -713,6 +789,13 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
       a.closeTotal += c.daysToClose;
       a.closeSample++;
     }
+  }
+
+  for (const l of authoritativeLostLeads(data)) {
+    if (!l.course) continue;
+    const a = get(l.course, l.mainCategory);
+    a.crmLeads++;
+    a.lost++;
   }
 
   // Ad spend reaches a course only through its campaign's inferred course.
@@ -729,10 +812,10 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   }
 
   if (prev) {
-    for (const i of prev.invoiced) {
-      if (!i.course) continue;
-      const a = map.get(normalizeName(i.course));
-      if (a) a.prevRevenue += i.usdSales;
+    for (const sale of prev.sales) {
+      if (!sale.course) continue;
+      const a = map.get(normalizeName(sale.course));
+      if (a) a.prevRevenue += sale.usdSales;
     }
   }
 
@@ -746,7 +829,7 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
       const r = div(a.spend, a.revenue);
       return r === null ? null : r * 100;
     })();
-    a.cpl = div(a.spend, a.crmLeads);
+    a.cpl = a.platformLeads === null ? null : div(a.spend, a.platformLeads);
     a.cpa = div(a.spend, a.won);
     a.ctrAll = pctOf(a.clicksAll, a.impressions);
     a.cpm = (() => {
@@ -825,28 +908,44 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
   }
 
-  // Invoice lines name a salesperson on 99% of rows but a team on 16%, so
-  // revenue is attributed through the person and rolled up to their team.
+  for (const l of authoritativeLostLeads(data)) {
+    const teamName = l.salesTeam || "—";
+    const t = getTeam(teamName);
+    t.agg.crmLeads++;
+    t.agg.lost++;
+    const person = l.salesperson || "—";
+    let p = t.people.get(person);
+    if (!p) {
+      p = { agg: blank(person, teamName), closeTotal: 0, orderRefs: new Set() };
+      t.people.set(person, p);
+    }
+    p.agg.crmLeads++;
+    p.agg.lost++;
+  }
+
+  // Paid accounting rows carry salesperson/team and are the authoritative
+  // revenue source. Missing team names are resolved through the CRM roster.
   const personTeam = new Map<string, string>();
   for (const c of data.crm) {
     if (c.salesperson && c.salesTeam && !personTeam.has(c.salesperson))
       personTeam.set(c.salesperson, c.salesTeam);
   }
 
-  for (const i of data.invoiced) {
-    const person = i.salesperson;
-    const teamName = i.salesTeam || (person ? personTeam.get(person) : "") || "—";
+  for (const sale of data.sales) {
+    const person = sale.salesperson;
+    const teamName = sale.salesTeam || (person ? personTeam.get(person) : "") || "—";
     const t = getTeam(teamName);
-    t.agg.revenue += i.usdSales;
-    if (i.orderRef) t.orderRefs.add(i.orderRef);
+    t.agg.revenue += sale.usdSales;
+    const ref = sale.orderRef || sale.movement;
+    if (ref) t.orderRefs.add(ref);
     if (person) {
       let p = t.people.get(person);
       if (!p) {
         p = { agg: blank(person, teamName), closeTotal: 0, orderRefs: new Set() };
         t.people.set(person, p);
       }
-      p.agg.revenue += i.usdSales;
-      if (i.orderRef) p.orderRefs.add(i.orderRef);
+      p.agg.revenue += sale.usdSales;
+      if (ref) p.orderRefs.add(ref);
     }
   }
 
@@ -932,7 +1031,7 @@ function matrix<T>(rows: T[], rowKey: (r: T) => string, colKey: (r: T) => string
  * returned so the UI can label which is which instead of implying one number.
  */
 export function computeLost(data: FilteredData): LostBreakdown {
-  const rows = data.lost;
+  const rows = authoritativeLostLeads(data);
   const labels = data.snapshot.sourceLabels;
   const monthOf = (d: string) => (d ? d.slice(0, 7) : "—");
   return {
@@ -946,7 +1045,7 @@ export function computeLost(data: FilteredData): LostBreakdown {
     reasonByTeam: matrix(rows, (r) => r.lossReason || "—", (r) => r.salesTeam || "—"),
     reasonByCourse: matrix(rows, (r) => r.lossReason || "—", (r) => r.course || "—"),
     total: rows.length,
-    crmLostCount: data.crm.filter((c) => c.isLost).length,
+    crmLostCount: 0,
   };
 }
 
@@ -968,32 +1067,53 @@ export function computeLeadOrigin(data: FilteredData): {
   cohorts: OriginCohort[];
   otherBySource: Grouped[];
 } {
-  const build = (key: "campaign" | "other", rows: CrmLeadRow[], revenue: number): OriginCohort => {
+  // Archived lost leads belong to a cohort too, otherwise this card reports a
+  // near-zero lost count while the Lost page reports hundreds.
+  const archived = authoritativeLostLeads(data);
+  const build = (
+    key: "campaign" | "other",
+    rows: CrmLeadRow[],
+    archivedRows: LostRow[],
+    revenue: number,
+  ): OriginCohort => {
     const { avg, sample } = closeStats(rows);
+    const leads = rows.length + archivedRows.length;
     const won = rows.filter((r) => r.isWon).length;
-    const lost = rows.filter((r) => r.isLost).length;
+    const lost = archivedRows.length;
     return {
       key,
-      leads: rows.length,
+      leads,
       won,
       lost,
-      conversionRate: pctOf(won, rows.length),
-      lostRate: pctOf(lost, rows.length),
+      conversionRate: pctOf(won, leads),
+      lostRate: pctOf(lost, leads),
       revenue,
       avgCloseDays: avg,
       closeSample: sample,
     };
   };
 
+  const hasCampaign = (l: LostRow) => !!l.campaignName || !!l.campaignId;
   const fromCampaign = data.crm.filter((c) => c.fromCampaign);
   const other = data.crm.filter((c) => !c.fromCampaign);
+  const archivedFromCampaign = archived.filter(hasCampaign);
+  const archivedOther = archived.filter((l) => !hasCampaign(l));
   const campaignRevenue = sum(data.invoiced.filter((i) => !!i.campaignKey), (i) => i.usdSales);
   const otherRevenue = sum(data.invoiced.filter((i) => !i.campaignKey), (i) => i.usdSales);
   const labels = data.snapshot.sourceLabels;
 
   return {
-    cohorts: [build("campaign", fromCampaign, campaignRevenue), build("other", other, otherRevenue)],
-    otherBySource: groupBy(other, (c) => labels.get(c.sourceKey) ?? c.source ?? "—"),
+    cohorts: [
+      build("campaign", fromCampaign, archivedFromCampaign, campaignRevenue),
+      build("other", other, archivedOther, otherRevenue),
+    ],
+    otherBySource: groupBy(
+      [
+        ...other.map((c) => ({ sourceKey: c.sourceKey, source: c.source })),
+        ...archivedOther.map((l) => ({ sourceKey: l.sourceKey, source: l.source })),
+      ],
+      (r) => labels.get(r.sourceKey) ?? r.source ?? "—",
+    ),
   };
 }
 
@@ -1061,11 +1181,12 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const revenueOf = (y: number, m?: string) =>
     sum(
-      all.invoiced.filter((i) => inYear(i.revenueDate, y) && (!m || i.revenueDate.slice(5, 7) === m)),
-      (i) => i.usdSales,
+      all.sales.filter((s) => inYear(s.paymentDate, y) && (!m || s.paymentDate.slice(5, 7) === m)),
+      (s) => s.usdSales,
     );
   const leadsOf = (y: number, m?: string) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length;
+    all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length +
+    all.lost.filter((l) => inYear(l.createdAt, y) && (!m || l.createdAt.slice(5, 7) === m)).length;
   const wonOf = (y: number, m?: string) =>
     all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length;
 
@@ -1078,12 +1199,12 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
     crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
-    invoiced: all.invoiced.filter((i) => inYear(i.revenueDate, prevYear)).length,
+    sales: all.sales.filter((s) => inYear(s.paymentDate, prevYear)).length,
   };
   const available =
     priorCounts.ads >= MIN_PRIOR_ROWS &&
     priorCounts.crm >= MIN_PRIOR_ROWS &&
-    priorCounts.invoiced >= MIN_PRIOR_ROWS;
+    priorCounts.sales >= MIN_PRIOR_ROWS;
 
   // Growth is only emitted when the prior year is comparable at all, so no
   // consumer of this payload can render a percentage the data cannot support.
@@ -1113,23 +1234,24 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     sum(all.ads.filter((a) => inYear(a.date, y) && a.date.slice(5) <= ytdCut), (a) => a.spend);
   const ytdRevenue = (y: number) =>
     sum(
-      all.invoiced.filter((i) => inYear(i.revenueDate, y) && i.revenueDate.slice(5) <= ytdCut),
-      (i) => i.usdSales,
+      all.sales.filter((s) => inYear(s.paymentDate, y) && s.paymentDate.slice(5) <= ytdCut),
+      (s) => s.usdSales,
     );
   const ytdLeads = (y: number) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length;
+    all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
+    all.lost.filter((l) => inYear(l.createdAt, y) && l.createdAt.slice(5) <= ytdCut).length;
   const ytdWon = (y: number) =>
     all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length;
 
-  const courseKeys = new Set(all.invoiced.map((i) => i.course).filter(Boolean));
+  const courseKeys = new Set(all.sales.map((s) => s.course).filter(Boolean));
   const byCourse = [...courseKeys].map((course) => {
     const current = sum(
-      all.invoiced.filter((i) => i.course === course && inYear(i.revenueDate, year)),
-      (i) => i.usdSales,
+      all.sales.filter((s) => s.course === course && inYear(s.paymentDate, year)),
+      (s) => s.usdSales,
     );
     const previous = sum(
-      all.invoiced.filter((i) => i.course === course && inYear(i.revenueDate, prevYear)),
-      (i) => i.usdSales,
+      all.sales.filter((s) => s.course === course && inYear(s.paymentDate, prevYear)),
+      (s) => s.usdSales,
     );
     return {
       key: course,
@@ -1189,32 +1311,41 @@ export function execSummary(
   const ar: string[] = [];
 
   en.push(
-    `Between ${window} you spent ${money(t.spend)} and ${t.crmLeads.toLocaleString("en-US")} leads entered the CRM. ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}) and ${t.lost.toLocaleString("en-US")} were lost (${pctStr(t.lostRate)}).`,
+    `Between ${window} you spent ${money(t.spend)}. The clean lead population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} non-lost CRM rows plus ${t.lost.toLocaleString("en-US")} archived losses from Lost Analysis. ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}).`,
   );
   ar.push(
-    `خلال الفترة ${window} أنفقت ${money(t.spend)} ودخل النظام ${t.crmLeads.toLocaleString("en-US")} عميلاً محتملاً. أُغلق منهم ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)} وضاع ${t.lost.toLocaleString("en-US")} بنسبة ${pctStr(t.lostRate)}.`,
+    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. إجمالي العملاء النظيف ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} من CRM بعد استبعاد Stage=Lost، مضافاً إليهم ${t.lost.toLocaleString("en-US")} صفقة ضائعة من Lost Analysis فقط. أُغلق ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
+  );
+
+  if (t.lostArchived > 0) {
+    en.push(
+      `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.`,
+    );
+    ar.push(
+      `كل الصفقات الضائعة وعددها ${t.lostArchived.toLocaleString("en-US")} مأخوذة من Lost Analysis فقط، وتم استبعاد Stage=Lost من CRM من كل المؤشرات والرسوم.`,
+    );
+  }
+
+  en.push(
+    `Paid-invoice revenue was ${money(t.revenue)} from Sales.$ Sales by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} is campaign-linked Full Invoiced Orders revenue and is advisory only.`,
+  );
+  ar.push(
+    `بلغ إيراد الفواتير المدفوعة ${money(t.revenue)} من عمود $ Sales في تبويب Sales حسب Payment Date، والعائد الأساسي ${roasStr(t.roas)}. أما ${money(t.attributedRevenue)} فهو إيراد أوامر مفوترة مرتبط بالحملات ويُعرض استرشادياً فقط.`,
   );
 
   en.push(
-    `Revenue was ${money(t.revenue)}, of which ${money(t.attributedRevenue)} traces back to a campaign — that attributed slice gives the honest ROAS of ${roasStr(t.attributedRoas)} against a blended ${roasStr(t.roas)}.`,
+    `CPL is ${money2(t.cpl)} = total spend ÷ ${t.platformLeads?.toLocaleString("en-US") ?? "—"} platform-reported leads; CPA is ${money2(t.cpa)} = total spend ÷ won deals; ACOS is ${pctStr(t.acos)}.`,
   );
   ar.push(
-    `بلغ الإيراد ${money(t.revenue)}، منه ${money(t.attributedRevenue)} مرتبط فعلياً بحملة إعلانية — وهذا الجزء وحده يعطي عائداً حقيقياً قدره ${roasStr(t.attributedRoas)} مقابل ${roasStr(t.roas)} للإيراد الكامل.`,
-  );
-
-  en.push(
-    `CPL is ${money2(t.cpl)} per CRM lead, CPA ${money2(t.cpa)} per won deal, and ACOS ${pctStr(t.acos)}.`,
-  );
-  ar.push(
-    `تكلفة العميل المحتمل ${money2(t.cpl)}، وتكلفة الصفقة المغلقة ${money2(t.cpa)}، ونسبة الإنفاق إلى الإيراد ${pctStr(t.acos)}.`,
+    `تكلفة العميل المحتمل ${money2(t.cpl)} = إجمالي الإنفاق ÷ ${t.platformLeads?.toLocaleString("en-US") ?? "—"} lead من منصات الإعلانات، وتكلفة الصفقة ${money2(t.cpa)} = الإنفاق ÷ Won، ونسبة الإنفاق إلى الإيراد ${pctStr(t.acos)}.`,
   );
 
   if (t.nonLeadSpend > 0) {
     en.push(
-      `${money(t.nonLeadSpend)} of that spend ran on traffic or unnamed accounts that generate no CRM leads, and is excluded from the efficiency figures above.`,
+      `${money(t.nonLeadSpend)} ran on traffic or unnamed accounts. It remains included because management requested every efficiency formula to use total ad spend.`,
     );
     ar.push(
-      `من هذا الإنفاق ${money(t.nonLeadSpend)} على حسابات زيارات أو حسابات بلا اسم لا تنتج عملاء في النظام، وقد استُبعدت من حسابات الكفاءة أعلاه.`,
+      `من هذا الإنفاق ${money(t.nonLeadSpend)} على حسابات زيارات أو حسابات بلا اسم، لكنه يظل داخلاً في الحساب لأن معادلات الإدارة تستخدم إجمالي الإنفاق الإعلاني كاملاً.`,
     );
   }
 
@@ -1233,8 +1364,8 @@ export function execSummary(
   }
 
   if (cheap) {
-    en.push(`Cheapest leads came from ${cheap.name} at ${money2(cheap.cpl)} across ${cheap.crmLeads} leads.`);
-    ar.push(`أرخص العملاء جاءوا من ${cheap.name} بتكلفة ${money2(cheap.cpl)} للعميل على ${cheap.crmLeads} عميلاً.`);
+    en.push(`Cheapest platform-reported leads came from ${cheap.name} at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} leads.`);
+    ar.push(`أرخص leads المبلغ عنها من المنصة جاءت من ${cheap.name} بتكلفة ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} lead.`);
   }
 
   if (t.avgCloseDays !== null) {

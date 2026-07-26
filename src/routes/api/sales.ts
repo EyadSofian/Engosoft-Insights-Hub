@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/sales")({
           totals: computeTotals(data),
           salesTotal: rows.reduce((s, r) => s + r.usdSales, 0),
           salesRows: rows.length,
-          salesOrders: new Set(rows.map((r) => r.orderRef).filter(Boolean)).size,
+          salesOrders: new Set(rows.map((r) => r.orderRef || r.movement).filter(Boolean)).size,
           invoicedTotal: data.invoiced.reduce((s, r) => s + r.usdSales, 0),
           byCourse: groupBy(rows, (r) => r.course || "—", money),
           byCategory: groupBy(rows, (r) => r.category || "—", money),
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/api/sales")({
             .map(([date, revenue]) => ({ date, revenue })),
           detail: capped(
             rows.map((r) => ({
+              movement: r.movement,
               paymentDate: r.paymentDate,
               invoiceDate: r.invoiceDate,
               orderRef: r.orderRef,

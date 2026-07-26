@@ -27,6 +27,7 @@ export const Route = createFileRoute("/api/refresh")({
               lost: data.lost.length,
             },
             fetchErrors: data.fetchErrors,
+            staleTabs: data.staleTabs,
           },
           { headers: { "cache-control": "no-store" } },
         );

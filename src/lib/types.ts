@@ -133,6 +133,8 @@ export interface InvoicedRow {
 }
 
 export interface SalesRow {
+  /** Accounting move / invoice number (for example INVNT/2026/00001). */
+  movement: string;
   paymentDate: string;
   invoiceDate: string;
   orderRef: string;
@@ -194,6 +196,7 @@ export interface LostRow {
   campaignKey: string;
   adName: string;
   adId: string;
+  adset: string;
   lossReason: string;
   course: string;
   mainCategory: string;
@@ -215,9 +218,9 @@ export interface Totals {
   spend: number;
   spendMeta: number;
   spendSnap: number;
-  /** Spend on traffic/unknown-objective accounts, excluded from efficiency. */
+  /** Diagnostic slice of spend on traffic/unknown-objective accounts; it remains included in efficiency formulas. */
   nonLeadSpend: number;
-  /** Spend actually used as the efficiency denominator. */
+  /** Spend used in management efficiency formulas. This is the full ad spend. */
   efficiencySpend: number;
   impressions: number;
   clicksAll: number;
@@ -230,11 +233,21 @@ export interface Totals {
   platformLeads: Maybe;
 
   /* CRM side */
+  /** Non-lost rows on the CRM Leads tab. CRM stage Lost is deliberately excluded. */
   crmLeads: number;
+  /** Authoritative archived-lost population from Lost Analysis. */
+  archivedLeads: number;
+  /** Every lead: non-lost CRM rows + authoritative Lost Analysis rows. */
+  totalLeads: number;
   leadsFromCampaign: number;
   leadsOther: number;
   won: number;
+  /** Lost total from Lost Analysis only. */
   lost: number;
+  /** Always zero: CRM-stage Lost never participates in reporting. */
+  lostInCrm: number;
+  /** Same authoritative count as `lost`. Kept for API compatibility. */
+  lostArchived: number;
   conversionRate: Maybe;
   lostRate: Maybe;
   avgCloseDays: Maybe;
@@ -242,8 +255,13 @@ export interface Totals {
   closeSample: number;
 
   /* money */
+  /** Primary paid-invoice revenue from Sales.$ Sales, filtered by Payment Date. */
   revenue: number;
-  /** Revenue traceable to a campaign present in the ads tabs. */
+  /** Same primary revenue, exposed explicitly for source transparency. */
+  accountingRevenue: number;
+  /** Fully invoiced sales-order revenue; secondary/advisory. */
+  orderRevenue: number;
+  /** Advisory order revenue traceable to a campaign present in the ads tabs. */
   attributedRevenue: number;
   orders: number;
   avgOrder: Maybe;

@@ -111,9 +111,9 @@ export const DICT = {
   closed_leads: { ar: "صفقة مغلقة", en: "closed leads" },
   revenue: { ar: "الإيراد", en: "Revenue" },
   revenue_per_lead: { ar: "الإيراد لكل عميل", en: "Revenue per lead" },
-  attributed_revenue: { ar: "إيراد مرتبط بالحملات", en: "Attributed revenue" },
+  attributed_revenue: { ar: "إيراد أوامر الحملات (استرشادي)", en: "Campaign order revenue (advisory)" },
   roas: { ar: "العائد على الإنفاق", en: "ROAS" },
-  attributed_roas: { ar: "العائد الحقيقي", en: "Attributed ROAS" },
+  attributed_roas: { ar: "عائد أوامر الحملات (استرشادي)", en: "Campaign order ROAS (advisory)" },
   orders: { ar: "الطلبات", en: "Orders" },
   avg_order: { ar: "متوسط الطلب", en: "Avg order" },
   aov: { ar: "متوسط قيمة الطلب", en: "AOV" },
@@ -229,8 +229,8 @@ export const DICT = {
   from_campaigns: { ar: "من حملات إعلانية", en: "From campaigns" },
   other_sources: { ar: "من مصادر أخرى", en: "Other sources" },
   origin_note: {
-    ar: "أداء الإعلانات المدفوعة لا يُقاس على الرقم المخلوط — العملاء بلا حملة يأتون من قنوات أخرى.",
-    en: "Paid performance must not be judged on the blended number — leads with no campaign came from elsewhere.",
+    ar: "أعداد العملاء تشمل Lost Analysis؛ توزيع الإيراد حسب المصدر استرشادي من Full Invoiced Orders لأن Sales لا يحمل مصدر الحملة.",
+    en: "Lead counts include Lost Analysis; source-level revenue is advisory from Full Invoiced Orders because Sales has no campaign-source field.",
   },
 
   // ad set

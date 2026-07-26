@@ -80,6 +80,7 @@ export const Route = createFileRoute("/api/filters")({
           fetchedAt: new Date(data.fetchedAt).toISOString(),
           health: data.health,
           fetchErrors: data.fetchErrors,
+          staleTabs: data.staleTabs,
           counts: {
             ads: data.ads.length,
             crm: data.crm.length,

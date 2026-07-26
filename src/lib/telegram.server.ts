@@ -116,20 +116,19 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   L.push("");
 
   L.push(`👥 *${esc("العملاء المحتملون")}*`);
-  L.push(esc(`دخل النظام: ${int(t.crmLeads)}  ${change(t.crmLeads, p.crmLeads)}`));
-  L.push(esc(`من حملات: ${int(t.leadsFromCampaign)} · من مصادر أخرى: ${int(t.leadsOther)}`));
-  L.push(esc(`ما أبلغت عنه ميتا: ${int(t.platformLeads)}`));
+  L.push(esc(`الإجمالي النظيف: ${int(t.totalLeads)} = CRM بدون Lost ${int(t.crmLeads)} + Lost Analysis ${int(t.lost)}`));
+  L.push(esc(`Leads الإعلانات حسب Meta/Snap: ${int(t.platformLeads)}`));
   L.push("");
 
   L.push(`🏆 *${esc("الإغلاق")}*`);
   L.push(esc(`صفقات مغلقة: ${int(t.won)} (${pct(t.conversionRate)})  ${change(t.won, p.won)}`));
-  L.push(esc(`ضائعة: ${int(t.lost)} (${pct(t.lostRate)})`));
-  L.push(esc(`قيمة الفواتير الصادرة: ${money(t.revenue)}  ${change(t.revenue, p.revenue)}`));
+  L.push(esc(`ضائعة من Lost Analysis فقط: ${int(t.lost)} (${pct(t.lostRate)})`));
+  L.push(esc(`إيراد الفواتير المدفوعة حسب Payment Date: ${money(t.revenue)}  ${change(t.revenue, p.revenue)}`));
   L.push("");
 
   L.push(`📈 *${esc("مؤشرات الكفاءة")}*`);
-  L.push(esc(`تكلفة العميل المحتمل: ${money(t.cpl, 2)}  ${change(t.cpl ?? 0, p.cpl ?? 0)}`));
-  L.push(esc(`تكلفة الصفقة المغلقة: ${money(t.cpa, 2)}`));
+  L.push(esc(`CPL = الإنفاق ÷ Leads المنصات: ${money(t.cpl, 2)}  ${change(t.cpl ?? 0, p.cpl ?? 0)}`));
+  L.push(esc(`CPA = الإنفاق ÷ Won: ${money(t.cpa, 2)}`));
   L.push(esc(`العائد على الإنفاق: ${times(t.roas)} · نسبة الإنفاق للإيراد: ${pct(t.acos)}`));
   L.push("");
 

@@ -63,14 +63,14 @@ function Lost() {
         <>
           <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
-              ? `جدول «تحليل الخسائر» يضم ${fmtNum(data.breakdown.total)} صفاً تحمل سبب ضياع، بينما عدد العملاء الذين مرحلتهم «ضائع» في النظام ${fmtNum(data.breakdown.crmLostCount)}. هما تصديران مختلفان ولا تتطابق أعدادهما، لذلك تُستخدم أسباب الضياع من الجدول الأول ونسبة الضياع من النظام.`
-              : `The Lost Analysis tab holds ${fmtNum(data.breakdown.total)} rows carrying a loss reason, while CRM stage "Lost" counts ${fmtNum(data.breakdown.crmLostCount)}. These are separate exports whose totals do not match, so reasons come from the tab and lost rate comes from the CRM.`}
+              ? `هذه الصفحة وكل مؤشرات الضياع تعتمد حصرياً على ${fmtNum(data.breakdown.total)} فرصة مؤرشفة في Lost Analysis. Stage=Lost داخل CRM مستبعد ولا يدخل في العدد أو النسبة.`
+              : `This page and every Lost KPI use only the ${fmtNum(data.breakdown.total)} archived opportunities in Lost Analysis. CRM Stage=Lost is excluded from both count and rate.`}
           </Notice>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("total_lost")} value={fmtNum(data.breakdown.total)} sub={lang === "ar" ? "بسبب مسجَّل" : "with a reason"} />
-            <KpiCard index={1} label={lang === "ar" ? "ضائع في النظام" : "CRM stage Lost"} value={fmtNum(data.breakdown.crmLostCount)} />
-            <KpiCard index={2} label={t("lost_rate")} value={fmtPct(data.totals.lostRate, 2)} sub={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.crmLeads)}`} />
+            <KpiCard index={0} label={t("total_lost")} value={fmtNum(data.breakdown.total)} sub={lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} />
+            <KpiCard index={1} label={lang === "ar" ? "CRM بدون Lost" : "Non-lost CRM"} value={fmtNum(data.totals.crmLeads)} />
+            <KpiCard index={2} label={t("lost_rate")} value={fmtPct(data.totals.lostRate, 2)} sub={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`} />
             <KpiCard index={3} label={lang === "ar" ? "عدد الأسباب" : "Distinct reasons"} value={fmtNum(data.breakdown.byReason.length)} />
           </div>
 

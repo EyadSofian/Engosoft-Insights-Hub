@@ -39,6 +39,8 @@ export interface FiltersResp {
   fetchedAt: string;
   health: DataHealth;
   fetchErrors: string[];
+  /** Tabs served from the last good copy because this pull failed or was empty. */
+  staleTabs: string[];
   counts: { ads: number; crm: number; invoiced: number; sales: number; lost: number };
 }
 
@@ -168,10 +170,52 @@ export function TopBar({ title }: { title?: string }) {
             ]}
           />
         </div>
+
+        <DataHealthBar data={data} />
       </header>
 
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} data={data} />
     </>
+  );
+}
+
+/**
+ * Degraded-data strip, shown on every page rather than only on the Overview.
+ *
+ * A tab that fails to load used to be silent everywhere except one page, so a
+ * page reading zeros was indistinguishable from a period that genuinely had no
+ * data. Whatever the state, the user now sees it before reading the numbers.
+ */
+function DataHealthBar({ data }: { data?: FiltersResp }) {
+  const { lang } = useI18n();
+  const failed = data?.fetchErrors ?? [];
+  const stale = data?.staleTabs ?? [];
+  if (!failed.length && !stale.length) return null;
+
+  const danger = failed.length > 0;
+  const tabName = (entry: string) => entry.split(":")[0];
+  const text = danger
+    ? lang === "ar"
+      ? `تعذّر تحميل: ${failed.map(tabName).join("، ")} — الأرقام المعروضة لا تشمل هذه المصادر.`
+      : `Failed to load: ${failed.map(tabName).join(", ")} — the numbers shown exclude these sources.`
+    : lang === "ar"
+      ? `معروض من آخر نسخة سليمة: ${stale.join("، ")} — قد تنقص أحدث الصفوف.`
+      : `Served from the last good copy: ${stale.join(", ")} — the newest rows may be missing.`;
+
+  return (
+    <div
+      className="px-4 sm:px-6 py-1.5 text-[11px] font-medium flex items-center gap-2 border-t border-border"
+      style={{
+        background: danger ? "var(--danger-soft, rgba(220,38,38,.10))" : "var(--warning-soft, rgba(217,119,6,.10))",
+        color: danger ? "var(--danger)" : "var(--warning)",
+      }}
+      role="status"
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "currentColor" }} />
+      <span className="truncate" title={text}>
+        {text}
+      </span>
+    </div>
   );
 }
 
@@ -361,36 +405,6 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
             onChange={(v) => filterStore.set({ salesperson: v })}
           />
 
-          <div className="border-t border-border pt-4 grid gap-3">
-            <Field label={t("cpa_basis")}>
-              <Segmented
-                value={filters.cpaBasis ?? "won"}
-                onChange={(v) => filterStore.set({ cpaBasis: v === "invoices" ? "invoices" : undefined })}
-                options={[
-                  { value: "won", label: t("cpa_won") },
-                  { value: "invoices", label: t("cpa_invoices") },
-                ]}
-                size="md"
-              />
-            </Field>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.includeNonLead === "1"}
-                onChange={(e) => filterStore.set({ includeNonLead: e.target.checked ? "1" : undefined })}
-                className="mt-1 w-4 h-4 cursor-pointer"
-              />
-              <span className="text-sm">
-                <span className="block font-medium text-text">{t("include_non_lead")}</span>
-                <span className="block text-xs text-text-muted mt-0.5">
-                  {lang === "ar"
-                    ? "حسابات الزيارات تُنفق دون إنتاج عملاء، وهي مستبعدة من مؤشرات الكفاءة افتراضياً."
-                    : "Traffic accounts spend without producing leads and are excluded from efficiency metrics by default."}
-                </span>
-              </span>
-            </label>
-          </div>
         </div>
 
         <div className="flex gap-2 mt-6">

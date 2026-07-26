@@ -10,6 +10,7 @@ import type { DataHealth, Grouped, Totals } from "@/lib/types";
 export const Route = createFileRoute("/sales")({ component: Sales });
 
 interface SaleRow {
+  movement: string;
   paymentDate: string;
   invoiceDate: string;
   orderRef: string;
@@ -48,6 +49,7 @@ function Sales() {
 
   const cols: Col<SaleRow>[] = [
     { key: "paymentDate", header: lang === "ar" ? "تاريخ الدفع" : "Payment date", sticky: true, width: "120px", sortValue: (r) => r.paymentDate, render: (r) => fmtDate(r.paymentDate, lang) },
+    { key: "movement", header: lang === "ar" ? "حركة" : "Invoice", sortValue: (r) => r.movement, render: (r) => r.movement || "—" },
     { key: "orderRef", header: t("order_ref"), sortValue: (r) => r.orderRef, render: (r) => r.orderRef || "—" },
     { key: "partner", header: t("partner"), sortValue: (r) => r.partner, render: (r) => <span className="truncate block max-w-[180px]" title={r.partner}>{r.partner || "—"}</span> },
     { key: "course", header: t("course"), sortValue: (r) => r.course, render: (r) => r.course || "—" },
@@ -69,15 +71,15 @@ function Sales() {
         <>
           <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
-              ? `تبويب «المبيعات» يسجّل بنود الدفع (${fmtUSD(data.salesTotal)} على ${fmtNum(data.salesRows)} صف) بينما تبويب الفواتير يسجّل بنود الطلب (${fmtUSD(data.invoicedTotal)}). الرقمان يصفان مالاً متقارباً لا متطابقاً، ولذلك يُعرضان منفصلين.`
-              : `The Sales tab records payment lines (${fmtUSD(data.salesTotal)} across ${fmtNum(data.salesRows)} rows) while Full Invoiced records order lines (${fmtUSD(data.invoicedTotal)}). They describe overlapping-but-different money, so both are shown rather than blended.`}
+              ? `الإيراد الأساسي هو مجموع عمود $ Sales في تبويب Sales حسب Payment Date: ${fmtUSD(data.salesTotal)} على ${fmtNum(data.salesRows)} صف. أما ${fmtUSD(data.invoicedTotal)} من Full Invoiced Orders فهو استرشادي لتحليل أوامر وحملات البيع ولا يُخلط مع الإيراد الأساسي.`
+              : `Primary revenue is Sales.$ Sales filtered by Payment Date: ${fmtUSD(data.salesTotal)} across ${fmtNum(data.salesRows)} rows. Full Invoiced Orders (${fmtUSD(data.invoicedTotal)}) is advisory for order/campaign analysis and is never blended into primary revenue.`}
           </Notice>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("revenue")} value={fmtUSD(data.salesTotal)} hero sub={lang === "ar" ? "من تبويب المبيعات" : "from the Sales tab"} />
+            <KpiCard index={0} label={t("revenue")} value={fmtUSD(data.salesTotal)} hero sub={lang === "ar" ? "$ Sales حسب Payment Date" : "$ Sales by Payment Date"} />
             <KpiCard index={1} label={t("orders")} value={fmtNum(data.salesOrders)} />
             <KpiCard index={2} label={t("aov")} value={fmtUSD(data.salesOrders > 0 ? data.salesTotal / data.salesOrders : null)} />
-            <KpiCard index={3} label={t("full_invoiced")} value={fmtUSD(data.invoicedTotal)} sub={lang === "ar" ? "من تبويب الفواتير" : "from Full Invoiced"} />
+            <KpiCard index={3} label={t("full_invoiced")} value={fmtUSD(data.invoicedTotal)} sub={lang === "ar" ? "استرشادي لأوامر الحملات" : "advisory order/campaign view"} />
           </div>
 
           <Card>
@@ -97,7 +99,7 @@ function Sales() {
           <DataTable
             rows={data.detail.rows}
             cols={cols}
-            searchable={(r) => `${r.orderRef} ${r.partner} ${r.course} ${r.salesperson} ${r.salesTeam}`}
+            searchable={(r) => `${r.movement} ${r.orderRef} ${r.partner} ${r.course} ${r.salesperson} ${r.salesTeam}`}
             initialSort={{ key: "paymentDate", dir: -1 }}
             csvFilename="engosoft-sales"
             maxHeight={620}
@@ -110,6 +112,7 @@ function Sales() {
             }
             csvRow={(r) => ({
               payment_date: r.paymentDate,
+              movement: r.movement,
               invoice_date: r.invoiceDate,
               order_ref: r.orderRef,
               partner: r.partner,

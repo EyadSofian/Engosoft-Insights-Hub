@@ -71,6 +71,12 @@ function Campaigns() {
         </Notice>
       )}
 
+      <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
+        {lang === "ar"
+          ? "إجمالي الإيراد أعلى الصفحة من Sales حسب Payment Date. أما الإيراد والعائد داخل صفوف الحملة/المجموعة/الإعلان فمن Full Invoiced Orders لوجود بيانات الربط الإعلاني هناك، ولذلك فهو تحليل استرشادي لا يساوي إجمالي الفواتير المدفوعة."
+          : "Headline revenue comes from Sales by Payment Date. Row-level campaign/ad-set/ad revenue and ROAS use Full Invoiced Orders because that is where attribution exists, so they are advisory and will not equal total paid-invoice revenue."}
+      </Notice>
+
       {isLoading || !data ? (
         <Skeleton className="h-[520px]" />
       ) : (
@@ -79,7 +85,7 @@ function Campaigns() {
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
               <Metric label={t("spend")}>{fmtUSD(data.totals.spend)}</Metric>
               <Metric label={t("revenue")}>{fmtUSD(data.totals.revenue)}</Metric>
-              <Metric label={t("crm_leads")}>{fmtNum(data.totals.crmLeads)}</Metric>
+              <Metric label={t("crm_leads")}>{fmtNum(data.totals.totalLeads)}</Metric>
               <Metric label={t("won")} hint={fmtPct(data.totals.conversionRate, 1)}>
                 {fmtNum(data.totals.won)}
               </Metric>
