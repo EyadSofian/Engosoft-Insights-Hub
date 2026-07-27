@@ -100,6 +100,21 @@ const pick = (row, ...cols) => {
   return "";
 };
 
+/**
+ * gviz does not error on an unknown `sheet=` name — verified directly against
+ * this workbook: a nonexistent tab returns HTTP 200 with the first tab's rows
+ * instead (CRM Leads here). TikTok Ads Daily does not exist yet, so its rows
+ * must be shape-checked before being trusted, or every CRM lead's own
+ * Campaign/Ad columns get counted as a TikTok ad row.
+ */
+function looksLikeAdsExport(rows) {
+  if (!rows.length) return true;
+  const header = new Set(Object.keys(rows[0]));
+  const hasAdsColumn = ["Spend (Cost)", "Cost", "Spend", "Impressions"].some((c) => header.has(c));
+  const hasCrmOnlyColumn = ["Cleaned Stage", "سبب الضياع", "__odoo_write_date"].some((c) => header.has(c));
+  return hasAdsColumn && !hasCrmOnlyColumn;
+}
+
 /* --- recompute ------------------------------------------------------------ */
 
 async function fromSheet(from, to) {
@@ -107,7 +122,9 @@ async function fromSheet(from, to) {
   const loaded = await Promise.all(
     names.map(async ([key, name]) => {
       try {
-        return [key, await tab(name)];
+        const rows = await tab(name);
+        if (OPTIONAL.has(key) && !looksLikeAdsExport(rows)) return [key, []];
+        return [key, rows];
       } catch (e) {
         if (OPTIONAL.has(key)) return [key, []];
         throw new Error(`could not read "${name}": ${e.message}`);

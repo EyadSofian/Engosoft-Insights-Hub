@@ -281,6 +281,20 @@ function csvUrl(sheetId: string, tab: string, bust: number): string {
 
 type Raw = Record<string, string>;
 
+/**
+ * True when `rows` genuinely look like an ads-tab export rather than another
+ * tab gviz served in its place (see `safeFetch`). Content-based rather than
+ * position-based: gviz's fallback target is whichever tab sits first in the
+ * workbook, which is an accident of sheet order, not a guarantee.
+ */
+function looksLikeAdsExport(rows: Raw[]): boolean {
+  if (!rows.length) return true;
+  const header = new Set(Object.keys(rows[0]));
+  const hasAdsColumn = ["Spend (Cost)", "Cost", "Spend", "Impressions"].some((c) => header.has(c));
+  const hasCrmOnlyColumn = ["Cleaned Stage", "سبب الضياع", "__odoo_write_date"].some((c) => header.has(c));
+  return hasAdsColumn && !hasCrmOnlyColumn;
+}
+
 /** Attempts per tab. Google drops roughly one request in a burst of seven. */
 const FETCH_ATTEMPTS = 3;
 const RETRY_BASE_MS = 400;
@@ -462,16 +476,32 @@ export async function loadAllData(force = false): Promise<Snapshot> {
      * fetched in between returns 200 with zero rows. Without this, one unlucky
      * read blanked a page for the full 30-minute TTL.
      */
-    const safeFetch = async (tab: string): Promise<Raw[]> => {
+    const safeFetch = async (
+      tab: string,
+      // gviz does not error on an unknown `sheet=` name — verified directly:
+      // a nonexistent tab returns HTTP 200 with the workbook's *first* tab's
+      // rows instead. A tab that has never been created (TikTok Ads Daily,
+      // today) must not be mistaken for whatever tab happens to sit first, so
+      // an optional caller supplies a shape check the rows must pass before
+      // they are trusted or cached.
+      isExpectedShape: (rows: Raw[]) => boolean = () => true,
+    ): Promise<Raw[]> => {
       // Keyed by workbook too: pointing SHEET_ID at a different sheet must not
       // resurrect rows from the previous one.
       const cacheKey = `${sheetId}::${tab}`;
       const previous = lastGoodRaw.get(cacheKey);
       try {
         const rows = await fetchTab(sheetId, tab, bust);
-        if (rows.length > 0) {
+        if (rows.length > 0 && isExpectedShape(rows)) {
           lastGoodRaw.set(cacheKey, rows);
           return rows;
+        }
+        if (rows.length > 0) {
+          // Rows arrived but from the wrong tab. A tab that has never existed
+          // correctly is not "gone stale", and misrouted rows must never enter
+          // the last-good cache — caching them would keep serving another
+          // tab's data back as this one's on every future empty/failed read.
+          return [];
         }
         if (previous?.length) {
           staleTabs.push(tab);
@@ -505,7 +535,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       safeFetch(TAB.sales),
       safeFetch(TAB.websiteSales),
       safeFetch(TAB.lost),
-      safeFetch(TAB.tiktok),
+      safeFetch(TAB.tiktok, looksLikeAdsExport),
     ]);
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
