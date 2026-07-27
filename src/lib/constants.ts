@@ -1,16 +1,18 @@
 import type { Platform } from "./types";
 
-export const PLATFORMS: Platform[] = ["meta", "snapchat"];
+export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok"];
 
 export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   meta: { ar: "ميتا", en: "Meta" },
   snapchat: { ar: "سناب شات", en: "Snapchat" },
+  tiktok: { ar: "تيك توك", en: "TikTok" },
 };
 
 /** Metrics a platform genuinely does not report, so the UI can say so. */
 export const PLATFORM_GAPS: Record<Platform, string[]> = {
   meta: [],
   snapchat: ["linkClicks", "ctrLink"],
+  tiktok: ["linkClicks", "ctrLink"],
 };
 
 /**

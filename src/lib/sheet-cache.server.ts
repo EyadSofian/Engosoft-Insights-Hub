@@ -26,12 +26,20 @@ const TTL_MS = 30 * 60 * 1000;
 const TAB = {
   meta: "Meta Ads Daily",
   snap: "Snap Ads Daily",
+  // Not in the workbook yet. TikTok spends real money and produces thousands of
+  // CRM leads, so it is read optionally: the moment the tab exists with the same
+  // columns as Meta it starts counting, and until then its absence is reported
+  // as a named data-health gap instead of silently flattering every ratio.
+  tiktok: "TikTok Ads Daily",
   crm: "CRM Leads",
   invoiced: "Full Invoiced Orders",
   sales: "Sales",
   websiteSales: "Website Sales",
   lost: "Lost Analysis",
 } as const;
+
+/** Tabs that may legitimately be absent. A miss is a gap, not a fetch failure. */
+const OPTIONAL_TABS = new Set<string>([TAB.tiktok]);
 
 const LOST_SHEET_GID = "1314891021";
 
@@ -200,6 +208,38 @@ export function normalizeSource(s: string): string {
   if (k === "whatsapp") return "whatsapp broadcast";
   return k;
 }
+
+/**
+ * Which normalized CRM `source` values identify each ad platform. Lives here
+ * rather than in the compute layer because both the platform filter and the
+ * "this platform has no spend tab" health check need the same mapping.
+ */
+export const PLATFORM_SOURCE_KEYS: Record<Platform, string[]> = {
+  meta: ["facebook", "instagram"],
+  snapchat: ["snapchat"],
+  tiktok: ["tiktok"],
+};
+
+/**
+ * Stages that must never enter the reportable lead population, whichever tab
+ * they arrive on. Compared against the lower-cased `Cleaned Stage`.
+ *
+ * `lost` — the business definition of a loss is an archived opportunity, and
+ *   those live in Lost Analysis. A CRM row carrying stage Lost is the same deal
+ *   counted twice. The upstream sync is supposed to withhold these rows, but it
+ *   has shipped them twice now (4,227 reappeared on 2026-07-27), so the guard
+ *   lives here as well: one wrong workflow edit must not move a headline number.
+ * `old auto dialer` — automated dialler residue, not commercial leads. Excluded
+ *   from the total on the data analyst's instruction.
+ */
+const EXCLUDED_STAGES = new Set(["lost", "old auto dialer"]);
+
+/**
+ * The same rule on the archived side, minus `lost` — every Lost Analysis row is
+ * archived by definition, so excluding stage `lost` there would delete the
+ * population it exists to describe.
+ */
+const EXCLUDED_ARCHIVED_STAGES = new Set(["old auto dialer"]);
 
 /** Sources that generate leads but have no spend tab in the sheet. */
 const SOURCES_WITHOUT_SPEND = new Set([
@@ -444,7 +484,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           staleTabs.push(tab);
           return previous;
         }
-        fetchErrors.push(`${tab}: ${message}`);
+        // An optional tab that does not exist yet is a known gap, reported
+        // through data health. Raising it as a fetch error would paint a red
+        // banner across every page for a tab nobody has created yet.
+        if (!OPTIONAL_TABS.has(tab)) fetchErrors.push(`${tab}: ${message}`);
         return [];
       }
     };
@@ -458,10 +501,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       safeFetch(TAB.crm),
       safeFetch(TAB.invoiced),
     ]);
-    const [salesRaw, websiteSalesRaw, lostRaw] = await Promise.all([
+    const [salesRaw, websiteSalesRaw, lostRaw, tiktokRaw] = await Promise.all([
       safeFetch(TAB.sales),
       safeFetch(TAB.websiteSales),
       safeFetch(TAB.lost),
+      safeFetch(TAB.tiktok),
     ]);
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
@@ -475,6 +519,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     for (const r of snapRaw) {
       keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]));
       adsets.learn(str(r["__ad_id"]), str(r["Ad Name"]), str(r["Ad set name"]));
+    }
+    for (const r of tiktokRaw) {
+      keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]) || str(r["Campaign name"]));
+      adsets.learn(
+        str(r["__ad_id"]),
+        str(r["Ad Name"]) || str(r["Ad name"]),
+        str(r["Ad set name"]) || str(r["Ad Set Name"]),
+      );
     }
     // CRM and invoices also pair ids with names; learning from them lets a
     // name-only row on one tab join an id-bearing row on another.
@@ -546,9 +598,56 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       };
     });
 
-    const ads = [...meta, ...snap];
+    // TikTok is read tolerantly. The tab does not exist yet, and when it is
+    // created it will most likely be a Supermetrics export with English headers
+    // rather than a copy of the Arabic-headed Meta sheet — so both spellings are
+    // accepted and a missing column stays null instead of becoming a zero.
+    const pick = (r: Raw, ...cols: string[]): string => {
+      for (const c of cols) {
+        const v = str(r[c]);
+        if (v !== "") return v;
+      }
+      return "";
+    };
+    const tiktok: AdRow[] = tiktokRaw.map((r) => {
+      const account = pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
+      const objective = classifyAccount(account);
+      const leads = pick(r, "Leads (Native)", "Leads", "On-Facebook leads", "Leads (Total)");
+      objectiveByAccount.set(account, objective);
+      const campaign = pick(r, "اسم الكامبين", "Campaign name", "Campaign Name");
+      const campaignId = pick(r, "__campaign_id", "Campaign ID");
+      return {
+        platform: "tiktok" as Platform,
+        date: parseDate(pick(r, "التاريخ", "Date")),
+        account,
+        accountId: pick(r, "__account_id", "Account ID"),
+        objective,
+        campaign,
+        campaignId,
+        campaignKey: keys.key(campaignId, campaign),
+        adset: pick(r, "Ad set name", "Ad Set Name"),
+        adsetId: pick(r, "__adset_id", "Ad Set ID"),
+        ad: pick(r, "Ad Name", "Ad name"),
+        adId: pick(r, "__ad_id", "Ad ID"),
+        spend: num(pick(r, "Spend (Cost)", "Cost", "Spend")),
+        impressions: num(pick(r, "Impressions")),
+        clicksAll: num(pick(r, "Clicks (all)", "Ad clicks", "Clicks")),
+        linkClicks: null,
+        platformLeads: leads === "" ? null : num(leads),
+        viewCompletions: null,
+        syncedAt: str(r["__synced_at"]),
+      };
+    });
+
+    const ads = [...meta, ...snap, ...tiktok];
 
     /* -- CRM --------------------------------------------------------------- */
+    // What the stage guard removed, so the number is explainable on the page
+    // instead of leaving people to wonder why the tab and the total disagree.
+    const excludedStageCounts = new Map<string, number>();
+    const noteExcluded = (stage: string) =>
+      excludedStageCounts.set(stage, (excludedStageCounts.get(stage) ?? 0) + 1);
+
     const crm: CrmLeadRow[] = crmRaw
       .filter((r) => str(r["__odoo_id"]))
       .map((r) => {
@@ -594,11 +693,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           fromCampaign: !!campaignName || !!campaignId,
         };
       })
-      // Lost Analysis is the only authoritative source for lost opportunities.
-      // Keeping CRM-stage Lost here double-counts them and pollutes every stage
-      // breakdown, so the dashboard is protected even while an upstream rebuild
-      // is still removing those rows physically from the sheet.
-      .filter((row) => !row.isLost);
+      // Lost Analysis is the only authoritative source for lost opportunities,
+      // and dialler residue is not a commercial lead. Both are dropped here so
+      // the reportable population is correct even when the upstream sync ships
+      // them — which it has done twice.
+      .filter((row) => {
+        const stage = row.cleanedStage.trim().toLowerCase();
+        if (!EXCLUDED_STAGES.has(stage)) return true;
+        noteExcluded(row.cleanedStage.trim() || stage);
+        return false;
+      });
 
     /* -- invoiced ---------------------------------------------------------- */
     const invoiced: InvoicedRow[] = invRaw
@@ -647,16 +751,88 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         };
       });
 
+    /* -- order → campaign bridge ------------------------------------------- */
+    /**
+     * Accounting revenue lives on the Sales tab, which Odoo writes with no
+     * campaign, ad or source column — the marketing context sits on the sales
+     * order's opportunity, which only Full Invoiced Orders exports. Both tabs
+     * name the same order, so the reference is the join key.
+     *
+     * This is what allows every campaign, ad-set, ad and source figure to be
+     * computed from *approved paid invoices* rather than from sales orders. The
+     * amounts still come from Sales; Full Invoiced Orders only supplies the
+     * labels, so nothing here can change a revenue total.
+     */
+    interface OrderAttribution {
+      campaignName: string;
+      campaignId: string;
+      campaignKey: string;
+      adName: string;
+      adId: string;
+      adset: string;
+      adsetOrigin: AdSetOrigin;
+      source: string;
+      sourceKey: string;
+    }
+    const attributionByOrder = new Map<string, OrderAttribution>();
+    for (const row of invoiced) {
+      const ref = normalizeName(row.orderRef);
+      if (!ref) continue;
+      const existing = attributionByOrder.get(ref);
+      // One order spans many invoice lines. Prefer the first line that actually
+      // carries a campaign, so a blank line cannot mask an attributed one.
+      if (existing && existing.campaignKey) continue;
+      attributionByOrder.set(ref, {
+        campaignName: row.campaignName,
+        campaignId: row.campaignId,
+        campaignKey: row.campaignKey,
+        adName: row.adName,
+        adId: row.adId,
+        adset: row.adset,
+        adsetOrigin: row.adsetOrigin,
+        source: row.source,
+        sourceKey: row.sourceKey,
+      });
+    }
+    const NO_ATTRIBUTION: OrderAttribution = {
+      campaignName: "",
+      campaignId: "",
+      campaignKey: "",
+      adName: "",
+      adId: "",
+      adset: "",
+      adsetOrigin: "none",
+      source: "",
+      sourceKey: "",
+    };
+    /** `Sales Order #` can join several orders with a comma. */
+    const attributionFor = (rawRef: string): { hit: OrderAttribution; matched: boolean } => {
+      const refs = rawRef
+        .split(",")
+        .map((s) => normalizeName(s))
+        .filter(Boolean);
+      let fallback: OrderAttribution | null = null;
+      for (const ref of refs) {
+        const hit = attributionByOrder.get(ref);
+        if (!hit) continue;
+        if (hit.campaignKey) return { hit, matched: true };
+        if (!fallback) fallback = hit;
+      }
+      return fallback ? { hit: fallback, matched: true } : { hit: NO_ATTRIBUTION, matched: false };
+    };
+
     /* -- sales ------------------------------------------------------------- */
     const sales: SalesRow[] = salesRaw
       .filter((r) => str(r["__odoo_id"]))
       .map((r) => {
         const paymentDate = parseDate(r["Payment Date"]);
+        const orderRef = str(r["Sales Order #"]);
+        const { hit, matched } = attributionFor(orderRef);
         return {
           movement: str(r["حركة"]),
           paymentDate,
           invoiceDate: parseDate(r["تاريخ الفاتورة"]),
-          orderRef: str(r["Sales Order #"]),
+          orderRef,
           course: str(r["Course Name"]) || str(r["فئة المنتج"]),
           category: str(r["فئة المنتج"]),
           partner: str(r["الشريك"]),
@@ -667,6 +843,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           currency: str(r["العملة"]),
           eventStage: str(r["Event Stage"]),
           month: paymentDate ? paymentDate.slice(0, 7) : "",
+          campaignName: hit.campaignName,
+          campaignId: hit.campaignId,
+          campaignKey: hit.campaignKey,
+          adName: hit.adName,
+          adId: hit.adId,
+          adset: hit.adset,
+          adsetOrigin: hit.adsetOrigin,
+          source: hit.source,
+          sourceKey: hit.sourceKey,
+          orderMatched: matched,
         };
       });
 
@@ -736,6 +922,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
           createdAt: parseDate(r["أنشئ في"]),
         };
+      })
+      // Dialler residue is excluded from the lead total on both tabs, otherwise
+      // the same rule would apply to active leads and not to archived ones.
+      .filter((row) => {
+        const stage = row.stage.trim().toLowerCase();
+        if (!EXCLUDED_ARCHIVED_STAGES.has(stage)) return true;
+        noteExcluded(row.stage.trim() || stage);
+        return false;
       });
 
     /* -- accounts ---------------------------------------------------------- */
@@ -932,18 +1126,45 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const totalRevenue = sales.reduce((s, r) => s + r.usdSales, 0);
     const campaignRevenueRows = invoiced.filter((r) => !!r.campaignKey);
     const campaignRevenue = campaignRevenueRows.reduce((s, r) => s + r.usdSales, 0);
-    const attributedRevenue = invoiced
+    // Attribution is measured on the approved revenue (Sales), not on sales
+    // orders, because that is the number every ratio on the dashboard divides.
+    const attributedRevenue = sales
       .filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey))
       .reduce((s, r) => s + r.usdSales, 0);
+    const matchedRevenue = sales.filter((r) => r.orderMatched).reduce((s, r) => s + r.usdSales, 0);
+    const salesCampaignRevenue = sales
+      .filter((r) => !!r.campaignKey)
+      .reduce((s, r) => s + r.usdSales, 0);
+
+    // A platform that generates CRM leads but has no spend tab is invisible cost.
+    // Naming it is the difference between a wrong ROAS and a known-incomplete one.
+    const platformsWithSpendTab = new Set<string>();
+    for (const a of ads) if (a.spend > 0) for (const key of PLATFORM_SOURCE_KEYS[a.platform] ?? []) platformsWithSpendTab.add(key);
+    const platformLeadCounts = new Map<string, number>();
+    for (const key of Object.keys(PLATFORM_SOURCE_KEYS) as Platform[]) {
+      if (platformsWithSpendTab.has(PLATFORM_SOURCE_KEYS[key][0])) continue;
+      const wanted = new Set(PLATFORM_SOURCE_KEYS[key]);
+      const leads =
+        crm.filter((c) => wanted.has(c.sourceKey)).length +
+        lost.filter((l) => wanted.has(l.sourceKey)).length;
+      if (leads > 0) platformLeadCounts.set(key, leads);
+    }
+    const platformsWithoutSpendTab = [...platformLeadCounts.entries()]
+      .map(([platform, leads]) => ({ platform, leads }))
+      .sort((a, b) => b.leads - a.leads);
 
     const crmWithCampaign = crm.filter((c) => c.fromCampaign);
     const crmMatched = crmWithCampaign.filter((c) => adCampaignKeys.has(c.campaignKey));
 
+    // A source stops being "unpriced" the moment its platform has a spend tab,
+    // so adding TikTok Ads Daily silently removes TikTok from this note instead
+    // of leaving a stale claim that its leads are free.
     const unpricedCounts = new Map<string, number>();
     for (const c of crm) {
-      if (c.sourceKey && SOURCES_WITHOUT_SPEND.has(c.sourceKey)) {
-        unpricedCounts.set(c.sourceKey, (unpricedCounts.get(c.sourceKey) ?? 0) + 1);
-      }
+      if (!c.sourceKey) continue;
+      if (!SOURCES_WITHOUT_SPEND.has(c.sourceKey)) continue;
+      if (platformsWithSpendTab.has(c.sourceKey)) continue;
+      unpricedCounts.set(c.sourceKey, (unpricedCounts.get(c.sourceKey) ?? 0) + 1);
     }
     const unpricedSources = [...unpricedCounts.entries()]
       .map(([label, count]) => ({ label: sourceLabels.get(label) ?? label, count }))
@@ -978,6 +1199,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         crmWithCampaign.length > 0 ? crmMatched.length / crmWithCampaign.length : 0,
       leadsWithoutSpendSource: [...unpricedCounts.values()].reduce((a, b) => a + b, 0),
       unpricedSources,
+      platformsWithoutSpendTab,
+      excludedStages: [...excludedStageCounts.entries()]
+        .map(([stage, rows]) => ({ stage, rows }))
+        .sort((a, b) => b.rows - a.rows),
+      salesOrderMatchRate: totalRevenue > 0 ? matchedRevenue / totalRevenue : 0,
+      salesCampaignShare: totalRevenue > 0 ? salesCampaignRevenue / totalRevenue : 0,
       closeSample: closable.length,
       closeCoverage: crm.length > 0 ? closable.length / crm.length : 0,
       invoicedMissingDate: invoiced.filter((i) => !i.revenueDate).length,

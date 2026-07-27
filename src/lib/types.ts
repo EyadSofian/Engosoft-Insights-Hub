@@ -1,6 +1,6 @@
 // Shared types (client + server-safe)
 
-export type Platform = "meta" | "snapchat";
+export type Platform = "meta" | "snapchat" | "tiktok";
 
 /** Why an ad account spends. Traffic/unknown accounts poison efficiency metrics. */
 export type CampaignObjective = "leads" | "traffic" | "unknown";
@@ -148,6 +148,26 @@ export interface SalesRow {
   currency: string;
   eventStage: string;
   month: string;
+
+  /* --- attribution, joined on `Sales Order #` ------------------------------
+   * The Sales tab is written by Odoo's accounting side and carries no campaign
+   * columns. Full Invoiced Orders holds the same sales orders *with* their
+   * opportunity's campaign, so the order reference joins the two. 93.9% of paid
+   * revenue finds its order and 57.2% of it reaches a campaign; per-campaign
+   * totals agree with Full Invoiced Orders to the cent. This is what lets every
+   * campaign figure come from approved invoices instead of sales orders. */
+  campaignName: string;
+  campaignId: string;
+  campaignKey: string;
+  adName: string;
+  adId: string;
+  adset: string;
+  adsetOrigin: AdSetOrigin;
+  /** Lead source carried over from the linked order's opportunity. */
+  source: string;
+  sourceKey: string;
+  /** False when no row in Full Invoiced Orders carries this order reference. */
+  orderMatched: boolean;
 }
 
 /** One confirmed Odoo website sales-order line (Website = Engosoft, state = sale). */
@@ -218,6 +238,7 @@ export interface Totals {
   spend: number;
   spendMeta: number;
   spendSnap: number;
+  spendTikTok: number;
   /** Diagnostic slice of spend on traffic/unknown-objective accounts; it remains included in efficiency formulas. */
   nonLeadSpend: number;
   /** Spend used in management efficiency formulas. This is the full ad spend. */
@@ -248,6 +269,12 @@ export interface Totals {
   lostInCrm: number;
   /** Same authoritative count as `lost`. Kept for API compatibility. */
   lostArchived: number;
+  /**
+   * Archived rows whose stage is Won. They are real leads, so they stay in
+   * `totalLeads`, but counting them as lost would mark the same deal closed and
+   * lost at once. Exposed so the count is explainable rather than missing.
+   */
+  archivedWon: number;
   conversionRate: Maybe;
   lostRate: Maybe;
   avgCloseDays: Maybe;
@@ -261,9 +288,19 @@ export interface Totals {
   accountingRevenue: number;
   /** Fully invoiced sales-order revenue; secondary/advisory. */
   orderRevenue: number;
-  /** Advisory order revenue traceable to a campaign present in the ads tabs. */
+  /**
+   * Approved revenue traceable to a campaign that actually spent in this window.
+   * Comes from Sales (paid invoices) joined to its order's campaign — not from
+   * sales orders.
+   */
   attributedRevenue: number;
+  /** The same measure computed on Full Invoiced Orders. Advisory/cross-check. */
+  attributedOrderRevenue: number;
+  /** Paid revenue whose order reference matches no row in Full Invoiced Orders. */
+  unmatchedRevenue: number;
   orders: number;
+  /** Distinct order references on the advisory Full Invoiced Orders dataset. */
+  invoicedOrders: number;
   avgOrder: Maybe;
   revenuePerLead: Maybe;
 
@@ -427,6 +464,22 @@ export interface DataHealth {
   /** Leads whose source has no spend tab in the sheet (TikTok, UChat, …). */
   leadsWithoutSpendSource: number;
   unpricedSources: { label: string; count: number }[];
+  /**
+   * Ad platforms that produced CRM leads but have no spend tab in the workbook.
+   * Their cost is missing from every denominator, so CPL/CPA/ROAS/ACOS all read
+   * better than reality until the tab exists. This must be loud, not implicit.
+   */
+  platformsWithoutSpendTab: { platform: string; leads: number }[];
+  /**
+   * Rows dropped from the lead population by the stage guard, per stage. A
+   * non-empty `lost` entry means the upstream sync is shipping CRM rows that
+   * belong to Lost Analysis — the dashboard is correct, the sheet is not.
+   */
+  excludedStages: { stage: string; rows: number }[];
+  /** Share of paid revenue that found its sales order in Full Invoiced Orders. */
+  salesOrderMatchRate: number;
+  /** Share of paid revenue that reached a campaign through that join. */
+  salesCampaignShare: number;
   closeSample: number;
   closeCoverage: number;
   invoicedMissingDate: number;
