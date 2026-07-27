@@ -135,11 +135,42 @@ function Overview() {
         </Notice>
       )}
 
+      {/* Spend that exists in reality but not in the workbook makes every
+          efficiency ratio look better than it is. That has to be stated on the
+          page, not buried in a health tab. */}
+      {health.platformsWithoutSpendTab?.length > 0 && (
+        <Notice
+          tone="danger"
+          title={t("missing_spend_tab")}
+          icon={<AlertTriangle size={16} />}
+        >
+          {health.platformsWithoutSpendTab
+            .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
+            .join(" · ")}
+          {" — "}
+          {t("missing_spend_tab_note")}
+        </Notice>
+      )}
+
+      {health.excludedStages?.length > 0 && (
+        <Notice
+          tone="warning"
+          title={t("excluded_stages")}
+          icon={<AlertTriangle size={16} />}
+        >
+          {health.excludedStages
+            .map((s) => `${s.stage}: ${fmtNum(s.rows)} ${lang === "ar" ? "صف" : "rows"}`)
+            .join(" · ")}
+          {" — "}
+          {t("excluded_stages_note")}
+        </Notice>
+      )}
+
       {T.lostArchived > 0 && (
         <Notice tone="info" icon={<Info size={16} />}>
           {lang === "ar"
-            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة. أي صف Stage=Lost في CRM مستبعد تماماً.`
-            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived deals. CRM Stage=Lost rows are completely excluded.`}
+            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? ` (بعد استبعاد ${T.archivedWon} صفاً مؤرشفاً حالته Won)` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
+            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived deals${T.archivedWon > 0 ? ` (excluding ${T.archivedWon} archived rows still marked Won)` : ""}. CRM Stage=Lost rows are completely excluded.`}
         </Notice>
       )}
 
@@ -188,7 +219,15 @@ function Overview() {
           delta={deltas.spend}
           deltaInvert
           icon={<DollarSign size={15} />}
-          sub={`${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)} · ${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`}
+          sub={
+            [
+              `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
+              `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
+              T.spendTikTok > 0 ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          }
         />
         <KpiCard
           index={7}
@@ -199,8 +238,8 @@ function Overview() {
           icon={<TrendingUp size={15} />}
           sub={
             lang === "ar"
-              ? `Sales.$ Sales حسب Payment Date · أوامر حملات استرشادية ${fmtUSD(T.attributedRevenue)}`
-              : `Sales.$ Sales by Payment Date · advisory campaign orders ${fmtUSD(T.attributedRevenue)}`
+              ? `محصَّل بتاريخ الدفع · منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملة`
+              : `Collected, by payment date · ${fmtUSD(T.attributedRevenue)} campaign-linked`
           }
         />
 

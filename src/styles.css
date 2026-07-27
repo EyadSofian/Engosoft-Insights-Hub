@@ -235,10 +235,19 @@
     font-feature-settings: "tnum" 1;
   }
 
-  /* Latin numerals inside Arabic copy still read left-to-right. */
+  /* Latin numerals inside Arabic copy still read left-to-right.
+   *
+   * `direction: ltr` also resets this box's `text-align: start` to LEFT, and
+   * `.num` sits on block-level <div>s (KPI values, metric readouts). In an RTL
+   * page that pushed every figure to the left edge of its card while the label
+   * above it stayed on the right — which is what made numbers look like they
+   * belonged to the neighbouring column. Alignment is restored explicitly here;
+   * any element that genuinely wants another alignment sets `text-start`/
+   * `text-end`, and those utilities win over this base rule. */
   [dir="rtl"] .num {
     direction: ltr;
     unicode-bidi: embed;
+    text-align: right;
   }
 
   input[type="date"] {

@@ -94,11 +94,31 @@ function FullInvoiced() {
         </>
       ) : (
         <>
+          {/* This page IS Full Invoiced Orders, so its cards must read that
+              dataset. They used to render `totals.revenue`, which is the Sales
+              tab — the page then showed $679K above a table that adds up to
+              $639K. Accounting revenue is still shown, labelled as the other
+              source, so the two are comparable instead of confusable. */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("revenue")} value={fmtUSD(data.totals.revenue)} hero />
-            <KpiCard index={1} label={t("orders")} value={fmtNum(data.totals.orders)} />
-            <KpiCard index={2} label={t("aov")} value={fmtUSD(data.totals.avgOrder)} />
-            <KpiCard index={3} label={t("attributed_revenue")} value={fmtUSD(data.totals.attributedRevenue)} sub={t("attributed_note")} />
+            <KpiCard
+              index={0}
+              label={t("full_invoiced")}
+              value={fmtUSD(data.totals.orderRevenue)}
+              sub={lang === "ar" ? "أوامر بيع مفوترة بالكامل — استرشادي" : "Fully invoiced sales orders — advisory"}
+              hero
+            />
+            <KpiCard index={1} label={t("orders")} value={fmtNum(data.totals.invoicedOrders)} />
+            <KpiCard
+              index={2}
+              label={t("aov")}
+              value={fmtUSD(data.totals.invoicedOrders > 0 ? data.totals.orderRevenue / data.totals.invoicedOrders : null)}
+            />
+            <KpiCard
+              index={3}
+              label={t("revenue")}
+              value={fmtUSD(data.totals.revenue)}
+              sub={lang === "ar" ? "المحصَّل من تبويب Sales — المعتمد" : "Collected, from the Sales tab — approved"}
+            />
           </div>
 
           <Card>
@@ -126,10 +146,12 @@ function FullInvoiced() {
                   <div className="text-[12px] text-text-muted mt-1">
                     {fmtNum(b.v.rows)} {lang === "ar" ? "صف" : "rows"} ·{" "}
                     {fmtPct(
-                      data.totals.revenue !== 0 ? (b.v.revenue / data.totals.revenue) * 100 : null,
+                      data.totals.orderRevenue !== 0
+                        ? (b.v.revenue / data.totals.orderRevenue) * 100
+                        : null,
                       1,
                     )}{" "}
-                    {lang === "ar" ? "من الإيراد" : "of revenue"}
+                    {lang === "ar" ? "من هذا التبويب" : "of this tab"}
                   </div>
                 </div>
               ))}

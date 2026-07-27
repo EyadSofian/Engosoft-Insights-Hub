@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { Platform } from "@/lib/types";
 
 /** Per-platform ad metrics. Unavailable metrics come back `null`, never 0. */
 export const Route = createFileRoute("/api/ads")({
@@ -62,15 +63,23 @@ export const Route = createFileRoute("/api/ads")({
           };
         }).filter((p) => p.rows > 0);
 
-        const dayMap = new Map<
-          string,
-          { date: string; meta: number; snapchat: number; impressions: number; clicks: number }
-        >();
+        // Keyed by Platform rather than a hand-written literal, so adding a
+        // platform cannot leave one silently missing from the daily series.
+        type DayPoint = { date: string; impressions: number; clicks: number } & Record<
+          Platform,
+          number
+        >;
+        const blankDay = (date: string): DayPoint => {
+          const e = { date, impressions: 0, clicks: 0 } as DayPoint;
+          for (const p of PLATFORMS) e[p] = 0;
+          return e;
+        };
+        const dayMap = new Map<string, DayPoint>();
         for (const a of data.ads) {
           if (!a.date) continue;
           let e = dayMap.get(a.date);
           if (!e) {
-            e = { date: a.date, meta: 0, snapchat: 0, impressions: 0, clicks: 0 };
+            e = blankDay(a.date);
             dayMap.set(a.date, e);
           }
           e[a.platform] += a.spend;

@@ -111,9 +111,10 @@ export const DICT = {
   closed_leads: { ar: "صفقة مغلقة", en: "closed leads" },
   revenue: { ar: "الإيراد", en: "Revenue" },
   revenue_per_lead: { ar: "الإيراد لكل عميل", en: "Revenue per lead" },
-  attributed_revenue: { ar: "إيراد أوامر الحملات (استرشادي)", en: "Campaign order revenue (advisory)" },
+  attributed_revenue: { ar: "إيراد محصَّل مرتبط بحملة", en: "Campaign-linked collected revenue" },
   roas: { ar: "العائد على الإنفاق", en: "ROAS" },
-  attributed_roas: { ar: "عائد أوامر الحملات (استرشادي)", en: "Campaign order ROAS (advisory)" },
+  attributed_roas: { ar: "العائد على الجزء المرتبط بحملة", en: "Campaign-linked ROAS" },
+  full_invoiced_revenue: { ar: "أوامر مفوترة (استرشادي)", en: "Invoiced orders (advisory)" },
   orders: { ar: "الطلبات", en: "Orders" },
   avg_order: { ar: "متوسط الطلب", en: "Avg order" },
   aov: { ar: "متوسط قيمة الطلب", en: "AOV" },
@@ -269,8 +270,28 @@ export const DICT = {
     en: "TikTok, UChat, WhatsApp and referrals produce leads but carry no spend in the sheet, so blended CPL reads cheaper than reality.",
   },
   attributed_note: {
-    ar: "الجزء من الإيراد المرتبط فعلياً بحملة إعلانية.",
-    en: "The share of revenue that traces back to an ad campaign.",
+    ar: "الجزء من الإيراد المحصَّل الذي يعود لحملة أنفقت في نفس الفترة، مربوطاً برقم أمر البيع.",
+    en: "The share of collected revenue tied to a campaign that spent in this window, joined on the sales-order number.",
+  },
+  revenue_basis_note: {
+    ar: "الإيراد = عمود ‎$ Sales في تبويب Sales، مؤرَّخ بتاريخ الدفع — أي المحصَّل فعلاً كما تقرأه الحسابات، لا المفوتر.",
+    en: "Revenue = the $ Sales column on the Sales tab, dated by Payment Date — money actually collected, as accounting reads it, not invoiced.",
+  },
+  missing_spend_tab: {
+    ar: "إنفاق ناقص — منصة تُنتج عملاء بلا تبويب إنفاق",
+    en: "Incomplete spend — a platform with leads but no spend tab",
+  },
+  excluded_stages: {
+    ar: "صفوف مستبعَدة من إجمالي العملاء",
+    en: "Rows excluded from the lead total",
+  },
+  excluded_stages_note: {
+    ar: "هذه الصفوف موجودة في الشيت لكنها خارج التعريف المعتمد: مرحلة Lost مكانها تبويب Lost Analysis وحده، و Old Auto Dialer ليست عملاء تجاريين. وجود Lost هنا يعني أن مزامنة n8n ترسل صفوفاً لا يجب أن ترسلها.",
+    en: "These rows exist in the sheet but fall outside the approved definition: stage Lost belongs to Lost Analysis alone, and Old Auto Dialer rows are not commercial leads. Any Lost here means the n8n sync is shipping rows it should withhold.",
+  },
+  missing_spend_tab_note: {
+    ar: "تكلفة هذه المنصة غائبة عن الملف، فتظهر تكلفة العميل وتكلفة الصفقة أقل من الحقيقة ويظهر العائد أعلى منها. الأرقام تصبح صحيحة فور إضافة تبويب إنفاق لها.",
+    en: "This platform's cost is missing from the workbook, so CPL and CPA read low and ROAS reads high. The numbers become correct as soon as it has a spend tab.",
   },
   lost_population_note: {
     ar: "جدول الخسائر وتصنيف المرحلة «ضائع» في النظام مجموعتان مختلفتان من الصفوف، ولا تتطابق أعدادهما.",

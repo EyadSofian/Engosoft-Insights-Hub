@@ -73,8 +73,8 @@ function Campaigns() {
 
       <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
         {lang === "ar"
-          ? "إجمالي الإيراد أعلى الصفحة من Sales حسب Payment Date. أما الإيراد والعائد داخل صفوف الحملة/المجموعة/الإعلان فمن Full Invoiced Orders لوجود بيانات الربط الإعلاني هناك، ولذلك فهو تحليل استرشادي لا يساوي إجمالي الفواتير المدفوعة."
-          : "Headline revenue comes from Sales by Payment Date. Row-level campaign/ad-set/ad revenue and ROAS use Full Invoiced Orders because that is where attribution exists, so they are advisory and will not equal total paid-invoice revenue."}
+          ? "الإيراد أعلى الصفحة وفي كل صف من صفوف الحملة/المجموعة/الإعلان من نفس المصدر: عمود $ Sales في تبويب Sales حسب Payment Date، مربوطاً بحملته عبر رقم أمر البيع. الصفوف بلا حملة معروفة لا تظهر هنا، فمجموع هذا الجدول أقل من إجمالي الإيراد أعلاه."
+          : "Revenue at the top of the page and inside every campaign/ad-set/ad row is the same source: the Sales tab's $ Sales column by Payment Date, joined to its campaign through the sales-order number. Rows with no known campaign do not appear here, so this table's total is less than the headline revenue above."}
       </Notice>
 
       {isLoading || !data ? (
@@ -84,8 +84,30 @@ function Campaigns() {
           <Card>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
               <Metric label={t("spend")}>{fmtUSD(data.totals.spend)}</Metric>
-              <Metric label={t("revenue")}>{fmtUSD(data.totals.revenue)}</Metric>
-              <Metric label={t("crm_leads")}>{fmtNum(data.totals.totalLeads)}</Metric>
+              <Metric
+                label={t("revenue")}
+                hint={
+                  lang === "ar"
+                    ? `منها ${fmtUSD(data.totals.attributedRevenue)} مرتبط بحملة`
+                    : `${fmtUSD(data.totals.attributedRevenue)} campaign-linked`
+                }
+              >
+                {fmtUSD(data.totals.revenue)}
+              </Metric>
+              {/* This is the ads page, so the headline lead number is what the
+                  platforms reported. The Odoo total sits underneath it — the two
+                  measure different things and the bigger one used to win by
+                  accident. */}
+              <Metric
+                label={t("platform_leads")}
+                hint={
+                  lang === "ar"
+                    ? `${fmtNum(data.totals.totalLeads)} في أودو`
+                    : `${fmtNum(data.totals.totalLeads)} in Odoo`
+                }
+              >
+                {data.totals.platformLeads === null ? "—" : fmtNum(data.totals.platformLeads)}
+              </Metric>
               <Metric label={t("won")} hint={fmtPct(data.totals.conversionRate, 1)}>
                 {fmtNum(data.totals.won)}
               </Metric>

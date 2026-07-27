@@ -4,7 +4,13 @@
 // when the denominator is zero. `null` renders as an em dash. A metric must
 // never surface as 0, NaN or Infinity because its denominator was empty — those
 // read as real results and get acted on.
-import { loadAllData, normalizeName, normalizeSource, type Snapshot } from "./sheet-cache.server";
+import {
+  loadAllData,
+  normalizeName,
+  normalizeSource,
+  PLATFORM_SOURCE_KEYS,
+  type Snapshot,
+} from "./sheet-cache.server";
 import type {
   AdRow,
   CourseAgg,
@@ -68,10 +74,7 @@ function sumMaybe<T>(rows: T[], pick: (r: T) => number | null): Maybe {
 const sum = <T>(rows: T[], pick: (r: T) => number) => rows.reduce((s, r) => s + pick(r), 0);
 
 /** Source keys that identify each ad platform inside the CRM. */
-const PLATFORM_SOURCES: Record<Platform, string[]> = {
-  meta: ["facebook", "instagram"],
-  snapchat: ["snapchat"],
-};
+const PLATFORM_SOURCES = PLATFORM_SOURCE_KEYS;
 
 /* --- filtering ------------------------------------------------------------ */
 
@@ -87,8 +90,8 @@ export interface FilteredData {
   nonLeadAccounts: string[];
   includeNonLead: boolean;
   cpaBasis: "won" | "invoices";
-  /** Sales rows do not carry ad attribution. When an ad dimension is selected,
-   * revenue falls back to Full Invoiced Orders and is explicitly advisory. */
+  /** True when an ad dimension narrows the view. Revenue still comes from Sales
+   * — this only tells the UI that unattributed invoices were filtered out. */
   attributionScoped: boolean;
 }
 
@@ -178,10 +181,21 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
+  // Sales rows now carry their order's campaign/ad/source (joined in the cache
+  // layer), so approved revenue answers an ad-dimension filter directly instead
+  // of falling back to sales orders.
   const sales = all.sales.filter((r) => {
     if (!inRange(r.paymentDate, from, to)) return false;
+    if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+    if (campaign && r.campaignName !== campaign) return false;
+    if (adset && r.adset !== adset) return false;
+    if (ad && r.adName !== ad) return false;
+    if (sourceKey && r.sourceKey !== sourceKey) return false;
     if (course && normalizeName(r.course) !== normalizeName(course)) return false;
-    if (salesTeam && r.salesTeam !== salesTeam) return false;
+    // `فريق المبيعات` is sparse on paid invoice lines for the same reason it is
+    // on order lines, so a team filter also matches through the salesperson.
+    if (salesTeam && r.salesTeam !== salesTeam && !teamHasPerson(all, salesTeam, r.salesperson))
+      return false;
     if (salesperson && r.salesperson !== salesperson) return false;
     return true;
   });
@@ -258,11 +272,11 @@ function closeStats(rows: CrmLeadRow[]): { avg: Maybe; sample: number } {
 /* --- lead population -------------------------------------------------------- */
 
 /**
- * Authoritative lost population. The business definition is archived CRM
- * opportunities as exported to Lost Analysis; CRM stage names never define
- * loss. Duplicate sheet rows are collapsed by Odoo id.
+ * Every archived CRM opportunity, deduplicated by Odoo id. This is the whole
+ * archived population, lost and otherwise — the denominator side of the lead
+ * count.
  */
-function authoritativeLostLeads(data: FilteredData): LostRow[] {
+function archivedLeads(data: FilteredData): LostRow[] {
   const seen = new Set<string>();
   return data.lost.filter((row, index) => {
     const key = row.id || `row:${index}`;
@@ -270,6 +284,23 @@ function authoritativeLostLeads(data: FilteredData): LostRow[] {
     seen.add(key);
     return true;
   });
+}
+
+/** An archived row that Odoo still marks Won. Real, but not a loss. */
+const isArchivedWon = (row: LostRow) => row.stage.trim().toLowerCase() === "won";
+
+/**
+ * Authoritative lost population. The business definition is archived CRM
+ * opportunities as exported to Lost Analysis; CRM stage names never define
+ * loss.
+ *
+ * Archived rows whose stage is Won are excluded: 13 of them exist in this
+ * workbook, and counting them would report the same deal as closed and lost at
+ * the same time. They stay inside `totalLeads` and are surfaced separately as
+ * `archivedWon` so the difference is explainable rather than missing.
+ */
+function authoritativeLostLeads(data: FilteredData): LostRow[] {
+  return archivedLeads(data).filter((row) => !isArchivedWon(row));
 }
 
 /* --- totals ---------------------------------------------------------------- */
@@ -280,6 +311,7 @@ export function computeTotals(data: FilteredData): Totals {
   const spend = sum(ads, (a) => a.spend);
   const spendMeta = sum(ads.filter((a) => a.platform === "meta"), (a) => a.spend);
   const spendSnap = sum(ads.filter((a) => a.platform === "snapchat"), (a) => a.spend);
+  const spendTikTok = sum(ads.filter((a) => a.platform === "tiktok"), (a) => a.spend);
   const nonLeadSpend = sum(ads.filter((a) => a.objective !== "leads"), (a) => a.spend);
   // Management's approved formulas use the complete paid-media bill. Traffic
   // spend stays visible as a diagnostic, but is not silently removed from CPL,
@@ -295,39 +327,45 @@ export function computeTotals(data: FilteredData): Totals {
   // clicks, so Snapchat impressions are excluded from its denominator.
   const linkImpressions = sum(ads.filter((a) => a.linkClicks !== null), (a) => a.impressions);
 
-  const archived = authoritativeLostLeads(data);
+  const allArchived = archivedLeads(data);
+  const archived = allArchived.filter((l) => !isArchivedWon(l));
+  const archivedWon = allArchived.length - archived.length;
   const crmLeads = crm.length;
-  const archivedLeads = archived.length;
-  const totalLeads = crmLeads + archivedLeads;
+  // Every archived row is a real lead and belongs in the denominator, including
+  // the handful Odoo still marks Won.
+  const totalLeads = crmLeads + allArchived.length;
   // Archived rows keep their campaign columns, so a paid lead that was later
   // archived as lost still belongs in the paid denominator.
   const leadsFromCampaign =
     crm.filter((c) => c.fromCampaign).length +
-    archived.filter((l) => !!l.campaignName || !!l.campaignId).length;
+    allArchived.filter((l) => !!l.campaignName || !!l.campaignId).length;
   const won = crm.filter((c) => c.isWon).length;
   const lostInCrm = 0;
-  const lost = archivedLeads;
+  const lost = archived.length;
   // Close time stays on CRM rows: archived rows carry no closing date, and
   // padding the sample with zeros would drag the average toward nothing.
   const { avg: avgCloseDays, sample: closeSample } = closeStats(crm);
 
+  // Money has exactly one primary source: the Sales tab, `$ Sales`, dated by
+  // Payment Date — collected revenue, the way accounting reports it. Full
+  // Invoiced Orders stays available as a cross-check and is never blended in.
   const accountingRevenue = sum(sales, (r) => r.usdSales);
   const orderRevenue = sum(invoiced, (r) => r.usdSales);
-  // The Sales tab is authoritative for money and is filtered by Payment Date.
-  // It has no campaign/ad columns, so an attribution-scoped view uses the
-  // secondary Full Invoiced Orders dataset rather than pretending all paid
-  // invoices belong to the selected campaign.
-  const revenue = data.attributionScoped ? orderRevenue : accountingRevenue;
+  const revenue = accountingRevenue;
   const adCampaignKeys = new Set(data.ads.map((a) => a.campaignKey).filter(Boolean));
   const attributedRevenue = sum(
+    sales.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
+    (r) => r.usdSales,
+  );
+  const attributedOrderRevenue = sum(
     invoiced.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
     (r) => r.usdSales,
   );
-  const accountingOrders =
+  const unmatchedRevenue = sum(sales.filter((r) => !r.orderMatched), (r) => r.usdSales);
+  const orders =
     new Set(sales.map((r) => r.orderRef || r.movement).filter(Boolean)).size || sales.length;
   const invoicedOrders =
     new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
-  const orders = data.attributionScoped ? invoicedOrders : accountingOrders;
 
   const cpaWon = div(efficiencySpend, won);
   const cpaInvoices = div(efficiencySpend, orders);
@@ -336,6 +374,7 @@ export function computeTotals(data: FilteredData): Totals {
     spend,
     spendMeta,
     spendSnap,
+    spendTikTok,
     nonLeadSpend,
     efficiencySpend,
     impressions,
@@ -351,14 +390,15 @@ export function computeTotals(data: FilteredData): Totals {
     platformLeads,
 
     crmLeads,
-    archivedLeads,
+    archivedLeads: allArchived.length,
     totalLeads,
     leadsFromCampaign,
     leadsOther: totalLeads - leadsFromCampaign,
     won,
     lost,
     lostInCrm,
-    lostArchived: archivedLeads,
+    lostArchived: lost,
+    archivedWon,
     conversionRate: pctOf(won, totalLeads),
     lostRate: pctOf(lost, totalLeads),
     avgCloseDays,
@@ -368,7 +408,10 @@ export function computeTotals(data: FilteredData): Totals {
     accountingRevenue,
     orderRevenue,
     attributedRevenue,
+    attributedOrderRevenue,
+    unmatchedRevenue,
     orders,
+    invoicedOrders,
     avgOrder: div(revenue, orders),
     revenuePerLead: div(revenue, totalLeads),
 
@@ -509,8 +552,9 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
 
   // Lost counts and their denominators come exclusively from Lost Analysis.
   // CRM-stage Lost rows were removed during parsing, so adding these rows here
-  // cannot double-count the same reporting population.
-  for (const l of authoritativeLostLeads(data)) {
+  // cannot double-count the same reporting population. Every archived row adds
+  // to the lead count; only the ones Odoo does not still mark Won add to lost.
+  for (const l of archivedLeads(data)) {
     const key =
       grain === "campaign"
         ? l.campaignKey
@@ -522,19 +566,25 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     const label = grain === "campaign" ? l.campaignName : grain === "adset" ? l.adset : l.adName;
     const b = touch(key, label);
     b.crmLeads++;
-    b.lost++;
+    if (!isArchivedWon(l)) b.lost++;
     if (!b.course && l.course) b.course = l.course;
   }
 
-  const invKey = (i: InvoicedRow) =>
-    grain === "campaign" ? i.campaignKey : grain === "adset" ? i.adset || UNKNOWN_ADSET : i.adName || "—";
-  for (const i of data.invoiced) {
-    const key = invKey(i);
-    if (!key || (grain === "campaign" && !i.campaignKey)) continue;
-    if (grain !== "campaign" && !i.adName && !i.adId) continue;
-    const b = touch(key, grain === "campaign" ? i.campaignName : grain === "adset" ? i.adset : i.adName);
-    b.revenue += i.usdSales;
-    if (i.revenueDate) b.revenueByDate.set(i.revenueDate, (b.revenueByDate.get(i.revenueDate) ?? 0) + i.usdSales);
+  // Revenue on every performance row is APPROVED PAID revenue from the Sales
+  // tab, attributed through its sales order (see the order → campaign bridge in
+  // sheet-cache.server.ts). It used to come from Full Invoiced Orders, which is
+  // sales orders — a different, larger population that management does not
+  // recognise as revenue.
+  const saleKey = (s: SalesRow) =>
+    grain === "campaign" ? s.campaignKey : grain === "adset" ? s.adset || UNKNOWN_ADSET : s.adName || "—";
+  for (const s of data.sales) {
+    const key = saleKey(s);
+    if (!key || (grain === "campaign" && !s.campaignKey)) continue;
+    if (grain !== "campaign" && !s.adName && !s.adId) continue;
+    const b = touch(key, grain === "campaign" ? s.campaignName : grain === "adset" ? s.adset : s.adName);
+    b.revenue += s.usdSales;
+    if (s.paymentDate)
+      b.revenueByDate.set(s.paymentDate, (b.revenueByDate.get(s.paymentDate) ?? 0) + s.usdSales);
   }
 
   const rows: PerfRow[] = [];
@@ -692,18 +742,15 @@ export function dailyTrend(
     return e;
   };
   for (const a of data.ads) if (a.date) at(a.date).spend += a.spend;
-  if (data.attributionScoped) {
-    for (const i of data.invoiced) if (i.revenueDate) at(i.revenueDate).revenue += i.usdSales;
-  } else {
-    for (const s of data.sales) if (s.paymentDate) at(s.paymentDate).revenue += s.usdSales;
-  }
+  // Always the accounting series, whatever the filter — one revenue definition.
+  for (const s of data.sales) if (s.paymentDate) at(s.paymentDate).revenue += s.usdSales;
   for (const c of data.crm) {
     if (!c.createdAt) continue;
     const e = at(c.createdAt);
     e.leads++;
     if (c.isWon) e.won++;
   }
-  for (const l of authoritativeLostLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
+  for (const l of archivedLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({ date, ...v }));
@@ -791,11 +838,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     }
   }
 
-  for (const l of authoritativeLostLeads(data)) {
+  for (const l of archivedLeads(data)) {
     if (!l.course) continue;
     const a = get(l.course, l.mainCategory);
     a.crmLeads++;
-    a.lost++;
+    if (!isArchivedWon(l)) a.lost++;
   }
 
   // Ad spend reaches a course only through its campaign's inferred course.
@@ -908,11 +955,11 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
   }
 
-  for (const l of authoritativeLostLeads(data)) {
+  for (const l of archivedLeads(data)) {
     const teamName = l.salesTeam || "—";
     const t = getTeam(teamName);
     t.agg.crmLeads++;
-    t.agg.lost++;
+    if (!isArchivedWon(l)) t.agg.lost++;
     const person = l.salesperson || "—";
     let p = t.people.get(person);
     if (!p) {
@@ -920,7 +967,7 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
       t.people.set(person, p);
     }
     p.agg.crmLeads++;
-    p.agg.lost++;
+    if (!isArchivedWon(l)) p.agg.lost++;
   }
 
   // Paid accounting rows carry salesperson/team and are the authoritative
@@ -1069,7 +1116,7 @@ export function computeLeadOrigin(data: FilteredData): {
 } {
   // Archived lost leads belong to a cohort too, otherwise this card reports a
   // near-zero lost count while the Lost page reports hundreds.
-  const archived = authoritativeLostLeads(data);
+  const archived = archivedLeads(data);
   const build = (
     key: "campaign" | "other",
     rows: CrmLeadRow[],
@@ -1079,7 +1126,7 @@ export function computeLeadOrigin(data: FilteredData): {
     const { avg, sample } = closeStats(rows);
     const leads = rows.length + archivedRows.length;
     const won = rows.filter((r) => r.isWon).length;
-    const lost = archivedRows.length;
+    const lost = archivedRows.filter((r) => !isArchivedWon(r)).length;
     return {
       key,
       leads,
@@ -1098,8 +1145,8 @@ export function computeLeadOrigin(data: FilteredData): {
   const other = data.crm.filter((c) => !c.fromCampaign);
   const archivedFromCampaign = archived.filter(hasCampaign);
   const archivedOther = archived.filter((l) => !hasCampaign(l));
-  const campaignRevenue = sum(data.invoiced.filter((i) => !!i.campaignKey), (i) => i.usdSales);
-  const otherRevenue = sum(data.invoiced.filter((i) => !i.campaignKey), (i) => i.usdSales);
+  const campaignRevenue = sum(data.sales.filter((s) => !!s.campaignKey), (s) => s.usdSales);
+  const otherRevenue = sum(data.sales.filter((s) => !s.campaignKey), (s) => s.usdSales);
   const labels = data.snapshot.sourceLabels;
 
   return {
@@ -1318,20 +1365,40 @@ export function execSummary(
   );
 
   if (t.lostArchived > 0) {
+    const wonNoteEn =
+      t.archivedWon > 0
+        ? ` ${t.archivedWon} archived rows are still marked Won in Odoo and are counted as leads but not as losses.`
+        : "";
+    const wonNoteAr =
+      t.archivedWon > 0
+        ? ` وهناك ${t.archivedWon} صفاً مؤرشفاً ما زالت حالته Won في أودو، فيُحتسب ضمن العملاء ولا يُحتسب ضياعاً.`
+        : "";
     en.push(
-      `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.`,
+      `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.${wonNoteEn}`,
     );
     ar.push(
-      `كل الصفقات الضائعة وعددها ${t.lostArchived.toLocaleString("en-US")} مأخوذة من Lost Analysis فقط، وتم استبعاد Stage=Lost من CRM من كل المؤشرات والرسوم.`,
+      `كل الصفقات الضائعة وعددها ${t.lostArchived.toLocaleString("en-US")} مأخوذة من Lost Analysis فقط، وتم استبعاد Stage=Lost من CRM من كل المؤشرات والرسوم.${wonNoteAr}`,
     );
   }
 
   en.push(
-    `Paid-invoice revenue was ${money(t.revenue)} from Sales.$ Sales by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} is campaign-linked Full Invoiced Orders revenue and is advisory only.`,
+    `Collected revenue was ${money(t.revenue)} from Sales.$ Sales by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} of that paid revenue traces to a campaign that spent in this window, through its sales order. Full Invoiced Orders shows ${money(t.orderRevenue)} for the same window and is a cross-check, not the revenue figure.`,
   );
   ar.push(
-    `بلغ إيراد الفواتير المدفوعة ${money(t.revenue)} من عمود $ Sales في تبويب Sales حسب Payment Date، والعائد الأساسي ${roasStr(t.roas)}. أما ${money(t.attributedRevenue)} فهو إيراد أوامر مفوترة مرتبط بالحملات ويُعرض استرشادياً فقط.`,
+    `الإيراد المحصَّل ${money(t.revenue)} من عمود $ Sales في تبويب Sales حسب تاريخ الدفع، والعائد الأساسي ${roasStr(t.roas)}. ومنه ${money(t.attributedRevenue)} يعود لحملة أنفقت داخل نفس الفترة، مربوطاً عبر رقم أمر البيع. أما تبويب الفواتير الكاملة فيعطي ${money(t.orderRevenue)} لنفس الفترة ويُستخدم للمراجعة لا كرقم إيراد.`,
   );
+
+  if (health.platformsWithoutSpendTab.length > 0) {
+    const list = health.platformsWithoutSpendTab
+      .map((p) => `${p.platform} (${p.leads.toLocaleString("en-US")})`)
+      .join("، ");
+    en.push(
+      `WARNING — spend is incomplete: ${list} produced leads in the CRM but have no spend tab in the workbook. Their cost is missing from CPL, CPA, ROAS and ACOS, so every one of those reads better than reality until the tab exists.`,
+    );
+    ar.push(
+      `تحذير — الإنفاق ناقص: ${list} أنتجت عملاء في النظام ولا يوجد لها تبويب إنفاق في الملف. تكلفتها غائبة عن CPL و CPA و ROAS و ACOS، فكل هذه المؤشرات تبدو أفضل من الحقيقة إلى أن يُضاف التبويب.`,
+    );
+  }
 
   en.push(
     `CPL is ${money2(t.cpl)} = total spend ÷ ${t.platformLeads?.toLocaleString("en-US") ?? "—"} platform-reported leads; CPA is ${money2(t.cpa)} = total spend ÷ won deals; ACOS is ${pctStr(t.acos)}.`,

@@ -13,6 +13,7 @@
     "start": "node .output/server/index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "reconcile": "node scripts/reconcile.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
