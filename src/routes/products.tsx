@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Boxes, Layers, ShoppingCart, Wallet, X } from "lucide-react";
+import { Boxes, ChevronDown, Wallet, X, Tag } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import {
@@ -9,7 +9,6 @@ import {
   ErrorState,
   KpiCard,
   KpiSkeletonGrid,
-  Notice,
   PageHeader,
   Pill,
   SectionTitle,
@@ -138,10 +137,16 @@ const fmtNative = (n: number, currency: string) =>
  * read as one running number ("1,753 AED 494,788 SAR"), which is precisely the
  * confusion this page exists to prevent.
  */
-function NativeChips({ native }: { native: CurrencyAmount[] }) {
+function NativeChips({
+  native,
+  align = "end",
+}: {
+  native: CurrencyAmount[];
+  align?: "start" | "end";
+}) {
   if (!native.length) return <span className="text-text-subtle">{EM}</span>;
   return (
-    <div className="flex flex-wrap gap-1 justify-end">
+    <div className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
       {native.map((n) => (
         <span
           key={n.currency}
@@ -159,62 +164,105 @@ const byUnits = (rows: Breakdown[]) =>
   [...rows].sort((a, b) => b.units - a.units || b.revenueUsd - a.revenueUsd);
 
 /** The variant mix, inline — this is the "CMRP has four types" answer. */
-function VariantChips({ variants, lang }: { variants: Breakdown[]; lang: "ar" | "en" }) {
-  if (!variants.length) return <span className="text-text-subtle">{EM}</span>;
+function VariantChips({
+  variants,
+  lang,
+  max = 4,
+}: {
+  variants: Breakdown[];
+  lang: "ar" | "en";
+  max?: number;
+}) {
+  if (!variants.length) return null;
+  const shown = byUnits(variants).slice(0, max);
   return (
     <div className="flex flex-wrap gap-1">
-      {variants.slice(0, 5).map((v) => (
+      {shown.map((v) => (
         <span
           key={v.key}
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] whitespace-nowrap"
           style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}
-          title={variantLabel(v.key, lang)}
         >
-          <span className="truncate max-w-[110px]">{variantLabel(v.key, lang)}</span>
+          <span className="truncate max-w-[120px]">{variantLabel(v.key, lang)}</span>
           <span className="num font-semibold text-text">{fmtNum(v.units)}</span>
         </span>
       ))}
-      {variants.length > 5 && (
-        <span className="text-[11px] text-text-subtle">+{variants.length - 5}</span>
+      {variants.length > max && (
+        <span className="text-[11px] text-text-subtle self-center">+{variants.length - max}</span>
       )}
     </div>
   );
 }
 
-function TopSource({
-  sources,
-  total,
+/**
+ * The headline block: a ranked leaderboard rather than a dense table, because
+ * the first question management asks is "which courses are selling" and the
+ * answer should be readable without scanning columns.
+ */
+function CourseLeaderboard({
+  rows,
   lang,
+  onOpen,
 }: {
-  sources: Breakdown[];
-  total: number;
+  rows: FamilyRow[];
   lang: "ar" | "en";
+  onOpen: (r: FamilyRow) => void;
 }) {
-  const top = sources[0];
-  if (!top || !total) return <span className="text-text-subtle">{EM}</span>;
-  const share = (top.units / total) * 100;
+  const peak = Math.max(...rows.map((r) => r.revenueUsd), 1);
   return (
-    <div className="min-w-0">
-      <div className="truncate text-[13px] text-text">{sourceLabel(top.key, top.label, lang)}</div>
-      <div className="num text-[11px] text-text-muted">
-        {isFinite(share) ? `${share.toFixed(0)}%` : EM} · {sources.length}
-      </div>
+    <div className="space-y-1">
+      {rows.map((r, i) => (
+        <button
+          key={r.familyKey}
+          onClick={() => onOpen(r)}
+          className="w-full text-start rounded-xl px-3 py-3 transition-colors hover:bg-surface-2 cursor-pointer stagger"
+          style={{ "--i": i } as React.CSSProperties}
+        >
+          <div className="flex items-baseline gap-3">
+            <span className="num text-[13px] font-semibold text-text-subtle w-5 shrink-0 tabular-nums">
+              {i + 1}
+            </span>
+            <span className="flex-1 min-w-0 truncate text-[14px] font-medium text-text">
+              {familyLabel(r.familyKey, r.family, lang)}
+            </span>
+            <span className="num text-[14px] font-semibold text-text shrink-0">
+              {fmtUSD(r.revenueUsd)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mt-1.5 ps-8">
+            <div className="flex-1 h-1.5 rounded-full bg-surface-2 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{
+                  width: `${Math.max(1.5, (r.revenueUsd / peak) * 100)}%`,
+                  background: "var(--chart-1)",
+                }}
+              />
+            </div>
+            <span className="num text-[12px] text-text-muted shrink-0">
+              {fmtNum(r.units)} {lang === "ar" ? "بيعة" : "sold"}
+            </span>
+          </div>
+          <div className="mt-2 ps-8">
+            <VariantChips variants={r.variants} lang={lang} max={4} />
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
 
 /* --- page ---------------------------------------------------------------- */
 
-type Grouping = "family" | "product";
 type Basis = "all" | "invoiced";
 
 function Products() {
   const { t, lang } = useI18n();
-  const [grouping, setGrouping] = useState<Grouping>("family");
   const [basis, setBasis] = useState<Basis>("all");
   const [company, setCompany] = useState<string>("");
   const [openFamily, setOpenFamily] = useState<FamilyRow | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const params = new URLSearchParams({ basis });
   if (company) params.set("company", company);
@@ -222,40 +270,26 @@ function Products() {
 
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/products?${params.toString()}`);
 
-  if (error) {
-    // A deploy without Odoo credentials is a setup step, not a fault — say so in
-    // the reader's language instead of echoing the server's English sentence.
-    const raw = (error as Error).message;
-    const unconfigured = /not configured/i.test(raw);
-    return (
-      <div className="space-y-5">
-        <PageHeader title={t("products")} subtitle={t("products_sub")} />
-        <ErrorState
-          message={unconfigured ? t("odoo_unconfigured") : raw}
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
+  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const totals = data?.totals;
   const health = data?.health;
   const notInvoiced = totals ? totals.units - totals.invoicedUnits : 0;
+  const avgSale = totals && totals.units > 0 ? totals.revenueUsd / totals.units : null;
 
   const companyOptions = [
     { value: "", label: t("all_companies") },
-    ...(health?.companies ?? []).map((c) => ({
-      value: String(c.id),
-      label: `${c.name} · ${c.currency}`,
-    })),
+    ...(health?.companies ?? []).map((c) => ({ value: String(c.id), label: c.name })),
   ];
 
-  const familyCols: Col<FamilyRow>[] = [
+  // Five columns, not nine. Native currency lives in the drawer, where someone
+  // asking that question has already drilled in.
+  const cols: Col<FamilyRow>[] = [
     {
       key: "family",
       header: t("product_family"),
       sticky: true,
-      width: "220px",
+      width: "230px",
       sortValue: (r) => r.family,
       render: (r) => (
         <div className="min-w-0">
@@ -269,16 +303,9 @@ function Products() {
     {
       key: "types",
       header: t("types"),
-      width: "260px",
+      width: "250px",
       sortValue: (r) => r.variants.length,
-      render: (r) => <VariantChips variants={r.variants} lang={lang} />,
-    },
-    {
-      key: "productCount",
-      header: t("variants_count"),
-      align: "right",
-      sortValue: (r) => r.productCount,
-      render: (r) => fmtNum(r.productCount),
+      render: (r) => <VariantChips variants={r.variants} lang={lang} max={3} />,
     },
     {
       key: "units",
@@ -288,13 +315,6 @@ function Products() {
       render: (r) => fmtNum(r.units),
     },
     {
-      key: "orders",
-      header: t("orders_count"),
-      align: "right",
-      sortValue: (r) => r.orders,
-      render: (r) => fmtNum(r.orders),
-    },
-    {
       key: "revenueUsd",
       header: t("revenue"),
       align: "right",
@@ -302,176 +322,62 @@ function Products() {
       render: (r) => fmtUSD(r.revenueUsd),
     },
     {
-      key: "native",
-      header: t("native_totals"),
-      align: "right",
-      width: "180px",
-      sortValue: (r) => r.native[0]?.amount ?? 0,
-      render: (r) => <NativeChips native={r.native} />,
-    },
-    {
-      key: "avg",
-      header: t("avg_price"),
-      align: "right",
-      sortValue: (r) => r.avgPriceUsd ?? -1,
-      render: (r) =>
-        r.avgPriceUsd === null ? (
-          <span className="text-text-subtle">{EM}</span>
-        ) : (
-          fmtUSD(r.avgPriceUsd)
-        ),
-    },
-    {
       key: "source",
       header: t("sale_source"),
-      width: "150px",
-      sortValue: (r) => r.sources[0]?.label ?? "",
-      render: (r) => <TopSource sources={r.sources} total={r.units} lang={lang} />,
+      width: "160px",
+      sortValue: (r) => r.sources[0]?.units ?? 0,
+      render: (r) => {
+        const top = byUnits(r.sources)[0];
+        if (!top || !r.units) return <span className="text-text-subtle">{EM}</span>;
+        return (
+          <div className="min-w-0">
+            <div className="truncate text-[13px] text-text">
+              {sourceLabel(top.key, top.label, lang)}
+            </div>
+            <div className="num text-[11px] text-text-muted">
+              {((top.units / r.units) * 100).toFixed(0)}%
+            </div>
+          </div>
+        );
+      },
     },
   ];
 
-  const productCols: Col<ProductRow>[] = [
-    {
-      key: "name",
-      header: t("product"),
-      sticky: true,
-      width: "280px",
-      sortValue: (r) => r.name,
-      render: (r) => (
-        <div className="min-w-0">
-          <div className="truncate text-text">{r.name.trim()}</div>
-          <div className="truncate text-[11px] text-text-subtle">{r.category || EM}</div>
-        </div>
-      ),
-    },
-    {
-      key: "variant",
-      header: t("product_type"),
-      width: "140px",
-      sortValue: (r) => r.variantKey,
-      render: (r) => (
-        <Pill tone={r.isDiscount ? "warning" : "neutral"}>{variantLabel(r.variantKey, lang)}</Pill>
-      ),
-    },
-    {
-      key: "units",
-      header: t("units_sold"),
-      align: "right",
-      sortValue: (r) => r.units,
-      render: (r) => fmtNum(r.units),
-    },
-    {
-      key: "orders",
-      header: t("orders_count"),
-      align: "right",
-      sortValue: (r) => r.orders,
-      render: (r) => fmtNum(r.orders),
-    },
-    {
-      key: "revenueUsd",
-      header: t("revenue"),
-      align: "right",
-      sortValue: (r) => r.revenueUsd,
-      render: (r) => fmtUSD(r.revenueUsd),
-    },
-    {
-      key: "native",
-      header: t("native_totals"),
-      align: "right",
-      width: "180px",
-      sortValue: (r) => r.native[0]?.amount ?? 0,
-      render: (r) => <NativeChips native={r.native} />,
-    },
-    {
-      key: "avg",
-      header: t("avg_price"),
-      align: "right",
-      sortValue: (r) => r.avgPriceUsd ?? -1,
-      render: (r) =>
-        r.avgPriceUsd === null ? (
-          <span className="text-text-subtle">{EM}</span>
-        ) : (
-          fmtUSD(r.avgPriceUsd)
-        ),
-    },
-    {
-      key: "source",
-      header: t("sale_source"),
-      width: "150px",
-      sortValue: (r) => r.sources[0]?.label ?? "",
-      render: (r) => <TopSource sources={r.sources} total={r.units} lang={lang} />,
-    },
-    {
-      key: "last",
-      header: t("last_sale"),
-      align: "right",
-      sortValue: (r) => r.lastSale,
-      render: (r) => (
-        <span className="num text-[12px]">{r.lastSale ? fmtDate(r.lastSale, lang) : EM}</span>
-      ),
-    },
-  ];
+  const topSources = data ? byUnits(data.sources) : [];
+  const sourceHead = topSources.slice(0, 7);
+  const sourceTail = topSources.slice(7);
+  const tailUnits = sourceTail.reduce((s, r) => s + r.units, 0);
+  const tailRevenue = sourceTail.reduce((s, r) => s + r.revenueUsd, 0);
 
   return (
     <div className="space-y-5">
       <PageHeader title={t("products")} subtitle={t("products_sub")} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">{t("group_by")}</span>
-          <Segmented
-            value={grouping}
-            onChange={setGrouping}
-            options={[
-              { value: "family", label: t("grouped") },
-              { value: "product", label: t("ungrouped") },
-            ]}
-          />
+      {/* One control. Period lives in the top bar with every other tab. */}
+      {companyOptions.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-text-muted">{t("company")}</span>
+          <Segmented value={company} onChange={setCompany} options={companyOptions} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">{t("basis")}</span>
-          <Segmented
-            value={basis}
-            onChange={setBasis}
-            options={[
-              { value: "all", label: t("basis_confirmed") },
-              { value: "invoiced", label: t("basis_invoiced") },
-            ]}
-          />
-        </div>
-        {companyOptions.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-muted">{t("company")}</span>
-            <Segmented value={company} onChange={setCompany} options={companyOptions} />
-          </div>
-        )}
-        {health && (
-          // Deliberately no count here. `ordersScanned` is how many orders were
-          // fetched — including the extra timezone day and orders with no
-          // product line — so showing it next to the Orders KPI read as two
-          // contradictory order counts.
-          <Pill tone={health.stale ? "warning" : "success"}>
-            {health.stale ? t("stale") : t("odoo_live")}
-          </Pill>
-        )}
-      </div>
+      )}
 
       {isLoading || !data || !totals ? (
         <>
-          <KpiSkeletonGrid count={4} />
-          <Skeleton className="h-64" />
+          <KpiSkeletonGrid count={3} />
           <Skeleton className="h-96" />
+          <Skeleton className="h-64" />
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Three cards, so a two-column grid would leave a hole. */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <KpiCard
               index={0}
               hero
               label={t("units_sold")}
               value={fmtNum(totals.units)}
               icon={<Boxes size={16} />}
-              sub={`${fmtNum(totals.products)} ${lang === "ar" ? "منتج" : "products"}`}
+              sub={`${fmtNum(totals.families)} ${lang === "ar" ? "دورة" : "courses"}`}
             />
             <KpiCard
               index={1}
@@ -482,97 +388,65 @@ function Products() {
             />
             <KpiCard
               index={2}
-              label={t("orders_count")}
-              value={fmtNum(totals.orders)}
-              icon={<ShoppingCart size={16} />}
-              // `notInvoiced` is a unit count, not an order count — say so, or it
-              // reads as "236 of these 1,893 orders".
-              sub={
-                basis === "all" && notInvoiced > 0
-                  ? `${fmtNum(notInvoiced)} ${lang === "ar" ? "وحدة" : "units"} · ${t("awaiting_invoice")}`
-                  : undefined
-              }
-            />
-            <KpiCard
-              index={3}
-              label={t("courses_grouped")}
-              value={fmtNum(totals.families)}
-              icon={<Layers size={16} />}
-              sub={`${fmtNum(data.variants.length)} ${lang === "ar" ? "نوع" : "types"}`}
+              label={t("avg_sale")}
+              value={avgSale === null ? EM : fmtUSD(avgSale)}
+              icon={<Tag size={16} />}
+              sub={`${fmtNum(totals.orders)} ${lang === "ar" ? "أمر بيع" : "orders"}`}
             />
           </div>
 
-          <Card>
-            <SectionTitle hint={t("currency_note")}>{t("native_totals")}</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {totals.native.map((n) => (
-                <div
-                  key={n.currency}
-                  className="px-3 py-2 rounded-xl border border-border bg-surface-2 min-w-[140px]"
-                >
-                  <div className="text-[11px] text-text-muted">{n.currency}</div>
-                  <div className="num text-[15px] font-semibold text-text">
-                    {n.amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="num text-[11px] text-text-subtle">
-                    {fmtNum(n.units)} {lang === "ar" ? "وحدة" : "units"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+          {/* The currency guard, stated once and quietly, instead of a whole card. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-text-muted shrink-0">{t("native_totals")}:</span>
+            <NativeChips native={totals.native} align="start" />
+          </div>
 
-          {health && health.ordersWithoutSource > 0 && (
-            <Notice tone="warning">
-              {lang === "ar"
-                ? `${fmtNum(health.ordersWithoutSource)} أمر بيع بدون مصدر مسجَّل في أودو — لا على الأمر ولا على الفرصة المرتبطة به. تظهر تحت «بدون مصدر مسجَّل» ولم تُوزَّع على أي قناة.`
-                : `${fmtNum(health.ordersWithoutSource)} orders carry no source in Odoo — neither on the order nor on its opportunity. They sit under "No source recorded" and were not spread across the other channels.`}
-            </Notice>
-          )}
+          <div className="grid gap-4 lg:grid-cols-5">
+            <Card className="lg:col-span-3">
+              <SectionTitle hint={t("tap_for_detail")}>{t("top_courses")}</SectionTitle>
+              <CourseLeaderboard
+                rows={data.families.slice(0, 8)}
+                lang={lang}
+                onOpen={setOpenFamily}
+              />
+            </Card>
 
-          {health?.warnings.map((w) => (
-            <Notice key={w} tone="warning">
-              {w}
-            </Notice>
-          ))}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <SectionTitle
-                hint={lang === "ar" ? "مصدر أمر البيع في أودو" : "The sale order's source in Odoo"}
-              >
-                {t("by_source")}
-              </SectionTitle>
+            <Card className="lg:col-span-2">
+              <SectionTitle>{t("where_from")}</SectionTitle>
               <BarList
-                items={byUnits(data.sources)
-                  .slice(0, 10)
-                  .map((s) => ({
+                items={[
+                  ...sourceHead.map((s) => ({
                     label: sourceLabel(s.key, s.label, lang),
                     value: s.units,
                     meta: `${fmtNum(s.units)} · ${fmtUSD(s.revenueUsd)}`,
-                  }))}
+                  })),
+                  ...(sourceTail.length
+                    ? [
+                        {
+                          label: `${t("other_sources")} (${sourceTail.length})`,
+                          value: tailUnits,
+                          meta: `${fmtNum(tailUnits)} · ${fmtUSD(tailRevenue)}`,
+                        },
+                      ]
+                    : []),
+                ]}
                 format={fmtNum}
               />
-            </Card>
-            <Card>
-              <SectionTitle
-                hint={
-                  lang === "ar" ? "مسجَّل، حضوري، محاكي اختبار…" : "Recorded, live, exam simulator…"
-                }
-              >
-                {t("by_type")}
-              </SectionTitle>
-              <BarList
-                items={byUnits(data.variants)
-                  .slice(0, 10)
-                  .map((v) => ({
-                    label: variantLabel(v.key, lang),
-                    value: v.units,
-                    meta: `${fmtNum(v.units)} · ${fmtUSD(v.revenueUsd)}`,
-                  }))}
-                format={fmtNum}
-                color="var(--chart-3)"
-              />
+
+              <div className="mt-6">
+                <SectionTitle>{t("by_type")}</SectionTitle>
+                <BarList
+                  items={byUnits(data.variants)
+                    .slice(0, 6)
+                    .map((v) => ({
+                      label: variantLabel(v.key, lang),
+                      value: v.units,
+                      meta: `${fmtNum(v.units)} · ${fmtUSD(v.revenueUsd)}`,
+                    }))}
+                  format={fmtNum}
+                  color="var(--chart-3)"
+                />
+              </div>
             </Card>
           </div>
 
@@ -599,18 +473,18 @@ function Products() {
             </Card>
           )}
 
-          {grouping === "family" ? (
+          {/* The full table is opt-in: eight courses answer most questions. */}
+          {showAll ? (
             <DataTable
               rows={data.families}
-              cols={familyCols}
+              cols={cols}
               searchable={(r) =>
                 `${r.family} ${r.category} ${r.products.map((p) => p.name).join(" ")}`
               }
               initialSort={{ key: "revenueUsd", dir: -1 }}
               onRowClick={(r) => setOpenFamily(r)}
               csvFilename="engosoft-products-by-course"
-              maxHeight={640}
-              truncatedNote={t("basis_note")}
+              maxHeight={620}
               csvRow={(r) => ({
                 course: familyLabel(r.familyKey, r.family, "en"),
                 category: r.category,
@@ -627,34 +501,22 @@ function Products() {
               })}
             />
           ) : (
-            <DataTable
-              rows={data.products}
-              cols={productCols}
-              searchable={(r) => `${r.name} ${r.code} ${r.category}`}
-              initialSort={{ key: "revenueUsd", dir: -1 }}
-              onRowClick={(r) => setDetailId(r.productId)}
-              csvFilename="engosoft-products"
-              maxHeight={640}
-              truncatedNote={t("basis_note")}
-              csvRow={(r) => ({
-                product: r.name.trim(),
-                code: r.code,
-                category: r.category,
-                type: variantLabel(r.variantKey, "en"),
-                course: r.family,
-                units: r.units,
-                orders: r.orders,
-                revenue_usd: r.revenueUsd.toFixed(2),
-                native: r.native.map((n) => `${n.amount.toFixed(2)} ${n.currency}`).join(" | "),
-                avg_price_usd: r.avgPriceUsd?.toFixed(2) ?? "",
-                sources: r.sources
-                  .map((s) => `${sourceLabel(s.key, s.label, "en")}=${s.units}`)
-                  .join(" | "),
-                first_sale: r.firstSale,
-                last_sale: r.lastSale,
-              })}
-            />
+            <button
+              onClick={() => setShowAll(true)}
+              className="w-full card py-3.5 text-sm font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <ChevronDown size={16} />
+              {t("all_courses")} ({fmtNum(totals.families)})
+            </button>
           )}
+
+          <FootNotes
+            basis={basis}
+            onBasis={setBasis}
+            notInvoiced={notInvoiced}
+            health={health}
+            lang={lang}
+          />
 
           {openFamily && (
             <FamilyDrawer
@@ -662,7 +524,7 @@ function Products() {
               onClose={() => setOpenFamily(null)}
               onProduct={(id) => {
                 setOpenFamily(null);
-                setGrouping("product");
+                setShowAll(true);
                 setDetailId(id);
               }}
             />
@@ -671,6 +533,93 @@ function Products() {
             <ProductDrawer detail={data.detail} onClose={() => setDetailId(null)} />
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Definitions and caveats belong on the page — they change what the numbers
+ * mean — but not above them. Collapsed by default so the view stays clean, and
+ * the basis switch lives here because it is a definitional choice, not a filter.
+ */
+function FootNotes({
+  basis,
+  onBasis,
+  notInvoiced,
+  health,
+  lang,
+}: {
+  basis: Basis;
+  onBasis: (b: Basis) => void;
+  notInvoiced: number;
+  health?: Health;
+  lang: "ar" | "en";
+}) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card p-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 text-start cursor-pointer"
+        aria-expanded={open}
+      >
+        <span className="text-[13px] font-medium text-text">{t("how_counted")}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {health && (
+            <Pill tone={health.stale ? "warning" : "success"}>
+              {health.stale ? t("stale") : t("odoo_live")}
+            </Pill>
+          )}
+          <ChevronDown
+            size={16}
+            className="text-text-subtle transition-transform"
+            style={{ transform: open ? "rotate(180deg)" : undefined }}
+          />
+        </div>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-4 animate-fade-in">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-text-muted">{t("basis")}</span>
+            <Segmented
+              value={basis}
+              onChange={onBasis}
+              options={[
+                { value: "all", label: t("basis_confirmed") },
+                { value: "invoiced", label: t("basis_invoiced") },
+              ]}
+            />
+          </div>
+
+          <p className="text-xs text-text-muted leading-relaxed">{t("basis_note")}</p>
+          <p className="text-xs text-text-muted leading-relaxed">{t("currency_note")}</p>
+
+          {basis === "all" && notInvoiced > 0 && (
+            <p className="text-xs text-text-muted leading-relaxed">
+              {lang === "ar"
+                ? `منها ${fmtNum(notInvoiced)} وحدة على أوامر مؤكَّدة لم تُفوتَر بعد.`
+                : `${fmtNum(notInvoiced)} of these units sit on confirmed orders that are not invoiced yet.`}
+            </p>
+          )}
+
+          {health && health.ordersWithoutSource > 0 && (
+            <p className="text-xs text-text-muted leading-relaxed">
+              {lang === "ar"
+                ? `${fmtNum(health.ordersWithoutSource)} أمر بيع بدون مصدر مسجَّل في أودو — لا على الأمر ولا على الفرصة المرتبطة به. تظهر تحت «بدون مصدر مسجَّل» ولم تُوزَّع على أي قناة.`
+                : `${fmtNum(health.ordersWithoutSource)} orders carry no source in Odoo — neither on the order nor its opportunity. They sit under "No source recorded" and were not spread across the other channels.`}
+            </p>
+          )}
+
+          {health?.warnings.map((w) => (
+            <p key={w} className="text-xs leading-relaxed" style={{ color: "var(--warning)" }}>
+              {w}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -877,11 +826,7 @@ function ProductDrawer({ detail, onClose }: { detail: Detail; onClose: () => voi
           <BarList
             items={byUnits(detail.salespeople)
               .slice(0, 8)
-              .map((s) => ({
-                label: s.label,
-                value: s.units,
-                meta: fmtNum(s.units),
-              }))}
+              .map((s) => ({ label: s.label, value: s.units, meta: fmtNum(s.units) }))}
             format={fmtNum}
             color="var(--chart-3)"
           />

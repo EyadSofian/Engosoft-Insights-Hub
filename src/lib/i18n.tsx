@@ -357,6 +357,12 @@ export const DICT = {
   first_sale: { ar: "أول بيع", en: "First sale" },
   last_sale: { ar: "آخر بيع", en: "Last sale" },
   recent_orders: { ar: "أحدث الأوامر", en: "Recent orders" },
+  avg_sale: { ar: "متوسط قيمة البيعة", en: "Average sale" },
+  top_courses: { ar: "أعلى الدورات مبيعاً", en: "Best selling courses" },
+  where_from: { ar: "البيع جاي منين", en: "Where the sales came from" },
+  all_courses: { ar: "كل الدورات", en: "All courses" },
+  how_counted: { ar: "طريقة الاحتساب", en: "How this is counted" },
+  tap_for_detail: { ar: "اضغط أي دورة للتفاصيل", en: "Tap any course for detail" },
 } satisfies Record<string, Entry>;
 
 export type DictKey = keyof typeof DICT;
