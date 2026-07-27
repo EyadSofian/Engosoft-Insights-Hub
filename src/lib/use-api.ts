@@ -19,7 +19,17 @@ export function useApi<T>(path: string) {
     queryKey: [base, own, filters],
     queryFn: async () => {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      if (!res.ok) {
+        // Routes that fail on purpose (a missing integration, an upstream that
+        // is down) send `{ error }`. Surfacing it beats "Request failed: 503",
+        // which tells the reader nothing about what to fix.
+        const detail = await res
+          .clone()
+          .json()
+          .then((body: { error?: string }) => body?.error)
+          .catch(() => undefined);
+        throw new Error(detail || `Request failed: ${res.status}`);
+      }
       return res.json();
     },
     staleTime: 30_000,

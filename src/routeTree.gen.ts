@@ -16,6 +16,7 @@ import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
+import { Route as ProductsRouteImport } from './routes/products'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as WebsiteRouteImport } from './routes/website'
@@ -30,6 +31,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
+import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
@@ -73,6 +75,11 @@ const LeadsRoute = LeadsRouteImport.update({
 const LostRoute = LostRouteImport.update({
   id: '/lost',
   path: '/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductsRoute = ProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SalesRoute = SalesRouteImport.update({
@@ -145,6 +152,11 @@ const ApiOverviewRoute = ApiOverviewRouteImport.update({
   path: '/api/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProductsRoute = ApiProductsRouteImport.update({
+  id: '/api/products',
+  path: '/api/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
   id: '/api/refresh',
   path: '/api/refresh',
@@ -199,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
@@ -213,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/products': typeof ApiProductsRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -231,6 +245,7 @@ export interface FileRoutesByTo {
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
@@ -245,6 +260,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/products': typeof ApiProductsRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -264,6 +280,7 @@ export interface FileRoutesById {
   '/full-invoiced': typeof FullInvoicedRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
@@ -278,6 +295,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/products': typeof ApiProductsRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -298,6 +316,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/leads'
     | '/lost'
+    | '/products'
     | '/sales'
     | '/teams'
     | '/website'
@@ -312,6 +331,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
+    | '/api/products'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -330,6 +350,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/leads'
     | '/lost'
+    | '/products'
     | '/sales'
     | '/teams'
     | '/website'
@@ -344,6 +365,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
+    | '/api/products'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -362,6 +384,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/leads'
     | '/lost'
+    | '/products'
     | '/sales'
     | '/teams'
     | '/website'
@@ -376,6 +399,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/overview'
+    | '/api/products'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -395,6 +419,7 @@ export interface RootRouteChildren {
   FullInvoicedRoute: typeof FullInvoicedRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
+  ProductsRoute: typeof ProductsRoute
   SalesRoute: typeof SalesRoute
   TeamsRoute: typeof TeamsRoute
   WebsiteRoute: typeof WebsiteRoute
@@ -409,6 +434,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
+  ApiProductsRoute: typeof ApiProductsRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
@@ -469,6 +495,13 @@ declare module '@tanstack/react-router' {
       path: '/lost'
       fullPath: '/lost'
       preLoaderRoute: typeof LostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products': {
+      id: '/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof ProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sales': {
@@ -569,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/products': {
+      id: '/api/products'
+      path: '/api/products'
+      fullPath: '/api/products'
+      preLoaderRoute: typeof ApiProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/refresh': {
       id: '/api/refresh'
       path: '/api/refresh'
@@ -643,6 +683,7 @@ const rootRouteChildren: RootRouteChildren = {
   FullInvoicedRoute: FullInvoicedRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
+  ProductsRoute: ProductsRoute,
   SalesRoute: SalesRoute,
   TeamsRoute: TeamsRoute,
   WebsiteRoute: WebsiteRoute,
@@ -657,6 +698,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
   ApiOverviewRoute: ApiOverviewRoute,
+  ApiProductsRoute: ApiProductsRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
   ApiTeamsRoute: ApiTeamsRoute,

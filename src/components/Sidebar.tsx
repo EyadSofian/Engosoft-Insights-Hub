@@ -10,6 +10,7 @@ import {
   FileText,
   TrendingDown,
   GraduationCap,
+  Package,
   CalendarRange,
   Globe2,
   MoreHorizontal,
@@ -46,6 +47,7 @@ const GROUPS: { label: { ar: string; en: string }; items: NavItem[] }[] = [
       { to: "/sales", key: "sales", icon: Receipt },
       { to: "/full-invoiced", key: "full_invoiced", icon: FileText },
       { to: "/courses", key: "courses", icon: GraduationCap },
+      { to: "/products", key: "products", icon: Package },
     ],
   },
   {

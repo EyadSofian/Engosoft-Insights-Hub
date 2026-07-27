@@ -31,6 +31,7 @@ export const DICT = {
   full_invoiced: { ar: "الفواتير", en: "Full Invoiced" },
   lost: { ar: "تحليل الخسائر", en: "Lost Analysis" },
   courses: { ar: "الدورات", en: "Courses" },
+  products: { ar: "المنتجات", en: "Products" },
   teams: { ar: "فرق المبيعات", en: "Sales Teams" },
   yoy: { ar: "مقارنة سنوية", en: "Year over year" },
   more: { ar: "المزيد", en: "More" },
@@ -312,6 +313,50 @@ export const DICT = {
   send_now: { ar: "إرسال الآن", en: "Send now" },
   preview: { ar: "معاينة", en: "Preview" },
   sent: { ar: "تم الإرسال", en: "Sent" },
+
+  // products (live from Odoo)
+  products_sub: {
+    ar: "مباشر من أودو — كل منتج: باع كام، وجه من أنهي مصدر.",
+    en: "Live from Odoo — what each product sold, and where each sale came from.",
+  },
+  units_sold: { ar: "عدد المبيعات", en: "Units sold" },
+  product_family: { ar: "الدورة", en: "Course" },
+  courses_grouped: { ar: "دورات مجمّعة", en: "Grouped courses" },
+  product_type: { ar: "النوع", en: "Type" },
+  types: { ar: "الأنواع", en: "Types" },
+  variants_count: { ar: "عدد الأنواع", en: "Variants" },
+  sale_source: { ar: "مصدر البيع", en: "Sale source" },
+  by_type: { ar: "حسب النوع", en: "By type" },
+  by_company: { ar: "حسب الشركة", en: "By company" },
+  company: { ar: "الشركة", en: "Company" },
+  all_companies: { ar: "كل الشركات", en: "All companies" },
+  native_totals: { ar: "بالعملة الأصلية", en: "In native currency" },
+  avg_price: { ar: "متوسط السعر", en: "Avg. price" },
+  basis: { ar: "أساس الاحتساب", en: "Counted as" },
+  basis_confirmed: { ar: "أوامر بيع مؤكدة", en: "Confirmed orders" },
+  basis_invoiced: { ar: "مفوترة بالكامل", en: "Fully invoiced" },
+  basis_note: {
+    ar: "«أوامر بيع مؤكدة» = كل أمر بيع حالته Sale في أودو. «مفوترة بالكامل» = نفس التعريف المستخدم في تبويب الفواتير.",
+    en: 'Confirmed = every Odoo order in state "Sale". Fully invoiced = the same population the Full Invoiced tab reports.',
+  },
+  currency_note: {
+    ar: "الشركات الثلاث تبيع بأربع عملات. الإجمالي الوحيد القابل للجمع هو الدولار، محسوباً بسعر صرف يوم البيع نفسه؛ والمبالغ بالعملة الأصلية معروضة كما هي دون جمع.",
+    en: "Three companies bill in four currencies. The only addable total is USD, converted at each sale's own date; native amounts are shown as-is and never summed together.",
+  },
+  no_source_recorded: { ar: "بدون مصدر مسجَّل", en: "No source recorded" },
+  odoo_live: { ar: "مباشر من أودو", en: "Live from Odoo" },
+  odoo_unconfigured: {
+    ar: "لم يتم ضبط الاتصال بأودو. أضف ODOO_LOGIN و ODOO_API_KEY في متغيرات البيئة.",
+    en: "Odoo is not configured. Set ODOO_LOGIN and ODOO_API_KEY in the environment.",
+  },
+  orders_count: { ar: "عدد الأوامر", en: "Orders" },
+  group_by: { ar: "التجميع", en: "Group by" },
+  ungrouped: { ar: "منتج منفرد", en: "Individual product" },
+  grouped: { ar: "دورة مجمّعة", en: "Grouped course" },
+  awaiting_invoice: { ar: "مؤكدة ولم تُفوتر بعد", en: "Confirmed, not yet invoiced" },
+  first_sale: { ar: "أول بيع", en: "First sale" },
+  last_sale: { ar: "آخر بيع", en: "Last sale" },
+  recent_orders: { ar: "أحدث الأوامر", en: "Recent orders" },
 } satisfies Record<string, Entry>;
 
 export type DictKey = keyof typeof DICT;

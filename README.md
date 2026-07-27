@@ -13,10 +13,13 @@ invoiced revenue, and reports full-funnel performance with an AI assistant on to
 | Styling    | Tailwind CSS v4, custom token layer                                        |
 | Charts     | Recharts                                                                   |
 | Data       | Google Sheets CSV (gviz), parsed with papaparse, cached in memory          |
+| Data (live) | Odoo 17 JSON-RPC, direct — Products tab only ([docs](docs/products-tab.md)) |
 | Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
 | AI         | OpenAI (isolated in the chat route, swappable)                             |
 
-No database. The sheet is the source of truth.
+No database. The sheet is the source of truth for every tab except **Products**,
+which reads Odoo directly so a confirmed order appears within a minute instead of
+waiting for the next 30-minute sync. See [docs/products-tab.md](docs/products-tab.md).
 
 ## Running locally
 
@@ -39,6 +42,11 @@ Copy `.env.example` to `.env`:
 | Variable                    | Required | Purpose                                                                                |
 | --------------------------- | -------- | -------------------------------------------------------------------------------------- |
 | `SHEET_ID`                  | No       | Google Sheet id. Falls back to the Engosoft sheet.                                     |
+| `ODOO_LOGIN`                | Products | Odoo user the API key belongs to. Without it only the Products tab is unavailable.     |
+| `ODOO_API_KEY`              | Products | Odoo API key, used in place of the password. Never logged or returned in a response.   |
+| `ODOO_URL` / `ODOO_DB`      | No       | Default to `https://engosoft.com` and `EngoSoft`.                                      |
+| `ODOO_COMPANY_IDS`          | No       | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                             |
+| `ODOO_START_DATE`           | No       | Earliest order date the Products tab reads. Default `2026-01-01`.                      |
 | `OPENAI_API_KEY`            | No       | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
 | `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
 | `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |

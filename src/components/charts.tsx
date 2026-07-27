@@ -67,14 +67,13 @@ function ChartTooltip({
       {payload.map((p, i) => (
         <div key={i} className="flex items-center justify-between gap-3 py-0.5">
           <span className="flex items-center gap-1.5 text-text-muted">
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ background: p.color }}
-            />
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
             {p.name}
           </span>
           <span className="num font-semibold">
-            {formatter ? formatter(Number(p.value ?? 0), String(p.dataKey ?? "")) : fmtCompact(Number(p.value ?? 0))}
+            {formatter
+              ? formatter(Number(p.value ?? 0), String(p.dataKey ?? ""))
+              : fmtCompact(Number(p.value ?? 0))}
           </span>
         </div>
       ))}
@@ -222,7 +221,13 @@ export function HBarChart({
           content={<ChartTooltip formatter={(v) => format(v)} />}
           cursor={{ fill: "var(--surface-2)" }}
         />
-        <Bar dataKey="value" name={t("revenue")} fill={color} radius={[0, 6, 6, 0]} maxBarSize={22} />
+        <Bar
+          dataKey="value"
+          name={t("revenue")}
+          fill={color}
+          radius={[0, 6, 6, 0]}
+          maxBarSize={22}
+        />
       </BarChart>
     </ChartFrame>
   );
@@ -271,7 +276,13 @@ export function VBarChart({
           content={<ChartTooltip formatter={(v) => format(v)} />}
           cursor={{ fill: "var(--surface-2)" }}
         />
-        <Bar dataKey="value" name={name ?? t("revenue")} fill={color} radius={[6, 6, 0, 0]} maxBarSize={44} />
+        <Bar
+          dataKey="value"
+          name={name ?? t("revenue")}
+          fill={color}
+          radius={[6, 6, 0, 0]}
+          maxBarSize={44}
+        />
       </BarChart>
     </ChartFrame>
   );
@@ -286,7 +297,17 @@ export function MultiLineChart({
   format = fmtCompact,
 }: {
   data: Record<string, string | number>[];
-  series: { key: string; name: string; color: string }[];
+  series: {
+    key: string;
+    name: string;
+    color: string;
+    /**
+     * Put a series on its own scale. Without this, plotting a count (~30/month)
+     * against revenue (~$30K) pins the count flat to the axis and it reads as
+     * zero. Only set it when the two series have genuinely different units.
+     */
+    axis?: "left" | "right";
+  }[];
   height?: number;
   format?: (n: number) => string;
 }) {
@@ -294,10 +315,11 @@ export function MultiLineChart({
   const narrow = useIsNarrow();
   if (!data.length) return <EmptyState label={t("no_data")} compact />;
   const interval = Math.max(0, Math.ceil(data.length / (narrow ? 4 : 10)) - 1);
+  const hasRight = series.some((s) => s.axis === "right");
 
   return (
     <ChartFrame height={height}>
-      <LineChart data={data} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 4, right: hasRight ? 4 : 4, left: -12, bottom: 0 }}>
         <CartesianGrid stroke={gridStroke} vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
@@ -309,14 +331,31 @@ export function MultiLineChart({
           minTickGap={8}
         />
         <YAxis
+          yAxisId="left"
           tick={axisTick}
           tickLine={false}
           axisLine={false}
           width={48}
           tickFormatter={(v: number) => fmtCompact(v)}
         />
+        {hasRight && (
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={44}
+            tickFormatter={(v: number) => fmtCompact(v)}
+          />
+        )}
         <Tooltip
-          content={<ChartTooltip formatter={(v) => format(v)} labelFormatter={(l) => fmtDayShort(l, lang)} />}
+          content={
+            <ChartTooltip
+              formatter={(v) => format(v)}
+              labelFormatter={(l) => fmtDayShort(l, lang)}
+            />
+          }
           cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }}
         />
         <Legend
@@ -327,6 +366,7 @@ export function MultiLineChart({
         {series.map((s) => (
           <Line
             key={s.key}
+            yAxisId={s.axis ?? "left"}
             type="monotone"
             dataKey={s.key}
             name={s.name}
