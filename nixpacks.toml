@@ -1,0 +1,15 @@
+# Build configuration for Railway/Nixpacks.
+#
+# Nixpacks defaults the install step to `npm ci`, which aborts the whole build
+# whenever the lock file cannot satisfy npm's ideal tree exactly. That is not a
+# theoretical risk here: it is what stopped this project from deploying for over
+# a week. Transitive optional and peer dependencies (@emnapi/*, @napi-rs/*, ajv)
+# publish new patch versions continuously, and the builder runs a different npm
+# major than any developer machine, so the two compute different trees from the
+# same lock. The build then fails on a dependency nobody in this repo chose.
+#
+# `npm install` still honours the lock for everything it can satisfy and only
+# deviates where the lock is genuinely unsatisfiable — which is the behaviour we
+# want from a deploy: ship, and stay pinned wherever pinning is possible.
+[phases.install]
+cmds = ["npm install --no-audit --no-fund"]
