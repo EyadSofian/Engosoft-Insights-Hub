@@ -1,10 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-/**
- * The Sales tab is payment lines; Full Invoiced Orders is order lines. They
- * describe overlapping-but-different money ($822,730 vs $783,425 all-time) so
- * both totals are returned rather than blending them into one "revenue".
- */
+/** @deprecated Compatibility endpoint. New clients should use `/api/accounting`. */
 export const Route = createFileRoute("/api/sales")({
   server: {
     handlers: {
@@ -14,20 +10,20 @@ export const Route = createFileRoute("/api/sales")({
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
-        const rows = data.sales;
-        const money = (r: (typeof rows)[number]) => r.usdSales;
+        const rows = data.accounting;
+        const money = (row: (typeof rows)[number]) => row.usdPaid;
 
         const byDay = new Map<string, number>();
         for (const r of rows) {
           if (!r.paymentDate) continue;
-          byDay.set(r.paymentDate, (byDay.get(r.paymentDate) ?? 0) + r.usdSales);
+          byDay.set(r.paymentDate, (byDay.get(r.paymentDate) ?? 0) + r.usdPaid);
         }
 
         return json({
           totals: computeTotals(data),
-          salesTotal: rows.reduce((s, r) => s + r.usdSales, 0),
+          salesTotal: rows.reduce((s, r) => s + r.usdPaid, 0),
           salesRows: rows.length,
-          salesOrders: new Set(rows.map((r) => r.orderRef || r.movement).filter(Boolean)).size,
+          salesOrders: new Set(rows.map((r) => r.movement).filter(Boolean)).size,
           invoicedTotal: data.invoiced.reduce((s, r) => s + r.usdSales, 0),
           byCourse: groupBy(rows, (r) => r.course || "—", money),
           byCategory: groupBy(rows, (r) => r.category || "—", money),
@@ -53,7 +49,7 @@ export const Route = createFileRoute("/api/sales")({
               teamLeader: r.teamLeader,
               salesTeam: r.salesTeam,
               eventStage: r.eventStage,
-              usdSales: r.usdSales,
+              usdSales: r.usdPaid,
             })),
           ),
           health: data.snapshot.health,

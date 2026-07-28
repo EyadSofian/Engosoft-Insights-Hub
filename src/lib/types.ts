@@ -24,8 +24,14 @@ export interface GlobalFilters {
   platform?: Platform;
   account?: string;
   campaign?: string;
+  /** Stable internal campaign key used by table drill-down. */
+  campaignKey?: string;
   adset?: string;
+  /** Stable internal ad-set bucket key used by table drill-down. */
+  adsetKey?: string;
   ad?: string;
+  /** Stable internal ad bucket key used by table drill-down. */
+  adKey?: string;
   source?: string;
   course?: string;
   mainCategory?: string;
@@ -92,6 +98,7 @@ export interface CrmLeadRow {
   /** Raw Odoo "Calling reply?" value when that custom field is available. */
   callingReply: string;
   isWon: boolean;
+  /** Always false in reportable CRM; Lost exists only in the archived population. */
   isLost: boolean;
   source: string;
   /** Case-normalized source key. `uchat` and `UChat` collapse to one. */
@@ -132,30 +139,49 @@ export interface InvoicedRow {
   usdSales: number;
 }
 
-export interface SalesRow {
+/**
+ * One paid Odoo invoice product line from the Accounting sheet.
+ *
+ * Payment Date is the reporting date. `movement` identifies the invoice, while
+ * every row keeps the product/category dimensions required by Accounting.
+ */
+export interface AccountingRow {
+  /** Stable Odoo move-line id when the sync provides one. */
+  id: string;
   /** Accounting move / invoice number (for example INVNT/2026/00001). */
   movement: string;
   paymentDate: string;
   invoiceDate: string;
   orderRef: string;
+  product: string;
+  productCategory: string;
+  mainCategory: string;
+  productCode: string;
+  company: string;
+  companyCurrency: string;
+  country: string;
+  /** Employee registration code from the accounting reference. */
+  code: string;
+  website: string;
+  untaxedTotal: number;
+  totalInCurrency: number;
+  usdPaid: number;
   course: string;
   category: string;
   partner: string;
   salesperson: string;
   teamLeader: string;
   salesTeam: string;
+  /** Backward-compatible numeric alias; new code should use `usdPaid`. */
   usdSales: number;
   currency: string;
+  event: string;
   eventStage: string;
   month: string;
 
-  /* --- attribution, joined on `Sales Order #` ------------------------------
-   * The Sales tab is written by Odoo's accounting side and carries no campaign
-   * columns. Full Invoiced Orders holds the same sales orders *with* their
-   * opportunity's campaign, so the order reference joins the two. 93.9% of paid
-   * revenue finds its order and 57.2% of it reaches a campaign; per-campaign
-   * totals agree with Full Invoiced Orders to the cent. This is what lets every
-   * campaign figure come from approved invoices instead of sales orders. */
+  /* --- attribution ---------------------------------------------------------
+   * Accounting may carry campaign columns directly. For legacy workbooks only,
+   * missing dimensions can be filled from the old order-attribution bridge. */
   campaignName: string;
   campaignId: string;
   campaignKey: string;
@@ -166,9 +192,12 @@ export interface SalesRow {
   /** Lead source carried over from the linked order's opportunity. */
   source: string;
   sourceKey: string;
-  /** False when no row in Full Invoiced Orders carries this order reference. */
+  /** True when direct or compatibility attribution was found. */
   orderMatched: boolean;
 }
+
+/** @deprecated Use `AccountingRow`. Kept so downstream integrations can migrate. */
+export type SalesRow = AccountingRow;
 
 /** One confirmed Odoo website sales-order line (Website = Engosoft, state = sale). */
 export interface WebsiteSaleRow {
@@ -269,11 +298,7 @@ export interface Totals {
   lostInCrm: number;
   /** Same authoritative count as `lost`. Kept for API compatibility. */
   lostArchived: number;
-  /**
-   * Archived rows whose stage is Won. They are real leads, so they stay in
-   * `totalLeads`, but counting them as lost would mark the same deal closed and
-   * lost at once. Exposed so the count is explainable rather than missing.
-   */
+  /** @deprecated Authoritative Lost rows are already validated; always zero. */
   archivedWon: number;
   conversionRate: Maybe;
   lostRate: Maybe;
@@ -282,7 +307,7 @@ export interface Totals {
   closeSample: number;
 
   /* money */
-  /** Primary paid-invoice revenue from Sales.$ Sales, filtered by Payment Date. */
+  /** Primary paid-invoice revenue from Accounting.USD Paid, filtered by Payment Date. */
   revenue: number;
   /** Same primary revenue, exposed explicitly for source transparency. */
   accountingRevenue: number;
@@ -290,13 +315,12 @@ export interface Totals {
   orderRevenue: number;
   /**
    * Approved revenue traceable to a campaign that actually spent in this window.
-   * Comes from Sales (paid invoices) joined to its order's campaign — not from
-   * sales orders.
+   * Comes from paid Accounting lines and their campaign dimensions.
    */
   attributedRevenue: number;
   /** The same measure computed on Full Invoiced Orders. Advisory/cross-check. */
   attributedOrderRevenue: number;
-  /** Paid revenue whose order reference matches no row in Full Invoiced Orders. */
+  /** Paid revenue with no direct or compatibility campaign attribution. */
   unmatchedRevenue: number;
   orders: number;
   /** Distinct order references on the advisory Full Invoiced Orders dataset. */
@@ -330,6 +354,12 @@ export interface ExecSummary {
 export interface PerfRow {
   key: string;
   name: string;
+  /** Stable parent dimensions keep drill-down scoped when display names repeat. */
+  campaignKey: string;
+  campaignName: string;
+  adsetKey: string;
+  adsetName: string;
+  adKey: string;
   platforms: Platform[];
   course: string;
   courseInferred: boolean;
@@ -419,7 +449,7 @@ export interface LostBreakdown {
   reasonByTeam: Matrix;
   reasonByCourse: Matrix;
   total: number;
-  /** CRM rows at stage Lost — a different population from the Lost tab. */
+  /** Always zero: active CRM stage text is never a Lost source. */
   crmLostCount: number;
 }
 
@@ -441,8 +471,68 @@ export interface FunnelStep {
 }
 
 export interface DataHealth {
+  /** Authoritative CRM source used for this snapshot. */
+  crmAuthority: "odoo-direct" | "google-sheet-fallback";
+  /** Paid invoice-line source selected only after the strict reconciliation gate. */
+  accountingAuthority: "odoo-direct" | "google-sheet-fallback";
+  /**
+   * Non-sensitive direct-Odoo reconciliation diagnostics. Direct Accounting is
+   * accepted only when rows and distinct invoices are at least 98% of the
+   * canonical sheet and USD revenue is within the reported tolerance.
+   */
+  accountingDirect: {
+    attempted: boolean;
+    accepted: boolean;
+    reportCandidates: number;
+    acceptedRows: number;
+    acceptedMoves: number;
+    missingPaymentDate: number;
+    missingCurrencyRate: number;
+    revenue: number;
+    referenceRows: number;
+    referenceMoves: number;
+    referenceRevenue: number;
+    rowRatio: number;
+    moveRatio: number;
+    revenueDelta: number;
+    revenueTolerance: number;
+    unresolvedFields: string[];
+    error: string;
+  };
+  /** Direct-Odoo population guards, exposed so excluded rows are auditable. */
+  crmExclusions: {
+    candidates: number;
+    accepted: number;
+    unassigned: number;
+    technicalIdentity: number;
+    nonInternalUser: number;
+    noEmployee: number;
+    excludedStage: number;
+    wrongType: number;
+    missingLostReason: number;
+  };
+  /** The same audit counters for the authoritative archived-Lost population. */
+  lostExclusions: {
+    candidates: number;
+    accepted: number;
+    unassigned: number;
+    technicalIdentity: number;
+    nonInternalUser: number;
+    noEmployee: number;
+    excludedStage: number;
+    wrongType: number;
+    missingLostReason: number;
+  };
   crmRows: number;
   invoicedRows: number;
+  /** Rows received from the selected Accounting/Sales source before guards. */
+  accountingSourceRows: number;
+  /** Customer credit-note rows removed before revenue and invoice counts. */
+  accountingRefundRowsExcluded: number;
+  /** Repeated invoice-product rows removed by stable id or full fingerprint. */
+  accountingDuplicateRowsExcluded: number;
+  accountingRows: number;
+  /** @deprecated Compatibility alias for `accountingRows`. */
   salesRows: number;
   lostRows: number;
   adRows: number;
@@ -455,6 +545,8 @@ export interface DataHealth {
   adsetResolutionRate: number;
   /** Share of CRM rows carrying an ad name/id at all. */
   crmAdCoverage: number;
+  accountingAdCoverage: number;
+  /** @deprecated Compatibility alias for `accountingAdCoverage`. */
   invoicedAdCoverage: number;
   /** Share of invoice lines and revenue that carry a campaign. */
   revenueCampaignCoverage: number;
@@ -484,8 +576,12 @@ export interface DataHealth {
   closeCoverage: number;
   invoicedMissingDate: number;
   crmMissingDate: number;
+  accountingMissingDate: number;
+  /** @deprecated Compatibility alias for `accountingMissingDate`. */
   salesMissingDate: number;
+  /** Legitimate negative discount/adjustment product lines inside customer invoices. */
   negativeRevenueRows: number;
+  /** Signed USD value of those discount/adjustment lines; credit notes are excluded earlier. */
   negativeRevenue: number;
 }
 

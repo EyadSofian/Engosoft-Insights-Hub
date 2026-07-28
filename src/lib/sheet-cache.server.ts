@@ -7,16 +7,19 @@
 // populations. Each guard below is load-bearing; see README "Things that are
 // easy to get wrong here" before simplifying any of them.
 import Papa from "papaparse";
+import { loadDirectCrm, type CrmExclusionDiagnostics, type CrmRawRow } from "./crm-odoo.server";
+import { loadDirectAccounting, type DirectAccountingSnapshot } from "./accounting-odoo.server";
+import { odooConfigured } from "./odoo.server";
 import type {
   AdRow,
   AdSetOrigin,
+  AccountingRow,
   CampaignObjective,
   CrmLeadRow,
   DataHealth,
   InvoicedRow,
   LostRow,
   Platform,
-  SalesRow,
   WebsiteSaleRow,
 } from "./types";
 
@@ -33,7 +36,9 @@ const TAB = {
   tiktok: "TikTok Ads Daily",
   crm: "CRM Leads",
   invoiced: "Full Invoiced Orders",
-  sales: "Sales",
+  accounting: "Accounting",
+  /** Temporary read fallback while the upstream workflow migrates its tab. */
+  legacySales: "Sales",
   websiteSales: "Website Sales",
   lost: "Lost Analysis",
 } as const;
@@ -81,7 +86,9 @@ export interface Snapshot {
   ads: AdRow[];
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
-  sales: SalesRow[];
+  accounting: AccountingRow[];
+  /** @deprecated Compatibility alias for `accounting`. */
+  sales: AccountingRow[];
   websiteSales: WebsiteSaleRow[];
   lost: LostRow[];
   accounts: AccountInfo[];
@@ -132,6 +139,20 @@ function num(v: unknown): number {
     .replace(/[^\d.-]/g, "");
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
+}
+
+/**
+ * Return the first populated value without treating numeric zero as missing.
+ * Financial exports legitimately contain zero-value lines, so `a || b` is not
+ * safe for choosing between equivalent headers.
+ */
+function firstPresent(...values: unknown[]): unknown {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    if (String(value).trim() === "") continue;
+    return value;
+  }
+  return "";
 }
 
 const USD_RATE: Record<string, number> = {
@@ -197,6 +218,51 @@ export function normalizeName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+const COURSE_RULES: { label: string; test: RegExp }[] = [
+  { label: "CMRP", test: /\bcmrp\b|certified maintenance (?:and|&) reliability/i },
+  { label: "CFM", test: /\bcfm\b|certified facility manager|facility management/i },
+  { label: "PMP", test: /\bpmp\b|project management professional/i },
+  { label: "BIM", test: /\bbim\b|building information model/i },
+  { label: "Interior", test: /\binterior\b|تصميم داخلي/i },
+  { label: "Auto", test: /\bautomotive\b|\bauto(?:mobile)?\b|سيارات/i },
+  { label: "Mech", test: /\bmechanical\b|\bmech\b|ميكانيك/i },
+  { label: "Elec", test: /\belectrical\b|\belec\b|كهرب/i },
+  { label: "Struc", test: /\bstructur(?:al|e)\b|\bstruc\b|إنشائ/i },
+  { label: "Arch", test: /\barchitect(?:ure|ural)?\b|\barch\b|معمار/i },
+  { label: "Infra", test: /\binfrastructure\b|\binfra\b|بنية تحتية/i },
+  { label: "Tech", test: /\btechnology\b|\btech\b|تقني/i },
+];
+
+/**
+ * Shared course key across CRM, Lost, paid invoices and sales orders.
+ * Unknown courses retain their real source value; they are never hidden under
+ * a generic "Other" bucket.
+ */
+function canonicalCourse(...values: unknown[]): string {
+  const real = values.map(str).filter(Boolean);
+  const searchable = real.join(" ");
+  for (const rule of COURSE_RULES) if (rule.test.test(searchable)) return rule.label;
+  return real[0] ?? "";
+}
+
+function canonicalMainCategory(
+  raw: unknown,
+  course: string,
+  productCategory: unknown = "",
+): string {
+  const explicit = str(raw);
+  if (explicit) return explicit;
+  if (["CFM", "PMP", "CMRP"].includes(course)) return "Professional Certificate";
+  if (course === "Interior") return "Interior & Decor";
+  if (["BIM", "Auto", "Mech", "Elec", "Struc", "Arch", "Infra"].includes(course))
+    return "Engineering";
+  if (course === "Tech") return "Technology";
+  const category = normalizeName(str(productCategory));
+  if (category.includes("non-engineering")) return "Non-Engineering";
+  if (category.includes("engineering")) return "Engineering";
+  return "";
+}
+
 /**
  * `cleaned Source` holds casing duplicates (`uchat` 458 / `UChat` 1,093) and two
  * spellings of email. Both collapse here so every grouping counts them once.
@@ -233,6 +299,16 @@ export const PLATFORM_SOURCE_KEYS: Record<Platform, string[]> = {
  *   from the total on the data analyst's instruction.
  */
 const EXCLUDED_STAGES = new Set(["lost", "old auto dialer"]);
+
+function isExcludedCrmStage(stage: string): boolean {
+  const normalized = normalizeName(stage)
+    .replace(/[_–—/\\().?:]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (EXCLUDED_STAGES.has(normalized)) return true;
+  if (normalized === "closed lost" || normalized === "close lost") return true;
+  if (/(^|\s)lost($|\s)/.test(normalized)) return true;
+  return /مفقود|خاسر|ضائع|خسارة/.test(normalized);
+}
 
 /**
  * The same rule on the archived side, minus `lost` — every Lost Analysis row is
@@ -281,6 +357,135 @@ function csvUrl(sheetId: string, tab: string, bust: number): string {
 
 type Raw = Record<string, string>;
 
+const ACCOUNTING_VOLATILE_FIELDS = new Set([
+  "__odoo_write_date",
+  "__synced_at",
+  "Synced At",
+  "Last Sync",
+]);
+
+function accountingMovement(row: Raw): string {
+  return str(firstPresent(row["Move"], row["Movement"], row["حركة"]));
+}
+
+function accountingMoveType(row: Raw): string {
+  return normalizeName(
+    str(
+      firstPresent(row["Move Type"], row["move_type"], row["__odoo_move_type"], row["نوع الحركة"]),
+    ),
+  );
+}
+
+function accountingExplicitLineId(row: Raw): string {
+  return str(
+    firstPresent(
+      row["__odoo_line_id"],
+      row["Invoice Line ID"],
+      row["Move Line ID"],
+      row["Line ID"],
+    ),
+  );
+}
+
+function accountingStableLineId(row: Raw): string {
+  return accountingExplicitLineId(row) || str(row["__odoo_id"]);
+}
+
+function accountingLineIdentity(row: Raw): string {
+  return [
+    accountingMovement(row),
+    str(firstPresent(row["Product ID"], row["المنتج /ID"])),
+    str(firstPresent(row["Product Code"], row["Product Reference"], row["الرقم المرجعي"])),
+    str(firstPresent(row["Product"], row["المنتج"], row["Course Name"], row["Course"])),
+  ].join("\u001f");
+}
+
+/** Customer credit notes must not enter the paid-invoice revenue population. */
+function isAccountingRefund(row: Raw): boolean {
+  const movement = accountingMovement(row);
+  const moveType = accountingMoveType(row);
+  return (
+    /^RINV/i.test(movement) ||
+    moveType === "out_refund" ||
+    moveType === "refund" ||
+    moveType === "credit note" ||
+    moveType === "customer credit note" ||
+    moveType.includes("إشعار دائن")
+  );
+}
+
+/**
+ * Full business-row fingerprint used only when the export has no trustworthy
+ * line id. Including every non-volatile populated column preserves legitimate
+ * repeated products whenever quantity, amount, order, event, attribution or
+ * another business dimension differs; it is deliberately much stricter than
+ * the unsafe old `Move + Product` fallback.
+ */
+function accountingComposite(row: Raw): string {
+  return Object.keys(row)
+    .filter((key) => !ACCOUNTING_VOLATILE_FIELDS.has(key) && str(row[key]) !== "")
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => `${key}=${str(row[key])}`)
+    .join("\u001f");
+}
+
+interface CanonicalAccountingRows {
+  rows: Raw[];
+  refundRowsExcluded: number;
+  duplicateRowsExcluded: number;
+}
+
+/**
+ * Canonicalise before both completeness comparison and parsing. The two-pass
+ * id check protects exports where `__odoo_id` unexpectedly identifies an
+ * invoice rather than an invoice line: an id that maps to different business
+ * rows is demoted to the full composite instead of collapsing its products.
+ */
+function canonicalizeAccountingRows(input: Raw[]): CanonicalAccountingRows {
+  const nonRefund = input.filter((row) => !isAccountingRefund(row));
+  const composites = nonRefund.map(accountingComposite);
+  const identitiesByGenericId = new Map<string, Set<string>>();
+
+  nonRefund.forEach((row) => {
+    if (accountingExplicitLineId(row)) return;
+    const id = str(row["__odoo_id"]);
+    if (!id) return;
+    let identities = identitiesByGenericId.get(id);
+    if (!identities) {
+      identities = new Set<string>();
+      identitiesByGenericId.set(id, identities);
+    }
+    identities.add(accountingLineIdentity(row));
+  });
+
+  const selected = new Map<string, { row: Raw; writeDate: string }>();
+  nonRefund.forEach((row, index) => {
+    const id = accountingStableLineId(row);
+    const explicitLineId = accountingExplicitLineId(row);
+    const idIsLineLevel = !!explicitLineId || (!!id && identitiesByGenericId.get(id)?.size === 1);
+    const key = idIsLineLevel ? `id:${id}` : `row:${composites[index]}`;
+    const writeDate = str(row["__odoo_write_date"]);
+    const prior = selected.get(key);
+    if (!prior) {
+      selected.set(key, { row, writeDate });
+      return;
+    }
+    // A duplicate id can be an older snapshot of the same Odoo line. Prefer
+    // the newest write timestamp; when neither row is timestamped, retain the
+    // first deterministic occurrence.
+    if (writeDate && (!prior.writeDate || writeDate > prior.writeDate)) {
+      selected.set(key, { row, writeDate });
+    }
+  });
+  const rows = [...selected.values()].map((entry) => entry.row);
+
+  return {
+    rows,
+    refundRowsExcluded: input.length - nonRefund.length,
+    duplicateRowsExcluded: nonRefund.length - rows.length,
+  };
+}
+
 /**
  * True when `rows` genuinely look like an ads-tab export rather than another
  * tab gviz served in its place (see `safeFetch`). Content-based rather than
@@ -291,8 +496,33 @@ function looksLikeAdsExport(rows: Raw[]): boolean {
   if (!rows.length) return true;
   const header = new Set(Object.keys(rows[0]));
   const hasAdsColumn = ["Spend (Cost)", "Cost", "Spend", "Impressions"].some((c) => header.has(c));
-  const hasCrmOnlyColumn = ["Cleaned Stage", "سبب الضياع", "__odoo_write_date"].some((c) => header.has(c));
+  const hasCrmOnlyColumn = ["Cleaned Stage", "سبب الضياع", "__odoo_write_date"].some((c) =>
+    header.has(c),
+  );
   return hasAdsColumn && !hasCrmOnlyColumn;
+}
+
+/**
+ * gviz returns the workbook's first tab when a requested tab does not exist.
+ * Require both an invoice identifier and the accounting date/value dimensions
+ * before accepting a response as Accounting (or its legacy Sales fallback).
+ */
+function looksLikeAccountingExport(rows: Raw[]): boolean {
+  if (!rows.length) return true;
+  const header = new Set(Object.keys(rows[0]));
+  const hasMove = ["Move", "Movement", "حركة", "__odoo_id", "__odoo_line_id"].some((c) =>
+    header.has(c),
+  );
+  const hasPaymentDate = ["Payment Date", "Payment date", "تاريخ الدفع"].some((c) => header.has(c));
+  const hasPaidValue = [
+    "USD Paid",
+    "$ paid",
+    "$ Paid",
+    "$ Sales",
+    "Total in Currency",
+    "الإجمالي بالعملة",
+  ].some((c) => header.has(c));
+  return hasMove && hasPaymentDate && hasPaidValue;
 }
 
 /** Attempts per tab. Google drops roughly one request in a burst of seven. */
@@ -522,21 +752,270 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }
     };
 
+    // Odoo is authoritative for CRM/Lost. Start it before the sheet waves so
+    // the independent network calls overlap. The sheet copies are still read as
+    // an explicit fallback and as an enrichment source for lookup-derived labels.
+    const directCrmWithTimeout = async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          loadDirectCrm(),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("Odoo CRM direct timed out after 90 seconds")),
+              90_000,
+            );
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+    const directCrmPromise: Promise<
+      | { value: Awaited<ReturnType<typeof loadDirectCrm>>; error?: never }
+      | { value?: never; error: string }
+    > = odooConfigured()
+      ? directCrmWithTimeout()
+          .then((value) => ({ value }))
+          .catch((error: unknown) => ({
+            error: error instanceof Error ? error.message : String(error),
+          }))
+      : Promise.resolve({
+          error: "Odoo CRM is not configured; using Google Sheets fallback.",
+        });
+
+    // Accounting follows the same fail-closed contract as CRM: start the Odoo
+    // read while Google is loading, cap its wall time, and never turn an Odoo
+    // failure into an empty financial population.  A later reconciliation gate
+    // decides whether these rows are safe to prefer over the canonical sheet.
+    const directAccountingWithTimeout = async (): Promise<DirectAccountingSnapshot> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          loadDirectAccounting(),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("Odoo Accounting direct timed out after 90 seconds")),
+              90_000,
+            );
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+    const directAccountingPromise: Promise<
+      { value: DirectAccountingSnapshot; error?: never } | { value?: never; error: string }
+    > = odooConfigured()
+      ? directAccountingWithTimeout()
+          .then((value) => ({ value }))
+          .catch((error: unknown) => ({
+            error: error instanceof Error ? error.message : String(error),
+          }))
+      : Promise.resolve({
+          error: "Odoo Accounting is not configured; using Google Sheets fallback.",
+        });
+
     // Seven simultaneous requests to one document is what triggers Google's
     // rate limiting in the first place. Two smaller waves cost a few hundred
     // milliseconds and remove the burst.
-    const [metaRaw, snapRaw, crmRaw, invRaw] = await Promise.all([
+    const [metaRaw, snapRaw, crmSheetRaw, invRaw] = await Promise.all([
       safeFetch(TAB.meta),
       safeFetch(TAB.snap),
       safeFetch(TAB.crm),
       safeFetch(TAB.invoiced),
     ]);
-    const [salesRaw, websiteSalesRaw, lostRaw, tiktokRaw] = await Promise.all([
-      safeFetch(TAB.sales),
+    const [accountingPrimaryRaw, websiteSalesRaw, lostSheetRaw, tiktokRaw] = await Promise.all([
+      safeFetch(TAB.accounting, looksLikeAccountingExport),
       safeFetch(TAB.websiteSales),
       safeFetch(TAB.lost),
       safeFetch(TAB.tiktok, looksLikeAdsExport),
     ]);
+    // Existing deployments still expose the same paid invoice lines as `Sales`.
+    // Always read it as an acceptance baseline: a newly-created Accounting tab
+    // may contain a valid header and only part of the year. Switching on the
+    // first valid row would silently cut recognised revenue.
+    const legacySalesRaw = await safeFetch(TAB.legacySales, looksLikeAccountingExport);
+    // Compare like with like: refunds and duplicate sync rows are removed before
+    // deciding whether the new Accounting tab is complete enough to replace
+    // the legacy Sales baseline.
+    const primaryCanonical = canonicalizeAccountingRows(accountingPrimaryRaw);
+    const legacyCanonical = canonicalizeAccountingRows(legacySalesRaw);
+    const distinctMoves = (rows: Raw[]): number =>
+      new Set(rows.map(accountingMovement).filter(Boolean)).size;
+    const primaryMoves = distinctMoves(primaryCanonical.rows);
+    const legacyMoves = distinctMoves(legacyCanonical.rows);
+    const NEAR_COMPLETE_RATIO = 0.98;
+    const accountingPrimaryComplete =
+      primaryCanonical.rows.length > 0 &&
+      (legacyCanonical.rows.length === 0 ||
+        (primaryCanonical.rows.length >= legacyCanonical.rows.length * NEAR_COMPLETE_RATIO &&
+          primaryMoves >= legacyMoves * NEAR_COMPLETE_RATIO));
+    const sheetAccountingSelection = accountingPrimaryComplete ? primaryCanonical : legacyCanonical;
+    const sheetAccountingSourceRaw = accountingPrimaryComplete
+      ? accountingPrimaryRaw
+      : legacySalesRaw;
+    const sheetAccountingTab = accountingPrimaryComplete ? TAB.accounting : TAB.legacySales;
+    if (
+      primaryCanonical.rows.length > 0 &&
+      legacyCanonical.rows.length > 0 &&
+      !accountingPrimaryComplete
+    ) {
+      fetchErrors.push(
+        `Accounting failed 98% completeness gate (${primaryCanonical.rows.length} canonical rows / ${primaryMoves} moves versus legacy Sales ${legacyCanonical.rows.length} canonical rows / ${legacyMoves} moves); using Sales fallback.`,
+      );
+    }
+
+    const rawAccountingRevenue = (rows: Raw[]): number =>
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          usdValue(
+            firstPresent(row["USD Paid"], row["$ paid"], row["$ Paid"], row["$ Sales"]),
+            firstPresent(row["Total in Currency"], row["Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¨Ø§Ù„Ø¹Ù…Ù„Ø©"]),
+            firstPresent(row["Currency"], row["Ø§Ù„Ø¹Ù…Ù„Ø©"]),
+          ),
+        0,
+      );
+    const referenceRows = sheetAccountingSelection.rows.length;
+    const referenceMoves = distinctMoves(sheetAccountingSelection.rows);
+    const referenceRevenue = rawAccountingRevenue(sheetAccountingSelection.rows);
+    const directAccounting = await directAccountingPromise;
+    const directCanonical = canonicalizeAccountingRows(directAccounting.value?.rows ?? []);
+    const directRows = directCanonical.rows.length;
+    const directMoves = distinctMoves(directCanonical.rows);
+    const directRevenue = rawAccountingRevenue(directCanonical.rows);
+    const rowRatio = referenceRows > 0 ? directRows / referenceRows : 0;
+    const moveRatio = referenceMoves > 0 ? directMoves / referenceMoves : 0;
+    const revenueDelta = directRevenue - referenceRevenue;
+    // One dollar protects small test datasets; 0.1% is tight enough to catch a
+    // missing/duplicated invoice while allowing harmless cent-level rounding.
+    const revenueTolerance = Math.max(1, Math.abs(referenceRevenue) * 0.001);
+    const accountingDirectAccepted =
+      !!directAccounting.value &&
+      referenceRows > 0 &&
+      referenceMoves > 0 &&
+      rowRatio >= NEAR_COMPLETE_RATIO &&
+      moveRatio >= NEAR_COMPLETE_RATIO &&
+      Math.abs(revenueDelta) <= revenueTolerance &&
+      directAccounting.value.diagnostics.missingCurrencyRate === 0;
+
+    const sheetAccountingById = new Map(
+      sheetAccountingSelection.rows
+        .map((row) => [accountingStableLineId(row), row] as const)
+        .filter(([id]) => !!id),
+    );
+    const directAccountingRows = directCanonical.rows.map((row) => {
+      const prior = sheetAccountingById.get(accountingStableLineId(row));
+      // Odoo owns dates and money; the sheet can still enrich a matching line
+      // with campaign/custom dimensions not present on account.invoice.report.
+      return prior ? { ...prior, ...row } : row;
+    });
+    const accountingSelection = accountingDirectAccepted
+      ? directCanonical
+      : sheetAccountingSelection;
+    const accountingSourceRaw = accountingDirectAccepted
+      ? directAccounting.value!.rows
+      : sheetAccountingSourceRaw;
+    const accountingRaw = accountingDirectAccepted
+      ? directAccountingRows
+      : sheetAccountingSelection.rows;
+    const accountingTab = accountingDirectAccepted
+      ? "Odoo Accounting (direct)"
+      : sheetAccountingTab;
+    const accountingAuthority: DataHealth["accountingAuthority"] = accountingDirectAccepted
+      ? "odoo-direct"
+      : "google-sheet-fallback";
+    const accountingDirectError = directAccounting.error
+      ? /not configured/i.test(directAccounting.error)
+        ? "Direct Odoo Accounting is not configured."
+        : /timed out/i.test(directAccounting.error)
+          ? "Direct Odoo Accounting timed out after 90 seconds."
+          : "Direct Odoo Accounting request failed."
+      : directAccounting.value && !accountingDirectAccepted
+        ? "Strict Accounting reconciliation gate failed."
+        : "";
+    const accountingDirectHealth: DataHealth["accountingDirect"] = {
+      attempted: odooConfigured(),
+      accepted: accountingDirectAccepted,
+      reportCandidates: directAccounting.value?.diagnostics.reportCandidates ?? 0,
+      acceptedRows: directAccounting.value?.diagnostics.acceptedRows ?? 0,
+      acceptedMoves: directAccounting.value?.diagnostics.acceptedMoves ?? 0,
+      missingPaymentDate: directAccounting.value?.diagnostics.missingPaymentDate ?? 0,
+      missingCurrencyRate: directAccounting.value?.diagnostics.missingCurrencyRate ?? 0,
+      revenue: directAccounting.value?.diagnostics.revenue ?? 0,
+      referenceRows,
+      referenceMoves,
+      referenceRevenue,
+      rowRatio,
+      moveRatio,
+      revenueDelta,
+      revenueTolerance,
+      unresolvedFields: directAccounting.value?.diagnostics.unresolvedFields ?? [],
+      error: accountingDirectError,
+    };
+    if (odooConfigured() && accountingDirectError) {
+      fetchErrors.push(
+        `${accountingDirectError} Retaining ${sheetAccountingTab} as the Accounting authority.`,
+      );
+    }
+
+    const blankExclusions = (): CrmExclusionDiagnostics => ({
+      candidates: 0,
+      accepted: 0,
+      unassigned: 0,
+      technicalIdentity: 0,
+      nonInternalUser: 0,
+      noEmployee: 0,
+      excludedStage: 0,
+      wrongType: 0,
+      missingLostReason: 0,
+    });
+    const enrichDirectRows = (direct: CrmRawRow[], sheet: Raw[]): Raw[] => {
+      const sheetById = new Map(sheet.map((row) => [str(row["__odoo_id"]), row]));
+      return direct.map((row) => {
+        const prior = sheetById.get(str(row["__odoo_id"]));
+        if (!prior) return row;
+        const merged: Raw = { ...prior, ...row };
+
+        // Odoo decides population/state. The lookup tabs may still provide the
+        // friendly course taxonomy and cleaned stage label for the same record.
+        const sameStage =
+          normalizeName(str(prior["Stage"]) || str(prior["المرحلة"])) ===
+          normalizeName(str(row["Stage"]) || str(row["المرحلة"]));
+        if (sameStage && str(prior["Cleaned Stage"]))
+          merged["Cleaned Stage"] = str(prior["Cleaned Stage"]);
+        if (str(prior["Course"])) merged["Course"] = str(prior["Course"]);
+        if (str(prior["Main Category"])) merged["Main Category"] = str(prior["Main Category"]);
+        return merged;
+      });
+    };
+
+    const directCrm = await directCrmPromise;
+    let crmRaw: Raw[] = crmSheetRaw;
+    let lostRaw: Raw[] = lostSheetRaw;
+    let crmAuthority: DataHealth["crmAuthority"] = "google-sheet-fallback";
+    let crmExclusions = blankExclusions();
+    let lostExclusions = blankExclusions();
+    const directComplete =
+      !!directCrm.value &&
+      directCrm.value.crm.length > 0 &&
+      directCrm.value.lost.length > 0 &&
+      (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75) &&
+      (!lostSheetRaw.length || directCrm.value.lost.length >= lostSheetRaw.length * 0.75);
+    if (directCrm.value && directComplete) {
+      crmRaw = enrichDirectRows(directCrm.value.crm, crmSheetRaw);
+      lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
+      crmAuthority = "odoo-direct";
+      crmExclusions = directCrm.value.diagnostics.crm;
+      lostExclusions = directCrm.value.diagnostics.lost;
+    } else if (directCrm.value) {
+      fetchErrors.push(
+        `Odoo CRM direct failed completeness gate (CRM ${directCrm.value.crm.length}/${crmSheetRaw.length || "no fallback"}, Lost ${directCrm.value.lost.length}/${lostSheetRaw.length || "no fallback"}); using Google Sheets fallback.`,
+      );
+    } else {
+      fetchErrors.push(`Odoo CRM direct: ${directCrm.error}`);
+    }
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
     const keys = new CampaignKeyResolver();
@@ -564,6 +1043,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     for (const r of invRaw)
       keys.learn(str(r["الفرصة /Campaign ID"]) || str(r["Campaign ID"]), str(r["Campaign Name"]));
     for (const r of lostRaw) keys.learn(str(r["Campaign ID"]), str(r["Campaign Name"]));
+    for (const r of accountingRaw) {
+      const campaignId = str(r["Campaign ID"]) || str(r["الفرصة /Campaign ID"]);
+      const campaignName = str(r["Campaign Name"]) || str(r["الفرصة /Campaign Name"]);
+      const adId = str(r["Ad ID"]) || str(r["الفرصة /Ad ID"]);
+      const adName = str(r["Ad Name"]) || str(r["AD Name"]) || str(r["الفرصة /Ad Name"]);
+      const adset = str(r["Ad Set Name"]) || str(r["AD Set Name"]) || str(r["الفرصة /Ad Set Name"]);
+      keys.learn(campaignId, campaignName);
+      adsets.learn(adId, adName, adset);
+    }
     adsets.finalize();
 
     /* -- ads --------------------------------------------------------------- */
@@ -640,7 +1128,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       return "";
     };
     const tiktok: AdRow[] = tiktokRaw.map((r) => {
-      const account = pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
+      const account =
+        pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
       const objective = classifyAccount(account);
       const leads = pick(r, "Leads (Native)", "Leads", "On-Facebook leads", "Leads (Total)");
       objectiveByAccount.set(account, objective);
@@ -693,6 +1182,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         const campaignId = str(r["Campaign ID"]);
         const cleanedStage = str(r["Cleaned Stage"]) || str(r["Stage"]);
         const source = str(r["cleaned Source"]) || str(r["Source"]);
+        const course = canonicalCourse(str(r["Course"]) || str(r["Course Categories"]));
         return {
           id: str(r["__odoo_id"]),
           createdAt,
@@ -717,8 +1207,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           isLost: cleanedStage.toLowerCase() === "lost",
           source,
           sourceKey: normalizeSource(source),
-          course: str(r["Course"]) || str(r["Course Categories"]),
-          mainCategory: str(r["Main Category"]),
+          course,
+          mainCategory: canonicalMainCategory(str(r["Main Category"]), course),
           priority: str(r["Priority"]),
           fromCampaign: !!campaignName || !!campaignId,
         };
@@ -729,7 +1219,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       // them — which it has done twice.
       .filter((row) => {
         const stage = row.cleanedStage.trim().toLowerCase();
-        if (!EXCLUDED_STAGES.has(stage)) return true;
+        if (!isExcludedCrmStage(stage)) return true;
         noteExcluded(row.cleanedStage.trim() || stage);
         return false;
       });
@@ -753,6 +1243,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         const adset = directAdset || resolvedAdset.adset;
         const origin: AdSetOrigin = directAdset ? "exact" : resolvedAdset.origin;
         const source = str(r["Cleaned Source"]) || str(r["Source"]) || str(r["الفرصة /المصدر"]);
+        const product = str(r["بنود الطلب /المنتج"]);
+        const productCategory = str(r["بنود الطلب /المنتج/فئة المنتج"]);
+        const course = canonicalCourse(
+          str(r["Course"]) || str(r["الفرصة /Course Categories"]),
+          product,
+          productCategory,
+        );
         return {
           orderRef: str(r["بنود الطلب /مرجع الطلب"]),
           campaignName,
@@ -762,10 +1259,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           adId,
           adset,
           adsetOrigin: origin,
-          product: str(r["بنود الطلب /المنتج"]),
+          product,
           customer: str(r["بنود الطلب /العميل"]),
-          course: str(r["Course"]) || str(r["الفرصة /Course Categories"]),
-          mainCategory: str(r["Main Category"]),
+          course,
+          mainCategory: canonicalMainCategory(str(r["Main Category"]), course, productCategory),
           // Only ~16% of rows carry a team, so this must never be used as a
           // revenue filter on its own — see health.revenueTeamCoverage.
           salesTeam: str(r["Sales Team"]) || str(r["Team"]),
@@ -783,15 +1280,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     /* -- order → campaign bridge ------------------------------------------- */
     /**
-     * Accounting revenue lives on the Sales tab, which Odoo writes with no
-     * campaign, ad or source column — the marketing context sits on the sales
-     * order's opportunity, which only Full Invoiced Orders exports. Both tabs
-     * name the same order, so the reference is the join key.
-     *
-     * This is what allows every campaign, ad-set, ad and source figure to be
-     * computed from *approved paid invoices* rather than from sales orders. The
-     * amounts still come from Sales; Full Invoiced Orders only supplies the
-     * labels, so nothing here can change a revenue total.
+     * Compatibility-only order attribution. The canonical Accounting schema
+     * carries campaign/ad/source columns directly. Older Sales exports did not,
+     * so their labels can temporarily be filled from the order's opportunity.
+     * Money always remains on the Accounting row; this bridge cannot change it.
      */
     interface OrderAttribution {
       campaignName: string;
@@ -851,77 +1343,167 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       return fallback ? { hit: fallback, matched: true } : { hit: NO_ATTRIBUTION, matched: false };
     };
 
-    /* -- sales ------------------------------------------------------------- */
-    const sales: SalesRow[] = salesRaw
-      .filter((r) => str(r["__odoo_id"]))
+    /* -- accounting -------------------------------------------------------- */
+    const accountingCandidates = accountingRaw.filter((r) => {
+      const movement = accountingMovement(r);
+      const id = accountingStableLineId(r);
+      return !!(movement || id);
+    });
+    const accountingMissingPaymentDate = accountingCandidates.filter((r) => {
+      const paymentDate =
+        parseDate(r["Payment Date"]) || parseDate(r["Payment date"]) || parseDate(r["تاريخ الدفع"]);
+      return !paymentDate;
+    }).length;
+    const accounting: AccountingRow[] = accountingCandidates
+      .filter((r) => {
+        // The accounting fact table is paid-invoice product lines. Rows without
+        // Payment Date are unpaid and must not leak into an all-time report.
+        const paymentDate =
+          parseDate(r["Payment Date"]) ||
+          parseDate(r["Payment date"]) ||
+          parseDate(r["تاريخ الدفع"]);
+        return !!paymentDate;
+      })
       .map((r) => {
-        const paymentDate = parseDate(r["Payment Date"]);
-        const orderRef = str(r["Sales Order #"]);
-        const { hit, matched } = attributionFor(orderRef);
+        const paymentDate =
+          parseDate(r["Payment Date"]) ||
+          parseDate(r["Payment date"]) ||
+          parseDate(r["تاريخ الدفع"]);
+        const movement = accountingMovement(r);
+        const orderRef =
+          str(r["Sales Order #"]) || str(r["Sales Order"]) || str(r["Order #"]) || str(r["SO #"]);
+        const fallback = attributionFor(orderRef);
+
+        const directCampaignName = str(r["Campaign Name"]) || str(r["الفرصة /Campaign Name"]);
+        const directCampaignId = str(r["Campaign ID"]) || str(r["الفرصة /Campaign ID"]);
+        const directAdName = str(r["Ad Name"]) || str(r["AD Name"]) || str(r["الفرصة /Ad Name"]);
+        const directAdId = str(r["Ad ID"]) || str(r["الفرصة /Ad ID"]);
+        const directAdset =
+          str(r["Ad Set Name"]) || str(r["AD Set Name"]) || str(r["الفرصة /Ad Set Name"]);
+        const directSource = str(r["Cleaned Source"]) || str(r["Source"]) || str(r["المصدر"]);
+        const hasDirectAttribution = !!(
+          directCampaignName ||
+          directCampaignId ||
+          directAdName ||
+          directAdId ||
+          directAdset ||
+          directSource
+        );
+        const hasDirectAdContext = !!(directAdset || directAdId || directAdName);
+        const resolvedAdset = adsets.resolve(directAdId, directAdName);
+        const campaignName = directCampaignName || fallback.hit.campaignName;
+        const campaignId = directCampaignId || fallback.hit.campaignId;
+        const adName = directAdName || fallback.hit.adName;
+        const adId = directAdId || fallback.hit.adId;
+        const adset = directAdset || resolvedAdset.adset || fallback.hit.adset;
+        const source = directSource || fallback.hit.source;
+        const product =
+          str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]);
+        const productCategory =
+          str(r["Product Category"]) || str(r["فئة المنتج"]) || str(r["Category"]);
+        const totalInCurrency = num(firstPresent(r["Total in Currency"], r["الإجمالي بالعملة"]));
+        const currency = str(firstPresent(r["Currency"], r["العملة"]));
+        const usdPaid = usdValue(
+          firstPresent(r["USD Paid"], r["$ paid"], r["$ Paid"], r["$ Sales"]),
+          totalInCurrency,
+          currency,
+        );
+        const untaxedTotal = num(firstPresent(r["Untaxed Total"], r["الإجمالي دون الضريبة"]));
+        const course = canonicalCourse(
+          str(r["Course Name"]) || str(r["Course"]),
+          product,
+          productCategory,
+        );
+
         return {
-          movement: str(r["حركة"]),
+          id: accountingStableLineId(r) || `${movement}:${accountingComposite(r)}`,
+          movement,
           paymentDate,
-          invoiceDate: parseDate(r["تاريخ الفاتورة"]),
+          invoiceDate: parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]),
           orderRef,
-          course: str(r["Course Name"]) || str(r["فئة المنتج"]),
-          category: str(r["فئة المنتج"]),
-          partner: str(r["الشريك"]),
-          salesperson: str(r["Salesperson"]),
-          teamLeader: str(r["Team Leader"]),
-          salesTeam: str(r["فريق المبيعات"]),
-          usdSales: usdValue(r["$ Sales"], r["الإجمالي بالعملة"], r["العملة"]),
-          currency: str(r["العملة"]),
+          product,
+          productCategory,
+          mainCategory: canonicalMainCategory(str(r["Main Category"]), course, productCategory),
+          productCode:
+            str(r["Product Code"]) || str(r["Product Reference"]) || str(r["الرقم المرجعي"]),
+          company: str(r["Company"]) || str(r["الشركة"]),
+          companyCurrency: str(r["Company Currency"]) || str(r["عملة الشركة"]),
+          country: str(r["Country"]) || str(r["الدولة"]),
+          code: str(r["Code"]) || str(r["Employee Reg. No"]) || str(r["Employee Code"]),
+          website: str(r["Website"]) || str(r["الموقع"]),
+          untaxedTotal,
+          totalInCurrency,
+          usdPaid,
+          // Existing marketing/course analysis reads these compatibility names.
+          course,
+          category: productCategory,
+          partner: str(r["Partner"]) || str(r["الشريك"]),
+          salesperson: str(r["Salesperson"]) || str(r["مندوب المبيعات"]),
+          teamLeader: str(r["Team Leader"]) || str(r["قائد الفريق"]),
+          salesTeam: str(r["Sales Team"]) || str(r["فريق المبيعات"]),
+          usdSales: usdPaid,
+          currency,
+          event: str(r["Event"]),
           eventStage: str(r["Event Stage"]),
-          month: paymentDate ? paymentDate.slice(0, 7) : "",
-          campaignName: hit.campaignName,
-          campaignId: hit.campaignId,
-          campaignKey: hit.campaignKey,
-          adName: hit.adName,
-          adId: hit.adId,
-          adset: hit.adset,
-          adsetOrigin: hit.adsetOrigin,
-          source: hit.source,
-          sourceKey: hit.sourceKey,
-          orderMatched: matched,
+          month: paymentDate.slice(0, 7),
+          campaignName,
+          campaignId,
+          campaignKey: keys.key(campaignId, campaignName),
+          adName,
+          adId,
+          adset,
+          adsetOrigin: directAdset
+            ? "exact"
+            : hasDirectAdContext
+              ? resolvedAdset.origin
+              : fallback.hit.adsetOrigin,
+          source,
+          sourceKey: normalizeSource(source),
+          orderMatched: hasDirectAttribution || fallback.matched,
         };
       });
 
     /* -- website sales (Odoo sale.order, never Meta attribution) ----------- */
     const websiteSales: WebsiteSaleRow[] = websiteSalesRaw
       .filter((r) => str(r["__odoo_id"]))
-      .map((r) => ({
-        id: str(r["__odoo_id"]),
-        writeDate: str(r["__odoo_write_date"]),
-        orderRef: str(r["Order #"]),
-        orderDate: parseDate(r["Order Date"]),
-        website: str(r["Website"]),
-        status: str(r["Status"]),
-        customer: str(r["Customer"]),
-        salesperson: str(r["Salesperson"]),
-        salesTeam: str(r["Sales Team"]),
-        currency: str(r["Currency"]),
-        product: str(r["Product"]),
-        productCategory: str(r["Product Category"]),
-        course: str(r["Course"]) || str(r["Product"]),
-        mainCategory: str(r["Main Category"]),
-        quantity: num(r["Quantity"]),
-        untaxedTotal: num(r["Untaxed Total"]),
-        localTotal: num(r["Total in Currency"]),
-        usdSales: usdValue(r["$ Sales"], r["Total in Currency"], r["Currency"]),
-        opportunityId: str(r["Opportunity ID"]),
-        opportunitySource: str(r["Opportunity Source"]),
-        invoiceStatus: str(r["Invoice Status"]),
-        paymentDate: parseDate(r["Payment Date"]),
-        recordSource: str(r["Record Source"]) || "Odoo",
-        revenueBasis: str(r["Revenue Basis"]) || "Odoo line total",
-        externalSheetPrice: num(r["External Sheet Price"]),
-        externalCurrency: str(r["External Currency"]),
-        externalSalesSource: str(r["External Sales Source"]),
-        externalPhone: str(r["External Phone"]),
-        externalSourceDate: parseDate(r["External Source Date"]),
-        reconciliationStatus: str(r["Reconciliation Status"]) || "Odoo only",
-        priceDifference: str(r["Price Difference"]) === "" ? null : num(r["Price Difference"]),
-      }));
+      .map((r) => {
+        const product = str(r["Product"]);
+        const productCategory = str(r["Product Category"]);
+        const course = canonicalCourse(str(r["Course"]), product, productCategory);
+        return {
+          id: str(r["__odoo_id"]),
+          writeDate: str(r["__odoo_write_date"]),
+          orderRef: str(r["Order #"]),
+          orderDate: parseDate(r["Order Date"]),
+          website: str(r["Website"]),
+          status: str(r["Status"]),
+          customer: str(r["Customer"]),
+          salesperson: str(r["Salesperson"]),
+          salesTeam: str(r["Sales Team"]),
+          currency: str(r["Currency"]),
+          product,
+          productCategory,
+          course,
+          mainCategory: canonicalMainCategory(str(r["Main Category"]), course, productCategory),
+          quantity: num(r["Quantity"]),
+          untaxedTotal: num(r["Untaxed Total"]),
+          localTotal: num(r["Total in Currency"]),
+          usdSales: usdValue(r["$ Sales"], r["Total in Currency"], r["Currency"]),
+          opportunityId: str(r["Opportunity ID"]),
+          opportunitySource: str(r["Opportunity Source"]),
+          invoiceStatus: str(r["Invoice Status"]),
+          paymentDate: parseDate(r["Payment Date"]),
+          recordSource: str(r["Record Source"]) || "Odoo",
+          revenueBasis: str(r["Revenue Basis"]) || "Odoo line total",
+          externalSheetPrice: num(r["External Sheet Price"]),
+          externalCurrency: str(r["External Currency"]),
+          externalSalesSource: str(r["External Sales Source"]),
+          externalPhone: str(r["External Phone"]),
+          externalSourceDate: parseDate(r["External Source Date"]),
+          reconciliationStatus: str(r["Reconciliation Status"]) || "Odoo only",
+          priceDifference: str(r["Price Difference"]) === "" ? null : num(r["Price Difference"]),
+        };
+      });
 
     /* -- lost -------------------------------------------------------------- */
     const lost: LostRow[] = lostRaw
@@ -933,6 +1515,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         const adId = str(r["Ad ID"]);
         const resolvedAdset = adsets.resolve(adId, adName);
         const source = str(r["cleaned Source"]) || str(r["المصدر"]);
+        const course = canonicalCourse(str(r["Course"]) || str(r["Course Categories"]));
         return {
           id: str(r["__odoo_id"]),
           contact: str(r["اسم جهة الاتصال"]),
@@ -943,8 +1526,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           adId,
           adset: str(r["Ad Set Name"]) || resolvedAdset.adset,
           lossReason: str(r["سبب الضياع"]),
-          course: str(r["Course"]) || str(r["Course Categories"]),
-          mainCategory: str(r["Main Category"]),
+          course,
+          mainCategory: canonicalMainCategory(str(r["Main Category"]), course),
           salesTeam: str(r["فريق المبيعات"]),
           salesperson: str(r["مندوب المبيعات"]),
           source,
@@ -1077,15 +1660,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
     const adsRange = range(ads.map((a) => a.date));
     const crmRange = range(crm.map((c) => c.createdAt));
-    // Headline revenue is accounting revenue and follows Payment Date.
-    const revRange = range(sales.map((s) => s.paymentDate));
+    // Headline revenue is Accounting.USD Paid and follows Payment Date.
+    const revRange = range(accounting.map((row) => row.paymentDate));
 
     const yearSet = new Set<number>();
     for (const d of [
       ...ads.map((a) => a.date),
       ...crm.map((c) => c.createdAt),
       ...invoiced.map((i) => i.revenueDate),
-      ...sales.map((s) => s.paymentDate),
+      ...accounting.map((row) => row.paymentDate),
       ...websiteSales.map((s) => s.orderDate),
     ]) {
       if (d) yearSet.add(+d.slice(0, 4));
@@ -1121,15 +1704,27 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const tabSyncs: SourceFreshness[] = [
       { key: "meta", label: TAB.meta, syncedAt: maxOf(metaRaw, "__synced_at") },
       { key: "snap", label: TAB.snap, syncedAt: maxOf(snapRaw, "__synced_at") },
-      { key: "crm", label: TAB.crm, syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")) },
+      {
+        key: "crm",
+        label: crmAuthority === "odoo-direct" ? "Odoo CRM (direct)" : TAB.crm,
+        syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")),
+      },
       { key: "invoiced", label: TAB.invoiced, syncedAt: asIso(maxOf(invRaw, "__odoo_write_date")) },
-      { key: "sales", label: TAB.sales, syncedAt: asIso(maxOf(salesRaw, "__odoo_write_date")) },
+      {
+        key: "accounting",
+        label: accountingTab,
+        syncedAt: asIso(maxOf(accountingRaw, "__odoo_write_date")),
+      },
       {
         key: "websiteSales",
         label: TAB.websiteSales,
         syncedAt: asIso(maxOf(websiteSalesRaw, "__odoo_write_date")),
       },
-      { key: "lost", label: TAB.lost, syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")) },
+      {
+        key: "lost",
+        label: crmAuthority === "odoo-direct" ? "Odoo Archived CRM (direct)" : TAB.lost,
+        syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")),
+      },
     ].filter((s) => !!s.syncedAt);
 
     // The headline stays the freshest source, but `sources` carries the detail so
@@ -1145,7 +1740,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     const countOrigin = (o: AdSetOrigin) =>
       crm.filter((c) => c.adsetOrigin === o).length +
-      invoiced.filter((i) => i.adsetOrigin === o).length;
+      accounting.filter((row) => row.adsetOrigin === o).length;
     const adsetExact = countOrigin("exact");
     const adsetDerived = countOrigin("derived");
     const adsetAmbiguous = countOrigin("ambiguous");
@@ -1153,23 +1748,27 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const adsetNoAd = countOrigin("none");
     const adBearing = adsetExact + adsetDerived + adsetAmbiguous + adsetUnknown;
 
-    const totalRevenue = sales.reduce((s, r) => s + r.usdSales, 0);
-    const campaignRevenueRows = invoiced.filter((r) => !!r.campaignKey);
-    const campaignRevenue = campaignRevenueRows.reduce((s, r) => s + r.usdSales, 0);
-    // Attribution is measured on the approved revenue (Sales), not on sales
-    // orders, because that is the number every ratio on the dashboard divides.
-    const attributedRevenue = sales
+    const totalRevenue = accounting.reduce((s, r) => s + r.usdPaid, 0);
+    const campaignRevenueRows = accounting.filter((row) => !!row.campaignKey);
+    const campaignRevenue = campaignRevenueRows.reduce((sum, row) => sum + row.usdPaid, 0);
+    // Attribution is measured on paid Accounting lines, not on sales orders,
+    // because that is the number every ratio on the dashboard divides.
+    const attributedRevenue = accounting
       .filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey))
-      .reduce((s, r) => s + r.usdSales, 0);
-    const matchedRevenue = sales.filter((r) => r.orderMatched).reduce((s, r) => s + r.usdSales, 0);
-    const salesCampaignRevenue = sales
+      .reduce((s, r) => s + r.usdPaid, 0);
+    const matchedRevenue = accounting
+      .filter((r) => r.orderMatched)
+      .reduce((s, r) => s + r.usdPaid, 0);
+    const accountingCampaignRevenue = accounting
       .filter((r) => !!r.campaignKey)
-      .reduce((s, r) => s + r.usdSales, 0);
+      .reduce((s, r) => s + r.usdPaid, 0);
 
     // A platform that generates CRM leads but has no spend tab is invisible cost.
     // Naming it is the difference between a wrong ROAS and a known-incomplete one.
     const platformsWithSpendTab = new Set<string>();
-    for (const a of ads) if (a.spend > 0) for (const key of PLATFORM_SOURCE_KEYS[a.platform] ?? []) platformsWithSpendTab.add(key);
+    for (const a of ads)
+      if (a.spend > 0)
+        for (const key of PLATFORM_SOURCE_KEYS[a.platform] ?? []) platformsWithSpendTab.add(key);
     const platformLeadCounts = new Map<string, number>();
     for (const key of Object.keys(PLATFORM_SOURCE_KEYS) as Platform[]) {
       if (platformsWithSpendTab.has(PLATFORM_SOURCE_KEYS[key][0])) continue;
@@ -1201,12 +1800,21 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       .sort((a, b) => b.count - a.count);
 
     const closable = crm.filter((c) => c.daysToClose !== null && c.daysToClose >= 0);
-    const negativeRows = sales.filter((r) => r.usdSales < 0);
+    const negativeRows = accounting.filter((r) => r.usdPaid < 0);
 
     const health: DataHealth = {
+      crmAuthority,
+      accountingAuthority,
+      accountingDirect: accountingDirectHealth,
+      crmExclusions,
+      lostExclusions,
       crmRows: crm.length,
       invoicedRows: invoiced.length,
-      salesRows: sales.length,
+      accountingSourceRows: accountingSourceRaw.length,
+      accountingRefundRowsExcluded: accountingSelection.refundRowsExcluded,
+      accountingDuplicateRowsExcluded: accountingSelection.duplicateRowsExcluded,
+      accountingRows: accounting.length,
+      salesRows: accounting.length,
       lostRows: lost.length,
       adRows: ads.length,
       adsetExact,
@@ -1217,12 +1825,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       adsetResolutionRate:
         adBearing > 0 ? (adsetExact + adsetDerived + adsetAmbiguous) / adBearing : 0,
       crmAdCoverage: crm.length > 0 ? crm.filter((c) => c.adName || c.adId).length / crm.length : 0,
+      accountingAdCoverage:
+        accounting.length > 0
+          ? accounting.filter((row) => row.adName || row.adId).length / accounting.length
+          : 0,
       invoicedAdCoverage:
-        invoiced.length > 0
-          ? invoiced.filter((i) => i.adName || i.adId).length / invoiced.length
+        accounting.length > 0
+          ? accounting.filter((row) => row.adName || row.adId).length / accounting.length
           : 0,
       revenueCampaignCoverage:
-        invoiced.length > 0 ? campaignRevenueRows.length / invoiced.length : 0,
+        accounting.length > 0 ? campaignRevenueRows.length / accounting.length : 0,
       revenueCampaignShare: totalRevenue > 0 ? campaignRevenue / totalRevenue : 0,
       attributedRevenueShare: totalRevenue > 0 ? attributedRevenue / totalRevenue : 0,
       campaignMatchRate:
@@ -1234,14 +1846,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         .map(([stage, rows]) => ({ stage, rows }))
         .sort((a, b) => b.rows - a.rows),
       salesOrderMatchRate: totalRevenue > 0 ? matchedRevenue / totalRevenue : 0,
-      salesCampaignShare: totalRevenue > 0 ? salesCampaignRevenue / totalRevenue : 0,
+      salesCampaignShare: totalRevenue > 0 ? accountingCampaignRevenue / totalRevenue : 0,
       closeSample: closable.length,
       closeCoverage: crm.length > 0 ? closable.length / crm.length : 0,
       invoicedMissingDate: invoiced.filter((i) => !i.revenueDate).length,
       crmMissingDate: crm.filter((c) => !c.createdAt).length,
-      salesMissingDate: sales.filter((s) => !s.paymentDate).length,
+      accountingMissingDate: accountingMissingPaymentDate,
+      salesMissingDate: accountingMissingPaymentDate,
       negativeRevenueRows: negativeRows.length,
-      negativeRevenue: negativeRows.reduce((s, r) => s + r.usdSales, 0),
+      negativeRevenue: negativeRows.reduce((s, r) => s + r.usdPaid, 0),
     };
 
     return {
@@ -1250,7 +1863,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       ads,
       crm,
       invoiced,
-      sales,
+      accounting,
+      // Temporary API compatibility. All first-party computation uses
+      // `accounting`; this alias can be removed after downstream migration.
+      sales: accounting,
       websiteSales,
       lost,
       accounts,
@@ -1278,19 +1894,19 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // If a tab came back empty but a good snapshot is still held, keep serving
     // the stale one rather than blanking the dashboard.
     //
-    // This used to test only ads/crm/invoiced/sales, so a wiped Website Sales or
+    // This used to test only ads/crm/invoiced/accounting, so a wiped Website Sales or
     // Lost Analysis tab passed as a healthy load and cached zeros for the full
     // TTL — the Website Analysis page reading empty was exactly this. Any tab
     // that previously carried rows and now carries none fails the check.
     const emptied = (rows: unknown[], key: string) =>
       !rows.length && !!previous && (previous[key as keyof Snapshot] as unknown[]).length > 0;
     const empty =
-      (!next.ads.length && !next.crm.length && !next.invoiced.length && !next.sales.length) ||
+      (!next.ads.length && !next.crm.length && !next.invoiced.length && !next.accounting.length) ||
       emptied(next.websiteSales, "websiteSales") ||
       emptied(next.lost, "lost") ||
       emptied(next.crm, "crm") ||
       emptied(next.invoiced, "invoiced") ||
-      emptied(next.sales, "sales") ||
+      emptied(next.accounting, "accounting") ||
       emptied(next.ads, "ads");
     if (empty && previous) {
       // Back off before retrying, but leave `fetchedAt` alone — bumping it here

@@ -35,10 +35,11 @@ export const Route = createFileRoute("/api/filters")({
           if (c.salesperson) salespeople.add(c.salesperson);
           if (c.course) courses.add(c.course);
         }
-        for (const i of data.invoiced) {
-          if (i.mainCategory) mainCategories.add(i.mainCategory);
-          if (i.course) courses.add(i.course);
-          if (i.salesperson) salespeople.add(i.salesperson);
+        for (const row of data.accounting) {
+          if (row.mainCategory) mainCategories.add(row.mainCategory);
+          if (row.course) courses.add(row.course);
+          if (row.salesTeam) salesTeams.add(row.salesTeam);
+          if (row.salesperson) salespeople.add(row.salesperson);
         }
         // One entry per normalized source key, labelled with its dominant
         // casing, so "uchat" and "UChat" appear once rather than twice.
@@ -84,8 +85,10 @@ export const Route = createFileRoute("/api/filters")({
           counts: {
             ads: data.ads.length,
             crm: data.crm.length,
+            accounting: data.accounting.length,
+            // Compatibility counters for older clients.
             invoiced: data.invoiced.length,
-            sales: data.sales.length,
+            sales: data.accounting.length,
             lost: data.lost.length,
           },
         });

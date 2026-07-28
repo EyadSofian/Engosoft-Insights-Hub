@@ -1,86 +1,36 @@
-import { useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
+import { useI18n } from "@/lib/i18n";
 import {
-  LayoutDashboard,
-  Megaphone,
-  BarChart3,
-  Receipt,
-  Users,
-  UsersRound,
-  FileText,
-  TrendingDown,
-  GraduationCap,
-  Package,
-  CalendarRange,
-  Globe2,
-  MoreHorizontal,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import { useI18n, type DictKey } from "@/lib/i18n";
-import { useModalGuard } from "@/lib/ui-store";
+  NAVIGATION_SECTIONS,
+  pathMatchesRoute,
+  sectionIsActive,
+  type NavigationItem,
+} from "@/lib/navigation";
 import logoImg from "@/assets/engosoft-logo.png";
 
-interface NavItem {
-  to: string;
-  key: DictKey;
-  icon: LucideIcon;
-  exact?: boolean;
-  /** Shorter label used in the mobile bar, where space is tight. */
-  shortKey?: DictKey;
-}
+function ChildLink({ item, pathname }: { item: NavigationItem; pathname: string }) {
+  const { t } = useI18n();
+  const active = pathMatchesRoute(pathname, item.to);
+  const Icon = item.icon;
 
-/** Grouped so ten destinations still scan as three ideas. */
-const GROUPS: { label: { ar: string; en: string }; items: NavItem[] }[] = [
-  {
-    label: { ar: "الأداء", en: "Performance" },
-    items: [
-      { to: "/", key: "overview", icon: LayoutDashboard, exact: true },
-      { to: "/campaigns", key: "campaigns", icon: Megaphone },
-      { to: "/ads", key: "ads_tech", icon: BarChart3 },
-      { to: "/yoy", key: "yoy", icon: CalendarRange },
-    ],
-  },
-  {
-    label: { ar: "الإيرادات", en: "Revenue" },
-    items: [
-      { to: "/sales", key: "sales", icon: Receipt },
-      { to: "/full-invoiced", key: "full_invoiced", icon: FileText },
-      { to: "/courses", key: "courses", icon: GraduationCap },
-      { to: "/products", key: "products", icon: Package },
-    ],
-  },
-  {
-    // "Pipeline" has no natural Arabic equivalent — "العملاء" reads correctly
-    // for the leads-and-losses pair without sounding translated.
-    label: { ar: "العملاء", en: "Pipeline" },
-    items: [
-      { to: "/website", key: "website", icon: Globe2 },
-      { to: "/leads", key: "leads", icon: Users },
-      { to: "/teams", key: "teams", icon: UsersRound },
-      { to: "/lost", key: "lost", icon: TrendingDown },
-    ],
-  },
-];
-
-const ALL_ITEMS = GROUPS.flatMap((g) => g.items);
-
-/** Five primary destinations for the mobile bar; the rest live behind "More". */
-const MOBILE_PRIMARY: NavItem[] = [
-  { to: "/", key: "overview", icon: LayoutDashboard, exact: true, shortKey: "overview_short" },
-  { to: "/campaigns", key: "campaigns", icon: Megaphone, shortKey: "campaigns_short" },
-  { to: "/courses", key: "courses", icon: GraduationCap },
-  { to: "/leads", key: "leads", icon: Users, shortKey: "leads_short" },
-];
-
-function useIsActive() {
-  const loc = useLocation();
-  return (it: NavItem) => (it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to));
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? "page" : undefined}
+      className={`relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium transition-colors duration-150 ${
+        active ? "text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+      }`}
+      style={active ? { background: "var(--brand)" } : undefined}
+    >
+      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{t(item.key)}</span>
+    </Link>
+  );
 }
 
 export function Sidebar() {
   const { t, lang } = useI18n();
-  const isActive = useIsActive();
+  const { pathname } = useLocation();
 
   return (
     <aside
@@ -99,33 +49,58 @@ export function Sidebar() {
         </div>
       </Link>
 
-      <nav className="flex flex-col gap-5">
-        {GROUPS.map((group) => (
-          <div key={group.label.en}>
-            <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">
-              {group.label[lang]}
+      <nav
+        className="flex flex-col gap-2"
+        aria-label={lang === "ar" ? "أقسام لوحة المعلومات" : "Dashboard sections"}
+      >
+        {NAVIGATION_SECTIONS.map((section) => {
+          const active = sectionIsActive(section, pathname);
+          const Icon = section.icon;
+          const hasChildren = section.id !== "overview";
+
+          return (
+            <div key={section.id}>
+              <Link
+                to={section.defaultTo}
+                aria-current={active && !hasChildren ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 ${
+                  active
+                    ? "bg-white/[0.09] text-white"
+                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
+                }`}
+              >
+                <Icon
+                  size={19}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  className="shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="truncate">{section.label[lang]}</span>
+                {active && (
+                  <span
+                    className="ms-auto h-1.5 w-1.5 shrink-0 rounded-full bg-electric"
+                    aria-hidden="true"
+                  />
+                )}
+              </Link>
+
+              {hasChildren && (
+                <div
+                  className="ms-[21px] mt-1 flex flex-col gap-0.5 border-s border-white/10 ps-2"
+                  aria-label={
+                    lang === "ar"
+                      ? `تقارير ${section.label[lang]}`
+                      : `${section.label[lang]} reports`
+                  }
+                >
+                  {section.items.map((item) => (
+                    <ChildLink key={item.to} item={item} pathname={pathname} />
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-0.5">
-              {group.items.map((it) => {
-                const active = isActive(it);
-                const Icon = it.icon;
-                return (
-                  <Link
-                    key={it.to}
-                    to={it.to}
-                    className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                      active ? "text-white" : "text-white/65 hover:text-white hover:bg-white/[0.06]"
-                    }`}
-                    style={active ? { background: "var(--brand)" } : undefined}
-                  >
-                    <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
-                    <span className="truncate">{t(it.key)}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="mt-auto pt-6 px-3 text-white/35 text-[11px]">
@@ -136,103 +111,37 @@ export function Sidebar() {
 }
 
 export function MobileNav() {
-  const { t, lang } = useI18n();
-  const isActive = useIsActive();
-  const [moreOpen, setMoreOpen] = useState(false);
-  useModalGuard(moreOpen);
-
-  const secondary = ALL_ITEMS.filter((i) => !MOBILE_PRIMARY.some((p) => p.to === i.to));
-  const secondaryActive = secondary.some(isActive);
+  const { lang } = useI18n();
+  const { pathname } = useLocation();
 
   return (
-    <>
-      <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch justify-around gap-1 px-2 pt-1.5 glass-navy"
-        style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
-        aria-label={lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}
-      >
-        {MOBILE_PRIMARY.map((it) => {
-          const active = isActive(it);
-          const Icon = it.icon;
-          return (
-            <Link
-              key={it.to}
-              to={it.to}
-              aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center justify-center gap-1 flex-1 min-h-[48px] rounded-xl transition-colors duration-150 ${
-                active ? "text-white" : "text-white/60"
-              }`}
-              style={active ? { background: "var(--brand)" } : undefined}
-            >
-              <Icon size={19} strokeWidth={active ? 2.2 : 1.8} />
-              <span className="text-[10px] font-medium leading-none truncate max-w-full px-1">
-                {t(it.shortKey ?? it.key)}
-              </span>
-            </Link>
-          );
-        })}
+    <nav
+      className="glass-navy fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 px-2 pt-1.5 lg:hidden"
+      style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
+      aria-label={lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}
+    >
+      {NAVIGATION_SECTIONS.map((section) => {
+        const active = sectionIsActive(section, pathname);
+        const Icon = section.icon;
 
-        <button
-          onClick={() => setMoreOpen(true)}
-          aria-haspopup="dialog"
-          className={`flex flex-col items-center justify-center gap-1 flex-1 min-h-[48px] rounded-xl transition-colors duration-150 ${
-            secondaryActive ? "text-white" : "text-white/60"
-          }`}
-          style={secondaryActive ? { background: "var(--brand)" } : undefined}
-        >
-          <MoreHorizontal size={19} />
-          <span className="text-[10px] font-medium leading-none">{t("more")}</span>
-        </button>
-      </nav>
-
-      {moreOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-50 flex items-end animate-fade-in"
-          style={{ background: "rgba(4, 12, 24, 0.5)" }}
-          onClick={() => setMoreOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="w-full glass rounded-t-3xl p-5 animate-slide-up"
-            style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
-            onClick={(e) => e.stopPropagation()}
+        return (
+          <Link
+            key={section.id}
+            to={section.defaultTo}
+            aria-current={active ? "true" : undefined}
+            aria-label={section.label[lang]}
+            className={`flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0.5 transition-colors duration-150 ${
+              active ? "text-white" : "text-white/60"
+            }`}
+            style={active ? { background: "var(--brand)" } : undefined}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-text">{t("more")}</h2>
-              <button
-                onClick={() => setMoreOpen(false)}
-                aria-label={t("close")}
-                className="w-10 h-10 grid place-items-center rounded-full hover:bg-surface-2 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {secondary.map((it) => {
-                const active = isActive(it);
-                const Icon = it.icon;
-                return (
-                  <Link
-                    key={it.to}
-                    to={it.to}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-medium transition-colors min-h-[52px] ${
-                      active
-                        ? "text-white border-transparent"
-                        : "border-border text-text hover:bg-surface-2"
-                    }`}
-                    style={active ? { background: "var(--brand)" } : undefined}
-                  >
-                    <Icon size={18} className="shrink-0" />
-                    <span className="truncate">{t(it.key)}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+            <Icon size={19} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+            <span className="max-w-full truncate text-[10px] font-medium leading-none">
+              {section.shortLabel[lang]}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

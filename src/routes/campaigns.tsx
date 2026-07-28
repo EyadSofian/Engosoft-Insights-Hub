@@ -53,9 +53,18 @@ function Campaigns() {
             { value: "ad", label: t("ad_name") },
           ]}
         />
-        {(filters.campaign || filters.adset || filters.ad) && (
+        {(filters.campaign || filters.campaignKey || filters.adset || filters.adsetKey || filters.ad || filters.adKey) && (
           <button
-            onClick={() => filterStore.set({ campaign: undefined, adset: undefined, ad: undefined })}
+            onClick={() =>
+              filterStore.set({
+                campaign: undefined,
+                campaignKey: undefined,
+                adset: undefined,
+                adsetKey: undefined,
+                ad: undefined,
+                adKey: undefined,
+              })
+            }
             className="text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer"
           >
             {t("clear")}: {[filters.campaign, filters.adset, filters.ad].filter(Boolean).join(" › ")}
@@ -73,26 +82,37 @@ function Campaigns() {
 
       <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
         {lang === "ar"
-          ? "الإيراد أعلى الصفحة وفي كل صف من صفوف الحملة/المجموعة/الإعلان من نفس المصدر: عمود $ Sales في تبويب Sales حسب Payment Date، مربوطاً بحملته عبر رقم أمر البيع. الصفوف بلا حملة معروفة لا تظهر هنا، فمجموع هذا الجدول أقل من إجمالي الإيراد أعلاه."
-          : "Revenue at the top of the page and inside every campaign/ad-set/ad row is the same source: the Sales tab's $ Sales column by Payment Date, joined to its campaign through the sales-order number. Rows with no known campaign do not appear here, so this table's total is less than the headline revenue above."}
+          ? "الإيراد أعلى الصفحة وفي كل صف من صفوف الحملة/المجموعة/الإعلان من Accounting.USD Paid حسب Payment Date. الصفوف بلا حملة معروفة لا تظهر هنا، فمجموع الجدول قد يكون أقل من إجمالي الإيراد."
+          : "Revenue at the top of the page and in every campaign/ad-set/ad row comes from Accounting.USD Paid by Payment Date. Rows without a known campaign are excluded here, so the table may total less than headline revenue."}
       </Notice>
+
+      {filters.account && (
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "نطاق حساب الإعلانات" : "Ad-account scope"}
+          icon={<Info size={16} />}
+        >
+          {lang === "ar"
+            ? "عند اختيار حساب إعلاني، تُربط بيانات CRM والصفقات الضائعة والإيراد بالحساب فقط عبر Campaign ID مطابق فعلياً. الصفوف التي لا تحمل Campaign ID تُستبعد بدلاً من تخمين حسابها."
+            : "With an ad account selected, CRM, lost and revenue facts are scoped only through an exact Campaign ID observed in that account. Rows without a Campaign ID are excluded rather than guessed into the account."}
+        </Notice>
+      )}
 
       {isLoading || !data ? (
         <Skeleton className="h-[520px]" />
       ) : (
         <>
           <Card>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-4">
               <Metric label={t("spend")}>{fmtUSD(data.totals.spend)}</Metric>
               <Metric
-                label={t("revenue")}
-                hint={
-                  lang === "ar"
-                    ? `منها ${fmtUSD(data.totals.attributedRevenue)} مرتبط بحملة`
-                    : `${fmtUSD(data.totals.attributedRevenue)} campaign-linked`
-                }
+                label={lang === "ar" ? "إجمالي الإيراد المحصّل" : "Total collected revenue"}
+                hint={lang === "ar" ? "Accounting ضمن الفلاتر الحالية" : "Accounting within current filters"}
               >
                 {fmtUSD(data.totals.revenue)}
+              </Metric>
+              <Metric label={t("attributed_revenue")}>
+                {fmtUSD(data.totals.attributedRevenue)}
               </Metric>
               {/* This is the ads page, so the headline lead number is what the
                   platforms reported. The Odoo total sits underneath it — the two
@@ -136,13 +156,34 @@ function Campaigns() {
               // every other page re-scopes with it.
               if (r.key === data.unknownAdsetKey) return;
               if (grain === "campaign") {
-                filterStore.set({ campaign: r.name });
+                filterStore.set({
+                  campaign: r.campaignName || r.name,
+                  campaignKey: r.campaignKey || r.key,
+                  adset: undefined,
+                  adsetKey: undefined,
+                  ad: undefined,
+                  adKey: undefined,
+                });
                 setGrain("adset");
               } else if (grain === "adset") {
-                filterStore.set({ adset: r.name });
+                filterStore.set({
+                  campaign: r.campaignName || filters.campaign,
+                  campaignKey: r.campaignKey || filters.campaignKey,
+                  adset: r.adsetName || r.name,
+                  adsetKey: r.adsetKey || r.key,
+                  ad: undefined,
+                  adKey: undefined,
+                });
                 setGrain("ad");
               } else {
-                filterStore.set({ ad: r.name });
+                filterStore.set({
+                  campaign: r.campaignName || filters.campaign,
+                  campaignKey: r.campaignKey || filters.campaignKey,
+                  adset: r.adsetName || filters.adset,
+                  adsetKey: r.adsetKey || filters.adsetKey,
+                  ad: r.name,
+                  adKey: r.adKey || r.key,
+                });
               }
             }}
           />

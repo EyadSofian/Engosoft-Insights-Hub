@@ -20,6 +20,8 @@ const DIMENSIONS = [
 let state: GlobalFilters = {};
 /** Year to date. Ad spend now covers the whole year, so this is the honest default. */
 let preset: DatePreset = "year";
+/** Prevent the default-year effect from immediately undoing a cleared custom range. */
+let manualDateMode = false;
 const listeners = new Set<Listener>();
 
 const emit = () => {
@@ -73,6 +75,7 @@ export function presetWindow(
 export const filterStore = {
   get: (): GlobalFilters => state,
   getPreset: (): DatePreset => preset,
+  isManualDateMode: (): boolean => manualDateMode,
 
   set(patch: Partial<GlobalFilters>) {
     state = { ...state, ...patch };
@@ -82,6 +85,7 @@ export const filterStore = {
 
   /** Manual date edits fall out of any named preset. */
   setDates(from?: string, to?: string) {
+    manualDateMode = true;
     state = { ...state, from, to };
     delete state.range;
     prune();
@@ -94,6 +98,7 @@ export const filterStore = {
    * "last 7 days" window.
    */
   setPreset(next: DatePreset, latest?: string) {
+    manualDateMode = false;
     preset = next;
     const w = presetWindow(next, latest);
     state = { ...state, from: w.from, to: w.to, range: w.range };
@@ -112,6 +117,7 @@ export const filterStore = {
   reset() {
     state = {};
     preset = "year";
+    manualDateMode = false;
     emit();
   },
 

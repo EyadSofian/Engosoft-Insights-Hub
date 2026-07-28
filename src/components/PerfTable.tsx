@@ -4,7 +4,6 @@ import { DataTable, type Col } from "./DataTable";
 import {
   AcosPill,
   AdSetOriginBadge,
-  CountPct,
   InferredCourse,
   PlatformBadges,
   RoasCell,
@@ -39,17 +38,29 @@ export function PerfTable({
       key: "name",
       header: grain === "campaign" ? t("campaign") : grain === "adset" ? t("ad_set") : t("ad_name"),
       sticky: true,
-      width: "220px",
+      width: "260px",
       sortValue: (r) => nameOf(r),
       render: (r) => (
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className={`truncate max-w-[200px] ${r.key === unknownAdsetKey ? "text-text-muted italic" : ""}`}
-            title={nameOf(r)}
-          >
-            {nameOf(r)}
-          </span>
-          {grain === "adset" && r.key !== unknownAdsetKey && <AdSetOriginBadge origin={r.adsetOrigin} />}
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="min-w-0">
+            <div
+              className={`truncate max-w-[220px] ${r.key === unknownAdsetKey ? "text-text-muted italic" : ""}`}
+              title={nameOf(r)}
+            >
+              {nameOf(r)}
+            </div>
+            {grain !== "campaign" && r.key !== unknownAdsetKey && (
+              <div
+                className="mt-0.5 max-w-[220px] truncate text-[10px] text-text-subtle"
+                title={[r.campaignName, grain === "ad" ? r.adsetName : ""].filter(Boolean).join(" › ")}
+              >
+                {[r.campaignName, grain === "ad" ? r.adsetName : ""].filter(Boolean).join(" › ")}
+              </div>
+            )}
+          </div>
+          {grain === "adset" && r.key !== unknownAdsetKey && (
+            <AdSetOriginBadge origin={r.adsetOrigin} />
+          )}
         </div>
       ),
     },
@@ -102,14 +113,28 @@ export function PerfTable({
       header: t("won"),
       align: "right",
       sortValue: (r) => r.won,
-      render: (r) => <CountPct count={r.won} pct={r.conversionRate} />,
+      render: (r) => fmtNum(r.won),
+    },
+    {
+      key: "conversionRate",
+      header: t("conversion_rate"),
+      align: "right",
+      sortValue: (r) => sortMaybe(r.conversionRate),
+      render: (r) => maybeNum(r.conversionRate, (v) => fmtPct(v, 2)),
     },
     {
       key: "lost",
       header: t("lost_count"),
       align: "right",
       sortValue: (r) => r.lost,
-      render: (r) => <CountPct count={r.lost} pct={r.lostRate} />,
+      render: (r) => fmtNum(r.lost),
+    },
+    {
+      key: "lostRate",
+      header: t("lost_rate"),
+      align: "right",
+      sortValue: (r) => sortMaybe(r.lostRate),
+      render: (r) => maybeNum(r.lostRate, (v) => fmtPct(v, 2)),
     },
     { key: "revenue", header: t("revenue"), align: "right", sortValue: (r) => r.revenue, render: (r) => fmtUSD(r.revenue) },
     {
@@ -161,13 +186,18 @@ export function PerfTable({
     <DataTable
       rows={rows}
       cols={cols}
-      searchable={(r) => `${nameOf(r)} ${r.course}`}
+      searchable={(r) => `${nameOf(r)} ${r.campaignName} ${r.adsetName} ${r.course}`}
       initialSort={{ key: "spend", dir: -1 }}
       onRowClick={onRowClick}
       csvFilename={csvFilename}
       maxHeight={620}
       csvRow={(r) => ({
         [lang === "ar" ? "الاسم" : "name"]: nameOf(r),
+        campaign: r.campaignName,
+        ad_set: r.adsetName,
+        campaign_key: r.campaignKey,
+        adset_key: r.adsetKey,
+        ad_key: r.adKey,
         platform: r.platforms.join("|"),
         course: r.course,
         course_inferred: r.courseInferred ? "yes" : "no",

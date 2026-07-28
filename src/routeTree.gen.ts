@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountingRouteImport } from './routes/accounting'
 import { Route as AdsRouteImport } from './routes/ads'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
@@ -21,6 +22,7 @@ import { Route as SalesRouteImport } from './routes/sales'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as YoyRouteImport } from './routes/yoy'
+import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -45,6 +47,11 @@ import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.we
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountingRoute = AccountingRouteImport.update({
+  id: '/accounting',
+  path: '/accounting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdsRoute = AdsRouteImport.update({
@@ -100,6 +107,11 @@ const WebsiteRoute = WebsiteRouteImport.update({
 const YoyRoute = YoyRouteImport.update({
   id: '/yoy',
   path: '/yoy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountingRoute = ApiAccountingRouteImport.update({
+  id: '/api/accounting',
+  path: '/api/accounting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdsRoute = ApiAdsRouteImport.update({
@@ -205,6 +217,7 @@ const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
@@ -216,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
+  '/api/accounting': typeof ApiAccountingRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -239,6 +253,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
@@ -250,6 +265,7 @@ export interface FileRoutesByTo {
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
+  '/api/accounting': typeof ApiAccountingRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -274,6 +290,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
@@ -285,6 +302,7 @@ export interface FileRoutesById {
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
+  '/api/accounting': typeof ApiAccountingRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -310,6 +328,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accounting'
     | '/ads'
     | '/campaigns'
     | '/courses'
@@ -321,6 +340,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/website'
     | '/yoy'
+    | '/api/accounting'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -344,6 +364,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accounting'
     | '/ads'
     | '/campaigns'
     | '/courses'
@@ -355,6 +376,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/website'
     | '/yoy'
+    | '/api/accounting'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -378,6 +400,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/accounting'
     | '/ads'
     | '/campaigns'
     | '/courses'
@@ -389,6 +412,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/website'
     | '/yoy'
+    | '/api/accounting'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -413,6 +437,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountingRoute: typeof AccountingRoute
   AdsRoute: typeof AdsRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
@@ -424,6 +449,7 @@ export interface RootRouteChildren {
   TeamsRoute: typeof TeamsRoute
   WebsiteRoute: typeof WebsiteRoute
   YoyRoute: typeof YoyRoute
+  ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -453,6 +479,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accounting': {
+      id: '/accounting'
+      path: '/accounting'
+      fullPath: '/accounting'
+      preLoaderRoute: typeof AccountingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ads': {
@@ -530,6 +563,13 @@ declare module '@tanstack/react-router' {
       path: '/yoy'
       fullPath: '/yoy'
       preLoaderRoute: typeof YoyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/accounting': {
+      id: '/api/accounting'
+      path: '/api/accounting'
+      fullPath: '/api/accounting'
+      preLoaderRoute: typeof ApiAccountingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ads': {
@@ -677,6 +717,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountingRoute: AccountingRoute,
   AdsRoute: AdsRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
@@ -688,6 +729,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsRoute: TeamsRoute,
   WebsiteRoute: WebsiteRoute,
   YoyRoute: YoyRoute,
+  ApiAccountingRoute: ApiAccountingRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,

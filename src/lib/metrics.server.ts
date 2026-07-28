@@ -13,6 +13,7 @@ import {
 } from "./sheet-cache.server";
 import type {
   AdRow,
+  AccountingRow,
   CourseAgg,
   CrmLeadRow,
   DataHealth,
@@ -28,7 +29,6 @@ import type {
   Maybe,
   PerfRow,
   Platform,
-  SalesRow,
   TeamAgg,
   Totals,
   YoyResult,
@@ -76,13 +76,207 @@ const sum = <T>(rows: T[], pick: (r: T) => number) => rows.reduce((s, r) => s + 
 /** Source keys that identify each ad platform inside the CRM. */
 const PLATFORM_SOURCES = PLATFORM_SOURCE_KEYS;
 
+const UNKNOWN_ADSET = "__unknown_adset__";
+
+interface PerformanceDimensionMeta {
+  key: string;
+  name: string;
+  campaignKey: string;
+  campaignName: string;
+  adsetKey: string;
+  adsetName: string;
+  adKey: string;
+}
+
+type AttributedFact = Pick<
+  CrmLeadRow | AccountingRow | LostRow,
+  "campaignId" | "campaignKey" | "campaignName" | "adId" | "adName" | "adset"
+>;
+
+const dimensionPart = (value: string) => normalizeName(value) || "unknown";
+const dimensionPair = (campaignKey: string, value: string) =>
+  `${campaignKey || "no-campaign"}|${dimensionPart(value)}`;
+
+/**
+ * Stable campaign/ad-set/ad identities shared by filtering and aggregation.
+ *
+ * Platform exports carry the real ids. CRM and Accounting often carry only an
+ * ad id/name, so those facts join to a platform identity only when the match is
+ * unique. Ambiguous name-only facts stay in a separate synthetic bucket rather
+ * than being merged into one of several same-named ads.
+ */
+class PerformanceDimensionIndex {
+  private meta = new Map<string, PerformanceDimensionMeta>();
+  private adByCampaignId = new Map<string, Set<string>>();
+  private adByGlobalId = new Map<string, Set<string>>();
+  private adByCampaignName = new Map<string, Set<string>>();
+  private adsetByCampaignName = new Map<string, Set<string>>();
+  private adsetByAd = new Map<string, string>();
+
+  constructor(ads: AdRow[]) {
+    for (const row of ads) this.learn(row);
+  }
+
+  private addCandidate(map: Map<string, Set<string>>, lookup: string, key: string) {
+    if (!lookup || !key) return;
+    let values = map.get(lookup);
+    if (!values) {
+      values = new Set();
+      map.set(lookup, values);
+    }
+    values.add(key);
+  }
+
+  private unique(map: Map<string, Set<string>>, lookup: string): string {
+    const values = map.get(lookup);
+    return values?.size === 1 ? [...values][0] : "";
+  }
+
+  private campaign(row: Pick<AttributedFact, "campaignKey" | "campaignName">) {
+    return {
+      key: row.campaignKey,
+      name: row.campaignName,
+      campaignKey: row.campaignKey,
+      campaignName: row.campaignName,
+      adsetKey: "",
+      adsetName: "",
+      adKey: "",
+    } satisfies PerformanceDimensionMeta;
+  }
+
+  private keysForAd(row: AdRow) {
+    const accountPart = dimensionPart(row.accountId || row.account);
+    const adsetKey = row.adset
+      ? row.adsetId
+        ? `adset:${row.platform}:${accountPart}:${row.adsetId}`
+        : `adset-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.adset)}`
+      : UNKNOWN_ADSET;
+    const adKey = row.adId
+      ? `ad:${row.platform}:${accountPart}:${row.adId}`
+      : `ad-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.ad)}`;
+    return { adsetKey, adKey };
+  }
+
+  private learn(row: AdRow) {
+    const { adsetKey, adKey } = this.keysForAd(row);
+    const adsetMeta: PerformanceDimensionMeta = {
+      key: adsetKey,
+      name: row.adset,
+      campaignKey: row.campaignKey,
+      campaignName: row.campaign,
+      adsetKey,
+      adsetName: row.adset,
+      adKey: "",
+    };
+    const adMeta: PerformanceDimensionMeta = {
+      key: adKey,
+      name: row.ad,
+      campaignKey: row.campaignKey,
+      campaignName: row.campaign,
+      adsetKey,
+      adsetName: row.adset,
+      adKey,
+    };
+
+    if (!this.meta.has(adsetKey)) this.meta.set(adsetKey, adsetMeta);
+    if (!this.meta.has(adKey)) this.meta.set(adKey, adMeta);
+    this.adsetByAd.set(adKey, adsetKey);
+
+    if (row.adId) {
+      this.addCandidate(this.adByCampaignId, dimensionPair(row.campaignKey, row.adId), adKey);
+      this.addCandidate(this.adByGlobalId, dimensionPart(row.adId), adKey);
+    }
+    if (row.ad) {
+      this.addCandidate(this.adByCampaignName, dimensionPair(row.campaignKey, row.ad), adKey);
+    }
+    if (row.adset) {
+      this.addCandidate(
+        this.adsetByCampaignName,
+        dimensionPair(row.campaignKey, row.adset),
+        adsetKey,
+      );
+    }
+  }
+
+  fromAd(row: AdRow, grain: Grain): PerformanceDimensionMeta {
+    if (grain === "campaign") {
+      return this.campaign({ campaignKey: row.campaignKey, campaignName: row.campaign });
+    }
+    const { adsetKey, adKey } = this.keysForAd(row);
+    return (
+      this.meta.get(grain === "adset" ? adsetKey : adKey) ?? {
+        key: grain === "adset" ? adsetKey : adKey,
+        name: grain === "adset" ? row.adset : row.ad,
+        campaignKey: row.campaignKey,
+        campaignName: row.campaign,
+        adsetKey,
+        adsetName: row.adset,
+        adKey,
+      }
+    );
+  }
+
+  private adForFact(row: AttributedFact): PerformanceDimensionMeta {
+    const byId = row.adId
+      ? this.unique(this.adByCampaignId, dimensionPair(row.campaignKey, row.adId)) ||
+        this.unique(this.adByGlobalId, dimensionPart(row.adId))
+      : "";
+    const byName = row.adName
+      ? this.unique(this.adByCampaignName, dimensionPair(row.campaignKey, row.adName))
+      : "";
+    const hit = this.meta.get(byId || byName);
+    if (hit) return hit;
+
+    const adKey = row.adId
+      ? `ad-unmatched-id:${row.campaignKey || "no-campaign"}:${dimensionPart(row.adId)}`
+      : `ad-unmatched-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.adName)}`;
+    return {
+      key: adKey,
+      name: row.adName,
+      campaignKey: row.campaignKey,
+      campaignName: row.campaignName,
+      adsetKey: "",
+      adsetName: row.adset,
+      adKey,
+    };
+  }
+
+  private adsetForFact(row: AttributedFact): PerformanceDimensionMeta {
+    const ad = this.adForFact(row);
+    const viaAd = this.adsetByAd.get(ad.key);
+    const viaName = row.adset
+      ? this.unique(this.adsetByCampaignName, dimensionPair(row.campaignKey, row.adset))
+      : "";
+    const hit = this.meta.get(viaAd || viaName);
+    if (hit) return hit;
+
+    const adsetKey = row.adset
+      ? `adset-unmatched:${row.campaignKey || "no-campaign"}:${dimensionPart(row.adset)}`
+      : UNKNOWN_ADSET;
+    return {
+      key: adsetKey,
+      name: row.adset,
+      campaignKey: row.campaignKey,
+      campaignName: row.campaignName,
+      adsetKey,
+      adsetName: row.adset,
+      adKey: "",
+    };
+  }
+
+  fromFact(row: AttributedFact, grain: Grain): PerformanceDimensionMeta {
+    if (grain === "campaign") return this.campaign(row);
+    return grain === "adset" ? this.adsetForFact(row) : this.adForFact(row);
+  }
+}
+
 /* --- filtering ------------------------------------------------------------ */
 
 export interface FilteredData {
   ads: AdRow[];
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
-  sales: SalesRow[];
+  accounting: AccountingRow[];
   lost: LostRow[];
   snapshot: Snapshot;
   applied: GlobalFilters;
@@ -90,7 +284,7 @@ export interface FilteredData {
   nonLeadAccounts: string[];
   includeNonLead: boolean;
   cpaBasis: "won" | "invoices";
-  /** True when an ad dimension narrows the view. Revenue still comes from Sales
+  /** True when an ad dimension narrows the view. Revenue still comes from Accounting
    * — this only tells the UI that unattributed invoices were filtered out. */
   attributionScoped: boolean;
 }
@@ -103,8 +297,11 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     platform,
     account,
     campaign,
+    campaignKey: campaignKeyFilter,
     adset,
+    adsetKey: adsetKeyFilter,
     ad,
+    adKey: adKeyFilter,
     source,
     course,
     mainCategory,
@@ -115,14 +312,45 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const includeNonLead = f.includeNonLead === "1";
   const cpaBasis = f.cpaBasis === "invoices" ? "invoices" : "won";
   const sourceKey = source ? normalizeSource(source) : "";
-  const attributionScoped = !!(platform || account || campaign || adset || ad || sourceKey);
+  const attributionScoped = !!(
+    platform ||
+    account ||
+    campaign ||
+    campaignKeyFilter ||
+    adset ||
+    adsetKeyFilter ||
+    ad ||
+    adKeyFilter ||
+    sourceKey
+  );
+  const dimensions = new PerformanceDimensionIndex(all.ads);
+
+  // Account exists only on the platform facts. Cross-fact scoping is therefore
+  // allowed only through an exact Campaign ID observed under that account. A
+  // name-only row is excluded rather than guessed into the selected account.
+  const accountCampaignIds = new Set(
+    account
+      ? all.ads
+          .filter((row) => row.account === account && row.campaignId)
+          .map((row) => row.campaignId)
+      : [],
+  );
+  const matchesAccount = (campaignId: string): boolean =>
+    !account || (!!campaignId && accountCampaignIds.has(campaignId));
+  const matchesStableFact = (row: AttributedFact): boolean => {
+    if (campaignKeyFilter && row.campaignKey !== campaignKeyFilter) return false;
+    if (adsetKeyFilter && dimensions.fromFact(row, "adset").key !== adsetKeyFilter) return false;
+    if (adKeyFilter && dimensions.fromFact(row, "ad").key !== adKeyFilter) return false;
+    return true;
+  };
 
   // Course lives on CRM/invoice/lost rows but never on an ad row, so a course
   // filter reaches the ads tabs through the campaign → modal-course inference.
   const courseCampaigns = new Set<string>();
   if (course) {
     for (const [key, meta] of all.campaigns) {
-      if (meta.course && normalizeName(meta.course) === normalizeName(course)) courseCampaigns.add(key);
+      if (meta.course && normalizeName(meta.course) === normalizeName(course))
+        courseCampaigns.add(key);
     }
   }
 
@@ -144,8 +372,11 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     if (platform && r.platform !== platform) return false;
     if (account && r.account !== account) return false;
     if (campaign && r.campaign !== campaign) return false;
+    if (campaignKeyFilter && r.campaignKey !== campaignKeyFilter) return false;
     if (adset && r.adset !== adset) return false;
+    if (adsetKeyFilter && dimensions.fromAd(r, "adset").key !== adsetKeyFilter) return false;
     if (ad && r.ad !== ad) return false;
+    if (adKeyFilter && dimensions.fromAd(r, "ad").key !== adKeyFilter) return false;
     if (course && !courseCampaigns.has(r.campaignKey)) return false;
     return true;
   });
@@ -153,6 +384,8 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const crm = all.crm.filter((r) => {
     if (!inRange(r.createdAt, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+    if (!matchesAccount(r.campaignId)) return false;
+    if (!matchesStableFact(r)) return false;
     if (campaign && r.campaignName !== campaign) return false;
     if (adset && r.adset !== adset) return false;
     if (ad && r.adName !== ad) return false;
@@ -167,6 +400,8 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const invoiced = all.invoiced.filter((r) => {
     if (!inRange(r.revenueDate, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+    if (!matchesAccount(r.campaignId)) return false;
+    if (!matchesStableFact(r)) return false;
     if (campaign && r.campaignName !== campaign) return false;
     if (adset && r.adset !== adset) return false;
     if (ad && r.adName !== ad) return false;
@@ -181,17 +416,19 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
-  // Sales rows now carry their order's campaign/ad/source (joined in the cache
-  // layer), so approved revenue answers an ad-dimension filter directly instead
-  // of falling back to sales orders.
-  const sales = all.sales.filter((r) => {
+  // Accounting rows carry direct campaign/ad/source dimensions when available,
+  // with a legacy order bridge only for older workbooks.
+  const accounting = all.accounting.filter((r) => {
     if (!inRange(r.paymentDate, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+    if (!matchesAccount(r.campaignId)) return false;
+    if (!matchesStableFact(r)) return false;
     if (campaign && r.campaignName !== campaign) return false;
     if (adset && r.adset !== adset) return false;
     if (ad && r.adName !== ad) return false;
     if (sourceKey && r.sourceKey !== sourceKey) return false;
     if (course && normalizeName(r.course) !== normalizeName(course)) return false;
+    if (mainCategory && r.mainCategory !== mainCategory) return false;
     // `فريق المبيعات` is sparse on paid invoice lines for the same reason it is
     // on order lines, so a team filter also matches through the salesperson.
     if (salesTeam && r.salesTeam !== salesTeam && !teamHasPerson(all, salesTeam, r.salesperson))
@@ -203,7 +440,10 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const lost = all.lost.filter((r) => {
     if (!inRange(r.createdAt, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+    if (!matchesAccount(r.campaignId)) return false;
+    if (!matchesStableFact(r)) return false;
     if (campaign && r.campaignName !== campaign) return false;
+    if (adset && r.adset !== adset) return false;
     if (ad && r.adName !== ad) return false;
     if (sourceKey && r.sourceKey !== sourceKey) return false;
     if (course && normalizeName(r.course) !== normalizeName(course)) return false;
@@ -217,7 +457,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     ads,
     crm,
     invoiced,
-    sales,
+    accounting,
     lost,
     snapshot: all,
     applied: f,
@@ -235,7 +475,8 @@ function teamHasPerson(all: Snapshot, team: string, person: string): boolean {
   if (personTeamCache?.snapshot !== all) {
     const map = new Map<string, string>();
     for (const c of all.crm) {
-      if (c.salesperson && c.salesTeam && !map.has(c.salesperson)) map.set(c.salesperson, c.salesTeam);
+      if (c.salesperson && c.salesTeam && !map.has(c.salesperson))
+        map.set(c.salesperson, c.salesTeam);
     }
     personTeamCache = { snapshot: all, map };
   }
@@ -246,7 +487,8 @@ function teamHasPerson(all: Snapshot, team: string, person: string): boolean {
  *  Meta-window default (and its period-mismatch warning) is gone. */
 export async function getDefaultRange(): Promise<{ from: string; to: string }> {
   const all = await loadAllData();
-  const latest = [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
+  const latest =
+    [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
   const year = latest ? latest.slice(0, 4) : String(new Date().getUTCFullYear());
   return { from: `${year}-01-01`, to: latest || `${year}-12-31` };
 }
@@ -271,12 +513,8 @@ function closeStats(rows: CrmLeadRow[]): { avg: Maybe; sample: number } {
 
 /* --- lead population -------------------------------------------------------- */
 
-/**
- * Every archived CRM opportunity, deduplicated by Odoo id. This is the whole
- * archived population, lost and otherwise — the denominator side of the lead
- * count.
- */
-function archivedLeads(data: FilteredData): LostRow[] {
+/** Every archived CRM row, deduplicated by Odoo id. */
+export function archivedCrmLeads(data: FilteredData): LostRow[] {
   const seen = new Set<string>();
   return data.lost.filter((row, index) => {
     const key = row.id || `row:${index}`;
@@ -286,33 +524,40 @@ function archivedLeads(data: FilteredData): LostRow[] {
   });
 }
 
-/** An archived row that Odoo still marks Won. Real, but not a loss. */
-const isArchivedWon = (row: LostRow) => row.stage.trim().toLowerCase() === "won";
+const isArchivedWon = (row: LostRow): boolean => row.stage.trim().toLowerCase() === "won";
 
 /**
- * Authoritative lost population. The business definition is archived CRM
- * opportunities as exported to Lost Analysis; CRM stage names never define
- * loss.
+ * The authoritative Lost population.
  *
- * Archived rows whose stage is Won are excluded: 13 of them exist in this
- * workbook, and counting them would report the same deal as closed and lost at
- * the same time. They stay inside `totalLeads` and are surfaced separately as
- * `archivedWon` so the difference is explainable rather than missing.
+ * CRM stage text never participates. The handful of archived rows still marked
+ * Won remain valid leads/denominator rows but cannot also be losses.
  */
-function authoritativeLostLeads(data: FilteredData): LostRow[] {
-  return archivedLeads(data).filter((row) => !isArchivedWon(row));
+export function authoritativeLostLeads(data: FilteredData): LostRow[] {
+  return archivedCrmLeads(data).filter((row) => !isArchivedWon(row));
 }
 
 /* --- totals ---------------------------------------------------------------- */
 
 export function computeTotals(data: FilteredData): Totals {
-  const { ads, crm, invoiced, sales, cpaBasis } = data;
+  const { ads, crm, invoiced, accounting, cpaBasis } = data;
 
   const spend = sum(ads, (a) => a.spend);
-  const spendMeta = sum(ads.filter((a) => a.platform === "meta"), (a) => a.spend);
-  const spendSnap = sum(ads.filter((a) => a.platform === "snapchat"), (a) => a.spend);
-  const spendTikTok = sum(ads.filter((a) => a.platform === "tiktok"), (a) => a.spend);
-  const nonLeadSpend = sum(ads.filter((a) => a.objective !== "leads"), (a) => a.spend);
+  const spendMeta = sum(
+    ads.filter((a) => a.platform === "meta"),
+    (a) => a.spend,
+  );
+  const spendSnap = sum(
+    ads.filter((a) => a.platform === "snapchat"),
+    (a) => a.spend,
+  );
+  const spendTikTok = sum(
+    ads.filter((a) => a.platform === "tiktok"),
+    (a) => a.spend,
+  );
+  const nonLeadSpend = sum(
+    ads.filter((a) => a.objective !== "leads"),
+    (a) => a.spend,
+  );
   // Management's approved formulas use the complete paid-media bill. Traffic
   // spend stays visible as a diagnostic, but is not silently removed from CPL,
   // CPA, ROAS or ACOS.
@@ -325,14 +570,15 @@ export function computeTotals(data: FilteredData): Totals {
 
   // Link CTR is only defined over impressions from platforms that report link
   // clicks, so Snapchat impressions are excluded from its denominator.
-  const linkImpressions = sum(ads.filter((a) => a.linkClicks !== null), (a) => a.impressions);
+  const linkImpressions = sum(
+    ads.filter((a) => a.linkClicks !== null),
+    (a) => a.impressions,
+  );
 
-  const allArchived = archivedLeads(data);
-  const archived = allArchived.filter((l) => !isArchivedWon(l));
+  const allArchived = archivedCrmLeads(data);
+  const archived = allArchived.filter((row) => !isArchivedWon(row));
   const archivedWon = allArchived.length - archived.length;
   const crmLeads = crm.length;
-  // Every archived row is a real lead and belongs in the denominator, including
-  // the handful Odoo still marks Won.
   const totalLeads = crmLeads + allArchived.length;
   // Archived rows keep their campaign columns, so a paid lead that was later
   // archived as lost still belongs in the paid denominator.
@@ -346,24 +592,28 @@ export function computeTotals(data: FilteredData): Totals {
   // padding the sample with zeros would drag the average toward nothing.
   const { avg: avgCloseDays, sample: closeSample } = closeStats(crm);
 
-  // Money has exactly one primary source: the Sales tab, `$ Sales`, dated by
-  // Payment Date — collected revenue, the way accounting reports it. Full
-  // Invoiced Orders stays available as a cross-check and is never blended in.
-  const accountingRevenue = sum(sales, (r) => r.usdSales);
+  // Money has exactly one primary source: Accounting.USD Paid, dated by
+  // Payment Date. Sales orders never define recognised revenue.
+  const accountingRevenue = sum(accounting, (r) => r.usdPaid);
   const orderRevenue = sum(invoiced, (r) => r.usdSales);
   const revenue = accountingRevenue;
   const adCampaignKeys = new Set(data.ads.map((a) => a.campaignKey).filter(Boolean));
   const attributedRevenue = sum(
-    sales.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
-    (r) => r.usdSales,
+    accounting.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
+    (r) => r.usdPaid,
   );
   const attributedOrderRevenue = sum(
     invoiced.filter((r) => r.campaignKey && adCampaignKeys.has(r.campaignKey)),
     (r) => r.usdSales,
   );
-  const unmatchedRevenue = sum(sales.filter((r) => !r.orderMatched), (r) => r.usdSales);
-  const orders =
-    new Set(sales.map((r) => r.orderRef || r.movement).filter(Boolean)).size || sales.length;
+  const unmatchedRevenue = sum(
+    accounting.filter((r) => !r.orderMatched),
+    (r) => r.usdPaid,
+  );
+  // The Accounting sheet is at product-line grain. Only a real Move identifies
+  // an invoice; falling back to line count would multiply invoices that contain
+  // more than one product and make CPA/AOV silently wrong.
+  const orders = new Set(accounting.map((r) => r.movement).filter(Boolean)).size;
   const invoicedOrders =
     new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
 
@@ -443,6 +693,11 @@ export type Grain = "campaign" | "adset" | "ad";
 interface Bucket {
   key: string;
   name: string;
+  campaignKey: string;
+  campaignName: string;
+  adsetKey: string;
+  adsetName: string;
+  adKey: string;
   platforms: Set<Platform>;
   objective: import("./types").CampaignObjective;
   course: string;
@@ -457,26 +712,31 @@ interface Bucket {
   won: number;
   lost: number;
   revenue: number;
+  invoiceRefs: Set<string>;
   closeTotal: number;
   closeSample: number;
   spendDates: Set<string>;
   revenueByDate: Map<string, number>;
 }
 
-const UNKNOWN_ADSET = "__unknown_adset__";
-
 /** Above this share of revenue landing outside the spend window, ratios lie. */
 const PARTIAL_SPEND_THRESHOLD = 0.3;
 
 export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
   const buckets = new Map<string, Bucket>();
+  const dimensions = new PerformanceDimensionIndex(data.snapshot.ads);
 
-  const touch = (key: string, name: string): Bucket => {
-    let b = buckets.get(key);
+  const touch = (dimension: PerformanceDimensionMeta): Bucket => {
+    let b = buckets.get(dimension.key);
     if (!b) {
       b = {
-        key,
-        name,
+        key: dimension.key,
+        name: dimension.name,
+        campaignKey: dimension.campaignKey,
+        campaignName: dimension.campaignName,
+        adsetKey: dimension.adsetKey,
+        adsetName: dimension.adsetName,
+        adKey: dimension.adKey,
         platforms: new Set(),
         objective: "leads",
         course: "",
@@ -490,26 +750,27 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
         won: 0,
         lost: 0,
         revenue: 0,
+        invoiceRefs: new Set(),
         closeTotal: 0,
         closeSample: 0,
         spendDates: new Set(),
         revenueByDate: new Map(),
       };
-      buckets.set(key, b);
+      buckets.set(dimension.key, b);
     }
-    if (!b.name && name) b.name = name;
+    if (!b.name && dimension.name) b.name = dimension.name;
+    if (!b.campaignKey && dimension.campaignKey) b.campaignKey = dimension.campaignKey;
+    if (!b.campaignName && dimension.campaignName) b.campaignName = dimension.campaignName;
+    if (!b.adsetKey && dimension.adsetKey) b.adsetKey = dimension.adsetKey;
+    if (!b.adsetName && dimension.adsetName) b.adsetName = dimension.adsetName;
+    if (!b.adKey && dimension.adKey) b.adKey = dimension.adKey;
     return b;
   };
 
-  const adKey = (a: AdRow) =>
-    grain === "campaign" ? a.campaignKey : grain === "adset" ? a.adset || UNKNOWN_ADSET : a.ad || "—";
-  const adLabel = (a: AdRow) =>
-    grain === "campaign" ? a.campaign : grain === "adset" ? a.adset : a.ad;
-
   for (const a of data.ads) {
-    const key = adKey(a);
-    if (!key) continue;
-    const b = touch(key, adLabel(a));
+    const dimension = dimensions.fromAd(a, grain);
+    if (!dimension.key) continue;
+    const b = touch(dimension);
     b.platforms.add(a.platform);
     if (a.objective !== "leads") b.objective = a.objective;
     b.spend += a.spend;
@@ -529,19 +790,13 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
 
   // Unresolved ad-set rows go into an explicit bucket with real totals rather
   // than being dropped, which would make the column silently under-count.
-  const crmKey = (c: CrmLeadRow) =>
-    grain === "campaign" ? c.campaignKey : grain === "adset" ? c.adset || UNKNOWN_ADSET : c.adName || "—";
-  const crmLabel = (c: CrmLeadRow) =>
-    grain === "campaign" ? c.campaignName : grain === "adset" ? c.adset : c.adName;
-
   for (const c of data.crm) {
-    const key = crmKey(c);
-    if (!key || (grain === "campaign" && !c.fromCampaign)) continue;
+    const dimension = dimensions.fromFact(c, grain);
+    if (!dimension.key || (grain === "campaign" && !c.fromCampaign)) continue;
     if (grain !== "campaign" && !c.adName && !c.adId) continue;
-    const b = touch(key, crmLabel(c));
+    const b = touch(dimension);
     b.crmLeads++;
     if (c.isWon) b.won++;
-    if (c.isLost) b.lost++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       b.closeTotal += c.daysToClose;
       b.closeSample++;
@@ -550,41 +805,30 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     if (!b.course && c.course) b.course = c.course;
   }
 
-  // Lost counts and their denominators come exclusively from Lost Analysis.
-  // CRM-stage Lost rows were removed during parsing, so adding these rows here
-  // cannot double-count the same reporting population. Every archived row adds
-  // to the lead count; only the ones Odoo does not still mark Won add to lost.
-  for (const l of archivedLeads(data)) {
-    const key =
-      grain === "campaign"
-        ? l.campaignKey
-        : grain === "adset"
-          ? l.adset || UNKNOWN_ADSET
-          : l.adName || "—";
-    if (!key || (grain === "campaign" && !l.campaignKey)) continue;
+  // Lost counts and their denominators come exclusively from the authoritative
+  // archived population. CRM stage text never increments this counter.
+  for (const l of archivedCrmLeads(data)) {
+    const dimension = dimensions.fromFact(l, grain);
+    if (!dimension.key || (grain === "campaign" && !l.campaignKey)) continue;
     if (grain !== "campaign" && !l.adName && !l.adId) continue;
-    const label = grain === "campaign" ? l.campaignName : grain === "adset" ? l.adset : l.adName;
-    const b = touch(key, label);
+    const b = touch(dimension);
     b.crmLeads++;
     if (!isArchivedWon(l)) b.lost++;
     if (!b.course && l.course) b.course = l.course;
   }
 
-  // Revenue on every performance row is APPROVED PAID revenue from the Sales
-  // tab, attributed through its sales order (see the order → campaign bridge in
-  // sheet-cache.server.ts). It used to come from Full Invoiced Orders, which is
-  // sales orders — a different, larger population that management does not
-  // recognise as revenue.
-  const saleKey = (s: SalesRow) =>
-    grain === "campaign" ? s.campaignKey : grain === "adset" ? s.adset || UNKNOWN_ADSET : s.adName || "—";
-  for (const s of data.sales) {
-    const key = saleKey(s);
-    if (!key || (grain === "campaign" && !s.campaignKey)) continue;
+  // Revenue on every performance row is paid Accounting revenue. Campaign
+  // dimensions are direct when available and use the legacy order bridge only
+  // during migration.
+  for (const s of data.accounting) {
+    const dimension = dimensions.fromFact(s, grain);
+    if (!dimension.key || (grain === "campaign" && !s.campaignKey)) continue;
     if (grain !== "campaign" && !s.adName && !s.adId) continue;
-    const b = touch(key, grain === "campaign" ? s.campaignName : grain === "adset" ? s.adset : s.adName);
-    b.revenue += s.usdSales;
+    const b = touch(dimension);
+    b.revenue += s.usdPaid;
+    if (s.movement) b.invoiceRefs.add(s.movement);
     if (s.paymentDate)
-      b.revenueByDate.set(s.paymentDate, (b.revenueByDate.get(s.paymentDate) ?? 0) + s.usdSales);
+      b.revenueByDate.set(s.paymentDate, (b.revenueByDate.get(s.paymentDate) ?? 0) + s.usdPaid);
   }
 
   const rows: PerfRow[] = [];
@@ -601,7 +845,10 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     }
     const spendCoverage = b.revenue > 0 && spendDateMin ? insideRevenue / b.revenue : null;
     const partialSpend =
-      b.spend > 0 && b.revenue > 0 && spendCoverage !== null && spendCoverage < 1 - PARTIAL_SPEND_THRESHOLD;
+      b.spend > 0 &&
+      b.revenue > 0 &&
+      spendCoverage !== null &&
+      spendCoverage < 1 - PARTIAL_SPEND_THRESHOLD;
 
     rows.push({
       spendDateMin,
@@ -610,6 +857,11 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
       spendCoverage,
       key: b.key,
       name: b.key === UNKNOWN_ADSET ? "" : b.name || "—",
+      campaignKey: b.campaignKey,
+      campaignName: b.campaignName,
+      adsetKey: b.adsetKey,
+      adsetName: b.adsetName,
+      adKey: b.adKey,
       platforms: [...b.platforms],
       course: b.course,
       courseInferred: b.courseInferred,
@@ -635,7 +887,7 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
       revenue: b.revenue,
       revenuePerLead: div(b.revenue, b.crmLeads),
       cpl: b.platformLeads === null ? null : div(b.spend, b.platformLeads),
-      cpa: data.cpaBasis === "invoices" ? null : div(b.spend, b.won),
+      cpa: data.cpaBasis === "invoices" ? div(b.spend, b.invoiceRefs.size) : div(b.spend, b.won),
       roas: div(b.revenue, b.spend),
       acos: (() => {
         const r = div(b.spend, b.revenue);
@@ -672,7 +924,8 @@ function decisionGrade(rows: PerfRow[], floor: number): PerfRow[] {
 
 export function bestCampaign(rows: PerfRow[], minSpend = 100): PerfRow | null {
   let eligible = decisionGrade(rows, minSpend).filter((r) => r.revenue > 0);
-  if (!eligible.length) eligible = rows.filter((r) => r.spend > 0 && r.revenue > 0 && !r.partialSpend);
+  if (!eligible.length)
+    eligible = rows.filter((r) => r.spend > 0 && r.revenue > 0 && !r.partialSpend);
   if (!eligible.length) return null;
   return eligible.reduce((a, b) => ((b.roas ?? 0) > (a.roas ?? 0) ? b : a));
 }
@@ -743,14 +996,15 @@ export function dailyTrend(
   };
   for (const a of data.ads) if (a.date) at(a.date).spend += a.spend;
   // Always the accounting series, whatever the filter — one revenue definition.
-  for (const s of data.sales) if (s.paymentDate) at(s.paymentDate).revenue += s.usdSales;
+  for (const row of data.accounting)
+    if (row.paymentDate) at(row.paymentDate).revenue += row.usdPaid;
   for (const c of data.crm) {
     if (!c.createdAt) continue;
     const e = at(c.createdAt);
     e.leads++;
     if (c.isWon) e.won++;
   }
-  for (const l of archivedLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
+  for (const l of archivedCrmLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({ date, ...v }));
@@ -767,6 +1021,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
       a = {
         key,
         name: course,
+        campaignKey: "",
+        campaignName: "",
+        adsetKey: "",
+        adsetName: "",
+        adKey: "",
         platforms: [],
         course,
         courseInferred: false,
@@ -811,11 +1070,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   };
 
   const orderRefs = new Map<string, Set<string>>();
-  for (const sale of data.sales) {
+  for (const sale of data.accounting) {
     if (!sale.course) continue;
-    const a = get(sale.course, sale.category);
-    a.revenue += sale.usdSales;
-    const ref = sale.orderRef || sale.movement;
+    const a = get(sale.course, sale.mainCategory);
+    a.revenue += sale.usdPaid;
+    const ref = sale.movement;
     if (ref) {
       let s = orderRefs.get(a.key);
       if (!s) {
@@ -831,14 +1090,13 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     const a = get(c.course, c.mainCategory);
     a.crmLeads++;
     if (c.isWon) a.won++;
-    if (c.isLost) a.lost++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       a.closeTotal += c.daysToClose;
       a.closeSample++;
     }
   }
 
-  for (const l of archivedLeads(data)) {
+  for (const l of archivedCrmLeads(data)) {
     if (!l.course) continue;
     const a = get(l.course, l.mainCategory);
     a.crmLeads++;
@@ -859,10 +1117,10 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   }
 
   if (prev) {
-    for (const sale of prev.sales) {
+    for (const sale of prev.accounting) {
       if (!sale.course) continue;
       const a = map.get(normalizeName(sale.course));
-      if (a) a.prevRevenue += sale.usdSales;
+      if (a) a.prevRevenue += sale.usdPaid;
     }
   }
 
@@ -934,7 +1192,6 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     const t = getTeam(teamName);
     t.agg.crmLeads++;
     if (c.isWon) t.agg.won++;
-    if (c.isLost) t.agg.lost++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       t.closeTotal += c.daysToClose;
       t.agg.closeSample++;
@@ -948,14 +1205,13 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
     p.agg.crmLeads++;
     if (c.isWon) p.agg.won++;
-    if (c.isLost) p.agg.lost++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       p.closeTotal += c.daysToClose;
       p.agg.closeSample++;
     }
   }
 
-  for (const l of archivedLeads(data)) {
+  for (const l of archivedCrmLeads(data)) {
     const teamName = l.salesTeam || "—";
     const t = getTeam(teamName);
     t.agg.crmLeads++;
@@ -978,12 +1234,12 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
       personTeam.set(c.salesperson, c.salesTeam);
   }
 
-  for (const sale of data.sales) {
+  for (const sale of data.accounting) {
     const person = sale.salesperson;
     const teamName = sale.salesTeam || (person ? personTeam.get(person) : "") || "—";
     const t = getTeam(teamName);
-    t.agg.revenue += sale.usdSales;
-    const ref = sale.orderRef || sale.movement;
+    t.agg.revenue += sale.usdPaid;
+    const ref = sale.movement;
     if (ref) t.orderRefs.add(ref);
     if (person) {
       let p = t.people.get(person);
@@ -991,7 +1247,7 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
         p = { agg: blank(person, teamName), closeTotal: 0, orderRefs: new Set() };
         t.people.set(person, p);
       }
-      p.agg.revenue += sale.usdSales;
+      p.agg.revenue += sale.usdPaid;
       if (ref) p.orderRefs.add(ref);
     }
   }
@@ -1044,7 +1300,13 @@ export function groupBy<T>(
   return out;
 }
 
-function matrix<T>(rows: T[], rowKey: (r: T) => string, colKey: (r: T) => string, topRows = 12, topCols = 10): Matrix {
+function matrix<T>(
+  rows: T[],
+  rowKey: (r: T) => string,
+  colKey: (r: T) => string,
+  topRows = 12,
+  topCols = 10,
+): Matrix {
   const rowTotalsMap = new Map<string, number>();
   const colTotalsMap = new Map<string, number>();
   const cellMap = new Map<string, number>();
@@ -1053,12 +1315,18 @@ function matrix<T>(rows: T[], rowKey: (r: T) => string, colKey: (r: T) => string
     const ck = colKey(r) || "—";
     rowTotalsMap.set(rk, (rowTotalsMap.get(rk) ?? 0) + 1);
     colTotalsMap.set(ck, (colTotalsMap.get(ck) ?? 0) + 1);
-    const k = rk + " " + ck;
+    const k = rk + "\u0000" + ck;
     cellMap.set(k, (cellMap.get(k) ?? 0) + 1);
   }
-  const rowNames = [...rowTotalsMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, topRows).map(([k]) => k);
-  const colNames = [...colTotalsMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, topCols).map(([k]) => k);
-  const cells = rowNames.map((rk) => colNames.map((ck) => cellMap.get(rk + " " + ck) ?? 0));
+  const rowNames = [...rowTotalsMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topRows)
+    .map(([k]) => k);
+  const colNames = [...colTotalsMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topCols)
+    .map(([k]) => k);
+  const cells = rowNames.map((rk) => colNames.map((ck) => cellMap.get(rk + "\u0000" + ck) ?? 0));
   return {
     rows: rowNames,
     cols: colNames,
@@ -1072,10 +1340,8 @@ function matrix<T>(rows: T[], rowKey: (r: T) => string, colKey: (r: T) => string
 /* --- lost ------------------------------------------------------------------- */
 
 /**
- * The Lost Analysis tab and CRM `Cleaned Stage = Lost` describe different
- * populations — they share no odoo ids and differ in size (6,550 vs 4,276).
- * Reason analysis uses the Lost tab; lost *rate* uses CRM. Both counts are
- * returned so the UI can label which is which instead of implying one number.
+ * Every Lost breakdown and rate uses the same authoritative archived
+ * population. Active CRM stage text is intentionally absent from this path.
  */
 export function computeLost(data: FilteredData): LostBreakdown {
   const rows = authoritativeLostLeads(data);
@@ -1084,13 +1350,23 @@ export function computeLost(data: FilteredData): LostBreakdown {
   return {
     byReason: groupBy(rows, (r) => r.lossReason || "—"),
     byCourse: groupBy(rows, (r) => r.course || "—"),
-    byMonth: groupBy(rows, (r) => monthOf(r.createdAt)).sort((a, b) => a.label.localeCompare(b.label)),
+    byMonth: groupBy(rows, (r) => monthOf(r.createdAt)).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    ),
     byTeam: groupBy(rows, (r) => r.salesTeam || "—"),
     bySalesperson: groupBy(rows, (r) => r.salesperson || "—"),
     bySource: groupBy(rows, (r) => labels.get(r.sourceKey) ?? r.source ?? "—"),
     byCampaign: groupBy(rows, (r) => r.campaignName || "—"),
-    reasonByTeam: matrix(rows, (r) => r.lossReason || "—", (r) => r.salesTeam || "—"),
-    reasonByCourse: matrix(rows, (r) => r.lossReason || "—", (r) => r.course || "—"),
+    reasonByTeam: matrix(
+      rows,
+      (r) => r.lossReason || "—",
+      (r) => r.salesTeam || "—",
+    ),
+    reasonByCourse: matrix(
+      rows,
+      (r) => r.lossReason || "—",
+      (r) => r.course || "—",
+    ),
     total: rows.length,
     crmLostCount: 0,
   };
@@ -1116,7 +1392,7 @@ export function computeLeadOrigin(data: FilteredData): {
 } {
   // Archived lost leads belong to a cohort too, otherwise this card reports a
   // near-zero lost count while the Lost page reports hundreds.
-  const archived = archivedLeads(data);
+  const archived = archivedCrmLeads(data);
   const build = (
     key: "campaign" | "other",
     rows: CrmLeadRow[],
@@ -1126,7 +1402,7 @@ export function computeLeadOrigin(data: FilteredData): {
     const { avg, sample } = closeStats(rows);
     const leads = rows.length + archivedRows.length;
     const won = rows.filter((r) => r.isWon).length;
-    const lost = archivedRows.filter((r) => !isArchivedWon(r)).length;
+    const lost = archivedRows.filter((row) => !isArchivedWon(row)).length;
     return {
       key,
       leads,
@@ -1145,8 +1421,14 @@ export function computeLeadOrigin(data: FilteredData): {
   const other = data.crm.filter((c) => !c.fromCampaign);
   const archivedFromCampaign = archived.filter(hasCampaign);
   const archivedOther = archived.filter((l) => !hasCampaign(l));
-  const campaignRevenue = sum(data.sales.filter((s) => !!s.campaignKey), (s) => s.usdSales);
-  const otherRevenue = sum(data.sales.filter((s) => !s.campaignKey), (s) => s.usdSales);
+  const campaignRevenue = sum(
+    data.accounting.filter((row) => !!row.campaignKey),
+    (row) => row.usdPaid,
+  );
+  const otherRevenue = sum(
+    data.accounting.filter((row) => !row.campaignKey),
+    (row) => row.usdPaid,
+  );
   const labels = data.snapshot.sourceLabels;
 
   return {
@@ -1175,7 +1457,9 @@ export function computeLeadOrigin(data: FilteredData): {
  * arithmetically correct, completely meaningless. When the previous window
  * predates complete data, no delta is shown at all.
  */
-export async function isPreviousComparable(prev: { from: string; to: string } | null): Promise<boolean> {
+export async function isPreviousComparable(
+  prev: { from: string; to: string } | null,
+): Promise<boolean> {
   if (!prev) return false;
   const all = await loadAllData();
   // Ads and CRM define where the dataset genuinely begins; the invoiced tab has
@@ -1214,7 +1498,8 @@ export function computeDeltas(now: Totals, prev: Totals): Deltas {
 
 export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const all = await loadAllData();
-  const latest = [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
+  const latest =
+    [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
   const year = currentYear ?? (latest ? +latest.slice(0, 4) : new Date().getUTCFullYear());
   const prevYear = year - 1;
 
@@ -1228,14 +1513,18 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const revenueOf = (y: number, m?: string) =>
     sum(
-      all.sales.filter((s) => inYear(s.paymentDate, y) && (!m || s.paymentDate.slice(5, 7) === m)),
-      (s) => s.usdSales,
+      all.accounting.filter(
+        (row) => inYear(row.paymentDate, y) && (!m || row.paymentDate.slice(5, 7) === m),
+      ),
+      (row) => row.usdPaid,
     );
   const leadsOf = (y: number, m?: string) =>
     all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length +
     all.lost.filter((l) => inYear(l.createdAt, y) && (!m || l.createdAt.slice(5, 7) === m)).length;
   const wonOf = (y: number, m?: string) =>
-    all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length;
+    all.crm.filter(
+      (c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m),
+    ).length;
 
   // Every source must carry a real prior year, not just one of them. The sheet
   // currently holds 109 invoice rows for 2025 and nothing else, which is enough
@@ -1246,12 +1535,12 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
     crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
-    sales: all.sales.filter((s) => inYear(s.paymentDate, prevYear)).length,
+    accounting: all.accounting.filter((row) => inYear(row.paymentDate, prevYear)).length,
   };
   const available =
     priorCounts.ads >= MIN_PRIOR_ROWS &&
     priorCounts.crm >= MIN_PRIOR_ROWS &&
-    priorCounts.sales >= MIN_PRIOR_ROWS;
+    priorCounts.accounting >= MIN_PRIOR_ROWS;
 
   // Growth is only emitted when the prior year is comparable at all, so no
   // consumer of this payload can render a percentage the data cannot support.
@@ -1278,37 +1567,45 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     return { metric: name, current, previous, growth: growthOf(current, previous) };
   };
   const ytdSpend = (y: number) =>
-    sum(all.ads.filter((a) => inYear(a.date, y) && a.date.slice(5) <= ytdCut), (a) => a.spend);
+    sum(
+      all.ads.filter((a) => inYear(a.date, y) && a.date.slice(5) <= ytdCut),
+      (a) => a.spend,
+    );
   const ytdRevenue = (y: number) =>
     sum(
-      all.sales.filter((s) => inYear(s.paymentDate, y) && s.paymentDate.slice(5) <= ytdCut),
-      (s) => s.usdSales,
+      all.accounting.filter(
+        (row) => inYear(row.paymentDate, y) && row.paymentDate.slice(5) <= ytdCut,
+      ),
+      (row) => row.usdPaid,
     );
   const ytdLeads = (y: number) =>
     all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
     all.lost.filter((l) => inYear(l.createdAt, y) && l.createdAt.slice(5) <= ytdCut).length;
   const ytdWon = (y: number) =>
-    all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length;
+    all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
+      .length;
 
-  const courseKeys = new Set(all.sales.map((s) => s.course).filter(Boolean));
-  const byCourse = [...courseKeys].map((course) => {
-    const current = sum(
-      all.sales.filter((s) => s.course === course && inYear(s.paymentDate, year)),
-      (s) => s.usdSales,
-    );
-    const previous = sum(
-      all.sales.filter((s) => s.course === course && inYear(s.paymentDate, prevYear)),
-      (s) => s.usdSales,
-    );
-    return {
-      key: course,
-      metric: "revenue",
-      current,
-      previous,
-      delta: current - previous,
-      growth: growthOf(current, previous),
-    };
-  }).sort((a, b) => b.current - a.current);
+  const courseKeys = new Set(all.accounting.map((row) => row.course).filter(Boolean));
+  const byCourse = [...courseKeys]
+    .map((course) => {
+      const current = sum(
+        all.accounting.filter((row) => row.course === course && inYear(row.paymentDate, year)),
+        (row) => row.usdPaid,
+      );
+      const previous = sum(
+        all.accounting.filter((row) => row.course === course && inYear(row.paymentDate, prevYear)),
+        (row) => row.usdPaid,
+      );
+      return {
+        key: course,
+        metric: "revenue",
+        current,
+        previous,
+        delta: current - previous,
+        growth: growthOf(current, previous),
+      };
+    })
+    .sort((a, b) => b.current - a.current);
 
   return {
     available,
@@ -1333,7 +1630,9 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 const money2 = (n: Maybe) =>
-  n === null ? "—" : "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n === null
+    ? "—"
+    : "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pctStr = (n: Maybe, d = 1) => (n === null ? "—" : n.toFixed(d) + "%");
 const roasStr = (n: Maybe) => (n === null ? "—" : n.toFixed(2) + "×");
 const delta = (n?: number) => (n === undefined ? "—" : (n >= 0 ? "+" : "") + n.toFixed(0) + "%");
@@ -1382,10 +1681,10 @@ export function execSummary(
   }
 
   en.push(
-    `Collected revenue was ${money(t.revenue)} from Sales.$ Sales by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} of that paid revenue traces to a campaign that spent in this window, through its sales order. Full Invoiced Orders shows ${money(t.orderRevenue)} for the same window and is a cross-check, not the revenue figure.`,
+    `Collected revenue was ${money(t.revenue)} from Accounting.USD Paid by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} of that paid revenue traces to a campaign in this window. Sales orders are not used as recognised revenue.`,
   );
   ar.push(
-    `الإيراد المحصَّل ${money(t.revenue)} من عمود $ Sales في تبويب Sales حسب تاريخ الدفع، والعائد الأساسي ${roasStr(t.roas)}. ومنه ${money(t.attributedRevenue)} يعود لحملة أنفقت داخل نفس الفترة، مربوطاً عبر رقم أمر البيع. أما تبويب الفواتير الكاملة فيعطي ${money(t.orderRevenue)} لنفس الفترة ويُستخدم للمراجعة لا كرقم إيراد.`,
+    `الإيراد المحصَّل ${money(t.revenue)} من عمود USD Paid في تبويب Accounting حسب تاريخ الدفع، والعائد الأساسي ${roasStr(t.roas)}. ومنه ${money(t.attributedRevenue)} مرتبط بحملة داخل نفس الفترة. أوامر البيع لا تُستخدم كإيراد محاسبي.`,
   );
 
   if (health.platformsWithoutSpendTab.length > 0) {
@@ -1417,8 +1716,12 @@ export function execSummary(
   }
 
   if (best) {
-    en.push(`Best campaign: ${best.name} — ${money(best.spend)} returned ${money(best.revenue)} (${roasStr(best.roas)}).`);
-    ar.push(`أفضل حملة: ${best.name} — أنفقت ${money(best.spend)} وأعادت ${money(best.revenue)} (${roasStr(best.roas)}).`);
+    en.push(
+      `Best campaign: ${best.name} — ${money(best.spend)} returned ${money(best.revenue)} (${roasStr(best.roas)}).`,
+    );
+    ar.push(
+      `أفضل حملة: ${best.name} — أنفقت ${money(best.spend)} وأعادت ${money(best.revenue)} (${roasStr(best.roas)}).`,
+    );
   }
 
   if (leak && (leak.roas === null || leak.roas < 1)) {
@@ -1431,13 +1734,21 @@ export function execSummary(
   }
 
   if (cheap) {
-    en.push(`Cheapest platform-reported leads came from ${cheap.name} at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} leads.`);
-    ar.push(`أرخص leads المبلغ عنها من المنصة جاءت من ${cheap.name} بتكلفة ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} lead.`);
+    en.push(
+      `Cheapest platform-reported leads came from ${cheap.name} at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} leads.`,
+    );
+    ar.push(
+      `أرخص leads المبلغ عنها من المنصة جاءت من ${cheap.name} بتكلفة ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} lead.`,
+    );
   }
 
   if (t.avgCloseDays !== null) {
-    en.push(`Deals take ${t.avgCloseDays.toFixed(1)} days to close on average, measured over ${t.closeSample.toLocaleString("en-US")} closed leads.`);
-    ar.push(`متوسط زمن إغلاق الصفقة ${t.avgCloseDays.toFixed(1)} يوماً، محسوباً على ${t.closeSample.toLocaleString("en-US")} صفقة مغلقة.`);
+    en.push(
+      `Deals take ${t.avgCloseDays.toFixed(1)} days to close on average, measured over ${t.closeSample.toLocaleString("en-US")} closed leads.`,
+    );
+    ar.push(
+      `متوسط زمن إغلاق الصفقة ${t.avgCloseDays.toFixed(1)} يوماً، محسوباً على ${t.closeSample.toLocaleString("en-US")} صفقة مغلقة.`,
+    );
   }
 
   if (health.leadsWithoutSpendSource > 0) {

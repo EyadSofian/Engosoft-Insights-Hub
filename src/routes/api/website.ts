@@ -4,7 +4,7 @@ export const Route = createFileRoute("/api/website")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered } = await import("@/lib/metrics.server");
+        const { getFiltered, authoritativeLostLeads } = await import("@/lib/metrics.server");
         const { normalizeName } = await import("@/lib/sheet-cache.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/website")({
         };
 
         const crm = uniqueById(data.crm);
-        const lost = uniqueById(data.lost);
+        const lost = authoritativeLostLeads(data);
         const won = crm.filter((lead) => lead.isWon);
         const open = crm.filter((lead) => !lead.isWon);
 

@@ -13,13 +13,14 @@ invoiced revenue, and reports full-funnel performance with an AI assistant on to
 | Styling    | Tailwind CSS v4, custom token layer                                        |
 | Charts     | Recharts                                                                   |
 | Data       | Google Sheets CSV (gviz), parsed with papaparse, cached in memory          |
-| Data (live) | Odoo 17 JSON-RPC, direct — Products tab only ([docs](docs/products-tab.md)) |
+| Data (live) | Odoo 17 JSON-RPC, direct — Products plus authoritative CRM/Lost |
 | Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
 | AI         | OpenAI (isolated in the chat route, swappable)                             |
 
-No database. The sheet is the source of truth for every tab except **Products**,
-which reads Odoo directly so a confirmed order appears within a minute instead of
-waiting for the next 30-minute sync. See [docs/products-tab.md](docs/products-tab.md).
+No database. Products, CRM, and Lost prefer Odoo directly. Products shows confirmed
+orders without waiting for the sheet sync; CRM uses the clean active population and
+Lost uses approved archived opportunities. A guarded sheet fallback keeps CRM/Lost
+available during an Odoo outage. See [docs/products-tab.md](docs/products-tab.md).
 
 ## Running locally
 
@@ -42,11 +43,11 @@ Copy `.env.example` to `.env`:
 | Variable                    | Required | Purpose                                                                                |
 | --------------------------- | -------- | -------------------------------------------------------------------------------------- |
 | `SHEET_ID`                  | No       | Google Sheet id. Falls back to the Engosoft sheet.                                     |
-| `ODOO_LOGIN`                | Products | Odoo user the API key belongs to. Without it only the Products tab is unavailable.     |
-| `ODOO_API_KEY`              | Products | Odoo API key, used in place of the password. Never logged or returned in a response.   |
+| `ODOO_LOGIN`                | Live data | Odoo user the API key belongs to. Without it Products is unavailable and CRM/Lost use the sheet fallback. |
+| `ODOO_API_KEY`              | Live data | Odoo API key, used in place of the password. Never logged or returned in a response.   |
 | `ODOO_URL` / `ODOO_DB`      | No       | Default to `https://engosoft.com` and `EngoSoft`.                                      |
 | `ODOO_COMPANY_IDS`          | No       | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                             |
-| `ODOO_START_DATE`           | No       | Earliest order date the Products tab reads. Default `2026-01-01`.                      |
+| `ODOO_START_DATE`           | No       | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                |
 | `OPENAI_API_KEY`            | No       | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
 | `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
 | `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |
@@ -59,12 +60,14 @@ The sheet must be shared as **anyone with the link can view**. The app only ever
 
 ## Data model
 
-`Campaign` is the spine. Ads ↔ CRM ↔ Full Invoiced Orders ↔ Lost join on a single
-campaign key: the campaign id when present, otherwise a normalized name that
-resolves back to an id if any tab pairs the two.
+`Campaign` is the marketing spine. Ads, CRM, Accounting, and Lost join on the
+campaign id when present, otherwise on a normalized campaign name. Accounting is
+the paid-revenue fact: `Payment Date` is the revenue date, `Move` is the distinct
+invoice key, and `USD Paid` is the authoritative revenue value.
 
-Sheet tabs consumed: `Meta Ads Daily`, `Snap Ads Daily`, `CRM Leads`,
-`Full Invoiced Orders`, `Sales`, `Lost Analysis`.
+Primary sheet tabs consumed: `Meta Ads Daily`, `Snap Ads Daily`, `CRM Leads`,
+`Accounting`, and `Lost Analysis`. `Sales` and `Full Invoiced Orders` remain
+temporary read-only compatibility fallbacks for older sheet deployments.
 
 Data is fetched on first request, cached in memory for 30 minutes, and refreshed via
 `POST /api/refresh`. If a fetch fails, the previous snapshot keeps serving rather than
@@ -141,7 +144,9 @@ the retry backoff instead.
 
 **14. CTR is never averaged.** It is recomputed as `Σ clicks / Σ impressions`.
 
-**15. `$ Sales` is already USD.** Never apply the `Value to dolar` rates to it.
+**15. `Accounting.USD Paid` is already USD.** Never apply the `Value to dolar`
+rates to it. Currency conversion is only a fallback for legacy rows where
+`USD Paid` is absent.
 
 **16. Prefer `attributedRoas` over `roas`.** Only ~42% of revenue carries a campaign at
 all, and only ~26% maps to a campaign present in the ads tabs.
@@ -179,8 +184,9 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                         |
 | `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                         |
 | `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate              |
-| `GET /api/full-invoiced`                       | Order lines, subtotals, attributed-vs-unattributed split                                 |
-| `GET /api/sales`                               | Revenue from the Sales tab (payment lines)                                               |
+| `GET /api/accounting`                          | Paid accounting lines, distinct invoices, revenue groups, and detail rows                |
+| `GET /api/full-invoiced`                       | Legacy compatibility endpoint; not a revenue source                                      |
+| `GET /api/sales`                               | Legacy alias backed by Accounting                                                        |
 | `GET /api/yoy`                                 | Year-over-year, or an honest empty state                                                 |
 | `GET /api/filters`                             | Distinct filter values, coverage, sync status, data health                               |
 | `POST /api/refresh`                            | Drops the cache and re-pulls the sheet; returns row counts so a no-op refresh is visible |

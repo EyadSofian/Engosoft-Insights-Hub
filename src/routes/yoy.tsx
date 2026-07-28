@@ -9,7 +9,7 @@ export const Route = createFileRoute("/yoy")({ component: Yoy });
 
 interface Resp extends YoyResult {
   years: number[];
-  rowsPerYear: { year: number; ads: number; crm: number; invoiced: number; sales: number }[];
+  rowsPerYear: { year: number; ads: number; crm: number; accounting: number }[];
   health: DataHealth;
 }
 
@@ -68,8 +68,7 @@ function Yoy() {
                     <th className="text-start py-2">{lang === "ar" ? "العام" : "Year"}</th>
                     <th className="text-end py-2">{lang === "ar" ? "إعلانات" : "Ads"}</th>
                     <th className="text-end py-2">{t("crm_leads")}</th>
-                    <th className="text-end py-2">{t("full_invoiced")}</th>
-                    <th className="text-end py-2">{t("sales")}</th>
+                    <th className="text-end py-2">{t("accounting")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -78,8 +77,7 @@ function Yoy() {
                       <td className="py-2.5 num font-medium">{r.year}</td>
                       <td className="py-2.5 text-end num">{fmtNum(r.ads)}</td>
                       <td className="py-2.5 text-end num">{fmtNum(r.crm)}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.invoiced)}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.sales)}</td>
+                      <td className="py-2.5 text-end num">{fmtNum(r.accounting)}</td>
                     </tr>
                   ))}
                 </tbody>

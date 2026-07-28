@@ -22,8 +22,9 @@ export const Route = createFileRoute("/api/refresh")({
             counts: {
               ads: data.ads.length,
               crm: data.crm.length,
+              accounting: data.accounting.length,
               invoiced: data.invoiced.length,
-              sales: data.sales.length,
+              sales: data.accounting.length,
               lost: data.lost.length,
             },
             fetchErrors: data.fetchErrors,

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/courses")({
         let drill = null;
         if (detail) {
           const rows = data.crm.filter((c) => c.course === detail);
-          const invoices = data.invoiced.filter((i) => i.course === detail);
+          const invoices = data.accounting.filter((row) => row.course === detail);
           const monthly = new Map<string, { month: string; revenue: number; leads: number; won: number }>();
           const at = (m: string) => {
             let e = monthly.get(m);
@@ -31,7 +31,9 @@ export const Route = createFileRoute("/api/courses")({
             }
             return e;
           };
-          for (const i of invoices) if (i.revenueDate) at(i.revenueDate.slice(0, 7)).revenue += i.usdSales;
+          for (const invoice of invoices)
+            if (invoice.paymentDate)
+              at(invoice.paymentDate.slice(0, 7)).revenue += invoice.usdPaid;
           for (const c of rows) {
             if (!c.createdAt) continue;
             const e = at(c.createdAt.slice(0, 7));

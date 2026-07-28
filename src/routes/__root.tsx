@@ -90,13 +90,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Engosoft — Marketing & Sales Intelligence" },
       {
         name: "description",
-        content: "Full-funnel marketing and sales intelligence dashboard for Engosoft.",
+        content: "Full-funnel marketing and accounting intelligence dashboard for Engosoft.",
       },
       { name: "theme-color", content: "#001E3C" },
       { property: "og:title", content: "Engosoft — Marketing & Sales Intelligence" },
       {
         property: "og:description",
-        content: "Full-funnel marketing and sales intelligence dashboard for Engosoft.",
+        content: "Full-funnel marketing and accounting intelligence dashboard for Engosoft.",
       },
       { property: "og:type", content: "website" },
     ],

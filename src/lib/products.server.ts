@@ -7,7 +7,7 @@
 //   Population   Confirmed sales orders (`sale.order.state = 'sale'`). A cancelled
 //                order or an unconfirmed quotation is not a sale. `basis=invoiced`
 //                narrows this to orders whose `invoice_status = 'invoiced'`, which
-//                is the same population the "Full Invoiced" tab reports.
+//                is an order-status diagnostic, not Accounting revenue.
 //   Date         `date_order` — when the sale happened. Not the invoice date,
 //                which is blank on most rows in this database.
 //   Units        Sum of `product_uom_qty` over real product lines. Discount and

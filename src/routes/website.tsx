@@ -183,6 +183,21 @@ function Website() {
           orderId: "Order ID",
         };
 
+  const displayCourseLabel = (value?: string) => {
+    const normalized = (value || "").trim().toLowerCase();
+    if (
+      !normalized ||
+      ["other", "others", "unknown", "unspecified", "not specified", "-", "—"].includes(
+        normalized,
+      )
+    ) {
+      return lang === "ar"
+        ? "غير محدد في أودو (حقل الكورس فارغ)"
+        : "Unspecified in Odoo (course field is blank)";
+    }
+    return value as string;
+  };
+
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const specialtyCols: Col<SpecialtyRow>[] = [
@@ -191,7 +206,7 @@ function Website() {
       header: t("course"),
       sticky: true,
       sortValue: (r) => r.specialty,
-      render: (r) => r.specialty,
+      render: (r) => displayCourseLabel(r.specialty),
     },
     {
       key: "total",
@@ -270,7 +285,7 @@ function Website() {
       key: "course",
       header: t("course"),
       sortValue: (r) => r.course,
-      render: (r) => r.course || "—",
+      render: (r) => displayCourseLabel(r.course),
     },
     {
       key: "stage",
@@ -317,7 +332,7 @@ function Website() {
       key: "courses",
       header: t("course"),
       sortValue: (r) => r.courses,
-      render: (r) => r.courses || "—",
+      render: (r) => displayCourseLabel(r.courses),
     },
     {
       key: "salesperson",
@@ -447,7 +462,9 @@ function Website() {
               <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="text-xs text-text-muted">{copy.bestSelling}</div>
                 <div className="mt-1 font-semibold text-text">
-                  {data.insights.bestSellingCourse?.label || copy.noData}
+                  {data.insights.bestSellingCourse
+                    ? displayCourseLabel(data.insights.bestSellingCourse.label)
+                    : copy.noData}
                 </div>
                 {data.insights.bestSellingCourse && (
                   <div className="mt-1 text-xs text-success">
@@ -459,7 +476,9 @@ function Website() {
               <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                 <div className="text-xs text-text-muted">{copy.unsoldDemand}</div>
                 <div className="mt-1 font-semibold text-text">
-                  {data.insights.highestDemandUnsoldCourse?.label || copy.noData}
+                  {data.insights.highestDemandUnsoldCourse
+                    ? displayCourseLabel(data.insights.highestDemandUnsoldCourse.label)
+                    : copy.noData}
                 </div>
                 {data.insights.highestDemandUnsoldCourse && (
                   <div className="mt-1 text-xs text-warning">
@@ -573,7 +592,7 @@ function Website() {
               {data.soldCourses.length ? (
                 <BarList
                   items={data.soldCourses.slice(0, 12).map((row) => ({
-                    label: row.label,
+                    label: displayCourseLabel(row.label),
                     value: row.value,
                     meta: (
                       <span>
@@ -593,7 +612,7 @@ function Website() {
               {data.unsoldCourses.length ? (
                 <BarList
                   items={data.unsoldCourses.slice(0, 12).map((row) => ({
-                    label: row.label,
+                    label: displayCourseLabel(row.label),
                     value: row.leads,
                     meta: (
                       <span>

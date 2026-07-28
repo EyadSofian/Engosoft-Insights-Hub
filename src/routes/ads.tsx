@@ -41,12 +41,18 @@ interface PlatformBlock {
 interface Resp {
   totals: Totals;
   byPlatform: PlatformBlock[];
-  byDay: { date: string; meta: number; snapchat: number; impressions: number; clicks: number }[];
+  byDay: ({ date: string; impressions: number; clicks: number } & Record<Platform, number>)[];
   byAd: PerfRow[];
   byAdset: PerfRow[];
   accounts: { name: string; objective: string; spend: number; platformLeads: number | null }[];
   health: DataHealth;
 }
+
+const PLATFORM_CHART_COLOR: Record<Platform, string> = {
+  meta: "var(--chart-1)",
+  snapchat: "var(--chart-4)",
+  tiktok: "var(--chart-3)",
+};
 
 function Ads() {
   const { t, lang } = useI18n();
@@ -73,7 +79,7 @@ function Ads() {
         </>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {data.byPlatform.map((p) => (
               <PlatformCard key={p.platform} block={p} />
             ))}
@@ -87,10 +93,11 @@ function Ads() {
             </SectionTitle>
             <MultiLineChart
               data={data.byDay}
-              series={[
-                { key: "meta", name: PLATFORM_LABEL.meta[lang], color: "var(--chart-1)" },
-                { key: "snapchat", name: PLATFORM_LABEL.snapchat[lang], color: "var(--chart-4)" },
-              ]}
+              series={data.byPlatform.map(({ platform }) => ({
+                key: platform,
+                name: PLATFORM_LABEL[platform][lang],
+                color: PLATFORM_CHART_COLOR[platform],
+              }))}
               format={fmtUSD}
             />
           </Card>

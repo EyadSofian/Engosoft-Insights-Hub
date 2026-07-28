@@ -22,8 +22,9 @@ export const Route = createFileRoute("/api/yoy")({
             year: y,
             ads: all.ads.filter((a) => a.date.startsWith(String(y))).length,
             crm: all.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
-            invoiced: all.invoiced.filter((i) => i.revenueDate.startsWith(String(y))).length,
-            sales: all.sales.filter((s) => s.paymentDate.startsWith(String(y))).length,
+            accounting: all.accounting.filter((row) =>
+              row.paymentDate.startsWith(String(y)),
+            ).length,
           })),
           health: all.health,
         });

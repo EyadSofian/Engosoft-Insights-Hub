@@ -16,11 +16,17 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
   const filters: GlobalFilters = {
     from: p.get("from") || undefined,
     to: p.get("to") || undefined,
-    platform: platform === "meta" || platform === "snapchat" ? (platform as Platform) : undefined,
+    platform:
+      platform === "meta" || platform === "snapchat" || platform === "tiktok"
+        ? (platform as Platform)
+        : undefined,
     account: p.get("account") || undefined,
     campaign: p.get("campaign") || undefined,
+    campaignKey: p.get("campaignKey") || undefined,
     adset: p.get("adset") || undefined,
+    adsetKey: p.get("adsetKey") || undefined,
     ad: p.get("ad") || undefined,
+    adKey: p.get("adKey") || undefined,
     source: p.get("source") || undefined,
     course: p.get("course") || undefined,
     mainCategory: p.get("mainCategory") || undefined,

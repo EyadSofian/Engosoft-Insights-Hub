@@ -243,8 +243,8 @@ function Overview() {
           }
         />
 
-        <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={lang === "ar" ? `إيراد Sales ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}` : `Sales revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
-        <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "الإنفاق ÷ إيراد Sales" : "Spend ÷ Sales revenue"} />
+        <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={lang === "ar" ? `الإيراد المحصّل من Accounting ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}` : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
+        <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "الإنفاق ÷ الإيراد المحصّل من Accounting" : "Spend ÷ collected Accounting revenue"} />
         <KpiCard index={10} label={t("cpl")} value={fmtUSDFull(T.cpl)} delta={deltas.cpl} deltaInvert icon={<DollarSign size={15} />} sub={lang === "ar" ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية` : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`} />
         <CpaCard totals={T} />
       </div>
@@ -504,6 +504,18 @@ export function DataHealthPanel({ health }: { health: DataHealth }) {
 
   const items: { label: string; value: string; warn?: boolean }[] = [
     {
+      label: lang === "ar" ? "مصدر CRM وLost" : "CRM & Lost source",
+      value:
+        health.crmAuthority === "odoo-direct"
+          ? lang === "ar"
+            ? "Odoo مباشر"
+            : "Odoo direct"
+          : lang === "ar"
+            ? "نسخة Google Sheets الاحتياطية"
+            : "Google Sheets fallback",
+      warn: health.crmAuthority !== "odoo-direct",
+    },
+    {
       label: t("adset_resolution"),
       value: `${pct(health.adsetResolutionRate)} (${fmtNum(adBearing - health.adsetUnknown)} / ${fmtNum(adBearing)})`,
       warn: health.adsetResolutionRate < 0.9,
@@ -520,7 +532,14 @@ export function DataHealthPanel({ health }: { health: DataHealth }) {
       warn: health.revenueCampaignShare < 0.6,
     },
     { label: lang === "ar" ? "تغطية اسم الإعلان في النظام" : "CRM ad-name coverage", value: pct(health.crmAdCoverage), warn: health.crmAdCoverage < 0.8 },
-    { label: lang === "ar" ? "تغطية اسم الإعلان في الفواتير" : "Invoice ad-name coverage", value: pct(health.invoicedAdCoverage), warn: health.invoicedAdCoverage < 0.8 },
+    {
+      label:
+        lang === "ar"
+          ? "تغطية اسم الإعلان في الحسابات"
+          : "Accounting ad-name coverage",
+      value: pct(health.accountingAdCoverage),
+      warn: health.accountingAdCoverage < 0.8,
+    },
     {
       label: lang === "ar" ? "قياس زمن الإغلاق" : "Close-time measurability",
       value: `${fmtNum(health.closeSample)} ${lang === "ar" ? "صفقة" : "leads"} (${pct(health.closeCoverage)})`,
@@ -528,7 +547,10 @@ export function DataHealthPanel({ health }: { health: DataHealth }) {
     },
     { label: t("no_spend_source"), value: fmtNum(health.leadsWithoutSpendSource), warn: health.leadsWithoutSpendSource > 0 },
     {
-      label: lang === "ar" ? "صفوف بإيراد سالب (مرتجعات)" : "Negative revenue rows (refunds)",
+      label:
+        lang === "ar"
+          ? "بنود خصم سالبة داخل الفواتير"
+          : "Negative discount lines inside invoices",
       value: `${fmtNum(health.negativeRevenueRows)} · ${fmtUSDFull(health.negativeRevenue)}`,
     },
   ];

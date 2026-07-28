@@ -49,8 +49,7 @@ function activePreset(f: GlobalFilters, latest?: string): DatePreset | null {
 /* -------------------------------------------------------------------------- */
 
 /** ISO "YYYY-MM-DD" → local Date at midnight (no timezone drift). */
-const parseISO = (s?: string): Date | undefined =>
-  s ? new Date(s + "T00:00:00") : undefined;
+const parseISO = (s?: string): Date | undefined => (s ? new Date(s + "T00:00:00") : undefined);
 
 /** Local Date → "YYYY-MM-DD" using local parts, so the picked day never shifts. */
 const toISO = (d: Date): string =>
@@ -70,7 +69,12 @@ function shortDay(s: string, lang: Lang): string {
 /*  Range calendar (react-day-picker, themed with app tokens)                  */
 /* -------------------------------------------------------------------------- */
 
-function RangeDayButton({ day, modifiers, className: _c, ...props }: ComponentProps<typeof DayButton>) {
+function RangeDayButton({
+  day,
+  modifiers,
+  className: _c,
+  ...props
+}: ComponentProps<typeof DayButton>) {
   const endpoint =
     modifiers.range_start || modifiers.range_end || (modifiers.selected && !modifiers.range_middle);
 
@@ -240,10 +244,7 @@ export function DateRangePanel({
             )}
             <ChevronDown
               size={16}
-              className={cn(
-                "text-text-subtle transition-transform",
-                showCal && "rotate-180",
-              )}
+              className={cn("text-text-subtle transition-transform", showCal && "rotate-180")}
             />
           </span>
         </button>
@@ -253,6 +254,17 @@ export function DateRangePanel({
           {t("custom_range")}
           <span className="h-px flex-1 bg-border" />
         </div>
+      )}
+
+      {showCal && filters.from && (
+        <button
+          type="button"
+          onClick={() => filterStore.setDates(undefined, undefined)}
+          className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text cursor-pointer"
+        >
+          <X size={13} />
+          {lang === "ar" ? "مسح التواريخ وبدء فترة جديدة" : "Clear dates and start a new range"}
+        </button>
       )}
 
       {showCal && (

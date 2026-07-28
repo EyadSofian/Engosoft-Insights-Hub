@@ -11,7 +11,13 @@ import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
 
 export interface FiltersResp {
-  accounts: { name: string; platform: Platform; objective: CampaignObjective; spend: number; platformLeads: number | null }[];
+  accounts: {
+    name: string;
+    platform: Platform;
+    objective: CampaignObjective;
+    spend: number;
+    platformLeads: number | null;
+  }[];
   accountNames: string[];
   campaigns: string[];
   adsets: string[];
@@ -41,7 +47,15 @@ export interface FiltersResp {
   fetchErrors: string[];
   /** Tabs served from the last good copy because this pull failed or was empty. */
   staleTabs: string[];
-  counts: { ads: number; crm: number; invoiced: number; sales: number; lost: number };
+  counts: {
+    ads: number;
+    crm: number;
+    accounting: number;
+    /** Compatibility counters retained by the API during migration. */
+    invoiced: number;
+    sales: number;
+    lost: number;
+  };
 }
 
 export function useFiltersData() {
@@ -77,7 +91,8 @@ export function TopBar({ title }: { title?: string }) {
   // The first payload tells us the sheet's real end date; re-anchor the default
   // year-to-date window to it so the chip label and the query agree.
   useEffect(() => {
-    if (!latest || filters.from || filters.to || filters.range) return;
+    if (!latest || filters.from || filters.to || filters.range || filterStore.isManualDateMode())
+      return;
     filterStore.setPreset("year", latest);
   }, [latest, filters.from, filters.to, filters.range]);
 
@@ -91,7 +106,6 @@ export function TopBar({ title }: { title?: string }) {
     }
   };
 
-
   return (
     <>
       <header className="sticky top-0 z-30 glass border-b border-border">
@@ -100,9 +114,13 @@ export function TopBar({ title }: { title?: string }) {
               The page title itself lives in each page's PageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
           <div className="flex items-center gap-2 min-w-0">
-            <span className="lg:hidden font-semibold text-[15px] tracking-tight text-text">ENGOSOFT</span>
+            <span className="lg:hidden font-semibold text-[15px] tracking-tight text-text">
+              ENGOSOFT
+            </span>
             {title && (
-              <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">{title}</h1>
+              <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">
+                {title}
+              </h1>
             )}
           </div>
 
@@ -163,7 +181,9 @@ export function TopBar({ title }: { title?: string }) {
           <DateFilter latest={latest} />
           <Segmented
             value={filters.platform ?? "all"}
-            onChange={(v) => filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })}
+            onChange={(v) =>
+              filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })
+            }
             options={[
               { value: "all", label: t("all_platforms") },
               ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
@@ -206,7 +226,9 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
     <div
       className="px-4 sm:px-6 py-1.5 text-[11px] font-medium flex items-center gap-2 border-t border-border"
       style={{
-        background: danger ? "var(--danger-soft, rgba(220,38,38,.10))" : "var(--warning-soft, rgba(217,119,6,.10))",
+        background: danger
+          ? "var(--danger-soft, rgba(220,38,38,.10))"
+          : "var(--warning-soft, rgba(217,119,6,.10))",
         color: danger ? "var(--danger)" : "var(--warning)",
       }}
       role="status"
@@ -274,9 +296,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
       .map((s) => `• ${s.label}: ${fmtDateTime(s.syncedAt, lang)} — ${fmtAge(ageH(s.syncedAt))}`),
   ].join("\n");
 
-  const lagging = tabSyncs
-    .slice()
-    .sort((a, b) => a.syncedAt.localeCompare(b.syncedAt))[0];
+  const lagging = tabSyncs.slice().sort((a, b) => a.syncedAt.localeCompare(b.syncedAt))[0];
 
   return (
     <span
@@ -298,7 +318,15 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
   );
 }
 
-function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => void; data?: FiltersResp }) {
+function FilterSheet({
+  open,
+  onClose,
+  data,
+}: {
+  open: boolean;
+  onClose: () => void;
+  data?: FiltersResp;
+}) {
   const { t, lang } = useI18n();
   const filters = useFilters();
   useModalGuard(open);
@@ -346,7 +374,9 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
 
         <div className="grid gap-4">
           <div>
-            <span className="block text-xs font-medium text-text-muted mb-2">{t("date_range")}</span>
+            <span className="block text-xs font-medium text-text-muted mb-2">
+              {t("date_range")}
+            </span>
             <DateRangePanel latest={latestDate(data)} collapsibleCalendar />
           </div>
 
@@ -360,19 +390,35 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
             label={t("campaign")}
             value={filters.campaign}
             options={data?.campaigns ?? []}
-            onChange={(v) => filterStore.set({ campaign: v })}
+            onChange={(v) =>
+              filterStore.set({
+                campaign: v,
+                campaignKey: undefined,
+                adset: undefined,
+                adsetKey: undefined,
+                ad: undefined,
+                adKey: undefined,
+              })
+            }
           />
           <Select
             label={t("ad_set")}
             value={filters.adset}
             options={data?.adsets ?? []}
-            onChange={(v) => filterStore.set({ adset: v })}
+            onChange={(v) =>
+              filterStore.set({
+                adset: v,
+                adsetKey: undefined,
+                ad: undefined,
+                adKey: undefined,
+              })
+            }
           />
           <Select
             label={t("ad_name")}
             value={filters.ad}
             options={data?.ads ?? []}
-            onChange={(v) => filterStore.set({ ad: v })}
+            onChange={(v) => filterStore.set({ ad: v, adKey: undefined })}
           />
           <Select
             label={t("course")}
@@ -404,7 +450,6 @@ function FilterSheet({ open, onClose, data }: { open: boolean; onClose: () => vo
             options={data?.salespeople ?? []}
             onChange={(v) => filterStore.set({ salesperson: v })}
           />
-
         </div>
 
         <div className="flex gap-2 mt-6">

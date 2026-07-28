@@ -123,7 +123,11 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   L.push(`🏆 *${esc("الإغلاق")}*`);
   L.push(esc(`صفقات مغلقة: ${int(t.won)} (${pct(t.conversionRate)})  ${change(t.won, p.won)}`));
   L.push(esc(`ضائعة من Lost Analysis فقط: ${int(t.lost)} (${pct(t.lostRate)})`));
-  L.push(esc(`إيراد الفواتير المدفوعة حسب Payment Date: ${money(t.revenue)}  ${change(t.revenue, p.revenue)}`));
+  L.push(
+    esc(
+      `إيراد Accounting.USD Paid حسب Payment Date: ${money(t.revenue)}  ${change(t.revenue, p.revenue)}`,
+    ),
+  );
   L.push("");
 
   L.push(`📈 *${esc("مؤشرات الكفاءة")}*`);

@@ -91,8 +91,10 @@ export const Route = createFileRoute("/api/ads")({
           totals: computeTotals(data),
           byPlatform,
           byDay: [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
-          byAd: computePerf(data, "ad").slice(0, 300),
-          byAdset: computePerf(data, "adset").slice(0, 300),
+          // Return the complete aggregate. Client-side search, sorting and CSV
+          // export must operate on the same population shown by the row count.
+          byAd: computePerf(data, "ad"),
+          byAdset: computePerf(data, "adset"),
           accounts: data.snapshot.accounts,
           health: data.snapshot.health,
           appliedFilters: filters,

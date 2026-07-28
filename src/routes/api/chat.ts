@@ -85,8 +85,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("total revenue", "إجمالي الإيراد", "اجمالي الايراد")) {
             return ar
-              ? `إجمالي الإيراد المدفوع: **${money(totals.revenue)}** من Sales.$ Sales حسب Payment Date. إيراد أوامر الحملات الاسترشادي ${money(totals.attributedRevenue)}.`
-              : `Paid-invoice revenue: **${money(totals.revenue)}** from Sales.$ Sales by Payment Date. Advisory campaign-order revenue is ${money(totals.attributedRevenue)}.`;
+              ? `إجمالي الإيراد المحصَّل: **${money(totals.revenue)}** من Accounting.USD Paid حسب Payment Date. منه ${money(totals.attributedRevenue)} مرتبط بحملات.`
+              : `Collected revenue: **${money(totals.revenue)}** from Accounting.USD Paid by Payment Date. ${money(totals.attributedRevenue)} is campaign-linked.`;
           }
           if (has("total leads", "إجمالي العملاء", "كم عميل")) {
             return ar
@@ -120,11 +120,11 @@ export const Route = createFileRoute("/api/chat")({
             cpl: "total ad spend ÷ leads reported by Meta and Snapchat.",
             cpa: "total ad spend ÷ won deals.",
             lost: "Lost Analysis only. CRM stage Lost is excluded.",
-            revenue: "Sales.$ Sales filtered by Payment Date. Campaign-order revenue from Full Invoiced Orders is advisory.",
-            roas: "Sales.$ Sales revenue ÷ total ad spend. attributedRoas is advisory Full Invoiced Orders campaign revenue ÷ spend.",
+            revenue: "Accounting.USD Paid filtered by Payment Date at invoice product-line grain.",
+            roas: "Accounting.USD Paid revenue ÷ total ad spend. attributedRoas uses campaign-linked Accounting revenue.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",
             nulls: "null means the metric is not measurable from this data — never report it as zero.",
-            caveats: `Campaign attribution is available only on Full Invoiced Orders, not on the primary Sales accounting rows. Close time is measured on ${health.closeSample} closed leads only.`,
+            caveats: `Campaign attribution comes from Accounting when populated and uses the legacy order bridge only as a compatibility fallback. Close time is measured on ${health.closeSample} closed leads only.`,
           },
           totals,
           topCampaigns: campaigns.slice(0, 20).map((c) => ({

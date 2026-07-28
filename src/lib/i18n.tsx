@@ -19,12 +19,13 @@ type Entry = { ar: string; en: string };
  */
 export const DICT = {
   app_title: { ar: "منصة إنجوسوفت للتحليلات", en: "Engosoft Insights" },
-  app_sub: { ar: "تحليلات التسويق والمبيعات", en: "Marketing & Sales Intelligence" },
+  app_sub: { ar: "تحليلات التسويق والحسابات", en: "Marketing & Accounting Intelligence" },
 
   // nav
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
+  accounting: { ar: "الحسابات", en: "Accounting" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
   leads: { ar: "العملاء المحتملون", en: "Leads (CRM)" },
   website: { ar: "أداء الموقع", en: "Website performance" },
@@ -117,6 +118,13 @@ export const DICT = {
   attributed_roas: { ar: "العائد على الجزء المرتبط بحملة", en: "Campaign-linked ROAS" },
   full_invoiced_revenue: { ar: "أوامر مفوترة (استرشادي)", en: "Invoiced orders (advisory)" },
   orders: { ar: "الطلبات", en: "Orders" },
+  invoices: { ar: "الفواتير", en: "Invoices" },
+  product_lines: { ar: "بنود المنتجات", en: "Product lines" },
+  avg_invoice: { ar: "متوسط الفاتورة", en: "Avg invoice" },
+  usd_paid: { ar: "المحصّل بالدولار", en: "USD Paid" },
+  usd_untaxed: { ar: "دون الضريبة بالدولار", en: "USD Untaxed" },
+  untaxed_total: { ar: "الإجمالي دون الضريبة", en: "Untaxed total" },
+  total_in_currency: { ar: "الإجمالي بالعملة", en: "Total in currency" },
   avg_order: { ar: "متوسط الطلب", en: "Avg order" },
   aov: { ar: "متوسط قيمة الطلب", en: "AOV" },
   vs_prev: { ar: "مقارنة بالفترة السابقة", en: "vs previous period" },
@@ -147,6 +155,11 @@ export const DICT = {
   contact: { ar: "جهة الاتصال", en: "Contact" },
   customer: { ar: "العميل", en: "Customer" },
   product: { ar: "المنتج", en: "Product" },
+  product_category: { ar: "فئة المنتج", en: "Product category" },
+  country: { ar: "الدولة", en: "Country" },
+  currency: { ar: "العملة", en: "Currency" },
+  payment_date: { ar: "تاريخ الدفع", en: "Payment date" },
+  movement: { ar: "الحركة", en: "Move" },
   ad_name: { ar: "الإعلان", en: "Ad name" },
   ad_set: { ar: "المجموعة الإعلانية", en: "Ad set" },
   order_ref: { ar: "رقم الطلب", en: "Order ref" },
@@ -231,8 +244,8 @@ export const DICT = {
   from_campaigns: { ar: "من حملات إعلانية", en: "From campaigns" },
   other_sources: { ar: "من مصادر أخرى", en: "Other sources" },
   origin_note: {
-    ar: "أعداد العملاء تشمل Lost Analysis؛ توزيع الإيراد حسب المصدر استرشادي من Full Invoiced Orders لأن Sales لا يحمل مصدر الحملة.",
-    en: "Lead counts include Lost Analysis; source-level revenue is advisory from Full Invoiced Orders because Sales has no campaign-source field.",
+    ar: "أعداد العملاء تشمل Lost Analysis؛ توزيع الإيراد حسب المصدر يعتمد على أبعاد الحملة في Accounting مع توافق مؤقت للملفات القديمة.",
+    en: "Lead counts include Lost Analysis; source-level revenue uses Accounting campaign dimensions with a temporary legacy fallback.",
   },
 
   // ad set
@@ -271,12 +284,12 @@ export const DICT = {
     en: "TikTok, UChat, WhatsApp and referrals produce leads but carry no spend in the sheet, so blended CPL reads cheaper than reality.",
   },
   attributed_note: {
-    ar: "الجزء من الإيراد المحصَّل الذي يعود لحملة أنفقت في نفس الفترة، مربوطاً برقم أمر البيع.",
-    en: "The share of collected revenue tied to a campaign that spent in this window, joined on the sales-order number.",
+    ar: "الجزء من الإيراد المحصَّل المرتبط بحملة أنفقت في نفس الفترة من أبعاد تبويب الحسابات.",
+    en: "The share of collected revenue tied to a campaign that spent in this window through Accounting dimensions.",
   },
   revenue_basis_note: {
-    ar: "الإيراد = عمود ‎$ Sales في تبويب Sales، مؤرَّخ بتاريخ الدفع — أي المحصَّل فعلاً كما تقرأه الحسابات، لا المفوتر.",
-    en: "Revenue = the $ Sales column on the Sales tab, dated by Payment Date — money actually collected, as accounting reads it, not invoiced.",
+    ar: "الإيراد = عمود USD Paid في تبويب Accounting، مؤرَّخ بتاريخ الدفع، وعلى مستوى بند المنتج.",
+    en: "Revenue = Accounting.USD Paid, dated by Payment Date at invoice product-line grain.",
   },
   missing_spend_tab: {
     ar: "إنفاق ناقص — منصة تُنتج عملاء بلا تبويب إنفاق",
@@ -336,8 +349,8 @@ export const DICT = {
   basis_confirmed: { ar: "أوامر بيع مؤكدة", en: "Confirmed orders" },
   basis_invoiced: { ar: "مفوترة بالكامل", en: "Fully invoiced" },
   basis_note: {
-    ar: "«أوامر بيع مؤكدة» = كل أمر بيع حالته Sale في أودو. «مفوترة بالكامل» = نفس التعريف المستخدم في تبويب الفواتير.",
-    en: 'Confirmed = every Odoo order in state "Sale". Fully invoiced = the same population the Full Invoiced tab reports.',
+    ar: "«أوامر بيع مؤكدة» = كل أمر بيع حالته Sale في أودو. «مفوترة بالكامل» = حالة Invoice Status في أمر البيع، وليست إيراد الحسابات.",
+    en: 'Confirmed = every Odoo order in state "Sale". Fully invoiced is the order Invoice Status, not Accounting revenue.',
   },
   currency_note: {
     ar: "الشركات الثلاث تبيع بأربع عملات. الإجمالي الوحيد القابل للجمع هو الدولار، محسوباً بسعر صرف يوم البيع نفسه؛ والمبالغ بالعملة الأصلية معروضة كما هي دون جمع.",
