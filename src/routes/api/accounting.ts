@@ -70,7 +70,7 @@ export const Route = createFileRoute("/api/accounting")({
           ),
           health: data.snapshot.health,
           source: {
-            tab: data.snapshot.tabSyncs.find((item) => item.key === "accounting")?.label ?? "Accounting",
+            tab: "Paid Invoices",
             dateBasis: "Payment Date",
             valueBasis: "USD Paid",
             grain: "invoice_product_line",

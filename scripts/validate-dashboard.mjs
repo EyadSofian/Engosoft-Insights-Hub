@@ -58,7 +58,7 @@ async function get(path, extraParams = {}) {
   throw lastError;
 }
 
-const [overview, accounting, ads, campaigns, adsets, adRows, lost, website] = await Promise.all([
+const [overview, accounting, ads, campaigns, adsets, adRows, lost, website, filters] = await Promise.all([
   get("/api/overview"),
   get("/api/accounting"),
   get("/api/ads"),
@@ -67,6 +67,7 @@ const [overview, accounting, ads, campaigns, adsets, adRows, lost, website] = aw
   get("/api/campaigns", { grain: "ad" }),
   get("/api/lost"),
   get("/api/website"),
+  get("/api/filters"),
 ]);
 
 const checks = [];
@@ -110,6 +111,14 @@ check(
   accounting.source.dateBasis === "Payment Date",
   accounting.source.dateBasis,
   "Payment Date",
+);
+check(
+  "Healthy canonical fallbacks are not reported as excluded sources",
+  !(filters.fetchErrors ?? []).some((entry) =>
+    /accounting reconciliation|retaining .* accounting authority|using (sales|google sheets) fallback/i.test(entry),
+  ),
+  filters.fetchErrors ?? [],
+  [],
 );
 check(
   "Spend = sum of platform spend",

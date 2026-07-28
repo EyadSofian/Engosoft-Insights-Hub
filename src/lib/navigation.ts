@@ -2,10 +2,8 @@ import {
   BarChart3,
   CalendarRange,
   Globe2,
-  GraduationCap,
   LayoutDashboard,
   Megaphone,
-  Package,
   Receipt,
   TrendingDown,
   Users,
@@ -79,11 +77,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     icon: Receipt,
     defaultTo: "/accounting",
     aliases: ["/sales", "/full-invoiced"],
-    items: [
-      { to: "/accounting", key: "accounting", icon: Receipt },
-      { to: "/courses", key: "courses", icon: GraduationCap },
-      { to: "/products", key: "products", icon: Package },
-    ],
+    items: [{ to: "/accounting", key: "accounting", icon: Receipt }],
   },
   {
     id: "website",

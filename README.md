@@ -13,14 +13,15 @@ invoiced revenue, and reports full-funnel performance with an AI assistant on to
 | Styling    | Tailwind CSS v4, custom token layer                                        |
 | Charts     | Recharts                                                                   |
 | Data       | Google Sheets CSV (gviz), parsed with papaparse, cached in memory          |
-| Data (live) | Odoo 17 JSON-RPC, direct — Products plus authoritative CRM/Lost |
+| Data (live) | Odoo 17 JSON-RPC, direct — guarded Accounting and authoritative CRM/Lost candidates |
 | Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
 | AI         | OpenAI (isolated in the chat route, swappable)                             |
 
-No database. Products, CRM, and Lost prefer Odoo directly. Products shows confirmed
-orders without waiting for the sheet sync; CRM uses the clean active population and
-Lost uses approved archived opportunities. A guarded sheet fallback keeps CRM/Lost
-available during an Odoo outage. See [docs/products-tab.md](docs/products-tab.md).
+No database. CRM and Lost prefer Odoo directly, while Accounting accepts a direct
+invoice extract only after it reconciles to the approved paid-invoice sheet. Healthy
+sheet fallbacks remain authoritative during an Odoo outage and are not shown as
+missing sources. The dashboard exposes one Accounting report; legacy Courses,
+Products, Sales and Full Invoiced routes redirect to it.
 
 ## Running locally
 
@@ -66,8 +67,9 @@ the paid-revenue fact: `Payment Date` is the revenue date, `Move` is the distinc
 invoice key, and `USD Paid` is the authoritative revenue value.
 
 Primary sheet tabs consumed: `Meta Ads Daily`, `Snap Ads Daily`, `CRM Leads`,
-`Accounting`, and `Lost Analysis`. `Sales` and `Full Invoiced Orders` remain
-temporary read-only compatibility fallbacks for older sheet deployments.
+`Lost Analysis`, and the approved paid-invoice analysis (`Accounting`, or the
+historical `Sales` tab when that is the complete reconciled source). `Full Invoiced
+Orders` is read only for compatibility and never defines Accounting revenue.
 
 Data is fetched on first request, cached in memory for 30 minutes, and refreshed via
 `POST /api/refresh`. If a fetch fails, the previous snapshot keeps serving rather than

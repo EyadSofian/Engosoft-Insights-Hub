@@ -855,16 +855,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const sheetAccountingSourceRaw = accountingPrimaryComplete
       ? accountingPrimaryRaw
       : legacySalesRaw;
-    const sheetAccountingTab = accountingPrimaryComplete ? TAB.accounting : TAB.legacySales;
-    if (
-      primaryCanonical.rows.length > 0 &&
-      legacyCanonical.rows.length > 0 &&
-      !accountingPrimaryComplete
-    ) {
-      fetchErrors.push(
-        `Accounting failed 98% completeness gate (${primaryCanonical.rows.length} canonical rows / ${primaryMoves} moves versus legacy Sales ${legacyCanonical.rows.length} canonical rows / ${legacyMoves} moves); using Sales fallback.`,
-      );
-    }
+    // A complete paid-invoice fallback is a valid Accounting authority, not a
+    // missing source. The reconciliation details stay in diagnostics; they must
+    // not create a red "numbers exclude this source" banner.
 
     const rawAccountingRevenue = (rows: Raw[]): number =>
       rows.reduce(
@@ -921,8 +914,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       ? directAccountingRows
       : sheetAccountingSelection.rows;
     const accountingTab = accountingDirectAccepted
-      ? "Odoo Accounting (direct)"
-      : sheetAccountingTab;
+      ? "Paid Invoices (Odoo direct)"
+      : "Paid Invoices (Payment Date)";
     const accountingAuthority: DataHealth["accountingAuthority"] = accountingDirectAccepted
       ? "odoo-direct"
       : "google-sheet-fallback";
@@ -954,11 +947,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       unresolvedFields: directAccounting.value?.diagnostics.unresolvedFields ?? [],
       error: accountingDirectError,
     };
-    if (odooConfigured() && accountingDirectError) {
-      fetchErrors.push(
-        `${accountingDirectError} Retaining ${sheetAccountingTab} as the Accounting authority.`,
-      );
-    }
+    // A rejected direct-Odoo candidate does not make Accounting unavailable:
+    // the canonical paid-invoice sheet above remains complete and authoritative.
+    // Keep the reason in `health.accountingDirect.error` for engineering audit,
+    // but do not mislabel the financial totals as incomplete.
 
     const blankExclusions = (): CrmExclusionDiagnostics => ({
       candidates: 0,
@@ -1009,12 +1001,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       crmAuthority = "odoo-direct";
       crmExclusions = directCrm.value.diagnostics.crm;
       lostExclusions = directCrm.value.diagnostics.lost;
-    } else if (directCrm.value) {
+    } else if (!crmSheetRaw.length || !lostSheetRaw.length) {
+      // Only call this a missing source when neither authority can supply the
+      // complete CRM + Lost population. A healthy sheet fallback is valid data,
+      // not an excluded source.
       fetchErrors.push(
-        `Odoo CRM direct failed completeness gate (CRM ${directCrm.value.crm.length}/${crmSheetRaw.length || "no fallback"}, Lost ${directCrm.value.lost.length}/${lostSheetRaw.length || "no fallback"}); using Google Sheets fallback.`,
+        directCrm.value
+          ? `CRM/Lost unavailable: direct Odoo failed completeness and the Google Sheets fallback is incomplete.`
+          : `CRM/Lost unavailable: ${directCrm.error}`,
       );
-    } else {
-      fetchErrors.push(`Odoo CRM direct: ${directCrm.error}`);
     }
 
     /* -- pass 1: learn keys from the ads tabs ----------------------------- */
@@ -1709,7 +1704,6 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         label: crmAuthority === "odoo-direct" ? "Odoo CRM (direct)" : TAB.crm,
         syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")),
       },
-      { key: "invoiced", label: TAB.invoiced, syncedAt: asIso(maxOf(invRaw, "__odoo_write_date")) },
       {
         key: "accounting",
         label: accountingTab,

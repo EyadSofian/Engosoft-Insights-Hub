@@ -11,6 +11,10 @@ import {
   PLATFORM_SOURCE_KEYS,
   type Snapshot,
 } from "./sheet-cache.server";
+import {
+  approvedReportingEnd,
+  REPORTING_WINDOW_START,
+} from "./reporting-window";
 import type {
   AdRow,
   AccountingRow,
@@ -483,14 +487,16 @@ function teamHasPerson(all: Snapshot, team: string, person: string): boolean {
   return personTeamCache.map.get(person) === team;
 }
 
-/** Default window: year to date. Spend now covers the full year, so the old
- *  Meta-window default (and its period-mismatch warning) is gone. */
+/**
+ * Default window: the signed-off reporting period. Newer source rows stay
+ * queryable through an explicit custom range, but cannot silently move the
+ * management totals beyond the approved 27 July cutoff.
+ */
 export async function getDefaultRange(): Promise<{ from: string; to: string }> {
   const all = await loadAllData();
   const latest =
     [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
-  const year = latest ? latest.slice(0, 4) : String(new Date().getUTCFullYear());
-  return { from: `${year}-01-01`, to: latest || `${year}-12-31` };
+  return { from: REPORTING_WINDOW_START, to: approvedReportingEnd(latest) };
 }
 
 /* --- close time ------------------------------------------------------------ */

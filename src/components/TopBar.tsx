@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, SlidersHorizontal, Languages, X, Moon, Sun, Check } from "lucide-react";
 import { fmtDateTime, useI18n } from "@/lib/i18n";
 import { activeDimensionCount, filterStore, useFilters } from "@/lib/filter-store";
+import { approvedReportingEnd } from "@/lib/reporting-window";
 import { useModalGuard } from "@/lib/ui-store";
 import type { CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
@@ -74,7 +75,11 @@ export function useFiltersData() {
 function latestDate(data?: FiltersResp): string | undefined {
   if (!data) return undefined;
   const c = data.coverage;
-  return [c.adsDateMax, c.crmDateMax, c.revenueDateMax].filter(Boolean).sort().pop();
+  const latest = [c.adsDateMax, c.crmDateMax, c.revenueDateMax]
+    .filter(Boolean)
+    .sort()
+    .pop();
+  return approvedReportingEnd(latest);
 }
 
 export function TopBar({ title }: { title?: string }) {
@@ -88,8 +93,8 @@ export function TopBar({ title }: { title?: string }) {
   const activeCount = activeDimensionCount(filters);
   const latest = latestDate(data);
 
-  // The first payload tells us the sheet's real end date; re-anchor the default
-  // year-to-date window to it so the chip label and the query agree.
+  // The first payload anchors the default year window to the approved reporting
+  // cutoff. Users can still choose a later custom date explicitly.
   useEffect(() => {
     if (!latest || filters.from || filters.to || filters.range || filterStore.isManualDateMode())
       return;

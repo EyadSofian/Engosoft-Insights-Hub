@@ -13,6 +13,7 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { useFilters } from "@/lib/filter-store";
 import type { DataHealth, Grouped, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
@@ -73,6 +74,7 @@ interface AccountingResponse {
 
 function Accounting() {
   const { t, lang } = useI18n();
+  const filters = useFilters();
   const { data, isLoading, error, refetch } =
     useApi<AccountingResponse>("/api/accounting");
 
@@ -203,8 +205,8 @@ function Accounting() {
         title={t("accounting")}
         subtitle={
           lang === "ar"
-            ? "الفواتير المدفوعة على مستوى بند المنتج، مؤرخة بتاريخ الدفع."
-            : "Paid invoices at product-line grain, reported by Payment Date."
+            ? `الفواتير المدفوعة على مستوى بند المنتج، مؤرخة بتاريخ الدفع.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
+            : `Paid invoices at product-line grain, reported by Payment Date.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
         }
       />
 
@@ -217,8 +219,8 @@ function Accounting() {
         <>
           <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المصدر: تبويب ${data.source.tab}. الإيراد المعتمد هو USD Paid، والعدد هو الفواتير المميزة حسب Move؛ لذلك لا يتكرر عدد الفاتورة مع تعدد المنتجات.`
-              : `Source: ${data.source.tab}. Recognised revenue is USD Paid and invoice count is distinct Move, so product lines never duplicate the invoice count.`}
+              ? "المصدر المالي المعتمد: الفواتير المدفوعة فقط من تحليل الفواتير، حسب Payment Date. الإيراد هو USD Paid المحسوب من Total in Currency، وعدد الفواتير مميز حسب Move؛ ولا تدخل أوامر البيع المؤكدة أو تبويب Full Invoiced Orders في حساب الإيراد."
+              : "Accounting authority: paid invoices only from invoice analysis, by Payment Date. Revenue is USD Paid calculated from Total in Currency, and invoice count is distinct Move; confirmed sales orders and Full Invoiced Orders are not revenue inputs."}
           </Notice>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
