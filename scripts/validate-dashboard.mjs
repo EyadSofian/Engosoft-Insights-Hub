@@ -40,12 +40,22 @@ async function get(path, extraParams = {}) {
   for (const [key, value] of Object.entries(extraParams)) {
     url.searchParams.set(key, String(value));
   }
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
-  return response.json();
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1_500));
+    }
+  }
+  throw lastError;
 }
 
 const [overview, accounting, ads, campaigns, adsets, adRows, lost, website] = await Promise.all([
