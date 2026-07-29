@@ -1421,6 +1421,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           mainCategory: canonicalMainCategory(str(r["Main Category"]), course, productCategory),
           productCode:
             str(r["Product Code"]) || str(r["Product Reference"]) || str(r["الرقم المرجعي"]),
+          quantity: num(firstPresent(r["Quantity"], r["الكمية"])),
           company: str(r["Company"]) || str(r["الشركة"]),
           companyCurrency: str(r["Company Currency"]) || str(r["عملة الشركة"]),
           country: str(r["Country"]) || str(r["الدولة"]),

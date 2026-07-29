@@ -6,6 +6,7 @@ export const Route = createFileRoute("/api/accounting")({
       GET: async ({ request }) => {
         const { getFiltered, computeTotals, groupBy } = await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
+        const { buildAccountingCourses } = await import("@/lib/accounting-courses");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/api/accounting")({
           byDay: [...byDay.entries()]
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([date, revenue]) => ({ date, revenue })),
+          courses: buildAccountingCourses(rows),
           detail: capped(
             rows.map((row) => ({
               id: row.id,
@@ -58,6 +60,7 @@ export const Route = createFileRoute("/api/accounting")({
               productCategory: row.productCategory,
               mainCategory: row.mainCategory,
               productCode: row.productCode,
+              quantity: row.quantity,
               untaxedTotal: row.untaxedTotal,
               totalInCurrency: row.totalInCurrency,
               currency: row.currency,
@@ -66,6 +69,7 @@ export const Route = createFileRoute("/api/accounting")({
               website: row.website,
               event: row.event,
               eventStage: row.eventStage,
+              source: row.source,
             })),
           ),
           health: data.snapshot.health,

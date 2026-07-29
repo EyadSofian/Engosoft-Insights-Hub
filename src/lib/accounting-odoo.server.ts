@@ -43,6 +43,7 @@ interface InvoiceReportRow {
   country_id?: M2O;
   invoice_user_id?: M2O;
   currency_id?: M2O;
+  quantity?: number;
   price_subtotal?: number;
   price_total?: number;
   [key: string]: unknown;
@@ -398,6 +399,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
     "country_id",
     "invoice_user_id",
     "currency_id",
+    "quantity",
     "price_subtotal",
     "price_total",
   ];
@@ -545,6 +547,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
       Product: display(product?.display_name || product?.name || m2oName(report.product_id)),
       "Product Code": display(product?.default_code),
       "Product Category": m2oName(report.product_categ_id) || m2oName(product?.categ_id),
+      Quantity: String(number(report.quantity)),
       Company: m2oName(report.company_id) || m2oName(move.company_id),
       "Company Currency": m2oName(report.company_currency_id),
       Partner: m2oName(report.partner_id) || m2oName(move.partner_id),

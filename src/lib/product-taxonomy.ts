@@ -156,6 +156,15 @@ export function detectVariant(name: string, category: string): string {
   if (/\bdiscount\b/i.test(category) || /^\s*\d+(\.\d+)?\s*%\s*on\b/i.test(name)) return "discount";
   if (/^\s*free\s+product\b/i.test(name)) return "free";
   if (FEE_WORDS.test(name)) return "fee";
+  // Engosoft's catalogue uses the bare "Preparation Course" product for the
+  // recorded/self-study edition, while live delivery is a separate product
+  // whose name explicitly carries Event/Attendance. Keep that business naming
+  // rule independent from marketing source.
+  if (
+    /\bpreparation\s+course\b/i.test(name) &&
+    !/\bevents?\b|\b(?:on|off)line\s+attendance\b/i.test(name)
+  )
+    return "recorded";
   for (const rule of VARIANT_RULES) if (rule.test.test(name)) return rule.key;
   return "standard";
 }

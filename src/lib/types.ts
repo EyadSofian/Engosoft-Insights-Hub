@@ -157,6 +157,8 @@ export interface AccountingRow {
   productCategory: string;
   mainCategory: string;
   productCode: string;
+  /** Product quantity on this paid invoice line. */
+  quantity: number;
   company: string;
   companyCurrency: string;
   country: string;

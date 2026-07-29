@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { SpendRevenueChart } from "@/components/charts";
+import {
+  CourseRevenueExplorer,
+  type AccountingCourses,
+} from "@/components/accounting/CourseRevenueExplorer";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
   BarList,
@@ -32,6 +36,7 @@ interface AccountingDetail {
   salesTeam: string;
   code: string;
   productCode: string;
+  quantity: number;
   product: string;
   productCategory: string;
   mainCategory: string;
@@ -43,6 +48,7 @@ interface AccountingDetail {
   website: string;
   event: string;
   eventStage: string;
+  source: string;
 }
 
 interface AccountingResponse {
@@ -62,6 +68,7 @@ interface AccountingResponse {
   bySalesperson: Grouped[];
   byMonth: Grouped[];
   byDay: { date: string; revenue: number }[];
+  courses: AccountingCourses;
   detail: { rows: AccountingDetail[]; total: number; truncated: boolean };
   health: DataHealth;
   source: {
@@ -75,8 +82,7 @@ interface AccountingResponse {
 function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
-  const { data, isLoading, error, refetch } =
-    useApi<AccountingResponse>("/api/accounting");
+  const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -134,6 +140,13 @@ function Accounting() {
       render: (row) => row.productCategory || "—",
     },
     {
+      key: "quantity",
+      header: lang === "ar" ? "الكمية" : "Quantity",
+      align: "right",
+      sortValue: (row) => row.quantity,
+      render: (row) => <span className="num">{fmtNum(row.quantity)}</span>,
+    },
+    {
       key: "mainCategory",
       header: t("main_category"),
       sortValue: (row) => row.mainCategory,
@@ -165,9 +178,7 @@ function Accounting() {
       render: (row) => (
         <span className="num whitespace-nowrap">
           {row.untaxedTotal.toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
-          <span className="text-[11px] text-text-muted">
-            {row.companyCurrency || "—"}
-          </span>
+          <span className="text-[11px] text-text-muted">{row.companyCurrency || "—"}</span>
         </span>
       ),
     },
@@ -198,6 +209,9 @@ function Accounting() {
       ),
     },
   ];
+  const detailCols = data?.courses.summary.quantityAvailable
+    ? cols
+    : cols.filter((column) => column.key !== "quantity");
 
   return (
     <div className="space-y-5">
@@ -255,6 +269,8 @@ function Accounting() {
             />
           </Card>
 
+          <CourseRevenueExplorer data={data.courses} />
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Money title={t("main_category")} rows={data.byMainCategory} />
             <Money title={t("product_category")} rows={data.byProductCategory} />
@@ -267,7 +283,7 @@ function Accounting() {
 
           <DataTable
             rows={data.detail.rows}
-            cols={cols}
+            cols={detailCols}
             searchable={(row) =>
               `${row.movement} ${row.orderRef} ${row.partner} ${row.product} ${row.productCategory} ${row.mainCategory} ${row.company} ${row.salesperson} ${row.salesTeam}`
             }
@@ -294,6 +310,7 @@ function Accounting() {
               product: row.product,
               product_category: row.productCategory,
               main_category: row.mainCategory,
+              quantity: data.courses.summary.quantityAvailable ? row.quantity : "",
               untaxed_total: row.untaxedTotal,
               company_currency: row.companyCurrency,
               total_in_currency: row.totalInCurrency,
@@ -302,6 +319,7 @@ function Accounting() {
               website: row.website,
               event: row.event,
               event_stage: row.eventStage,
+              source: row.source,
             })}
           />
         </>

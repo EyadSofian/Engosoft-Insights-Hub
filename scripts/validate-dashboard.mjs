@@ -106,6 +106,34 @@ check(
   accounting.summary.productLines,
   accounting.detail.total,
 );
+const courseRevenue = accounting.courses.families.reduce(
+  (sum, course) => sum + course.revenueUsd,
+  0,
+);
+check(
+  "Course drill-down preserves all Accounting revenue",
+  same(courseRevenue, accounting.summary.paidUsd),
+  courseRevenue,
+  accounting.summary.paidUsd,
+);
+check(
+  "Course drill-down preserves distinct invoices",
+  accounting.courses.summary.invoices === accounting.summary.invoices,
+  accounting.courses.summary.invoices,
+  accounting.summary.invoices,
+);
+const cfmCourse = accounting.courses.families.find(
+  (course) => String(course.family).trim().toUpperCase() === "CFM",
+);
+if (cfmCourse) {
+  const cfmVariants = new Set(cfmCourse.variants.map((row) => row.key));
+  check(
+    "CFM keeps Event, Recorded and Exam Simulator products",
+    ["event", "recorded", "exam_simulator"].every((key) => cfmVariants.has(key)),
+    [...cfmVariants].sort(),
+    ["event", "recorded", "exam_simulator"],
+  );
+}
 check(
   "Payment Date is the accounting date",
   accounting.source.dateBasis === "Payment Date",
