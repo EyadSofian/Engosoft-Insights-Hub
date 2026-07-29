@@ -487,11 +487,7 @@ function teamHasPerson(all: Snapshot, team: string, person: string): boolean {
   return personTeamCache.map.get(person) === team;
 }
 
-/**
- * Default window: the signed-off reporting period. Newer source rows stay
- * queryable through an explicit custom range, but cannot silently move the
- * management totals beyond the approved 27 July cutoff.
- */
+/** Default window: 1 January through the newest available source date. */
 export async function getDefaultRange(): Promise<{ from: string; to: string }> {
   const all = await loadAllData();
   const latest =

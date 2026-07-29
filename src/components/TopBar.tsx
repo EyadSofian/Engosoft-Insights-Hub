@@ -93,8 +93,8 @@ export function TopBar({ title }: { title?: string }) {
   const activeCount = activeDimensionCount(filters);
   const latest = latestDate(data);
 
-  // The first payload anchors the default year window to the approved reporting
-  // cutoff. Users can still choose a later custom date explicitly.
+  // Anchor the default year window to the newest available source date so a
+  // preset never silently hides recent valid rows.
   useEffect(() => {
     if (!latest || filters.from || filters.to || filters.range || filterStore.isManualDateMode())
       return;

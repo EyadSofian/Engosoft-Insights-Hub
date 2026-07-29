@@ -315,7 +315,16 @@ export const Route = createFileRoute("/api/website")({
             matchedOrders: matchedOrders.length,
             externalOnlyOrders: externalOnlyOrders.length,
             discrepancyOrders: discrepancyOrders.length,
+            odooOnlySales: odooOnlyOrders.reduce((sum, order) => sum + order.usdSales, 0),
+            matchedSales: matchedOrders.reduce((sum, order) => sum + order.usdSales, 0),
             externalOnlySales: externalOnlyOrders.reduce((sum, order) => sum + order.usdSales, 0),
+          },
+          leadSources: {
+            activeCrm: crm.length,
+            activeWon: won.length,
+            activeOpen: open.length,
+            archivedLost: lost.length,
+            notContactedOpen: notContacted.length,
           },
           salesDetail: capped(
             websiteOrders.map((order) => ({

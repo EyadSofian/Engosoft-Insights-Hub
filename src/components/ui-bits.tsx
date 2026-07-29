@@ -141,6 +141,7 @@ export function KpiCard({
   hero = false,
   icon,
   index = 0,
+  subWrap = false,
 }: {
   label: string;
   value: ReactNode;
@@ -150,6 +151,8 @@ export function KpiCard({
   hero?: boolean;
   icon?: ReactNode;
   index?: number;
+  /** Allow explanatory KPI source text to wrap instead of silently truncating. */
+  subWrap?: boolean;
 }) {
   return (
     <div
@@ -186,7 +189,13 @@ export function KpiCard({
 
       <div className="mt-2 flex items-center gap-2 min-h-[18px] flex-wrap">
         <DeltaBadge value={delta} invert={deltaInvert} />
-        {sub != null && <span className="text-[11px] text-text-muted truncate">{sub}</span>}
+        {sub != null && (
+          <span
+            className={`text-[11px] text-text-muted ${subWrap ? "leading-relaxed" : "truncate"}`}
+          >
+            {sub}
+          </span>
+        )}
       </div>
     </div>
   );

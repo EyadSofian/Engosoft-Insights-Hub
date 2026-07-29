@@ -1,14 +1,13 @@
-/**
- * Approved validation window for the current management report.
- *
- * Upstream sources can already contain rows after the signed-off cutoff. Those
- * rows remain available through a manually selected range, but an unfiltered
- * dashboard must reconcile to the approved 1 Jan → 27 Jul 2026 workbook.
- */
+/** Default start of the 2026 management reporting window. */
 export const REPORTING_WINDOW_START = "2026-01-01";
-export const REPORTING_WINDOW_END = "2026-07-27";
 
+/** Presets follow the newest date actually present in the source data. */
 export function approvedReportingEnd(latest?: string): string {
-  if (!latest) return REPORTING_WINDOW_END;
-  return latest < REPORTING_WINDOW_END ? latest : REPORTING_WINDOW_END;
+  if (latest) return latest;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }

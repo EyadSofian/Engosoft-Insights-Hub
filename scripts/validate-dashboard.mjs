@@ -308,6 +308,37 @@ check(
   website.reconciliation?.totalOrders,
   "number",
 );
+check(
+  "Website lead equation (active CRM + archived Lost)",
+  website.totals.leads ===
+    website.leadSources.activeCrm + website.leadSources.archivedLost,
+  website.totals.leads,
+  website.leadSources.activeCrm + website.leadSources.archivedLost,
+);
+check(
+  "Website order-source equation",
+  website.reconciliation.totalOrders ===
+    website.reconciliation.odooOnlyOrders +
+      website.reconciliation.matchedOrders +
+      website.reconciliation.externalOnlyOrders,
+  website.reconciliation.totalOrders,
+  website.reconciliation.odooOnlyOrders +
+    website.reconciliation.matchedOrders +
+    website.reconciliation.externalOnlyOrders,
+);
+check(
+  "Website sales-source equation",
+  same(
+    website.totals.sales,
+    website.reconciliation.odooOnlySales +
+      website.reconciliation.matchedSales +
+      website.reconciliation.externalOnlySales,
+  ),
+  website.totals.sales,
+  website.reconciliation.odooOnlySales +
+    website.reconciliation.matchedSales +
+    website.reconciliation.externalOnlySales,
+);
 
 for (const [metric, wanted] of Object.entries(expected)) {
   if (wanted === null) continue;

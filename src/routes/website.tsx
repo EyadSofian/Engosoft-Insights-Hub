@@ -19,7 +19,7 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { fmtDate, fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 
 export const Route = createFileRoute("/website")({ component: Website });
@@ -103,7 +103,16 @@ interface Resp {
     matchedOrders: number;
     externalOnlyOrders: number;
     discrepancyOrders: number;
+    odooOnlySales: number;
+    matchedSales: number;
     externalOnlySales: number;
+  };
+  leadSources: {
+    activeCrm: number;
+    activeWon: number;
+    activeOpen: number;
+    archivedLost: number;
+    notContactedOpen: number;
   };
   salesDetail: { rows: SalesOrderRow[]; total: number; truncated: boolean };
   detail: { rows: ContactRow[]; total: number; truncated: boolean };
@@ -138,9 +147,17 @@ function Website() {
           specialtyNote: "يجمع ليدز CRM ومبيعات الموقع الموحّدة حسب الكورس",
           reconciliation: "مطابقة مصادر المبيعات",
           reconciliationHint: "Odoo + شيت Website Sales الخارجي حسب Order ID",
+          odooOnlyOrders: "من Odoo فقط",
           matchedOrders: "متطابق بين المصدرين",
-          externalOnlyOrders: "إضافي من الشيت",
+          externalOnlyOrders: "من الشيت فقط",
           discrepancyOrders: "يحتاج مراجعة",
+          activeCrm: "ليد نشط من Odoo CRM",
+          archivedLost: "Lost مؤكد من الأرشيف",
+          wonDefinition: "من Odoo CRM وحالته Won",
+          lostDefinition: "من Lost Analysis المؤرشف فقط",
+          openDefinition: "نشط في CRM وغير Won",
+          notContactedDefinition: "جزء من المفتوح: لا يوجد رد ناجح",
+          dataThrough: "البيانات المعروضة حتى",
           salesDetails: "تفاصيل أوردرات مبيعات الموقع",
           salesDetailsHint: "صف واحد لكل أوردر بعد الدمج ومنع التكرار",
           source: "مصدر السجل",
@@ -171,9 +188,17 @@ function Website() {
           specialtyNote: "Combines Odoo CRM website leads and reconciled website sales by course",
           reconciliation: "Sales-source reconciliation",
           reconciliationHint: "Odoo + external Website Sales sheet matched by Order ID",
+          odooOnlyOrders: "Odoo only",
           matchedOrders: "Matched across both sources",
-          externalOnlyOrders: "Added from external sheet",
+          externalOnlyOrders: "External sheet only",
           discrepancyOrders: "Needs review",
+          activeCrm: "active leads from Odoo CRM",
+          archivedLost: "confirmed archived lost",
+          wonDefinition: "Odoo CRM leads whose status is Won",
+          lostDefinition: "Archived Lost Analysis only",
+          openDefinition: "Active CRM leads excluding Won",
+          notContactedDefinition: "Subset of open leads with no successful reply",
+          dataThrough: "Data shown through",
           salesDetails: "Website sales-order details",
           salesDetailsHint: "One row per order after source reconciliation and deduplication",
           source: "Record source",
@@ -404,7 +429,10 @@ function Website() {
       ) : (
         <>
           <div className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-xs text-text-muted leading-relaxed">
-            {copy.sourceNote}
+            <div>{copy.sourceNote}</div>
+            <div className="mt-1 font-semibold text-brand">
+              {copy.dataThrough} {fmtDate(data.asOf, lang)}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -412,46 +440,49 @@ function Website() {
               index={0}
               label={t("website_leads")}
               value={fmtNum(data.totals.leads)}
+              sub={`${fmtNum(data.leadSources.activeCrm)} ${copy.activeCrm} + ${fmtNum(data.leadSources.archivedLost)} ${copy.archivedLost}`}
+              subWrap
               icon={<Globe2 size={18} />}
             />
             <KpiCard
               index={1}
               label={t("won")}
               value={fmtNum(data.totals.won)}
-              sub={fmtPct(
-                data.totals.leads ? (data.totals.won / data.totals.leads) * 100 : null,
-                1,
-              )}
+              sub={`${fmtPct(data.totals.leads ? (data.totals.won / data.totals.leads) * 100 : null, 1)} · ${copy.wonDefinition}`}
+              subWrap
               icon={<CircleCheckBig size={18} />}
             />
             <KpiCard
               index={2}
               label={t("lost_count")}
               value={fmtNum(data.totals.lost)}
-              sub={fmtPct(
-                data.totals.leads ? (data.totals.lost / data.totals.leads) * 100 : null,
-                1,
-              )}
+              sub={`${fmtPct(data.totals.leads ? (data.totals.lost / data.totals.leads) * 100 : null, 1)} · ${copy.lostDefinition}`}
+              subWrap
               icon={<CircleX size={18} />}
             />
             <KpiCard
               index={3}
               label={t("open_leads")}
               value={fmtNum(data.totals.open)}
+              sub={copy.openDefinition}
+              subWrap
               icon={<CircleDot size={18} />}
             />
             <KpiCard
               index={4}
               label={t("not_contacted")}
               value={fmtNum(data.totals.notContacted)}
+              sub={copy.notContactedDefinition}
+              subWrap
               icon={<Clock3 size={18} />}
             />
             <KpiCard
               index={5}
               hero
               label={t("website_sales")}
-              value={fmtUSD(data.totals.sales)}
-              sub={`${fmtNum(data.totals.salesOrders)} ${copy.orders}`}
+              value={fmtUSDFull(data.totals.sales)}
+              sub={`${fmtNum(data.totals.salesOrders)} ${copy.orders} · ${fmtNum(data.reconciliation.odooOnlyOrders)} ${copy.odooOnlyOrders} · ${fmtNum(data.reconciliation.matchedOrders)} ${copy.matchedOrders} · ${fmtNum(data.reconciliation.externalOnlyOrders)} ${copy.externalOnlyOrders}`}
+              subWrap
               icon={<Banknote size={18} />}
             />
           </div>
@@ -504,6 +535,9 @@ function Website() {
                   {copy.reconciliation}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
+                  <Pill tone="neutral">
+                    {fmtNum(data.reconciliation.odooOnlyOrders)} {copy.odooOnlyOrders}
+                  </Pill>
                   <Pill tone="success">
                     {fmtNum(data.reconciliation.matchedOrders)} {copy.matchedOrders}
                   </Pill>
@@ -514,8 +548,28 @@ function Website() {
                     {fmtNum(data.reconciliation.discrepancyOrders)} {copy.discrepancyOrders}
                   </Pill>
                 </div>
-                <div className="mt-2 text-xs text-text-muted">
-                  {fmtUSD(data.reconciliation.externalOnlySales)} · {copy.reconciliationHint}
+                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-text-muted">
+                  <div>
+                    <div>{copy.odooOnlyOrders}</div>
+                    <div className="num mt-0.5 font-semibold text-text">
+                      {fmtUSDFull(data.reconciliation.odooOnlySales)}
+                    </div>
+                  </div>
+                  <div>
+                    <div>{copy.matchedOrders}</div>
+                    <div className="num mt-0.5 font-semibold text-text">
+                      {fmtUSDFull(data.reconciliation.matchedSales)}
+                    </div>
+                  </div>
+                  <div>
+                    <div>{copy.externalOnlyOrders}</div>
+                    <div className="num mt-0.5 font-semibold text-text">
+                      {fmtUSDFull(data.reconciliation.externalOnlySales)}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-text-subtle">
+                  {copy.reconciliationHint}
                 </div>
               </div>
             </div>
