@@ -99,9 +99,12 @@ export function ChartFrame({ height = 260, children }: { height?: number; childr
 export function SpendRevenueChart({
   data,
   height = 280,
+  moneyFormat = fmtUSD,
 }: {
   data: { date: string; spend: number; revenue: number }[];
   height?: number;
+  /** Tooltip formatter. Accounting passes the exact, non-abbreviated formatter. */
+  moneyFormat?: (value: number) => string;
 }) {
   const { t, lang } = useI18n();
   const narrow = useIsNarrow();
@@ -143,7 +146,7 @@ export function SpendRevenueChart({
         <Tooltip
           content={
             <ChartTooltip
-              formatter={(v) => fmtUSD(v)}
+              formatter={(v) => moneyFormat(v)}
               labelFormatter={(l) => fmtDayShort(l, lang)}
             />
           }

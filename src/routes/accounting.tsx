@@ -1,5 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Calculator,
+  Download,
+  FileSpreadsheet,
+  GraduationCap,
+  Info,
+  ListChecks,
+  ReceiptText,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { SpendRevenueChart } from "@/components/charts";
 import {
   CourseRevenueExplorer,
@@ -16,9 +27,10 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { useFilters } from "@/lib/filter-store";
-import type { DataHealth, Grouped, Totals } from "@/lib/types";
+import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
+import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
 
 export const Route = createFileRoute("/accounting")({ component: Accounting });
@@ -28,7 +40,6 @@ interface AccountingDetail {
   movement: string;
   paymentDate: string;
   invoiceDate: string;
-  orderRef: string;
   partner: string;
   country: string;
   company: string;
@@ -82,6 +93,7 @@ interface AccountingResponse {
 function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
+  const [exportOpen, setExportOpen] = useState(false);
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -204,7 +216,7 @@ function Accounting() {
           className="num font-medium"
           style={row.usdPaid < 0 ? { color: "var(--danger)" } : undefined}
         >
-          {fmtUSDFull(row.usdPaid)}
+          {fmtUSDExact(row.usdPaid)}
         </span>
       ),
     },
@@ -231,6 +243,17 @@ function Accounting() {
         </>
       ) : (
         <>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setExportOpen(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              <Download size={17} />
+              {lang === "ar" ? "تصدير الحسابات كاملة" : "Export all Accounting"}
+            </button>
+          </div>
+
           <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
               ? "المصدر المالي المعتمد: الفواتير المدفوعة فقط من تحليل الفواتير، حسب Payment Date. الإيراد هو USD Paid المحسوب من Total in Currency، وعدد الفواتير مميز حسب Move؛ ولا تدخل أوامر البيع المؤكدة أو تبويب Full Invoiced Orders في حساب الإيراد."
@@ -241,7 +264,7 @@ function Accounting() {
             <KpiCard
               index={0}
               label={t("revenue")}
-              value={fmtUSD(data.summary.paidUsd)}
+              value={fmtUSDExact(data.summary.paidUsd)}
               sub={lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date"}
               hero
             />
@@ -254,7 +277,7 @@ function Accounting() {
             <KpiCard
               index={3}
               label={t("avg_invoice")}
-              value={fmtUSD(data.summary.averageInvoice)}
+              value={fmtUSDExact(data.summary.averageInvoice)}
             />
           </div>
 
@@ -266,6 +289,7 @@ function Accounting() {
                 spend: 0,
                 revenue: point.revenue,
               }))}
+              moneyFormat={fmtUSDExact}
             />
           </Card>
 
@@ -285,43 +309,24 @@ function Accounting() {
             rows={data.detail.rows}
             cols={detailCols}
             searchable={(row) =>
-              `${row.movement} ${row.orderRef} ${row.partner} ${row.product} ${row.productCategory} ${row.mainCategory} ${row.company} ${row.salesperson} ${row.salesTeam}`
+              `${row.movement} ${row.partner} ${row.product} ${row.productCategory} ${row.mainCategory} ${row.company} ${row.salesperson} ${row.salesTeam}`
             }
             initialSort={{ key: "paymentDate", dir: -1 }}
-            csvFilename="engosoft-accounting"
             maxHeight={640}
             truncatedNote={
               data.detail.truncated
                 ? `${t("showing")} ${fmtNum(data.detail.rows.length)} ${t("of")} ${fmtNum(data.detail.total)}`
                 : undefined
             }
-            csvRow={(row) => ({
-              move: row.movement,
-              payment_date: row.paymentDate,
-              invoice_date: row.invoiceDate,
-              sales_order: row.orderRef,
-              partner: row.partner,
-              country: row.country,
-              company: row.company,
-              salesperson: row.salesperson,
-              sales_team: row.salesTeam,
-              employee_code: row.code,
-              product_code: row.productCode,
-              product: row.product,
-              product_category: row.productCategory,
-              main_category: row.mainCategory,
-              quantity: data.courses.summary.quantityAvailable ? row.quantity : "",
-              untaxed_total: row.untaxedTotal,
-              company_currency: row.companyCurrency,
-              total_in_currency: row.totalInCurrency,
-              currency: row.currency,
-              usd_paid: row.usdPaid,
-              website: row.website,
-              event: row.event,
-              event_stage: row.eventStage,
-              source: row.source,
-            })}
           />
+
+          {exportOpen && (
+            <AccountingExportDialog
+              filters={filters}
+              lang={lang}
+              onClose={() => setExportOpen(false)}
+            />
+          )}
         </>
       )}
     </div>
@@ -339,16 +344,182 @@ function Money({ title, rows }: { title: string; rows: Grouped[] }) {
           value: row.value,
           meta: (
             <span>
-              <span className="num">{fmtUSD(row.value)}</span>
+              <span className="num">{fmtUSDExact(row.value)}</span>
               <span className="num ms-1.5 text-[11px] text-text-muted">
                 ({fmtPct(row.share, 1)})
               </span>
             </span>
           ),
         }))}
-        format={fmtUSD}
+        format={fmtUSDExact}
         color="var(--chart-2)"
       />
     </Card>
+  );
+}
+
+type AccountingExportView = "summary" | "invoices" | "lines" | "courses";
+
+function exportHref(view: AccountingExportView, filters: GlobalFilters, lang: "ar" | "en") {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, String(value));
+  }
+  params.set("view", view);
+  params.set("lang", lang);
+  return `/api/accounting-export?${params.toString()}`;
+}
+
+function AccountingExportDialog({
+  filters,
+  lang,
+  onClose,
+}: {
+  filters: GlobalFilters;
+  lang: "ar" | "en";
+  onClose: () => void;
+}) {
+  useModalGuard(true);
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  const options: {
+    view: AccountingExportView;
+    icon: typeof Calculator;
+    title: string;
+    description: string;
+  }[] =
+    lang === "ar"
+      ? [
+          {
+            view: "summary",
+            icon: Calculator,
+            title: "ملخص الحسابات والمعادلات",
+            description: "الإيراد، عدد الفواتير، المتوسط، وطريقة حساب كل مؤشر.",
+          },
+          {
+            view: "invoices",
+            icon: ReceiptText,
+            title: "الفواتير المجمعة",
+            description: "صف واحد لكل فاتورة مدفوعة مع إجمالياتها ومنتجاتها.",
+          },
+          {
+            view: "lines",
+            icon: ListChecks,
+            title: "كل بنود الفواتير",
+            description: "كل الصفوف بدون حد 3,000 صف وبدون أي أعمدة Sales Order.",
+          },
+          {
+            view: "courses",
+            icon: GraduationCap,
+            title: "تحليل الكورسات والمنتجات",
+            description: "الإيراد والنسب والأنواع والفعاليات لكل منتج داخل الكورس.",
+          },
+        ]
+      : [
+          {
+            view: "summary",
+            icon: Calculator,
+            title: "Summary and formulas",
+            description: "Revenue, invoice count, averages and every calculation rule.",
+          },
+          {
+            view: "invoices",
+            icon: ReceiptText,
+            title: "Invoice-level export",
+            description: "One row per paid invoice with its totals and products.",
+          },
+          {
+            view: "lines",
+            icon: ListChecks,
+            title: "All invoice lines",
+            description: "Every row with no 3,000-row cap and no Sales Order columns.",
+          },
+          {
+            view: "courses",
+            icon: GraduationCap,
+            title: "Courses and products",
+            description: "Revenue, shares, types and events for every invoiced product.",
+          },
+        ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,12,24,0.58)] p-3 backdrop-blur-[2px] animate-fade-in sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="accounting-export-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">
+              <ShieldCheck size={14} />
+              {lang === "ar" ? "الفواتير المدفوعة فقط" : "Paid invoices only"}
+            </div>
+            <h2 id="accounting-export-title" className="text-lg font-semibold text-text">
+              {lang === "ar" ? "تصدير الحسابات للمراجعة" : "Export Accounting for review"}
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              {lang === "ar"
+                ? "كل ملف يلتزم بالفترة والفلاتر المختارة حاليًا. لا تدخل أوامر البيع في أي رقم أو معادلة."
+                : "Every file follows the current period and filters. Sales orders are excluded from every number and formula."}
+            </p>
+          </div>
+          <button
+            type="button"
+            autoFocus
+            onClick={onClose}
+            className="grid size-11 shrink-0 place-items-center rounded-full text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={lang === "ar" ? "إغلاق" : "Close"}
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        <div className="grid max-h-[70vh] gap-3 overflow-y-auto p-4 sm:grid-cols-2 sm:p-6">
+          {options.map((option) => {
+            const Icon = option.icon;
+            return (
+              <a
+                key={option.view}
+                href={exportHref(option.view, filters, lang)}
+                onClick={onClose}
+                className="group flex min-h-32 items-start gap-3 rounded-xl border border-border p-4 text-start transition-colors hover:border-brand/40 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+                  <Icon size={19} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-text">{option.title}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-text-muted">
+                    {option.description}
+                  </span>
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand">
+                    <FileSpreadsheet size={14} />
+                    {lang === "ar" ? "تنزيل CSV كامل" : "Download full CSV"}
+                  </span>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

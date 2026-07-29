@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, Layers3, ReceiptText, X } from "lucide-react";
 import { BarList, Card, Pill, SectionTitle } from "@/components/ui-bits";
-import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { familyLabel, sourceLabel, variantLabel } from "@/lib/product-taxonomy";
+import { useModalGuard } from "@/lib/ui-store";
 
 export interface CourseBreakdown {
   key: string;
@@ -125,7 +126,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
               type="button"
               onClick={() => setOpen(row)}
               className="group min-h-28 rounded-xl border border-border p-3 text-start transition-colors hover:border-brand/40 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              aria-label={`${familyLabel(row.familyKey, row.family, lang)} — ${fmtUSDFull(row.revenueUsd)}`}
+              aria-label={`${familyLabel(row.familyKey, row.family, lang)} — ${fmtUSDExact(row.revenueUsd)}`}
             >
               <div className="flex items-start gap-3">
                 <span className="num mt-0.5 w-6 shrink-0 text-[12px] font-semibold text-text-subtle">
@@ -144,7 +145,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span className="num text-[14px] font-semibold text-text">
-                        {fmtUSD(row.revenueUsd)}
+                        {fmtUSDExact(row.revenueUsd)}
                       </span>
                       <ChevronRight
                         size={16}
@@ -226,13 +227,23 @@ function CourseDrawer({
   onClose: () => void;
 }) {
   const { lang } = useI18n();
+  const [selectedEvent, setSelectedEvent] = useState<CourseBreakdown | null>(null);
+  useModalGuard(true);
+
   useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (selectedEvent) setSelectedEvent(null);
+      else onClose();
     };
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose, selectedEvent]);
 
   const sourceMissing = useMemo(
     () => course.sources.find((row) => row.key === "__none__"),
@@ -241,14 +252,14 @@ function CourseDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-[rgba(4,12,24,0.5)] animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,12,24,0.58)] p-3 backdrop-blur-[2px] animate-fade-in sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="accounting-course-title"
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-3xl overflow-y-auto border-s border-border bg-surface shadow-xl animate-slide-up sm:animate-fade-in"
+        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl animate-slide-up sm:animate-fade-in"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
@@ -263,7 +274,7 @@ function CourseDrawer({
               {familyLabel(course.familyKey, course.family, lang)}
             </h2>
             <p className="mt-1 text-xs text-text-muted">
-              <span className="num">{fmtUSDFull(course.revenueUsd)}</span> ·{" "}
+              <span className="num">{fmtUSDExact(course.revenueUsd)}</span> ·{" "}
               {quantityAvailable && (
                 <>
                   {fmtNum(course.quantity)} {lang === "ar" ? "وحدة" : "units"} ·{" "}
@@ -286,8 +297,8 @@ function CourseDrawer({
           {sourceMissing && (
             <div className="rounded-xl border border-border bg-surface-2 p-3 text-xs leading-relaxed text-text-muted">
               {lang === "ar"
-                ? `${fmtUSD(sourceMissing.revenueUsd)} بدون مصدر تسويقي مسجّل. ده لا يغيّر تصنيف الكورس أو نوعه؛ Recorded وEvent مأخوذان من اسم المنتج/الفعالية.`
-                : `${fmtUSD(sourceMissing.revenueUsd)} has no recorded marketing source. That does not change course or modality classification; Recorded and Event come from the product/event fields.`}
+                ? `${fmtUSDExact(sourceMissing.revenueUsd)} بدون مصدر تسويقي مسجّل. ده لا يغيّر تصنيف الكورس أو نوعه؛ Recorded وEvent مأخوذان من اسم المنتج/الفعالية.`
+                : `${fmtUSDExact(sourceMissing.revenueUsd)} has no recorded marketing source. That does not change course or modality classification; Recorded and Event come from the product/event fields.`}
             </div>
           )}
 
@@ -352,7 +363,7 @@ function CourseDrawer({
                       )}
                       <td className="num px-3 py-3 text-end">{fmtNum(product.invoices)}</td>
                       <td className="num px-3 py-3 text-end font-semibold text-text">
-                        {fmtUSDFull(product.revenueUsd)}
+                        {fmtUSDExact(product.revenueUsd)}
                       </td>
                     </tr>
                   ))}
@@ -368,11 +379,11 @@ function CourseDrawer({
                 items={course.variants.map((row) => ({
                   label: variantLabel(row.key, lang),
                   value: row.revenueUsd,
-                  meta: `${fmtUSD(row.revenueUsd)} · ${fmtNum(
+                  meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtNum(
                     quantityAvailable ? row.quantity : row.invoices,
                   )} ${quantityAvailable ? (lang === "ar" ? "وحدة" : "units") : lang === "ar" ? "فاتورة" : "invoices"}`,
                 }))}
-                format={fmtUSD}
+                format={fmtUSDExact}
                 color="var(--chart-3)"
               />
             </section>
@@ -384,12 +395,12 @@ function CourseDrawer({
                 items={course.sources.map((row) => ({
                   label: sourceLabel(row.key, row.label, lang),
                   value: row.revenueUsd,
-                  meta: `${fmtUSD(row.revenueUsd)} · ${fmtPct(
+                  meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtPct(
                     course.revenueUsd ? (row.revenueUsd / course.revenueUsd) * 100 : null,
                     1,
                   )}`,
                 }))}
-                format={fmtUSD}
+                format={fmtUSDExact}
               />
             </section>
           </div>
@@ -398,15 +409,19 @@ function CourseDrawer({
             <section className="grid gap-5 md:grid-cols-2">
               {course.events.length > 0 && (
                 <div>
-                  <SectionTitle>{lang === "ar" ? "الفعاليات" : "Events"}</SectionTitle>
-                  <BarList
-                    items={course.events.map((row) => ({
-                      label: row.label,
-                      value: row.revenueUsd,
-                      meta: `${fmtUSD(row.revenueUsd)} · ${fmtNum(row.invoices)}`,
-                    }))}
-                    format={fmtUSD}
-                    color="var(--chart-4)"
+                  <SectionTitle
+                    hint={
+                      lang === "ar"
+                        ? "اضغط على أي فعالية لعرض رقمها وحسابها في نافذة مستقلة"
+                        : "Select an event to inspect its exact figures"
+                    }
+                  >
+                    {lang === "ar" ? "الفعاليات" : "Events"}
+                  </SectionTitle>
+                  <EventRows
+                    rows={course.events}
+                    courseRevenue={course.revenueUsd}
+                    onSelect={setSelectedEvent}
                   />
                 </div>
               )}
@@ -417,9 +432,9 @@ function CourseDrawer({
                     items={course.eventStages.map((row) => ({
                       label: row.label,
                       value: row.revenueUsd,
-                      meta: `${fmtUSD(row.revenueUsd)} · ${fmtNum(row.invoices)}`,
+                      meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtNum(row.invoices)}`,
                     }))}
-                    format={fmtUSD}
+                    format={fmtUSDExact}
                     color="var(--chart-5)"
                   />
                 </div>
@@ -435,6 +450,155 @@ function CourseDrawer({
                 : "Revenue is USD Paid from Total in Currency and dated by Payment Date. These are the same Accounting rows; no sales orders are included."}
             </p>
           </div>
+        </div>
+
+        {selectedEvent && (
+          <EventDetailDialog
+            event={selectedEvent}
+            course={course}
+            quantityAvailable={quantityAvailable}
+            onClose={() => setSelectedEvent(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventRows({
+  rows,
+  courseRevenue,
+  onSelect,
+}: {
+  rows: CourseBreakdown[];
+  courseRevenue: number;
+  onSelect: (event: CourseBreakdown) => void;
+}) {
+  const { lang } = useI18n();
+  const peak = Math.max(...rows.map((row) => Math.abs(row.revenueUsd)), 1);
+  return (
+    <div className="space-y-2.5">
+      {rows.map((row) => (
+        <button
+          key={row.key}
+          type="button"
+          onClick={() => onSelect(row)}
+          className="group block w-full rounded-xl border border-transparent p-2 text-start transition-colors hover:border-brand/25 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          aria-label={`${row.label} — ${fmtUSDExact(row.revenueUsd)}`}
+        >
+          <span className="mb-1 flex items-start justify-between gap-3">
+            <span className="min-w-0 truncate text-[13px] font-medium text-text" title={row.label}>
+              {row.label}
+            </span>
+            <span className="num shrink-0 text-[12px] font-semibold text-text">
+              {fmtUSDExact(row.revenueUsd)} · {fmtNum(row.invoices)}
+            </span>
+          </span>
+          <span className="block h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <span
+              className="block h-full rounded-full bg-[var(--chart-4)] transition-[width] duration-500"
+              style={{ width: `${Math.max(1.5, (Math.abs(row.revenueUsd) / peak) * 100)}%` }}
+            />
+          </span>
+          <span className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-text-muted">
+            <span>{lang === "ar" ? "عرض التفاصيل" : "View details"}</span>
+            <span className="num">
+              {fmtPct(courseRevenue ? (row.revenueUsd / courseRevenue) * 100 : null, 2)}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EventDetailDialog({
+  event,
+  course,
+  quantityAvailable,
+  onClose,
+}: {
+  event: CourseBreakdown;
+  course: CourseFamily;
+  quantityAvailable: boolean;
+  onClose: () => void;
+}) {
+  const { lang } = useI18n();
+  const share = course.revenueUsd ? (event.revenueUsd / course.revenueUsd) * 100 : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(4,12,24,0.62)] p-4 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="accounting-event-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-border bg-surface p-5 shadow-2xl sm:p-6"
+        onClick={(click) => click.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <Pill tone="brand">
+              {lang === "ar" ? "فعالية من فاتورة مدفوعة" : "Paid-invoice event"}
+            </Pill>
+            <h3 id="accounting-event-title" className="mt-3 text-lg font-semibold text-text">
+              {event.label}
+            </h3>
+            <p className="mt-1 text-xs text-text-muted">
+              {familyLabel(course.familyKey, course.family, lang)}
+            </p>
+          </div>
+          <button
+            type="button"
+            autoFocus
+            onClick={onClose}
+            className="grid size-11 shrink-0 place-items-center rounded-full text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={lang === "ar" ? "إغلاق" : "Close"}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <dl className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-surface-2 p-3">
+            <dt className="text-[11px] text-text-muted">{lang === "ar" ? "الإيراد" : "Revenue"}</dt>
+            <dd className="num mt-1 break-all text-base font-semibold text-text">
+              {fmtUSDExact(event.revenueUsd)}
+            </dd>
+          </div>
+          <div className="rounded-xl bg-surface-2 p-3">
+            <dt className="text-[11px] text-text-muted">
+              {lang === "ar" ? "الفواتير" : "Invoices"}
+            </dt>
+            <dd className="num mt-1 text-base font-semibold text-text">{fmtNum(event.invoices)}</dd>
+          </div>
+          {quantityAvailable && (
+            <div className="rounded-xl bg-surface-2 p-3">
+              <dt className="text-[11px] text-text-muted">
+                {lang === "ar" ? "الكمية" : "Quantity"}
+              </dt>
+              <dd className="num mt-1 text-base font-semibold text-text">
+                {fmtNum(event.quantity)}
+              </dd>
+            </div>
+          )}
+          <div className="rounded-xl bg-surface-2 p-3">
+            <dt className="text-[11px] text-text-muted">
+              {lang === "ar" ? "نسبتها من إيراد الكورس" : "Share of course revenue"}
+            </dt>
+            <dd className="num mt-1 text-base font-semibold text-text">{fmtPct(share, 2)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-brand/20 bg-brand-soft p-3 text-xs leading-relaxed text-text-muted">
+          <ReceiptText className="mt-0.5 shrink-0 text-brand" size={15} />
+          <p>
+            {lang === "ar"
+              ? "الرقم هو مجموع USD Paid لبنود الفواتير المدفوعة المرتبطة بهذه الفعالية، حسب Payment Date. لا توجد أوامر بيع في الحساب."
+              : "This is the sum of USD Paid on paid-invoice lines for this event, by Payment Date. No sales orders are included."}
+          </p>
         </div>
       </div>
     </div>

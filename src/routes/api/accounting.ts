@@ -49,7 +49,6 @@ export const Route = createFileRoute("/api/accounting")({
               movement: row.movement,
               paymentDate: row.paymentDate,
               invoiceDate: row.invoiceDate,
-              orderRef: row.orderRef,
               partner: row.partner,
               country: row.country,
               company: row.company,

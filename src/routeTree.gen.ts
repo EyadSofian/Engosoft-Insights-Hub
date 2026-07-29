@@ -23,6 +23,7 @@ import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
+import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -112,6 +113,11 @@ const YoyRoute = YoyRouteImport.update({
 const ApiAccountingRoute = ApiAccountingRouteImport.update({
   id: '/api/accounting',
   path: '/api/accounting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountingExportRoute = ApiAccountingExportRouteImport.update({
+  id: '/api/accounting-export',
+  path: '/api/accounting-export',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdsRoute = ApiAdsRouteImport.update({
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
+  '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
+  '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/website': typeof WebsiteRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
+  '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/website'
     | '/yoy'
     | '/api/accounting'
+    | '/api/accounting-export'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/website'
     | '/yoy'
     | '/api/accounting'
+    | '/api/accounting-export'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/website'
     | '/yoy'
     | '/api/accounting'
+    | '/api/accounting-export'
     | '/api/ads'
     | '/api/campaigns'
     | '/api/chat'
@@ -450,6 +462,7 @@ export interface RootRouteChildren {
   WebsiteRoute: typeof WebsiteRoute
   YoyRoute: typeof YoyRoute
   ApiAccountingRoute: typeof ApiAccountingRoute
+  ApiAccountingExportRoute: typeof ApiAccountingExportRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -570,6 +583,13 @@ declare module '@tanstack/react-router' {
       path: '/api/accounting'
       fullPath: '/api/accounting'
       preLoaderRoute: typeof ApiAccountingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/accounting-export': {
+      id: '/api/accounting-export'
+      path: '/api/accounting-export'
+      fullPath: '/api/accounting-export'
+      preLoaderRoute: typeof ApiAccountingExportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ads': {
@@ -730,6 +750,7 @@ const rootRouteChildren: RootRouteChildren = {
   WebsiteRoute: WebsiteRoute,
   YoyRoute: YoyRoute,
   ApiAccountingRoute: ApiAccountingRoute,
+  ApiAccountingExportRoute: ApiAccountingExportRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,

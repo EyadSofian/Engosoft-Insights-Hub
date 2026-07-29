@@ -476,6 +476,21 @@ export function fmtUSDFull(n: number | null | undefined): string {
   return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
+/**
+ * Accounting-grade money display: never abbreviates with K/M and preserves
+ * the source precision used by the USD conversion (up to six decimals).
+ */
+export function fmtUSDExact(n: number | null | undefined): string {
+  if (n === null || n === undefined || !isFinite(n)) return EM_DASH;
+  return (
+    "$" +
+    n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    })
+  );
+}
+
 export function fmtNum(n: number | null | undefined): string {
   if (n === null || n === undefined || !isFinite(n)) return EM_DASH;
   return n.toLocaleString("en-US", { maximumFractionDigits: 0 });

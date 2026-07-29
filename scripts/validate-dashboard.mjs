@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import Papa from "papaparse";
+
 /**
  * Cross-endpoint production validation.
  *
@@ -58,16 +60,39 @@ async function get(path, extraParams = {}) {
   throw lastError;
 }
 
-const [overview, accounting, ads, campaigns, adsets, adRows, lost, website, filters] = await Promise.all([
-  get("/api/overview"),
-  get("/api/accounting"),
-  get("/api/ads"),
-  get("/api/campaigns"),
-  get("/api/campaigns", { grain: "adset" }),
-  get("/api/campaigns", { grain: "ad" }),
-  get("/api/lost"),
-  get("/api/website"),
-  get("/api/filters"),
+async function getCsv(view) {
+  const url = new URL("/api/accounting-export", `${API}/`);
+  for (const [key, value] of query) url.searchParams.set(key, value);
+  url.searchParams.set("view", view);
+  url.searchParams.set("lang", "en");
+  const response = await fetch(url, {
+    headers: { accept: "text/csv" },
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!response.ok) throw new Error(`Accounting ${view} export returned HTTP ${response.status}`);
+  const text = await response.text();
+  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
+  if (parsed.errors.length) {
+    throw new Error(`Accounting ${view} export has invalid CSV: ${parsed.errors[0].message}`);
+  }
+  return { rows: parsed.data, headers: parsed.meta.fields ?? [], response };
+}
+
+const [overview, accounting, ads, campaigns, adsets, adRows, lost, website, filters] =
+  await Promise.all([
+    get("/api/overview"),
+    get("/api/accounting"),
+    get("/api/ads"),
+    get("/api/campaigns"),
+    get("/api/campaigns", { grain: "adset" }),
+    get("/api/campaigns", { grain: "ad" }),
+    get("/api/lost"),
+    get("/api/website"),
+    get("/api/filters"),
+  ]);
+const [accountingLineExport, accountingInvoiceExport] = await Promise.all([
+  getCsv("lines"),
+  getCsv("invoices"),
 ]);
 
 const checks = [];
@@ -106,6 +131,40 @@ check(
   accounting.summary.productLines,
   accounting.detail.total,
 );
+check(
+  "Accounting full export has every invoice line",
+  accountingLineExport.rows.length === accounting.summary.productLines,
+  accountingLineExport.rows.length,
+  accounting.summary.productLines,
+);
+check(
+  "Accounting invoice export has every distinct invoice",
+  accountingInvoiceExport.rows.length === accounting.summary.invoices,
+  accountingInvoiceExport.rows.length,
+  accounting.summary.invoices,
+);
+check(
+  "Accounting export excludes Sales Order columns",
+  !accountingLineExport.headers.some((header) => /sales\s*order|order\s*ref/i.test(header)),
+  accountingLineExport.headers,
+  "no Sales Order columns",
+);
+const exportedPaidUsd = accountingLineExport.rows.reduce(
+  (sum, row) => sum + Number(row["USD Paid"] || 0),
+  0,
+);
+check(
+  "Accounting export preserves exact paid revenue",
+  same(exportedPaidUsd, accounting.summary.paidUsd),
+  exportedPaidUsd,
+  accounting.summary.paidUsd,
+);
+check(
+  "Every Accounting export row is explicitly paid-invoice-only",
+  accountingLineExport.rows.every((row) => row["Accounting Rule"] === "Paid invoice only"),
+  accountingLineExport.rows.filter((row) => row["Accounting Rule"] !== "Paid invoice only").length,
+  0,
+);
 const courseRevenue = accounting.courses.families.reduce(
   (sum, course) => sum + course.revenueUsd,
   0,
@@ -143,7 +202,9 @@ check(
 check(
   "Healthy canonical fallbacks are not reported as excluded sources",
   !(filters.fetchErrors ?? []).some((entry) =>
-    /accounting reconciliation|retaining .* accounting authority|using (sales|google sheets) fallback/i.test(entry),
+    /accounting reconciliation|retaining .* accounting authority|using (sales|google sheets) fallback/i.test(
+      entry,
+    ),
   ),
   filters.fetchErrors ?? [],
   [],
