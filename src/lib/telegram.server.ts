@@ -116,7 +116,11 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   L.push("");
 
   L.push(`👥 *${esc("العملاء المحتملون")}*`);
-  L.push(esc(`الإجمالي النظيف: ${int(t.totalLeads)} = CRM بدون Lost ${int(t.crmLeads)} + Lost Analysis ${int(t.lost)}`));
+  L.push(
+    esc(
+      `الإجمالي النظيف: ${int(t.totalLeads)} = CRM بدون Lost ${int(t.crmLeads)} + Lost مؤرشف ${int(t.lost)}${t.archivedWon > 0 ? ` + Won مؤرشف ${int(t.archivedWon)}` : ""}`,
+    ),
+  );
   L.push(esc(`Leads الإعلانات حسب Meta/Snap: ${int(t.platformLeads)}`));
   L.push("");
 

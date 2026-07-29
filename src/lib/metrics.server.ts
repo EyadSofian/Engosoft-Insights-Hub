@@ -1664,10 +1664,10 @@ export function execSummary(
   const ar: string[] = [];
 
   en.push(
-    `Between ${window} you spent ${money(t.spend)}. The clean lead population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} non-lost CRM rows plus ${t.lost.toLocaleString("en-US")} archived losses from Lost Analysis. ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}).`,
+    `Between ${window} you spent ${money(t.spend)}. The clean lead population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} non-lost CRM rows plus ${t.archivedLeads.toLocaleString("en-US")} archived rows from Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}).`,
   );
   ar.push(
-    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. إجمالي العملاء النظيف ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} من CRM بعد استبعاد Stage=Lost، مضافاً إليهم ${t.lost.toLocaleString("en-US")} صفقة ضائعة من Lost Analysis فقط. أُغلق ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
+    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. إجمالي العملاء النظيف ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} من CRM بعد استبعاد Stage=Lost، مضافاً إليهم ${t.archivedLeads.toLocaleString("en-US")} صفاً مؤرشفاً من Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). أُغلق ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
   );
 
   if (t.lostArchived > 0) {

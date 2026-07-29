@@ -169,8 +169,8 @@ function Overview() {
       {T.lostArchived > 0 && (
         <Notice tone="info" icon={<Info size={16} />}>
           {lang === "ar"
-            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? ` (بعد استبعاد ${T.archivedWon} صفاً مؤرشفاً حالته Won)` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
-            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived deals${T.archivedWon > 0 ? ` (excluding ${T.archivedWon} archived rows still marked Won)` : ""}. CRM Stage=Lost rows are completely excluded.`}
+            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
+            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
         </Notice>
       )}
 
@@ -188,8 +188,9 @@ function Overview() {
           value={fmtNum(T.totalLeads)}
           delta={deltas.totalLeads}
           icon={<Users size={15} />}
+          subWrap
           sub={
-            `${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "تحليل الضياع" : "Lost Analysis"} ${fmtNum(T.lost)}`
+            `${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "Lost" : "Lost"} ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
           }
         />
         <KpiCard index={1} label={t("won")} value={fmtNum(T.won)} delta={deltas.won} icon={<Award size={15} />} sub={fmtPct(T.conversionRate, 1)} />

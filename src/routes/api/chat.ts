@@ -90,8 +90,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("total leads", "إجمالي العملاء", "كم عميل")) {
             return ar
-              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} من Lost Analysis. Leads الإعلانات حسب Meta/Snap: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
-              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} from Lost Analysis. Meta/Snap-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
+              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} Lost مؤرشف${totals.archivedWon > 0 ? ` + ${totals.archivedWon} Won مؤرشف` : ""}. Leads الإعلانات حسب Meta/Snap: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
+              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} archived Lost${totals.archivedWon > 0 ? ` + ${totals.archivedWon} archived Won` : ""}. Meta/Snap-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
           }
           if (has("cpl", "تكلفة العميل")) {
             return ar

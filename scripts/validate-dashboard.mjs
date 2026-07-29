@@ -270,6 +270,18 @@ check(
   lost.breakdown.total,
 );
 check(
+  "Total leads = non-lost CRM + every archived Lost Analysis row",
+  totals.totalLeads === totals.crmLeads + totals.archivedLeads,
+  totals.totalLeads,
+  totals.crmLeads + totals.archivedLeads,
+);
+check(
+  "Archived Lost Analysis rows = Lost + archived Won",
+  totals.archivedLeads === totals.lost + totals.archivedWon,
+  totals.archivedLeads,
+  totals.lost + totals.archivedWon,
+);
+check(
   "CPL = spend / platform leads",
   same(totals.cpl, totals.spend / totals.platformLeads),
   totals.cpl,
