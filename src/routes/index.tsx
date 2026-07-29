@@ -496,7 +496,7 @@ function Spotlight({ tone, title, row }: { tone: "success" | "danger"; title: st
   );
 }
 
-export function DataHealthPanel({ health }: { health: DataHealth }) {
+function DataHealthPanel({ health }: { health: DataHealth }) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const pct = (n: number) => fmtPct(n * 100, 1);
