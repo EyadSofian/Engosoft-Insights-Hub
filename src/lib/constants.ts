@@ -8,6 +8,13 @@ export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   tiktok: { ar: "تيك توك", en: "TikTok" },
 };
 
+/** One colour per platform, shared by the switcher, the charts and every badge. */
+export const PLATFORM_COLOR: Record<Platform, string> = {
+  meta: "var(--chart-1)",
+  snapchat: "var(--chart-2)",
+  tiktok: "var(--chart-4)",
+};
+
 /** Metrics a platform genuinely does not report, so the UI can say so. */
 export const PLATFORM_GAPS: Record<Platform, string[]> = {
   meta: [],

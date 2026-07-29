@@ -57,6 +57,11 @@ export const DICT = {
   theme: { ar: "المظهر", en: "Theme" },
   search: { ar: "بحث…", en: "Search…" },
   export_csv: { ar: "تصدير CSV", en: "Export CSV" },
+  columns: { ar: "الأعمدة", en: "Columns" },
+  columns_hint: {
+    ar: "شيل أو رجّع أي عمود. الأعمدة الأقل استخدامًا مقفولة من الأول عشان الجدول يفضل مقروء.",
+    en: "Show or hide any column. The less-used ones start off so the table stays readable.",
+  },
   no_data: { ar: "لا توجد بيانات في هذه الفترة", en: "No data for this period" },
   no_results: { ar: "لا توجد نتائج مطابقة", en: "No matching results" },
   loading: { ar: "جارٍ التحميل…", en: "Loading…" },

@@ -12,9 +12,12 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
+  ZAxis,
 } from "recharts";
 import { fmtCompact, fmtDayShort, fmtUSD, useI18n } from "@/lib/i18n";
 import { EmptyState } from "./ui-bits";
@@ -377,6 +380,192 @@ export function MultiLineChart({
           />
         ))}
       </LineChart>
+    </ChartFrame>
+  );
+}
+
+/* --- grouped bars --------------------------------------------------------- */
+
+/**
+ * Two measures per category, side by side. Used to put a campaign's cost next
+ * to what it brought back — the single comparison that decides whether it stays
+ * on. Categories are expected to be pre-trimmed to a readable count by the
+ * caller; this chart does not silently drop any it is given.
+ */
+export function GroupedBarChart({
+  data,
+  series,
+  height = 300,
+  format = fmtUSD,
+  emptyLabel,
+}: {
+  data: { label: string; [k: string]: string | number }[];
+  series: { key: string; name: string; color: string }[];
+  height?: number;
+  format?: (n: number) => string;
+  /** Say *why* it is empty. "No data" reads as a bug when the cause is a missing source. */
+  emptyLabel?: string;
+}) {
+  const { t } = useI18n();
+  const narrow = useIsNarrow();
+  if (!data.length) return <EmptyState label={emptyLabel ?? t("no_data")} compact />;
+
+  const width = narrow ? 92 : 150;
+  const trim = (s: string) => {
+    const max = narrow ? 13 : 22;
+    return s.length > max ? s.slice(0, max) + "…" : s;
+  };
+
+  return (
+    <ChartFrame height={height}>
+      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke={gridStroke} horizontal={false} strokeDasharray="3 3" />
+        <XAxis
+          type="number"
+          tick={axisTick}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtCompact(v)}
+        />
+        <YAxis
+          type="category"
+          dataKey="label"
+          tick={axisTick}
+          tickLine={false}
+          axisLine={false}
+          width={width}
+          tickFormatter={trim}
+        />
+        <Tooltip
+          content={<ChartTooltip formatter={(v) => format(v)} />}
+          cursor={{ fill: "var(--surface-2)" }}
+        />
+        <Legend
+          iconType="circle"
+          iconSize={8}
+          wrapperStyle={{ fontSize: 12, color: "var(--text-muted)", paddingTop: 8 }}
+        />
+        {series.map((s) => (
+          <Bar
+            key={s.key}
+            dataKey={s.key}
+            name={s.name}
+            fill={s.color}
+            radius={[0, 4, 4, 0]}
+            maxBarSize={14}
+          />
+        ))}
+      </BarChart>
+    </ChartFrame>
+  );
+}
+
+/* --- scatter -------------------------------------------------------------- */
+
+/**
+ * Spend on one axis, what it produced on the other. Every dot is one campaign,
+ * so the shape of the cloud answers "is more spend actually buying more?" in a
+ * way no sorted table does. A reference line marks break-even where both axes
+ * are money.
+ */
+export function ScatterPlot({
+  points,
+  xName,
+  yName,
+  height = 300,
+  formatX = fmtUSD,
+  formatY = fmtUSD,
+  breakEven = false,
+  emptyLabel,
+}: {
+  points: { x: number; y: number; label: string; color?: string }[];
+  xName: string;
+  yName: string;
+  height?: number;
+  formatX?: (n: number) => string;
+  formatY?: (n: number) => string;
+  breakEven?: boolean;
+  /** Say *why* it is empty. "No data" reads as a bug when the cause is a missing source. */
+  emptyLabel?: string;
+}) {
+  const { t } = useI18n();
+  if (!points.length) return <EmptyState label={emptyLabel ?? t("no_data")} compact />;
+
+  const maxX = Math.max(...points.map((p) => p.x), 1);
+  const maxY = Math.max(...points.map((p) => p.y), 1);
+  const line = breakEven
+    ? [
+        { x: 0, y: 0 },
+        { x: Math.min(maxX, maxY), y: Math.min(maxX, maxY) },
+      ]
+    : null;
+
+  return (
+    <ChartFrame height={height}>
+      <ScatterChart margin={{ top: 8, right: 12, left: -8, bottom: 4 }}>
+        <CartesianGrid stroke={gridStroke} strokeDasharray="3 3" />
+        <XAxis
+          type="number"
+          dataKey="x"
+          name={xName}
+          tick={axisTick}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtCompact(v)}
+        />
+        <YAxis
+          type="number"
+          dataKey="y"
+          name={yName}
+          tick={axisTick}
+          tickLine={false}
+          axisLine={false}
+          width={52}
+          tickFormatter={(v: number) => fmtCompact(v)}
+        />
+        <ZAxis range={[46, 46]} />
+        <Tooltip
+          cursor={{ strokeDasharray: "3 3", stroke: "var(--border-strong)" }}
+          content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const p = payload[0].payload as { x: number; y: number; label: string };
+            return (
+              <div
+                className="rounded-xl px-3 py-2 text-xs shadow-lg pointer-events-none max-w-[15rem]"
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text)",
+                }}
+              >
+                <div className="font-medium mb-1 break-words">{p.label}</div>
+                <div className="flex items-center justify-between gap-3 text-text-muted">
+                  <span>{xName}</span>
+                  <span className="num font-semibold text-text">{formatX(p.x)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-text-muted">
+                  <span>{yName}</span>
+                  <span className="num font-semibold text-text">{formatY(p.y)}</span>
+                </div>
+              </div>
+            );
+          }}
+        />
+        {line && (
+          <Scatter
+            data={line}
+            line={{ stroke: "var(--border-strong)", strokeDasharray: "4 4" }}
+            shape={() => <g />}
+            legendType="none"
+            isAnimationActive={false}
+          />
+        )}
+        <Scatter data={points} name={yName} fill="var(--chart-1)">
+          {points.map((p, i) => (
+            <Cell key={i} fill={p.color ?? "var(--chart-1)"} fillOpacity={0.75} />
+          ))}
+        </Scatter>
+      </ScatterChart>
     </ChartFrame>
   );
 }

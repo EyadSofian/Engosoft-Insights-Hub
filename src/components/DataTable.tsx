@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Search, Download, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Search,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Columns3,
+  Check,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { EmptyState } from "./ui-bits";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 export interface Col<T> {
   key: string;
@@ -12,6 +23,16 @@ export interface Col<T> {
   width?: string;
   /** Pins the column while the table scrolls sideways. Use on the label column. */
   sticky?: boolean;
+  /** Band this column belongs to, rendered as a grouped header above it. */
+  group?: string;
+  /** Off until the reader turns it on. Keeps the default table readable. */
+  hideByDefault?: boolean;
+  /** Cannot be hidden — the column that identifies the row. */
+  always?: boolean;
+  /** Plain-language name for the column chooser, when `header` is a node. */
+  label?: string;
+  /** Native tooltip on the header cell. */
+  headerTitle?: string;
 }
 
 export function DataTable<T>({
@@ -26,7 +47,11 @@ export function DataTable<T>({
   initialSort,
   maxHeight = 560,
   toolbar,
+  belowToolbar,
   truncatedNote,
+  groupLabels,
+  columnChooser = false,
+  emptyState,
 }: {
   rows: T[];
   cols: Col<T>[];
@@ -39,13 +64,37 @@ export function DataTable<T>({
   initialSort?: { key: string; dir: 1 | -1 };
   maxHeight?: number;
   toolbar?: ReactNode;
+  /** Full-width strip under the toolbar — filter chips, quick views. */
+  belowToolbar?: ReactNode;
   truncatedNote?: string;
+  /** Display names for the `group` values used on the columns. */
+  groupLabels?: Record<string, string>;
+  columnChooser?: boolean;
+  emptyState?: ReactNode;
 }) {
   const { t, lang } = useI18n();
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(initialSort?.key ?? null);
   const [sortDir, setSortDir] = useState<1 | -1>(initialSort?.dir ?? -1);
   const [page, setPage] = useState(0);
+
+  // A column set changes when the table switches grain, and the old hidden set
+  // would then be meaningless. Re-seeding on identity change keeps the defaults
+  // honest without wiping a choice the reader just made on the same set.
+  const colIdentity = cols.map((c) => c.key).join("|");
+  const [hidden, setHidden] = useState<Set<string>>(
+    () => new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)),
+  );
+  useEffect(() => {
+    setHidden(new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)));
+    // Re-seed on the column set itself, not on every render of new col objects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colIdentity]);
+
+  const visibleCols = useMemo(
+    () => cols.filter((c) => c.always || !hidden.has(c.key)),
+    [cols, hidden],
+  );
 
   const filtered = useMemo(() => {
     let out = rows;
@@ -106,6 +155,20 @@ export function DataTable<T>({
     }
   };
 
+  // Contiguous runs of the same group, so the band sits exactly over its columns.
+  const bands = useMemo(() => {
+    if (!groupLabels) return null;
+    const out: { group?: string; span: number }[] = [];
+    for (const c of visibleCols) {
+      const last = out[out.length - 1];
+      if (last && last.group === c.group) last.span += 1;
+      else out.push({ group: c.group, span: 1 });
+    }
+    return out.some((b) => b.group) ? out : null;
+  }, [visibleCols, groupLabels]);
+
+  const hiddenCount = cols.filter((c) => !c.always && hidden.has(c.key)).length;
+
   return (
     <div className={`card overflow-hidden ${className}`}>
       <div className="flex flex-wrap items-center gap-2 p-3 border-b border-border">
@@ -126,6 +189,77 @@ export function DataTable<T>({
           <span className="text-xs text-text-muted num whitespace-nowrap">
             {filtered.length.toLocaleString("en-US")} {t("rows")}
           </span>
+
+          {columnChooser && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="text-xs inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer min-h-[36px]"
+                  aria-label={t("columns")}
+                >
+                  <Columns3 size={14} />
+                  <span className="hidden sm:inline">{t("columns")}</span>
+                  {hiddenCount > 0 && (
+                    <span className="num text-[10px] text-text-muted">({hiddenCount})</span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-64 max-h-[60vh] overflow-y-auto p-2 rounded-xl"
+                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+              >
+                <p className="px-2 py-1.5 text-[11px] text-text-muted leading-relaxed">
+                  {t("columns_hint")}
+                </p>
+                {Object.entries(
+                  cols.reduce<Record<string, Col<T>[]>>((acc, c) => {
+                    const g = c.group ?? "";
+                    (acc[g] ??= []).push(c);
+                    return acc;
+                  }, {}),
+                ).map(([group, groupCols]) => (
+                  <div key={group} className="mb-1.5 last:mb-0">
+                    {group && groupLabels?.[group] && (
+                      <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+                        {groupLabels[group]}
+                      </div>
+                    )}
+                    {groupCols.map((c) => {
+                      const on = c.always || !hidden.has(c.key);
+                      return (
+                        <button
+                          key={c.key}
+                          disabled={c.always}
+                          onClick={() =>
+                            setHidden((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(c.key)) next.delete(c.key);
+                              else next.add(c.key);
+                              return next;
+                            })
+                          }
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-start hover:bg-surface-2 transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
+                        >
+                          <span
+                            className="w-4 h-4 grid place-items-center rounded border shrink-0"
+                            style={{
+                              background: on ? "var(--brand)" : "transparent",
+                              borderColor: on ? "var(--brand)" : "var(--border-strong)",
+                            }}
+                          >
+                            {on && <Check size={11} color="#fff" strokeWidth={3} />}
+                          </span>
+                          <span className="truncate">{c.label ?? c.key}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+
           {csvRow && (
             <button
               onClick={exportCsv}
@@ -138,6 +272,8 @@ export function DataTable<T>({
         </div>
       </div>
 
+      {belowToolbar && <div className="px-3 py-2 border-b border-border">{belowToolbar}</div>}
+
       {truncatedNote && (
         <div className="px-3 py-2 text-[11px] text-text-muted bg-warning-soft border-b border-border">
           {truncatedNote}
@@ -147,8 +283,29 @@ export function DataTable<T>({
       <div className="table-wrap" style={{ maxHeight }}>
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead className="sticky top-0 z-10">
+            {bands && (
+              <tr>
+                {bands.map((b, i) => (
+                  <th
+                    key={i}
+                    colSpan={b.span}
+                    scope="colgroup"
+                    className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide bg-surface-2 whitespace-nowrap text-start ${
+                      i === 0 && visibleCols[0]?.sticky ? "sticky-col z-20" : ""
+                    }`}
+                    style={{
+                      color: b.group ? "var(--text-muted)" : "transparent",
+                      background: "var(--surface-2)",
+                      borderInlineStart: i > 0 && b.group ? "1px solid var(--border)" : undefined,
+                    }}
+                  >
+                    {b.group ? (groupLabels?.[b.group] ?? b.group) : " "}
+                  </th>
+                ))}
+              </tr>
+            )}
             <tr>
-              {cols.map((c) => {
+              {visibleCols.map((c) => {
                 const sorted = sortKey === c.key;
                 return (
                   <th
@@ -156,12 +313,16 @@ export function DataTable<T>({
                     onClick={() => toggleSort(c)}
                     aria-sort={sorted ? (sortDir === 1 ? "ascending" : "descending") : undefined}
                     scope="col"
+                    title={c.headerTitle}
                     className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
                       c.sortValue ? "cursor-pointer hover:text-text" : ""
                     } ${c.align === "right" ? "text-end" : "text-start"} ${
                       c.sticky ? "sticky-col z-20" : ""
                     } ${sorted ? "text-text" : "text-text-muted"}`}
-                    style={{ width: c.width, ...(c.sticky ? { background: "var(--surface-2)" } : {}) }}
+                    style={{
+                      width: c.width,
+                      ...(c.sticky ? { background: "var(--surface-2)" } : {}),
+                    }}
                   >
                     <span
                       className={`inline-flex items-center gap-1 ${
@@ -190,9 +351,23 @@ export function DataTable<T>({
               <tr
                 key={i}
                 onClick={() => onRowClick?.(r)}
+                // A clickable row has to be reachable without a mouse, otherwise
+                // the drill-down simply does not exist for keyboard users.
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(r);
+                        }
+                      }
+                    : undefined
+                }
                 className={`group ${onRowClick ? "cursor-pointer" : ""}`}
               >
-                {cols.map((c) => (
+                {visibleCols.map((c) => (
                   <td
                     key={c.key}
                     className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
@@ -209,9 +384,8 @@ export function DataTable<T>({
           </tbody>
         </table>
 
-        {visible.length === 0 && (
-          <EmptyState label={q ? t("no_results") : t("no_data")} compact />
-        )}
+        {visible.length === 0 &&
+          (emptyState ?? <EmptyState label={q ? t("no_results") : t("no_data")} compact />)}
       </div>
 
       {pageCount > 1 && (
@@ -225,8 +399,8 @@ export function DataTable<T>({
             {lang === "ar" ? "السابق" : "Prev"}
           </button>
           <span className="text-xs text-text-muted num">
-            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} {t("of")}{" "}
-            {filtered.length.toLocaleString("en-US")}
+            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)}{" "}
+            {t("of")} {filtered.length.toLocaleString("en-US")}
           </span>
           <button
             disabled={safePage + 1 >= pageCount}

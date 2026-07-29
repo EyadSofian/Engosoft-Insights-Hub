@@ -181,7 +181,7 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `GET /api/overview`                            | KPI totals, deltas, funnel, trend, lead origin, spotlights, data health                  |
 | `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains                                             |
-| `GET /api/ads`                                 | Per-platform metrics, daily spend, ad and ad-set breakdowns                              |
+| `GET /api/ads[?grain=campaign\|adset\|ad]`     | Per-platform metrics, platform coverage, daily spend and trend. With `grain`, one level of the performance table; without it, the full ad + ad-set breakdown |
 | `GET /api/courses`                             | Course leaderboard, inferred spend, optional `?detail=` drilldown                        |
 | `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                         |
 | `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                         |
