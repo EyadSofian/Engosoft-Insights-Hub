@@ -201,6 +201,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
   }
 
   /* Arabic needs a touch more leading and no synthetic letter-spacing. */

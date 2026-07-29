@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   AlertTriangle,
   Award,
+  ChevronDown,
   DollarSign,
   Info,
   Percent,
@@ -103,6 +104,13 @@ function Overview() {
   }
 
   const { totals: T, deltas, health } = data;
+  const mobileAlertCount = [
+    data.fetchErrors.length > 0,
+    data.staleTabs?.length > 0,
+    health.platformsWithoutSpendTab?.length > 0,
+    health.excludedStages?.length > 0,
+    T.lostArchived > 0,
+  ].filter(Boolean).length;
 
   return (
     <div className="space-y-5">
@@ -111,6 +119,84 @@ function Overview() {
         subtitle={filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined}
       />
 
+      {mobileAlertCount > 0 && (
+        <details className="group card overflow-hidden sm:hidden">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
+            <span
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+              style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
+            >
+              <AlertTriangle size={16} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-text">
+                {lang === "ar" ? "ملاحظات مهمة على البيانات" : "Important data notes"}
+              </span>
+              <span className="block text-[10.5px] text-text-muted">
+                {lang === "ar"
+                  ? "اضغط لعرض التفاصيل بدون تعطيل الأرقام"
+                  : "Tap to review without pushing the metrics down"}
+              </span>
+            </span>
+            <span className="num rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">
+              {mobileAlertCount}
+            </span>
+            <ChevronDown
+              size={16}
+              className="shrink-0 text-text-muted transition-transform group-open:rotate-180"
+            />
+          </summary>
+
+          <div className="max-h-[52dvh] space-y-2 overflow-y-auto border-t border-border p-2.5 text-[11.5px] leading-relaxed">
+            {data.fetchErrors.length > 0 && (
+              <div className="rounded-lg bg-danger-soft p-2.5 text-danger">
+                <strong className="block">{lang === "ar" ? "مصادر تعذّر تحميلها" : "Sources failed to load"}</strong>
+                <span>{data.fetchErrors.join(" · ")}</span>
+              </div>
+            )}
+            {data.staleTabs?.length > 0 && (
+              <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
+                <strong className="block">{lang === "ar" ? "معروض من آخر نسخة سليمة" : "Using the last good copy"}</strong>
+                <span>{data.staleTabs.join(" · ")}</span>
+              </div>
+            )}
+            {health.platformsWithoutSpendTab?.length > 0 && (
+              <div className="rounded-lg bg-danger-soft p-2.5 text-danger">
+                <strong className="block">{t("missing_spend_tab")}</strong>
+                <span>
+                  {health.platformsWithoutSpendTab
+                    .map((p) => `${p.platform}: ${fmtNum(p.leads)}`)
+                    .join(" · ")}
+                </span>
+              </div>
+            )}
+            {health.excludedStages?.length > 0 && (
+              <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
+                <strong className="block">{t("excluded_stages")}</strong>
+                <span>
+                  {health.excludedStages
+                    .map((s) => `${s.stage}: ${fmtNum(s.rows)}`)
+                    .join(" · ")}
+                </span>
+              </div>
+            )}
+            {T.lostArchived > 0 && (
+              <div className="rounded-lg bg-brand-soft p-2.5 text-brand">
+                <strong className="block">
+                  {lang === "ar" ? "مصدر الصفقات الضائعة" : "Lost-deal source"}
+                </strong>
+                <span>
+                  {lang === "ar"
+                    ? `${fmtNum(T.lostArchived)} من Lost Analysis فقط${T.archivedWon > 0 ? `، و${fmtNum(T.archivedWon)} مؤرشف Won داخل الإجمالي وليس Lost` : ""}.`
+                    : `${fmtNum(T.lostArchived)} from Lost Analysis only${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows in total leads, not Lost` : ""}.`}
+                </span>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      <div className="hidden space-y-3 sm:block">
       {data.fetchErrors.length > 0 && (
         <Notice
           tone="danger"
@@ -173,8 +259,27 @@ function Overview() {
             : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
         </Notice>
       )}
+      </div>
 
-      <Card>
+      <details className="group card overflow-hidden sm:hidden">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
+          <span className="text-[13px] font-semibold text-text">{t("exec_summary")}</span>
+          <span className="flex items-center gap-2 text-[10.5px] text-text-muted">
+            {lang === "ar" ? "اضغط للقراءة" : "Tap to read"}
+            <ChevronDown
+              size={16}
+              className="transition-transform group-open:rotate-180"
+            />
+          </span>
+        </summary>
+        <div className="max-h-[58dvh] overflow-y-auto border-t border-border px-3.5 py-3">
+          <p className="text-[12px] leading-relaxed text-text-muted">
+            {lang === "ar" ? data.summary.ar : data.summary.en}
+          </p>
+        </div>
+      </details>
+
+      <Card className="hidden sm:block">
         <SectionTitle>{t("exec_summary")}</SectionTitle>
         <p className="text-[13px] sm:text-sm leading-relaxed text-text-muted">
           {lang === "ar" ? data.summary.ar : data.summary.en}

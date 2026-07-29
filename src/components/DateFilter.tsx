@@ -210,7 +210,7 @@ export function DateRangePanel({
                 onApply?.();
               }}
               className={cn(
-                "inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-all cursor-pointer",
+                "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-all cursor-pointer",
                 p.full && "col-span-2",
                 on
                   ? "text-white shadow-sm"
@@ -306,7 +306,7 @@ export function DateFilter({ latest }: { latest?: string }) {
   const label = useRangeLabel(latest);
 
   const triggerClasses =
-    "inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 sm:px-3 text-sm text-text transition-colors hover:bg-surface-2 cursor-pointer max-w-[60vw] sm:max-w-none";
+    "inline-flex h-11 items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 text-sm text-text transition-colors hover:bg-surface-2 active:scale-[0.98] sm:h-10 sm:rounded-lg sm:px-3 cursor-pointer max-w-[42vw] sm:max-w-none";
 
   // Name the control AND its current value, so a screen reader announces both.
   const a11yLabel = `${t("date_range")}: ${label}`;

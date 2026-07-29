@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
   Calculator,
+  ChevronDown,
   Download,
   FileSpreadsheet,
   GraduationCap,
@@ -298,15 +299,15 @@ function Accounting() {
                   <BadgeDollarSign size={18} className="text-brand" />
                   {lang === "ar" ? "أسعار تحويل الحسابات إلى الدولار" : "Accounting USD conversion rates"}
                 </div>
-                <p className="mt-1.5 text-xs leading-relaxed text-text-muted">
+                <p className="mt-1.5 hidden text-xs leading-relaxed text-text-muted sm:block">
                   {lang === "ar"
                     ? "الحساب يتم من Total in Currency: الجنيه ÷ سعر الجنيه، والريال ÷ سعر الريال. التعديل يعيد حساب كل مؤشرات الحسابات والتصدير فورًا ويُحفظ على هذا الجهاز."
                     : "Calculated from Total in Currency: EGP ÷ EGP rate and SAR ÷ SAR rate. Applying a change refreshes every Accounting KPI and export and saves it on this device."}
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[520px]">
-                <label className="text-xs font-medium text-text-muted">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[520px]">
+                <label className="text-[11px] font-medium text-text-muted sm:text-xs">
                   <span className="mb-1.5 block">
                     {lang === "ar" ? "1 دولار = جنيه مصري" : "1 USD = EGP"}
                   </span>
@@ -320,7 +321,7 @@ function Accounting() {
                     className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
                   />
                 </label>
-                <label className="text-xs font-medium text-text-muted">
+                <label className="text-[11px] font-medium text-text-muted sm:text-xs">
                   <span className="mb-1.5 block">
                     {lang === "ar" ? "1 دولار = ريال سعودي" : "1 USD = SAR"}
                   </span>
@@ -334,23 +335,23 @@ function Accounting() {
                     className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
                   />
                 </label>
-                <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                <div className="col-span-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={applyFxRates}
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-brand px-3 py-2 text-[12px] font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
                   >
                     {lang === "ar" ? "تطبيق وإعادة الحساب" : "Apply and recalculate"}
                   </button>
                   <button
                     type="button"
                     onClick={resetFxRates}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[12px] font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
                   >
                     <RotateCcw size={15} />
                     {lang === "ar" ? "استرجاع 50.5 و3.7453" : "Restore 50.5 and 3.7453"}
                   </button>
-                  <span className="text-xs text-text-muted">
+                  <span className="w-full text-[10.5px] text-text-muted sm:w-auto sm:text-xs">
                     {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD = {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
                   </span>
                 </div>
@@ -359,7 +360,25 @@ function Accounting() {
             </div>
           </Card>
 
-          <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
+          <details className="group card overflow-hidden sm:hidden">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 font-semibold text-brand [&::-webkit-details-marker]:hidden">
+              <span className="flex min-w-0 items-center gap-2">
+                <Info size={17} className="shrink-0" />
+                <span>{t("data_notes")}</span>
+              </span>
+              <ChevronDown
+                size={18}
+                className="shrink-0 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <p className="border-t border-border px-3.5 py-3 text-xs leading-6 text-text-muted">
+              {lang === "ar"
+                ? "المصدر المالي المعتمد هو الفواتير المدفوعة فقط حسب تاريخ الدفع. الإيراد بالدولار محسوب من إجمالي المبلغ بالعملة، ولا تدخل أوامر البيع في حسابه."
+                : "Accounting uses paid invoices only by Payment Date. USD revenue is calculated from Total in Currency; sales orders are excluded."}
+            </p>
+          </details>
+
+          <Notice className="hidden sm:flex" tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
               ? "المصدر المالي المعتمد: الفواتير المدفوعة فقط من تحليل الفواتير، حسب Payment Date. الإيراد هو USD Paid المحسوب من Total in Currency، وعدد الفواتير مميز حسب Move؛ ولا تدخل أوامر البيع المؤكدة أو تبويب Full Invoiced Orders في حساب الإيراد."
               : "Accounting authority: paid invoices only from invoice analysis, by Payment Date. Revenue is USD Paid calculated from Total in Currency, and invoice count is distinct Move; confirmed sales orders and Full Invoiced Orders are not revenue inputs."}

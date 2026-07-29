@@ -12,13 +12,13 @@ import { TopBar } from "./TopBar";
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh flex bg-bg">
+    <div className="min-h-dvh flex bg-bg overflow-x-clip">
       <Sidebar />
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar />
         <SectionTabs />
         {/* Bottom padding clears the mobile nav bar and its safe area. */}
-        <main className="flex-1 px-4 sm:px-6 py-5 pb-28 lg:pb-8 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 pb-24 lg:pb-8 max-w-[1600px] w-full mx-auto overflow-x-clip">
           {children}
         </main>
       </div>

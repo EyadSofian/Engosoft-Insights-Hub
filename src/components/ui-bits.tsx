@@ -20,7 +20,7 @@ export function Card({
   return (
     <div
       style={style}
-      className={`card ${padded ? "p-4 sm:p-5" : ""} ${
+      className={`card min-w-0 ${padded ? "p-3.5 sm:p-5" : ""} ${
         hoverable ? "card-hover hover:shadow-md hover:-translate-y-0.5" : ""
       } ${className}`}
     >
@@ -41,9 +41,9 @@ export function SectionTitle({
   className?: string;
 }) {
   return (
-    <div className={`flex items-start justify-between gap-3 mb-4 ${className}`}>
+    <div className={`flex items-start justify-between gap-3 mb-3.5 sm:mb-4 ${className}`}>
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-text truncate">{children}</h2>
+        <h2 className="text-[14px] sm:text-[15px] font-semibold text-text leading-snug sm:truncate">{children}</h2>
         {hint && <p className="text-xs text-text-muted mt-0.5 leading-snug">{hint}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -53,9 +53,9 @@ export function SectionTitle({
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="mb-5">
-      <h1 className="text-xl sm:text-2xl font-semibold text-text">{title}</h1>
-      {subtitle && <p className="text-sm text-text-muted mt-1">{subtitle}</p>}
+    <div className="mb-3.5 sm:mb-5">
+      <h1 className="text-[21px] sm:text-2xl font-semibold text-text">{title}</h1>
+      {subtitle && <p className="text-[12px] sm:text-sm text-text-muted mt-0.5 sm:mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -156,7 +156,7 @@ export function KpiCard({
 }) {
   return (
     <div
-      className="card stagger p-4 sm:p-5 relative overflow-hidden"
+      className="card stagger min-h-[118px] p-3.5 sm:min-h-0 sm:p-5 relative overflow-hidden"
       style={
         {
           "--i": index,
@@ -170,7 +170,7 @@ export function KpiCard({
       }
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted truncate">
+        <span className="min-h-7 text-[10.5px] sm:min-h-0 sm:text-[11px] font-medium uppercase tracking-wide text-text-muted leading-snug line-clamp-2 sm:block sm:truncate">
           {label}
         </span>
         {icon && (
@@ -181,7 +181,7 @@ export function KpiCard({
       </div>
 
       <div
-        className="num mt-2 font-semibold leading-none text-[22px] sm:text-[27px]"
+        className="num mt-1.5 sm:mt-2 font-semibold leading-none text-[16px] min-[420px]:text-[19px] sm:text-[27px]"
         style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
       >
         {value}
@@ -191,7 +191,9 @@ export function KpiCard({
         <DeltaBadge value={delta} invert={deltaInvert} />
         {sub != null && (
           <span
-            className={`text-[11px] text-text-muted ${subWrap ? "leading-relaxed" : "truncate"}`}
+            className={`text-[10.5px] sm:text-[11px] text-text-muted ${
+              subWrap ? "leading-relaxed" : "line-clamp-2 sm:block sm:truncate"
+            }`}
           >
             {sub}
           </span>
@@ -360,11 +362,13 @@ export function Notice({
   title,
   children,
   icon,
+  className = "",
 }: {
   tone?: "info" | "warning" | "danger";
   title?: string;
   children: ReactNode;
   icon?: ReactNode;
+  className?: string;
 }) {
   const map = {
     info: { bg: "var(--brand-soft)", color: "var(--brand)" },
@@ -374,7 +378,7 @@ export function Notice({
 
   return (
     <div
-      className="rounded-xl px-4 py-3 flex gap-2.5 items-start text-sm animate-fade-in"
+      className={`rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 flex gap-2.5 items-start text-[13px] sm:text-sm animate-fade-in ${className}`}
       style={{ background: map.bg, color: map.color }}
     >
       {icon && <span className="shrink-0 mt-0.5">{icon}</span>}
@@ -401,7 +405,7 @@ export function Segmented<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-2 border border-border"
+      className="inline-flex w-max items-center gap-0.5 rounded-xl border border-border bg-surface-2 p-0.5 sm:rounded-lg"
       role="tablist"
     >
       {options.map((o) => {
@@ -412,8 +416,8 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`rounded-[7px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              size === "md" ? "px-3 py-1.5 text-[13px]" : "px-2.5 py-1 text-xs"
+            className={`min-h-11 min-w-11 rounded-[9px] font-medium transition-colors active:scale-[0.97] sm:min-h-0 sm:min-w-0 sm:rounded-[7px] cursor-pointer whitespace-nowrap ${
+              size === "md" ? "px-3 py-1.5 text-[13px]" : "px-3 py-1 text-xs"
             } ${active ? "text-white shadow-sm" : "text-text-muted hover:text-text"}`}
             style={active ? { background: "var(--brand)" } : undefined}
           >

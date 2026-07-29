@@ -161,9 +161,9 @@ export function DataTable<T>({
 
   return (
     <div className={`card overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-center gap-2 p-3 border-b border-border">
+      <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3 border-b border-border">
         {searchable && (
-          <div className="flex items-center gap-2 flex-1 min-w-[160px] max-w-[340px] px-2.5 rounded-lg bg-surface-2 border border-border focus-within:border-brand transition-colors">
+          <div className="flex min-h-11 items-center gap-2 flex-1 min-w-[160px] max-w-[340px] px-2.5 rounded-xl sm:rounded-lg bg-surface-2 border border-border focus-within:border-brand transition-colors">
             <Search size={15} className="text-text-subtle shrink-0" />
             <input
               value={q}
@@ -184,7 +184,7 @@ export function DataTable<T>({
             <Popover>
               <PopoverTrigger asChild>
                 <button
-                  className="text-xs inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer min-h-[36px]"
+                  className="text-xs inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-surface-2 active:scale-[0.98] sm:min-h-9 sm:rounded-lg sm:px-2.5 cursor-pointer"
                   aria-label={t("columns")}
                 >
                   <Columns3 size={14} />
@@ -255,7 +255,7 @@ export function DataTable<T>({
               onClick={() =>
                 csvRow && exportCsv(filtered, csvRow, csvFilename ?? "engosoft-export")
               }
-              className="text-xs inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer min-h-[36px]"
+              className="text-xs inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-surface-2 active:scale-[0.98] sm:min-h-9 sm:rounded-lg sm:px-2.5 cursor-pointer"
             >
               <Download size={14} />
               <span className="hidden sm:inline">{t("export_csv")}</span>
@@ -272,7 +272,11 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="table-wrap" style={{ maxHeight }}>
+      <div className="sm:hidden border-b border-border bg-surface-2/60 px-3 py-1.5 text-[10.5px] text-text-muted">
+        {lang === "ar" ? "اسحب الجدول يمينًا ويسارًا لعرض باقي الأعمدة" : "Swipe sideways to view the remaining columns"}
+      </div>
+
+      <div className="table-wrap scrollbar-thin" style={{ maxHeight }}>
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead className="sticky top-0 z-10">
             {bands && (
@@ -385,7 +389,7 @@ export function DataTable<T>({
           <button
             disabled={safePage === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-xs disabled:opacity-40 hover:bg-surface-2 transition-colors cursor-pointer disabled:cursor-default min-h-[36px]"
+            className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs transition-colors hover:bg-surface-2 active:scale-[0.98] disabled:cursor-default disabled:opacity-40 sm:min-h-9 sm:rounded-lg cursor-pointer"
           >
             <ChevronLeft size={14} className="rtl:rotate-180" />
             {lang === "ar" ? "السابق" : "Prev"}
@@ -397,7 +401,7 @@ export function DataTable<T>({
           <button
             disabled={safePage + 1 >= pageCount}
             onClick={() => setPage((p) => p + 1)}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-xs disabled:opacity-40 hover:bg-surface-2 transition-colors cursor-pointer disabled:cursor-default min-h-[36px]"
+            className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs transition-colors hover:bg-surface-2 active:scale-[0.98] disabled:cursor-default disabled:opacity-40 sm:min-h-9 sm:rounded-lg cursor-pointer"
           >
             {lang === "ar" ? "التالي" : "Next"}
             <ChevronRight size={14} className="rtl:rotate-180" />

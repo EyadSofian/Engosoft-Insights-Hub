@@ -62,7 +62,7 @@ export function PlatformSwitcher({
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5"
+      className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain scrollbar-none pb-1"
       role="tablist"
       aria-label={t("platform")}
     >
@@ -135,7 +135,7 @@ function Tab({
       // flattens into nothing; name the tab explicitly, availability included.
       aria-label={`${title} — ${line}`}
       onClick={onClick}
-      className={`shrink-0 min-w-[9.5rem] text-start rounded-xl border px-3 py-2 transition-colors cursor-pointer ${
+      className={`min-h-[64px] min-w-[8.5rem] shrink-0 snap-start text-start rounded-xl border px-3 py-2 transition-colors active:scale-[0.98] sm:min-w-[9.5rem] cursor-pointer ${
         active ? "shadow-sm" : "hover:bg-surface-2"
       }`}
       style={{

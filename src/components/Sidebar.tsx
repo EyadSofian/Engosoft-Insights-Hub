@@ -116,7 +116,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="glass-navy fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 px-2 pt-1.5 lg:hidden"
+      className="glass-navy fixed inset-x-0 bottom-0 z-40 flex min-h-[64px] items-stretch justify-around gap-1 border-t border-white/10 px-1.5 pt-1.5 shadow-[0_-10px_28px_rgba(0,18,40,0.18)] lg:hidden"
       style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
       aria-label={lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}
     >
@@ -128,9 +128,9 @@ export function MobileNav() {
           <Link
             key={section.id}
             to={section.defaultTo}
-            aria-current={active ? "true" : undefined}
+            aria-current={active ? "page" : undefined}
             aria-label={section.label[lang]}
-            className={`flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0.5 transition-colors duration-150 ${
+            className={`flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0.5 transition-colors duration-150 active:scale-[0.97] ${
               active ? "text-white" : "text-white/60"
             }`}
             style={active ? { background: "var(--brand)" } : undefined}

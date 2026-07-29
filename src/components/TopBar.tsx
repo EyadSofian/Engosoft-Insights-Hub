@@ -119,12 +119,12 @@ export function TopBar({ title }: { title?: string }) {
   return (
     <>
       <header className="sticky top-0 z-30 glass border-b border-border">
-        <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3">
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's PageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
           <div className="flex items-center gap-2 min-w-0">
-            <span className="lg:hidden font-semibold text-[15px] tracking-tight text-text">
+            <span className="lg:hidden font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">
               ENGOSOFT
             </span>
             {title && (
@@ -134,12 +134,12 @@ export function TopBar({ title }: { title?: string }) {
             )}
           </div>
 
-          <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
+          <div className="ms-auto flex items-center gap-2">
             <SyncBadge data={data} />
 
             <button
               onClick={() => setSheetOpen(true)}
-              className="relative inline-flex items-center gap-1.5 px-2.5 sm:px-3 h-10 rounded-lg border border-border bg-surface text-sm hover:bg-surface-2 transition-colors cursor-pointer"
+              className="relative inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 text-sm transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:min-w-0 sm:rounded-lg sm:px-3 cursor-pointer"
               aria-label={t("filters")}
             >
               <SlidersHorizontal size={16} />
@@ -157,7 +157,7 @@ export function TopBar({ title }: { title?: string }) {
             <button
               onClick={doRefresh}
               disabled={refreshing}
-              className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-surface hover:bg-surface-2 transition-colors cursor-pointer disabled:opacity-60"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg cursor-pointer disabled:opacity-60"
               aria-label={t("refresh")}
               title={t("refresh")}
             >
@@ -166,7 +166,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={toggleTheme}
-              className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-surface hover:bg-surface-2 transition-colors cursor-pointer"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg cursor-pointer"
               aria-label={t("theme")}
               title={t("theme")}
             >
@@ -175,7 +175,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="inline-flex items-center gap-1 px-2.5 h-10 rounded-lg border border-border bg-surface text-sm font-medium hover:bg-surface-2 transition-colors cursor-pointer"
+              className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-border bg-surface px-2.5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:rounded-lg cursor-pointer"
               aria-label="Toggle language"
             >
               <Languages size={16} />
@@ -187,18 +187,22 @@ export function TopBar({ title }: { title?: string }) {
         {/* Period and platform stay visible on every screen — the most-used controls.
             The date control is now a single button that opens a preset + calendar
             picker, so custom ranges no longer hide inside the filter sheet. */}
-        <div className="px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <DateFilter latest={latest} />
-          <Segmented
-            value={filters.platform ?? "all"}
-            onChange={(v) =>
-              filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })
-            }
-            options={[
-              { value: "all", label: t("all_platforms") },
-              ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
-            ]}
-          />
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5 sm:flex sm:px-6">
+          <div className="shrink-0">
+            <DateFilter latest={latest} />
+          </div>
+          <div className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-none">
+            <Segmented
+              value={filters.platform ?? "all"}
+              onChange={(v) =>
+                filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })
+              }
+              options={[
+                { value: "all", label: t("all_platforms") },
+                ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
+              ]}
+            />
+          </div>
         </div>
 
         <DataHealthBar data={data} />
@@ -376,7 +380,7 @@ function FilterSheet({
           <button
             onClick={onClose}
             aria-label={t("close")}
-            className="w-10 h-10 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer"
+            className="grid h-11 w-11 place-items-center rounded-full transition-colors hover:bg-surface-2 active:scale-95 cursor-pointer"
           >
             <X size={20} />
           </button>

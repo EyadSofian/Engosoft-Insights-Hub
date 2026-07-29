@@ -98,9 +98,9 @@ export function FloatingChat() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("ai_assistant")}
         aria-expanded={open}
-        className={`fixed z-40 bottom-24 lg:bottom-6 ${
-          dir === "rtl" ? "start-5" : "end-5"
-        } w-14 h-14 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
+        className={`fixed z-40 bottom-20 lg:bottom-6 ${
+          dir === "rtl" ? "start-3.5 lg:start-6" : "end-3.5 lg:end-6"
+        } w-12 h-12 lg:w-14 lg:h-14 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
           open || anyModalOpen ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
         }`}
         style={{
@@ -108,7 +108,7 @@ export function FloatingChat() {
           boxShadow: "0 12px 32px -8px rgba(22, 86, 160, 0.55), 0 0 0 1px rgba(255,255,255,0.12) inset",
         }}
       >
-        <Sparkles size={22} />
+        <Sparkles size={19} />
       </button>
 
       {open && (
@@ -148,7 +148,7 @@ export function FloatingChat() {
                   onClick={() => setMessages([])}
                   aria-label={t("new_chat")}
                   title={t("new_chat")}
-                  className="w-9 h-9 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer text-text-muted"
+                  className="w-11 h-11 lg:w-9 lg:h-9 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer text-text-muted"
                 >
                   <RotateCcw size={16} />
                 </button>
@@ -156,7 +156,7 @@ export function FloatingChat() {
               <button
                 onClick={() => setOpen(false)}
                 aria-label={t("close")}
-                className="w-9 h-9 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer"
+                className="w-11 h-11 lg:w-9 lg:h-9 grid place-items-center rounded-full hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <X size={19} />
               </button>
