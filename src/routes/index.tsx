@@ -428,7 +428,6 @@ function Overview() {
         </div>
       </Card>
 
-      <DataHealthPanel health={health} />
       <TelegramPanel />
     </div>
   );
