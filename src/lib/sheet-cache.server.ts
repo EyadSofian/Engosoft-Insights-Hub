@@ -156,8 +156,8 @@ function firstPresent(...values: unknown[]): unknown {
 }
 
 const USD_RATE: Record<string, number> = {
-  EGP: 0.02054,
-  SAR: 0.267,
+  EGP: 1 / 50.5,
+  SAR: 1 / 3.75,
   AED: 0.27,
   USD: 1,
 };

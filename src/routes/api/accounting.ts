@@ -7,6 +7,7 @@ export const Route = createFileRoute("/api/accounting")({
         const { getFiltered, computeTotals, groupBy } = await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const { buildAccountingCourses } = await import("@/lib/accounting-courses");
+        const { fxRatesFromFilters } = await import("@/lib/fx-rates");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -78,6 +79,7 @@ export const Route = createFileRoute("/api/accounting")({
             valueBasis: "USD Paid",
             grain: "invoice_product_line",
           },
+          fxRates: fxRatesFromFilters(filters),
           appliedFilters: filters,
         });
       },

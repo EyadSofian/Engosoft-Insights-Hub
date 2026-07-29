@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  BadgeDollarSign,
   Calculator,
   Download,
   FileSpreadsheet,
@@ -8,6 +9,7 @@ import {
   Info,
   ListChecks,
   ReceiptText,
+  RotateCcw,
   ShieldCheck,
   X,
 } from "lucide-react";
@@ -28,7 +30,8 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
-import { useFilters } from "@/lib/filter-store";
+import { filterStore, useFilters } from "@/lib/filter-store";
+import { DEFAULT_FX_RATES } from "@/lib/fx-rates";
 import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
 import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
@@ -88,13 +91,47 @@ interface AccountingResponse {
     valueBasis: string;
     grain: string;
   };
+  fxRates: {
+    EGP: number;
+    SAR: number;
+  };
 }
 
 function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
+  const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
+  const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
+  const [fxError, setFxError] = useState("");
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
+
+  useEffect(() => {
+    filterStore.hydrateFx();
+  }, []);
+
+  useEffect(() => {
+    setFxEgpInput(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
+    setFxSarInput(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
+  }, [filters.fxEgp, filters.fxSar]);
+
+  const applyFxRates = () => {
+    const egp = Number(fxEgpInput);
+    const sar = Number(fxSarInput);
+    if (!Number.isFinite(egp) || egp <= 0 || !Number.isFinite(sar) || sar <= 0) {
+      setFxError(lang === "ar" ? "أدخل سعرين أكبر من صفر." : "Enter two rates greater than zero.");
+      return;
+    }
+    setFxError("");
+    filterStore.setFxRates(egp, sar);
+  };
+
+  const resetFxRates = () => {
+    setFxError("");
+    setFxEgpInput(String(DEFAULT_FX_RATES.EGP));
+    setFxSarInput(String(DEFAULT_FX_RATES.SAR));
+    filterStore.setFxRates(DEFAULT_FX_RATES.EGP, DEFAULT_FX_RATES.SAR);
+  };
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -253,6 +290,74 @@ function Accounting() {
               {lang === "ar" ? "تصدير الحسابات كاملة" : "Export all Accounting"}
             </button>
           </div>
+
+          <Card>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                  <BadgeDollarSign size={18} className="text-brand" />
+                  {lang === "ar" ? "أسعار تحويل الحسابات إلى الدولار" : "Accounting USD conversion rates"}
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-text-muted">
+                  {lang === "ar"
+                    ? "الحساب يتم من Total in Currency: الجنيه ÷ سعر الجنيه، والريال ÷ سعر الريال. التعديل يعيد حساب كل مؤشرات الحسابات والتصدير فورًا ويُحفظ على هذا الجهاز."
+                    : "Calculated from Total in Currency: EGP ÷ EGP rate and SAR ÷ SAR rate. Applying a change refreshes every Accounting KPI and export and saves it on this device."}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[520px]">
+                <label className="text-xs font-medium text-text-muted">
+                  <span className="mb-1.5 block">
+                    {lang === "ar" ? "1 دولار = جنيه مصري" : "1 USD = EGP"}
+                  </span>
+                  <input
+                    type="number"
+                    min="0.000001"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={fxEgpInput}
+                    onChange={(event) => setFxEgpInput(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
+                  />
+                </label>
+                <label className="text-xs font-medium text-text-muted">
+                  <span className="mb-1.5 block">
+                    {lang === "ar" ? "1 دولار = ريال سعودي" : "1 USD = SAR"}
+                  </span>
+                  <input
+                    type="number"
+                    min="0.000001"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={fxSarInput}
+                    onChange={(event) => setFxSarInput(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={applyFxRates}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                  >
+                    {lang === "ar" ? "تطبيق وإعادة الحساب" : "Apply and recalculate"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetFxRates}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                  >
+                    <RotateCcw size={15} />
+                    {lang === "ar" ? "استرجاع 50.5 و3.75" : "Restore 50.5 and 3.75"}
+                  </button>
+                  <span className="text-xs text-text-muted">
+                    {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD = {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
+                  </span>
+                </div>
+                {fxError && <p className="text-xs text-danger sm:col-span-2">{fxError}</p>}
+              </div>
+            </div>
+          </Card>
 
           <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"

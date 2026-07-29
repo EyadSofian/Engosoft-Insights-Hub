@@ -93,6 +93,11 @@ export function TopBar({ title }: { title?: string }) {
   const activeCount = activeDimensionCount(filters);
   const latest = latestDate(data);
 
+  // Accountant-managed FX settings must survive navigation and reload on every page.
+  useEffect(() => {
+    filterStore.hydrateFx();
+  }, []);
+
   // Anchor the default year window to the newest available source date so a
   // preset never silently hides recent valid rows.
   useEffect(() => {

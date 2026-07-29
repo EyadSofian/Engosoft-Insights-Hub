@@ -1,6 +1,7 @@
 // Server-only helpers shared by every /api route.
 import type { GlobalFilters, Platform } from "./types";
 import { getDefaultRange } from "./metrics.server";
+import { DEFAULT_FX_RATES } from "./fx-rates";
 
 /**
  * Reads filters off the query string. With no explicit window the range falls
@@ -34,6 +35,8 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
     salesperson: p.get("salesperson") || undefined,
     includeNonLead: p.get("includeNonLead") === "1" ? "1" : undefined,
     cpaBasis: p.get("cpaBasis") === "invoices" ? "invoices" : undefined,
+    fxEgp: p.get("fxEgp") || String(DEFAULT_FX_RATES.EGP),
+    fxSar: p.get("fxSar") || String(DEFAULT_FX_RATES.SAR),
   };
 
   if (explicitAll) {

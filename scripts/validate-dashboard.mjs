@@ -160,6 +160,32 @@ check(
   accounting.summary.paidUsd,
 );
 check(
+  "Accounting applies the approved EGP rate",
+  same(accounting.fxRates?.EGP, 50.5),
+  accounting.fxRates?.EGP,
+  50.5,
+);
+check(
+  "Accounting applies the approved SAR rate",
+  same(accounting.fxRates?.SAR, 3.75),
+  accounting.fxRates?.SAR,
+  3.75,
+);
+const managedFxRows = accountingLineExport.rows.filter((row) =>
+  ["EGP", "SAR"].includes(String(row.Currency || "").trim().toUpperCase()),
+);
+const invalidManagedFxRows = managedFxRows.filter((row) => {
+  const currency = String(row.Currency || "").trim().toUpperCase();
+  const rate = currency === "EGP" ? 50.5 : 3.75;
+  return !same(Number(row["USD Paid"]), Number(row["Total in Currency"]) / rate);
+});
+check(
+  "Every EGP/SAR line follows Total in Currency / approved rate",
+  invalidManagedFxRows.length === 0,
+  invalidManagedFxRows.length,
+  0,
+);
+check(
   "Every Accounting export row is explicitly paid-invoice-only",
   accountingLineExport.rows.every((row) => row["Accounting Rule"] === "Paid invoice only"),
   accountingLineExport.rows.filter((row) => row["Accounting Rule"] !== "Paid invoice only").length,

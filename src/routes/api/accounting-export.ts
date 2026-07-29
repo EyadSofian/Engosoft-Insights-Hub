@@ -42,6 +42,7 @@ export const Route = createFileRoute("/api/accounting-export")({
         const { getFiltered } = await import("@/lib/metrics.server");
         const { parseFilters } = await import("@/lib/api.server");
         const { buildAccountingCourses } = await import("@/lib/accounting-courses");
+        const { fxRatesFromFilters } = await import("@/lib/fx-rates");
 
         const url = new URL(request.url);
         const requested = url.searchParams.get("view");
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/api/accounting-export")({
             : "lines";
         const ar = url.searchParams.get("lang") !== "en";
         const filters = await parseFilters(request);
+        const fxRates = fxRatesFromFilters(filters);
         const data = await getFiltered(filters);
         const rows = data.accounting;
         const name = filename(view, filters.from, filters.to);
@@ -120,6 +122,18 @@ export const Route = createFileRoute("/api/accounting-export")({
               ar ? "أساس القيمة" : "Value basis",
               "Total in Currency → USD Paid",
               ar ? "التحويل للدولار من الإجمالي بالعملة" : "USD conversion from Total in Currency",
+              source,
+            ],
+            [
+              ar ? "سعر الدولار بالجنيه" : "USD rate in EGP",
+              fxRates.EGP,
+              ar ? "Total in Currency ÷ سعر الجنيه" : "Total in Currency / EGP rate",
+              source,
+            ],
+            [
+              ar ? "سعر الدولار بالريال" : "USD rate in SAR",
+              fxRates.SAR,
+              ar ? "Total in Currency ÷ سعر الريال" : "Total in Currency / SAR rate",
               source,
             ],
             [

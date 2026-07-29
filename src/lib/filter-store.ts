@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { DatePreset, GlobalFilters } from "./types";
+import { DEFAULT_FX_RATES } from "./fx-rates";
 
 type Listener = () => void;
 
@@ -17,7 +18,14 @@ const DIMENSIONS = [
   "salesperson",
 ] as const;
 
-let state: GlobalFilters = {};
+const FX_STORAGE_KEY = "engosoft-accounting-fx-v1";
+const defaultFxFilters = (): Pick<GlobalFilters, "fxEgp" | "fxSar"> => ({
+  fxEgp: String(DEFAULT_FX_RATES.EGP),
+  fxSar: String(DEFAULT_FX_RATES.SAR),
+});
+
+let state: GlobalFilters = { ...defaultFxFilters() };
+let fxHydrated = false;
 /** Year to date. Ad spend now covers the whole year, so this is the honest default. */
 let preset: DatePreset = "year";
 /** Prevent the default-year effect from immediately undoing a cleared custom range. */
@@ -83,6 +91,37 @@ export const filterStore = {
     emit();
   },
 
+  /** Load accountant-saved rates after hydration, avoiding an SSR mismatch. */
+  hydrateFx() {
+    if (fxHydrated || typeof window === "undefined") return;
+    fxHydrated = true;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(FX_STORAGE_KEY) || "{}") as {
+        fxEgp?: unknown;
+        fxSar?: unknown;
+      };
+      const fxEgp = Number(saved.fxEgp);
+      const fxSar = Number(saved.fxSar);
+      state = {
+        ...state,
+        fxEgp: Number.isFinite(fxEgp) && fxEgp > 0 ? String(fxEgp) : state.fxEgp,
+        fxSar: Number.isFinite(fxSar) && fxSar > 0 ? String(fxSar) : state.fxSar,
+      };
+      emit();
+    } catch {
+      // A malformed browser value must never block the Accounting page.
+    }
+  },
+
+  setFxRates(fxEgp: number, fxSar: number) {
+    if (!Number.isFinite(fxEgp) || fxEgp <= 0 || !Number.isFinite(fxSar) || fxSar <= 0) return;
+    state = { ...state, fxEgp: String(fxEgp), fxSar: String(fxSar) };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(FX_STORAGE_KEY, JSON.stringify({ fxEgp, fxSar }));
+    }
+    emit();
+  },
+
   /** Manual date edits fall out of any named preset. */
   setDates(from?: string, to?: string) {
     manualDateMode = true;
@@ -108,14 +147,15 @@ export const filterStore = {
 
   /** Clears dimension filters but keeps the chosen period and metric options. */
   resetDimensions() {
-    const { from, to, range, includeNonLead, cpaBasis } = state;
-    state = { from, to, range, includeNonLead, cpaBasis };
+    const { from, to, range, includeNonLead, cpaBasis, fxEgp, fxSar } = state;
+    state = { from, to, range, includeNonLead, cpaBasis, fxEgp, fxSar };
     prune();
     emit();
   },
 
   reset() {
-    state = {};
+    const { fxEgp, fxSar } = state;
+    state = { ...defaultFxFilters(), fxEgp, fxSar };
     preset = "year";
     manualDateMode = false;
     emit();

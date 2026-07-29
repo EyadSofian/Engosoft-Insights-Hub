@@ -295,6 +295,8 @@ export interface FilteredData {
 
 export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> {
   const all = await loadAllData();
+  const { accountingUsdPaid, fxRatesFromFilters } = await import("./fx-rates");
+  const fxRates = fxRatesFromFilters(f);
   const {
     from,
     to,
@@ -439,6 +441,9 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
       return false;
     if (salesperson && r.salesperson !== salesperson) return false;
     return true;
+  }).map((row) => {
+    const usdPaid = accountingUsdPaid(row, fxRates);
+    return { ...row, usdPaid, usdSales: usdPaid };
   });
 
   const lost = all.lost.filter((r) => {

@@ -43,6 +43,9 @@ export interface GlobalFilters {
   includeNonLead?: "1";
   /** CPA denominator: won leads (default) or distinct invoices. */
   cpaBasis?: "won" | "invoices";
+  /** Local-currency units per 1 USD. Accounting-only business settings. */
+  fxEgp?: string;
+  fxSar?: string;
 }
 
 export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
