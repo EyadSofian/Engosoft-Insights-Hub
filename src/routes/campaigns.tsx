@@ -22,7 +22,7 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { GroupedBarChart } from "@/components/charts";
+import { CompareBars } from "@/components/ads/CompareBars";
 import { MetricCard, Unavailable } from "@/components/ads/MetricCard";
 import { roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricsGlossaryButton } from "@/components/ads/MetricsGlossary";
@@ -174,8 +174,8 @@ function Campaigns() {
               }
               hint={
                 lang === "ar"
-                  ? "أعلى ١٠ صفوف إنفاقًا، وجنب كل واحدة التحصيل المربوط بيها. الصف اللي عموده البرتقالي أقصر من الأزرق لسه ما رجّعش فلوسه."
-                  : "The ten biggest spenders with the revenue linked to each. Where the orange bar is shorter than the blue one, the money has not come back."
+                  ? "أعلى ٨ صفوف إنفاقًا. العمود الأزرق هو الإنفاق والبرتقالي هو التحصيل — لو البرتقالي أقصر يبقى لسه ما رجّعش فلوسه."
+                  : "The eight biggest spenders. Blue is spend, orange is revenue — where orange is shorter, the money has not come back."
               }
             >
               <span className="inline-flex items-center gap-1.5">
@@ -183,25 +183,11 @@ function Campaigns() {
                 {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
               </span>
             </SectionTitle>
-            <GroupedBarChart
-              height={330}
-              data={[...data.rows]
+            <CompareBars
+              rows={[...data.rows]
                 .filter((r) => r.spend > 0)
                 .sort((a, b) => b.spend - a.spend)
-                .slice(0, 10)
-                .map((r) => ({ label: r.name || "—", spend: r.spend, revenue: r.revenue }))}
-              series={[
-                {
-                  key: "spend",
-                  name: lang === "ar" ? "الإنفاق" : "Spend",
-                  color: "var(--chart-1)",
-                },
-                {
-                  key: "revenue",
-                  name: lang === "ar" ? "الإيراد" : "Revenue",
-                  color: "var(--chart-2)",
-                },
-              ]}
+                .slice(0, 8)}
             />
           </Card>
 

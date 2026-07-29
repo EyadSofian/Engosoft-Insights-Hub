@@ -29,7 +29,8 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { GroupedBarChart, MultiLineChart, ScatterPlot } from "@/components/charts";
+import { MultiLineChart, ScatterPlot } from "@/components/charts";
+import { CompareBars } from "@/components/ads/CompareBars";
 import { MetricCard, Unavailable } from "@/components/ads/MetricCard";
 import { acosVerdict, roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricInfo } from "@/components/ads/MetricInfo";
@@ -426,8 +427,8 @@ function Ads() {
                     action={<GrainPill grain={grain} />}
                     hint={
                       lang === "ar"
-                        ? "أعلى ١٠ صفوف إنفاقًا، وجنب كل واحدة التحصيل المربوط بيها"
-                        : "The ten biggest spenders, each next to the revenue linked to it"
+                        ? "أعلى ٨ صفوف إنفاقًا، وتحت كل واحدة عمودين: الأزرق الإنفاق والبرتقالي التحصيل"
+                        : "The eight biggest spenders, each with spend in blue above the revenue it brought back in orange"
                     }
                   >
                     <span className="inline-flex items-center gap-1.5">
@@ -435,8 +436,11 @@ function Ads() {
                       {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
                     </span>
                   </SectionTitle>
-                  <GroupedBarChart
-                    height={320}
+                  <CompareBars
+                    rows={[...data.rows]
+                      .filter((r) => r.spend > 0)
+                      .sort((a, b) => b.spend - a.spend)
+                      .slice(0, 8)}
                     emptyLabel={
                       noSpendTab
                         ? lang === "ar"
@@ -444,27 +448,6 @@ function Ads() {
                           : "This platform has no spend data in the current source, so there is nothing to compare"
                         : undefined
                     }
-                    data={[...data.rows]
-                      .filter((r) => r.spend > 0)
-                      .sort((a, b) => b.spend - a.spend)
-                      .slice(0, 10)
-                      .map((r) => ({
-                        label: r.name || "—",
-                        spend: r.spend,
-                        revenue: r.revenue,
-                      }))}
-                    series={[
-                      {
-                        key: "spend",
-                        name: lang === "ar" ? "الإنفاق" : "Spend",
-                        color: "var(--chart-1)",
-                      },
-                      {
-                        key: "revenue",
-                        name: lang === "ar" ? "الإيراد" : "Revenue",
-                        color: "var(--chart-2)",
-                      },
-                    ]}
                   />
                 </Card>
 

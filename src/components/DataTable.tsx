@@ -13,6 +13,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { EmptyState } from "./ui-bits";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { exportCsv } from "@/lib/csv";
 
 export interface Col<T> {
   key: string;
@@ -39,6 +40,8 @@ export function DataTable<T>({
   rows,
   cols,
   searchable,
+  search,
+  onSearchChange,
   pageSize = 25,
   className = "",
   onRowClick,
@@ -56,6 +59,9 @@ export function DataTable<T>({
   rows: T[];
   cols: Col<T>[];
   searchable?: (r: T) => string;
+  /** Controlled search text. Omit to let the table own it. */
+  search?: string;
+  onSearchChange?: (v: string) => void;
   pageSize?: number;
   className?: string;
   onRowClick?: (r: T) => void;
@@ -73,7 +79,11 @@ export function DataTable<T>({
   emptyState?: ReactNode;
 }) {
   const { t, lang } = useI18n();
-  const [q, setQ] = useState("");
+  // Controlled when the caller passes `search`, so a sibling layout can share
+  // one query and switching between them cannot change the visible rows.
+  const [ownQ, setOwnQ] = useState("");
+  const q = search ?? ownQ;
+  const setQ = onSearchChange ?? setOwnQ;
   const [sortKey, setSortKey] = useState<string | null>(initialSort?.key ?? null);
   const [sortDir, setSortDir] = useState<1 | -1>(initialSort?.dir ?? -1);
   const [page, setPage] = useState(0);
@@ -125,26 +135,6 @@ export function DataTable<T>({
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const visible = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
-
-  const exportCsv = () => {
-    if (!csvRow) return;
-    const objs = filtered.map(csvRow);
-    if (!objs.length) return;
-    const headers = Object.keys(objs[0]);
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [headers.join(","), ...objs.map((o) => headers.map((h) => esc(o[h])).join(","))];
-    // BOM keeps Arabic readable when the file is opened in Excel.
-    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${csvFilename ?? "engosoft-export"}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const toggleSort = (c: Col<T>) => {
     if (!c.sortValue) return;
@@ -262,7 +252,9 @@ export function DataTable<T>({
 
           {csvRow && (
             <button
-              onClick={exportCsv}
+              onClick={() =>
+                csvRow && exportCsv(filtered, csvRow, csvFilename ?? "engosoft-export")
+              }
               className="text-xs inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer min-h-[36px]"
             >
               <Download size={14} />

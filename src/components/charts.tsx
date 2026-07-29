@@ -322,7 +322,9 @@ export function MultiLineChart({
 
   return (
     <ChartFrame height={height}>
-      <LineChart data={data} margin={{ top: 4, right: hasRight ? 4 : 4, left: -12, bottom: 0 }}>
+      {/* No negative left margin: it slid the y-axis "0" under the first x-axis
+          label, so the two collided in the corner. tickMargin keeps them apart. */}
+      <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
         <CartesianGrid stroke={gridStroke} vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
@@ -330,15 +332,17 @@ export function MultiLineChart({
           tickLine={false}
           axisLine={false}
           interval={interval}
+          tickMargin={8}
           tickFormatter={(v: string) => fmtDayShort(v, lang)}
-          minTickGap={8}
+          minTickGap={12}
         />
         <YAxis
           yAxisId="left"
           tick={axisTick}
           tickLine={false}
           axisLine={false}
-          width={48}
+          width={46}
+          tickMargin={4}
           tickFormatter={(v: number) => fmtCompact(v)}
         />
         {hasRight && (
@@ -348,7 +352,8 @@ export function MultiLineChart({
             tick={axisTick}
             tickLine={false}
             axisLine={false}
-            width={44}
+            width={42}
+            tickMargin={4}
             tickFormatter={(v: number) => fmtCompact(v)}
           />
         )}
@@ -380,82 +385,6 @@ export function MultiLineChart({
           />
         ))}
       </LineChart>
-    </ChartFrame>
-  );
-}
-
-/* --- grouped bars --------------------------------------------------------- */
-
-/**
- * Two measures per category, side by side. Used to put a campaign's cost next
- * to what it brought back — the single comparison that decides whether it stays
- * on. Categories are expected to be pre-trimmed to a readable count by the
- * caller; this chart does not silently drop any it is given.
- */
-export function GroupedBarChart({
-  data,
-  series,
-  height = 300,
-  format = fmtUSD,
-  emptyLabel,
-}: {
-  data: { label: string; [k: string]: string | number }[];
-  series: { key: string; name: string; color: string }[];
-  height?: number;
-  format?: (n: number) => string;
-  /** Say *why* it is empty. "No data" reads as a bug when the cause is a missing source. */
-  emptyLabel?: string;
-}) {
-  const { t } = useI18n();
-  const narrow = useIsNarrow();
-  if (!data.length) return <EmptyState label={emptyLabel ?? t("no_data")} compact />;
-
-  const width = narrow ? 92 : 150;
-  const trim = (s: string) => {
-    const max = narrow ? 13 : 22;
-    return s.length > max ? s.slice(0, max) + "…" : s;
-  };
-
-  return (
-    <ChartFrame height={height}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
-        <CartesianGrid stroke={gridStroke} horizontal={false} strokeDasharray="3 3" />
-        <XAxis
-          type="number"
-          tick={axisTick}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(v: number) => fmtCompact(v)}
-        />
-        <YAxis
-          type="category"
-          dataKey="label"
-          tick={axisTick}
-          tickLine={false}
-          axisLine={false}
-          width={width}
-          tickFormatter={trim}
-        />
-        <Tooltip
-          content={<ChartTooltip formatter={(v) => format(v)} />}
-          cursor={{ fill: "var(--surface-2)" }}
-        />
-        <Legend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 12, color: "var(--text-muted)", paddingTop: 8 }}
-        />
-        {series.map((s) => (
-          <Bar
-            key={s.key}
-            dataKey={s.key}
-            name={s.name}
-            fill={s.color}
-            radius={[0, 4, 4, 0]}
-            maxBarSize={14}
-          />
-        ))}
-      </BarChart>
     </ChartFrame>
   );
 }
@@ -502,7 +431,7 @@ export function ScatterPlot({
 
   return (
     <ChartFrame height={height}>
-      <ScatterChart margin={{ top: 8, right: 12, left: -8, bottom: 4 }}>
+      <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
         <CartesianGrid stroke={gridStroke} strokeDasharray="3 3" />
         <XAxis
           type="number"
@@ -511,6 +440,8 @@ export function ScatterPlot({
           tick={axisTick}
           tickLine={false}
           axisLine={false}
+          tickMargin={8}
+          minTickGap={16}
           tickFormatter={(v: number) => fmtCompact(v)}
         />
         <YAxis
@@ -520,7 +451,8 @@ export function ScatterPlot({
           tick={axisTick}
           tickLine={false}
           axisLine={false}
-          width={52}
+          width={50}
+          tickMargin={4}
           tickFormatter={(v: number) => fmtCompact(v)}
         />
         <ZAxis range={[46, 46]} />

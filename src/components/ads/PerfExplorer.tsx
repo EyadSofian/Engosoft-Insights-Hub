@@ -1,21 +1,84 @@
-import { useMemo, useState } from "react";
-import { ChevronLeft, Layers, PanelRightOpen, Target, X } from "lucide-react";
-import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n, type DictKey } from "@/lib/i18n";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, Download, Layers, PanelRightOpen, Search, Target, X } from "lucide-react";
+import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n, type DictKey, type Lang } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { useApi } from "@/lib/use-api";
 import { METRIC_GROUP_LABEL, METRICS, type MetricKey } from "@/lib/metric-catalog";
 import type { PerfRow } from "@/lib/types";
 import { DataTable, type Col } from "@/components/DataTable";
+import { exportCsv } from "@/lib/csv";
 import { EmptyState, Segmented, Skeleton } from "@/components/ui-bits";
+import { useIsNarrow } from "@/components/charts";
 import { AdSetOriginBadge, InferredCourse, PlatformBadges } from "@/components/metric-bits";
 import { MetricInfo } from "./MetricInfo";
 import { Unavailable, VerdictChip } from "./MetricCard";
+import { PerfCards } from "./PerfCards";
 import { acosVerdict, roasVerdict } from "./verdict";
 import { csvMaybe, csvRatio, maybeCell, ratioCell, sortMaybe, sortRatio } from "./cells";
 
 export type Grain = "campaign" | "adset" | "ad";
 
+type Layout = "table" | "cards";
+
 const EM = "—";
+
+/** Cards are taller than rows, so they load in batches rather than all at once. */
+const CARD_PAGE = 12;
+
+type CardSortKey = "spend" | "revenue" | "roas" | "crmLeads" | "won" | "cpl";
+
+const CARD_SORTS: Record<CardSortKey, { ar: string; en: string; value: (r: PerfRow) => number }> = {
+  spend: { ar: "الإنفاق", en: "Spend", value: (r) => r.spend },
+  revenue: { ar: "الإيراد", en: "Revenue", value: (r) => r.revenue },
+  roas: { ar: "العائد", en: "ROAS", value: (r) => sortRatio(r.roas, r.spend) },
+  crmLeads: { ar: "عملاء النظام", en: "CRM leads", value: (r) => r.crmLeads },
+  won: { ar: "الصفقات المكسوبة", en: "Won", value: (r) => r.won },
+  cpl: { ar: "تكلفة العميل", en: "CPL", value: (r) => sortRatio(r.cpl, r.spend) },
+};
+
+/** One export shape, whichever layout the reader is in. */
+function buildCsvRow(
+  r: PerfRow,
+  nameOf: (r: PerfRow) => string,
+  lang: Lang,
+  spendAvailable: boolean,
+): Record<string, string | number> {
+  return {
+    [lang === "ar" ? "الاسم" : "name"]: nameOf(r),
+    campaign: r.campaignName,
+    ad_set: r.adsetName,
+    campaign_key: r.campaignKey,
+    adset_key: r.adsetKey,
+    ad_key: r.adKey,
+    platform: r.platforms.join("|"),
+    course: r.course,
+    course_inferred: r.courseInferred ? "yes" : "no",
+    adset_origin: r.adsetOrigin ?? "",
+    // Blank, not "0.00", when the platform has no spend tab — the export has to
+    // carry the same "unknown" the screen shows.
+    spend: spendAvailable ? r.spend.toFixed(2) : "",
+    impressions: r.impressions,
+    clicks: r.clicksAll,
+    link_clicks: r.linkClicks ?? "",
+    ctr_all: csvMaybe(r.ctrAll, 4),
+    ctr_link: csvMaybe(r.ctrLink, 4),
+    platform_leads: r.platformLeads ?? "",
+    crm_leads: r.crmLeads,
+    won: r.won,
+    conversion_rate: csvMaybe(r.conversionRate),
+    lost: r.lost,
+    lost_rate: csvMaybe(r.lostRate),
+    revenue: r.revenue.toFixed(2),
+    revenue_per_lead: csvMaybe(r.revenuePerLead),
+    cpl: csvRatio(r.cpl, r.spend),
+    cpa: csvRatio(r.cpa, r.spend),
+    roas: csvRatio(r.roas, r.spend, 4),
+    acos: csvRatio(r.acos, r.spend),
+    spend_from: r.spendDateMin,
+    spend_to: r.spendDateMax,
+    partial_spend: r.partialSpend ? "yes" : "no",
+  };
+}
 
 /* --- quick views ----------------------------------------------------------
  * Saved questions, not new metrics. Each one filters and sorts the rows the
@@ -182,14 +245,101 @@ export function PerfExplorer({
 }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
+  const narrow = useIsNarrow(768);
   const [view, setView] = useState<QuickViewKey>("all");
+  const [layout, setLayout] = useState<Layout | null>(null);
+  const [query, setQuery] = useState("");
+  const [cardSort, setCardSort] = useState<CardSortKey>("spend");
+  const [cardLimit, setCardLimit] = useState(CARD_PAGE);
   const [detail, setDetail] = useState<PerfRow | null>(null);
+
+  // Cards by default on a phone, where a twenty-column table is a sideways
+  // scroll with the labels left behind on the far edge. Once the reader picks a
+  // layout that choice sticks, whatever the screen does afterwards.
+  const effectiveLayout: Layout = layout ?? (narrow ? "cards" : "table");
 
   const nameOf = (r: PerfRow) => (r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM);
 
   const views = QUICK_VIEWS.filter((v) => !v.adOnly || grain === "ad");
   const activeView = views.find((v) => v.key === view) ?? views[0];
   const shown = useMemo(() => activeView.apply(rows), [activeView, rows]);
+
+  const searchable = (r: PerfRow) =>
+    `${nameOf(r)} ${r.campaignName} ${r.adsetName} ${r.course}`.toLowerCase();
+
+  // The card grid does its own filtering and sorting; the table keeps using the
+  // DataTable machinery. Both read the same query so switching layout never
+  // changes which rows the reader is looking at.
+  const cardRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q ? shown.filter((r) => searchable(r).includes(q)) : shown;
+    const pick = CARD_SORTS[cardSort].value;
+    return [...filtered].sort((a, b) => pick(b) - pick(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, query, cardSort, unknownAdsetKey]);
+
+  useEffect(() => {
+    setCardLimit(CARD_PAGE);
+  }, [query, cardSort, view, grain, rows]);
+
+  const csvRow = (r: PerfRow) => buildCsvRow(r, nameOf, lang, spendAvailable);
+
+  const emptyState = (
+    <EmptyState
+      label={
+        lang === "ar" ? "مفيش صفوف مطابقة للاختيار الحالي" : "No rows match the current selection"
+      }
+      hint={
+        view !== "all"
+          ? lang === "ar"
+            ? "جرّب ترجع لعرض «الكل» أو توسّع الفترة."
+            : "Try the All view, or widen the period."
+          : lang === "ar"
+            ? "غيّر المنصة أو الفترة من فوق."
+            : "Change the platform or period above."
+      }
+    />
+  );
+
+  const quickViews = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {views.map((v) => {
+        const active = v.key === view;
+        return (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            title={v.hint[lang]}
+            aria-pressed={active}
+            className={`px-3 py-1.5 rounded-full text-[11.5px] font-medium border transition-colors cursor-pointer whitespace-nowrap touch-manipulation ${
+              active
+                ? "text-white border-transparent"
+                : "border-border text-text-muted hover:bg-surface-2"
+            }`}
+            style={active ? { background: "var(--brand)" } : undefined}
+          >
+            {v[lang]}
+          </button>
+        );
+      })}
+      {view !== "all" && (
+        <span className="text-[11px] text-text-muted ms-1 basis-full sm:basis-auto">
+          {activeView.hint[lang]}
+        </span>
+      )}
+    </div>
+  );
+
+  const layoutToggle = (
+    <Segmented
+      value={effectiveLayout}
+      onChange={setLayout}
+      options={[
+        { value: "table", label: lang === "ar" ? "جدول" : "Table" },
+        { value: "cards", label: lang === "ar" ? "كروت" : "Cards" },
+      ]}
+    />
+  );
 
   const cols = useMemo<Col<PerfRow>[]>(
     () => buildColumns({ grain, nameOf, unknownAdsetKey, lang, t, spendAvailable, spendNote }),
@@ -245,7 +395,8 @@ export function PerfExplorer({
 
       <div className="flex flex-wrap items-center gap-2">
         <Breadcrumbs grain={grain} onGrainChange={onGrainChange} />
-        <div className="ms-auto">
+        <div className="ms-auto flex items-center gap-2">
+          {layoutToggle}
           <Segmented
             value={grain}
             onChange={onGrainChange}
@@ -261,11 +412,13 @@ export function PerfExplorer({
 
       {loading ? (
         <Skeleton className="h-[420px]" />
-      ) : (
+      ) : effectiveLayout === "table" ? (
         <DataTable
           rows={shown}
           cols={cols}
-          searchable={(r) => `${nameOf(r)} ${r.campaignName} ${r.adsetName} ${r.course}`}
+          searchable={searchable}
+          search={query}
+          onSearchChange={setQuery}
           initialSort={{ key: "spend", dir: -1 }}
           onRowClick={setDetail}
           csvFilename={`${csvPrefix}-${grain}`}
@@ -278,86 +431,43 @@ export function PerfExplorer({
             efficiency: METRIC_GROUP_LABEL.efficiency[lang],
             identity: lang === "ar" ? "التعريف" : "Identity",
           }}
-          emptyState={
-            <EmptyState
-              label={
-                lang === "ar"
-                  ? "مفيش صفوف مطابقة للاختيار الحالي"
-                  : "No rows match the current selection"
-              }
-              hint={
-                view !== "all"
-                  ? lang === "ar"
-                    ? "جرّب ترجع لعرض «الكل» أو توسّع الفترة."
-                    : "Try the All view, or widen the period."
-                  : lang === "ar"
-                    ? "غيّر المنصة أو الفترة من فوق."
-                    : "Change the platform or period above."
-              }
-            />
-          }
-          belowToolbar={
-            <div className="flex flex-wrap items-center gap-1.5">
-              {views.map((v) => {
-                const active = v.key === view;
-                return (
-                  <button
-                    key={v.key}
-                    onClick={() => setView(v.key)}
-                    title={v.hint[lang]}
-                    aria-pressed={active}
-                    className={`px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors cursor-pointer whitespace-nowrap ${
-                      active
-                        ? "text-white border-transparent"
-                        : "border-border text-text-muted hover:bg-surface-2"
-                    }`}
-                    style={active ? { background: "var(--brand)" } : undefined}
-                  >
-                    {v[lang]}
-                  </button>
-                );
-              })}
-              {view !== "all" && (
-                <span className="text-[11px] text-text-muted ms-1">{activeView.hint[lang]}</span>
-              )}
-            </div>
-          }
-          csvRow={(r) => ({
-            [lang === "ar" ? "الاسم" : "name"]: nameOf(r),
-            campaign: r.campaignName,
-            ad_set: r.adsetName,
-            campaign_key: r.campaignKey,
-            adset_key: r.adsetKey,
-            ad_key: r.adKey,
-            platform: r.platforms.join("|"),
-            course: r.course,
-            course_inferred: r.courseInferred ? "yes" : "no",
-            adset_origin: r.adsetOrigin ?? "",
-            // Blank, not "0.00", when the platform has no spend tab — the export
-            // has to carry the same "unknown" the screen shows.
-            spend: spendAvailable ? r.spend.toFixed(2) : "",
-            impressions: r.impressions,
-            clicks: r.clicksAll,
-            link_clicks: r.linkClicks ?? "",
-            ctr_all: csvMaybe(r.ctrAll, 4),
-            ctr_link: csvMaybe(r.ctrLink, 4),
-            platform_leads: r.platformLeads ?? "",
-            crm_leads: r.crmLeads,
-            won: r.won,
-            conversion_rate: csvMaybe(r.conversionRate),
-            lost: r.lost,
-            lost_rate: csvMaybe(r.lostRate),
-            revenue: r.revenue.toFixed(2),
-            revenue_per_lead: csvMaybe(r.revenuePerLead),
-            cpl: csvRatio(r.cpl, r.spend),
-            cpa: csvRatio(r.cpa, r.spend),
-            roas: csvRatio(r.roas, r.spend, 4),
-            acos: csvRatio(r.acos, r.spend),
-            spend_from: r.spendDateMin,
-            spend_to: r.spendDateMax,
-            partial_spend: r.partialSpend ? "yes" : "no",
-          })}
+          emptyState={emptyState}
+          belowToolbar={quickViews}
+          csvRow={csvRow}
         />
+      ) : (
+        <div className="space-y-3">
+          <CardToolbar
+            query={query}
+            onQuery={setQuery}
+            sort={cardSort}
+            onSort={setCardSort}
+            count={cardRows.length}
+            rows={cardRows}
+            csvRow={csvRow}
+            csvFilename={`${csvPrefix}-${grain}`}
+          />
+          {quickViews}
+          <PerfCards
+            rows={cardRows.slice(0, cardLimit)}
+            grain={grain}
+            nameOf={nameOf}
+            spendAvailable={spendAvailable}
+            spendNote={spendNote}
+            onRowClick={setDetail}
+            emptyState={emptyState}
+          />
+          {cardRows.length > cardLimit && (
+            <button
+              onClick={() => setCardLimit((n) => n + CARD_PAGE)}
+              className="w-full py-2.5 rounded-xl border border-border text-[13px] font-medium text-text-muted hover:bg-surface-2 transition-colors cursor-pointer"
+            >
+              {lang === "ar"
+                ? `وريني ${Math.min(CARD_PAGE, cardRows.length - cardLimit)} كمان (${cardLimit} من ${cardRows.length})`
+                : `Show ${Math.min(CARD_PAGE, cardRows.length - cardLimit)} more (${cardLimit} of ${cardRows.length})`}
+            </button>
+          )}
+        </div>
       )}
 
       {detail && (
@@ -371,6 +481,73 @@ export function PerfExplorer({
           onDrill={() => drillTo(detail)}
         />
       )}
+    </div>
+  );
+}
+
+/* --- card toolbar ----------------------------------------------------------- */
+
+function CardToolbar({
+  query,
+  onQuery,
+  sort,
+  onSort,
+  count,
+  rows,
+  csvRow,
+  csvFilename,
+}: {
+  query: string;
+  onQuery: (v: string) => void;
+  sort: CardSortKey;
+  onSort: (v: CardSortKey) => void;
+  count: number;
+  rows: PerfRow[];
+  csvRow: (r: PerfRow) => Record<string, string | number>;
+  csvFilename: string;
+}) {
+  const { t, lang } = useI18n();
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 flex-1 min-w-[150px] max-w-[320px] px-2.5 rounded-lg bg-surface border border-border focus-within:border-brand transition-colors">
+        <Search size={15} className="text-text-subtle shrink-0" />
+        <input
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={t("search")}
+          aria-label={t("search")}
+          className="flex-1 bg-transparent text-sm outline-none py-2 min-w-0"
+        />
+      </div>
+
+      <label className="inline-flex items-center gap-1.5 text-[12px] text-text-muted">
+        <span className="hidden sm:inline">{lang === "ar" ? "رتّب حسب" : "Sort by"}</span>
+        <select
+          value={sort}
+          onChange={(e) => onSort(e.target.value as CardSortKey)}
+          aria-label={lang === "ar" ? "ترتيب الكروت" : "Sort cards"}
+          className="px-2.5 py-2 rounded-lg bg-surface border border-border text-[13px] min-h-[38px] cursor-pointer"
+        >
+          {(Object.keys(CARD_SORTS) as CardSortKey[]).map((k) => (
+            <option key={k} value={k}>
+              {CARD_SORTS[k][lang]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="ms-auto flex items-center gap-2">
+        <span className="text-xs text-text-muted num whitespace-nowrap">
+          {count.toLocaleString("en-US")} {t("rows")}
+        </span>
+        <button
+          onClick={() => exportCsv(rows, csvRow, csvFilename)}
+          className="text-xs inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border hover:bg-surface-2 transition-colors cursor-pointer min-h-[36px]"
+        >
+          <Download size={14} />
+          <span className="hidden sm:inline">{t("export_csv")}</span>
+        </button>
+      </div>
     </div>
   );
 }
