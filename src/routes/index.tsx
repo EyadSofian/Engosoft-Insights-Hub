@@ -510,10 +510,14 @@ export function DataHealthPanel({ health }: { health: DataHealth }) {
           ? lang === "ar"
             ? "Odoo مباشر"
             : "Odoo direct"
+          : health.crmAuthority === "google-sheet"
+            ? lang === "ar"
+              ? "Google Sheets — نفس مصدر Power BI"
+              : "Google Sheets — Power BI canonical source"
           : lang === "ar"
             ? "نسخة Google Sheets الاحتياطية"
             : "Google Sheets fallback",
-      warn: health.crmAuthority !== "odoo-direct",
+      warn: health.crmAuthority === "google-sheet-fallback",
     },
     {
       label: t("adset_resolution"),

@@ -81,7 +81,7 @@ interface AccountingResponse {
   byTeam: Grouped[];
   bySalesperson: Grouped[];
   byMonth: Grouped[];
-  byDay: { date: string; revenue: number }[];
+  byDay: { date: string; spend: number; revenue: number }[];
   courses: AccountingCourses;
   detail: { rows: AccountingDetail[]; total: number; truncated: boolean };
   health: DataHealth;
@@ -313,7 +313,7 @@ function Accounting() {
                   <input
                     type="number"
                     min="0.000001"
-                    step="0.01"
+                    step="0.0001"
                     inputMode="decimal"
                     value={fxEgpInput}
                     onChange={(event) => setFxEgpInput(event.target.value)}
@@ -327,7 +327,7 @@ function Accounting() {
                   <input
                     type="number"
                     min="0.000001"
-                    step="0.01"
+                    step="0.0001"
                     inputMode="decimal"
                     value={fxSarInput}
                     onChange={(event) => setFxSarInput(event.target.value)}
@@ -348,7 +348,7 @@ function Accounting() {
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                   >
                     <RotateCcw size={15} />
-                    {lang === "ar" ? "استرجاع 50.5 و3.75" : "Restore 50.5 and 3.75"}
+                    {lang === "ar" ? "استرجاع 50.5 و3.7453" : "Restore 50.5 and 3.7453"}
                   </button>
                   <span className="text-xs text-text-muted">
                     {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD = {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
@@ -389,13 +389,14 @@ function Accounting() {
           <Card>
             <SectionTitle>{t("by_day")}</SectionTitle>
             <SpendRevenueChart
-              data={data.byDay.map((point) => ({
-                date: point.date,
-                spend: 0,
-                revenue: point.revenue,
-              }))}
+              data={data.byDay}
               moneyFormat={fmtUSDExact}
             />
+            <p className="mt-3 text-xs leading-relaxed text-text-muted">
+              {lang === "ar"
+                ? "الإنفاق من صفوف Meta وSnapchat وTikTok حسب تاريخ الإعلان؛ الإيراد من الفواتير المدفوعة حسب Payment Date."
+                : "Spend comes from dated Meta, Snapchat, and TikTok rows; revenue comes from paid invoices by Payment Date."}
+            </p>
           </Card>
 
           <CourseRevenueExplorer data={data.courses} />

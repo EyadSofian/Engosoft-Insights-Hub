@@ -157,7 +157,7 @@ function firstPresent(...values: unknown[]): unknown {
 
 const USD_RATE: Record<string, number> = {
   EGP: 1 / 50.5,
-  SAR: 1 / 3.75,
+  SAR: 1 / 3.7453,
   AED: 0.27,
   USD: 1,
 };
@@ -752,9 +752,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }
     };
 
-    // Odoo is authoritative for CRM/Lost. Start it before the sheet waves so
-    // the independent network calls overlap. The sheet copies are still read as
-    // an explicit fallback and as an enrichment source for lookup-derived labels.
+    // Power BI's canonical CRM/Lost tabs are preferred. Keep the direct Odoo
+    // reader lazy: starting a 90-second Odoo scan on every healthy sheet refresh
+    // wastes time and can make parallel dashboard endpoints appear to hang.
+    // It is invoked only when one of the two canonical tabs is unavailable.
     const directCrmWithTimeout = async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -771,18 +772,19 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         if (timer) clearTimeout(timer);
       }
     };
-    const directCrmPromise: Promise<
-      | { value: Awaited<ReturnType<typeof loadDirectCrm>>; error?: never }
-      | { value?: never; error: string }
-    > = odooConfigured()
-      ? directCrmWithTimeout()
-          .then((value) => ({ value }))
-          .catch((error: unknown) => ({
-            error: error instanceof Error ? error.message : String(error),
-          }))
-      : Promise.resolve({
-          error: "Odoo CRM is not configured; using Google Sheets fallback.",
-        });
+    const loadDirectCrmCandidate = (): Promise<{
+      value?: Awaited<ReturnType<typeof loadDirectCrm>>;
+      error?: string;
+    }> =>
+      odooConfigured()
+        ? directCrmWithTimeout()
+            .then((value) => ({ value }))
+            .catch((error: unknown) => ({
+              error: error instanceof Error ? error.message : String(error),
+            }))
+        : Promise.resolve({
+            error: "Odoo CRM is not configured; using Google Sheets fallback.",
+          });
 
     // Accounting follows the same fail-closed contract as CRM: start the Odoo
     // read while Google is loading, cap its wall time, and never turn an Odoo
@@ -983,10 +985,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       });
     };
 
-    const directCrm = await directCrmPromise;
     let crmRaw: Raw[] = crmSheetRaw;
     let lostRaw: Raw[] = lostSheetRaw;
-    let crmAuthority: DataHealth["crmAuthority"] = "google-sheet-fallback";
+    const sheetCrmComplete = crmSheetRaw.length > 0 && lostSheetRaw.length > 0;
+    const directCrm = sheetCrmComplete ? {} : await loadDirectCrmCandidate();
+    let crmAuthority: DataHealth["crmAuthority"] = sheetCrmComplete
+      ? "google-sheet"
+      : "google-sheet-fallback";
     let crmExclusions = blankExclusions();
     let lostExclusions = blankExclusions();
     const directComplete =
@@ -995,13 +1000,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       directCrm.value.lost.length > 0 &&
       (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75) &&
       (!lostSheetRaw.length || directCrm.value.lost.length >= lostSheetRaw.length * 0.75);
-    if (directCrm.value && directComplete) {
+    // Power BI is built from these two canonical tabs. Prefer the exact same
+    // population and refresh boundary so headline lead counts cannot drift by
+    // a handful of records merely because direct Odoo finished at a different
+    // instant. Direct Odoo remains the automatic continuity fallback.
+    if (!sheetCrmComplete && directCrm.value && directComplete) {
       crmRaw = enrichDirectRows(directCrm.value.crm, crmSheetRaw);
       lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
       crmAuthority = "odoo-direct";
       crmExclusions = directCrm.value.diagnostics.crm;
       lostExclusions = directCrm.value.diagnostics.lost;
-    } else if (!crmSheetRaw.length || !lostSheetRaw.length) {
+    } else if (!sheetCrmComplete) {
       // Only call this a missing source when neither authority can supply the
       // complete CRM + Lost population. A healthy sheet fallback is valid data,
       // not an excluded source.

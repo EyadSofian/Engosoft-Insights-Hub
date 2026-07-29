@@ -3,7 +3,7 @@ import type { AccountingRow, GlobalFilters } from "./types";
 /** Business-approved fixed rates, expressed as local currency per 1 USD. */
 export const DEFAULT_FX_RATES = {
   EGP: 50.5,
-  SAR: 3.75,
+  SAR: 3.7453,
 } as const;
 
 export interface FxRates {

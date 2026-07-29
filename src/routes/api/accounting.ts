@@ -16,10 +16,22 @@ export const Route = createFileRoute("/api/accounting")({
         const invoiceCount = new Set(rows.map((row) => row.movement).filter(Boolean)).size;
         const paidUsd = rows.reduce((sum, row) => sum + row.usdPaid, 0);
 
-        const byDay = new Map<string, number>();
+        const byDay = new Map<string, { date: string; spend: number; revenue: number }>();
+        const atDay = (date: string) => {
+          let point = byDay.get(date);
+          if (!point) {
+            point = { date, spend: 0, revenue: 0 };
+            byDay.set(date, point);
+          }
+          return point;
+        };
+        for (const row of data.ads) {
+          if (!row.date) continue;
+          atDay(row.date).spend += row.spend;
+        }
         for (const row of rows) {
           if (!row.paymentDate) continue;
-          byDay.set(row.paymentDate, (byDay.get(row.paymentDate) ?? 0) + row.usdPaid);
+          atDay(row.paymentDate).revenue += row.usdPaid;
         }
 
         return json({
@@ -40,9 +52,7 @@ export const Route = createFileRoute("/api/accounting")({
           byMonth: groupBy(rows, (row) => row.month || "—", paid).sort((a, b) =>
             a.label.localeCompare(b.label),
           ),
-          byDay: [...byDay.entries()]
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([date, revenue]) => ({ date, revenue })),
+          byDay: [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)),
           courses: buildAccountingCourses(rows),
           detail: capped(
             rows.map((row) => ({

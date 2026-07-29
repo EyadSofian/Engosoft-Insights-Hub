@@ -167,16 +167,16 @@ check(
 );
 check(
   "Accounting applies the approved SAR rate",
-  same(accounting.fxRates?.SAR, 3.75),
+  same(accounting.fxRates?.SAR, 3.7453),
   accounting.fxRates?.SAR,
-  3.75,
+  3.7453,
 );
 const managedFxRows = accountingLineExport.rows.filter((row) =>
   ["EGP", "SAR"].includes(String(row.Currency || "").trim().toUpperCase()),
 );
 const invalidManagedFxRows = managedFxRows.filter((row) => {
   const currency = String(row.Currency || "").trim().toUpperCase();
-  const rate = currency === "EGP" ? 50.5 : 3.75;
+  const rate = currency === "EGP" ? 50.5 : 3.7453;
   return !same(Number(row["USD Paid"]), Number(row["Total in Currency"]) / rate);
 });
 check(
@@ -184,6 +184,16 @@ check(
   invalidManagedFxRows.length === 0,
   invalidManagedFxRows.length,
   0,
+);
+const accountingDailySpend = accounting.byDay.reduce(
+  (sum, point) => sum + Number(point.spend || 0),
+  0,
+);
+check(
+  "Accounting daily chart preserves all filtered ad spend",
+  same(accountingDailySpend, accounting.totals.spend),
+  accountingDailySpend,
+  accounting.totals.spend,
 );
 check(
   "Every Accounting export row is explicitly paid-invoice-only",
@@ -234,6 +244,12 @@ check(
   ),
   filters.fetchErrors ?? [],
   [],
+);
+check(
+  "CRM and Lost use the same canonical Google Sheets source as Power BI",
+  filters.health?.crmAuthority === "google-sheet",
+  filters.health?.crmAuthority,
+  "google-sheet",
 );
 check(
   "Spend = sum of platform spend",
