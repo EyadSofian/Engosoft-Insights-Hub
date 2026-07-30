@@ -134,17 +134,29 @@ export async function odooCall<T>(
   args: unknown[] = [],
   kwargs: Record<string, unknown> = {},
 ): Promise<T> {
+  return odooCallWithPolicy<T>(model, method, args, kwargs);
+}
+
+export async function odooCallWithPolicy<T>(
+  model: string,
+  method: string,
+  args: unknown[] = [],
+  kwargs: Record<string, unknown> = {},
+  policy: { attempts?: number; timeoutMs?: number } = {},
+): Promise<T> {
   const cfg = odooConfig();
   let lastError: unknown;
+  const attempts = Math.max(1, policy.attempts ?? 3);
+  const timeoutMs = Math.max(1_000, policy.timeoutMs ?? 120_000);
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const user = await uid();
       return (await rpc(
         "object",
         "execute_kw",
         [cfg.db, user, cfg.apiKey, model, method, args, kwargs],
-        120_000,
+        timeoutMs,
       )) as T;
     } catch (err) {
       lastError = err;
@@ -152,9 +164,9 @@ export async function odooCall<T>(
       if (err instanceof OdooError && err.kind === "auth") {
         // Force a fresh authenticate once, then give up.
         uidCache = null;
-        if (attempt > 0) throw err;
+        if (attempt > 0 || attempts === 1) throw err;
       }
-      if (attempt < 2) await wait(800 * (attempt + 1));
+      if (attempt < attempts - 1) await wait(800 * (attempt + 1));
     }
   }
 

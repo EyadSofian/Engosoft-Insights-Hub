@@ -23,13 +23,14 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { CompareBars } from "@/components/ads/CompareBars";
+import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
 import { MetricCard, Unavailable } from "@/components/ads/MetricCard";
 import { roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricsGlossaryButton } from "@/components/ads/MetricsGlossary";
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { PerfExplorer, type Grain } from "@/components/ads/PerfExplorer";
 import { ratioCell } from "@/components/ads/cells";
-import type { DataHealth, PerfRow, Totals } from "@/lib/types";
+import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types";
 
 export const Route = createFileRoute("/campaigns")({ component: Campaigns });
 
@@ -37,6 +38,7 @@ interface Resp {
   grain: Grain;
   rows: PerfRow[];
   totals: Totals;
+  activity: CampaignActivity;
   unknownAdsetKey: string;
   health: DataHealth;
 }
@@ -160,6 +162,8 @@ function Campaigns() {
               }
             />
           </div>
+
+          <CampaignActivityPanel activity={data.activity} />
 
           <Card>
             <SectionTitle

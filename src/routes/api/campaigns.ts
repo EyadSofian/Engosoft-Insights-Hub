@@ -4,9 +4,13 @@ export const Route = createFileRoute("/api/campaigns")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, computePerf, computeTotals, UNKNOWN_ADSET_KEY } = await import(
-          "@/lib/metrics.server"
-        );
+        const {
+          getFiltered,
+          computePerf,
+          computeTotals,
+          computeRecentCampaignActivity,
+          UNKNOWN_ADSET_KEY,
+        } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
 
         const raw = new URL(request.url).searchParams.get("grain");
@@ -14,11 +18,13 @@ export const Route = createFileRoute("/api/campaigns")({
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const activity = await computeRecentCampaignActivity(filters, data);
 
         return json({
           grain,
           rows: computePerf(data, grain),
           totals: computeTotals(data),
+          activity,
           unknownAdsetKey: UNKNOWN_ADSET_KEY,
           health: data.snapshot.health,
           appliedFilters: filters,

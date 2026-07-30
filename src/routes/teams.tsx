@@ -5,6 +5,7 @@ import { useApi } from "@/lib/use-api";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { Card, ErrorState, PageHeader, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
 import { CloseTime, CountPct } from "@/components/metric-bits";
+import { AccountingAgentsView } from "@/components/accounting/AccountingSubViews";
 import type { DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
 
 export const Route = createFileRoute("/teams")({ component: Teams });
@@ -40,11 +41,11 @@ function Teams() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={t("teams")}
+        title={lang === "ar" ? "أداء الموظفين وفرق المبيعات" : "Employees and sales teams"}
         subtitle={
           lang === "ar"
-            ? "الإيراد يُنسب عبر مندوب المبيعات ثم يُجمَّع للفريق، لأن عمود الفريق فارغ في أغلب صفوف الفواتير."
-            : "Revenue is attributed through the salesperson then rolled up, because the team column is empty on most invoice rows."
+            ? "التحصيل من الفواتير المدفوعة، والعملاء وWon/Lost من CRM، والمكالمات وسرعة التواصل من نظام SLA."
+            : "Collections come from paid invoices, CRM supplies leads and Won/Lost, and SLA supplies calls and contact speed."
         }
       />
 
@@ -55,6 +56,8 @@ function Teams() {
         </>
       ) : (
         <>
+          <AccountingAgentsView />
+
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <SectionTitle hint={lang === "ar" ? "٢٠ عميلاً فأكثر" : "20+ leads"}>

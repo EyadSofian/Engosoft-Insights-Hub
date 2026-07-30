@@ -32,7 +32,9 @@ import {
 import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bits";
 import { TelegramPanel } from "@/components/TelegramPanel";
 import { HBarChart, SpendRevenueChart } from "@/components/charts";
+import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
 import type {
+  CampaignActivity,
   DataHealth,
   Deltas,
   ExecSummary,
@@ -67,6 +69,7 @@ interface OverviewResp {
   best: PerfRow | null;
   leak: PerfRow | null;
   bestCPL: PerfRow | null;
+  activity: CampaignActivity;
   topLeaks: PerfRow[];
   topByROAS: PerfRow[];
   topSpend: PerfRow[];
@@ -400,6 +403,8 @@ function Overview() {
         <Spotlight tone="success" title={t("best_campaign")} row={data.best} />
         <Spotlight tone="danger" title={t("money_leak")} row={data.leak} />
       </div>
+
+      <CampaignActivityPanel activity={data.activity} />
 
       <Card>
         <SectionTitle hint={t("origin_note")}>{t("lead_origin")}</SectionTitle>

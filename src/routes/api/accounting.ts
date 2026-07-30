@@ -15,6 +15,38 @@ export const Route = createFileRoute("/api/accounting")({
         const paid = (row: (typeof rows)[number]) => row.usdPaid;
         const invoiceCount = new Set(rows.map((row) => row.movement).filter(Boolean)).size;
         const paidUsd = rows.reduce((sum, row) => sum + row.usdPaid, 0);
+        const monthlyMap = new Map<
+          string,
+          { month: string; revenue: number; productLines: number; invoices: Set<string> }
+        >();
+        for (const row of rows) {
+          const month = row.month || row.paymentDate.slice(0, 7) || "—";
+          let point = monthlyMap.get(month);
+          if (!point) {
+            point = { month, revenue: 0, productLines: 0, invoices: new Set() };
+            monthlyMap.set(month, point);
+          }
+          point.revenue += row.usdPaid;
+          point.productLines++;
+          if (row.movement) point.invoices.add(row.movement);
+        }
+        const monthly = [...monthlyMap.values()]
+          .sort((a, b) => a.month.localeCompare(b.month))
+          .map((point, index, all) => {
+            const invoices = point.invoices.size;
+            const previous = all[index - 1]?.revenue ?? null;
+            return {
+              month: point.month,
+              revenue: point.revenue,
+              invoices,
+              productLines: point.productLines,
+              averageInvoice: invoices > 0 ? point.revenue / invoices : null,
+              growthPct:
+                previous !== null && previous !== 0
+                  ? ((point.revenue - previous) / Math.abs(previous)) * 100
+                  : null,
+            };
+          });
 
         const byDay = new Map<string, { date: string; spend: number; revenue: number }>();
         const atDay = (date: string) => {
@@ -52,6 +84,7 @@ export const Route = createFileRoute("/api/accounting")({
           byMonth: groupBy(rows, (row) => row.month || "—", paid).sort((a, b) =>
             a.label.localeCompare(b.label),
           ),
+          monthly,
           byDay: [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)),
           courses: buildAccountingCourses(rows),
           detail: capped(

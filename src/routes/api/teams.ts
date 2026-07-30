@@ -10,6 +10,8 @@ export const Route = createFileRoute("/api/teams")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const teams = computeTeams(data);
+        const { buildAgentAnalytics } = await import("@/lib/agent-analytics.server");
+        const agentAnalytics = await buildAgentAnalytics(data, filters, teams);
 
         const people = teams.flatMap((t) => t.people ?? []);
         const MIN_LEADS = 20;
@@ -39,6 +41,7 @@ export const Route = createFileRoute("/api/teams")({
 
         return json({
           teams,
+          ...agentAnalytics,
           leaderboard,
           needsAttention,
           medianConversion: medianConv,

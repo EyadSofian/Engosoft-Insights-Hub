@@ -19,6 +19,12 @@ import {
   CourseRevenueExplorer,
   type AccountingCourses,
 } from "@/components/accounting/CourseRevenueExplorer";
+import {
+  AccountingAgentsView,
+  AccountingMonthlyView,
+  AccountingProfitabilityView,
+  type AccountingMonth,
+} from "@/components/accounting/AccountingSubViews";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
   BarList,
@@ -27,6 +33,7 @@ import {
   KpiCard,
   Notice,
   PageHeader,
+  Segmented,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
@@ -82,6 +89,7 @@ interface AccountingResponse {
   byTeam: Grouped[];
   bySalesperson: Grouped[];
   byMonth: Grouped[];
+  monthly: AccountingMonth[];
   byDay: { date: string; spend: number; revenue: number }[];
   courses: AccountingCourses;
   detail: { rows: AccountingDetail[]; total: number; truncated: boolean };
@@ -102,6 +110,7 @@ function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
+  const [view, setView] = useState<"summary" | "months" | "agents" | "profitability">("summary");
   const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
@@ -274,6 +283,32 @@ function Accounting() {
         }
       />
 
+      <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        <Segmented
+          value={view}
+          onChange={setView}
+          size="md"
+          options={[
+            {
+              value: "summary",
+              label: lang === "ar" ? "ملخص الحسابات" : "Accounting summary",
+            },
+            {
+              value: "months",
+              label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison",
+            },
+            {
+              value: "agents",
+              label: lang === "ar" ? "أداء الموظفين" : "Employee performance",
+            },
+            {
+              value: "profitability",
+              label: lang === "ar" ? "الربحية" : "Profitability",
+            },
+          ]}
+        />
+      </div>
+
       {isLoading || !data ? (
         <>
           <Skeleton className="h-28" />
@@ -281,6 +316,8 @@ function Accounting() {
         </>
       ) : (
         <>
+          {view === "summary" && (
+            <>
           <div className="flex justify-end">
             <button
               type="button"
@@ -452,6 +489,12 @@ function Accounting() {
               onClose={() => setExportOpen(false)}
             />
           )}
+            </>
+          )}
+
+          {view === "months" && <AccountingMonthlyView monthly={data.monthly} />}
+          {view === "agents" && <AccountingAgentsView />}
+          {view === "profitability" && <AccountingProfitabilityView />}
         </>
       )}
     </div>

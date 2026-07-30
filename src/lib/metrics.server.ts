@@ -975,6 +975,86 @@ export function topLeaks(rows: PerfRow[], n = 5): PerfRow[] {
     .slice(0, n);
 }
 
+function shiftIsoDay(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Operational "running now" signal.
+ *
+ * The ad sheets do not carry a trustworthy platform status field, so activity
+ * is evidence-based: a campaign is active when it actually spent money during
+ * the last three days represented by the selected source. This avoids calling
+ * an enabled-but-idle campaign active, and it also works across Meta/Snap/TikTok.
+ */
+export async function computeRecentCampaignActivity(
+  filters: GlobalFilters,
+  current: FilteredData,
+): Promise<import("./types").CampaignActivity> {
+  const latest = current.ads.reduce(
+    (max, row) => (row.date && row.date > max ? row.date : max),
+    "",
+  );
+  if (!latest) {
+    return {
+      window: null,
+      definition: "recent_spend",
+      rows: [],
+      best: null,
+      worst: null,
+      zeroResult: [],
+    };
+  }
+
+  const from = shiftIsoDay(latest, -2);
+  const recent = await getFiltered({ ...filters, from, to: latest, range: undefined });
+  const rows = computePerf(recent, "campaign")
+    .filter((row) => row.spend > 0)
+    .sort((a, b) => b.spend - a.spend);
+  const materialFloor = Math.max(
+    25,
+    rows.reduce((sum, row) => sum + row.spend, 0) * 0.01,
+  );
+  const decisionRows = rows.filter((row) => row.spend >= materialFloor);
+  const zeroResult = decisionRows
+    .filter(
+      (row) =>
+        (row.platformLeads ?? 0) <= 0 &&
+        row.crmLeads <= 0 &&
+        row.won <= 0 &&
+        row.revenue <= 0,
+    )
+    .sort((a, b) => b.spend - a.spend);
+  const bestPool = decisionRows.filter(
+    (row) => (row.platformLeads ?? 0) > 0 || row.crmLeads > 0 || row.revenue > 0,
+  );
+  const best =
+    bestPool.sort(
+      (a, b) =>
+        b.won - a.won ||
+        (b.roas ?? 0) - (a.roas ?? 0) ||
+        (b.platformLeads ?? 0) - (a.platformLeads ?? 0),
+    )[0] ?? null;
+  const worstPool = decisionRows.filter((row) => row !== best);
+  const worst =
+    worstPool.sort((a, b) => {
+      const scoreA = a.spend - a.revenue + (a.platformLeads ?? 0) * -0.01;
+      const scoreB = b.spend - b.revenue + (b.platformLeads ?? 0) * -0.01;
+      return scoreB - scoreA;
+    })[0] ?? null;
+
+  return {
+    window: { from, to: latest },
+    definition: "recent_spend",
+    rows: rows.slice(0, 10),
+    best,
+    worst,
+    zeroResult: zeroResult.slice(0, 8),
+  };
+}
+
 /* --- funnel & trend -------------------------------------------------------- */
 
 export function computeFunnel(t: Totals): FunnelStep[] {

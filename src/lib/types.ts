@@ -408,6 +408,17 @@ export interface PerfRow {
   spendCoverage: Maybe;
 }
 
+export interface CampaignActivity {
+  /** Last three calendar days represented by the selected ad data. */
+  window: { from: string; to: string } | null;
+  /** A campaign is active here only when it recorded spend in this window. */
+  definition: "recent_spend";
+  rows: PerfRow[];
+  best: PerfRow | null;
+  worst: PerfRow | null;
+  zeroResult: PerfRow[];
+}
+
 export interface CourseAgg extends PerfRow {
   mainCategory: string;
   orders: number;

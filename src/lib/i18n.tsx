@@ -33,7 +33,7 @@ export const DICT = {
   lost: { ar: "تحليل الخسائر", en: "Lost Analysis" },
   courses: { ar: "الدورات", en: "Courses" },
   products: { ar: "المنتجات", en: "Products" },
-  teams: { ar: "فرق المبيعات", en: "Sales Teams" },
+  teams: { ar: "أداء الموظفين", en: "Employee Performance" },
   yoy: { ar: "مقارنة سنوية", en: "Year over year" },
   more: { ar: "المزيد", en: "More" },
   // Short forms for the mobile bar, where five labels share one row.

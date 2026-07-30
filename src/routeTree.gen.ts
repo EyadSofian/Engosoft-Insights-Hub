@@ -35,6 +35,7 @@ import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
+import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
@@ -175,6 +176,11 @@ const ApiProductsRoute = ApiProductsRouteImport.update({
   path: '/api/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfitabilityRoute = ApiProfitabilityRouteImport.update({
+  id: '/api/profitability',
+  path: '/api/profitability',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
   id: '/api/refresh',
   path: '/api/refresh',
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
+  '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
+  '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/api/lost': typeof ApiLostRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
+  '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/teams': typeof ApiTeamsRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/overview'
     | '/api/products'
+    | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/overview'
     | '/api/products'
+    | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -436,6 +447,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/overview'
     | '/api/products'
+    | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
     | '/api/teams'
@@ -474,6 +486,7 @@ export interface RootRouteChildren {
   ApiLostRoute: typeof ApiLostRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
   ApiProductsRoute: typeof ApiProductsRoute
+  ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
@@ -669,6 +682,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profitability': {
+      id: '/api/profitability'
+      path: '/api/profitability'
+      fullPath: '/api/profitability'
+      preLoaderRoute: typeof ApiProfitabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/refresh': {
       id: '/api/refresh'
       path: '/api/refresh'
@@ -762,6 +782,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLostRoute: ApiLostRoute,
   ApiOverviewRoute: ApiOverviewRoute,
   ApiProductsRoute: ApiProductsRoute,
+  ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
   ApiTeamsRoute: ApiTeamsRoute,

@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/overview")({
           isPreviousComparable,
           computeDeltas,
           execSummary,
+          computeRecentCampaignActivity,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
 
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/api/overview")({
         const data = await getFiltered(filters);
         const totals = computeTotals(data);
         const campaigns = computePerf(data, "campaign");
+        const activity = await computeRecentCampaignActivity(filters, data);
 
         // Previous equal-length window, for the delta on each KPI card. Skipped
         // entirely when that window predates the data — see isPreviousComparable.
@@ -49,6 +51,7 @@ export const Route = createFileRoute("/api/overview")({
           best: bestCampaign(campaigns),
           leak: moneyLeak(campaigns),
           bestCPL: bestCPL(campaigns),
+          activity,
           topLeaks: topLeaks(campaigns, 5),
           topByROAS: [...spending].sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0)).slice(0, 6),
           topSpend: [...campaigns].sort((a, b) => b.spend - a.spend).slice(0, 6),
