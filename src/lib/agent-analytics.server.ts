@@ -42,6 +42,13 @@ export interface AgentAnalyticsRow {
 
 export interface AgentAnalyticsResult {
   agents: AgentAnalyticsRow[];
+  months: string[];
+  selected: {
+    from?: string;
+    to?: string;
+    dateBasis: "payment" | "invoice";
+    company: string;
+  };
   summary: {
     agents: number;
     paidRevenue: number;
@@ -229,6 +236,13 @@ export async function buildAgentAnalytics(
   teams: TeamAgg[],
 ): Promise<AgentAnalyticsResult> {
   const map = new Map<string, MutableAgent>();
+  const availableMonths = new Set<string>();
+  const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+  for (const invoice of data.snapshot.accounting) {
+    if (filters.company && invoice.company !== filters.company) continue;
+    const date = dateBasis === "invoice" ? invoice.invoiceDate : invoice.paymentDate;
+    if (date) availableMonths.add(monthKey(date));
+  }
   mergeMainPeople(map, teams);
   mergeInvoiceRefs(map, data);
 
@@ -248,6 +262,9 @@ export async function buildAgentAnalytics(
         "SLA is still refreshing in the background. Accounting and CRM figures remain available.",
       );
     }
+    for (const row of snapshot.repMonthly) if (row.month) availableMonths.add(monthKey(row.month));
+    for (const row of snapshot.salesSummary)
+      if (row.month) availableMonths.add(monthKey(row.month));
     mergeSlaRep(map, snapshot.repMonthly.filter((row) => monthIncluded(row.month, filters)));
     mergeSlaSales(map, snapshot.salesSummary.filter((row) => monthIncluded(row.month, filters)));
     slaStatus = {
@@ -308,5 +325,16 @@ export async function buildAgentAnalytics(
   summary.answerRate =
     summary.outboundCalls > 0 ? (summary.answeredCalls / summary.outboundCalls) * 100 : null;
 
-  return { agents, summary, sla: slaStatus };
+  return {
+    agents,
+    months: [...availableMonths].filter(Boolean).sort(),
+    selected: {
+      from: filters.from,
+      to: filters.to,
+      dateBasis,
+      company: filters.company || "",
+    },
+    summary,
+    sla: slaStatus,
+  };
 }

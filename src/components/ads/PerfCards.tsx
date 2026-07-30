@@ -146,6 +146,14 @@ export function PerfCards({
                     </>
                   }
                 />
+                <SimpleFact
+                  label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
+                  value={fmtNum(r.invoices)}
+                />
+                <SimpleFact
+                  label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
+                  value={fmtNum(r.salesOrders)}
+                />
                 <Fact metric="cpl" value={ratioCell(r.cpl, r.spend, fmtUSDFull, spendNote)} />
               </dl>
 
@@ -173,6 +181,15 @@ function Fact({ metric, value }: { metric: MetricKey; value: React.ReactNode }) 
   return (
     <div className="min-w-0">
       <dt className="text-[10px] text-text-muted truncate">{METRICS[metric][lang].short}</dt>
+      <dd className="num text-[13px] font-semibold text-text">{value}</dd>
+    </div>
+  );
+}
+
+function SimpleFact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-[10px] text-text-muted">{label}</dt>
       <dd className="num text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );

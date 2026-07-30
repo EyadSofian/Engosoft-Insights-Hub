@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/filters")({
         const salesTeams = new Set<string>();
         const salespeople = new Set<string>();
         const courses = new Set<string>();
+        const companies = new Set<string>();
 
         for (const a of data.ads) {
           if (a.account) accounts.add(a.account);
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/api/filters")({
           if (c.course) courses.add(c.course);
         }
         for (const row of data.accounting) {
+          if (row.company) companies.add(row.company);
           if (row.mainCategory) mainCategories.add(row.mainCategory);
           if (row.course) courses.add(row.course);
           if (row.salesTeam) salesTeams.add(row.salesTeam);
@@ -64,6 +66,7 @@ export const Route = createFileRoute("/api/filters")({
           salesTeams: sorted(salesTeams),
           salespeople: sorted(salespeople),
           courses: sorted(courses),
+          companies: sorted(companies),
           defaultRange,
           years: data.years,
           coverage: {

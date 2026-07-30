@@ -12,6 +12,10 @@ export const Route = createFileRoute("/api/accounting")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const rows = data.accounting;
+        const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+        const accountingDate = (row: (typeof rows)[number]) =>
+          dateBasis === "invoice" ? row.invoiceDate : row.paymentDate;
+        const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const paid = (row: (typeof rows)[number]) => row.usdPaid;
         const invoiceCount = new Set(rows.map((row) => row.movement).filter(Boolean)).size;
         const paidUsd = rows.reduce((sum, row) => sum + row.usdPaid, 0);
@@ -20,7 +24,7 @@ export const Route = createFileRoute("/api/accounting")({
           { month: string; revenue: number; productLines: number; invoices: Set<string> }
         >();
         for (const row of rows) {
-          const month = row.month || row.paymentDate.slice(0, 7) || "—";
+          const month = accountingDate(row).slice(0, 7) || "—";
           let point = monthlyMap.get(month);
           if (!point) {
             point = { month, revenue: 0, productLines: 0, invoices: new Set() };
@@ -62,8 +66,9 @@ export const Route = createFileRoute("/api/accounting")({
           atDay(row.date).spend += row.spend;
         }
         for (const row of rows) {
-          if (!row.paymentDate) continue;
-          atDay(row.paymentDate).revenue += row.usdPaid;
+          const date = accountingDate(row);
+          if (!date) continue;
+          atDay(date).revenue += row.usdPaid;
         }
 
         return json({
@@ -81,7 +86,7 @@ export const Route = createFileRoute("/api/accounting")({
           byCurrency: groupBy(rows, (row) => row.currency || "—", paid),
           byTeam: groupBy(rows, (row) => row.salesTeam || "—", paid),
           bySalesperson: groupBy(rows, (row) => row.salesperson || "—", paid),
-          byMonth: groupBy(rows, (row) => row.month || "—", paid).sort((a, b) =>
+          byMonth: groupBy(rows, (row) => accountingDate(row).slice(0, 7) || "—", paid).sort((a, b) =>
             a.label.localeCompare(b.label),
           ),
           monthly,
@@ -118,7 +123,7 @@ export const Route = createFileRoute("/api/accounting")({
           health: data.snapshot.health,
           source: {
             tab: "Paid Invoices",
-            dateBasis: "Payment Date",
+            dateBasis: dateBasisLabel,
             valueBasis: "USD Paid",
             grain: "invoice_product_line",
           },

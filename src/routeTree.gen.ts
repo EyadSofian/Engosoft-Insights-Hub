@@ -25,6 +25,7 @@ import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
+import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
@@ -124,6 +125,11 @@ const ApiAccountingExportRoute = ApiAccountingExportRouteImport.update({
 const ApiAdsRoute = ApiAdsRouteImport.update({
   id: '/api/ads',
   path: '/api/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCampaignRiskRoute = ApiCampaignRiskRouteImport.update({
+  id: '/api/campaign-risk',
+  path: '/api/campaign-risk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCampaignsRoute = ApiCampaignsRouteImport.update({
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -321,6 +329,7 @@ export interface FileRoutesById {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
@@ -361,6 +370,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
@@ -476,6 +488,7 @@ export interface RootRouteChildren {
   ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
   ApiAdsRoute: typeof ApiAdsRoute
+  ApiCampaignRiskRoute: typeof ApiCampaignRiskRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
@@ -610,6 +623,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ads'
       fullPath: '/api/ads'
       preLoaderRoute: typeof ApiAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/campaign-risk': {
+      id: '/api/campaign-risk'
+      path: '/api/campaign-risk'
+      fullPath: '/api/campaign-risk'
+      preLoaderRoute: typeof ApiCampaignRiskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/campaigns': {
@@ -772,6 +792,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAccountingRoute: ApiAccountingRoute,
   ApiAccountingExportRoute: ApiAccountingExportRoute,
   ApiAdsRoute: ApiAdsRoute,
+  ApiCampaignRiskRoute: ApiCampaignRiskRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiCoursesRoute: ApiCoursesRoute,

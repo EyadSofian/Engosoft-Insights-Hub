@@ -21,6 +21,18 @@ export function FilterSummary({ className = "" }: { className?: string }) {
     value: string;
     clears?: Partial<GlobalFilters>;
   }[] = [];
+  if (filters.dateBasis === "invoice")
+    chips.push({
+      key: "dateBasis",
+      label: lang === "ar" ? "أساس التاريخ" : "Date basis",
+      value: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+    });
+  if (filters.company)
+    chips.push({
+      key: "company",
+      label: lang === "ar" ? "شركة الفاتورة" : "Invoice company",
+      value: filters.company,
+    });
 
   if (filters.platform) {
     chips.push({

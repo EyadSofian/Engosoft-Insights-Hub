@@ -45,6 +45,21 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         />
       ) : (
         <div className="space-y-4">
+          {activity.atRisk.length > 0 && (
+            <Notice
+              tone="warning"
+              title={
+                lang === "ar"
+                  ? `${fmtNum(activity.atRisk.length)} حملة تحتاج مراجعة`
+                  : `${fmtNum(activity.atRisk.length)} campaigns need review`
+              }
+              icon={<AlertTriangle size={16} />}
+            >
+              {lang === "ar"
+                ? "سجلت إنفاقًا حديثًا ولم تسجل Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في نفس نافذة القياس."
+                : "They recorded recent spend with no Won, paid invoice, or fully invoiced sales order in the same measurement window."}
+            </Notice>
+          )}
           {activity.zeroResult.length > 0 && (
             <Notice
               tone="danger"
@@ -81,13 +96,15 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                 (row.platformLeads ?? 0) <= 0 &&
                 row.crmLeads <= 0 &&
                 row.won <= 0 &&
+                row.invoices <= 0 &&
+                row.salesOrders <= 0 &&
                 row.revenue <= 0;
               return (
                 <div
                   key={row.key}
-                  className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(4,auto)] sm:items-center sm:gap-4"
+                  className="grid grid-cols-2 gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(6,auto)] sm:items-center sm:gap-4"
                 >
-                  <div className="min-w-0">
+                  <div className="col-span-2 min-w-0 sm:col-span-1">
                     <div className="truncate text-[13px] font-semibold text-text" title={row.name}>
                       {row.name || "—"}
                     </div>
@@ -113,6 +130,14 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   />
                   <Mini label={lang === "ar" ? "ليدز أودو" : "Odoo leads"} value={fmtNum(row.crmLeads)} />
                   <Mini label={lang === "ar" ? "مغلق" : "Won"} value={fmtNum(row.won)} />
+                  <Mini
+                    label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"}
+                    value={fmtNum(row.invoices)}
+                  />
+                  <Mini
+                    label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
+                    value={fmtNum(row.salesOrders)}
+                  />
                 </div>
               );
             })}
@@ -154,13 +179,21 @@ function ActivitySpotlight({
       <div className="mt-2 truncate text-sm font-semibold text-text" title={row.name}>
         {row.name}
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
         <Mini label={lang === "ar" ? "الإنفاق" : "Spend"} value={fmtUSD(row.spend)} />
         <Mini
           label={lang === "ar" ? "ليدز" : "Leads"}
           value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
         />
         <Mini label={lang === "ar" ? "Won" : "Won"} value={fmtNum(row.won)} />
+        <Mini
+          label={lang === "ar" ? "فواتير" : "Invoices"}
+          value={fmtNum(row.invoices)}
+        />
+        <Mini
+          label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
+          value={fmtNum(row.salesOrders)}
+        />
       </div>
     </div>
   );

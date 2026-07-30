@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
+  Building2,
   Calculator,
+  CalendarDays,
   ChevronDown,
   Download,
   FileSpreadsheet,
@@ -43,6 +45,7 @@ import { DEFAULT_FX_RATES } from "@/lib/fx-rates";
 import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
 import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
+import { useFiltersData } from "@/components/TopBar";
 
 export const Route = createFileRoute("/accounting")({ component: Accounting });
 
@@ -115,6 +118,8 @@ function Accounting() {
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
+  const { data: filterOptions } = useFiltersData();
+  const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
 
   useEffect(() => {
     filterStore.hydrateFx();
@@ -278,10 +283,74 @@ function Accounting() {
         title={t("accounting")}
         subtitle={
           lang === "ar"
-            ? `الفواتير المدفوعة على مستوى بند المنتج، مؤرخة بتاريخ الدفع.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
-            : `Paid invoices at product-line grain, reported by Payment Date.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
+            ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
+            : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
         }
       />
+
+      <Card className="border-brand/20 bg-surface">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+              <CalendarDays size={15} className="text-brand" />
+              {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+            </div>
+            <Segmented
+              value={dateBasis}
+              onChange={(value) =>
+                filterStore.set({
+                  dateBasis: value === "invoice" ? "invoice" : undefined,
+                })
+              }
+              size="md"
+              options={[
+                {
+                  value: "payment",
+                  label: lang === "ar" ? "تاريخ الدفع — الافتراضي" : "Payment Date — default",
+                },
+                {
+                  value: "invoice",
+                  label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+                },
+              ]}
+            />
+          </div>
+
+          <label className="block">
+            <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+              <Building2 size={15} className="text-brand" />
+              {lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
+            </span>
+            <select
+              value={filters.company ?? ""}
+              onChange={(event) => filterStore.set({ company: event.target.value || undefined })}
+              className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15"
+            >
+              <option value="">{lang === "ar" ? "كل الشركات" : "All companies"}</option>
+              {(filterOptions?.companies ?? []).map((company) => (
+                <option key={company} value={company}>
+                  {company}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-xs text-text-muted">
+            <div className="font-semibold text-text">
+              {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
+            </div>
+            <div className="mt-1">
+              {dateBasis === "invoice"
+                ? lang === "ar"
+                  ? "الفترة تُطبّق على تاريخ الفاتورة"
+                  : "Range applies to Invoice Date"
+                : lang === "ar"
+                  ? "الفترة تُطبّق على تاريخ الدفع"
+                  : "Range applies to Payment Date"}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <Segmented

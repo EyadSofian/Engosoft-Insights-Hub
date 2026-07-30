@@ -65,6 +65,8 @@ function buildCsvRow(
     platform_leads: r.platformLeads ?? "",
     crm_leads: r.crmLeads,
     won: r.won,
+    paid_invoices: r.invoices,
+    fully_invoiced_sales_orders: r.salesOrders,
     conversion_rate: csvMaybe(r.conversionRate),
     lost: r.lost,
     lost_rate: csvMaybe(r.lostRate),
@@ -709,6 +711,14 @@ function RowDrawer({
       label: lang === "ar" ? "أيام الإنفاق المتاحة" : "Spend data covers",
       value: <span className="num text-[11px]">{`${row.spendDateMin} → ${row.spendDateMax}`}</span>,
     });
+  facts.push({
+    label: lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices",
+    value: <span className="num">{fmtNum(row.invoices)}</span>,
+  });
+  facts.push({
+    label: lang === "ar" ? "أوامر البيع المفوترة بالكامل" : "Fully invoiced sales orders",
+    value: <span className="num">{fmtNum(row.salesOrders)}</span>,
+  });
 
   const groups: {
     group: keyof typeof METRIC_GROUP_LABEL;
@@ -1205,6 +1215,24 @@ function buildColumns({
       align: "right",
       sortValue: (r) => r.revenue,
       render: (r) => fmtUSD(r.revenue),
+    },
+    {
+      key: "invoices",
+      group: "accounting",
+      label: lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices",
+      header: lang === "ar" ? "الفواتير" : "Invoices",
+      align: "right",
+      sortValue: (r) => r.invoices,
+      render: (r) => fmtNum(r.invoices),
+    },
+    {
+      key: "salesOrders",
+      group: "accounting",
+      label: lang === "ar" ? "أوامر البيع المفوترة بالكامل" : "Fully invoiced sales orders",
+      header: lang === "ar" ? "أوامر البيع" : "Sales orders",
+      align: "right",
+      sortValue: (r) => r.salesOrders,
+      render: (r) => fmtNum(r.salesOrders),
     },
     {
       key: "revenuePerLead",

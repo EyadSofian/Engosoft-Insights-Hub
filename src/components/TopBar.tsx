@@ -28,6 +28,7 @@ export interface FiltersResp {
   salesTeams: string[];
   salespeople: string[];
   courses: string[];
+  companies: string[];
   defaultRange: { from: string; to: string };
   years: number[];
   coverage: {
@@ -393,6 +394,38 @@ function FilterSheet({
             </span>
             <DateRangePanel latest={latestDate(data)} collapsibleCalendar />
           </div>
+
+          <div>
+            <span className="block text-xs font-medium text-text-muted mb-2">
+              {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+            </span>
+            <Segmented
+              value={filters.dateBasis ?? "payment"}
+              onChange={(value) =>
+                filterStore.set({
+                  dateBasis: value === "invoice" ? "invoice" : undefined,
+                })
+              }
+              size="md"
+              options={[
+                {
+                  value: "payment",
+                  label: lang === "ar" ? "تاريخ الدفع" : "Payment Date",
+                },
+                {
+                  value: "invoice",
+                  label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+                },
+              ]}
+            />
+          </div>
+
+          <Select
+            label={lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
+            value={filters.company}
+            options={data?.companies ?? []}
+            onChange={(v) => filterStore.set({ company: v })}
+          />
 
           <Select
             label={t("account")}

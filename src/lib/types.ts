@@ -21,6 +21,10 @@ export type AdSetOrigin =
 export interface GlobalFilters {
   from?: string; // YYYY-MM-DD
   to?: string;
+  /** Accounting date used for filtering and trends. Payment Date is the default. */
+  dateBasis?: "payment" | "invoice";
+  /** Accounting invoice company. Other facts are left untouched when they lack this dimension. */
+  company?: string;
   platform?: Platform;
   account?: string;
   campaign?: string;
@@ -386,6 +390,10 @@ export interface PerfRow {
   conversionRate: Maybe;
   lostRate: Maybe;
   revenue: number;
+  /** Distinct paid accounting invoices attributed to this performance row. */
+  invoices: number;
+  /** Distinct fully invoiced sales orders attributed to this performance row. */
+  salesOrders: number;
   revenuePerLead: Maybe;
   cpl: Maybe;
   cpa: Maybe;
@@ -417,6 +425,8 @@ export interface CampaignActivity {
   best: PerfRow | null;
   worst: PerfRow | null;
   zeroResult: PerfRow[];
+  /** Material spend with no Won, paid invoice, or fully invoiced sales order in the recent window. */
+  atRisk: PerfRow[];
 }
 
 export interface CourseAgg extends PerfRow {

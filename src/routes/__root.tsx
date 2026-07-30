@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "@/lib/i18n";
 import { FloatingChat } from "@/components/FloatingChat";
 import { AppShell } from "@/components/AppShell";
+import { CampaignRiskPopup } from "@/components/CampaignRiskPopup";
 
 /**
  * Applies the stored language and theme before first paint. Without this the
@@ -144,6 +145,7 @@ function RootComponent() {
         <AppShell>
           <Outlet />
         </AppShell>
+        <CampaignRiskPopup />
         {/* Mounted once, so the conversation survives navigation. */}
         <FloatingChat />
       </I18nProvider>

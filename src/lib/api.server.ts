@@ -17,6 +17,8 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
   const filters: GlobalFilters = {
     from: p.get("from") || undefined,
     to: p.get("to") || undefined,
+    dateBasis: p.get("dateBasis") === "invoice" ? "invoice" : undefined,
+    company: p.get("company") || undefined,
     platform:
       platform === "meta" || platform === "snapchat" || platform === "tiktok"
         ? (platform as Platform)

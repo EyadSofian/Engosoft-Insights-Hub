@@ -1,5 +1,15 @@
-import { useEffect } from "react";
-import { Activity, Calculator, Info, PhoneCall, RefreshCw, TrendingUp, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Calculator,
+  Info,
+  PhoneCall,
+  ReceiptText,
+  RefreshCw,
+  Search,
+  Trophy,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { MultiLineChart } from "@/components/charts";
 import {
   Card,
@@ -8,10 +18,12 @@ import {
   Notice,
   Pill,
   SectionTitle,
+  Segmented,
   Skeleton,
 } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { filterStore, useFilters } from "@/lib/filter-store";
 
 export interface AccountingMonth {
   month: string;
@@ -44,6 +56,13 @@ interface AgentRow {
 
 interface AgentsResponse {
   agents: AgentRow[];
+  months: string[];
+  selected: {
+    from?: string;
+    to?: string;
+    dateBasis: "payment" | "invoice";
+    company: string;
+  };
   summary: {
     agents: number;
     paidRevenue: number;
@@ -93,14 +112,16 @@ const localMoney = (value: number | null, currency = "LE") =>
 
 export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] }) {
   const { lang } = useI18n();
+  const filters = useFilters();
+  const dateBasis = filters.dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
   const latest = monthly.at(-1);
   const previous = monthly.at(-2);
   return (
     <div className="space-y-4">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
-          ? "المقارنة مبنية على الفواتير المدفوعة حسب Payment Date. كل شهر يُقارن بالشهر السابق مباشرة."
-          : "Comparison uses paid invoices by Payment Date. Every month is compared with its immediate predecessor."}
+          ? `المقارنة مبنية على الفواتير المدفوعة حسب ${dateBasis}. كل شهر يُقارن بالشهر السابق مباشرة.`
+          : `Comparison uses paid invoices by ${dateBasis}. Every month is compared with its immediate predecessor.`}
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
@@ -145,45 +166,50 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
           format={fmtNum}
         />
       </Card>
-      <Card padded={false}>
-        <div className="border-b border-border p-4 sm:p-5">
-          <SectionTitle className="mb-0">{lang === "ar" ? "مقارنة شهر بشهر" : "Month-by-month comparison"}</SectionTitle>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr className="bg-surface-2 text-[11px] uppercase tracking-wide text-text-muted">
-                <th className="px-3 py-2.5 text-start">{lang === "ar" ? "الشهر" : "Month"}</th>
-                <th className="px-3 py-2.5 text-end">{lang === "ar" ? "التحصيل" : "Collections"}</th>
-                <th className="px-3 py-2.5 text-end">{lang === "ar" ? "الفواتير" : "Invoices"}</th>
-                <th className="px-3 py-2.5 text-end">{lang === "ar" ? "متوسط الفاتورة" : "Average invoice"}</th>
-                <th className="px-3 py-2.5 text-end">{lang === "ar" ? "التغير" : "Change"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthly.map((row) => (
-                <tr key={row.month} className="border-t border-border">
-                  <td className="px-3 py-3 font-semibold text-text">{row.month}</td>
-                  <td className="num px-3 py-3 text-end">{fmtUSDExact(row.revenue)}</td>
-                  <td className="num px-3 py-3 text-end">{fmtNum(row.invoices)}</td>
-                  <td className="num px-3 py-3 text-end">{fmtUSDExact(row.averageInvoice)}</td>
-                  <td className="px-3 py-3 text-end">
-                    <Pill
-                      tone={
-                        row.growthPct === null
-                          ? "neutral"
-                          : row.growthPct >= 0
-                            ? "success"
-                            : "danger"
-                      }
-                    >
-                      {fmtPct(row.growthPct, 1)}
-                    </Pill>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Card>
+        <SectionTitle>{lang === "ar" ? "مقارنة شهر بشهر" : "Month-by-month comparison"}</SectionTitle>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {monthly.map((row, index) => (
+            <article
+              key={row.month}
+              className="rounded-2xl border border-border bg-surface p-4 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium text-text-muted">
+                    {lang === "ar" ? "الشهر" : "Month"}
+                  </div>
+                  <div className="mt-1 text-base font-semibold text-text">
+                    {monthLabel(row.month, lang)}
+                  </div>
+                </div>
+                <Pill
+                  tone={
+                    row.growthPct === null
+                      ? "neutral"
+                      : row.growthPct >= 0
+                        ? "success"
+                        : "danger"
+                  }
+                >
+                  {index === 0 ? (lang === "ar" ? "بداية القياس" : "Baseline") : fmtPct(row.growthPct, 1)}
+                </Pill>
+              </div>
+              <div className="num mt-4 text-2xl font-semibold text-text">
+                {fmtUSDExact(row.revenue)}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <MiniMetric
+                  label={lang === "ar" ? "الفواتير" : "Invoices"}
+                  value={fmtNum(row.invoices)}
+                />
+                <MiniMetric
+                  label={lang === "ar" ? "متوسط الفاتورة" : "Average invoice"}
+                  value={fmtUSDExact(row.averageInvoice)}
+                />
+              </div>
+            </article>
+          ))}
         </div>
       </Card>
     </div>
@@ -192,15 +218,48 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
 
 export function AccountingAgentsView() {
   const { lang } = useI18n();
+  const filters = useFilters();
+  const [display, setDisplay] = useState<"cards" | "table">("cards");
+  const [sortBy, setSortBy] = useState<"revenue" | "conversion" | "calls">("revenue");
+  const [search, setSearch] = useState("");
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (isLoading || !data) return <><Skeleton className="h-28" /><Skeleton className="mt-4 h-96" /></>;
+
+  const filterMonth = filters.from?.slice(0, 7) || "";
+  const selectedMonth =
+    filterMonth &&
+    filters.from === `${filterMonth}-01` &&
+    filters.to === monthEnd(filterMonth)
+      ? filterMonth
+      : "";
+  const normalizedSearch = search.trim().toLocaleLowerCase(lang === "ar" ? "ar" : "en");
+  const visibleAgents = data.agents
+    .filter((row) =>
+      normalizedSearch
+        ? `${row.name} ${row.team}`.toLocaleLowerCase(lang === "ar" ? "ar" : "en").includes(normalizedSearch)
+        : true,
+    )
+    .sort((a, b) =>
+      sortBy === "conversion"
+        ? (b.conversionRate ?? -1) - (a.conversionRate ?? -1) ||
+          b.paidRevenue - a.paidRevenue
+        : sortBy === "calls"
+          ? b.outboundCalls - a.outboundCalls || b.answeredCalls - a.answeredCalls
+          : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
+    );
+
+  const selectMonth = (month: string) => {
+    if (!month) return;
+    filterStore.setDates(`${month}-01`, monthEnd(month));
+  };
+
   return (
     <div className="space-y-4">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
-          ? "التحصيل لكل موظف من الفواتير المدفوعة في الحسابات. المكالمات وسرعة التواصل من نظام SLA وبياناته شهرية؛ عند اختيار جزء من شهر تظهر حركة الشهر المتقاطع كاملة. لا يُنسب إنفاق إعلاني لموظف بدون قاعدة توزيع معتمدة."
-          : "Employee collections come from paid Accounting invoices. Calls and contact speed come from monthly SLA data, so a partial-month filter includes the intersecting month in full. Ad spend is not assigned to employees without an approved allocation rule."}
+          ? `التحصيل والفواتير من الحسابات حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. المكالمات والعملاء من SLA وCRM، ولا تُنسب تكلفة إعلانية لموظف من غير قاعدة توزيع معتمدة.`
+          : `Collections and invoices use ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Calls and leads come from SLA and CRM; ad spend is not assigned without an approved allocation rule.`}
       </Notice>
       {!data.sla.ok && (
         <Notice tone="warning" title={lang === "ar" ? "بيانات المكالمات غير متاحة مؤقتًا" : "Call data temporarily unavailable"}>
@@ -208,13 +267,195 @@ export function AccountingAgentsView() {
         </Notice>
       )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard index={0} label={lang === "ar" ? "الموظفون" : "Employees"} value={fmtNum(data.summary.agents)} />
-        <KpiCard index={1} label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDExact(data.summary.paidRevenue)} hero />
-        <KpiCard index={2} label={lang === "ar" ? "Won" : "Won"} value={fmtNum(data.summary.won)} sub={fmtPct(data.summary.conversionRate, 1)} />
-        <KpiCard index={3} label={lang === "ar" ? "مكالمات صادرة" : "Outbound calls"} value={fmtNum(data.summary.outboundCalls)} />
-        <KpiCard index={4} label={lang === "ar" ? "تم الرد" : "Answered"} value={fmtNum(data.summary.answeredCalls)} sub={fmtPct(data.summary.answerRate, 1)} />
+        <KpiCard
+          index={0}
+          label={lang === "ar" ? "الموظفون النشطون" : "Active employees"}
+          value={fmtNum(data.summary.agents)}
+          icon={<Users size={18} />}
+        />
+        <KpiCard
+          index={1}
+          label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+          value={fmtUSDExact(data.summary.paidRevenue)}
+          sub={`${fmtNum(data.summary.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+          icon={<ReceiptText size={18} />}
+          hero
+        />
+        <KpiCard
+          index={2}
+          label={lang === "ar" ? "الصفقات المغلقة" : "Closed won"}
+          value={fmtNum(data.summary.won)}
+          sub={fmtPct(data.summary.conversionRate, 1)}
+          icon={<Trophy size={18} />}
+        />
+        <KpiCard
+          index={3}
+          label={lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"}
+          value={fmtNum(data.summary.outboundCalls)}
+          icon={<PhoneCall size={18} />}
+        />
+        <KpiCard
+          index={4}
+          label={lang === "ar" ? "المكالمات المجاب عنها" : "Answered calls"}
+          value={fmtNum(data.summary.answeredCalls)}
+          sub={fmtPct(data.summary.answerRate, 1)}
+          icon={<UserRound size={18} />}
+        />
       </div>
-      <AgentTable rows={data.agents} />
+
+      <Card>
+        <div className="grid gap-3 xl:grid-cols-[minmax(190px,.7fr)_minmax(250px,1fr)_auto_auto] xl:items-end">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-text-muted">
+              {lang === "ar" ? "اختر الشهر" : "Choose month"}
+            </span>
+            <select
+              value={selectedMonth}
+              onChange={(event) => selectMonth(event.target.value)}
+              className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+            >
+              <option value="">
+                {lang === "ar" ? "الفترة الحالية" : "Current date range"}
+              </option>
+              {[...data.months].reverse().map((month) => (
+                <option key={month} value={month}>
+                  {monthLabel(month, lang)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-text-muted">
+              {lang === "ar" ? "بحث عن موظف أو فريق" : "Search employee or team"}
+            </span>
+            <span className="relative block">
+              <Search
+                size={16}
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-text-muted"
+              />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={lang === "ar" ? "اكتب الاسم…" : "Type a name…"}
+                className="min-h-11 w-full rounded-xl border border-border bg-surface ps-10 pe-3 text-sm text-text outline-none placeholder:text-text-subtle focus:border-brand focus:ring-2 focus:ring-brand/15"
+              />
+            </span>
+          </label>
+
+          <div className="overflow-x-auto">
+            <span className="mb-1.5 block text-xs font-medium text-text-muted">
+              {lang === "ar" ? "الترتيب" : "Sort by"}
+            </span>
+            <Segmented
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { value: "revenue", label: lang === "ar" ? "التحصيل" : "Revenue" },
+                { value: "conversion", label: lang === "ar" ? "الإغلاق" : "Conversion" },
+                { value: "calls", label: lang === "ar" ? "المكالمات" : "Calls" },
+              ]}
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <span className="mb-1.5 block text-xs font-medium text-text-muted">
+              {lang === "ar" ? "طريقة العرض" : "View"}
+            </span>
+            <Segmented
+              value={display}
+              onChange={setDisplay}
+              options={[
+                { value: "cards", label: lang === "ar" ? "كروت" : "Cards" },
+                { value: "table", label: lang === "ar" ? "جدول" : "Table" },
+              ]}
+            />
+          </div>
+        </div>
+      </Card>
+
+      {display === "cards" ? (
+        <AgentCards rows={visibleAgents} />
+      ) : (
+        <AgentTable rows={visibleAgents} />
+      )}
+    </div>
+  );
+}
+
+function AgentCards({ rows }: { rows: AgentRow[] }) {
+  const { lang } = useI18n();
+  return (
+    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      {rows.map((row, index) => (
+        <article
+          key={row.key}
+          className="card overflow-hidden p-4 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md sm:p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-bold text-brand">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-semibold text-text" title={row.name}>
+                    {row.name}
+                  </h3>
+                  <p className="mt-0.5 truncate text-[11px] text-text-muted" title={row.team}>
+                    {row.team}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <Pill tone={row.conversionRate !== null && row.conversionRate >= 10 ? "success" : "neutral"}>
+              {lang === "ar" ? "إغلاق" : "CVR"} {fmtPct(row.conversionRate, 1)}
+            </Pill>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-surface-2 p-3">
+            <div className="text-[11px] font-medium text-text-muted">
+              {lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+            </div>
+            <div className="num mt-1 text-xl font-semibold text-text">
+              {fmtUSDExact(row.paidRevenue)}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <MiniMetric label={lang === "ar" ? "الفواتير" : "Invoices"} value={fmtNum(row.invoices)} />
+            <MiniMetric label={lang === "ar" ? "العملاء" : "Leads"} value={fmtNum(row.cleanLeads)} />
+            <MiniMetric label="Won" value={fmtNum(row.won)} />
+            <MiniMetric label="Lost" value={fmtNum(row.lost)} />
+            <MiniMetric label={lang === "ar" ? "المكالمات" : "Calls"} value={fmtNum(row.outboundCalls)} />
+            <MiniMetric label={lang === "ar" ? "تم الرد" : "Answered"} value={fmtNum(row.answeredCalls)} />
+          </div>
+
+          <div className="mt-4 space-y-2.5">
+            <ProgressMetric
+              label={lang === "ar" ? "نسبة الإغلاق" : "Conversion rate"}
+              value={row.conversionRate}
+              color="var(--success)"
+            />
+            <ProgressMetric
+              label={lang === "ar" ? "نسبة الرد" : "Answer rate"}
+              value={row.answerRate}
+              color="var(--chart-1)"
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-text-muted">
+            <span>
+              {lang === "ar" ? "لم يتم التواصل" : "Uncontacted"}:{" "}
+              <b className="num text-text">{fmtNum(row.uncontactedLeads)}</b>
+            </span>
+            <span>
+              {lang === "ar" ? "صفقات SLA" : "SLA deals"}:{" "}
+              <b className="num text-text">{fmtNum(row.operationalDeals)}</b>
+            </span>
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
@@ -275,6 +516,61 @@ function AgentTable({ rows }: { rows: AgentRow[] }) {
         </table>
       </div>
     </Card>
+  );
+}
+
+function monthEnd(month: string): string {
+  const [year, rawMonth] = month.split("-").map(Number);
+  if (!year || !rawMonth) return `${month}-31`;
+  return new Date(Date.UTC(year, rawMonth, 0)).toISOString().slice(0, 10);
+}
+
+function monthLabel(month: string, lang: "ar" | "en"): string {
+  const [year, rawMonth] = month.split("-").map(Number);
+  if (!year || !rawMonth) return month;
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, rawMonth - 1, 1)));
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">
+      <div className="truncate text-[10px] text-text-muted" title={label}>
+        {label}
+      </div>
+      <div className="num mt-1 truncate text-sm font-semibold text-text" title={value}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ProgressMetric({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number | null;
+  color: string;
+}) {
+  const safe = value === null ? 0 : Math.max(0, Math.min(100, value));
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+        <span className="text-text-muted">{label}</span>
+        <span className="num font-semibold text-text">{fmtPct(value, 1)}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${safe}%`, background: color }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -346,9 +642,6 @@ export function AccountingProfitabilityView() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-text-muted">
           <span className="inline-flex items-center gap-1"><Users size={13} />{p.companies.map((company) => company.name).join(" · ")}</span>
-          <span className="inline-flex items-center gap-1"><Activity size={13} />{new Date(p.fetchedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</span>
-          <span className="inline-flex items-center gap-1"><PhoneCall size={13} />{lang === "ar" ? "لا علاقة له بمؤشرات المكالمات أو أوامر البيع" : "Independent of calls and sales orders"}</span>
-          <span className="inline-flex items-center gap-1"><TrendingUp size={13} />{lang === "ar" ? "عملة التقرير كما يعرضها Odoo" : "Report currency as displayed by Odoo"}</span>
         </div>
       </Card>
     </div>

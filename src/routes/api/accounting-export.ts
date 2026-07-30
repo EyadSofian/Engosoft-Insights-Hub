@@ -55,6 +55,10 @@ export const Route = createFileRoute("/api/accounting-export")({
         const fxRates = fxRatesFromFilters(filters);
         const data = await getFiltered(filters);
         const rows = data.accounting;
+        const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+        const accountingDate = (row: { invoiceDate: string; paymentDate: string }) =>
+          dateBasis === "invoice" ? row.invoiceDate : row.paymentDate;
+        const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const name = filename(view, filters.from, filters.to);
 
         if (view === "summary") {
@@ -114,8 +118,12 @@ export const Route = createFileRoute("/api/accounting-export")({
             ],
             [
               ar ? "أساس التاريخ" : "Date basis",
-              "Payment Date",
-              ar ? "الفترة تُطبّق على تاريخ الدفع" : "Filters apply to Payment Date",
+              dateBasisLabel,
+              ar
+                ? dateBasis === "invoice"
+                  ? "الفترة تُطبّق على تاريخ الفاتورة"
+                  : "الفترة تُطبّق على تاريخ الدفع"
+                : `Filters apply to ${dateBasisLabel}`,
               source,
             ],
             [
@@ -246,7 +254,7 @@ export const Route = createFileRoute("/api/accounting-export")({
             ...[...invoices.values()]
               .sort(
                 (a, b) =>
-                  b.paymentDate.localeCompare(a.paymentDate) ||
+                  accountingDate(b).localeCompare(accountingDate(a)) ||
                   a.movement.localeCompare(b.movement),
               )
               .map((row) => [
@@ -399,7 +407,8 @@ export const Route = createFileRoute("/api/accounting-export")({
             .slice()
             .sort(
               (a, b) =>
-                b.paymentDate.localeCompare(a.paymentDate) || a.movement.localeCompare(b.movement),
+                accountingDate(b).localeCompare(accountingDate(a)) ||
+                a.movement.localeCompare(b.movement),
             )
             .map((row) => [
               row.movement,

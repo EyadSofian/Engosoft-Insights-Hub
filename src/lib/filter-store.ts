@@ -6,6 +6,8 @@ type Listener = () => void;
 
 /** Dimensions that count toward the "N filters active" badge. */
 const DIMENSIONS = [
+  "dateBasis",
+  "company",
   "platform",
   "account",
   "campaign",
@@ -147,8 +149,8 @@ export const filterStore = {
 
   /** Clears dimension filters but keeps the chosen period and metric options. */
   resetDimensions() {
-    const { from, to, range, includeNonLead, cpaBasis, fxEgp, fxSar } = state;
-    state = { from, to, range, includeNonLead, cpaBasis, fxEgp, fxSar };
+    const { from, to, range, dateBasis, includeNonLead, cpaBasis, fxEgp, fxSar } = state;
+    state = { from, to, range, dateBasis, includeNonLead, cpaBasis, fxEgp, fxSar };
     prune();
     emit();
   },

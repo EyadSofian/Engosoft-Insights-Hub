@@ -83,10 +83,14 @@ const findLine = (lines: ProfitabilityLine[], label: string): number | null => {
   return exact?.value ?? null;
 };
 
-async function fetchProfitability(from: string, to: string): Promise<ProfitabilitySnapshot> {
+async function fetchProfitability(
+  from: string,
+  to: string,
+  company?: string,
+): Promise<ProfitabilitySnapshot> {
   if (!odooConfigured()) throw new Error("Odoo credentials are not configured.");
   const cfg = odooConfig();
-  const context = companyContext({
+  const baseContext = companyContext({
     lang: "en_US",
     tz: "Africa/Cairo",
     report_id: REPORT_ID,
@@ -96,9 +100,25 @@ async function fetchProfitability(from: string, to: string): Promise<Profitabili
     "account.report",
     "get_options",
     [REPORT_ID, {}],
-    { context },
+    { context: baseContext },
     { attempts: 1, timeoutMs: 45_000 },
   );
+  const availableCompanies =
+    options.companies ?? cfg.companyIds.map((id) => ({ id, name: String(id) }));
+  const selectedCompanies = company
+    ? availableCompanies.filter((item) => clean(item.name) === clean(company))
+    : availableCompanies;
+  if (company && !selectedCompanies.length) {
+    throw new Error(`Odoo Profit and Loss company was not found: ${company}`);
+  }
+  const selectedCompanyIds = selectedCompanies.map((item) => Number(item.id));
+  options.companies = selectedCompanies;
+  const reportContext = companyContext({
+    lang: "en_US",
+    tz: "Africa/Cairo",
+    report_id: REPORT_ID,
+    allowed_company_ids: selectedCompanyIds,
+  });
   options.date = {
     ...(options.date ?? {}),
     string: `${from} - ${to}`,
@@ -123,7 +143,7 @@ async function fetchProfitability(from: string, to: string): Promise<Profitabili
     "account.report",
     "get_report_information",
     [REPORT_ID, options],
-    { context },
+    { context: reportContext },
     // The P&L engine can be slow on this database. It runs in the background;
     // callers time out quickly and then receive the cached result.
     { attempts: 1, timeoutMs: 240_000 },
@@ -148,7 +168,7 @@ async function fetchProfitability(from: string, to: string): Promise<Profitabili
     currency: "LE",
     reportId: REPORT_ID,
     postedOnly: true,
-    companies: (options.companies ?? cfg.companyIds.map((id) => ({ id, name: String(id) }))).map(
+    companies: selectedCompanies.map(
       (company) => ({ id: Number(company.id), name: String(company.name) }),
     ),
     netProfit: findLine(lines, "Net Profit"),
@@ -164,10 +184,15 @@ async function fetchProfitability(from: string, to: string): Promise<Profitabili
   };
 }
 
-function startRefresh(key: string, from: string, to: string): Promise<ProfitabilitySnapshot> {
+function startRefresh(
+  key: string,
+  from: string,
+  to: string,
+  company?: string,
+): Promise<ProfitabilitySnapshot> {
   let job = running.get(key);
   if (job) return job;
-  job = fetchProfitability(from, to)
+  job = fetchProfitability(from, to, company)
     .then((value) => {
       cache.set(key, { value, expiresAt: Date.now() + TTL });
       return value;
@@ -177,12 +202,16 @@ function startRefresh(key: string, from: string, to: string): Promise<Profitabil
   return job;
 }
 
-export async function getProfitability(from: string, to: string): Promise<ProfitabilityResult> {
-  const key = `${from}|${to}|${odooConfig().companyIds.join(",")}`;
+export async function getProfitability(
+  from: string,
+  to: string,
+  company?: string,
+): Promise<ProfitabilityResult> {
+  const key = `${from}|${to}|${company || odooConfig().companyIds.join(",")}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return { status: "ready", snapshot: cached.value };
 
-  const refresh = startRefresh(key, from, to);
+  const refresh = startRefresh(key, from, to, company);
   if (cached) return { status: "refreshing", snapshot: cached.value };
 
   try {

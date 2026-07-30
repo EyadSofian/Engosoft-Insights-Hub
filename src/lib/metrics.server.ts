@@ -313,7 +313,10 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     mainCategory,
     salesTeam,
     salesperson,
+    company,
   } = f;
+  const accountingDate = (row: AccountingRow): string =>
+    f.dateBasis === "invoice" ? row.invoiceDate : row.paymentDate;
 
   const includeNonLead = f.includeNonLead === "1";
   const cpaBasis = f.cpaBasis === "invoices" ? "invoices" : "won";
@@ -425,7 +428,8 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   // Accounting rows carry direct campaign/ad/source dimensions when available,
   // with a legacy order bridge only for older workbooks.
   const accounting = all.accounting.filter((r) => {
-    if (!inRange(r.paymentDate, from, to)) return false;
+    if (!inRange(accountingDate(r), from, to)) return false;
+    if (company && r.company !== company) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
     if (!matchesStableFact(r)) return false;
@@ -720,6 +724,7 @@ interface Bucket {
   lost: number;
   revenue: number;
   invoiceRefs: Set<string>;
+  salesOrderRefs: Set<string>;
   closeTotal: number;
   closeSample: number;
   spendDates: Set<string>;
@@ -758,6 +763,7 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
         lost: 0,
         revenue: 0,
         invoiceRefs: new Set(),
+        salesOrderRefs: new Set(),
         closeTotal: 0,
         closeSample: 0,
         spendDates: new Set(),
@@ -834,8 +840,19 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     const b = touch(dimension);
     b.revenue += s.usdPaid;
     if (s.movement) b.invoiceRefs.add(s.movement);
-    if (s.paymentDate)
-      b.revenueByDate.set(s.paymentDate, (b.revenueByDate.get(s.paymentDate) ?? 0) + s.usdPaid);
+    const revenueDate = data.applied.dateBasis === "invoice" ? s.invoiceDate : s.paymentDate;
+    if (revenueDate)
+      b.revenueByDate.set(revenueDate, (b.revenueByDate.get(revenueDate) ?? 0) + s.usdPaid);
+  }
+
+  // Full Invoiced Orders remain advisory, but their distinct order references
+  // are useful operational context beside the authoritative paid invoices.
+  for (const order of data.invoiced) {
+    const dimension = dimensions.fromFact(order, grain);
+    if (!dimension.key || (grain === "campaign" && !order.campaignKey)) continue;
+    if (grain !== "campaign" && !order.adName && !order.adId) continue;
+    const b = touch(dimension);
+    if (order.orderRef) b.salesOrderRefs.add(order.orderRef);
   }
 
   const rows: PerfRow[] = [];
@@ -892,6 +909,8 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
       conversionRate: pctOf(b.won, b.crmLeads),
       lostRate: pctOf(b.lost, b.crmLeads),
       revenue: b.revenue,
+      invoices: b.invoiceRefs.size,
+      salesOrders: b.salesOrderRefs.size,
       revenuePerLead: div(b.revenue, b.crmLeads),
       cpl: b.platformLeads === null ? null : div(b.spend, b.platformLeads),
       cpa: data.cpaBasis === "invoices" ? div(b.spend, b.invoiceRefs.size) : div(b.spend, b.won),
@@ -1005,6 +1024,7 @@ export async function computeRecentCampaignActivity(
       best: null,
       worst: null,
       zeroResult: [],
+      atRisk: [],
     };
   }
 
@@ -1024,7 +1044,17 @@ export async function computeRecentCampaignActivity(
         (row.platformLeads ?? 0) <= 0 &&
         row.crmLeads <= 0 &&
         row.won <= 0 &&
+        row.invoices <= 0 &&
+        row.salesOrders <= 0 &&
         row.revenue <= 0,
+    )
+    .sort((a, b) => b.spend - a.spend);
+  const atRisk = decisionRows
+    .filter(
+      (row) =>
+        row.won <= 0 &&
+        row.invoices <= 0 &&
+        row.salesOrders <= 0,
     )
     .sort((a, b) => b.spend - a.spend);
   const bestPool = decisionRows.filter(
@@ -1052,6 +1082,7 @@ export async function computeRecentCampaignActivity(
     best,
     worst,
     zeroResult: zeroResult.slice(0, 8),
+    atRisk: atRisk.slice(0, 8),
   };
 }
 
@@ -1133,6 +1164,8 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
         conversionRate: null,
         lostRate: null,
         revenue: 0,
+        invoices: 0,
+        salesOrders: 0,
         revenuePerLead: null,
         cpl: null,
         cpa: null,
@@ -1213,6 +1246,7 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
 
   for (const a of map.values()) {
     a.orders = orderRefs.get(a.key)?.size ?? 0;
+    a.invoices = a.orders;
     a.avgOrder = div(a.revenue, a.orders);
     a.conversionRate = pctOf(a.won, a.crmLeads);
     a.lostRate = pctOf(a.lost, a.crmLeads);
