@@ -1,10 +1,21 @@
-import { Activity, AlertTriangle, CalendarClock, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BellRing,
+  CalendarClock,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import type { CampaignActivity, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
+import { mutedRiskCount, riskAlertPrefs, useRiskAlertPrefs } from "@/lib/campaign-risk-prefs";
 import { Card, EmptyState, Notice, Pill, SectionTitle } from "./ui-bits";
 
 export function CampaignActivityPanel({ activity }: { activity: CampaignActivity }) {
   const { lang } = useI18n();
+  const prefs = useRiskAlertPrefs();
+  // The only way back once the popup has been silenced for good.
+  const muted = mutedRiskCount(activity.atRisk, prefs);
   const range = activity.window
     ? `${activity.window.from} → ${activity.window.to}`
     : lang === "ar"
@@ -58,6 +69,18 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               {lang === "ar"
                 ? "سجلت إنفاقًا حديثًا ولم تسجل Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في نفس نافذة القياس."
                 : "They recorded recent spend with no Won, paid invoice, or fully invoiced sales order in the same measurement window."}
+              {muted > 0 && (
+                <button
+                  type="button"
+                  onClick={() => riskAlertPrefs.restore()}
+                  className="mt-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-current/25 px-2.5 text-[12px] font-semibold transition-colors hover:bg-current/10"
+                >
+                  <BellRing size={13} aria-hidden="true" />
+                  {lang === "ar"
+                    ? `إظهار تنبيه ${fmtNum(muted)} حملة مكتومة`
+                    : `Unmute ${fmtNum(muted)} silenced ${muted === 1 ? "campaign" : "campaigns"}`}
+                </button>
+              )}
             </Notice>
           )}
           {activity.zeroResult.length > 0 && (

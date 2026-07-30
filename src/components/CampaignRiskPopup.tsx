@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "@tanstack/react-router";
 import {
   AlertTriangle,
   BadgeDollarSign,
+  BellOff,
+  Clock,
   ReceiptText,
   ShoppingCart,
   Users,
@@ -13,6 +16,12 @@ import type { CampaignActivity, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
 import { Pill } from "@/components/ui-bits";
 import { useModalGuard } from "@/lib/ui-store";
+import {
+  pendingRiskRows,
+  riskAlertPrefs,
+  shouldShowRiskAlert,
+  useRiskAlertPrefs,
+} from "@/lib/campaign-risk-prefs";
 
 interface RiskResponse {
   activity: CampaignActivity;
@@ -22,7 +31,12 @@ interface RiskResponse {
 
 export function CampaignRiskPopup() {
   const { lang } = useI18n();
-  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const prefs = useRiskAlertPrefs();
+  // Closing only hides the alert for the current view — it returns on the next
+  // page load and every time the overview is opened. Anything longer is an
+  // explicit choice made through the snooze/mute buttons.
+  const [closed, setClosed] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const { data } = useQuery<RiskResponse>({
     queryKey: ["campaign-risk", "all-platforms"],
@@ -35,21 +49,22 @@ export function CampaignRiskPopup() {
     retry: 1,
   });
 
-  const windowKey = data?.activity.window
-    ? `${data.activity.window.from}-${data.activity.window.to}`
-    : "";
-  const storageKey = `engosoft-campaign-risk-seen:${windowKey}`;
-  const dismiss = useCallback(() => {
-    if (typeof window !== "undefined" && windowKey) {
-      window.sessionStorage.setItem(storageKey, new Date().toISOString());
-    }
-    setOpen(false);
-  }, [storageKey, windowKey]);
+  const atRisk = data?.activity.atRisk;
+  const rows = useMemo(() => pendingRiskRows(atRisk ?? [], prefs), [atRisk, prefs]);
+  const open = !closed && shouldShowRiskAlert(rows, prefs);
 
   useEffect(() => {
-    if (!windowKey || !data?.activity.atRisk.length || typeof window === "undefined") return;
-    if (!window.sessionStorage.getItem(storageKey)) setOpen(true);
-  }, [data?.activity.atRisk.length, storageKey, windowKey]);
+    if (pathname === "/") setClosed(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (prefs.restoredAt) setClosed(false);
+  }, [prefs.restoredAt]);
+
+  const dismiss = useCallback(() => setClosed(true), []);
+  const keys = useMemo(() => rows.map((row) => row.key), [rows]);
+  const snooze = useCallback(() => riskAlertPrefs.snooze(keys), [keys]);
+  const mute = useCallback(() => riskAlertPrefs.mute(keys), [keys]);
 
   useEffect(() => {
     if (!open) return;
@@ -68,7 +83,7 @@ export function CampaignRiskPopup() {
 
   useModalGuard(open);
 
-  if (!open || !data?.activity.atRisk.length || typeof document === "undefined") return null;
+  if (!open || !data || typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -113,8 +128,8 @@ export function CampaignRiskPopup() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-semibold text-text">
               {lang === "ar"
-                ? `${fmtNum(data.activity.atRisk.length)} حملة مرتبة حسب الإنفاق`
-                : `${fmtNum(data.activity.atRisk.length)} campaigns ranked by spend`}
+                ? `${fmtNum(rows.length)} حملة مرتبة حسب الإنفاق`
+                : `${fmtNum(rows.length)} campaigns ranked by spend`}
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Pill tone="neutral">Meta</Pill>
@@ -124,26 +139,53 @@ export function CampaignRiskPopup() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            {data.activity.atRisk.map((row) => (
+            {rows.map((row) => (
               <RiskCard key={row.key} row={row} />
             ))}
           </div>
 
-          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={dismiss}
-              className="min-h-11 cursor-pointer rounded-xl border border-border px-4 text-sm font-semibold text-text transition-colors hover:bg-surface-2"
-            >
-              {lang === "ar" ? "إغلاق بعد المراجعة" : "Close after review"}
-            </button>
-            <a
-              href="/campaigns"
-              onClick={dismiss}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
-              {lang === "ar" ? "فتح تفاصيل الحملات" : "Open campaign details"}
-            </a>
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={snooze}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                >
+                  <Clock size={15} aria-hidden="true" />
+                  {lang === "ar" ? "ذكّرني بكرة" : "Remind me tomorrow"}
+                </button>
+                <button
+                  type="button"
+                  onClick={mute}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                >
+                  <BellOff size={15} aria-hidden="true" />
+                  {lang === "ar" ? "لا تظهر مجددًا" : "Don't show again"}
+                </button>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={dismiss}
+                  className="min-h-11 cursor-pointer rounded-xl border border-border px-4 text-sm font-semibold text-text transition-colors hover:bg-surface-2"
+                >
+                  {lang === "ar" ? "إغلاق بعد المراجعة" : "Close after review"}
+                </button>
+                <a
+                  href="/campaigns"
+                  onClick={dismiss}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                >
+                  {lang === "ar" ? "فتح تفاصيل الحملات" : "Open campaign details"}
+                </a>
+              </div>
+            </div>
+            <p className="mt-2.5 text-[11px] leading-relaxed text-text-subtle">
+              {lang === "ar"
+                ? "«لا تظهر مجددًا» تكتم الحملات المعروضة هنا فقط — أي حملة جديدة تدخل الخطر هتنبّهك، وتقدر ترجّع المكتومة من بطاقة «الحملات التي تعمل الآن» في النظرة العامة."
+                : "“Don't show again” silences only the campaigns listed here — a newly at-risk campaign still alerts you, and you can unmute from the “Campaigns running now” card on the overview."}
+            </p>
           </div>
         </div>
       </section>
