@@ -9,6 +9,7 @@
 import Papa from "papaparse";
 import { loadDirectCrm, type CrmExclusionDiagnostics, type CrmRawRow } from "./crm-odoo.server";
 import { loadDirectAccounting, type DirectAccountingSnapshot } from "./accounting-odoo.server";
+import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
 import { odooConfigured } from "./odoo.server";
 import type {
   AdRow,
@@ -400,7 +401,7 @@ function accountingLineIdentity(row: Raw): string {
   ].join("\u001f");
 }
 
-/** Customer credit notes must not enter the paid-invoice revenue population. */
+/** Detect Odoo customer credit notes so they can be signed and dated correctly. */
 function isAccountingRefund(row: Raw): boolean {
   const movement = accountingMovement(row);
   const moveType = accountingMoveType(row);
@@ -432,6 +433,7 @@ function accountingComposite(row: Raw): string {
 interface CanonicalAccountingRows {
   rows: Raw[];
   refundRowsExcluded: number;
+  creditNoteRowsIncluded: number;
   duplicateRowsExcluded: number;
 }
 
@@ -442,11 +444,10 @@ interface CanonicalAccountingRows {
  * rows is demoted to the full composite instead of collapsing its products.
  */
 function canonicalizeAccountingRows(input: Raw[]): CanonicalAccountingRows {
-  const nonRefund = input.filter((row) => !isAccountingRefund(row));
-  const composites = nonRefund.map(accountingComposite);
+  const composites = input.map(accountingComposite);
   const identitiesByGenericId = new Map<string, Set<string>>();
 
-  nonRefund.forEach((row) => {
+  input.forEach((row) => {
     if (accountingExplicitLineId(row)) return;
     const id = str(row["__odoo_id"]);
     if (!id) return;
@@ -459,7 +460,7 @@ function canonicalizeAccountingRows(input: Raw[]): CanonicalAccountingRows {
   });
 
   const selected = new Map<string, { row: Raw; writeDate: string }>();
-  nonRefund.forEach((row, index) => {
+  input.forEach((row, index) => {
     const id = accountingStableLineId(row);
     const explicitLineId = accountingExplicitLineId(row);
     const idIsLineLevel = !!explicitLineId || (!!id && identitiesByGenericId.get(id)?.size === 1);
@@ -481,8 +482,9 @@ function canonicalizeAccountingRows(input: Raw[]): CanonicalAccountingRows {
 
   return {
     rows,
-    refundRowsExcluded: input.length - nonRefund.length,
-    duplicateRowsExcluded: nonRefund.length - rows.length,
+    refundRowsExcluded: 0,
+    creditNoteRowsIncluded: rows.filter(isAccountingRefund).length,
+    duplicateRowsExcluded: input.length - rows.length,
   };
 }
 
@@ -838,9 +840,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // may contain a valid header and only part of the year. Switching on the
     // first valid row would silently cut recognised revenue.
     const legacySalesRaw = await safeFetch(TAB.legacySales, looksLikeAccountingExport);
-    // Compare like with like: refunds and duplicate sync rows are removed before
-    // deciding whether the new Accounting tab is complete enough to replace
-    // the legacy Sales baseline.
+    // Compare like with like: invoices and credit notes are canonicalised
+    // together before deciding whether Accounting can replace legacy Sales.
     const primaryCanonical = canonicalizeAccountingRows(accountingPrimaryRaw);
     const legacyCanonical = canonicalizeAccountingRows(legacySalesRaw);
     const distinctMoves = (rows: Raw[]): number =>
@@ -865,10 +866,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       rows.reduce(
         (sum, row) =>
           sum +
-          usdValue(
-            firstPresent(row["USD Paid"], row["$ paid"], row["$ Paid"], row["$ Sales"]),
-            firstPresent(row["Total in Currency"], row["Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¨Ø§Ù„Ø¹Ù…Ù„Ø©"]),
-            firstPresent(row["Currency"], row["Ø§Ù„Ø¹Ù…Ù„Ø©"]),
+          signedCreditAmount(
+            usdValue(
+              firstPresent(row["USD Paid"], row["$ paid"], row["$ Paid"], row["$ Sales"]),
+              firstPresent(row["Total in Currency"], row["Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¨Ø§Ù„Ø¹Ù…Ù„Ø©"]),
+              firstPresent(row["Currency"], row["Ø§Ù„Ø¹Ù…Ù„Ø©"]),
+            ),
+            isAccountingRefund(row),
           ),
         0,
       );
@@ -1356,17 +1360,19 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const accountingMissingPaymentDate = accountingCandidates.filter((r) => {
       const paymentDate =
         parseDate(r["Payment Date"]) || parseDate(r["Payment date"]) || parseDate(r["تاريخ الدفع"]);
-      return !paymentDate;
+      const reversalDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
+      return isAccountingRefund(r) ? !(reversalDate || paymentDate) : !paymentDate;
     }).length;
     const accounting: AccountingRow[] = accountingCandidates
       .filter((r) => {
-        // The accounting fact table is paid-invoice product lines. Rows without
-        // Payment Date are unpaid and must not leak into an all-time report.
+        // Paid invoices require Payment Date. Credit notes are recognised on
+        // their Odoo reversal (Invoice) Date and may have no payment event.
         const paymentDate =
           parseDate(r["Payment Date"]) ||
           parseDate(r["Payment date"]) ||
           parseDate(r["تاريخ الدفع"]);
-        return !!paymentDate;
+        const reversalDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
+        return isAccountingRefund(r) ? !!(reversalDate || paymentDate) : !!paymentDate;
       })
       .map((r) => {
         const paymentDate =
@@ -1374,6 +1380,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           parseDate(r["Payment date"]) ||
           parseDate(r["تاريخ الدفع"]);
         const movement = accountingMovement(r);
+        const isCreditNote = isAccountingRefund(r);
+        const moveType = accountingMoveType(r) || (isCreditNote ? "out_refund" : "out_invoice");
+        const invoiceDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
         const orderRef =
           str(r["Sales Order #"]) || str(r["Sales Order"]) || str(r["Order #"]) || str(r["SO #"]);
         const fallback = attributionFor(orderRef);
@@ -1405,14 +1414,23 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]);
         const productCategory =
           str(r["Product Category"]) || str(r["فئة المنتج"]) || str(r["Category"]);
-        const totalInCurrency = num(firstPresent(r["Total in Currency"], r["الإجمالي بالعملة"]));
-        const currency = str(firstPresent(r["Currency"], r["العملة"]));
-        const usdPaid = usdValue(
-          firstPresent(r["USD Paid"], r["$ paid"], r["$ Paid"], r["$ Sales"]),
-          totalInCurrency,
-          currency,
+        const totalInCurrency = signedCreditAmount(
+          num(firstPresent(r["Total in Currency"], r["الإجمالي بالعملة"])),
+          isCreditNote,
         );
-        const untaxedTotal = num(firstPresent(r["Untaxed Total"], r["الإجمالي دون الضريبة"]));
+        const currency = str(firstPresent(r["Currency"], r["العملة"]));
+        const usdPaid = signedCreditAmount(
+          usdValue(
+            firstPresent(r["USD Paid"], r["$ paid"], r["$ Paid"], r["$ Sales"]),
+            totalInCurrency,
+            currency,
+          ),
+          isCreditNote,
+        );
+        const untaxedTotal = signedCreditAmount(
+          num(firstPresent(r["Untaxed Total"], r["الإجمالي دون الضريبة"])),
+          isCreditNote,
+        );
         const course = canonicalCourse(
           str(r["Course Name"]) || str(r["Course"]),
           product,
@@ -1422,8 +1440,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         return {
           id: accountingStableLineId(r) || `${movement}:${accountingComposite(r)}`,
           movement,
+          moveType,
+          isCreditNote,
           paymentDate,
-          invoiceDate: parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]),
+          invoiceDate,
           orderRef,
           product,
           productCategory,
@@ -1450,7 +1470,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           currency,
           event: str(r["Event"]),
           eventStage: str(r["Event Stage"]),
-          month: paymentDate.slice(0, 7),
+          month: accountingReportingDate({ paymentDate, invoiceDate, isCreditNote }, "payment").slice(0, 7),
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),
@@ -1665,15 +1685,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
     const adsRange = range(ads.map((a) => a.date));
     const crmRange = range(crm.map((c) => c.createdAt));
-    // Headline revenue is Accounting.USD Paid and follows Payment Date.
-    const revRange = range(accounting.map((row) => row.paymentDate));
+    // Paid invoices follow Payment Date; credit notes follow their reversal date.
+    const revRange = range(accounting.map((row) => accountingReportingDate(row, "payment")));
 
     const yearSet = new Set<number>();
     for (const d of [
       ...ads.map((a) => a.date),
       ...crm.map((c) => c.createdAt),
       ...invoiced.map((i) => i.revenueDate),
-      ...accounting.map((row) => row.paymentDate),
+      ...accounting.map((row) => accountingReportingDate(row, "payment")),
       ...websiteSales.map((s) => s.orderDate),
     ]) {
       if (d) yearSet.add(+d.slice(0, 4));
@@ -1816,6 +1836,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       invoicedRows: invoiced.length,
       accountingSourceRows: accountingSourceRaw.length,
       accountingRefundRowsExcluded: accountingSelection.refundRowsExcluded,
+      accountingCreditNoteRowsIncluded: accountingSelection.creditNoteRowsIncluded,
       accountingDuplicateRowsExcluded: accountingSelection.duplicateRowsExcluded,
       accountingRows: accounting.length,
       salesRows: accounting.length,

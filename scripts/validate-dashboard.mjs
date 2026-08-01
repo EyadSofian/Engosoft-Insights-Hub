@@ -138,10 +138,10 @@ check(
   accounting.summary.productLines,
 );
 check(
-  "Accounting invoice export has every distinct invoice",
-  accountingInvoiceExport.rows.length === accounting.summary.invoices,
+  "Accounting document export has every invoice and credit note",
+  accountingInvoiceExport.rows.length === accounting.summary.invoices + accounting.summary.creditNotes,
   accountingInvoiceExport.rows.length,
-  accounting.summary.invoices,
+  accounting.summary.invoices + accounting.summary.creditNotes,
 );
 check(
   "Accounting export excludes Sales Order columns",
@@ -329,13 +329,25 @@ check(
   totals.ctrAll,
   (totals.clicksAll / totals.impressions) * 100,
 );
-const returnedCreditNotes = accounting.detail.rows.filter((row) =>
-  /^RINV/i.test(String(row.movement || "")),
+const returnedCreditNotes = accountingLineExport.rows.filter((row) =>
+  /^RINV/i.test(String(row.Move || "")),
 );
 check(
-  "No customer credit notes remain in Accounting",
-  returnedCreditNotes.length === 0,
+  "Customer credit-note rows are included in Accounting",
+  accounting.health.accountingCreditNoteRowsIncluded === 0 || returnedCreditNotes.length > 0,
   returnedCreditNotes.length,
+  accounting.health.accountingCreditNoteRowsIncluded,
+);
+check(
+  "Customer credit notes reduce revenue",
+  returnedCreditNotes.every((row) => Number(row["USD Paid"] || 0) <= 0),
+  returnedCreditNotes.filter((row) => Number(row["USD Paid"] || 0) > 0).length,
+  0,
+);
+check(
+  "Credit-note cancellation date is available",
+  returnedCreditNotes.every((row) => Boolean(row["Invoice Date"] || row["Payment Date"])),
+  returnedCreditNotes.filter((row) => !row["Invoice Date"] && !row["Payment Date"]).length,
   0,
 );
 check(

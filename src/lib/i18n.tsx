@@ -24,6 +24,7 @@ export const DICT = {
   // nav
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
+  media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
   accounting: { ar: "الحسابات", en: "Accounting" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },

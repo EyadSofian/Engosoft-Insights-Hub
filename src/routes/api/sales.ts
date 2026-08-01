@@ -7,16 +7,19 @@ export const Route = createFileRoute("/api/sales")({
       GET: async ({ request }) => {
         const { getFiltered, computeTotals, groupBy } = await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
+        const { accountingReportingDate } = await import("@/lib/accounting-policy");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const rows = data.accounting;
         const money = (row: (typeof rows)[number]) => row.usdPaid;
+        const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
 
         const byDay = new Map<string, number>();
         for (const r of rows) {
-          if (!r.paymentDate) continue;
-          byDay.set(r.paymentDate, (byDay.get(r.paymentDate) ?? 0) + r.usdPaid);
+          const date = accountingReportingDate(r, dateBasis);
+          if (!date) continue;
+          byDay.set(date, (byDay.get(date) ?? 0) + r.usdPaid);
         }
 
         return json({
@@ -39,6 +42,8 @@ export const Route = createFileRoute("/api/sales")({
           detail: capped(
             rows.map((r) => ({
               movement: r.movement,
+              moveType: r.moveType,
+              isCreditNote: r.isCreditNote,
               paymentDate: r.paymentDate,
               invoiceDate: r.invoiceDate,
               orderRef: r.orderRef,

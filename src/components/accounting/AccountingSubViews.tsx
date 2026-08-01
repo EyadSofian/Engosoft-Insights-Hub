@@ -29,6 +29,8 @@ export interface AccountingMonth {
   month: string;
   revenue: number;
   invoices: number;
+  creditNotes: number;
+  creditNoteUsd: number;
   productLines: number;
   averageInvoice: number | null;
   growthPct: number | null;
@@ -120,8 +122,8 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
     <div className="space-y-4">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
-          ? `المقارنة مبنية على الفواتير المدفوعة حسب ${dateBasis}. كل شهر يُقارن بالشهر السابق مباشرة.`
-          : `Comparison uses paid invoices by ${dateBasis}. Every month is compared with its immediate predecessor.`}
+          ? `الفواتير الموجبة حسب ${dateBasis}، والإلغاء يظهر بالسالب في شهر تاريخ العكس. كل شهر يُقارن بالشهر السابق مباشرة.`
+          : `Positive invoices use ${dateBasis}; cancellations are negative in their reversal month. Each month is compared with its predecessor.`}
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
@@ -142,8 +144,9 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
         />
         <KpiCard
           index={3}
-          label={lang === "ar" ? "تحصيل الشهر السابق" : "Previous month collections"}
-          value={fmtUSDExact(previous?.revenue ?? null)}
+          label={lang === "ar" ? "إلغاءات آخر شهر" : "Latest month cancellations"}
+          value={fmtUSDExact(latest?.creditNoteUsd ?? null)}
+          sub={`${fmtNum(latest?.creditNotes ?? 0)} ${lang === "ar" ? "إشعار خصم" : "credit notes"}`}
         />
       </div>
       <Card>
@@ -208,6 +211,11 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
                   value={fmtUSDExact(row.averageInvoice)}
                 />
               </div>
+              {row.creditNotes > 0 && (
+                <div className="mt-2 rounded-xl bg-danger/8 px-3 py-2 text-xs text-danger">
+                  {lang === "ar" ? "إلغاءات الشهر" : "Month cancellations"}: {fmtNum(row.creditNotes)} · {fmtUSDExact(row.creditNoteUsd)}
+                </div>
+              )}
             </article>
           ))}
         </div>

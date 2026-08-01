@@ -102,7 +102,7 @@ function addBucket(
   };
   current.quantity += qty;
   current.revenueUsd += row.usdPaid;
-  if (row.movement) current.invoiceIds.add(row.movement);
+  if (row.movement && !row.isCreditNote) current.invoiceIds.add(row.movement);
   map.set(key, current);
 }
 
@@ -174,7 +174,7 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
     familyBucket.quantity += qty;
     familyBucket.revenueUsd += row.usdPaid;
     familyBucket.lines += 1;
-    if (invoiceId) familyBucket.invoiceIds.add(invoiceId);
+    if (invoiceId && !row.isCreditNote) familyBucket.invoiceIds.add(invoiceId);
     if (!familyBucket.category && category) familyBucket.category = category;
 
     addBucket(familyBucket.variants, variantKey, variantKey, row, qty);
@@ -203,7 +203,7 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
     product.quantity += qty;
     product.revenueUsd += row.usdPaid;
     product.lines += 1;
-    if (invoiceId) product.invoiceIds.add(invoiceId);
+    if (invoiceId && !row.isCreditNote) product.invoiceIds.add(invoiceId);
     addBucket(product.sources, sourceKey, sourceName, row, qty);
     if (row.event) addBucket(product.events, row.event, row.event, row, qty);
     if (row.eventStage) addBucket(product.eventStages, row.eventStage, row.eventStage, row, qty);
@@ -254,7 +254,9 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
       products: familyRows.reduce((sum, family) => sum + family.products.length, 0),
       quantity: familyRows.reduce((sum, family) => sum + family.quantity, 0),
       quantityAvailable: rows.some((row) => Math.abs(row.quantity) > 0),
-      invoices: new Set(rows.map((row) => row.movement).filter(Boolean)).size,
+      invoices: new Set(
+        rows.filter((row) => !row.isCreditNote).map((row) => row.movement).filter(Boolean),
+      ).size,
       revenueUsd: familyRows.reduce((sum, family) => sum + family.revenueUsd, 0),
       withoutSourceRevenue:
         breakdown(allSources).find((source) => source.key === UNATTRIBUTED)?.revenueUsd ?? 0,

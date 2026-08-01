@@ -43,6 +43,7 @@ export const Route = createFileRoute("/api/accounting-export")({
         const { parseFilters } = await import("@/lib/api.server");
         const { buildAccountingCourses } = await import("@/lib/accounting-courses");
         const { fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { accountingReportingDate } = await import("@/lib/accounting-policy");
 
         const url = new URL(request.url);
         const requested = url.searchParams.get("view");
@@ -56,8 +57,12 @@ export const Route = createFileRoute("/api/accounting-export")({
         const data = await getFiltered(filters);
         const rows = data.accounting;
         const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
-        const accountingDate = (row: { invoiceDate: string; paymentDate: string }) =>
-          dateBasis === "invoice" ? row.invoiceDate : row.paymentDate;
+        const accountingDate = (row: {
+          invoiceDate: string;
+          paymentDate: string;
+          isCreditNote: boolean;
+        }) =>
+          accountingReportingDate(row, dateBasis);
         const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const name = filename(view, filters.from, filters.to);
 
@@ -157,6 +162,8 @@ export const Route = createFileRoute("/api/accounting-export")({
         if (view === "invoices") {
           type Invoice = {
             movement: string;
+            moveType: string;
+            isCreditNote: boolean;
             paymentDate: string;
             invoiceDate: string;
             partner: string;
@@ -179,6 +186,8 @@ export const Route = createFileRoute("/api/accounting-export")({
             const key = row.movement || `__line__:${row.id}`;
             const invoice = invoices.get(key) ?? {
               movement: row.movement,
+              moveType: row.moveType,
+              isCreditNote: row.isCreditNote,
               paymentDate: row.paymentDate,
               invoiceDate: row.invoiceDate,
               partner: row.partner,

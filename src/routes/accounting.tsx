@@ -52,6 +52,8 @@ export const Route = createFileRoute("/accounting")({ component: Accounting });
 interface AccountingDetail {
   id: string;
   movement: string;
+  moveType: string;
+  isCreditNote: boolean;
   paymentDate: string;
   invoiceDate: string;
   partner: string;
@@ -81,6 +83,8 @@ interface AccountingResponse {
   summary: {
     paidUsd: number;
     invoices: number;
+    creditNotes: number;
+    creditNoteUsd: number;
     productLines: number;
     averageInvoice: number | null;
   };
@@ -157,7 +161,24 @@ function Accounting() {
       sticky: true,
       width: "150px",
       sortValue: (row) => row.movement,
-      render: (row) => row.movement || "—",
+      render: (row) => (
+        <span className={row.isCreditNote ? "font-semibold text-danger" : undefined}>
+          {row.movement || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "moveType",
+      header: lang === "ar" ? "نوع المستند" : "Document type",
+      sortValue: (row) => row.moveType,
+      render: (row) =>
+        row.isCreditNote ? (
+          <span className="inline-flex rounded-full bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">
+            {lang === "ar" ? "إلغاء / إشعار خصم" : "Cancellation / credit note"}
+          </span>
+        ) : (
+          <span className="text-xs text-text-muted">{lang === "ar" ? "فاتورة" : "Invoice"}</span>
+        ),
     },
     {
       key: "paymentDate",
@@ -479,18 +500,18 @@ function Accounting() {
             </summary>
             <p className="border-t border-border px-3.5 py-3 text-xs leading-6 text-text-muted">
               {lang === "ar"
-                ? "المصدر المالي المعتمد هو الفواتير المدفوعة فقط حسب تاريخ الدفع. الإيراد بالدولار محسوب من إجمالي المبلغ بالعملة، ولا تدخل أوامر البيع في حسابه."
-                : "Accounting uses paid invoices only by Payment Date. USD revenue is calculated from Total in Currency; sales orders are excluded."}
+                ? "الفاتورة المدفوعة تُسجّل حسب تاريخ الدفع، وإشعار الخصم يُسجّل بالسالب في تاريخ الإلغاء. الإيراد بالدولار محسوب من إجمالي المبلغ بالعملة، ولا تدخل أوامر البيع في حسابه."
+                : "Paid invoices follow Payment Date; credit notes are negative in their reversal month. USD revenue is calculated from Total in Currency; sales orders are excluded."}
             </p>
           </details>
 
           <Notice className="hidden sm:flex" tone="info" title={t("data_notes")} icon={<Info size={16} />}>
             {lang === "ar"
-              ? "المصدر المالي المعتمد: الفواتير المدفوعة فقط من تحليل الفواتير، حسب Payment Date. الإيراد هو USD Paid المحسوب من Total in Currency، وعدد الفواتير مميز حسب Move؛ ولا تدخل أوامر البيع المؤكدة أو تبويب Full Invoiced Orders في حساب الإيراد."
-              : "Accounting authority: paid invoices only from invoice analysis, by Payment Date. Revenue is USD Paid calculated from Total in Currency, and invoice count is distinct Move; confirmed sales orders and Full Invoiced Orders are not revenue inputs."}
+              ? "المصدر المالي المعتمد: الفواتير المدفوعة وإشعارات الخصم من تحليل الفواتير. الفاتورة الموجبة حسب Payment Date، والإلغاء بالسالب حسب Reversal/Invoice Date؛ ولا تدخل أوامر البيع المؤكدة في الإيراد."
+              : "Accounting authority: paid invoices plus credit notes. Positive invoices follow Payment Date; cancellations are negative on Reversal/Invoice Date. Sales orders are excluded from revenue."}
           </Notice>
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <KpiCard
               index={0}
               label={t("revenue")}
@@ -501,11 +522,17 @@ function Accounting() {
             <KpiCard index={1} label={t("invoices")} value={fmtNum(data.summary.invoices)} />
             <KpiCard
               index={2}
+              label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
+              value={fmtNum(data.summary.creditNotes)}
+              sub={fmtUSDExact(data.summary.creditNoteUsd)}
+            />
+            <KpiCard
+              index={3}
               label={t("product_lines")}
               value={fmtNum(data.summary.productLines)}
             />
             <KpiCard
-              index={3}
+              index={4}
               label={t("avg_invoice")}
               value={fmtUSDExact(data.summary.averageInvoice)}
             />
@@ -519,8 +546,8 @@ function Accounting() {
             />
             <p className="mt-3 text-xs leading-relaxed text-text-muted">
               {lang === "ar"
-                ? "الإنفاق من صفوف Meta وSnapchat وTikTok حسب تاريخ الإعلان؛ الإيراد من الفواتير المدفوعة حسب Payment Date."
-                : "Spend comes from dated Meta, Snapchat, and TikTok rows; revenue comes from paid invoices by Payment Date."}
+                ? "الإنفاق حسب تاريخ الإعلان؛ الفواتير الموجبة حسب Payment Date، والإلغاءات بالسالب في تاريخ عكس الفاتورة."
+                : "Spend follows ad date; positive invoices follow Payment Date and cancellations are negative on their reversal date."}
             </p>
           </Card>
 

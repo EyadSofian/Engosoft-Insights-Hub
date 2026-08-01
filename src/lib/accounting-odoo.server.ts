@@ -427,7 +427,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
   ];
 
   const domain: Domain = [
-    ["move_type", "=", "out_invoice"],
+    ["move_type", "in", ["out_invoice", "out_refund"]],
     ["state", "=", "posted"],
     ["invoice_date", ">=", cfg.startDate],
     ["company_id", "in", cfg.companyIds],
@@ -510,25 +510,30 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
 
   for (const report of reportRows) {
     const move = moveById.get(m2oId(report.move_id));
-    if (!move || move.move_type === "out_refund" || /^RINV/i.test(String(move.name ?? ""))) {
-      continue;
-    }
+    if (!move) continue;
+    const moveType = String(move.move_type || report.move_type || "out_invoice");
+    const isCreditNote = moveType === "out_refund" || /^RINV/i.test(String(move.name ?? ""));
+    const invoiceOn = date(report.invoice_date) || date(move.invoice_date) || date(move.date);
     const paidOn =
       date(paymentDateReport ? report[paymentDateReport] : "") ||
       date(paymentDateMove ? move[paymentDateMove] : "") ||
       widgetPaymentDate(move.invoice_payments_widget);
-    if (!paidOn || paidOn < cfg.startDate) {
+    const recognitionDate = isCreditNote ? invoiceOn || paidOn : paidOn;
+    if (!recognitionDate || recognitionDate < cfg.startDate) {
       missingPaymentDate++;
       continue;
     }
 
     const product = productById.get(m2oId(report.product_id));
     const currency = m2oName(report.currency_id) || m2oName(move.currency_id);
-    const totalInCurrency = Math.abs(number(report.price_total));
+    const sign = isCreditNote ? -1 : 1;
+    const totalInCurrency = sign * Math.abs(number(report.price_total));
     const hasExplicitUsd = !!usdPaidReport && present(report[usdPaidReport]);
     const fx = FX_TO_USD[currency.toUpperCase()];
     if (!hasExplicitUsd && fx === undefined) missingCurrencyRate++;
-    const usdPaid = hasExplicitUsd ? number(report[usdPaidReport]) : totalInCurrency * (fx ?? 0);
+    const usdPaid = sign * Math.abs(
+      hasExplicitUsd ? number(report[usdPaidReport]) : Math.abs(totalInCurrency) * (fx ?? 0),
+    );
     const teamValue = reportTeam ? report[reportTeam] : moveTeam ? move[moveTeam] : move.team_id;
     const teamId = m2oId(teamValue as M2O);
     const team = teamById.get(teamId);
@@ -539,11 +544,11 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
     rows.push({
       __odoo_id: String(report.id),
       __odoo_line_id: String(report.id),
-      __odoo_move_type: "out_invoice",
+      __odoo_move_type: moveType,
       __odoo_write_date: display(move.write_date),
       Move: m2oName(report.move_id) || display(move.name),
-      "Invoice Date": date(report.invoice_date) || date(move.invoice_date) || date(move.date),
-      "Payment Date": paidOn,
+      "Invoice Date": invoiceOn,
+      "Payment Date": paidOn || (isCreditNote ? invoiceOn : ""),
       Product: display(product?.display_name || product?.name || m2oName(report.product_id)),
       "Product Code": display(product?.default_code),
       "Product Category": m2oName(report.product_categ_id) || m2oName(product?.categ_id),
@@ -552,7 +557,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
       "Company Currency": m2oName(report.company_currency_id),
       Partner: m2oName(report.partner_id) || m2oName(move.partner_id),
       Country: m2oName(report.country_id),
-      "Untaxed Total": String(number(report.price_subtotal)),
+      "Untaxed Total": String(sign * Math.abs(number(report.price_subtotal))),
       "Total in Currency": String(totalInCurrency),
       Currency: currency,
       "USD Paid": String(usdPaid),

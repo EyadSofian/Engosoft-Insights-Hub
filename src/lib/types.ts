@@ -149,14 +149,20 @@ export interface InvoicedRow {
 /**
  * One paid Odoo invoice product line from the Accounting sheet.
  *
- * Payment Date is the reporting date. `movement` identifies the invoice, while
- * every row keeps the product/category dimensions required by Accounting.
+ * Paid invoices normally report by Payment Date. Customer credit notes report
+ * by their reversal Invoice Date so a later cancellation reduces that month.
+ * `movement` identifies the accounting document while every row retains the
+ * product/category dimensions required by Accounting.
  */
 export interface AccountingRow {
   /** Stable Odoo move-line id when the sync provides one. */
   id: string;
   /** Accounting move / invoice number (for example INVNT/2026/00001). */
   movement: string;
+  /** Odoo account.move type. Customer cancellations are `out_refund`. */
+  moveType: string;
+  /** True for an Odoo customer credit note / RINV reversal. */
+  isCreditNote: boolean;
   paymentDate: string;
   invoiceDate: string;
   orderRef: string;
@@ -553,8 +559,10 @@ export interface DataHealth {
   invoicedRows: number;
   /** Rows received from the selected Accounting/Sales source before guards. */
   accountingSourceRows: number;
-  /** Customer credit-note rows removed before revenue and invoice counts. */
+  /** @deprecated Credit notes are now included as negative reversal-month rows. */
   accountingRefundRowsExcluded: number;
+  /** Customer credit-note product rows included in net revenue. */
+  accountingCreditNoteRowsIncluded: number;
   /** Repeated invoice-product rows removed by stable id or full fingerprint. */
   accountingDuplicateRowsExcluded: number;
   accountingRows: number;

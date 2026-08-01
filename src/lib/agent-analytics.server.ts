@@ -1,5 +1,6 @@
 import type { GlobalFilters, TeamAgg } from "./types";
 import type { FilteredData } from "./metrics.server";
+import { accountingReportingDate } from "./accounting-policy";
 import {
   getSlaSnapshot,
   type SlaRepMonthly,
@@ -180,7 +181,7 @@ function mergeInvoiceRefs(map: Map<string, MutableAgent>, data: FilteredData) {
     const key = normalizePersonName(invoice.salesperson);
     if (!key) continue;
     const row = map.get(key) ?? blank(key, invoice.salesperson);
-    row.invoiceRefs.add(invoice.movement);
+    if (!invoice.isCreditNote) row.invoiceRefs.add(invoice.movement);
     if (invoice.salesTeam) row.teams.add(invoice.salesTeam);
     map.set(key, row);
   }
@@ -240,7 +241,7 @@ export async function buildAgentAnalytics(
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
   for (const invoice of data.snapshot.accounting) {
     if (filters.company && invoice.company !== filters.company) continue;
-    const date = dateBasis === "invoice" ? invoice.invoiceDate : invoice.paymentDate;
+    const date = accountingReportingDate(invoice, dateBasis);
     if (date) availableMonths.add(monthKey(date));
   }
   mergeMainPeople(map, teams);

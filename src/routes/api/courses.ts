@@ -7,6 +7,7 @@ export const Route = createFileRoute("/api/courses")({
         const { getFiltered, computeCourses, computeTotals, previousPeriod, isPreviousComparable, groupBy } =
           await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
+        const { accountingReportingDate } = await import("@/lib/accounting-policy");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -31,9 +32,10 @@ export const Route = createFileRoute("/api/courses")({
             }
             return e;
           };
-          for (const invoice of invoices)
-            if (invoice.paymentDate)
-              at(invoice.paymentDate.slice(0, 7)).revenue += invoice.usdPaid;
+          for (const invoice of invoices) {
+            const date = accountingReportingDate(invoice, data.applied.dateBasis ?? "payment");
+            if (date) at(date.slice(0, 7)).revenue += invoice.usdPaid;
+          }
           for (const c of rows) {
             if (!c.createdAt) continue;
             const e = at(c.createdAt.slice(0, 7));

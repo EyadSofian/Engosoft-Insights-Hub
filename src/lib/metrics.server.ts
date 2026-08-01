@@ -15,6 +15,7 @@ import {
   approvedReportingEnd,
   REPORTING_WINDOW_START,
 } from "./reporting-window";
+import { accountingReportingDate } from "./accounting-policy";
 import type {
   AdRow,
   AccountingRow,
@@ -316,7 +317,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     company,
   } = f;
   const accountingDate = (row: AccountingRow): string =>
-    f.dateBasis === "invoice" ? row.invoiceDate : row.paymentDate;
+    accountingReportingDate(row, f.dateBasis === "invoice" ? "invoice" : "payment");
 
   const includeNonLead = f.includeNonLead === "1";
   const cpaBasis = f.cpaBasis === "invoices" ? "invoices" : "won";
@@ -624,7 +625,9 @@ export function computeTotals(data: FilteredData): Totals {
   // The Accounting sheet is at product-line grain. Only a real Move identifies
   // an invoice; falling back to line count would multiply invoices that contain
   // more than one product and make CPA/AOV silently wrong.
-  const orders = new Set(accounting.map((r) => r.movement).filter(Boolean)).size;
+  const orders = new Set(
+    accounting.filter((r) => !r.isCreditNote).map((r) => r.movement).filter(Boolean),
+  ).size;
   const invoicedOrders =
     new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
 
@@ -839,8 +842,8 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     if (grain !== "campaign" && !s.adName && !s.adId) continue;
     const b = touch(dimension);
     b.revenue += s.usdPaid;
-    if (s.movement) b.invoiceRefs.add(s.movement);
-    const revenueDate = data.applied.dateBasis === "invoice" ? s.invoiceDate : s.paymentDate;
+    if (s.movement && !s.isCreditNote) b.invoiceRefs.add(s.movement);
+    const revenueDate = accountingReportingDate(s, data.applied.dateBasis ?? "payment");
     if (revenueDate)
       b.revenueByDate.set(revenueDate, (b.revenueByDate.get(revenueDate) ?? 0) + s.usdPaid);
   }
@@ -1114,8 +1117,10 @@ export function dailyTrend(
   };
   for (const a of data.ads) if (a.date) at(a.date).spend += a.spend;
   // Always the accounting series, whatever the filter — one revenue definition.
-  for (const row of data.accounting)
-    if (row.paymentDate) at(row.paymentDate).revenue += row.usdPaid;
+  for (const row of data.accounting) {
+    const revenueDate = accountingReportingDate(row, data.applied.dateBasis ?? "payment");
+    if (revenueDate) at(revenueDate).revenue += row.usdPaid;
+  }
   for (const c of data.crm) {
     if (!c.createdAt) continue;
     const e = at(c.createdAt);
@@ -1635,7 +1640,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const revenueOf = (y: number, m?: string) =>
     sum(
       all.accounting.filter(
-        (row) => inYear(row.paymentDate, y) && (!m || row.paymentDate.slice(5, 7) === m),
+        (row) => {
+          const d = accountingReportingDate(row, "payment");
+          return inYear(d, y) && (!m || d.slice(5, 7) === m);
+        },
       ),
       (row) => row.usdPaid,
     );
@@ -1656,7 +1664,9 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
     crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
-    accounting: all.accounting.filter((row) => inYear(row.paymentDate, prevYear)).length,
+    accounting: all.accounting.filter((row) =>
+      inYear(accountingReportingDate(row, "payment"), prevYear),
+    ).length,
   };
   const available =
     priorCounts.ads >= MIN_PRIOR_ROWS &&
@@ -1695,7 +1705,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const ytdRevenue = (y: number) =>
     sum(
       all.accounting.filter(
-        (row) => inYear(row.paymentDate, y) && row.paymentDate.slice(5) <= ytdCut,
+        (row) => {
+          const d = accountingReportingDate(row, "payment");
+          return inYear(d, y) && d.slice(5) <= ytdCut;
+        },
       ),
       (row) => row.usdPaid,
     );
@@ -1710,11 +1723,17 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const byCourse = [...courseKeys]
     .map((course) => {
       const current = sum(
-        all.accounting.filter((row) => row.course === course && inYear(row.paymentDate, year)),
+        all.accounting.filter(
+          (row) => row.course === course && inYear(accountingReportingDate(row, "payment"), year),
+        ),
         (row) => row.usdPaid,
       );
       const previous = sum(
-        all.accounting.filter((row) => row.course === course && inYear(row.paymentDate, prevYear)),
+        all.accounting.filter(
+          (row) =>
+            row.course === course &&
+            inYear(accountingReportingDate(row, "payment"), prevYear),
+        ),
         (row) => row.usdPaid,
       );
       return {
