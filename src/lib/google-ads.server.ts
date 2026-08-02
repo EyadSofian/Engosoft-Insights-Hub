@@ -266,12 +266,12 @@ function gaql(from: string, to: string): string {
   `;
 }
 
-async function searchCustomer(
+async function searchWithLogin(
   cfg: GoogleAdsConfig,
   customerId: string,
+  loginCustomerId?: string,
 ): Promise<GoogleAdsResultRow[]> {
   let lastError = "unknown error";
-  let useManagerHeader = true;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const token = await accessToken(cfg);
     const headers: Record<string, string> = {
@@ -279,7 +279,7 @@ async function searchCustomer(
       "developer-token": cfg.developerToken,
       "content-type": "application/json",
     };
-    if (useManagerHeader) headers["login-customer-id"] = cfg.loginCustomerId;
+    if (loginCustomerId) headers["login-customer-id"] = loginCustomerId;
     const response = await fetch(`${API}/customers/${customerId}/googleAds:searchStream`, {
       method: "POST",
       headers,
@@ -301,18 +301,83 @@ async function searchCustomer(
     }
 
     lastError = apiErrorMessage(body, response.status, rawBody);
-    // A user can have direct access to the client account without access
-    // through the configured manager. Google explicitly supports omitting the
-    // login-customer-id in that case, so retry directly only for this error.
-    if (useManagerHeader && lastError.includes("USER_PERMISSION_DENIED")) {
-      useManagerHeader = false;
-      continue;
-    }
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt === MAX_RETRIES - 1) break;
     await sleep(750 * 2 ** attempt + Math.floor(Math.random() * 250));
   }
-  throw new Error(`Google Ads customer ${customerId}: ${lastError}`);
+  throw new Error(lastError);
+}
+
+async function listAccessibleCustomerIds(cfg: GoogleAdsConfig): Promise<string[]> {
+  const token = await accessToken(cfg);
+  const response = await fetch(`${API}/customers:listAccessibleCustomers`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      "developer-token": cfg.developerToken,
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const rawBody = await response.text();
+  let body: { resourceNames?: string[] } | GoogleAdsApiError = {};
+  try {
+    body = JSON.parse(rawBody) as { resourceNames?: string[] } | GoogleAdsApiError;
+  } catch {
+    // apiErrorMessage below includes a compact non-JSON response when present.
+  }
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body as GoogleAdsApiError, response.status, rawBody));
+  }
+  return ("resourceNames" in body ? (body.resourceNames ?? []) : [])
+    .map((name) => name.replace(/^customers\//, "").replace(/-/g, ""))
+    .filter(Boolean);
+}
+
+async function searchCustomer(
+  cfg: GoogleAdsConfig,
+  customerId: string,
+): Promise<GoogleAdsResultRow[]> {
+  let lastError = "unknown error";
+
+  // Prefer the configured manager, then direct access. If both permissions
+  // fail, ask Google which accounts the OAuth user can access directly and try
+  // those as possible manager logins. This also handles an older owner MCC.
+  for (const loginCustomerId of [cfg.loginCustomerId, undefined]) {
+    try {
+      return await searchWithLogin(cfg, customerId, loginCustomerId);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      if (!lastError.includes("USER_PERMISSION_DENIED")) {
+        throw new Error(`Google Ads customer ${customerId}: ${lastError}`);
+      }
+    }
+  }
+
+  let accessible: string[] = [];
+  try {
+    accessible = await listAccessibleCustomerIds(cfg);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Google Ads customer ${customerId}: ${lastError}; couldn't list OAuth-accessible accounts: ${message}`,
+    );
+  }
+
+  const managerCandidates = accessible.filter(
+    (id) => id !== customerId && id !== cfg.loginCustomerId,
+  );
+  for (const managerId of managerCandidates) {
+    try {
+      return await searchWithLogin(cfg, customerId, managerId);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      if (!lastError.includes("USER_PERMISSION_DENIED")) break;
+    }
+  }
+
+  throw new Error(
+    `Google Ads customer ${customerId}: ${lastError}; OAuth-accessible customer IDs: ${accessible.join(", ") || "none"}`,
+  );
 }
 
 export async function fetchGoogleAds(): Promise<GoogleAdsFetchResult> {
