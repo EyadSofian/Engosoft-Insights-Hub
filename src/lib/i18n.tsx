@@ -286,8 +286,8 @@ export const DICT = {
     en: "Leads from sources with no spend data",
   },
   no_spend_source_note: {
-    ar: "تيك توك ويوشات وواتساب والترشيحات تُنتج عملاء لكن لا يوجد لها إنفاق في الملف، لذلك تظهر تكلفة العميل الإجمالية أرخص من الحقيقة.",
-    en: "TikTok, UChat, WhatsApp and referrals produce leads but carry no spend in the sheet, so blended CPL reads cheaper than reality.",
+    ar: "يوشات وواتساب والترشيحات وغيرها قد تُنتج عملاء بلا مصدر إنفاق مقابل، لذلك قد تظهر تكلفة العميل الإجمالية أرخص من تكلفة القنوات المدفوعة.",
+    en: "UChat, WhatsApp, referrals and other sources may produce leads without matching spend, so blended CPL can read cheaper than paid-channel CPL.",
   },
   attributed_note: {
     ar: "الجزء من الإيراد المحصَّل المرتبط بحملة أنفقت في نفس الفترة من أبعاد تبويب الحسابات.",

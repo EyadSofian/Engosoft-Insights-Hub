@@ -1096,8 +1096,8 @@ export function computeFunnel(t: Totals): FunnelStep[] {
     { key: "impressions", value: t.impressions },
     { key: "clicks", value: t.clicksAll },
     { key: "platform_leads", value: t.platformLeads, note: "meta_only" },
-    // CRM holds leads from TikTok, UChat, WhatsApp and referrals that no ad tab
-    // prices, so this stage can legitimately exceed the one above it.
+    // CRM holds leads from UChat, WhatsApp, referrals and other sources with no
+    // matching spend feed, so this stage can legitimately exceed the one above.
     { key: "crm_leads", value: t.totalLeads, note: "includes_unpaid_sources" },
     { key: "won", value: t.won },
   ];
@@ -1892,11 +1892,15 @@ export function execSummary(
   }
 
   if (health.leadsWithoutSpendSource > 0) {
+    const unpriced = health.unpricedSources
+      .slice(0, 6)
+      .map((source) => source.label)
+      .join(", ");
     en.push(
-      `Note: ${health.leadsWithoutSpendSource.toLocaleString("en-US")} leads arrived from sources with no spend data in the sheet (TikTok, UChat, WhatsApp and referrals), so blended CPL reads cheaper than paid CPL alone.`,
+      `Note: ${health.leadsWithoutSpendSource.toLocaleString("en-US")} leads arrived from sources with no matching spend (${unpriced || "unclassified"}), so blended CPL can read cheaper than paid CPL alone.`,
     );
     ar.push(
-      `ملاحظة: وصل ${health.leadsWithoutSpendSource.toLocaleString("en-US")} عميلاً من مصادر لا يوجد لها إنفاق في الملف (تيك توك ويوشات وواتساب والترشيحات)، لذلك تظهر تكلفة العميل الإجمالية أقل من تكلفة العميل المدفوع.`,
+      `ملاحظة: وصل ${health.leadsWithoutSpendSource.toLocaleString("en-US")} عميلاً من مصادر بلا إنفاق مطابق (${unpriced || "غير مصنفة"})، لذلك قد تظهر تكلفة العميل الإجمالية أقل من تكلفة العميل المدفوع.`,
     );
   }
 

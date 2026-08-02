@@ -393,8 +393,8 @@ function Overview() {
           />
           <p className="text-[11px] text-text-muted mt-3 leading-relaxed">
             {lang === "ar"
-              ? "عدد العملاء في النظام قد يتجاوز ما تُبلغ عنه المنصة، لأن جزءاً منهم يأتي من تيك توك وواتساب والترشيحات ولا يوجد لها إنفاق في الملف."
-              : "CRM leads can exceed platform-reported leads: some arrive from TikTok, WhatsApp and referrals, which carry no spend in the sheet."}
+              ? "عدد العملاء في النظام قد يتجاوز ما تُبلغ عنه المنصات، لأن بعضهم يأتي من واتساب والترشيحات ومصادر أخرى لا ترتبط بإنفاق إعلاني."
+              : "CRM leads can exceed platform-reported leads because some arrive from WhatsApp, referrals and other sources without matching ad spend."}
           </p>
         </Card>
       </div>

@@ -94,7 +94,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       formula: "مجموع الإنفاق من منصات الإعلان",
       what: "الفلوس اللي اتصرفت فعلاً على الإعلانات في الفترة المختارة.",
       how: "جمع عمود Spend لكل صف إعلان × يوم داخل الفترة.",
-      source: "تبويبات الإعلانات: Meta Ads Daily و Snap Ads Daily (وتيك توك لو اتعمل له تبويب).",
+      source: "تبويبات Meta وSnap، وTikTok Marketing API عند تفعيل بيانات الاعتماد.",
       dateBasis: "تاريخ الإعلان (عمود التاريخ في تبويب المنصة).",
       whenEmpty:
         "بيبقى صفر لو مفيش صرف في الفترة، وبيبقى «غير متاح» لو المنصة أصلاً ملهاش تبويب إنفاق.",
@@ -105,7 +105,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       formula: "Sum of Spend from the ad platforms",
       what: "The money actually spent on ads inside the selected period.",
       how: "Sums the Spend column over every ad × day row in the window.",
-      source: "Ad tabs: Meta Ads Daily and Snap Ads Daily (plus TikTok once it has a tab).",
+      source: "Meta and Snap ad tabs, plus TikTok Marketing API when credentials are configured.",
       dateBasis: "Ad date (the date column on the platform tab).",
       whenEmpty:
         "Zero when nothing was spent; not available when the platform has no spend tab at all.",

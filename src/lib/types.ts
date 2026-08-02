@@ -587,11 +587,11 @@ export interface DataHealth {
   revenueCampaignShare: number;
   attributedRevenueShare: number;
   campaignMatchRate: number;
-  /** Leads whose source has no spend tab in the sheet (TikTok, UChat, …). */
+  /** Leads whose source currently has no matching spend feed (UChat, referrals, …). */
   leadsWithoutSpendSource: number;
   unpricedSources: { label: string; count: number }[];
   /**
-   * Ad platforms that produced CRM leads but have no spend tab in the workbook.
+   * Ad platforms that produced CRM leads but have no connected spend feed.
    * Their cost is missing from every denominator, so CPL/CPA/ROAS/ACOS all read
    * better than reality until the tab exists. This must be loud, not implicit.
    */

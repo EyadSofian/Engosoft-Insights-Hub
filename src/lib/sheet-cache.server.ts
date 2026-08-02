@@ -11,6 +11,7 @@ import { loadDirectCrm, type CrmExclusionDiagnostics, type CrmRawRow } from "./c
 import { loadDirectAccounting, type DirectAccountingSnapshot } from "./accounting-odoo.server";
 import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
 import { odooConfigured } from "./odoo.server";
+import { fetchTikTokAds } from "./tiktok.server";
 import type {
   AdRow,
   AdSetOrigin,
@@ -829,12 +830,25 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       safeFetch(TAB.crm),
       safeFetch(TAB.invoiced),
     ]);
-    const [accountingPrimaryRaw, websiteSalesRaw, lostSheetRaw, tiktokRaw] = await Promise.all([
-      safeFetch(TAB.accounting, looksLikeAccountingExport),
-      safeFetch(TAB.websiteSales),
-      safeFetch(TAB.lost),
-      safeFetch(TAB.tiktok, looksLikeAdsExport),
-    ]);
+    const safeTikTok = () =>
+      fetchTikTokAds().catch((error: unknown) => ({
+        configured: Boolean(
+          process.env.TIKTOK_ACCESS_TOKEN?.trim() && process.env.TIKTOK_ADVERTISER_IDS?.trim(),
+        ),
+        rows: [],
+        syncedAt: "",
+        errors: [error instanceof Error ? error.message : String(error)],
+      }));
+    const [accountingPrimaryRaw, websiteSalesRaw, lostSheetRaw, tiktokRaw, tiktokResult] =
+      await Promise.all([
+        safeFetch(TAB.accounting, looksLikeAccountingExport),
+        safeFetch(TAB.websiteSales),
+        safeFetch(TAB.lost),
+        safeFetch(TAB.tiktok, looksLikeAdsExport),
+        safeTikTok(),
+      ]);
+    fetchErrors.push(...tiktokResult.errors.map((error) => `TikTok Ads: ${error}`));
+    const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
     // Existing deployments still expose the same paid invoice lines as `Sales`.
     // Always read it as an acceptance baseline: a newly-created Accounting tab
     // may contain a valid header and only part of the year. Switching on the
@@ -1045,6 +1059,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         str(r["Ad set name"]) || str(r["Ad Set Name"]),
       );
     }
+    for (const r of tiktokResult.rows) {
+      keys.learn(r.campaignId, r.campaign);
+      adsets.learn(r.adId, r.ad, r.adset);
+    }
     // CRM and invoices also pair ids with names; learning from them lets a
     // name-only row on one tab join an id-bearing row on another.
     for (const r of crmRaw) keys.learn(str(r["Campaign ID"]), str(r["Campaign Name"]));
@@ -1135,7 +1153,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }
       return "";
     };
-    const tiktok: AdRow[] = tiktokRaw.map((r) => {
+    const tiktokFromSheet: AdRow[] = tiktokRaw.map((r) => {
       const account =
         pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
       const objective = classifyAccount(account);
@@ -1165,6 +1183,36 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         syncedAt: str(r["__synced_at"]),
       };
     });
+    const tiktokFromApi: AdRow[] = tiktokResult.rows.map((r) => {
+      const objective = classifyAccount(r.account);
+      objectiveByAccount.set(r.account, objective);
+      return {
+        platform: "tiktok" as Platform,
+        date: r.date,
+        account: r.account,
+        accountId: r.accountId,
+        objective,
+        campaign: r.campaign,
+        campaignId: r.campaignId,
+        campaignKey: keys.key(r.campaignId, r.campaign),
+        adset: r.adset,
+        adsetId: r.adsetId,
+        ad: r.ad,
+        adId: r.adId,
+        spend: r.spend,
+        impressions: r.impressions,
+        clicksAll: r.clicks,
+        // TikTok exposes one general click measure in this report, not a
+        // dedicated link-click field comparable to Meta's export.
+        linkClicks: null,
+        // Lead-form submissions are preferred when present. The authorised
+        // Engosoft accounts currently report website conversions instead.
+        platformLeads: r.formLeads > 0 ? r.formLeads : r.conversions,
+        viewCompletions: r.viewCompletions,
+        syncedAt: r.syncedAt,
+      };
+    });
+    const tiktok = tiktokApiUsable ? tiktokFromApi : tiktokFromSheet;
 
     const ads = [...meta, ...snap, ...tiktok];
 
@@ -1730,6 +1778,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       { key: "meta", label: TAB.meta, syncedAt: maxOf(metaRaw, "__synced_at") },
       { key: "snap", label: TAB.snap, syncedAt: maxOf(snapRaw, "__synced_at") },
       {
+        key: "tiktok",
+        label: tiktokApiUsable ? "TikTok Marketing API" : TAB.tiktok,
+        syncedAt: tiktokApiUsable ? tiktokResult.syncedAt : maxOf(tiktokRaw, "__synced_at"),
+      },
+      {
         key: "crm",
         label: crmAuthority === "odoo-direct" ? "Odoo CRM (direct)" : TAB.crm,
         syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")),
@@ -1933,11 +1986,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       emptied(next.invoiced, "invoiced") ||
       emptied(next.accounting, "accounting") ||
       emptied(next.ads, "ads");
-    if (empty && previous) {
+    if ((empty || next.fetchErrors.length > 0) && previous) {
       // Back off before retrying, but leave `fetchedAt` alone — bumping it here
       // is what made a failed reload report the old snapshot as freshly loaded.
-      previous.lastAttemptAt = Date.now();
-      return previous;
+      cache = {
+        ...previous,
+        lastAttemptAt: Date.now(),
+        fetchErrors: next.fetchErrors,
+        staleTabs: [...new Set([...previous.staleTabs, ...next.staleTabs])],
+      };
+      return cache;
     }
     cache = next;
     return cache;

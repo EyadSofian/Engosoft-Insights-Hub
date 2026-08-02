@@ -1,8 +1,9 @@
 # Engosoft Insights Hub
 
 Bilingual (Arabic RTL / English) marketing & sales intelligence dashboard for Engosoft.
-It reads a published Google Sheet, joins Meta and Snapchat ad spend to CRM leads and
-invoiced revenue, and reports full-funnel performance with an AI assistant on top.
+It reads a published Google Sheet plus TikTok's Marketing API, joins Meta, Snapchat and
+TikTok ad spend to CRM leads and invoiced revenue, and reports full-funnel performance
+with an AI assistant on top.
 
 ## Stack
 
@@ -50,6 +51,11 @@ Copy `.env.example` to `.env`:
 | `ODOO_COMPANY_IDS`          | No       | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                             |
 | `ODOO_START_DATE`           | No       | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                |
 | `OPENAI_API_KEY`            | No       | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
+| `TIKTOK_APP_ID`             | For TikTok | Developer app ID used to resolve authorised account names.                          |
+| `TIKTOK_APP_SECRET`         | For TikTok | Developer app secret. Server-only; never returned or logged.                        |
+| `TIKTOK_ACCESS_TOKEN`       | For TikTok | Long-term Marketing API access token.                                               |
+| `TIKTOK_ADVERTISER_IDS`     | For TikTok | Comma-separated advertiser account IDs.                                             |
+| `TIKTOK_START_DATE`         | No       | Historical start date; defaults to Jan 1 of the current year.                         |
 | `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
 | `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |
 | `TELEGRAM_SUBSCRIBERS_FILE` | No       | Where the subscriber list is stored. Point at a mounted volume on Railway.             |
@@ -70,6 +76,11 @@ Primary sheet tabs consumed: `Meta Ads Daily`, `Snap Ads Daily`, `CRM Leads`,
 `Lost Analysis`, and the approved paid-invoice analysis (`Accounting`, or the
 historical `Sales` tab when that is the complete reconciled source). `Full Invoiced
 Orders` is read only for compatibility and never defines Accounting revenue.
+
+TikTok delivery and spend are read directly from Marketing API v1.3. Daily ad reports
+are fetched in 30-day chunks and include deleted ads, then joined to `/ad/get/` where
+hierarchy metadata remains available. The optional `TikTok Ads Daily` sheet stays as a
+fallback when API credentials are not configured.
 
 Data is fetched on first request, cached in memory for 30 minutes, and refreshed via
 `POST /api/refresh`. If a fetch fails, the previous snapshot keeps serving rather than
@@ -108,9 +119,10 @@ The corrected feed writes `native_leads` to `Leads (Native)`. Link clicks stay `
 not `0`, and link-CTR's denominator excludes Snapchat impressions.
 
 **7. Not every lead source has spend data.**
-TikTok, UChat, WhatsApp and referrals produce ~6,600 leads with no cost anywhere in the
-sheet. Blended CPL (`spend ÷ all CRM leads`) therefore reads cheaper than paid CPL.
-Both are exposed: `cpl`, `platformCpl`, and `attributedCpl`.
+UChat, WhatsApp, referrals and other sources can produce leads without a matching spend
+feed. TikTok is priced when its API credentials are configured. Blended CPL
+(`spend ÷ all CRM leads`) can therefore read cheaper than paid CPL. Both are exposed:
+`cpl`, `platformCpl`, and `attributedCpl`.
 
 **8. Traffic and unnamed ad accounts are excluded from efficiency denominators.**
 `Engo soft website` runs traffic campaigns and `114732099069544` has no name and zero
