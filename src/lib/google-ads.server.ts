@@ -271,16 +271,18 @@ async function searchCustomer(
   customerId: string,
 ): Promise<GoogleAdsResultRow[]> {
   let lastError = "unknown error";
+  let useManagerHeader = true;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const token = await accessToken(cfg);
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      "developer-token": cfg.developerToken,
+      "content-type": "application/json",
+    };
+    if (useManagerHeader) headers["login-customer-id"] = cfg.loginCustomerId;
     const response = await fetch(`${API}/customers/${customerId}/googleAds:searchStream`, {
       method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "developer-token": cfg.developerToken,
-        "login-customer-id": cfg.loginCustomerId,
-        "content-type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ query: gaql(cfg.startDate, cfg.endDate) }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -299,6 +301,13 @@ async function searchCustomer(
     }
 
     lastError = apiErrorMessage(body, response.status, rawBody);
+    // A user can have direct access to the client account without access
+    // through the configured manager. Google explicitly supports omitting the
+    // login-customer-id in that case, so retry directly only for this error.
+    if (useManagerHeader && lastError.includes("USER_PERMISSION_DENIED")) {
+      useManagerHeader = false;
+      continue;
+    }
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt === MAX_RETRIES - 1) break;
     await sleep(750 * 2 ** attempt + Math.floor(Math.random() * 250));
