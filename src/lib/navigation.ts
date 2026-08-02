@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarRange,
+  ChartNoAxesCombined,
   Globe2,
   LayoutDashboard,
   Megaphone,
@@ -78,8 +79,11 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     shortLabel: { ar: "الحسابات", en: "Accounts" },
     icon: Receipt,
     defaultTo: "/accounting",
-    aliases: ["/sales", "/full-invoiced"],
-    items: [{ to: "/accounting", key: "accounting", icon: Receipt }],
+    aliases: ["/full-invoiced"],
+    items: [
+      { to: "/sales", key: "sales", icon: ChartNoAxesCombined },
+      { to: "/accounting", key: "accounting", icon: Receipt },
+    ],
   },
   {
     id: "website",
