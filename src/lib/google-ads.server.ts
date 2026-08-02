@@ -33,6 +33,13 @@ interface GoogleAdsApiError {
     code?: number;
     message?: string;
     status?: string;
+    details?: Array<{
+      errors?: Array<{
+        errorCode?: Record<string, string>;
+        message?: string;
+      }>;
+      requestId?: string;
+    }>;
   };
 }
 
@@ -74,6 +81,7 @@ interface GoogleAdsResultRow {
 interface SearchStreamBatch {
   results?: GoogleAdsResultRow[];
   requestId?: string;
+  error?: GoogleAdsApiError["error"];
 }
 
 export interface GoogleAdsDaily {
@@ -173,6 +181,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function apiErrorMessage(
+  body: SearchStreamBatch[] | GoogleAdsApiError,
+  status: number,
+  rawBody: string,
+): string {
+  const error = Array.isArray(body) ? body.find((batch) => batch.error)?.error : body.error;
+  if (!error) {
+    const compact = rawBody.replace(/\s+/g, " ").trim().slice(0, 400);
+    return compact ? `HTTP ${status}: ${compact}` : `HTTP ${status}`;
+  }
+
+  const reasons = (error.details ?? [])
+    .flatMap((detail) => detail.errors ?? [])
+    .flatMap((detail) => [...Object.values(detail.errorCode ?? {}), detail.message?.trim() ?? ""])
+    .filter(Boolean);
+  const summary = error.message?.trim() || error.status?.trim() || `HTTP ${status}`;
+  return reasons.length ? `${summary} (${[...new Set(reasons)].join(": ")})` : summary;
+}
+
 async function accessToken(cfg: GoogleAdsConfig): Promise<string> {
   if (cachedAccessToken && cachedAccessToken.expiresAt - Date.now() > 5 * 60_000) {
     return cachedAccessToken.value;
@@ -258,15 +285,20 @@ async function searchCustomer(
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    const body = (await response.json().catch(() => ({}))) as
-      SearchStreamBatch[] | GoogleAdsApiError;
+    const rawBody = await response.text();
+    const body = (() => {
+      try {
+        return JSON.parse(rawBody) as SearchStreamBatch[] | GoogleAdsApiError;
+      } catch {
+        return {} as GoogleAdsApiError;
+      }
+    })();
 
     if (response.ok && Array.isArray(body)) {
       return body.flatMap((batch) => batch.results ?? []);
     }
 
-    const apiError = !Array.isArray(body) ? body.error : undefined;
-    lastError = apiError?.message?.trim() || apiError?.status?.trim() || `HTTP ${response.status}`;
+    lastError = apiErrorMessage(body, response.status, rawBody);
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt === MAX_RETRIES - 1) break;
     await sleep(750 * 2 ** attempt + Math.floor(Math.random() * 250));
