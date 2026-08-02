@@ -531,6 +531,7 @@ function SpendSplit({ totals }: { totals: Totals }) {
     totals.spendMeta > 0 ? `${PLATFORM_LABEL.meta[lang]} ${fmtUSD(totals.spendMeta)}` : "",
     totals.spendSnap > 0 ? `${PLATFORM_LABEL.snapchat[lang]} ${fmtUSD(totals.spendSnap)}` : "",
     totals.spendTikTok > 0 ? `${PLATFORM_LABEL.tiktok[lang]} ${fmtUSD(totals.spendTikTok)}` : "",
+    totals.spendGoogle > 0 ? `${PLATFORM_LABEL.google[lang]} ${fmtUSD(totals.spendGoogle)}` : "",
   ].filter(Boolean);
   return <>{parts.join(" · ")}</>;
 }

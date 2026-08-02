@@ -11,6 +11,7 @@ import { loadDirectCrm, type CrmExclusionDiagnostics, type CrmRawRow } from "./c
 import { loadDirectAccounting, type DirectAccountingSnapshot } from "./accounting-odoo.server";
 import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
 import { odooConfigured } from "./odoo.server";
+import { fetchGoogleAds } from "./google-ads.server";
 import { fetchTikTokAds } from "./tiktok.server";
 import type {
   AdRow,
@@ -286,6 +287,7 @@ export const PLATFORM_SOURCE_KEYS: Record<Platform, string[]> = {
   meta: ["facebook", "instagram"],
   snapchat: ["snapchat"],
   tiktok: ["tiktok"],
+  google: ["google", "google ads", "adwords", "youtube"],
 };
 
 /**
@@ -839,16 +841,40 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         syncedAt: "",
         errors: [error instanceof Error ? error.message : String(error)],
       }));
-    const [accountingPrimaryRaw, websiteSalesRaw, lostSheetRaw, tiktokRaw, tiktokResult] =
+    const safeGoogle = () =>
+      fetchGoogleAds().catch((error: unknown) => ({
+        configured: Boolean(
+          process.env.GOOGLE_ADS_CLIENT_ID?.trim() &&
+            process.env.GOOGLE_ADS_CLIENT_SECRET?.trim() &&
+            process.env.GOOGLE_ADS_REFRESH_TOKEN?.trim() &&
+            process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim() &&
+            process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.trim() &&
+            process.env.GOOGLE_ADS_CUSTOMER_IDS?.trim(),
+        ),
+        rows: [],
+        syncedAt: "",
+        errors: [error instanceof Error ? error.message : String(error)],
+      }));
+    const [
+      accountingPrimaryRaw,
+      websiteSalesRaw,
+      lostSheetRaw,
+      tiktokRaw,
+      tiktokResult,
+      googleResult,
+    ] =
       await Promise.all([
         safeFetch(TAB.accounting, looksLikeAccountingExport),
         safeFetch(TAB.websiteSales),
         safeFetch(TAB.lost),
         safeFetch(TAB.tiktok, looksLikeAdsExport),
         safeTikTok(),
+        safeGoogle(),
       ]);
     fetchErrors.push(...tiktokResult.errors.map((error) => `TikTok Ads: ${error}`));
     const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
+    fetchErrors.push(...googleResult.errors.map((error) => `Google Ads: ${error}`));
+    const googleApiUsable = googleResult.configured && googleResult.errors.length === 0;
     // Existing deployments still expose the same paid invoice lines as `Sales`.
     // Always read it as an acceptance baseline: a newly-created Accounting tab
     // may contain a valid header and only part of the year. Switching on the
@@ -1063,6 +1089,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       keys.learn(r.campaignId, r.campaign);
       adsets.learn(r.adId, r.ad, r.adset);
     }
+    for (const r of googleResult.rows) {
+      keys.learn(r.campaignId, r.campaign);
+      adsets.learn(r.adId, r.ad, r.adset);
+    }
     // CRM and invoices also pair ids with names; learning from them lets a
     // name-only row on one tab join an id-bearing row on another.
     for (const r of crmRaw) keys.learn(str(r["Campaign ID"]), str(r["Campaign Name"]));
@@ -1214,7 +1244,42 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     });
     const tiktok = tiktokApiUsable ? tiktokFromApi : tiktokFromSheet;
 
-    const ads = [...meta, ...snap, ...tiktok];
+    const googleLeadCampaigns = new Set(
+      googleResult.rows.filter((r) => r.conversions > 0).map((r) => r.campaignId || r.campaign),
+    );
+    const google: AdRow[] = googleResult.rows.map((r) => {
+      // Google uses one website account for mixed campaign goals. A campaign
+      // that has produced conversions is a lead campaign even though the
+      // account name itself contains "Website".
+      const objective = googleLeadCampaigns.has(r.campaignId || r.campaign)
+        ? ("leads" as CampaignObjective)
+        : classifyAccount(r.account);
+      objectiveByAccount.set(r.account, objective);
+      return {
+        platform: "google" as Platform,
+        date: r.date,
+        account: r.account,
+        accountId: r.accountId,
+        objective,
+        campaign: r.campaign,
+        campaignId: r.campaignId,
+        campaignKey: keys.key(r.campaignId, r.campaign),
+        adset: r.adset,
+        adsetId: r.adsetId,
+        ad: r.ad,
+        adId: r.adId,
+        spend: r.spend,
+        impressions: r.impressions,
+        clicksAll: r.clicks,
+        // Google reports clicks for this query, not the Meta-specific link-click metric.
+        linkClicks: null,
+        platformLeads: r.conversions,
+        viewCompletions: r.videoViews,
+        syncedAt: r.syncedAt,
+      };
+    });
+
+    const ads = [...meta, ...snap, ...tiktok, ...google];
 
     /* -- CRM --------------------------------------------------------------- */
     // What the stage guard removed, so the number is explainable on the page
@@ -1782,6 +1847,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         label: tiktokApiUsable ? "TikTok Marketing API" : TAB.tiktok,
         syncedAt: tiktokApiUsable ? tiktokResult.syncedAt : maxOf(tiktokRaw, "__synced_at"),
       },
+      ...(googleResult.configured
+        ? [
+            {
+              key: "google",
+              label: "Google Ads API",
+              syncedAt: googleApiUsable ? googleResult.syncedAt : "",
+            },
+          ]
+        : []),
       {
         key: "crm",
         label: crmAuthority === "odoo-direct" ? "Odoo CRM (direct)" : TAB.crm,

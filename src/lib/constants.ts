@@ -1,11 +1,12 @@
 import type { Platform } from "./types";
 
-export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok"];
+export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok", "google"];
 
 export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   meta: { ar: "ميتا", en: "Meta" },
   snapchat: { ar: "سناب شات", en: "Snapchat" },
   tiktok: { ar: "تيك توك", en: "TikTok" },
+  google: { ar: "جوجل", en: "Google Ads" },
 };
 
 /** One colour per platform, shared by the switcher, the charts and every badge. */
@@ -13,6 +14,7 @@ export const PLATFORM_COLOR: Record<Platform, string> = {
   meta: "var(--chart-1)",
   snapchat: "var(--chart-2)",
   tiktok: "var(--chart-4)",
+  google: "var(--chart-3)",
 };
 
 /** Metrics a platform genuinely does not report, so the UI can say so. */
@@ -20,6 +22,7 @@ export const PLATFORM_GAPS: Record<Platform, string[]> = {
   meta: [],
   snapchat: ["linkClicks", "ctrLink"],
   tiktok: ["linkClicks", "ctrLink"],
+  google: ["linkClicks", "ctrLink"],
 };
 
 /**

@@ -1,6 +1,6 @@
 // Shared types (client + server-safe)
 
-export type Platform = "meta" | "snapchat" | "tiktok";
+export type Platform = "meta" | "snapchat" | "tiktok" | "google";
 
 /** Why an ad account spends. Traffic/unknown accounts poison efficiency metrics. */
 export type CampaignObjective = "leads" | "traffic" | "unknown";
@@ -283,6 +283,7 @@ export interface Totals {
   spendMeta: number;
   spendSnap: number;
   spendTikTok: number;
+  spendGoogle: number;
   /** Diagnostic slice of spend on traffic/unknown-objective accounts; it remains included in efficiency formulas. */
   nonLeadSpend: number;
   /** Spend used in management efficiency formulas. This is the full ad spend. */
@@ -294,7 +295,7 @@ export interface Totals {
   ctrLink: Maybe;
   cpm: Maybe;
   cpc: Maybe;
-  /** Leads reported by the ad platform (Meta form leads or Snapchat native leads). */
+  /** Leads or conversions reported by the selected ad platforms. */
   platformLeads: Maybe;
 
   /* CRM side */

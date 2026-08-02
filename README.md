@@ -56,6 +56,14 @@ Copy `.env.example` to `.env`:
 | `TIKTOK_ACCESS_TOKEN`       | For TikTok | Long-term Marketing API access token.                                               |
 | `TIKTOK_ADVERTISER_IDS`     | For TikTok | Comma-separated advertiser account IDs.                                             |
 | `TIKTOK_START_DATE`         | No       | Historical start date; defaults to Jan 1 of the current year.                         |
+| `GOOGLE_ADS_CLIENT_ID`      | For Google Ads | OAuth desktop/web client ID. Server-only.                                        |
+| `GOOGLE_ADS_CLIENT_SECRET`  | For Google Ads | OAuth client secret. Server-only; never returned or logged.                      |
+| `GOOGLE_ADS_REFRESH_TOKEN`  | For Google Ads | OAuth refresh token authorised for the Google Ads scope.                        |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | For Google Ads | Developer token from the linked manager account's API Center.                  |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | For Google Ads | Manager account ID used in the `login-customer-id` header.                    |
+| `GOOGLE_ADS_CUSTOMER_IDS`   | For Google Ads | Comma-separated client account IDs to report.                                      |
+| `GOOGLE_ADS_START_DATE`     | No       | Historical start date; defaults to Jan 1 of the current year.                         |
+| `GOOGLE_ADS_END_DATE`       | No       | Optional fixed report end date; defaults to today.                                    |
 | `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
 | `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |
 | `TELEGRAM_SUBSCRIBERS_FILE` | No       | Where the subscriber list is stored. Point at a mounted volume on Railway.             |

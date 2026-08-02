@@ -109,7 +109,18 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
 
   L.push(`💰 *${esc("الإنفاق الإعلاني")}*`);
   L.push(esc(`الإجمالي: ${money(t.spend, 2)}  ${change(t.spend, p.spend)}`));
-  L.push(esc(`ميتا: ${money(t.spendMeta, 2)} · سناب شات: ${money(t.spendSnap, 2)}`));
+  L.push(
+    esc(
+      [
+        `ميتا: ${money(t.spendMeta, 2)}`,
+        `سناب شات: ${money(t.spendSnap, 2)}`,
+        t.spendTikTok > 0 ? `تيك توك: ${money(t.spendTikTok, 2)}` : "",
+        t.spendGoogle > 0 ? `جوجل: ${money(t.spendGoogle, 2)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+  );
   if (t.nonLeadSpend > 0) {
     L.push(esc(`منها ${money(t.nonLeadSpend, 2)} على حسابات لا تنتج عملاء (زيارات فقط).`));
   }

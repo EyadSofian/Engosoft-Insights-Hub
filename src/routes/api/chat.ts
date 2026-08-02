@@ -79,9 +79,21 @@ export const Route = createFileRoute("/api/chat")({
               : `Cheapest reported CPL: **${cheap.name}** at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} platform leads (${money(cheap.spend)} spent).`;
           }
           if (has("total spend", "إجمالي الإنفاق", "اجمالي الانفاق")) {
+            const spendPartsAr = [
+              `ميتا ${money(totals.spendMeta)}`,
+              `سناب ${money(totals.spendSnap)}`,
+              totals.spendTikTok > 0 ? `تيك توك ${money(totals.spendTikTok)}` : "",
+              totals.spendGoogle > 0 ? `جوجل ${money(totals.spendGoogle)}` : "",
+            ].filter(Boolean);
+            const spendPartsEn = [
+              `Meta ${money(totals.spendMeta)}`,
+              `Snapchat ${money(totals.spendSnap)}`,
+              totals.spendTikTok > 0 ? `TikTok ${money(totals.spendTikTok)}` : "",
+              totals.spendGoogle > 0 ? `Google ${money(totals.spendGoogle)}` : "",
+            ].filter(Boolean);
             return ar
-              ? `إجمالي الإنفاق: **${money(totals.spend)}** (ميتا ${money(totals.spendMeta)}، سناب ${money(totals.spendSnap)}).`
-              : `Total spend: **${money(totals.spend)}** (Meta ${money(totals.spendMeta)}, Snapchat ${money(totals.spendSnap)}).`;
+              ? `إجمالي الإنفاق: **${money(totals.spend)}** (${spendPartsAr.join("، ")}).`
+              : `Total spend: **${money(totals.spend)}** (${spendPartsEn.join(", ")}).`;
           }
           if (has("total revenue", "إجمالي الإيراد", "اجمالي الايراد")) {
             return ar
@@ -90,8 +102,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("total leads", "إجمالي العملاء", "كم عميل")) {
             return ar
-              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} Lost مؤرشف${totals.archivedWon > 0 ? ` + ${totals.archivedWon} Won مؤرشف` : ""}. Leads الإعلانات حسب Meta/Snap: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
-              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} archived Lost${totals.archivedWon > 0 ? ` + ${totals.archivedWon} archived Won` : ""}. Meta/Snap-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
+              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} Lost مؤرشف${totals.archivedWon > 0 ? ` + ${totals.archivedWon} Won مؤرشف` : ""}. Leads المبلّغ عنها من منصات الإعلان: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
+              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} archived Lost${totals.archivedWon > 0 ? ` + ${totals.archivedWon} archived Won` : ""}. Ad-platform-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
           }
           if (has("cpl", "تكلفة العميل")) {
             return ar

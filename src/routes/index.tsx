@@ -333,6 +333,7 @@ function Overview() {
               `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
               `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
               T.spendTikTok > 0 ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}` : "",
+              T.spendGoogle > 0 ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}` : "",
             ]
               .filter(Boolean)
               .join(" · ")

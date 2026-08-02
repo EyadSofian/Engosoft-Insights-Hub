@@ -566,6 +566,10 @@ export function computeTotals(data: FilteredData): Totals {
     ads.filter((a) => a.platform === "tiktok"),
     (a) => a.spend,
   );
+  const spendGoogle = sum(
+    ads.filter((a) => a.platform === "google"),
+    (a) => a.spend,
+  );
   const nonLeadSpend = sum(
     ads.filter((a) => a.objective !== "leads"),
     (a) => a.spend,
@@ -639,6 +643,7 @@ export function computeTotals(data: FilteredData): Totals {
     spendMeta,
     spendSnap,
     spendTikTok,
+    spendGoogle,
     nonLeadSpend,
     efficiencySpend,
     impressions,
