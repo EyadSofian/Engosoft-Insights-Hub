@@ -74,7 +74,6 @@ interface GoogleAdsResultRow {
     clicks?: string | number;
     conversions?: string | number;
     allConversions?: string | number;
-    videoViews?: string | number;
   };
 }
 
@@ -98,7 +97,6 @@ export interface GoogleAdsDaily {
   impressions: number;
   clicks: number;
   conversions: number;
-  videoViews: number;
   syncedAt: string;
 }
 
@@ -258,8 +256,7 @@ function gaql(from: string, to: string): string {
       metrics.impressions,
       metrics.clicks,
       metrics.conversions,
-      metrics.all_conversions,
-      metrics.video_views
+      metrics.all_conversions
     FROM ad_group_ad
     WHERE segments.date BETWEEN '${from}' AND '${to}'
     ORDER BY segments.date
@@ -420,7 +417,6 @@ export async function fetchGoogleAds(): Promise<GoogleAdsFetchResult> {
           impressions: numberOf(metrics.impressions),
           clicks: numberOf(metrics.clicks),
           conversions: numberOf(metrics.conversions),
-          videoViews: numberOf(metrics.videoViews),
           syncedAt,
         });
       }

@@ -20,7 +20,10 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
     dateBasis: p.get("dateBasis") === "invoice" ? "invoice" : undefined,
     company: p.get("company") || undefined,
     platform:
-      platform === "meta" || platform === "snapchat" || platform === "tiktok"
+      platform === "meta" ||
+      platform === "snapchat" ||
+      platform === "tiktok" ||
+      platform === "google"
         ? (platform as Platform)
         : undefined,
     account: p.get("account") || undefined,
@@ -58,6 +61,9 @@ export function json(data: unknown): Response {
 /** Detail endpoints cap payload size so a page can't ship 18k rows to a phone. */
 export const ROW_CAP = 3000;
 
-export function capped<T>(rows: T[], cap = ROW_CAP): { rows: T[]; total: number; truncated: boolean } {
+export function capped<T>(
+  rows: T[],
+  cap = ROW_CAP,
+): { rows: T[]; total: number; truncated: boolean } {
   return { rows: rows.slice(0, cap), total: rows.length, truncated: rows.length > cap };
 }

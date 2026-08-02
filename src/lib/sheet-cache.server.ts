@@ -1274,7 +1274,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         // Google reports clicks for this query, not the Meta-specific link-click metric.
         linkClicks: null,
         platformLeads: r.conversions,
-        viewCompletions: r.videoViews,
+        viewCompletions: null,
         syncedAt: r.syncedAt,
       };
     });
