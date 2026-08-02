@@ -9,6 +9,14 @@ const API = "https://business-api.tiktok.com/open_api/v1.3";
 const REPORT_PAGE_SIZE = 1000;
 const MAX_REPORT_DAYS = 30;
 const MAX_PAGES = 100;
+// The app's Basic quota is 10 QPS. Report pages are fetched concurrently, so
+// space request starts far enough apart to leave headroom for retries and any
+// other TikTok call made by the same process.
+const MIN_REQUEST_GAP_MS = 150;
+const MAX_RATE_LIMIT_RETRIES = 5;
+
+let requestSchedule: Promise<void> = Promise.resolve();
+let nextRequestAt = 0;
 
 interface TikTokConfig {
   accessToken: string;
@@ -128,6 +136,35 @@ function safeMessage(path: string, body: ApiEnvelope<unknown>, status?: number):
   return `TikTok ${path}: ${detail}`;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Serialize request starts without serializing the network responses. */
+async function waitForRequestSlot(): Promise<void> {
+  let release!: () => void;
+  const previous = requestSchedule;
+  requestSchedule = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await previous;
+  try {
+    const waitMs = Math.max(0, nextRequestAt - Date.now());
+    if (waitMs) await delay(waitMs);
+    nextRequestAt = Date.now() + MIN_REQUEST_GAP_MS;
+  } finally {
+    release();
+  }
+}
+
+function isRateLimited(response: Response, body: ApiEnvelope<unknown>): boolean {
+  return (
+    response.status === 429 ||
+    /(?:qps|rate) limit|too many requests/i.test(body.message?.trim() ?? "")
+  );
+}
+
 async function getApi<T>(
   path: string,
   params: Record<string, string>,
@@ -136,15 +173,25 @@ async function getApi<T>(
   const url = new URL(`${API}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  const response = await fetch(url, {
-    headers: { "Access-Token": accessToken },
-    cache: "no-store",
-  });
-  const body = (await response.json().catch(() => ({}))) as ApiEnvelope<T>;
-  if (!response.ok || body.code !== 0 || !body.data) {
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+    await waitForRequestSlot();
+    const response = await fetch(url, {
+      headers: { "Access-Token": accessToken },
+      cache: "no-store",
+    });
+    const body = (await response.json().catch(() => ({}))) as ApiEnvelope<T>;
+    if (response.ok && body.code === 0 && body.data) return body.data;
+
+    if (isRateLimited(response, body) && attempt < MAX_RATE_LIMIT_RETRIES) {
+      // TikTok's quota is a rolling window. Exponential backoff lets that
+      // window drain even if another deployment instance is also refreshing.
+      await delay(Math.min(8_000, 750 * 2 ** attempt) + Math.floor(Math.random() * 250));
+      continue;
+    }
     throw new Error(safeMessage(path, body, response.status));
   }
-  return body.data;
+
+  throw new Error(`TikTok ${path}: request failed after rate-limit retries`);
 }
 
 function dateChunks(from: string, to: string): { from: string; to: string }[] {
@@ -358,4 +405,3 @@ export async function fetchTikTokAds(): Promise<TikTokFetchResult> {
 
   return { configured: true, rows, syncedAt, errors };
 }
-
