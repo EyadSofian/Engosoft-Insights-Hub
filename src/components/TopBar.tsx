@@ -3,7 +3,12 @@ import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, SlidersHorizontal, Languages, X, Moon, Sun, Check } from "lucide-react";
 import { fmtDateTime, useI18n } from "@/lib/i18n";
-import { activeDimensionCount, filterStore, useFilters } from "@/lib/filter-store";
+import {
+  activeDimensionCount,
+  filterStore,
+  setPlatformFilter,
+  useFilters,
+} from "@/lib/filter-store";
 import { approvedReportingEnd } from "@/lib/reporting-window";
 import { useModalGuard } from "@/lib/ui-store";
 import type { CampaignObjective, DataHealth, Platform } from "@/lib/types";
@@ -20,6 +25,13 @@ export interface FiltersResp {
     platformLeads: number | null;
   }[];
   accountNames: string[];
+  adDimensions: {
+    platform: Platform;
+    account: string;
+    campaign: string;
+    adset: string;
+    ad: string;
+  }[];
   campaigns: string[];
   adsets: string[];
   ads: string[];
@@ -76,12 +88,12 @@ export function useFiltersData() {
 function latestDate(data?: FiltersResp): string | undefined {
   if (!data) return undefined;
   const c = data.coverage;
-  const latest = [c.adsDateMax, c.crmDateMax, c.revenueDateMax]
-    .filter(Boolean)
-    .sort()
-    .pop();
+  const latest = [c.adsDateMax, c.crmDateMax, c.revenueDateMax].filter(Boolean).sort().pop();
   return approvedReportingEnd(latest);
 }
+
+const sortedUnique = (values: string[]): string[] =>
+  [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 export function TopBar({ title }: { title?: string }) {
   const { t, lang, setLang, theme, toggleTheme } = useI18n();
@@ -135,7 +147,7 @@ export function TopBar({ title }: { title?: string }) {
             )}
           </div>
 
-          <div className="ms-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
             <SyncBadge data={data} />
 
             <button
@@ -195,9 +207,7 @@ export function TopBar({ title }: { title?: string }) {
           <div className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-none">
             <Segmented
               value={filters.platform ?? "all"}
-              onChange={(v) =>
-                filterStore.set({ platform: v === "all" ? undefined : (v as Platform) })
-              }
+              onChange={(v) => setPlatformFilter(v === "all" ? undefined : (v as Platform))}
               options={[
                 { value: "all", label: t("all_platforms") },
                 ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
@@ -344,6 +354,39 @@ function FilterSheet({
 }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
+  const dimensions = data?.adDimensions ?? [];
+  const platformDimensions = dimensions.filter(
+    (row) => !filters.platform || row.platform === filters.platform,
+  );
+  const accountOptions = filters.platform
+    ? sortedUnique(
+        (data?.accounts ?? [])
+          .filter((account) => account.platform === filters.platform)
+          .map((account) => account.name),
+      )
+    : (data?.accountNames ?? []);
+  const accountDimensions = platformDimensions.filter(
+    (row) => !filters.account || row.account === filters.account,
+  );
+  const campaignOptions =
+    filters.platform || filters.account
+      ? sortedUnique(accountDimensions.map((row) => row.campaign))
+      : (data?.campaigns ?? []);
+  const campaignDimensions = accountDimensions.filter(
+    (row) => !filters.campaign || row.campaign === filters.campaign,
+  );
+  const adsetOptions =
+    filters.platform || filters.account || filters.campaign
+      ? sortedUnique(campaignDimensions.map((row) => row.adset))
+      : (data?.adsets ?? []);
+  const adsetDimensions = campaignDimensions.filter(
+    (row) => !filters.adset || row.adset === filters.adset,
+  );
+  const adOptions =
+    filters.platform || filters.account || filters.campaign || filters.adset
+      ? sortedUnique(adsetDimensions.map((row) => row.ad))
+      : (data?.ads ?? []);
+  const activeCount = activeDimensionCount(filters);
   useModalGuard(open);
 
   useEffect(() => {
@@ -372,12 +415,25 @@ function FilterSheet({
       aria-label={t("filters")}
     >
       <div
-        className="w-full sm:max-w-lg glass rounded-t-3xl sm:rounded-3xl p-5 max-h-[88vh] overflow-y-auto animate-slide-up sm:animate-scale-in"
-        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+        className="glass flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl sm:max-w-lg sm:rounded-3xl animate-slide-up sm:animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-text text-lg">{t("filters")}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-text">{t("filters")}</h2>
+              {activeCount > 0 && (
+                <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+                  {activeCount}
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              {lang === "ar"
+                ? "الاختيارات تُطبق مباشرة على كل التقارير"
+                : "Selections apply instantly across every report"}
+            </p>
+          </div>
           <button
             onClick={onClose}
             aria-label={t("close")}
@@ -387,119 +443,156 @@ function FilterSheet({
           </button>
         </div>
 
-        <div className="grid gap-4">
-          <div>
-            <span className="block text-xs font-medium text-text-muted mb-2">
-              {t("date_range")}
-            </span>
-            <DateRangePanel latest={latestDate(data)} collapsibleCalendar />
-          </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+          <div className="grid gap-4">
+            <div>
+              <span className="block text-xs font-medium text-text-muted mb-2">
+                {t("platform")}
+              </span>
+              <div className="overflow-x-auto overscroll-x-contain scrollbar-none pb-1">
+                <Segmented
+                  value={filters.platform ?? "all"}
+                  onChange={(value) =>
+                    setPlatformFilter(value === "all" ? undefined : (value as Platform))
+                  }
+                  size="md"
+                  options={[
+                    { value: "all", label: t("all_platforms") },
+                    ...PLATFORMS.map((platform) => ({
+                      value: platform,
+                      label: PLATFORM_LABEL[platform][lang],
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
 
-          <div>
-            <span className="block text-xs font-medium text-text-muted mb-2">
-              {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
-            </span>
-            <Segmented
-              value={filters.dateBasis ?? "payment"}
-              onChange={(value) =>
+            <div>
+              <span className="block text-xs font-medium text-text-muted mb-2">
+                {t("date_range")}
+              </span>
+              <DateRangePanel latest={latestDate(data)} collapsibleCalendar />
+            </div>
+
+            <div>
+              <span className="block text-xs font-medium text-text-muted mb-2">
+                {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+              </span>
+              <Segmented
+                value={filters.dateBasis ?? "payment"}
+                onChange={(value) =>
+                  filterStore.set({
+                    dateBasis: value === "invoice" ? "invoice" : undefined,
+                  })
+                }
+                size="md"
+                options={[
+                  {
+                    value: "payment",
+                    label: lang === "ar" ? "تاريخ الدفع" : "Payment Date",
+                  },
+                  {
+                    value: "invoice",
+                    label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+                  },
+                ]}
+              />
+            </div>
+
+            <Select
+              label={lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
+              value={filters.company}
+              options={data?.companies ?? []}
+              onChange={(v) => filterStore.set({ company: v })}
+            />
+
+            <Select
+              label={t("account")}
+              value={filters.account}
+              options={accountOptions}
+              onChange={(v) =>
                 filterStore.set({
-                  dateBasis: value === "invoice" ? "invoice" : undefined,
+                  account: v,
+                  campaign: undefined,
+                  campaignKey: undefined,
+                  adset: undefined,
+                  adsetKey: undefined,
+                  ad: undefined,
+                  adKey: undefined,
                 })
               }
-              size="md"
-              options={[
-                {
-                  value: "payment",
-                  label: lang === "ar" ? "تاريخ الدفع" : "Payment Date",
-                },
-                {
-                  value: "invoice",
-                  label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
-                },
-              ]}
+            />
+            <Select
+              label={t("campaign")}
+              value={filters.campaign}
+              options={campaignOptions}
+              onChange={(v) =>
+                filterStore.set({
+                  campaign: v,
+                  campaignKey: undefined,
+                  adset: undefined,
+                  adsetKey: undefined,
+                  ad: undefined,
+                  adKey: undefined,
+                })
+              }
+            />
+            <Select
+              label={t("ad_set")}
+              value={filters.adset}
+              options={adsetOptions}
+              onChange={(v) =>
+                filterStore.set({
+                  adset: v,
+                  adsetKey: undefined,
+                  ad: undefined,
+                  adKey: undefined,
+                })
+              }
+            />
+            <Select
+              label={t("ad_name")}
+              value={filters.ad}
+              options={adOptions}
+              onChange={(v) => filterStore.set({ ad: v, adKey: undefined })}
+            />
+            <Select
+              label={t("course")}
+              value={filters.course}
+              options={data?.courses ?? []}
+              onChange={(v) => filterStore.set({ course: v })}
+            />
+            <Select
+              label={t("source")}
+              value={filters.source}
+              options={data?.sources ?? []}
+              onChange={(v) => filterStore.set({ source: v })}
+            />
+            <Select
+              label={t("main_category")}
+              value={filters.mainCategory}
+              options={data?.mainCategories ?? []}
+              onChange={(v) => filterStore.set({ mainCategory: v })}
+            />
+            <Select
+              label={t("sales_team")}
+              value={filters.salesTeam}
+              options={data?.salesTeams ?? []}
+              onChange={(v) => filterStore.set({ salesTeam: v })}
+            />
+            <Select
+              label={t("salesperson")}
+              value={filters.salesperson}
+              options={data?.salespeople ?? []}
+              onChange={(v) => filterStore.set({ salesperson: v })}
             />
           </div>
-
-          <Select
-            label={lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
-            value={filters.company}
-            options={data?.companies ?? []}
-            onChange={(v) => filterStore.set({ company: v })}
-          />
-
-          <Select
-            label={t("account")}
-            value={filters.account}
-            options={data?.accountNames ?? []}
-            onChange={(v) => filterStore.set({ account: v })}
-          />
-          <Select
-            label={t("campaign")}
-            value={filters.campaign}
-            options={data?.campaigns ?? []}
-            onChange={(v) =>
-              filterStore.set({
-                campaign: v,
-                campaignKey: undefined,
-                adset: undefined,
-                adsetKey: undefined,
-                ad: undefined,
-                adKey: undefined,
-              })
-            }
-          />
-          <Select
-            label={t("ad_set")}
-            value={filters.adset}
-            options={data?.adsets ?? []}
-            onChange={(v) =>
-              filterStore.set({
-                adset: v,
-                adsetKey: undefined,
-                ad: undefined,
-                adKey: undefined,
-              })
-            }
-          />
-          <Select
-            label={t("ad_name")}
-            value={filters.ad}
-            options={data?.ads ?? []}
-            onChange={(v) => filterStore.set({ ad: v, adKey: undefined })}
-          />
-          <Select
-            label={t("course")}
-            value={filters.course}
-            options={data?.courses ?? []}
-            onChange={(v) => filterStore.set({ course: v })}
-          />
-          <Select
-            label={t("source")}
-            value={filters.source}
-            options={data?.sources ?? []}
-            onChange={(v) => filterStore.set({ source: v })}
-          />
-          <Select
-            label={t("main_category")}
-            value={filters.mainCategory}
-            options={data?.mainCategories ?? []}
-            onChange={(v) => filterStore.set({ mainCategory: v })}
-          />
-          <Select
-            label={t("sales_team")}
-            value={filters.salesTeam}
-            options={data?.salesTeams ?? []}
-            onChange={(v) => filterStore.set({ salesTeam: v })}
-          />
-          <Select
-            label={t("salesperson")}
-            value={filters.salesperson}
-            options={data?.salespeople ?? []}
-            onChange={(v) => filterStore.set({ salesperson: v })}
-          />
         </div>
 
-        <div className="flex gap-2 mt-6">
+        <div
+          className="flex shrink-0 gap-2 border-t border-border bg-surface/95 px-4 pt-3 sm:px-5"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
           <button
             onClick={() => filterStore.resetDimensions()}
             className="flex-1 px-4 py-3 rounded-xl border border-border text-sm font-medium hover:bg-surface-2 transition-colors cursor-pointer min-h-[48px]"

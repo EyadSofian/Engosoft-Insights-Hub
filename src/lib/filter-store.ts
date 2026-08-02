@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { DatePreset, GlobalFilters } from "./types";
+import type { DatePreset, GlobalFilters, Platform } from "./types";
 import { DEFAULT_FX_RATES } from "./fx-rates";
 
 type Listener = () => void;
@@ -181,6 +181,26 @@ export function usePreset(): DatePreset {
 
 export function activeDimensionCount(f: GlobalFilters): number {
   return DIMENSIONS.filter((k) => !!f[k]).length;
+}
+
+/**
+ * A platform change invalidates every ad-hierarchy selection beneath it.
+ * Keeping an account or campaign from another platform is the most common
+ * reason a valid report appears empty, so every platform switch uses one
+ * canonical reset path.
+ */
+export function setPlatformFilter(platform?: Platform) {
+  filterStore.set({
+    platform,
+    account: undefined,
+    campaign: undefined,
+    campaignKey: undefined,
+    adset: undefined,
+    adsetKey: undefined,
+    ad: undefined,
+    adKey: undefined,
+    source: undefined,
+  });
 }
 
 export function buildQuery(f: GlobalFilters): string {

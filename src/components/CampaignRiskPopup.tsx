@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { CampaignActivity, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
+import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { Pill } from "@/components/ui-bits";
 import { useModalGuard } from "@/lib/ui-store";
 import {
@@ -33,6 +34,7 @@ export function CampaignRiskPopup() {
   const { lang } = useI18n();
   const { pathname } = useLocation();
   const prefs = useRiskAlertPrefs();
+  const eligiblePath = pathname === "/";
   // Closing only hides the alert for the current view — it returns on the next
   // page load and every time the overview is opened. Anything longer is an
   // explicit choice made through the snooze/mute buttons.
@@ -47,11 +49,12 @@ export function CampaignRiskPopup() {
     },
     staleTime: 5 * 60_000,
     retry: 1,
+    enabled: eligiblePath,
   });
 
   const atRisk = data?.activity.atRisk;
   const rows = useMemo(() => pendingRiskRows(atRisk ?? [], prefs), [atRisk, prefs]);
-  const open = !closed && shouldShowRiskAlert(rows, prefs);
+  const open = eligiblePath && !closed && shouldShowRiskAlert(rows, prefs);
 
   useEffect(() => {
     if (pathname === "/") setClosed(false);
@@ -132,9 +135,11 @@ export function CampaignRiskPopup() {
                 : `${fmtNum(rows.length)} campaigns ranked by spend`}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Pill tone="neutral">Meta</Pill>
-              <Pill tone="neutral">Snapchat</Pill>
-              <Pill tone="neutral">TikTok</Pill>
+              {PLATFORMS.map((platform) => (
+                <Pill key={platform} tone="neutral">
+                  {PLATFORM_LABEL[platform][lang]}
+                </Pill>
+              ))}
             </div>
           </div>
 
@@ -206,7 +211,7 @@ function RiskCard({ row }: { row: PerfRow }) {
           <div className="mt-1.5 flex flex-wrap gap-1">
             {row.platforms.map((platform) => (
               <Pill key={platform} tone="neutral">
-                {platform === "snapchat" ? "Snapchat" : platform === "tiktok" ? "TikTok" : "Meta"}
+                {PLATFORM_LABEL[platform][lang]}
               </Pill>
             ))}
           </div>
@@ -245,15 +250,7 @@ function RiskCard({ row }: { row: PerfRow }) {
   );
 }
 
-function RiskMetric({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
+function RiskMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-surface px-2.5 py-2">
       <div className="flex items-center gap-1 text-[10px] text-text-muted">

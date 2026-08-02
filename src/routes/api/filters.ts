@@ -21,12 +21,25 @@ export const Route = createFileRoute("/api/filters")({
         const salespeople = new Set<string>();
         const courses = new Set<string>();
         const companies = new Set<string>();
+        const adDimensions = new Map<
+          string,
+          { platform: string; account: string; campaign: string; adset: string; ad: string }
+        >();
 
         for (const a of data.ads) {
           if (a.account) accounts.add(a.account);
           if (a.campaign) campaigns.add(a.campaign);
           if (a.adset) adsets.add(a.adset);
           if (a.ad) ads.add(a.ad);
+          const dimension = {
+            platform: a.platform,
+            account: a.account,
+            campaign: a.campaign,
+            adset: a.adset,
+            ad: a.ad,
+          };
+          const dimensionKey = Object.values(dimension).join("\u0000");
+          if (!adDimensions.has(dimensionKey)) adDimensions.set(dimensionKey, dimension);
         }
         for (const c of data.crm) {
           if (c.campaignName) campaigns.add(c.campaignName);
@@ -58,6 +71,7 @@ export const Route = createFileRoute("/api/filters")({
             platformLeads: a.platformLeads,
           })),
           accountNames: sorted(accounts),
+          adDimensions: [...adDimensions.values()],
           campaigns: sorted(campaigns),
           adsets: sorted(adsets),
           ads: sorted(ads),

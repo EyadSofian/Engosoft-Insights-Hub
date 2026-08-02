@@ -1,6 +1,6 @@
 import { LayoutGrid, TriangleAlert } from "lucide-react";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
-import { filterStore, useFilters } from "@/lib/filter-store";
+import { setPlatformFilter, useFilters } from "@/lib/filter-store";
 import { PLATFORM_COLOR, PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import type { Maybe, Platform } from "@/lib/types";
 
@@ -49,15 +49,7 @@ export function PlatformSwitcher({
   const select = (value: Platform | "all") => {
     // A campaign belongs to exactly one platform, so a drill-down cannot
     // survive a platform change — clear it rather than show an empty table.
-    filterStore.set({
-      platform: value === "all" ? undefined : value,
-      campaign: undefined,
-      campaignKey: undefined,
-      adset: undefined,
-      adsetKey: undefined,
-      ad: undefined,
-      adKey: undefined,
-    });
+    setPlatformFilter(value === "all" ? undefined : value);
   };
 
   return (
