@@ -54,6 +54,8 @@ export function CampaignRiskPopup() {
 
   const atRisk = data?.activity.atRisk;
   const rows = useMemo(() => pendingRiskRows(atRisk ?? [], prefs), [atRisk, prefs]);
+  const platformWindows = data?.activity.platformWindows ?? {};
+  const visiblePlatforms = PLATFORMS.filter((platform) => platformWindows[platform]);
   const open = eligiblePath && !closed && shouldShowRiskAlert(rows, prefs);
 
   useEffect(() => {
@@ -111,8 +113,8 @@ export function CampaignRiskPopup() {
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-text-muted sm:text-sm">
                 {lang === "ar"
-                  ? `إنفاق حديث بلا Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل · ${data.activity.window?.from} → ${data.activity.window?.to}`
-                  : `Recent spend with no Won, paid invoice, or fully invoiced sales order · ${data.activity.window?.from} → ${data.activity.window?.to}`}
+                  ? "إنفاق في أحدث 3 أيام متاحة لكل منصة بلا Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل."
+                  : "Spend in each platform's latest 3 available days with no Won, paid invoice, or fully invoiced sales order."}
               </p>
             </div>
           </div>
@@ -135,17 +137,21 @@ export function CampaignRiskPopup() {
                 : `${fmtNum(rows.length)} campaigns ranked by spend`}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {PLATFORMS.map((platform) => (
-                <Pill key={platform} tone="neutral">
-                  {PLATFORM_LABEL[platform][lang]}
-                </Pill>
-              ))}
+              {visiblePlatforms.map((platform) => {
+                const window = platformWindows[platform];
+                return (
+                  <Pill key={platform} tone="neutral">
+                    {PLATFORM_LABEL[platform][lang]}
+                    {window ? ` · ${window.from.slice(5)} → ${window.to.slice(5)}` : ""}
+                  </Pill>
+                );
+              })}
             </div>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             {rows.map((row) => (
-              <RiskCard key={row.key} row={row} />
+              <RiskCard key={`${row.platforms.join("-")}:${row.key}`} row={row} />
             ))}
           </div>
 

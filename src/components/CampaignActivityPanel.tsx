@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { CampaignActivity, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
+import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { mutedRiskCount, riskAlertPrefs, useRiskAlertPrefs } from "@/lib/campaign-risk-prefs";
 import { Card, EmptyState, Notice, Pill, SectionTitle } from "./ui-bits";
 
@@ -16,8 +17,12 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
   const prefs = useRiskAlertPrefs();
   // The only way back once the popup has been silenced for good.
   const muted = mutedRiskCount(activity.atRisk, prefs);
-  const range = activity.window
-    ? `${activity.window.from} → ${activity.window.to}`
+  const platformWindows = activity.platformWindows ?? {};
+  const representedPlatforms = PLATFORMS.filter((platform) => platformWindows[platform]);
+  const range = representedPlatforms.length
+    ? lang === "ar"
+      ? "أحدث 3 أيام لكل منصة"
+      : "Latest 3 days per platform"
     : lang === "ar"
       ? "لا توجد أيام إنفاق"
       : "No spend dates";
@@ -35,8 +40,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         }
         hint={
           lang === "ar"
-            ? "نشطة فعليًا = سجلت إنفاقًا خلال آخر 3 أيام متاحة في مصدر الإعلانات."
-            : "Operationally active = recorded spend during the latest three source days."
+            ? "نشطة فعليًا = سجلت إنفاقًا خلال آخر 3 أيام متاحة لكل منصة، لأن مواعيد تحديث المصادر مختلفة."
+            : "Operationally active = recorded spend during each platform's latest three available days, since sources refresh on different schedules."
         }
       >
         <span className="inline-flex items-center gap-1.5">
@@ -44,6 +49,20 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
           {lang === "ar" ? "الحملات التي تعمل الآن" : "Campaigns running now"}
         </span>
       </SectionTitle>
+
+      {representedPlatforms.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {representedPlatforms.map((platform) => {
+            const window = platformWindows[platform];
+            return (
+              <Pill key={platform} tone="neutral">
+                {PLATFORM_LABEL[platform][lang]}
+                {window ? ` · ${window.from.slice(5)} → ${window.to.slice(5)}` : ""}
+              </Pill>
+            );
+          })}
+        </div>
+      )}
 
       {!activity.rows.length ? (
         <EmptyState
@@ -124,7 +143,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                 row.revenue <= 0;
               return (
                 <div
-                  key={row.key}
+                  key={`${row.platforms.join("-")}:${row.key}`}
                   className="grid grid-cols-2 gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(6,auto)] sm:items-center sm:gap-4"
                 >
                   <div className="col-span-2 min-w-0 sm:col-span-1">
@@ -134,11 +153,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                     <div className="mt-1 flex flex-wrap gap-1">
                       {row.platforms.map((platform) => (
                         <Pill key={platform} tone="neutral">
-                          {platform === "snapchat"
-                            ? "Snapchat"
-                            : platform === "tiktok"
-                              ? "TikTok"
-                              : "Meta"}
+                          {PLATFORM_LABEL[platform][lang]}
                         </Pill>
                       ))}
                       {zero && (
@@ -146,12 +161,18 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                       )}
                     </div>
                   </div>
-                  <Mini label={lang === "ar" ? "إنفاق 3 أيام" : "3-day spend"} value={fmtUSD(row.spend)} />
+                  <Mini
+                    label={lang === "ar" ? "إنفاق 3 أيام" : "3-day spend"}
+                    value={fmtUSD(row.spend)}
+                  />
                   <Mini
                     label={lang === "ar" ? "ليدز المنصة" : "Platform leads"}
                     value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
                   />
-                  <Mini label={lang === "ar" ? "ليدز أودو" : "Odoo leads"} value={fmtNum(row.crmLeads)} />
+                  <Mini
+                    label={lang === "ar" ? "ليدز أودو" : "Odoo leads"}
+                    value={fmtNum(row.crmLeads)}
+                  />
                   <Mini label={lang === "ar" ? "مغلق" : "Won"} value={fmtNum(row.won)} />
                   <Mini
                     label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"}
@@ -209,10 +230,7 @@ function ActivitySpotlight({
           value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
         />
         <Mini label={lang === "ar" ? "Won" : "Won"} value={fmtNum(row.won)} />
-        <Mini
-          label={lang === "ar" ? "فواتير" : "Invoices"}
-          value={fmtNum(row.invoices)}
-        />
+        <Mini label={lang === "ar" ? "فواتير" : "Invoices"} value={fmtNum(row.invoices)} />
         <Mini
           label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
           value={fmtNum(row.salesOrders)}
@@ -226,7 +244,9 @@ function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="text-[10px] text-text-muted">{label}</div>
-      <div className="num mt-0.5 whitespace-nowrap text-[12px] font-semibold text-text">{value}</div>
+      <div className="num mt-0.5 whitespace-nowrap text-[12px] font-semibold text-text">
+        {value}
+      </div>
     </div>
   );
 }

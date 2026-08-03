@@ -424,8 +424,10 @@ export interface PerfRow {
 }
 
 export interface CampaignActivity {
-  /** Last three calendar days represented by the selected ad data. */
+  /** Broadest window retained for older summary UI. */
   window: { from: string; to: string } | null;
+  /** The latest three available calendar days for every represented platform. */
+  platformWindows: Partial<Record<Platform, { from: string; to: string }>>;
   /** A campaign is active here only when it recorded spend in this window. */
   definition: "recent_spend";
   rows: PerfRow[];

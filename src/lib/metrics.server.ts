@@ -11,11 +11,9 @@ import {
   PLATFORM_SOURCE_KEYS,
   type Snapshot,
 } from "./sheet-cache.server";
-import {
-  approvedReportingEnd,
-  REPORTING_WINDOW_START,
-} from "./reporting-window";
+import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
+import { PLATFORMS } from "./constants";
 import type {
   AdRow,
   AccountingRow,
@@ -428,28 +426,30 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
 
   // Accounting rows carry direct campaign/ad/source dimensions when available,
   // with a legacy order bridge only for older workbooks.
-  const accounting = all.accounting.filter((r) => {
-    if (!inRange(accountingDate(r), from, to)) return false;
-    if (company && r.company !== company) return false;
-    if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
-    if (!matchesAccount(r.campaignId)) return false;
-    if (!matchesStableFact(r)) return false;
-    if (campaign && r.campaignName !== campaign) return false;
-    if (adset && r.adset !== adset) return false;
-    if (ad && r.adName !== ad) return false;
-    if (sourceKey && r.sourceKey !== sourceKey) return false;
-    if (course && normalizeName(r.course) !== normalizeName(course)) return false;
-    if (mainCategory && r.mainCategory !== mainCategory) return false;
-    // `فريق المبيعات` is sparse on paid invoice lines for the same reason it is
-    // on order lines, so a team filter also matches through the salesperson.
-    if (salesTeam && r.salesTeam !== salesTeam && !teamHasPerson(all, salesTeam, r.salesperson))
-      return false;
-    if (salesperson && r.salesperson !== salesperson) return false;
-    return true;
-  }).map((row) => {
-    const usdPaid = accountingUsdPaid(row, fxRates);
-    return { ...row, usdPaid, usdSales: usdPaid };
-  });
+  const accounting = all.accounting
+    .filter((r) => {
+      if (!inRange(accountingDate(r), from, to)) return false;
+      if (company && r.company !== company) return false;
+      if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
+      if (!matchesAccount(r.campaignId)) return false;
+      if (!matchesStableFact(r)) return false;
+      if (campaign && r.campaignName !== campaign) return false;
+      if (adset && r.adset !== adset) return false;
+      if (ad && r.adName !== ad) return false;
+      if (sourceKey && r.sourceKey !== sourceKey) return false;
+      if (course && normalizeName(r.course) !== normalizeName(course)) return false;
+      if (mainCategory && r.mainCategory !== mainCategory) return false;
+      // `فريق المبيعات` is sparse on paid invoice lines for the same reason it is
+      // on order lines, so a team filter also matches through the salesperson.
+      if (salesTeam && r.salesTeam !== salesTeam && !teamHasPerson(all, salesTeam, r.salesperson))
+        return false;
+      if (salesperson && r.salesperson !== salesperson) return false;
+      return true;
+    })
+    .map((row) => {
+      const usdPaid = accountingUsdPaid(row, fxRates);
+      return { ...row, usdPaid, usdSales: usdPaid };
+    });
 
   const lost = all.lost.filter((r) => {
     if (!inRange(r.createdAt, from, to)) return false;
@@ -630,7 +630,10 @@ export function computeTotals(data: FilteredData): Totals {
   // an invoice; falling back to line count would multiply invoices that contain
   // more than one product and make CPA/AOV silently wrong.
   const orders = new Set(
-    accounting.filter((r) => !r.isCreditNote).map((r) => r.movement).filter(Boolean),
+    accounting
+      .filter((r) => !r.isCreditNote)
+      .map((r) => r.movement)
+      .filter(Boolean),
   ).size;
   const invoicedOrders =
     new Set(invoiced.map((r) => r.orderRef).filter(Boolean)).size || invoiced.length;
@@ -1008,25 +1011,60 @@ function shiftIsoDay(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function campaignActivityIdentity(row: PerfRow): string {
+  return `${row.platforms.slice().sort().join("|")}:${row.key}`;
+}
+
+/**
+ * Keep the most expensive campaigns first without allowing a high-volume
+ * platform to push every smaller source out of the alert. Each represented
+ * platform gets one row before the remaining slots are filled by spend.
+ */
+function platformBalancedRows(rows: PerfRow[], limit: number): PerfRow[] {
+  const sorted = [...rows].sort((a, b) => b.spend - a.spend);
+  const selected: PerfRow[] = [];
+  const seen = new Set<string>();
+
+  for (const platform of PLATFORMS) {
+    const row = sorted.find((candidate) => candidate.platforms.includes(platform));
+    if (!row) continue;
+    const identity = campaignActivityIdentity(row);
+    if (seen.has(identity)) continue;
+    selected.push(row);
+    seen.add(identity);
+  }
+
+  for (const row of sorted) {
+    if (selected.length >= limit) break;
+    const identity = campaignActivityIdentity(row);
+    if (seen.has(identity)) continue;
+    selected.push(row);
+    seen.add(identity);
+  }
+
+  return selected.slice(0, limit);
+}
+
 /**
  * Operational "running now" signal.
  *
  * The ad sheets do not carry a trustworthy platform status field, so activity
  * is evidence-based: a campaign is active when it actually spent money during
- * the last three days represented by the selected source. This avoids calling
- * an enabled-but-idle campaign active, and it also works across Meta/Snap/TikTok.
+ * the last three days represented by each selected source. Platforms export on
+ * different schedules, so every platform gets its own latest date and its own
+ * material-spend threshold before the results are merged.
  */
 export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
   current: FilteredData,
 ): Promise<import("./types").CampaignActivity> {
-  const latest = current.ads.reduce(
-    (max, row) => (row.date && row.date > max ? row.date : max),
-    "",
+  const selectedPlatforms = PLATFORMS.filter((platform) =>
+    current.ads.some((row) => row.platform === platform),
   );
-  if (!latest) {
+  if (!selectedPlatforms.length) {
     return {
       window: null,
+      platformWindows: {},
       definition: "recent_spend",
       rows: [],
       best: null,
@@ -1036,16 +1074,43 @@ export async function computeRecentCampaignActivity(
     };
   }
 
-  const from = shiftIsoDay(latest, -2);
-  const recent = await getFiltered({ ...filters, from, to: latest, range: undefined });
-  const rows = computePerf(recent, "campaign")
-    .filter((row) => row.spend > 0)
-    .sort((a, b) => b.spend - a.spend);
-  const materialFloor = Math.max(
-    25,
-    rows.reduce((sum, row) => sum + row.spend, 0) * 0.01,
+  const slices = await Promise.all(
+    selectedPlatforms.map(async (platform) => {
+      const latest = current.ads.reduce(
+        (max, row) => (row.platform === platform && row.date && row.date > max ? row.date : max),
+        "",
+      );
+      const from = shiftIsoDay(latest, -2);
+      const recent = await getFiltered({
+        ...filters,
+        platform,
+        from,
+        to: latest,
+        range: undefined,
+      });
+      const rows = computePerf(recent, "campaign")
+        .filter((row) => row.spend > 0)
+        .sort((a, b) => b.spend - a.spend);
+      const recentSpend = rows.reduce((total, row) => total + row.spend, 0);
+      // Ignore pennies, but scale the threshold to the source. A fixed $25
+      // floor hid genuine TikTok/Snapchat risk whenever their total spend was
+      // smaller than Meta's.
+      const materialFloor = Math.max(5, Math.min(25, recentSpend * 0.1));
+      return {
+        platform,
+        from,
+        to: latest,
+        rows,
+        decisionRows: rows.filter((row) => row.spend >= materialFloor),
+      };
+    }),
   );
-  const decisionRows = rows.filter((row) => row.spend >= materialFloor);
+
+  const platformWindows = Object.fromEntries(
+    slices.map(({ platform, from, to }) => [platform, { from, to }]),
+  ) as Partial<Record<Platform, { from: string; to: string }>>;
+  const rows = slices.flatMap((slice) => slice.rows);
+  const decisionRows = slices.flatMap((slice) => slice.decisionRows);
   const zeroResult = decisionRows
     .filter(
       (row) =>
@@ -1058,18 +1123,13 @@ export async function computeRecentCampaignActivity(
     )
     .sort((a, b) => b.spend - a.spend);
   const atRisk = decisionRows
-    .filter(
-      (row) =>
-        row.won <= 0 &&
-        row.invoices <= 0 &&
-        row.salesOrders <= 0,
-    )
+    .filter((row) => row.won <= 0 && row.invoices <= 0 && row.salesOrders <= 0)
     .sort((a, b) => b.spend - a.spend);
   const bestPool = decisionRows.filter(
     (row) => (row.platformLeads ?? 0) > 0 || row.crmLeads > 0 || row.revenue > 0,
   );
   const best =
-    bestPool.sort(
+    [...bestPool].sort(
       (a, b) =>
         b.won - a.won ||
         (b.roas ?? 0) - (a.roas ?? 0) ||
@@ -1077,20 +1137,24 @@ export async function computeRecentCampaignActivity(
     )[0] ?? null;
   const worstPool = decisionRows.filter((row) => row !== best);
   const worst =
-    worstPool.sort((a, b) => {
+    [...worstPool].sort((a, b) => {
       const scoreA = a.spend - a.revenue + (a.platformLeads ?? 0) * -0.01;
       const scoreB = b.spend - b.revenue + (b.platformLeads ?? 0) * -0.01;
       return scoreB - scoreA;
     })[0] ?? null;
 
   return {
-    window: { from, to: latest },
+    window: {
+      from: slices.reduce((min, slice) => (slice.from < min ? slice.from : min), slices[0].from),
+      to: slices.reduce((max, slice) => (slice.to > max ? slice.to : max), slices[0].to),
+    },
+    platformWindows,
     definition: "recent_spend",
-    rows: rows.slice(0, 10),
+    rows: platformBalancedRows(rows, 12),
     best,
     worst,
-    zeroResult: zeroResult.slice(0, 8),
-    atRisk: atRisk.slice(0, 8),
+    zeroResult: platformBalancedRows(zeroResult, 12),
+    atRisk: platformBalancedRows(atRisk, 12),
   };
 }
 
@@ -1644,12 +1708,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const revenueOf = (y: number, m?: string) =>
     sum(
-      all.accounting.filter(
-        (row) => {
-          const d = accountingReportingDate(row, "payment");
-          return inYear(d, y) && (!m || d.slice(5, 7) === m);
-        },
-      ),
+      all.accounting.filter((row) => {
+        const d = accountingReportingDate(row, "payment");
+        return inYear(d, y) && (!m || d.slice(5, 7) === m);
+      }),
       (row) => row.usdPaid,
     );
   const leadsOf = (y: number, m?: string) =>
@@ -1709,12 +1771,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const ytdRevenue = (y: number) =>
     sum(
-      all.accounting.filter(
-        (row) => {
-          const d = accountingReportingDate(row, "payment");
-          return inYear(d, y) && d.slice(5) <= ytdCut;
-        },
-      ),
+      all.accounting.filter((row) => {
+        const d = accountingReportingDate(row, "payment");
+        return inYear(d, y) && d.slice(5) <= ytdCut;
+      }),
       (row) => row.usdPaid,
     );
   const ytdLeads = (y: number) =>
@@ -1736,8 +1796,7 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
       const previous = sum(
         all.accounting.filter(
           (row) =>
-            row.course === course &&
-            inYear(accountingReportingDate(row, "payment"), prevYear),
+            row.course === course && inYear(accountingReportingDate(row, "payment"), prevYear),
         ),
         (row) => row.usdPaid,
       );
