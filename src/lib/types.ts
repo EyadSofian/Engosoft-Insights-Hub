@@ -423,6 +423,27 @@ export interface PerfRow {
   spendCoverage: Maybe;
 }
 
+/**
+ * What a currently-spending campaign has returned across its whole history.
+ *
+ * Spend answers "is this running now"; only the full history answers "has this
+ * ever paid for itself", because a deal closes weeks after the click that
+ * produced it.
+ */
+export interface CampaignLifetime {
+  spend: number;
+  platformLeads: Maybe;
+  crmLeads: number;
+  won: number;
+  invoices: number;
+  salesOrders: number;
+  revenue: number;
+  roas: Maybe;
+  /** First and last day this campaign ever recorded spend under the active filters. */
+  firstSpendDate: string;
+  lastSpendDate: string;
+}
+
 export interface CampaignActivity {
   /** Broadest window retained for older summary UI. */
   window: { from: string; to: string } | null;
@@ -433,9 +454,19 @@ export interface CampaignActivity {
   rows: PerfRow[];
   best: PerfRow | null;
   worst: PerfRow | null;
+  /** Material recent spend that produced no lead at all — leads arrive same day. */
   zeroResult: PerfRow[];
-  /** Material spend with no Won, paid invoice, or fully invoiced sales order in the recent window. */
+  /**
+   * Material recent spend from a campaign that has never produced a Won, a paid
+   * invoice, or a fully invoiced sales order across its whole history.
+   *
+   * Outcomes are deliberately not read from the three-day spend window. Sales
+   * cycles here run for weeks, so a short window reported every healthy
+   * campaign as failing — including the account's best performers.
+   */
   atRisk: PerfRow[];
+  /** Whole-history outcome for each campaign referenced above, keyed by PerfRow.key. */
+  lifetime: Record<string, CampaignLifetime>;
 }
 
 export interface CourseAgg extends PerfRow {

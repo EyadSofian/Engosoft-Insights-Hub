@@ -1006,7 +1006,11 @@ export function topLeaks(rows: PerfRow[], n = 5): PerfRow[] {
 }
 
 function shiftIsoDay(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00Z`);
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  // An undated source row would otherwise reach toISOString() as Invalid Date
+  // and throw, taking the whole overview response down with it.
+  if (!Number.isFinite(ms)) return value;
+  const date = new Date(ms);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
@@ -1042,7 +1046,10 @@ function platformBalancedRows(rows: PerfRow[], limit: number): PerfRow[] {
     seen.add(identity);
   }
 
-  return selected.slice(0, limit);
+  // Representation decides who survives the cut; spend decides the reading
+  // order. Otherwise a $7 row reserved for a small platform sits above a $45
+  // one and the list looks unsorted.
+  return selected.slice(0, limit).sort((a, b) => b.spend - a.spend);
 }
 
 /**
@@ -1058,21 +1065,23 @@ export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
   current: FilteredData,
 ): Promise<import("./types").CampaignActivity> {
+  const empty: import("./types").CampaignActivity = {
+    window: null,
+    platformWindows: {},
+    definition: "recent_spend",
+    rows: [],
+    best: null,
+    worst: null,
+    zeroResult: [],
+    atRisk: [],
+    lifetime: {},
+  };
+  // A platform with only undated rows cannot produce a window, so it is not a
+  // candidate at all rather than a source of an invalid date downstream.
   const selectedPlatforms = PLATFORMS.filter((platform) =>
-    current.ads.some((row) => row.platform === platform),
+    current.ads.some((row) => row.platform === platform && !!row.date),
   );
-  if (!selectedPlatforms.length) {
-    return {
-      window: null,
-      platformWindows: {},
-      definition: "recent_spend",
-      rows: [],
-      best: null,
-      worst: null,
-      zeroResult: [],
-      atRisk: [],
-    };
-  }
+  if (!selectedPlatforms.length) return empty;
 
   const slices = await Promise.all(
     selectedPlatforms.map(async (platform) => {
@@ -1111,6 +1120,18 @@ export async function computeRecentCampaignActivity(
   ) as Partial<Record<Platform, { from: string; to: string }>>;
   const rows = slices.flatMap((slice) => slice.rows);
   const decisionRows = slices.flatMap((slice) => slice.decisionRows);
+
+  // Outcomes need a longer horizon than spend does. Deals here close weeks
+  // after the click that paid for them, so reading Won/invoices out of the
+  // same three days reported the account's strongest campaigns as failures —
+  // one of them carrying 20 Won and $10K collected. Spend answers "is it
+  // running now"; the campaign's whole history answers "has it ever returned
+  // anything". Every non-date filter the user set is preserved.
+  const history = await getFiltered({ ...filters, from: undefined, to: undefined, range: "all" });
+  const lifetimeRows = new Map(computePerf(history, "campaign").map((row) => [row.key, row]));
+
+  // Leads are the exception: they arrive the same day or the next one, so a
+  // campaign spending for three days with none at all is broken right now.
   const zeroResult = decisionRows
     .filter(
       (row) =>
@@ -1122,26 +1143,73 @@ export async function computeRecentCampaignActivity(
         row.revenue <= 0,
     )
     .sort((a, b) => b.spend - a.spend);
-  const atRisk = decisionRows
-    .filter((row) => row.won <= 0 && row.invoices <= 0 && row.salesOrders <= 0)
-    .sort((a, b) => b.spend - a.spend);
+
+  const neverSold = (row: PerfRow): boolean => {
+    const life = lifetimeRows.get(row.key);
+    // No history row means no evidence of failure. Staying silent beats
+    // accusing a campaign the join could not resolve.
+    if (!life) return false;
+    return life.won <= 0 && life.invoices <= 0 && life.salesOrders <= 0 && life.revenue <= 0;
+  };
+  const atRisk = decisionRows.filter(neverSold).sort((a, b) => b.spend - a.spend);
+  const atRiskKeys = new Set(atRisk.map((row) => row.key));
+  /** Money this campaign consumed that never came back, over its whole life. */
+  const unrecovered = (row: PerfRow): number => {
+    const life = lifetimeRows.get(row.key);
+    return (life?.spend ?? row.spend) - (life?.revenue ?? row.revenue);
+  };
+
+  // A campaign that has never collected a pound cannot be the best performer,
+  // however busy its last three days look.
   const bestPool = decisionRows.filter(
-    (row) => (row.platformLeads ?? 0) > 0 || row.crmLeads > 0 || row.revenue > 0,
+    (row) =>
+      !atRiskKeys.has(row.key) &&
+      ((row.platformLeads ?? 0) > 0 || row.crmLeads > 0 || row.revenue > 0),
   );
   const best =
-    [...bestPool].sort(
-      (a, b) =>
+    [...bestPool].sort((a, b) => {
+      const lifeA = lifetimeRows.get(a.key);
+      const lifeB = lifetimeRows.get(b.key);
+      // Money collected now, then money collected ever, then pipeline. Ranking
+      // by CRM Won first crowned a campaign holding one unpaid deal over one
+      // that had actually banked thousands.
+      return (
+        b.revenue - a.revenue ||
+        (lifeB?.revenue ?? 0) - (lifeA?.revenue ?? 0) ||
         b.won - a.won ||
-        (b.roas ?? 0) - (a.roas ?? 0) ||
-        (b.platformLeads ?? 0) - (a.platformLeads ?? 0),
-    )[0] ?? null;
+        (b.platformLeads ?? 0) - (a.platformLeads ?? 0)
+      );
+    })[0] ?? null;
   const worstPool = decisionRows.filter((row) => row !== best);
   const worst =
     [...worstPool].sort((a, b) => {
-      const scoreA = a.spend - a.revenue + (a.platformLeads ?? 0) * -0.01;
-      const scoreB = b.spend - b.revenue + (b.platformLeads ?? 0) * -0.01;
-      return scoreB - scoreA;
+      // A campaign that has never returned anything outranks one merely having
+      // a slow three days, however large that campaign's recent spend is.
+      const riskDelta = (atRiskKeys.has(b.key) ? 1 : 0) - (atRiskKeys.has(a.key) ? 1 : 0);
+      return riskDelta || unrecovered(b) - unrecovered(a);
     })[0] ?? null;
+
+  const selectedRows = platformBalancedRows(rows, 12);
+  const selectedZeroResult = platformBalancedRows(zeroResult, 12);
+  const selectedAtRisk = platformBalancedRows(atRisk, 12);
+  const lifetime: Record<string, import("./types").CampaignLifetime> = {};
+  for (const row of [...selectedRows, ...selectedZeroResult, ...selectedAtRisk, best, worst]) {
+    if (!row || lifetime[row.key]) continue;
+    const life = lifetimeRows.get(row.key);
+    if (!life) continue;
+    lifetime[row.key] = {
+      spend: life.spend,
+      platformLeads: life.platformLeads,
+      crmLeads: life.crmLeads,
+      won: life.won,
+      invoices: life.invoices,
+      salesOrders: life.salesOrders,
+      revenue: life.revenue,
+      roas: life.roas,
+      firstSpendDate: life.spendDateMin,
+      lastSpendDate: life.spendDateMax,
+    };
+  }
 
   return {
     window: {
@@ -1150,11 +1218,12 @@ export async function computeRecentCampaignActivity(
     },
     platformWindows,
     definition: "recent_spend",
-    rows: platformBalancedRows(rows, 12),
+    rows: selectedRows,
     best,
     worst,
-    zeroResult: platformBalancedRows(zeroResult, 12),
-    atRisk: platformBalancedRows(atRisk, 12),
+    zeroResult: selectedZeroResult,
+    atRisk: selectedAtRisk,
+    lifetime,
   };
 }
 

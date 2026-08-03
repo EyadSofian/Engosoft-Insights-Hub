@@ -17,6 +17,11 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
   const prefs = useRiskAlertPrefs();
   // The only way back once the popup has been silenced for good.
   const muted = mutedRiskCount(activity.atRisk, prefs);
+  // Both badges read the server's own verdict. Recomputing them here let the
+  // list disagree with the count in the notice right above it.
+  const zeroKeys = new Set(activity.zeroResult.map((row) => row.key));
+  const atRiskKeys = new Set(activity.atRisk.map((row) => row.key));
+  const lifetime = activity.lifetime ?? {};
   const platformWindows = activity.platformWindows ?? {};
   const representedPlatforms = PLATFORMS.filter((platform) => platformWindows[platform]);
   const range = representedPlatforms.length
@@ -40,8 +45,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         }
         hint={
           lang === "ar"
-            ? "نشطة فعليًا = سجلت إنفاقًا خلال آخر 3 أيام متاحة لكل منصة، لأن مواعيد تحديث المصادر مختلفة."
-            : "Operationally active = recorded spend during each platform's latest three available days, since sources refresh on different schedules."
+            ? "نشطة فعليًا = سجلت إنفاقًا خلال آخر 3 أيام متاحة لكل منصة، لأن مواعيد تحديث المصادر مختلفة. الإنفاق والليدز من الـ3 أيام دي، أما الحكم بالبيع فمن تاريخ الحملة كله لأن الصفقة بتقفل بعد أسابيع."
+            : "Operationally active = recorded spend during each platform's latest three available days, since sources refresh on different schedules. Spend and leads come from those days; the sales verdict comes from the campaign's whole history, because deals close weeks later."
         }
       >
         <span className="inline-flex items-center gap-1.5">
@@ -86,8 +91,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               icon={<AlertTriangle size={16} />}
             >
               {lang === "ar"
-                ? "سجلت إنفاقًا حديثًا ولم تسجل Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في نفس نافذة القياس."
-                : "They recorded recent spend with no Won, paid invoice, or fully invoiced sales order in the same measurement window."}
+                ? "بتصرف حاليًا ولم تسجل ولا Won ولا فاتورة مدفوعة ولا أمر بيع مفوتر بالكامل طوال تاريخها، مش في آخر 3 أيام بس."
+                : "Spending now and never recorded a single Won, paid invoice, or fully invoiced sales order across their entire history — not merely in the last three days."}
               {muted > 0 && (
                 <button
                   type="button"
@@ -107,15 +112,20 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               tone="danger"
               title={
                 lang === "ar"
-                  ? `${fmtNum(activity.zeroResult.length)} حملة تصرف بلا نتيجة مسجلة`
-                  : `${fmtNum(activity.zeroResult.length)} campaigns spending with no recorded result`
+                  ? `${fmtNum(activity.zeroResult.length)} حملة تصرف بلا أي ليد`
+                  : `${fmtNum(activity.zeroResult.length)} campaigns spending with zero leads`
               }
               icon={<AlertTriangle size={16} />}
             >
-              {activity.zeroResult
-                .slice(0, 3)
-                .map((row) => `${row.name}: ${fmtUSD(row.spend)}`)
-                .join(" · ")}
+              {lang === "ar"
+                ? "الليد بيوصل في نفس اليوم عادة، فصفر ليد مع إنفاق مستمر معناه غالبًا عطل في الاستهداف أو الفورم أو الصفحة."
+                : "Leads normally arrive the same day, so zero leads against continuing spend usually means a broken target, form, or landing page."}
+              <div className="mt-1.5">
+                {activity.zeroResult
+                  .slice(0, 3)
+                  .map((row) => `${row.name}: ${fmtUSD(row.spend)}`)
+                  .join(" · ")}
+              </div>
             </Notice>
           )}
 
@@ -134,13 +144,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
 
           <div className="divide-y divide-border rounded-xl border border-border">
             {activity.rows.slice(0, 6).map((row) => {
-              const zero =
-                (row.platformLeads ?? 0) <= 0 &&
-                row.crmLeads <= 0 &&
-                row.won <= 0 &&
-                row.invoices <= 0 &&
-                row.salesOrders <= 0 &&
-                row.revenue <= 0;
+              const life = lifetime[row.key];
+              const sold = !!life && (life.won > 0 || life.invoices > 0 || life.revenue > 0);
               return (
                 <div
                   key={`${row.platforms.join("-")}:${row.key}`}
@@ -156,8 +161,22 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                           {PLATFORM_LABEL[platform][lang]}
                         </Pill>
                       ))}
-                      {zero && (
-                        <Pill tone="danger">{lang === "ar" ? "صرف بلا نتيجة" : "No result"}</Pill>
+                      {zeroKeys.has(row.key) && (
+                        <Pill tone="danger">{lang === "ar" ? "صرف بلا ليدز" : "No leads"}</Pill>
+                      )}
+                      {atRiskKeys.has(row.key) && (
+                        <Pill tone="warning">
+                          {lang === "ar" ? "لم تبِع من قبل" : "Never sold"}
+                        </Pill>
+                      )}
+                      {/* Without this a healthy campaign with a slow three days
+                          reads exactly like one that has never sold anything. */}
+                      {sold && (
+                        <Pill tone="success">
+                          {lang === "ar"
+                            ? `إجمالي ${fmtUSD(life.revenue)} · ${fmtNum(life.won)} Won`
+                            : `${fmtUSD(life.revenue)} lifetime · ${fmtNum(life.won)} Won`}
+                        </Pill>
                       )}
                     </div>
                   </div>

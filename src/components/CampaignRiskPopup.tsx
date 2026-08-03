@@ -12,7 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { CampaignActivity, PerfRow } from "@/lib/types";
+import type { CampaignActivity, CampaignLifetime, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { Pill } from "@/components/ui-bits";
@@ -113,8 +113,8 @@ export function CampaignRiskPopup() {
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-text-muted sm:text-sm">
                 {lang === "ar"
-                  ? "إنفاق في أحدث 3 أيام متاحة لكل منصة بلا Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل."
-                  : "Spend in each platform's latest 3 available days with no Won, paid invoice, or fully invoiced sales order."}
+                  ? "بتصرف في أحدث 3 أيام متاحة لكل منصة، ولم تسجل ولا Won ولا فاتورة مدفوعة ولا أمر بيع مفوتر بالكامل طوال تاريخها."
+                  : "Spending in each platform's latest 3 available days, with no Won, paid invoice, or fully invoiced sales order across their entire history."}
               </p>
             </div>
           </div>
@@ -151,7 +151,11 @@ export function CampaignRiskPopup() {
 
           <div className="grid gap-3 lg:grid-cols-2">
             {rows.map((row) => (
-              <RiskCard key={`${row.platforms.join("-")}:${row.key}`} row={row} />
+              <RiskCard
+                key={`${row.platforms.join("-")}:${row.key}`}
+                row={row}
+                lifetime={data.activity.lifetime?.[row.key]}
+              />
             ))}
           </div>
 
@@ -205,7 +209,7 @@ export function CampaignRiskPopup() {
   );
 }
 
-function RiskCard({ row }: { row: PerfRow }) {
+function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime }) {
   const { lang } = useI18n();
   return (
     <article className="rounded-2xl border border-danger/25 bg-danger-soft/40 p-4">
@@ -225,11 +229,18 @@ function RiskCard({ row }: { row: PerfRow }) {
         <Pill tone="danger">{lang === "ar" ? "مراجعة عاجلة" : "Urgent review"}</Pill>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+      {/* Won, invoices and sales orders are zero by definition here, so the
+          card spends its space on the size of the loss instead. */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <RiskMetric
           icon={<BadgeDollarSign size={14} />}
-          label={lang === "ar" ? "الإنفاق" : "Spend"}
+          label={lang === "ar" ? "إنفاق 3 أيام" : "3-day spend"}
           value={fmtUSD(row.spend)}
+        />
+        <RiskMetric
+          icon={<ReceiptText size={14} />}
+          label={lang === "ar" ? "إجمالي المصروف" : "Total burned"}
+          value={lifetime ? fmtUSD(lifetime.spend) : "—"}
         />
         <RiskMetric
           icon={<Users size={14} />}
@@ -238,20 +249,19 @@ function RiskCard({ row }: { row: PerfRow }) {
         />
         <RiskMetric
           icon={<Users size={14} />}
-          label={lang === "ar" ? "ليدز أودو" : "Odoo leads"}
-          value={fmtNum(row.crmLeads)}
-        />
-        <RiskMetric
-          icon={<ReceiptText size={14} />}
-          label={lang === "ar" ? "الفواتير" : "Invoices"}
-          value={fmtNum(row.invoices)}
-        />
-        <RiskMetric
-          icon={<ShoppingCart size={14} />}
-          label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
-          value={fmtNum(row.salesOrders)}
+          label={lang === "ar" ? "ليدز أودو (الكل)" : "Odoo leads (all time)"}
+          value={lifetime ? fmtNum(lifetime.crmLeads) : fmtNum(row.crmLeads)}
         />
       </div>
+
+      {lifetime?.firstSpendDate && (
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-text-muted">
+          <ShoppingCart size={12} aria-hidden="true" />
+          {lang === "ar"
+            ? `بتصرف من ${lifetime.firstSpendDate} بدون أي بيع مسجّل`
+            : `Spending since ${lifetime.firstSpendDate} with no recorded sale`}
+        </p>
+      )}
     </article>
   );
 }
