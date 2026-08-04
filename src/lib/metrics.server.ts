@@ -16,6 +16,7 @@ import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
+import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
 import type {
   AdRow,
   AccountingRow,
@@ -1078,9 +1079,9 @@ function platformBalancedRows(rows: PerfRow[], limit: number): PerfRow[] {
 /**
  * Operational "running now" signal.
  *
- * n8n reads the official campaign switch from Meta, Snapchat, TikTok and
- * Google Ads. Recent spend is joined only as reporting context; it never
- * changes an Active/Paused decision. Google Sheets keeps a fallback snapshot.
+ * The official campaign switch comes from the platform APIs. Google Ads is
+ * read directly by this server; Meta, Snapchat and TikTok use the shared live
+ * status collector. Recent spend is reporting context only.
  */
 export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
@@ -1183,15 +1184,37 @@ export async function computeRecentCampaignActivity(
     return state.deliveryState === "active";
   };
 
-  // Status is read directly from every platform through n8n. Spend never
-  // decides whether a campaign is Active; it is attached later as context.
-  const live = await loadMetaLiveStatus();
-  const directStates: CampaignOperationalState[] = (live?.campaigns ?? []).map((state) => ({
-    ...state,
-    campaignKey: `id:${state.campaignId}`,
-  }));
+  // Spend never decides whether a campaign is Active. Google is deliberately
+  // read direct here so its OAuth authority cannot drift from the reporting API.
+  const [live, googleDirect] = await Promise.all([
+    loadMetaLiveStatus(),
+    fetchGoogleAdsCampaignStatus(),
+  ]);
+  const collectorStates: CampaignOperationalState[] = (live?.campaigns ?? [])
+    .filter((state) => state.platform !== "google")
+    .map((state) => ({
+      ...state,
+      campaignKey: `id:${state.campaignId}`,
+    }));
+  const directStates = googleDirect.health.ok
+    ? [...collectorStates, ...googleDirect.campaigns]
+    : [
+        ...collectorStates,
+        ...(live?.campaigns ?? [])
+          .filter((state) => state.platform === "google")
+          .map((state) => ({ ...state, campaignKey: `id:${state.campaignId}` })),
+      ];
   const fallbackStates = history.snapshot.campaignStates;
-  const officialStates = (live ? directStates : fallbackStates).filter(acceptsState);
+  const officialStates = (live || googleDirect.health.ok ? directStates : fallbackStates).filter(
+    acceptsState,
+  );
+  const platformHealth = (() => {
+    const collectorHealth = (live?.platformHealth ?? []).filter(
+      (entry) => entry.platform !== "google",
+    );
+    return [...collectorHealth, googleDirect.health];
+  })();
+  const stateSource = googleDirect.health.ok ? "platform_direct" : live ? "n8n_live" : "daily_proxy";
 
   // Recent figures are context only. Most feeds are daily, so the UI calls
   // them "latest recorded" rather than pretending every value is a rolling
@@ -1243,9 +1266,9 @@ export async function computeRecentCampaignActivity(
   if (!rows.length) {
     return {
       ...empty,
-      source: live ? "n8n_live" : fallbackStates.length ? "google_snapshot" : "daily_proxy",
-      generatedAt: live?.generatedAt || fallbackStates[0]?.checkedAt || "",
-      platformHealth: live?.platformHealth ?? [],
+      source: stateSource,
+      generatedAt: googleDirect.health.checkedAt || live?.generatedAt || fallbackStates[0]?.checkedAt || "",
+      platformHealth,
       delivery,
       platformWindows,
     };
@@ -1355,12 +1378,15 @@ export async function computeRecentCampaignActivity(
     })(),
     platformWindows,
     definition: "official_status",
-    source: live ? "n8n_live" : fallbackStates.length ? "google_snapshot" : "daily_proxy",
+    source: stateSource,
     generatedAt:
+      googleDirect.health.checkedAt ||
       live?.generatedAt ||
       Object.values(delivery).reduce((max, state) => (state.checkedAt > max ? state.checkedAt : max), ""),
     platformHealth:
-      live?.platformHealth ??
+      platformHealth.length > 0
+        ? platformHealth
+        :
       PLATFORMS.map((platform) => ({
         platform,
         ok: fallbackStates.some((state) => state.platform === platform),

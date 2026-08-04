@@ -53,6 +53,12 @@ interface GoogleAdsResultRow {
     id?: string;
     name?: string;
     advertisingChannelType?: string;
+    status?: string;
+    primaryStatus?: string;
+    primaryStatusReasons?: string[];
+    servingStatus?: string;
+    startDate?: string;
+    endDate?: string;
   };
   adGroup?: {
     id?: string;
@@ -104,6 +110,13 @@ export interface GoogleAdsFetchResult {
   configured: boolean;
   rows: GoogleAdsDaily[];
   syncedAt: string;
+  errors: string[];
+}
+
+export interface GoogleAdsCampaignStatusResult {
+  configured: boolean;
+  campaigns: import("./types").CampaignOperationalState[];
+  health: import("./types").CampaignPlatformHealth;
   errors: string[];
 }
 
@@ -263,10 +276,30 @@ function gaql(from: string, to: string): string {
   `;
 }
 
+function campaignStatusGaql(): string {
+  return `
+    SELECT
+      customer.id,
+      customer.descriptive_name,
+      campaign.id,
+      campaign.name,
+      campaign.status,
+      campaign.primary_status,
+      campaign.primary_status_reasons,
+      campaign.serving_status,
+      campaign.start_date,
+      campaign.end_date
+    FROM campaign
+    WHERE campaign.status != 'REMOVED'
+    ORDER BY campaign.name
+  `;
+}
+
 async function searchWithLogin(
   cfg: GoogleAdsConfig,
   customerId: string,
   loginCustomerId?: string,
+  query = gaql(cfg.startDate, cfg.endDate),
 ): Promise<GoogleAdsResultRow[]> {
   let lastError = "unknown error";
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -280,7 +313,7 @@ async function searchWithLogin(
     const response = await fetch(`${API}/customers/${customerId}/googleAds:searchStream`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ query: gaql(cfg.startDate, cfg.endDate) }),
+      body: JSON.stringify({ query }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -333,6 +366,7 @@ async function listAccessibleCustomerIds(cfg: GoogleAdsConfig): Promise<string[]
 async function searchCustomer(
   cfg: GoogleAdsConfig,
   customerId: string,
+  query = gaql(cfg.startDate, cfg.endDate),
 ): Promise<GoogleAdsResultRow[]> {
   let lastError = "unknown error";
 
@@ -341,7 +375,7 @@ async function searchCustomer(
   // those as possible manager logins. This also handles an older owner MCC.
   for (const loginCustomerId of [cfg.loginCustomerId, undefined]) {
     try {
-      return await searchWithLogin(cfg, customerId, loginCustomerId);
+      return await searchWithLogin(cfg, customerId, loginCustomerId, query);
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (!lastError.includes("USER_PERMISSION_DENIED")) {
@@ -365,7 +399,7 @@ async function searchCustomer(
   );
   for (const managerId of managerCandidates) {
     try {
-      return await searchWithLogin(cfg, customerId, managerId);
+      return await searchWithLogin(cfg, customerId, managerId, query);
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (!lastError.includes("USER_PERMISSION_DENIED")) break;
@@ -375,6 +409,94 @@ async function searchCustomer(
   throw new Error(
     `Google Ads customer ${customerId}: ${lastError}; OAuth-accessible customer IDs: ${accessible.join(", ") || "none"}`,
   );
+}
+
+/**
+ * Reads Google's own campaign switch directly from Google Ads. Spend is not
+ * consulted here: ENABLED is Active, while PAUSED stays out of the active list.
+ */
+export async function fetchGoogleAdsCampaignStatus(): Promise<GoogleAdsCampaignStatusResult> {
+  const cfg = config();
+  const checkedAt = new Date().toISOString();
+  if (!cfg) {
+    return {
+      configured: false,
+      campaigns: [],
+      errors: ["Google Ads direct connection is not configured."],
+      health: {
+        platform: "google",
+        ok: false,
+        active: 0,
+        total: 0,
+        message: "Google Ads direct connection is not configured.",
+        checkedAt,
+      },
+    };
+  }
+
+  const campaigns: import("./types").CampaignOperationalState[] = [];
+  const errors: string[] = [];
+  let total = 0;
+
+  for (const customerId of cfg.customerIds) {
+    try {
+      const rows = await searchCustomer(cfg, customerId, campaignStatusGaql());
+      total += rows.length;
+      for (const row of rows) {
+        const campaignId = String(row.campaign?.id ?? "").trim();
+        const status = String(row.campaign?.status ?? "UNKNOWN").trim();
+        if (!campaignId || status !== "ENABLED") continue;
+        const primaryStatus = String(row.campaign?.primaryStatus ?? "").trim();
+        const reasons = Array.isArray(row.campaign?.primaryStatusReasons)
+          ? row.campaign.primaryStatusReasons.map(String).filter(Boolean)
+          : [];
+        const accountId = String(row.customer?.id ?? customerId).trim();
+        campaigns.push({
+          platform: "google",
+          accountId,
+          account: String(row.customer?.descriptiveName ?? "").trim() || accountId,
+          accountTimezone: "",
+          campaignId,
+          campaignKey: `id:${campaignId}`,
+          name: String(row.campaign?.name ?? "").trim() || `Google Campaign ${campaignId}`,
+          configuredStatus: status,
+          effectiveStatus: primaryStatus || status,
+          servingStatus: String(row.campaign?.servingStatus ?? "").trim(),
+          statusReason: reasons.join(", "),
+          startTime: String(row.campaign?.startDate ?? "").trim(),
+          stopTime: String(row.campaign?.endDate ?? "").trim(),
+          updatedTime: "",
+          activeAdsets: 0,
+          activeAds: 0,
+          spend24h: 0,
+          impressions24h: 0,
+          clicks24h: 0,
+          platformLeads24h: null,
+          deliveryState: "active",
+          checkedAt,
+          source: "platform_direct",
+        });
+      }
+    } catch (error) {
+      errors.push(
+        `Google Ads customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return {
+    configured: true,
+    campaigns,
+    errors,
+    health: {
+      platform: "google",
+      ok: errors.length === 0,
+      active: campaigns.length,
+      total,
+      message: errors.join(" | "),
+      checkedAt,
+    },
+  };
 }
 
 export async function fetchGoogleAds(): Promise<GoogleAdsFetchResult> {

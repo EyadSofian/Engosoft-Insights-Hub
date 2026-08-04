@@ -445,7 +445,11 @@ export interface CampaignLifetime {
 }
 
 export type CampaignDeliveryState = "active" | "paused" | "ended" | "unknown";
-export type CampaignStateSource = "n8n_live" | "google_snapshot" | "daily_proxy";
+export type CampaignStateSource =
+  | "n8n_live"
+  | "platform_direct"
+  | "google_snapshot"
+  | "daily_proxy";
 
 export interface CampaignPlatformHealth {
   platform: Platform;

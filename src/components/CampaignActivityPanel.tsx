@@ -35,10 +35,14 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
   const disconnectedCount = platformHealth.filter((item) => !item.ok).length;
   const range = lang === "ar" ? "الحالة الآن" : "Current status";
   const sourceLabel =
-    activity.source === "n8n_live"
+    activity.source === "platform_direct"
       ? lang === "ar"
-        ? "كل المنصات مباشر من n8n"
-        : "All platforms live from n8n"
+        ? "الحالة مباشرة من المنصات"
+        : "Status direct from platforms"
+      : activity.source === "n8n_live"
+        ? lang === "ar"
+          ? "حالة المنصات المباشرة"
+          : "Live platform status"
       : activity.source === "google_snapshot"
         ? lang === "ar"
           ? "آخر نسخة محفوظة في Google"
@@ -58,7 +62,13 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                 {range}
               </span>
             </Pill>
-            <Pill tone={activity.source === "n8n_live" ? "success" : "warning"}>
+            <Pill
+              tone={
+                activity.source === "n8n_live" || activity.source === "platform_direct"
+                  ? "success"
+                  : "warning"
+              }
+            >
               {sourceLabel}
             </Pill>
           </div>
