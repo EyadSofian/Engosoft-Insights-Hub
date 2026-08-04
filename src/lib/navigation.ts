@@ -2,6 +2,7 @@ import {
   BarChart3,
   CalendarRange,
   ChartNoAxesCombined,
+  GraduationCap,
   Globe2,
   LayoutDashboard,
   Megaphone,
@@ -56,6 +57,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     defaultTo: "/campaigns",
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
+      { to: "/courses", key: "courses", icon: GraduationCap },
       { to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch },
       { to: "/ads", key: "ads_tech", icon: BarChart3 },
       { to: "/yoy", key: "yoy", icon: CalendarRange },

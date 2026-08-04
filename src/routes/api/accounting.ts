@@ -19,7 +19,10 @@ export const Route = createFileRoute("/api/accounting")({
         const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const paid = (row: (typeof rows)[number]) => row.usdPaid;
         const invoiceCount = new Set(
-          rows.filter((row) => !row.isCreditNote).map((row) => row.movement).filter(Boolean),
+          rows
+            .filter((row) => !row.isCreditNote)
+            .map((row) => row.movement)
+            .filter(Boolean),
         ).size;
         const paidUsd = rows.reduce((sum, row) => sum + row.usdPaid, 0);
         const monthlyMap = new Map<
@@ -101,7 +104,10 @@ export const Route = createFileRoute("/api/accounting")({
             paidUsd,
             invoices: invoiceCount,
             creditNotes: new Set(
-              rows.filter((row) => row.isCreditNote).map((row) => row.movement).filter(Boolean),
+              rows
+                .filter((row) => row.isCreditNote)
+                .map((row) => row.movement)
+                .filter(Boolean),
             ).size,
             creditNoteUsd: rows
               .filter((row) => row.isCreditNote)
@@ -116,41 +122,50 @@ export const Route = createFileRoute("/api/accounting")({
           byCurrency: groupBy(rows, (row) => row.currency || "—", paid),
           byTeam: groupBy(rows, (row) => row.salesTeam || "—", paid),
           bySalesperson: groupBy(rows, (row) => row.salesperson || "—", paid),
-          byMonth: groupBy(rows, (row) => accountingDate(row).slice(0, 7) || "—", paid).sort((a, b) =>
-            a.label.localeCompare(b.label),
+          byMonth: groupBy(rows, (row) => accountingDate(row).slice(0, 7) || "—", paid).sort(
+            (a, b) => a.label.localeCompare(b.label),
           ),
           monthly,
           byDay: [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)),
           courses: buildAccountingCourses(rows),
           detail: capped(
-            rows.map((row) => ({
-              id: row.id,
-              movement: row.movement,
-              moveType: row.moveType,
-              isCreditNote: row.isCreditNote,
-              paymentDate: row.paymentDate,
-              invoiceDate: row.invoiceDate,
-              partner: row.partner,
-              country: row.country,
-              company: row.company,
-              salesperson: row.salesperson,
-              salesTeam: row.salesTeam,
-              code: row.code,
-              product: row.product,
-              productCategory: row.productCategory,
-              mainCategory: row.mainCategory,
-              productCode: row.productCode,
-              quantity: row.quantity,
-              untaxedTotal: row.untaxedTotal,
-              totalInCurrency: row.totalInCurrency,
-              currency: row.currency,
-              companyCurrency: row.companyCurrency,
-              usdPaid: row.usdPaid,
-              website: row.website,
-              event: row.event,
-              eventStage: row.eventStage,
-              source: row.source,
-            })),
+            rows
+              .slice()
+              .sort(
+                (a, b) =>
+                  accountingDate(b).localeCompare(accountingDate(a)) ||
+                  b.movement.localeCompare(a.movement) ||
+                  String(b.id).localeCompare(String(a.id)),
+              )
+              .map((row) => ({
+                id: row.id,
+                movement: row.movement,
+                orderRef: row.orderRef,
+                moveType: row.moveType,
+                isCreditNote: row.isCreditNote,
+                paymentDate: row.paymentDate,
+                invoiceDate: row.invoiceDate,
+                partner: row.partner,
+                country: row.country,
+                company: row.company,
+                salesperson: row.salesperson,
+                salesTeam: row.salesTeam,
+                code: row.code,
+                product: row.product,
+                productCategory: row.productCategory,
+                mainCategory: row.mainCategory,
+                productCode: row.productCode,
+                quantity: row.quantity,
+                untaxedTotal: row.untaxedTotal,
+                totalInCurrency: row.totalInCurrency,
+                currency: row.currency,
+                companyCurrency: row.companyCurrency,
+                usdPaid: row.usdPaid,
+                website: row.website,
+                event: row.event,
+                eventStage: row.eventStage,
+                source: row.source,
+              })),
           ),
           health: data.snapshot.health,
           source: {

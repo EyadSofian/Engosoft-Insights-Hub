@@ -27,7 +27,11 @@ import type {
 } from "./types";
 
 const DEFAULT_SHEET_ID = "14kv8Xkv8SeFhF9roekDI0OKmpZBU29YQOlMj03LOKT0";
-const TTL_MS = 30 * 60 * 1000;
+// The ad workflows write daily rows independently of this process. Keeping the
+// old 30-minute snapshot made a successful Meta/Snap run look stalled and led
+// operators to run n8n again. Five minutes keeps the shared sheet/Odoo load
+// bounded while allowing scheduled syncs to appear without manual intervention.
+const TTL_MS = 5 * 60 * 1000;
 
 const TAB = {
   meta: "Meta Ads Daily",

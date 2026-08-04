@@ -1332,20 +1332,32 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     return a;
   };
 
-  const orderRefs = new Map<string, Set<string>>();
+  const invoiceRefs = new Map<string, Set<string>>();
   for (const sale of data.accounting) {
     if (!sale.course) continue;
     const a = get(sale.course, sale.mainCategory);
     a.revenue += sale.usdPaid;
     const ref = sale.movement;
     if (ref) {
-      let s = orderRefs.get(a.key);
+      let s = invoiceRefs.get(a.key);
       if (!s) {
         s = new Set();
-        orderRefs.set(a.key, s);
+        invoiceRefs.set(a.key, s);
       }
       s.add(ref);
     }
+  }
+
+  const salesOrderRefs = new Map<string, Set<string>>();
+  for (const sale of data.invoiced) {
+    if (!sale.course || !sale.orderRef) continue;
+    const a = get(sale.course, sale.mainCategory);
+    let refs = salesOrderRefs.get(a.key);
+    if (!refs) {
+      refs = new Set();
+      salesOrderRefs.set(a.key, refs);
+    }
+    refs.add(sale.orderRef);
   }
 
   for (const c of data.crm) {
@@ -1366,12 +1378,13 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     if (!isArchivedWon(l)) a.lost++;
   }
 
-  // Ad spend reaches a course only through its campaign's inferred course.
+  // Ad spend reaches a course through the dominant course inferred for its campaign.
+  // Creating the course here keeps spend-only campaigns visible before a CRM or
+  // invoice outcome exists.
   for (const ad of data.ads) {
     const meta = data.snapshot.campaigns.get(ad.campaignKey);
     if (!meta?.course) continue;
-    const a = map.get(normalizeName(meta.course));
-    if (!a) continue;
+    const a = get(meta.course, "");
     a.spend += ad.spend;
     a.impressions += ad.impressions;
     a.clicksAll += ad.clicksAll;
@@ -1388,9 +1401,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   }
 
   for (const a of map.values()) {
-    a.orders = orderRefs.get(a.key)?.size ?? 0;
-    a.invoices = a.orders;
-    a.avgOrder = div(a.revenue, a.orders);
+    a.invoices = invoiceRefs.get(a.key)?.size ?? 0;
+    a.salesOrders = salesOrderRefs.get(a.key)?.size ?? 0;
+    // Backward-compatible alias used by older course consumers.
+    a.orders = a.invoices;
+    a.avgOrder = div(a.revenue, a.invoices);
     a.conversionRate = pctOf(a.won, a.crmLeads);
     a.lostRate = pctOf(a.lost, a.crmLeads);
     a.roas = div(a.revenue, a.spend);

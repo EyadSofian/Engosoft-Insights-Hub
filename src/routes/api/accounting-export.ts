@@ -61,8 +61,7 @@ export const Route = createFileRoute("/api/accounting-export")({
           invoiceDate: string;
           paymentDate: string;
           isCreditNote: boolean;
-        }) =>
-          accountingReportingDate(row, dateBasis);
+        }) => accountingReportingDate(row, dateBasis);
         const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const name = filename(view, filters.from, filters.to);
 
@@ -180,6 +179,7 @@ export const Route = createFileRoute("/api/accounting-export")({
             events: Set<string>;
             eventStages: Set<string>;
             sources: Set<string>;
+            orderRefs: Set<string>;
           };
           const invoices = new Map<string, Invoice>();
           for (const row of rows) {
@@ -204,6 +204,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               events: new Set<string>(),
               eventStages: new Set<string>(),
               sources: new Set<string>(),
+              orderRefs: new Set<string>(),
             };
             invoice.untaxedTotal += row.untaxedTotal;
             invoice.totalInCurrency += row.totalInCurrency;
@@ -215,11 +216,13 @@ export const Route = createFileRoute("/api/accounting-export")({
             if (row.event) invoice.events.add(row.event);
             if (row.eventStage) invoice.eventStages.add(row.eventStage);
             if (row.source) invoice.sources.add(row.source);
+            if (row.orderRef) invoice.orderRefs.add(row.orderRef);
             invoices.set(key, invoice);
           }
           const header = ar
             ? [
                 "الحركة",
+                "رقم أمر البيع",
                 "تاريخ الدفع",
                 "تاريخ الفاتورة",
                 "الشريك",
@@ -240,6 +243,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               ]
             : [
                 "Move",
+                "Sales Order",
                 "Payment Date",
                 "Invoice Date",
                 "Partner",
@@ -268,6 +272,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               )
               .map((row) => [
                 row.movement,
+                [...row.orderRefs].join(" | "),
                 row.paymentDate,
                 row.invoiceDate,
                 row.partner,
@@ -360,6 +365,7 @@ export const Route = createFileRoute("/api/accounting-export")({
         const header = ar
           ? [
               "الحركة",
+              "رقم أمر البيع",
               "تاريخ الدفع",
               "تاريخ الفاتورة",
               "الشريك",
@@ -386,6 +392,7 @@ export const Route = createFileRoute("/api/accounting-export")({
             ]
           : [
               "Move",
+              "Sales Order",
               "Payment Date",
               "Invoice Date",
               "Partner",
@@ -421,6 +428,7 @@ export const Route = createFileRoute("/api/accounting-export")({
             )
             .map((row) => [
               row.movement,
+              row.orderRef,
               row.paymentDate,
               row.invoiceDate,
               row.partner,

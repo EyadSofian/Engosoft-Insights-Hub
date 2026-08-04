@@ -21,8 +21,8 @@ with an AI assistant on top.
 No database. CRM and Lost prefer Odoo directly, while Accounting accepts a direct
 invoice extract only after it reconciles to the approved paid-invoice sheet. Healthy
 sheet fallbacks remain authoritative during an Odoo outage and are not shown as
-missing sources. The dashboard exposes one Accounting report; legacy Courses,
-Products, Sales and Full Invoiced routes redirect to it.
+missing sources. The dashboard exposes one Accounting report plus a dedicated
+Marketing Courses view; legacy Products and Full Invoiced routes redirect to Accounting.
 
 ## Running locally
 
@@ -90,7 +90,7 @@ are fetched in 30-day chunks and include deleted ads, then joined to `/ad/get/` 
 hierarchy metadata remains available. The optional `TikTok Ads Daily` sheet stays as a
 fallback when API credentials are not configured.
 
-Data is fetched on first request, cached in memory for 30 minutes, and refreshed via
+Data is fetched on first request, cached in memory for five minutes, and refreshed via
 `POST /api/refresh`. If a fetch fails, the previous snapshot keeps serving rather than
 blanking the dashboard.
 
