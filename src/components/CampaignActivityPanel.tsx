@@ -3,10 +3,15 @@ import {
   AlertTriangle,
   BellRing,
   CalendarClock,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
+  Radio,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import type { CampaignActivity, PerfRow } from "@/lib/types";
+import type { ReactNode } from "react";
+import type { CampaignActivity, CampaignDeliveryState, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { mutedRiskCount, riskAlertPrefs, useRiskAlertPrefs } from "@/lib/campaign-risk-prefs";
@@ -22,50 +27,83 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
   const zeroKeys = new Set(activity.zeroResult.map((row) => row.key));
   const atRiskKeys = new Set(activity.atRisk.map((row) => row.key));
   const lifetime = activity.lifetime ?? {};
-  const platformWindows = activity.platformWindows ?? {};
-  const representedPlatforms = PLATFORMS.filter((platform) => platformWindows[platform]);
-  const range = representedPlatforms.length
-    ? lang === "ar"
-      ? "أحدث 3 أيام لكل منصة"
-      : "Latest 3 days per platform"
-    : lang === "ar"
-      ? "لا توجد أيام إنفاق"
-      : "No spend dates";
+  const delivery = activity.delivery ?? {};
+  const states = Object.values(delivery);
+  const activeCount = states.filter((state) => state.deliveryState === "active").length;
+  const platformHealth = activity.platformHealth ?? [];
+  const connectedCount = platformHealth.filter((item) => item.ok).length;
+  const disconnectedCount = platformHealth.filter((item) => !item.ok).length;
+  const range = lang === "ar" ? "الحالة الآن" : "Current status";
+  const sourceLabel =
+    activity.source === "n8n_live"
+      ? lang === "ar"
+        ? "كل المنصات مباشر من n8n"
+        : "All platforms live from n8n"
+      : activity.source === "google_snapshot"
+        ? lang === "ar"
+          ? "آخر نسخة محفوظة في Google"
+          : "Latest Google backup"
+        : lang === "ar"
+            ? "حالة محفوظة"
+            : "Saved status";
 
   return (
     <Card>
       <SectionTitle
         action={
-          <Pill tone="neutral">
-            <span className="inline-flex items-center gap-1">
-              <CalendarClock size={13} />
-              {range}
-            </span>
-          </Pill>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Pill tone="neutral">
+              <span className="inline-flex items-center gap-1">
+                <CalendarClock size={13} />
+                {range}
+              </span>
+            </Pill>
+            <Pill tone={activity.source === "n8n_live" ? "success" : "warning"}>
+              {sourceLabel}
+            </Pill>
+          </div>
         }
         hint={
           lang === "ar"
-            ? "نشطة فعليًا = سجلت إنفاقًا خلال آخر 3 أيام متاحة لكل منصة، لأن مواعيد تحديث المصادر مختلفة. الإنفاق والليدز من الـ3 أيام دي، أما الحكم بالبيع فمن تاريخ الحملة كله لأن الصفقة بتقفل بعد أسابيع."
-            : "Operationally active = recorded spend during each platform's latest three available days, since sources refresh on different schedules. Spend and leads come from those days; the sales verdict comes from the campaign's whole history, because deals close weeks later."
+            ? "Active هنا جاي من الحالة الرسمية داخل ميتا أو سناب أو تيك توك أو جوجل. أرقام الصرف والليدز معلومات زيادة فقط، ومش بنستخدمها علشان نحكم إن الحملة شغالة أو واقفة."
+            : "Active comes from each platform's official campaign status. Spend and lead figures are extra context only; they never decide whether a campaign is active or paused."
         }
       >
         <span className="inline-flex items-center gap-1.5">
           <Activity size={16} className="text-brand" />
-          {lang === "ar" ? "الحملات التي تعمل الآن" : "Campaigns running now"}
+          {lang === "ar" ? "الحملات الـ Active الآن" : "Active campaigns now"}
         </span>
       </SectionTitle>
 
-      {representedPlatforms.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1.5">
-          {representedPlatforms.map((platform) => {
-            const window = platformWindows[platform];
-            return (
-              <Pill key={platform} tone="neutral">
-                {PLATFORM_LABEL[platform][lang]}
-                {window ? ` · ${window.from.slice(5)} → ${window.to.slice(5)}` : ""}
-              </Pill>
-            );
+      {platformHealth.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {PLATFORMS.map((platform) => {
+            const health = platformHealth.find((item) => item.platform === platform);
+            return <PlatformHealthCard key={platform} platform={platform} health={health} />;
           })}
+        </div>
+      )}
+
+      {states.length > 0 && (
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <StatusCount
+            icon={<Radio size={15} />}
+            label={lang === "ar" ? "إجمالي Active" : "Total active"}
+            value={activeCount}
+            tone="success"
+          />
+          <StatusCount
+            icon={<CircleCheck size={15} />}
+            label={lang === "ar" ? "منصات متصلة" : "Connected"}
+            value={connectedCount}
+            tone="success"
+          />
+          <StatusCount
+            icon={<CircleX size={15} />}
+            label={lang === "ar" ? "ربط محتاج مراجعة" : "Need reconnect"}
+            value={disconnectedCount}
+            tone={disconnectedCount ? "warning" : "neutral"}
+          />
         </div>
       )}
 
@@ -74,8 +112,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
           compact
           label={
             lang === "ar"
-              ? "لا توجد حملة سجلت إنفاقًا في آخر 3 أيام متاحة."
-              : "No campaign recorded spend in the latest three available days."
+              ? "الحالة الرسمية للحملات مش متاحة دلوقتي."
+              : "Official campaign status is not available right now."
           }
         />
       ) : (
@@ -91,8 +129,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               icon={<AlertTriangle size={16} />}
             >
               {lang === "ar"
-                ? "بتصرف حاليًا ولم تسجل ولا Won ولا فاتورة مدفوعة ولا أمر بيع مفوتر بالكامل طوال تاريخها، مش في آخر 3 أيام بس."
-                : "Spending now and never recorded a single Won, paid invoice, or fully invoiced sales order across their entire history — not merely in the last three days."}
+                ? `دي قائمة المراجعة فقط، مش كل الحملات الـ Active. الحملات دي Active على منصتها، وعندها صرف حديث، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
+                : "This is only the review list, not every active campaign. These campaigns are officially active, have recent spend, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
               {muted > 0 && (
                 <button
                   type="button"
@@ -112,14 +150,14 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               tone="danger"
               title={
                 lang === "ar"
-                  ? `${fmtNum(activity.zeroResult.length)} حملة تصرف بلا أي ليد`
-                  : `${fmtNum(activity.zeroResult.length)} campaigns spending with zero leads`
+                  ? `${fmtNum(activity.zeroResult.length)} حملة Active صرفت مؤخرًا بلا أي ليد`
+                  : `${fmtNum(activity.zeroResult.length)} active campaigns with recent spend and zero leads`
               }
               icon={<AlertTriangle size={16} />}
             >
               {lang === "ar"
-                ? "الليد بيوصل في نفس اليوم عادة، فصفر ليد مع إنفاق مستمر معناه غالبًا عطل في الاستهداف أو الفورم أو الصفحة."
-                : "Leads normally arrive the same day, so zero leads against continuing spend usually means a broken target, form, or landing page."}
+                ? "ده مؤشر مراجعة، مش حكم على حالة الحملة: شيّك على الاستهداف والفورم والصفحة."
+                : "This is a review signal, not a campaign-status verdict: check targeting, form and landing page."}
               <div className="mt-1.5">
                 {activity.zeroResult
                   .slice(0, 3)
@@ -142,66 +180,98 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
             />
           </div>
 
-          <div className="divide-y divide-border rounded-xl border border-border">
-            {activity.rows.slice(0, 6).map((row) => {
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+            {activity.rows.map((row) => {
               const life = lifetime[row.key];
+              const state = delivery[row.key];
               const sold = !!life && (life.won > 0 || life.invoices > 0 || life.revenue > 0);
               return (
-                <div
+                <details
                   key={`${row.platforms.join("-")}:${row.key}`}
-                  className="grid grid-cols-2 gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(6,auto)] sm:items-center sm:gap-4"
+                  className="group bg-surface open:bg-surface-2/55"
                 >
-                  <div className="col-span-2 min-w-0 sm:col-span-1">
-                    <div className="truncate text-[13px] font-semibold text-text" title={row.name}>
-                      {row.name || "—"}
+                  <summary className="grid min-h-16 cursor-pointer list-none grid-cols-2 items-center gap-3 px-3 py-3 marker:content-none sm:grid-cols-[minmax(0,1fr)_repeat(4,auto)_24px] sm:gap-5">
+                    <div className="col-span-2 min-w-0 sm:col-span-1">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="truncate text-[13px] font-semibold text-text"
+                          title={row.name}
+                        >
+                          {row.name || "—"}
+                        </div>
+                        <ChevronDown
+                          size={14}
+                          className="shrink-0 text-text-muted transition-transform group-open:rotate-180 sm:hidden"
+                        />
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {row.platforms.map((platform) => (
+                          <Pill key={platform} tone="neutral">
+                            {PLATFORM_LABEL[platform][lang]}
+                          </Pill>
+                        ))}
+                        {state && <DeliveryPill state={state.deliveryState} />}
+                        {zeroKeys.has(row.key) && (
+                          <Pill tone="danger">{lang === "ar" ? "صرف بلا ليدز" : "No leads"}</Pill>
+                        )}
+                        {atRiskKeys.has(row.key) && (
+                          <Pill tone="warning">
+                            {lang === "ar" ? "لم تبِع من قبل" : "Never sold"}
+                          </Pill>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {row.platforms.map((platform) => (
-                        <Pill key={platform} tone="neutral">
-                          {PLATFORM_LABEL[platform][lang]}
-                        </Pill>
-                      ))}
-                      {zeroKeys.has(row.key) && (
-                        <Pill tone="danger">{lang === "ar" ? "صرف بلا ليدز" : "No leads"}</Pill>
-                      )}
-                      {atRiskKeys.has(row.key) && (
-                        <Pill tone="warning">
-                          {lang === "ar" ? "لم تبِع من قبل" : "Never sold"}
-                        </Pill>
-                      )}
-                      {/* Without this a healthy campaign with a slow three days
-                          reads exactly like one that has never sold anything. */}
-                      {sold && (
-                        <Pill tone="success">
-                          {lang === "ar"
-                            ? `إجمالي ${fmtUSD(life.revenue)} · ${fmtNum(life.won)} Won`
-                            : `${fmtUSD(life.revenue)} lifetime · ${fmtNum(life.won)} Won`}
-                        </Pill>
-                      )}
+                    <Mini label={lang === "ar" ? "صرف حديث" : "Recent spend"} value={row.spend > 0 ? fmtUSD(row.spend) : "—"} />
+                    <Mini
+                      label={lang === "ar" ? "ليدز حديثة" : "Recent leads"}
+                      value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
+                    />
+                    <Mini
+                      label={lang === "ar" ? "إيراد تاريخي" : "Lifetime revenue"}
+                      value={life ? fmtUSD(life.revenue) : "—"}
+                    />
+                    <Mini
+                      label={lang === "ar" ? "أوامر بيع تاريخية" : "Lifetime orders"}
+                      value={life ? fmtNum(life.salesOrders) : "—"}
+                    />
+                    <ChevronDown
+                      size={15}
+                      className="hidden text-text-muted transition-transform group-open:rotate-180 sm:block"
+                    />
+                  </summary>
+
+                  <div className="border-t border-border px-3 py-3 text-xs leading-relaxed text-text-muted">
+                    <p className="text-text">
+                      {lang === "ar"
+                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active. أرقام الصرف والليدز المعروضة منفصلة عن الـStatus ومش بتغيّره.`
+                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active. Spend and lead figures are separate from its status and never change it.`}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-6">
+                      <Mini label={lang === "ar" ? "ليدز أودو — الكل" : "Odoo leads — all"} value={life ? fmtNum(life.crmLeads) : "—"} />
+                      <Mini label="Won" value={life ? fmtNum(life.won) : "—"} />
+                      <Mini label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"} value={life ? fmtNum(life.invoices) : "—"} />
+                      <Mini label={lang === "ar" ? "أوامر بيع" : "Sales orders"} value={life ? fmtNum(life.salesOrders) : "—"} />
+                      <Mini label={lang === "ar" ? "إجمالي المصروف" : "Lifetime spend"} value={life ? fmtUSD(life.spend) : "—"} />
+                      <Mini label="ROAS" value={life?.roas === null || life?.roas === undefined ? "—" : `${life.roas.toFixed(2)}×`} />
                     </div>
+                    {state && (
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-subtle">
+                        <span>{PLATFORM_LABEL[state.platform][lang]}: {state.configuredStatus}</span>
+                        {state.servingStatus && <span>{lang === "ar" ? "التقديم" : "Serving"}: {state.servingStatus}</span>}
+                        {state.activeAdsets > 0 && <span>{lang === "ar" ? "Ad sets نشطة" : "Active ad sets"}: {fmtNum(state.activeAdsets)}</span>}
+                        {state.activeAds > 0 && <span>{lang === "ar" ? "إعلانات نشطة" : "Active ads"}: {fmtNum(state.activeAds)}</span>}
+                        <span>{lang === "ar" ? "آخر فحص" : "Checked"}: {state.checkedAt || "—"}</span>
+                      </div>
+                    )}
+                    {sold && (
+                      <div className="mt-2 font-semibold text-success">
+                        {lang === "ar"
+                          ? `الحملة باعت قبل كده: ${fmtUSD(life.revenue)} و${fmtNum(life.won)} Won.`
+                          : `This campaign has sold before: ${fmtUSD(life.revenue)} and ${fmtNum(life.won)} Won.`}
+                      </div>
+                    )}
                   </div>
-                  <Mini
-                    label={lang === "ar" ? "إنفاق 3 أيام" : "3-day spend"}
-                    value={fmtUSD(row.spend)}
-                  />
-                  <Mini
-                    label={lang === "ar" ? "ليدز المنصة" : "Platform leads"}
-                    value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
-                  />
-                  <Mini
-                    label={lang === "ar" ? "ليدز أودو" : "Odoo leads"}
-                    value={fmtNum(row.crmLeads)}
-                  />
-                  <Mini label={lang === "ar" ? "مغلق" : "Won"} value={fmtNum(row.won)} />
-                  <Mini
-                    label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"}
-                    value={fmtNum(row.invoices)}
-                  />
-                  <Mini
-                    label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
-                    value={fmtNum(row.salesOrders)}
-                  />
-                </div>
+                </details>
               );
             })}
           </div>
@@ -243,9 +313,9 @@ function ActivitySpotlight({
         {row.name}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
-        <Mini label={lang === "ar" ? "الإنفاق" : "Spend"} value={fmtUSD(row.spend)} />
+        <Mini label={lang === "ar" ? "صرف حديث" : "Recent spend"} value={fmtUSD(row.spend)} />
         <Mini
-          label={lang === "ar" ? "ليدز" : "Leads"}
+          label={lang === "ar" ? "ليدز حديثة" : "Recent leads"}
           value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
         />
         <Mini label={lang === "ar" ? "Won" : "Won"} value={fmtNum(row.won)} />
@@ -265,6 +335,87 @@ function Mini({ label, value }: { label: string; value: string }) {
       <div className="text-[10px] text-text-muted">{label}</div>
       <div className="num mt-0.5 whitespace-nowrap text-[12px] font-semibold text-text">
         {value}
+      </div>
+    </div>
+  );
+}
+
+function DeliveryPill({ state }: { state: CampaignDeliveryState }) {
+  const { lang } = useI18n();
+  if (state === "active")
+    return <Pill tone="success">{lang === "ar" ? "Active على المنصة" : "Active on platform"}</Pill>;
+  return <Pill tone="neutral">{lang === "ar" ? "الحالة غير واضحة" : "Status unclear"}</Pill>;
+}
+
+function PlatformHealthCard({
+  platform,
+  health,
+}: {
+  platform: (typeof PLATFORMS)[number];
+  health?: CampaignActivity["platformHealth"][number];
+}) {
+  const { lang } = useI18n();
+  const ok = health?.ok === true;
+  const googleHelp = platform === "google" && !ok;
+  return (
+    <div
+      className={`min-w-0 rounded-xl border px-3 py-3 ${
+        ok ? "border-success/25 bg-success-soft/35" : "border-warning/30 bg-warning-soft/45"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-xs font-semibold text-text">
+          {PLATFORM_LABEL[platform][lang]}
+        </span>
+        {ok ? (
+          <CircleCheck size={15} className="shrink-0 text-success" aria-hidden="true" />
+        ) : (
+          <CircleX size={15} className="shrink-0 text-warning" aria-hidden="true" />
+        )}
+      </div>
+      <div className="num mt-1 text-lg font-bold text-text">{ok ? fmtNum(health.active) : "—"}</div>
+      <div className="mt-0.5 text-[10px] leading-relaxed text-text-muted">
+        {ok
+          ? lang === "ar"
+            ? "حملة Active رسميًا"
+            : "officially Active"
+          : googleHelp
+            ? lang === "ar"
+              ? "محتاج تسجيل دخول بحساب Engosoft الصحيح"
+              : "Sign in with the correct Engosoft account"
+            : lang === "ar"
+              ? "الربط محتاج مراجعة"
+              : "Connection needs review"}
+      </div>
+    </div>
+  );
+}
+
+function StatusCount({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  tone: "success" | "warning" | "neutral";
+}) {
+  const color =
+    tone === "success"
+      ? "text-success bg-success-soft"
+      : tone === "warning"
+        ? "text-warning bg-warning-soft"
+        : "text-text-muted bg-surface-2";
+  return (
+    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2.5">
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${color}`}>{icon}</span>
+      <div className="min-w-0">
+        <div className="num text-sm font-bold text-text">{fmtNum(value)}</div>
+        <div className="truncate text-[10px] text-text-muted" title={label}>
+          {label}
+        </div>
       </div>
     </div>
   );

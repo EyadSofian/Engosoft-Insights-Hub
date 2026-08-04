@@ -15,9 +15,11 @@ import {
 import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
+import { loadMetaLiveStatus } from "./meta-live-status.server";
 import type {
   AdRow,
   AccountingRow,
+  CampaignOperationalState,
   CourseAgg,
   CrmLeadRow,
   DataHealth,
@@ -1076,20 +1078,23 @@ function platformBalancedRows(rows: PerfRow[], limit: number): PerfRow[] {
 /**
  * Operational "running now" signal.
  *
- * The ad sheets do not carry a trustworthy platform status field, so activity
- * is evidence-based: a campaign is active when it actually spent money during
- * the last three days represented by each selected source. Platforms export on
- * different schedules, so every platform gets its own latest date and its own
- * material-spend threshold before the results are merged.
+ * n8n reads the official campaign switch from Meta, Snapchat, TikTok and
+ * Google Ads. Recent spend is joined only as reporting context; it never
+ * changes an Active/Paused decision. Google Sheets keeps a fallback snapshot.
  */
 export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
   current: FilteredData,
 ): Promise<import("./types").CampaignActivity> {
+  void current;
   const empty: import("./types").CampaignActivity = {
     window: null,
     platformWindows: {},
-    definition: "recent_spend",
+    definition: "official_status",
+    source: "daily_proxy",
+    generatedAt: "",
+    platformHealth: [],
+    delivery: {},
     rows: [],
     best: null,
     worst: null,
@@ -1097,62 +1102,164 @@ export async function computeRecentCampaignActivity(
     atRisk: [],
     lifetime: {},
   };
-  // A platform with only undated rows cannot produce a window, so it is not a
-  // candidate at all rather than a source of an invalid date downstream.
-  const selectedPlatforms = PLATFORMS.filter((platform) =>
-    current.ads.some((row) => row.platform === platform && !!row.date),
-  );
-  if (!selectedPlatforms.length) return empty;
-
-  const slices = await Promise.all(
-    selectedPlatforms.map(async (platform) => {
-      const latest = current.ads.reduce(
-        (max, row) => (row.platform === platform && row.date && row.date > max ? row.date : max),
-        "",
-      );
-      const from = shiftIsoDay(latest, -2);
-      const recent = await getFiltered({
-        ...filters,
-        platform,
-        from,
-        to: latest,
-        range: undefined,
-      });
-      const rows = computePerf(recent, "campaign")
-        .filter((row) => row.spend > 0)
-        .sort((a, b) => b.spend - a.spend);
-      const recentSpend = rows.reduce((total, row) => total + row.spend, 0);
-      // Ignore pennies, but scale the threshold to the source. A fixed $25
-      // floor hid genuine TikTok/Snapchat risk whenever their total spend was
-      // smaller than Meta's.
-      const materialFloor = Math.max(5, Math.min(25, recentSpend * 0.1));
-      return {
-        platform,
-        from,
-        to: latest,
-        rows,
-        decisionRows: rows.filter((row) => row.spend >= materialFloor),
-      };
-    }),
-  );
-
-  const platformWindows = Object.fromEntries(
-    slices.map(({ platform, from, to }) => [platform, { from, to }]),
-  ) as Partial<Record<Platform, { from: string; to: string }>>;
-  const rows = slices.flatMap((slice) => slice.rows);
-  const decisionRows = slices.flatMap((slice) => slice.decisionRows);
-
-  // Outcomes need a longer horizon than spend does. Deals here close weeks
-  // after the click that paid for them, so reading Won/invoices out of the
-  // same three days reported the account's strongest campaigns as failures —
-  // one of them carrying 20 Won and $10K collected. Spend answers "is it
-  // running now"; the campaign's whole history answers "has it ever returned
-  // anything". Every non-date filter the user set is preserved.
   const history = await getFiltered({ ...filters, from: undefined, to: undefined, range: "all" });
   const lifetimeRows = new Map(computePerf(history, "campaign").map((row) => [row.key, row]));
+  const eligibleCampaignKeys = new Set([
+    ...history.ads.map((row) => row.campaignKey),
+    ...history.crm.map((row) => row.campaignKey),
+    ...history.accounting.map((row) => row.campaignKey),
+  ]);
+  const selectedPlatforms = filters.platform ? [filters.platform] : PLATFORMS;
+  const platformWindows: Partial<Record<Platform, { from: string; to: string }>> = {};
+  const delivery: Record<string, CampaignOperationalState> = {};
+  const rows: PerfRow[] = [];
 
-  // Leads are the exception: they arrive the same day or the next one, so a
-  // campaign spending for three days with none at all is broken right now.
+  const operationalRow = (state: CampaignOperationalState): PerfRow => {
+    const life = lifetimeRows.get(state.campaignKey);
+    const campaign = history.snapshot.campaigns.get(state.campaignKey);
+    const day = state.checkedAt.slice(0, 10);
+    return {
+      key: state.campaignKey,
+      name: state.name,
+      campaignKey: state.campaignKey,
+      campaignName: state.name,
+      adsetKey: "",
+      adsetName: "",
+      adKey: "",
+      platforms: [state.platform],
+      course: life?.course || campaign?.course || "",
+      courseInferred: life?.courseInferred ?? campaign?.courseSource === "crm_leads",
+      objective: life?.objective || campaign?.objective || "unknown",
+      spend: state.spend24h,
+      impressions: state.impressions24h,
+      clicksAll: state.clicks24h,
+      linkClicks: null,
+      ctrAll: pctOf(state.clicks24h, state.impressions24h),
+      ctrLink: null,
+      cpm:
+        state.impressions24h > 0 ? (state.spend24h / state.impressions24h) * 1000 : null,
+      cpc: div(state.spend24h, state.clicks24h),
+      platformLeads: state.platformLeads24h,
+      crmLeads: 0,
+      won: 0,
+      lost: 0,
+      conversionRate: null,
+      lostRate: null,
+      revenue: 0,
+      invoices: 0,
+      salesOrders: 0,
+      revenuePerLead: null,
+      cpl:
+        state.platformLeads24h === null ? null : div(state.spend24h, state.platformLeads24h),
+      cpa: null,
+      roas: null,
+      acos: null,
+      avgCloseDays: null,
+      closeSample: 0,
+      spendDateMin: state.spend24h > 0 ? day : "",
+      spendDateMax: state.spend24h > 0 ? day : "",
+      partialSpend: false,
+      spendCoverage: null,
+    };
+  };
+
+  const deeperDimensionFilter = !!(
+    filters.adset ||
+    filters.adsetKey ||
+    filters.ad ||
+    filters.adKey ||
+    filters.source ||
+    filters.course ||
+    filters.mainCategory ||
+    filters.salesTeam ||
+    filters.salesperson
+  );
+  const acceptsState = (state: CampaignOperationalState): boolean => {
+    if (!selectedPlatforms.includes(state.platform)) return false;
+    if (filters.account && state.account !== filters.account) return false;
+    if (filters.campaign && state.name !== filters.campaign) return false;
+    if (filters.campaignKey && state.campaignKey !== filters.campaignKey) return false;
+    if (deeperDimensionFilter && !eligibleCampaignKeys.has(state.campaignKey)) return false;
+    return state.deliveryState === "active";
+  };
+
+  // Status is read directly from every platform through n8n. Spend never
+  // decides whether a campaign is Active; it is attached later as context.
+  const live = await loadMetaLiveStatus();
+  const directStates: CampaignOperationalState[] = (live?.campaigns ?? []).map((state) => ({
+    ...state,
+    campaignKey: `id:${state.campaignId}`,
+  }));
+  const fallbackStates = history.snapshot.campaignStates;
+  const officialStates = (live ? directStates : fallbackStates).filter(acceptsState);
+
+  // Recent figures are context only. Most feeds are daily, so the UI calls
+  // them "latest recorded" rather than pretending every value is a rolling
+  // real-time window.
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const yesterday = shiftIsoDay(today, -1);
+  const recentByKey = new Map<string, PerfRow>();
+  const recentByName = new Map<string, PerfRow>();
+  for (const platform of selectedPlatforms) {
+    const recent = await getFiltered({
+      ...filters,
+      platform,
+      from: yesterday,
+      to: today,
+      range: undefined,
+    });
+    const recentRows = computePerf(recent, "campaign").filter((row) =>
+      row.platforms.includes(platform),
+    );
+    if (recentRows.length) platformWindows[platform] = { from: yesterday, to: today };
+    for (const row of recentRows) {
+      recentByKey.set(`${platform}|${row.key}`, row);
+      recentByName.set(`${platform}|${normalizeName(row.name)}`, row);
+    }
+  }
+
+  for (const original of officialStates) {
+    const recent =
+      recentByKey.get(`${original.platform}|${original.campaignKey}`) ||
+      recentByName.get(`${original.platform}|${normalizeName(original.name)}`);
+    const campaignKey = recent?.key || original.campaignKey;
+    const state: CampaignOperationalState = {
+      ...original,
+      campaignKey,
+      spend24h: recent?.spend ?? 0,
+      impressions24h: recent?.impressions ?? 0,
+      clicks24h: recent?.clicksAll ?? 0,
+      platformLeads24h: recent?.platformLeads ?? null,
+    };
+    delivery[campaignKey] = state;
+    rows.push(recent ?? operationalRow(state));
+  }
+
+  if (!rows.length) {
+    return {
+      ...empty,
+      source: live ? "n8n_live" : fallbackStates.length ? "google_snapshot" : "daily_proxy",
+      generatedAt: live?.generatedAt || fallbackStates[0]?.checkedAt || "",
+      platformHealth: live?.platformHealth ?? [],
+      delivery,
+      platformWindows,
+    };
+  }
+
+  const spendingRows = rows.filter((row) => row.spend > 0);
+  const decisionRows: PerfRow[] = [];
+  for (const platform of selectedPlatforms) {
+    const platformRows = spendingRows.filter((row) => row.platforms.includes(platform));
+    const platformSpend = platformRows.reduce((total, row) => total + row.spend, 0);
+    const materialFloor = Math.max(5, Math.min(25, platformSpend * 0.1));
+    decisionRows.push(...platformRows.filter((row) => row.spend >= materialFloor));
+  }
+
   const zeroResult = decisionRows
     .filter(
       (row) =>
@@ -1181,7 +1288,7 @@ export async function computeRecentCampaignActivity(
   };
 
   // A campaign that has never collected a pound cannot be the best performer,
-  // however busy its last three days look.
+  // however busy its last 24 hours look.
   const bestPool = decisionRows.filter(
     (row) =>
       !atRiskKeys.has(row.key) &&
@@ -1205,12 +1312,17 @@ export async function computeRecentCampaignActivity(
   const worst =
     [...worstPool].sort((a, b) => {
       // A campaign that has never returned anything outranks one merely having
-      // a slow three days, however large that campaign's recent spend is.
+      // a slow 24 hours, however large that campaign's recent spend is.
       const riskDelta = (atRiskKeys.has(b.key) ? 1 : 0) - (atRiskKeys.has(a.key) ? 1 : 0);
       return riskDelta || unrecovered(b) - unrecovered(a);
     })[0] ?? null;
 
-  const selectedRows = platformBalancedRows(rows, 12);
+  const rankedActive = [...rows].sort((a, b) => {
+    const lifeA = lifetimeRows.get(a.key);
+    const lifeB = lifetimeRows.get(b.key);
+    return b.spend - a.spend || (lifeB?.revenue ?? 0) - (lifeA?.revenue ?? 0) || a.name.localeCompare(b.name);
+  });
+  const selectedRows = platformBalancedRows(rankedActive, 16);
   const selectedZeroResult = platformBalancedRows(zeroResult, 12);
   const selectedAtRisk = platformBalancedRows(atRisk, 12);
   const lifetime: Record<string, import("./types").CampaignLifetime> = {};
@@ -1233,12 +1345,31 @@ export async function computeRecentCampaignActivity(
   }
 
   return {
-    window: {
-      from: slices.reduce((min, slice) => (slice.from < min ? slice.from : min), slices[0].from),
-      to: slices.reduce((max, slice) => (slice.to > max ? slice.to : max), slices[0].to),
-    },
+    window: (() => {
+      const windows = Object.values(platformWindows);
+      if (!windows.length) return null;
+      return {
+        from: windows.reduce((min, window) => (window.from < min ? window.from : min), windows[0].from),
+        to: windows.reduce((max, window) => (window.to > max ? window.to : max), windows[0].to),
+      };
+    })(),
     platformWindows,
-    definition: "recent_spend",
+    definition: "official_status",
+    source: live ? "n8n_live" : fallbackStates.length ? "google_snapshot" : "daily_proxy",
+    generatedAt:
+      live?.generatedAt ||
+      Object.values(delivery).reduce((max, state) => (state.checkedAt > max ? state.checkedAt : max), ""),
+    platformHealth:
+      live?.platformHealth ??
+      PLATFORMS.map((platform) => ({
+        platform,
+        ok: fallbackStates.some((state) => state.platform === platform),
+        active: fallbackStates.filter((state) => state.platform === platform).length,
+        total: fallbackStates.filter((state) => state.platform === platform).length,
+        message: "",
+        checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
+      })),
+    delivery,
     rows: selectedRows,
     best,
     worst,

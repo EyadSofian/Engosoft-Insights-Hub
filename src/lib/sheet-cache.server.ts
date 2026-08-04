@@ -18,6 +18,7 @@ import type {
   AdSetOrigin,
   AccountingRow,
   CampaignObjective,
+  CampaignOperationalState,
   CrmLeadRow,
   DataHealth,
   InvoicedRow,
@@ -93,6 +94,8 @@ export interface Snapshot {
    *  failing is not re-fetched on every single request. */
   lastAttemptAt: number;
   ads: AdRow[];
+  /** Latest operational campaign snapshot, kept out of historical ad facts. */
+  campaignStates: CampaignOperationalState[];
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
   accounting: AccountingRow[];
@@ -1088,6 +1091,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const keys = new CampaignKeyResolver();
     const adsets = new AdSetIndex();
 
+    // The live n8n workflow writes its Google fallback into reserved state rows
+    // in the existing Meta tab. They must never enter ad aggregates: doing so
+    // would move adsDateMax and source freshness despite carrying zero spend.
+    const metaStateRaw = metaRaw.filter((row) => str(row["__meta_key"]).startsWith("state|"));
+    const metaHistoryRaw = metaRaw.filter(
+      (row) => !str(row["__meta_key"]).startsWith("state|"),
+    );
+
     for (const r of metaRaw) {
       keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]));
       adsets.learn(str(r["__ad_id"]), str(r["Ad Name"]), str(r["Ad set name"]));
@@ -1132,7 +1143,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     /* -- ads --------------------------------------------------------------- */
     const objectiveByAccount = new Map<string, CampaignObjective>();
 
-    const meta: AdRow[] = metaRaw.map((r) => {
+    const meta: AdRow[] = metaHistoryRaw.map((r) => {
       const account = str(r["اسم الحساب الإعلاني"]) || str(r["__account_name"]);
       const objective = classifyAccount(account);
       objectiveByAccount.set(account, objective);
@@ -1159,6 +1170,53 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         viewCompletions: null,
         syncedAt: str(r["__synced_at"]),
       };
+    });
+
+    const campaignStates: CampaignOperationalState[] = metaStateRaw.flatMap((r) => {
+      let state: Record<string, unknown> = {};
+      try {
+        state = JSON.parse(str(r["__lead_types"]) || "{}");
+      } catch {
+        return [];
+      }
+      const campaignId = str(r["__campaign_id"]);
+      const name = str(r["اسم الكامبين"]);
+      if (!campaignId || state.rowType !== "campaign_state") return [];
+      const deliveryState = state.deliveryState === "active" ? "active" : "unknown";
+      // Old paused/unknown rows may remain after an upsert-only backup run. The
+      // dashboard lists the platform's current Active campaigns only.
+      if (deliveryState !== "active") return [];
+      const rawPlatform = str(state.platform);
+      const platform: Platform = ["meta", "snapchat", "tiktok", "google"].includes(rawPlatform)
+        ? (rawPlatform as Platform)
+        : "meta";
+      return [
+        {
+          platform,
+          accountId: str(r["__account_id"]),
+          account: str(r["__account_name"]) || str(r["اسم الحساب الإعلاني"]),
+          accountTimezone: str(state.accountTimezone),
+          campaignId,
+          campaignKey: keys.key(campaignId, name),
+          name,
+          configuredStatus: str(state.campaignStatus) || "UNKNOWN",
+          effectiveStatus: str(state.campaignEffectiveStatus) || "UNKNOWN",
+          servingStatus: str(state.servingStatus),
+          statusReason: str(state.statusReason),
+          startTime: str(state.campaignStartTime),
+          stopTime: str(state.campaignStopTime),
+          updatedTime: str(state.campaignUpdatedTime),
+          activeAdsets: num(state.activeAdsets),
+          activeAds: num(state.activeAds),
+          spend24h: num(state.spend24h),
+          impressions24h: num(state.impressions24h),
+          clicks24h: num(state.clicks24h),
+          platformLeads24h: num(state.platformLeads24h),
+          deliveryState,
+          checkedAt: str(state.checkedAt) || str(r["__synced_at"]),
+          source: "google_snapshot" as const,
+        },
+      ];
     });
 
     const snap: AdRow[] = snapRaw.map((r) => {
@@ -1765,6 +1823,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       const e = campaigns.get(a.campaignKey);
       if (e && e.objective === "unknown") e.objective = a.objective;
     }
+    for (const state of campaignStates)
+      touchCampaign(state.campaignKey, state.name, state.campaignId, state.platform);
     for (const c of crm) touchCampaign(c.campaignKey, c.campaignName, c.campaignId);
     for (const i of invoiced) touchCampaign(i.campaignKey, i.campaignName, i.campaignId);
     for (const l of lost) touchCampaign(l.campaignKey, l.campaignName, l.campaignId);
@@ -1870,7 +1930,19 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
 
     const tabSyncs: SourceFreshness[] = [
-      { key: "meta", label: TAB.meta, syncedAt: maxOf(metaRaw, "__synced_at") },
+      { key: "meta", label: TAB.meta, syncedAt: maxOf(metaHistoryRaw, "__synced_at") },
+      ...(campaignStates.length
+        ? [
+            {
+              key: "metaLive",
+              label: "Meta live status (Google backup)",
+              syncedAt: campaignStates.reduce(
+                (max, state) => (state.checkedAt > max ? state.checkedAt : max),
+                "",
+              ),
+            },
+          ]
+        : []),
       { key: "snap", label: TAB.snap, syncedAt: maxOf(snapRaw, "__synced_at") },
       {
         key: "tiktok",
@@ -2043,6 +2115,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       fetchedAt: Date.now(),
       lastAttemptAt: Date.now(),
       ads,
+      campaignStates,
       crm,
       invoiced,
       accounting,

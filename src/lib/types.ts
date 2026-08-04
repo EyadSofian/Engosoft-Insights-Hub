@@ -444,13 +444,61 @@ export interface CampaignLifetime {
   lastSpendDate: string;
 }
 
+export type CampaignDeliveryState = "active" | "paused" | "ended" | "unknown";
+export type CampaignStateSource = "n8n_live" | "google_snapshot" | "daily_proxy";
+
+export interface CampaignPlatformHealth {
+  platform: Platform;
+  ok: boolean;
+  active: number;
+  total: number;
+  message: string;
+  checkedAt: string;
+}
+
+/**
+ * The platform's current operational truth, kept separate from historical ad
+ * rows so a status snapshot can never inflate spend or move reporting dates.
+ */
+export interface CampaignOperationalState {
+  platform: Platform;
+  accountId: string;
+  account: string;
+  accountTimezone: string;
+  campaignId: string;
+  campaignKey: string;
+  name: string;
+  configuredStatus: string;
+  effectiveStatus: string;
+  servingStatus: string;
+  statusReason: string;
+  startTime: string;
+  stopTime: string;
+  updatedTime: string;
+  activeAdsets: number;
+  activeAds: number;
+  spend24h: number;
+  impressions24h: number;
+  clicks24h: number;
+  platformLeads24h: number | null;
+  deliveryState: CampaignDeliveryState;
+  checkedAt: string;
+  source: CampaignStateSource;
+}
+
 export interface CampaignActivity {
   /** Broadest window retained for older summary UI. */
   window: { from: string; to: string } | null;
-  /** The latest three available calendar days for every represented platform. */
+  /** Dates contributing to the optional recent spend/lead context. */
   platformWindows: Partial<Record<Platform, { from: string; to: string }>>;
-  /** A campaign is active here only when it recorded spend in this window. */
-  definition: "recent_spend";
+  /** Official platform status is the only source of truth for Active/Paused. */
+  definition: "official_status";
+  /** Where the freshest official operational state came from. */
+  source: CampaignStateSource;
+  generatedAt: string;
+  platformHealth: CampaignPlatformHealth[];
+  /** Current official state for every active campaign returned by the platforms. */
+  delivery: Record<string, CampaignOperationalState>;
   rows: PerfRow[];
   best: PerfRow | null;
   worst: PerfRow | null;
@@ -460,7 +508,7 @@ export interface CampaignActivity {
    * Material recent spend from a campaign that has never produced a Won, a paid
    * invoice, or a fully invoiced sales order across its whole history.
    *
-   * Outcomes are deliberately not read from the three-day spend window. Sales
+   * Outcomes are deliberately not read from the 24-hour spend window. Sales
    * cycles here run for weeks, so a short window reported every healthy
    * campaign as failing — including the account's best performers.
    */

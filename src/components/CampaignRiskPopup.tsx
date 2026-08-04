@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { CampaignActivity, CampaignLifetime, PerfRow } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
-import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
+import { PLATFORM_LABEL } from "@/lib/constants";
 import { Pill } from "@/components/ui-bits";
 import { useModalGuard } from "@/lib/ui-store";
 import {
@@ -54,8 +54,9 @@ export function CampaignRiskPopup() {
 
   const atRisk = data?.activity.atRisk;
   const rows = useMemo(() => pendingRiskRows(atRisk ?? [], prefs), [atRisk, prefs]);
-  const platformWindows = data?.activity.platformWindows ?? {};
-  const visiblePlatforms = PLATFORMS.filter((platform) => platformWindows[platform]);
+  const totalActive = (data?.activity.platformHealth ?? [])
+    .filter((platform) => platform.ok)
+    .reduce((total, platform) => total + platform.active, 0);
   const open = eligiblePath && !closed && shouldShowRiskAlert(rows, prefs);
 
   useEffect(() => {
@@ -109,12 +110,12 @@ export function CampaignRiskPopup() {
             </span>
             <div className="min-w-0">
               <h2 id="campaign-risk-title" className="text-lg font-semibold text-text sm:text-xl">
-                {lang === "ar" ? "حملات تحتاج قرارًا الآن" : "Campaigns needing a decision now"}
+                {lang === "ar" ? "حملات محتاجة مراجعة" : "Campaigns needing review"}
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-text-muted sm:text-sm">
                 {lang === "ar"
-                  ? "بتصرف في أحدث 3 أيام متاحة لكل منصة، ولم تسجل ولا Won ولا فاتورة مدفوعة ولا أمر بيع مفوتر بالكامل طوال تاريخها."
-                  : "Spending in each platform's latest 3 available days, with no Won, paid invoice, or fully invoiced sales order across their entire history."}
+                  ? "دي مش قائمة كل الحملات الشغالة. دي بس الحملات الـActive على منصتها وعندها صرف حديث، لكن لسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل."
+                  : "This is not the full active-campaign list. It only shows officially Active campaigns with recent spend but no Won, paid invoice, or fully invoiced sales order."}
               </p>
             </div>
           </div>
@@ -133,20 +134,12 @@ export function CampaignRiskPopup() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-semibold text-text">
               {lang === "ar"
-                ? `${fmtNum(rows.length)} حملة مرتبة حسب الإنفاق`
-                : `${fmtNum(rows.length)} campaigns ranked by spend`}
+                ? `${fmtNum(rows.length)} للمراجعة من أصل ${fmtNum(totalActive)} حملة Active`
+                : `${fmtNum(rows.length)} to review out of ${fmtNum(totalActive)} Active campaigns`}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {visiblePlatforms.map((platform) => {
-                const window = platformWindows[platform];
-                return (
-                  <Pill key={platform} tone="neutral">
-                    {PLATFORM_LABEL[platform][lang]}
-                    {window ? ` · ${window.from.slice(5)} → ${window.to.slice(5)}` : ""}
-                  </Pill>
-                );
-              })}
-            </div>
+            <Pill tone="neutral">
+              {lang === "ar" ? "الـStatus من المنصة مباشرة" : "Status comes directly from platform"}
+            </Pill>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
@@ -234,12 +227,12 @@ function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <RiskMetric
           icon={<BadgeDollarSign size={14} />}
-          label={lang === "ar" ? "إنفاق 3 أيام" : "3-day spend"}
+          label={lang === "ar" ? "صرف حديث مسجل" : "Recent recorded spend"}
           value={fmtUSD(row.spend)}
         />
         <RiskMetric
           icon={<ReceiptText size={14} />}
-          label={lang === "ar" ? "إجمالي المصروف" : "Total burned"}
+          label={lang === "ar" ? "إجمالي صرف الحملة" : "Campaign lifetime spend"}
           value={lifetime ? fmtUSD(lifetime.spend) : "—"}
         />
         <RiskMetric
@@ -269,11 +262,9 @@ function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime
 function RiskMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-surface px-2.5 py-2">
-      <div className="flex items-center gap-1 text-[10px] text-text-muted">
+      <div className="flex items-start gap-1 text-[10px] leading-tight text-text-muted">
         {icon}
-        <span className="truncate" title={label}>
-          {label}
-        </span>
+        <span>{label}</span>
       </div>
       <div className="num mt-1 text-sm font-semibold text-text">{value}</div>
     </div>
