@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Download, Layers, PanelRightOpen, Search, Target, X } from "lucide-react";
+import {
+  ChevronLeft,
+  CircleDollarSign,
+  Download,
+  Layers,
+  PanelRightOpen,
+  Search,
+  Target,
+  X,
+} from "lucide-react";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n, type DictKey, type Lang } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { useApi } from "@/lib/use-api";
@@ -91,6 +100,7 @@ function buildCsvRow(
 
 type QuickViewKey =
   | "all"
+  | "attributedRevenue"
   | "bestRoas"
   | "worst"
   | "topSpend"
@@ -118,6 +128,19 @@ const QUICK_VIEWS: QuickView[] = [
     en: "All",
     hint: { ar: "كل الصفوف في النطاق الحالي", en: "Every row in the current scope" },
     apply: (rows) => rows,
+  },
+  {
+    key: "attributedRevenue",
+    ar: "الإيراد المرتبط",
+    en: "Campaign-linked revenue",
+    hint: {
+      ar: "الحملات الموجودة في مصدر الإعلانات خلال الفترة ولها تحصيل محاسبي — مجموعها يطابق الرقم المرتبط في كارت الإيراد",
+      en: "Campaigns present in the ad feed during the period with accounting collections — their sum matches the linked figure on the revenue card",
+    },
+    apply: (rows) =>
+      rows
+        .filter((row) => row.platforms.length > 0 && row.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue),
   },
   {
     key: "bestRoas",
@@ -233,6 +256,7 @@ export function PerfExplorer({
   spendNote,
   title,
   subtitle,
+  initialView,
 }: {
   rows: PerfRow[];
   grain: Grain;
@@ -244,11 +268,13 @@ export function PerfExplorer({
   spendNote?: string;
   title?: string;
   subtitle?: string;
+  /** Deep-link from the overview into one decision-ready quick view. */
+  initialView?: "attributedRevenue";
 }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const narrow = useIsNarrow(768);
-  const [view, setView] = useState<QuickViewKey>("all");
+  const [view, setView] = useState<QuickViewKey>(initialView ?? "all");
   const [layout, setLayout] = useState<Layout | null>(null);
   const [query, setQuery] = useState("");
   const [cardSort, setCardSort] = useState<CardSortKey>("spend");
@@ -262,7 +288,9 @@ export function PerfExplorer({
 
   const nameOf = (r: PerfRow) => (r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM);
 
-  const views = QUICK_VIEWS.filter((v) => !v.adOnly || grain === "ad");
+  const views = QUICK_VIEWS.filter(
+    (v) => (!v.adOnly || grain === "ad") && (v.key !== "attributedRevenue" || grain === "campaign"),
+  );
   const activeView = views.find((v) => v.key === view) ?? views[0];
   const shown = useMemo(() => activeView.apply(rows), [activeView, rows]);
 
@@ -283,6 +311,15 @@ export function PerfExplorer({
   useEffect(() => {
     setCardLimit(CARD_PAGE);
   }, [query, cardSort, view, grain, rows]);
+
+  useEffect(() => {
+    if (initialView) setView(initialView);
+  }, [initialView]);
+
+  useEffect(() => {
+    if (grain !== "campaign")
+      setView((current) => (current === "attributedRevenue" ? "all" : current));
+  }, [grain]);
 
   const csvRow = (r: PerfRow) => buildCsvRow(r, nameOf, lang, spendAvailable);
 
@@ -411,6 +448,42 @@ export function PerfExplorer({
           />
         </div>
       </div>
+
+      {view === "attributedRevenue" && !loading && (
+        <div
+          className="flex flex-col gap-3 rounded-xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+          style={{
+            background: "var(--accent-soft)",
+            borderColor: "color-mix(in oklab, var(--accent) 35%, transparent)",
+          }}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface text-accent-ink">
+              <CircleDollarSign size={17} />
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-text">
+                {lang === "ar"
+                  ? "الحملات الداخلة في رقم الإيراد المرتبط"
+                  : "Campaigns included in linked revenue"}
+              </div>
+              <p className="mt-0.5 text-xs leading-5 text-text-muted">
+                {lang === "ar"
+                  ? "كل صف له منصة إعلانية في الفترة وتحصيل من Accounting. الصفوف بدون منصة أو Organic مستبعدة."
+                  : "Every row has an ad platform in the period and Accounting collections. Platform-less and organic rows are excluded."}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-start sm:min-w-[160px]">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+              {lang === "ar" ? `${fmtNum(shown.length)} حملات · مجموع الصفوف` : `${fmtNum(shown.length)} campaigns · row total`}
+            </div>
+            <div className="num mt-0.5 text-lg font-semibold text-text">
+              {fmtUSDFull(shown.reduce((sum, row) => sum + row.revenue, 0))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <Skeleton className="h-[420px]" />

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   AlertTriangle,
@@ -339,19 +339,36 @@ function Overview() {
               .join(" · ")
           }
         />
-        <KpiCard
-          index={7}
-          label={t("revenue")}
-          value={fmtUSD(T.revenue)}
-          delta={deltas.revenue}
-          hero
-          icon={<TrendingUp size={15} />}
-          sub={
+        <Link
+          to="/campaigns"
+          search={{ view: "attributedRevenue" }}
+          className="group block rounded-xl outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          aria-label={
             lang === "ar"
-              ? `محصَّل بتاريخ الدفع · منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملة`
-              : `Collected, by payment date · ${fmtUSD(T.attributedRevenue)} campaign-linked`
+              ? `افتح الحملات المرتبطة بإيراد ${fmtUSD(T.attributedRevenue)}`
+              : `Open campaigns linked to ${fmtUSD(T.attributedRevenue)} of revenue`
           }
-        />
+        >
+          <KpiCard
+            index={7}
+            label={t("revenue")}
+            value={fmtUSD(T.revenue)}
+            delta={deltas.revenue}
+            hero
+            icon={<TrendingUp size={15} />}
+            subWrap
+            sub={
+              <span>
+                {lang === "ar"
+                  ? `محصَّل بتاريخ الدفع · منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
+                  : `Collected, by payment date · ${fmtUSD(T.attributedRevenue)} campaign-linked`}
+                <span className="mt-1 block font-semibold text-brand group-hover:underline">
+                  {lang === "ar" ? "اضغط لعرض الحملات ←" : "Open the contributing campaigns →"}
+                </span>
+              </span>
+            }
+          />
+        </Link>
 
         <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={lang === "ar" ? `الإيراد المحصّل من Accounting ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}` : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
         <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "الإنفاق ÷ الإيراد المحصّل من Accounting" : "Spend ÷ collected Accounting revenue"} />

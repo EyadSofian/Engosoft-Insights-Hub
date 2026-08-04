@@ -32,7 +32,14 @@ import { PerfExplorer, type Grain } from "@/components/ads/PerfExplorer";
 import { ratioCell } from "@/components/ads/cells";
 import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types";
 
-export const Route = createFileRoute("/campaigns")({ component: Campaigns });
+type CampaignsSearch = { view?: "attributedRevenue" };
+
+export const Route = createFileRoute("/campaigns")({
+  validateSearch: (search: Record<string, unknown>): CampaignsSearch => ({
+    view: search.view === "attributedRevenue" ? "attributedRevenue" : undefined,
+  }),
+  component: Campaigns,
+});
 
 interface Resp {
   grain: Grain;
@@ -45,6 +52,7 @@ interface Resp {
 
 function Campaigns() {
   const { t, lang } = useI18n();
+  const { view: initialView } = Route.useSearch();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
@@ -235,6 +243,7 @@ function Campaigns() {
             rows={data.rows}
             grain={grain}
             onGrainChange={setGrain}
+            initialView={initialView}
             unknownAdsetKey={data.unknownAdsetKey}
             csvPrefix="engosoft"
             spendAvailable={spend > 0}
