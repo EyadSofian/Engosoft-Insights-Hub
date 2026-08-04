@@ -57,8 +57,6 @@ interface GoogleAdsResultRow {
     primaryStatus?: string;
     primaryStatusReasons?: string[];
     servingStatus?: string;
-    startDate?: string;
-    endDate?: string;
   };
   adGroup?: {
     id?: string;
@@ -286,9 +284,7 @@ function campaignStatusGaql(): string {
       campaign.status,
       campaign.primary_status,
       campaign.primary_status_reasons,
-      campaign.serving_status,
-      campaign.start_date,
-      campaign.end_date
+      campaign.serving_status
     FROM campaign
     WHERE campaign.status != 'REMOVED'
     ORDER BY campaign.name
@@ -463,8 +459,8 @@ export async function fetchGoogleAdsCampaignStatus(): Promise<GoogleAdsCampaignS
           effectiveStatus: primaryStatus || status,
           servingStatus: String(row.campaign?.servingStatus ?? "").trim(),
           statusReason: reasons.join(", "),
-          startTime: String(row.campaign?.startDate ?? "").trim(),
-          stopTime: String(row.campaign?.endDate ?? "").trim(),
+          startTime: "",
+          stopTime: "",
           updatedTime: "",
           activeAdsets: 0,
           activeAds: 0,
@@ -478,9 +474,7 @@ export async function fetchGoogleAdsCampaignStatus(): Promise<GoogleAdsCampaignS
         });
       }
     } catch (error) {
-      errors.push(
-        `Google Ads customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      errors.push(error instanceof Error ? error.message : String(error));
     }
   }
 
