@@ -4,50 +4,269 @@ export const Route = createFileRoute("/api/courses")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, computeCourses, computeTotals, previousPeriod, isPreviousComparable, groupBy } =
-          await import("@/lib/metrics.server");
+        const {
+          attributedAdCourse,
+          computeCourses,
+          computeTotals,
+          getFiltered,
+          groupBy,
+          isPreviousComparable,
+          previousPeriod,
+        } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { normalizeName } = await import("@/lib/sheet-cache.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const prevRange = previousPeriod(filters.from, filters.to);
         // No prior-period revenue delta when that window predates the data.
         const prevComparable = await isPreviousComparable(prevRange);
-        const prevData = prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
+        const prevData =
+          prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
 
         const courses = computeCourses(data, prevData ?? undefined);
-        const detail = new URL(request.url).searchParams.get("detail");
+        const detail = new URL(request.url).searchParams.get("detail")?.trim() ?? "";
 
         let drill = null;
         if (detail) {
-          const rows = data.crm.filter((c) => c.course === detail);
-          const invoices = data.accounting.filter((row) => row.course === detail);
-          const monthly = new Map<string, { month: string; revenue: number; leads: number; won: number }>();
-          const at = (m: string) => {
-            let e = monthly.get(m);
-            if (!e) {
-              e = { month: m, revenue: 0, leads: 0, won: 0 };
-              monthly.set(m, e);
-            }
-            return e;
+          const courseKey = normalizeName(detail);
+          const isCourse = (value: string) => normalizeName(value) === courseKey;
+
+          type MonthAcc = {
+            month: string;
+            spend: number;
+            platformLeads: number | null;
+            leads: number;
+            won: number;
+            revenue: number;
+            invoiceRefs: Set<string>;
+            salesOrderRefs: Set<string>;
           };
-          for (const invoice of invoices) {
-            const date = accountingReportingDate(invoice, data.applied.dateBasis ?? "payment");
-            if (date) at(date.slice(0, 7)).revenue += invoice.usdPaid;
+          const monthly = new Map<string, MonthAcc>();
+          const atMonth = (month: string) => {
+            let value = monthly.get(month);
+            if (!value) {
+              value = {
+                month,
+                spend: 0,
+                platformLeads: null,
+                leads: 0,
+                won: 0,
+                revenue: 0,
+                invoiceRefs: new Set(),
+                salesOrderRefs: new Set(),
+              };
+              monthly.set(month, value);
+            }
+            return value;
+          };
+
+          type CampaignAcc = {
+            key: string;
+            name: string;
+            platforms: Set<import("@/lib/types").Platform>;
+            accounts: Set<string>;
+            objective: import("@/lib/types").CampaignObjective;
+            spend: number;
+            latestSpend: number;
+            latestDates: Set<string>;
+            platformLeads: number | null;
+            crmLeads: number;
+            won: number;
+            revenue: number;
+            invoiceRefs: Set<string>;
+            salesOrderRefs: Set<string>;
+            spendDateMin: string;
+            spendDateMax: string;
+            attributionSources: Set<string>;
+            attributionConfidence: number;
+          };
+          const campaignMap = new Map<string, CampaignAcc>();
+          const campaignKey = (key: string, name: string) => key || `name:${normalizeName(name)}`;
+          const atCampaign = (key: string, name: string) => {
+            const stableKey = campaignKey(key, name);
+            let value = campaignMap.get(stableKey);
+            if (!value) {
+              value = {
+                key: stableKey,
+                name: name || "—",
+                platforms: new Set(),
+                accounts: new Set(),
+                objective: "unknown",
+                spend: 0,
+                latestSpend: 0,
+                latestDates: new Set(),
+                platformLeads: null,
+                crmLeads: 0,
+                won: 0,
+                revenue: 0,
+                invoiceRefs: new Set(),
+                salesOrderRefs: new Set(),
+                spendDateMin: "",
+                spendDateMax: "",
+                attributionSources: new Set(),
+                attributionConfidence: 1,
+              };
+              campaignMap.set(stableKey, value);
+            }
+            if ((!value.name || value.name === "—") && name) value.name = name;
+            return value;
+          };
+
+          // "Active" means spend on the latest available day from each platform.
+          // The feeds are daily, so claiming an hour-level status would be false precision.
+          const latestByPlatform = new Map<import("@/lib/types").Platform, string>();
+          for (const ad of data.ads) {
+            if (!ad.date) continue;
+            const current = latestByPlatform.get(ad.platform) ?? "";
+            if (ad.date > current) latestByPlatform.set(ad.platform, ad.date);
           }
-          for (const c of rows) {
-            if (!c.createdAt) continue;
-            const e = at(c.createdAt.slice(0, 7));
-            e.leads++;
-            if (c.isWon) e.won++;
+
+          const spendBySource: Record<string, number> = {
+            ad_name: 0,
+            adset_name: 0,
+            campaign_name: 0,
+            crm_leads: 0,
+          };
+
+          for (const ad of data.ads) {
+            const attribution = attributedAdCourse(ad, data.snapshot);
+            if (!isCourse(attribution.course)) continue;
+            const campaign = atCampaign(ad.campaignKey, ad.campaign);
+            campaign.platforms.add(ad.platform);
+            if (ad.account) campaign.accounts.add(ad.account);
+            if (campaign.objective === "unknown" || ad.objective === "leads")
+              campaign.objective = ad.objective;
+            campaign.spend += ad.spend;
+            if (ad.platformLeads !== null)
+              campaign.platformLeads = (campaign.platformLeads ?? 0) + ad.platformLeads;
+            if (
+              ad.date &&
+              ad.spend > 0 &&
+              (!campaign.spendDateMin || ad.date < campaign.spendDateMin)
+            )
+              campaign.spendDateMin = ad.date;
+            if (ad.date && ad.spend > 0 && ad.date > campaign.spendDateMax)
+              campaign.spendDateMax = ad.date;
+            if (attribution.source) {
+              campaign.attributionSources.add(attribution.source);
+              spendBySource[attribution.source] =
+                (spendBySource[attribution.source] ?? 0) + ad.spend;
+            }
+            campaign.attributionConfidence = Math.min(
+              campaign.attributionConfidence,
+              attribution.confidence,
+            );
+            if (ad.date && ad.date === latestByPlatform.get(ad.platform) && ad.spend > 0) {
+              campaign.latestSpend += ad.spend;
+              campaign.latestDates.add(ad.date);
+            }
+
+            if (ad.date) {
+              const month = atMonth(ad.date.slice(0, 7));
+              month.spend += ad.spend;
+              if (ad.platformLeads !== null)
+                month.platformLeads = (month.platformLeads ?? 0) + ad.platformLeads;
+            }
           }
+
+          const crmRows = data.crm.filter((row) => isCourse(row.course));
+          for (const row of crmRows) {
+            if (row.createdAt) {
+              const month = atMonth(row.createdAt.slice(0, 7));
+              month.leads++;
+              if (row.isWon) month.won++;
+            }
+            if (!row.fromCampaign) continue;
+            const campaign = atCampaign(row.campaignKey, row.campaignName);
+            campaign.crmLeads++;
+            if (row.isWon) campaign.won++;
+          }
+
+          const invoiceRows = data.accounting.filter((row) => isCourse(row.course));
+          for (const row of invoiceRows) {
+            const date = accountingReportingDate(row, data.applied.dateBasis ?? "payment");
+            if (date) {
+              const month = atMonth(date.slice(0, 7));
+              month.revenue += row.usdPaid;
+              if (row.movement && !row.isCreditNote) month.invoiceRefs.add(row.movement);
+            }
+            if (!row.campaignKey && !row.campaignName) continue;
+            const campaign = atCampaign(row.campaignKey, row.campaignName);
+            campaign.revenue += row.usdPaid;
+            if (row.movement && !row.isCreditNote) campaign.invoiceRefs.add(row.movement);
+          }
+
+          const orderRows = data.invoiced.filter((row) => isCourse(row.course));
+          for (const row of orderRows) {
+            if (row.revenueDate && row.orderRef)
+              atMonth(row.revenueDate.slice(0, 7)).salesOrderRefs.add(row.orderRef);
+            if ((!row.campaignKey && !row.campaignName) || !row.orderRef) continue;
+            atCampaign(row.campaignKey, row.campaignName).salesOrderRefs.add(row.orderRef);
+          }
+
+          const campaignRows = [...campaignMap.values()]
+            .filter((row) => row.spend > 0)
+            .map((row) => ({
+              key: row.key,
+              name: row.name,
+              platforms: [...row.platforms],
+              accounts: [...row.accounts],
+              objective: row.objective,
+              spend: row.spend,
+              latestSpend: row.latestSpend,
+              latestDates: [...row.latestDates].sort(),
+              platformLeads: row.platformLeads,
+              crmLeads: row.crmLeads,
+              won: row.won,
+              revenue: row.revenue,
+              invoices: row.invoiceRefs.size,
+              salesOrders: row.salesOrderRefs.size,
+              roas: row.spend > 0 ? row.revenue / row.spend : null,
+              spendDateMin: row.spendDateMin,
+              spendDateMax: row.spendDateMax,
+              attributionSources: [...row.attributionSources],
+              attributionConfidence: row.attributionConfidence,
+            }));
+
           drill = {
             course: detail,
-            campaigns: groupBy(rows.filter((c) => c.fromCampaign), (c) => c.campaignName),
-            salespeople: groupBy(rows, (c) => c.salesperson || "—"),
-            teams: groupBy(rows, (c) => c.salesTeam || "—"),
-            monthly: [...monthly.values()].sort((a, b) => a.month.localeCompare(b.month)),
+            latestWindow: Object.fromEntries(latestByPlatform),
+            activeCampaigns: campaignRows
+              .filter((row) => row.latestSpend > 0)
+              .sort((a, b) => b.latestSpend - a.latestSpend),
+            previousCampaigns: campaignRows
+              .filter((row) => row.latestSpend <= 0)
+              .sort((a, b) => b.spendDateMax.localeCompare(a.spendDateMax) || b.spend - a.spend)
+              .slice(0, 12),
+            previousCampaignCount: campaignRows.filter((row) => row.latestSpend <= 0).length,
+            attribution: {
+              spendBySource,
+              totalAttributedSpend: Object.values(spendBySource).reduce(
+                (sum, value) => sum + value,
+                0,
+              ),
+            },
+            campaigns: groupBy(
+              crmRows.filter((row) => row.fromCampaign),
+              (row) => row.campaignName,
+            ),
+            salespeople: groupBy(crmRows, (row) => row.salesperson || "—"),
+            teams: groupBy(crmRows, (row) => row.salesTeam || "—"),
+            monthly: [...monthly.values()]
+              .sort((a, b) => a.month.localeCompare(b.month))
+              .map((row) => ({
+                month: row.month,
+                spend: row.spend,
+                platformLeads: row.platformLeads,
+                leads: row.leads,
+                won: row.won,
+                salesOrders: row.salesOrderRefs.size,
+                invoices: row.invoiceRefs.size,
+                revenue: row.revenue,
+                roas: row.spend > 0 ? row.revenue / row.spend : null,
+              })),
           };
         }
 

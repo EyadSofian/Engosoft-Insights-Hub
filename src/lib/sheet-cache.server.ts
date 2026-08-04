@@ -75,9 +75,11 @@ export interface CampaignMeta {
   key: string;
   name: string;
   id: string;
-  /** Modal course of this campaign's CRM leads. */
+  /** Course named by the campaign, or the modal course of its CRM leads. */
   course: string;
-  /** Share of the campaign's leads that carry the modal course, 0–1. */
+  /** How the campaign-level course was identified. Ad/ad-set names are handled per ad row. */
+  courseSource: "" | "campaign_name" | "crm_leads";
+  /** Confidence of the campaign-level inference, 0–1. */
   courseDominance: number;
   platforms: Platform[];
   objective: CampaignObjective;
@@ -239,6 +241,19 @@ const COURSE_RULES: { label: string; test: RegExp }[] = [
   { label: "Infra", test: /\binfrastructure\b|\binfra\b|بنية تحتية/i },
   { label: "Tech", test: /\btechnology\b|\btech\b|تقني/i },
 ];
+
+/**
+ * Returns a known course only when the supplied text names exactly one course.
+ * A campaign such as "PMP + CFM" is deliberately left unresolved instead of
+ * assigning all of its spend to whichever rule happens to appear first.
+ */
+export function knownCourseFromText(...values: unknown[]): string {
+  const searchable = values.map(str).filter(Boolean).join(" ");
+  if (!searchable) return "";
+  const matches = new Set<string>();
+  for (const rule of COURSE_RULES) if (rule.test.test(searchable)) matches.add(rule.label);
+  return matches.size === 1 ? [...matches][0] : "";
+}
 
 /**
  * Shared course key across CRM, Lost, paid invoices and sales orders.
@@ -1708,9 +1723,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const accounts = [...acctMap.values()].sort((x, y) => y.spend - x.spend);
 
     /* -- campaign → course inference --------------------------------------- */
-    // Ads tabs carry no course, so spend rolls up to a course through the modal
-    // course of the campaign's CRM leads. Dominance is kept so the UI can say how
-    // confident that inference is (it averages ~99% here).
+    // Campaign names often carry the course explicitly. When they do not, the
+    // modal course of the campaign's CRM leads is a safe fallback. Ad and ad-set
+    // names are evaluated later per ad row because a single campaign can contain
+    // several courses.
     const courseCounts = new Map<string, Map<string, number>>();
     for (const c of crm) {
       if (!c.campaignKey || !c.course) continue;
@@ -1732,6 +1748,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           name,
           id,
           course: "",
+          courseSource: "",
           courseDominance: 0,
           platforms: [],
           objective: "unknown",
@@ -1752,9 +1769,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     for (const i of invoiced) touchCampaign(i.campaignKey, i.campaignName, i.campaignId);
     for (const l of lost) touchCampaign(l.campaignKey, l.campaignName, l.campaignId);
 
-    for (const [key, counts] of courseCounts) {
-      const e = campaigns.get(key);
-      if (!e) continue;
+    for (const e of campaigns.values()) {
+      const namedCourse = knownCourseFromText(e.name);
+      if (namedCourse) {
+        e.course = namedCourse;
+        e.courseSource = "campaign_name";
+        e.courseDominance = 1;
+        continue;
+      }
+
+      const counts = courseCounts.get(e.key);
+      if (!counts) continue;
       let top = "";
       let best = 0;
       let total = 0;
@@ -1766,6 +1791,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         }
       }
       e.course = top;
+      e.courseSource = top ? "crm_leads" : "";
       e.courseDominance = total > 0 ? best / total : 0;
     }
 

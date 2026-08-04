@@ -6,6 +6,7 @@
 // read as real results and get acted on.
 import {
   loadAllData,
+  knownCourseFromText,
   normalizeName,
   normalizeSource,
   PLATFORM_SOURCE_KEYS,
@@ -292,6 +293,31 @@ export interface FilteredData {
   attributionScoped: boolean;
 }
 
+export type CourseAttributionSource = "ad_name" | "adset_name" | "campaign_name" | "crm_leads" | "";
+
+/**
+ * Course attribution for one daily ad row, ordered from the most specific ad
+ * dimension to the campaign fallback. This prevents a multi-course campaign
+ * from putting every ad dollar under one course.
+ */
+export function attributedAdCourse(
+  row: AdRow,
+  snapshot: Snapshot,
+): { course: string; source: CourseAttributionSource; confidence: number } {
+  const adCourse = knownCourseFromText(row.ad);
+  if (adCourse) return { course: adCourse, source: "ad_name", confidence: 1 };
+  const adsetCourse = knownCourseFromText(row.adset);
+  if (adsetCourse) return { course: adsetCourse, source: "adset_name", confidence: 1 };
+  const campaignCourse = knownCourseFromText(row.campaign);
+  if (campaignCourse) return { course: campaignCourse, source: "campaign_name", confidence: 1 };
+  const meta = snapshot.campaigns.get(row.campaignKey);
+  return {
+    course: meta?.course ?? "",
+    source: meta?.courseSource ?? "",
+    confidence: meta?.courseDominance ?? 0,
+  };
+}
+
 export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> {
   const all = await loadAllData();
   const { accountingUsdPaid, fxRatesFromFilters } = await import("./fx-rates");
@@ -352,15 +378,9 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   };
 
-  // Course lives on CRM/invoice/lost rows but never on an ad row, so a course
-  // filter reaches the ads tabs through the campaign → modal-course inference.
-  const courseCampaigns = new Set<string>();
-  if (course) {
-    for (const [key, meta] of all.campaigns) {
-      if (meta.course && normalizeName(meta.course) === normalizeName(course))
-        courseCampaigns.add(key);
-    }
-  }
+  // Ads have no explicit course column. Names are checked from the most specific
+  // dimension (ad) up to campaign, then the CRM modal-course fallback is used.
+  const normalizedCourse = course ? normalizeName(course) : "";
 
   // CRM/invoice rows carry no platform column. A row belongs to a platform when
   // its campaign is one of that platform's campaigns, or when its source names
@@ -385,7 +405,8 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     if (adsetKeyFilter && dimensions.fromAd(r, "adset").key !== adsetKeyFilter) return false;
     if (ad && r.ad !== ad) return false;
     if (adKeyFilter && dimensions.fromAd(r, "ad").key !== adKeyFilter) return false;
-    if (course && !courseCampaigns.has(r.campaignKey)) return false;
+    if (normalizedCourse && normalizeName(attributedAdCourse(r, all).course) !== normalizedCourse)
+      return false;
     return true;
   });
 
@@ -1378,13 +1399,13 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     if (!isArchivedWon(l)) a.lost++;
   }
 
-  // Ad spend reaches a course through the dominant course inferred for its campaign.
+  // Ad/ad-set/campaign names are more precise than campaign-level lead inference.
   // Creating the course here keeps spend-only campaigns visible before a CRM or
   // invoice outcome exists.
   for (const ad of data.ads) {
-    const meta = data.snapshot.campaigns.get(ad.campaignKey);
-    if (!meta?.course) continue;
-    const a = get(meta.course, "");
+    const attribution = attributedAdCourse(ad, data.snapshot);
+    if (!attribution.course) continue;
+    const a = get(attribution.course, "");
     a.spend += ad.spend;
     a.impressions += ad.impressions;
     a.clicksAll += ad.clicksAll;
