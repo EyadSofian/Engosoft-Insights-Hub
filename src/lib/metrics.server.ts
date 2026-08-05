@@ -1306,6 +1306,7 @@ export async function computeRecentCampaignActivity(
     period[campaignKey] = {
       spend: inPeriod?.spend ?? 0,
       crmLeads,
+      lostArchived: inPeriod?.lost ?? 0,
       won: inPeriod?.won ?? 0,
       invoices: inPeriod?.invoices ?? 0,
       salesOrders: inPeriod?.salesOrders ?? 0,

@@ -495,6 +495,8 @@ export interface CampaignPeriodSummary {
   spend: number;
   /** Reportable CRM rows only; archived Lost rows are deliberately excluded. */
   crmLeads: number;
+  /** Authoritative archived Lost rows attributed to this campaign in the selected period. */
+  lostArchived: number;
   won: number;
   invoices: number;
   salesOrders: number;

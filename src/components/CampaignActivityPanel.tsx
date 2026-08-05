@@ -249,12 +249,12 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                       value={fmtNum(inPeriod?.crmLeads ?? 0)}
                     />
                     <Mini
-                      label="Won"
-                      value={fmtNum(inPeriod?.won ?? 0)}
+                      label={lang === "ar" ? "Lost مؤرشف في الفترة" : "Archived Lost in period"}
+                      value={fmtNum(inPeriod?.lostArchived ?? 0)}
                     />
                     <Mini
-                      label={lang === "ar" ? "أوامر بيع في الفترة" : "Period sales orders"}
-                      value={fmtNum(inPeriod?.salesOrders ?? 0)}
+                      label={lang === "ar" ? "إيراد مدفوع في الفترة" : "Paid revenue in period"}
+                      value={fmtUSD(inPeriod?.revenue ?? 0)}
                     />
                     <ChevronDown
                       size={15}
@@ -265,8 +265,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   <div className="border-t border-border px-3 py-3 text-xs leading-relaxed text-text-muted">
                     <p className="text-text">
                       {lang === "ar"
-                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. الأرقام اللي فوق للفترة المختارة؛ الأرقام الجاية لكل تاريخ الحملة.`
-                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. The row above is the selected period; the figures below are lifetime totals.`}
+                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. فوق: صرف، ليدز CRM الحالية، Lost المؤرشف، والإيراد المدفوع في الفترة المختارة. تحت: إجمالي تاريخ الحملة.`
+                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. Above: spend, current CRM leads, archived Lost, and paid revenue in the selected period. Below: lifetime totals.`}
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
                       <Mini label={lang === "ar" ? "Won — كل التاريخ" : "Lifetime Won"} value={life ? fmtNum(life.won) : "—"} />
@@ -340,17 +340,19 @@ function ActivitySpotlight({
       <div className="mt-2 truncate text-sm font-semibold text-text" title={row.name}>
         {row.name}
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <Mini label={lang === "ar" ? "صرف الفترة" : "Period spend"} value={fmtUSD(period?.spend ?? row.spend)} />
         <Mini
           label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
           value={fmtNum(period?.crmLeads ?? 0)}
         />
-        <Mini label="Won" value={fmtNum(period?.won ?? row.won)} />
-        <Mini label={lang === "ar" ? "فواتير" : "Invoices"} value={fmtNum(period?.invoices ?? row.invoices)} />
         <Mini
-          label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
-          value={fmtNum(period?.salesOrders ?? row.salesOrders)}
+          label={lang === "ar" ? "Lost مؤرشف" : "Archived Lost"}
+          value={fmtNum(period?.lostArchived ?? 0)}
+        />
+        <Mini
+          label={lang === "ar" ? "إيراد مدفوع" : "Paid revenue"}
+          value={fmtUSD(period?.revenue ?? row.revenue)}
         />
       </div>
     </div>
