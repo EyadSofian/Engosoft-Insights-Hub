@@ -49,11 +49,11 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         ? lang === "ar"
           ? "حالة المنصات المباشرة"
           : "Live platform status"
-      : activity.source === "google_snapshot"
-        ? lang === "ar"
-          ? "آخر نسخة محفوظة في Google"
-          : "Latest Google backup"
-        : lang === "ar"
+        : activity.source === "google_snapshot"
+          ? lang === "ar"
+            ? "آخر نسخة محفوظة في Google"
+            : "Latest Google backup"
+          : lang === "ar"
             ? "حالة محفوظة"
             : "Saved status";
 
@@ -209,7 +209,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   key={`${row.platforms.join("-")}:${row.key}`}
                   className="group bg-surface open:bg-surface-2/55"
                 >
-                  <summary className="grid min-h-16 cursor-pointer list-none grid-cols-2 items-center gap-3 px-3 py-3 marker:content-none sm:grid-cols-[minmax(0,1fr)_repeat(4,auto)_24px] sm:gap-5">
+                  <summary className="grid min-h-16 cursor-pointer list-none grid-cols-2 items-center gap-3 px-3 py-3 marker:content-none sm:grid-cols-[minmax(0,1fr)_repeat(5,auto)_24px] sm:gap-4">
                     <div className="col-span-2 min-w-0 sm:col-span-1">
                       <div className="flex items-center gap-2">
                         <div
@@ -253,6 +253,10 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                       value={fmtNum(inPeriod?.lostArchived ?? 0)}
                     />
                     <Mini
+                      label={lang === "ar" ? "Won في الفترة" : "Won in period"}
+                      value={fmtNum(inPeriod?.won ?? 0)}
+                    />
+                    <Mini
                       label={lang === "ar" ? "إيراد مدفوع في الفترة" : "Paid revenue in period"}
                       value={fmtUSD(inPeriod?.revenue ?? 0)}
                     />
@@ -265,16 +269,38 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   <div className="border-t border-border px-3 py-3 text-xs leading-relaxed text-text-muted">
                     <p className="text-text">
                       {lang === "ar"
-                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. فوق: صرف، ليدز CRM الحالية، Lost المؤرشف، والإيراد المدفوع في الفترة المختارة. تحت: إجمالي تاريخ الحملة.`
-                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. Above: spend, current CRM leads, archived Lost, and paid revenue in the selected period. Below: lifetime totals.`}
+                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. فوق: صرف، ليدز CRM، Lost، Won، والإيراد المدفوع في الفترة المختارة. تحت: إجمالي تاريخ الحملة.`
+                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. Above: selected-period spend, CRM leads, archived Lost, Won, and paid revenue. Below: lifetime totals.`}
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-                      <Mini label={lang === "ar" ? "Won — كل التاريخ" : "Lifetime Won"} value={life ? fmtNum(life.won) : "—"} />
-                      <Mini label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"} value={life ? fmtNum(life.invoices) : "—"} />
-                      <Mini label={lang === "ar" ? "أوامر بيع" : "Sales orders"} value={life ? fmtNum(life.salesOrders) : "—"} />
-                      <Mini label={lang === "ar" ? "إجمالي المصروف" : "Lifetime spend"} value={life ? fmtUSD(life.spend) : "—"} />
-                      <Mini label={lang === "ar" ? "إجمالي الإيراد" : "Lifetime revenue"} value={life ? fmtUSD(life.revenue) : "—"} />
-                      <Mini label="ROAS" value={life?.roas === null || life?.roas === undefined ? "—" : `${life.roas.toFixed(2)}×`} />
+                      <Mini
+                        label={lang === "ar" ? "Won — كل التاريخ" : "Lifetime Won"}
+                        value={life ? fmtNum(life.won) : "—"}
+                      />
+                      <Mini
+                        label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"}
+                        value={life ? fmtNum(life.invoices) : "—"}
+                      />
+                      <Mini
+                        label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
+                        value={life ? fmtNum(life.salesOrders) : "—"}
+                      />
+                      <Mini
+                        label={lang === "ar" ? "إجمالي المصروف" : "Lifetime spend"}
+                        value={life ? fmtUSD(life.spend) : "—"}
+                      />
+                      <Mini
+                        label={lang === "ar" ? "إجمالي الإيراد" : "Lifetime revenue"}
+                        value={life ? fmtUSD(life.revenue) : "—"}
+                      />
+                      <Mini
+                        label="ROAS"
+                        value={
+                          life?.roas === null || life?.roas === undefined
+                            ? "—"
+                            : `${life.roas.toFixed(2)}×`
+                        }
+                      />
                       <Mini
                         label={lang === "ar" ? "آخر يوم صرف" : "Last spend date"}
                         value={life?.lastSpendDate || "—"}
@@ -282,11 +308,29 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                     </div>
                     {state && (
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-subtle">
-                        <span>{PLATFORM_LABEL[state.platform][lang]}: {state.configuredStatus}</span>
-                        {state.servingStatus && <span>{lang === "ar" ? "التقديم" : "Serving"}: {state.servingStatus}</span>}
-                        {state.activeAdsets > 0 && <span>{lang === "ar" ? "Ad sets نشطة" : "Active ad sets"}: {fmtNum(state.activeAdsets)}</span>}
-                        {state.activeAds > 0 && <span>{lang === "ar" ? "إعلانات نشطة" : "Active ads"}: {fmtNum(state.activeAds)}</span>}
-                        <span>{lang === "ar" ? "آخر فحص" : "Checked"}: {state.checkedAt || "—"}</span>
+                        <span>
+                          {PLATFORM_LABEL[state.platform][lang]}: {state.configuredStatus}
+                        </span>
+                        {state.servingStatus && (
+                          <span>
+                            {lang === "ar" ? "التقديم" : "Serving"}: {state.servingStatus}
+                          </span>
+                        )}
+                        {state.activeAdsets > 0 && (
+                          <span>
+                            {lang === "ar" ? "Ad sets نشطة" : "Active ad sets"}:{" "}
+                            {fmtNum(state.activeAdsets)}
+                          </span>
+                        )}
+                        {state.activeAds > 0 && (
+                          <span>
+                            {lang === "ar" ? "إعلانات نشطة" : "Active ads"}:{" "}
+                            {fmtNum(state.activeAds)}
+                          </span>
+                        )}
+                        <span>
+                          {lang === "ar" ? "آخر فحص" : "Checked"}: {state.checkedAt || "—"}
+                        </span>
                       </div>
                     )}
                     {sold && (
@@ -340,8 +384,11 @@ function ActivitySpotlight({
       <div className="mt-2 truncate text-sm font-semibold text-text" title={row.name}>
         {row.name}
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        <Mini label={lang === "ar" ? "صرف الفترة" : "Period spend"} value={fmtUSD(period?.spend ?? row.spend)} />
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+        <Mini
+          label={lang === "ar" ? "صرف الفترة" : "Period spend"}
+          value={fmtUSD(period?.spend ?? row.spend)}
+        />
         <Mini
           label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
           value={fmtNum(period?.crmLeads ?? 0)}
@@ -349,6 +396,10 @@ function ActivitySpotlight({
         <Mini
           label={lang === "ar" ? "Lost مؤرشف" : "Archived Lost"}
           value={fmtNum(period?.lostArchived ?? 0)}
+        />
+        <Mini
+          label={lang === "ar" ? "Won في الفترة" : "Period Won"}
+          value={fmtNum(period?.won ?? 0)}
         />
         <Mini
           label={lang === "ar" ? "إيراد مدفوع" : "Paid revenue"}

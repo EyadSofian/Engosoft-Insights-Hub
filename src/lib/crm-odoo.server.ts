@@ -118,7 +118,8 @@ function isTechnicalIdentity(name: string, includeEngosoftDomain: boolean): bool
 function isExcludedCrmStage(stage: string): boolean {
   const normalized = normalize(stage);
   if (normalized === "old auto dialer") return true;
-  if (normalized === "lost" || normalized === "closed lost" || normalized === "close lost") return true;
+  if (normalized === "lost" || normalized === "closed lost" || normalized === "close lost")
+    return true;
   if (/(^|\s)lost($|\s)/.test(normalized)) return true;
   return /مفقود|خاسر|ضائع|خسارة/.test(normalized);
 }
@@ -129,7 +130,10 @@ function display(value: unknown): string {
     if (value.length === 2 && typeof value[0] === "number" && typeof value[1] === "string") {
       return String(value[1]).trim();
     }
-    return value.map((part) => String(part ?? "").trim()).filter(Boolean).join(", ");
+    return value
+      .map((part) => String(part ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
   }
   return String(value).trim();
 }
@@ -142,9 +146,7 @@ function dateTime(value: unknown): string {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const instant = new Date(
-    /[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`,
-  );
+  const instant = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`);
   if (!Number.isFinite(instant.getTime())) return raw;
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Cairo",
@@ -196,11 +198,7 @@ function customFieldPlan(metadata: Record<string, OdooField>): CustomFields {
       ["x_studio_ad_name", "x_ad_name", "ad_name"],
       ["Ad Name", "اسم الإعلان"],
     ),
-    adId: resolveField(
-      metadata,
-      ["x_studio_ad_id", "x_ad_id", "ad_id"],
-      ["Ad ID", "معرف الإعلان"],
-    ),
+    adId: resolveField(metadata, ["x_studio_ad_id", "x_ad_id", "ad_id"], ["Ad ID", "معرف الإعلان"]),
     adsetName: resolveField(
       metadata,
       ["x_studio_ad_set_name", "x_ad_set_name", "ad_set_name", "adset_name"],
@@ -300,6 +298,8 @@ function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     المرحلة: rawStage,
     "Cleaned Stage": rawStage,
     "أنشئ في": dateTime(lead.create_date),
+    "التاريخ المقفل": dateTime(lead.date_closed),
+    "Closing Date": date(lead.date_closed),
     "Course Categories": rawCourse,
     Course: rawCourse,
     "Main Category": "",
@@ -311,10 +311,7 @@ function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
   };
 }
 
-function validateActiveIdentity(
-  lead: OdooCrmLead,
-  diagnostics: CrmExclusionDiagnostics,
-): boolean {
+function validateActiveIdentity(lead: OdooCrmLead, diagnostics: CrmExclusionDiagnostics): boolean {
   const userId = m2oId(lead.user_id);
   if (!userId) {
     diagnostics.unassigned++;
@@ -364,15 +361,10 @@ function validateLostIdentity(
  */
 export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const cfg = odooConfig();
-  const metadata = await odooCall<Record<string, OdooField>>(
-    "crm.lead",
-    "fields_get",
-    [],
-    {
-      attributes: ["string", "type", "relation"],
-      context: companyContext({ active_test: false }),
-    },
-  );
+  const metadata = await odooCall<Record<string, OdooField>>("crm.lead", "fields_get", [], {
+    attributes: ["string", "type", "relation"],
+    context: companyContext({ active_test: false }),
+  });
   const customFields = customFieldPlan(metadata);
   const standardFields = [
     "id",
@@ -413,7 +405,10 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const lostDomain: Domain = [
     ["active", "=", false],
     ["probability", "=", 0],
-    ["create_date", ">=", floor],
+    // Lost reporting is based on when the opportunity was actually closed,
+    // not when the lead was first created. This also keeps an old lead that was
+    // closed during the selected reporting period in the correct month.
+    ["date_closed", ">=", floor],
   ];
 
   const [activeCandidates, lostCandidates, rawUsers, employees] = await Promise.all([
@@ -423,12 +418,9 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
     searchRead<OdooCrmLead>("crm.lead", lostDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<OdooUser>(
-      "res.users",
-      [["share", "=", false]],
-      ["name", "share", "active"],
-      { context: { active_test: false } },
-    ),
+    searchRead<OdooUser>("res.users", [["share", "=", false]], ["name", "share", "active"], {
+      context: { active_test: false },
+    }),
     searchRead<OdooEmployee>("hr.employee", [], ["user_id", "active"], {
       context: { active_test: false },
     }),
@@ -455,7 +447,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   crmDiagnostics.accepted = crm.length;
 
   const lostDiagnostics = emptyDiagnostics();
-  const lostInPeriod = lostCandidates.filter((lead) => date(lead.create_date) >= cfg.startDate);
+  const lostInPeriod = lostCandidates.filter((lead) => date(lead.date_closed) >= cfg.startDate);
   lostDiagnostics.candidates = lostInPeriod.length;
   const lost = lostInPeriod
     .filter((lead) => {

@@ -15,6 +15,7 @@ import { Route as AdsRouteImport } from './routes/ads'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
+import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
@@ -77,6 +78,11 @@ const CoursesRoute = CoursesRouteImport.update({
 const FullInvoicedRoute = FullInvoicedRouteImport.update({
   id: '/full-invoiced',
   path: '/full-invoiced',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
+  '/guide': typeof GuideRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -293,6 +300,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
+  '/guide': typeof GuideRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -335,6 +343,7 @@ export interface FileRoutesById {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
+  '/guide': typeof GuideRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -378,6 +387,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
+    | '/guide'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -419,6 +429,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
+    | '/guide'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
+    | '/guide'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -502,6 +514,7 @@ export interface RootRouteChildren {
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
+  GuideRoute: typeof GuideRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
@@ -579,6 +592,13 @@ declare module '@tanstack/react-router' {
       path: '/full-invoiced'
       fullPath: '/full-invoiced'
       preLoaderRoute: typeof FullInvoicedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -822,6 +842,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
+  GuideRoute: GuideRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   MediaBuyersRoute: MediaBuyersRoute,

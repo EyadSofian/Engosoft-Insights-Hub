@@ -186,8 +186,8 @@ function Campaigns() {
               }
               hint={
                 lang === "ar"
-                  ? "أعلى ٨ صفوف إنفاقًا. العمود الأزرق هو الإنفاق والبرتقالي هو التحصيل — لو البرتقالي أقصر يبقى لسه ما رجّعش فلوسه."
-                  : "The eight biggest spenders. Blue is spend, orange is revenue — where orange is shorter, the money has not come back."
+                  ? "كل الصفوف اللي صرفت في الفترة المختارة. الأزرق هو الإنفاق والبرتقالي هو التحصيل — مرّر داخل الكارت لمراجعة كل الحملات."
+                  : "Every row with spend in the selected period. Blue is spend and orange is collected revenue; scroll inside the card to review all campaigns."
               }
             >
               <span className="inline-flex items-center gap-1.5">
@@ -195,12 +195,11 @@ function Campaigns() {
                 {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
               </span>
             </SectionTitle>
-            <CompareBars
-              rows={[...data.rows]
-                .filter((r) => r.spend > 0)
-                .sort((a, b) => b.spend - a.spend)
-                .slice(0, 8)}
-            />
+            <div className="max-h-[720px] overflow-y-auto pe-1 scrollbar-thin">
+              <CompareBars
+                rows={[...data.rows].filter((r) => r.spend > 0).sort((a, b) => b.spend - a.spend)}
+              />
+            </div>
           </Card>
 
           <div className="space-y-3">

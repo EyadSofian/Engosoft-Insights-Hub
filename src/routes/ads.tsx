@@ -427,8 +427,8 @@ function Ads() {
                     action={<GrainPill grain={grain} />}
                     hint={
                       lang === "ar"
-                        ? "أعلى ٨ صفوف إنفاقًا، وتحت كل واحدة عمودين: الأزرق الإنفاق والبرتقالي التحصيل"
-                        : "The eight biggest spenders, each with spend in blue above the revenue it brought back in orange"
+                        ? "كل الصفوف اللي صرفت في الفترة؛ الأزرق إنفاق والبرتقالي تحصيل. مرّر داخل الكارت لعرضهم كلهم."
+                        : "Every row with period spend; blue is spend and orange is collected revenue. Scroll inside the card to see them all."
                     }
                   >
                     <span className="inline-flex items-center gap-1.5">
@@ -436,19 +436,20 @@ function Ads() {
                       {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
                     </span>
                   </SectionTitle>
-                  <CompareBars
-                    rows={[...data.rows]
-                      .filter((r) => r.spend > 0)
-                      .sort((a, b) => b.spend - a.spend)
-                      .slice(0, 8)}
-                    emptyLabel={
-                      noSpendTab
-                        ? lang === "ar"
-                          ? "المنصة دي مالهاش بيانات إنفاق في المصدر الحالي، فمفيش مقارنة إنفاق تتعرض"
-                          : "This platform has no spend data in the current source, so there is nothing to compare"
-                        : undefined
-                    }
-                  />
+                  <div className="max-h-[720px] overflow-y-auto pe-1 scrollbar-thin">
+                    <CompareBars
+                      rows={[...data.rows]
+                        .filter((r) => r.spend > 0)
+                        .sort((a, b) => b.spend - a.spend)}
+                      emptyLabel={
+                        noSpendTab
+                          ? lang === "ar"
+                            ? "المنصة دي مالهاش بيانات إنفاق في المصدر الحالي، فمفيش مقارنة إنفاق تتعرض"
+                            : "This platform has no spend data in the current source, so there is nothing to compare"
+                          : undefined
+                      }
+                    />
+                  </div>
                 </Card>
 
                 <Card>

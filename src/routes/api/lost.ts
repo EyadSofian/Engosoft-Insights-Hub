@@ -6,6 +6,7 @@ export const Route = createFileRoute("/api/lost")({
       GET: async ({ request }) => {
         const {
           getFiltered,
+          archivedLostReportingDate,
           computeLost,
           computeTotals,
           authoritativeLostLeads,
@@ -50,6 +51,8 @@ export const Route = createFileRoute("/api/lost")({
           detail: capped(
             lostRows.map((l) => ({
               createdAt: l.createdAt,
+              closeDate: l.closeDate,
+              reportingDate: archivedLostReportingDate(l, data.snapshot),
               campaign: l.campaignName,
               adName: l.adName,
               reason: l.lossReason,

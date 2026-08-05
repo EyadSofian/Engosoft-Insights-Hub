@@ -378,8 +378,8 @@ function Accounting() {
                   ? "الفترة تُطبّق على تاريخ الفاتورة"
                   : "Range applies to Invoice Date"
                 : lang === "ar"
-                  ? "الفترة تُطبّق على تاريخ الدفع"
-                  : "Range applies to Payment Date"}
+                  ? "الفترة على تاريخ الدفع الفعلي، مش Due Date"
+                  : "Range uses the actual Payment Date, never Due Date"}
             </div>
           </div>
         </div>
@@ -582,8 +582,8 @@ function Accounting() {
 
               <Notice icon={<Info size={17} />}>
                 {lang === "ar"
-                  ? "تقدر تبحث برقم أمر البيع مثل S18401 أو برقم الفاتورة. خُد بالك: الوضع الافتراضي يعرض المستند في تاريخ الدفع، وقد يختلف عن تاريخ إصدار الفاتورة."
-                  : "Search by Sales Order (for example S18401) or invoice number. The default view places a document on its payment date, which can differ from its invoice date."}
+                  ? "تقدر تبحث برقم أمر البيع مثل S18401 أو برقم الفاتورة. الوضع الافتراضي يعرض المستند في Payment Date الموجود داخل حركة السداد في Odoo — مش Due Date — وممكن يكون قبل تاريخ الفاتورة لو العميل دفع مقدّمًا."
+                  : "Search by Sales Order (for example S18401) or invoice number. The default view uses the Payment Date inside the Odoo payment movement—not Due Date—and it can precede the invoice when the customer prepaid."}
               </Notice>
 
               <DataTable

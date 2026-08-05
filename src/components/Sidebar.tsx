@@ -1,4 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { BookOpen } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
   NAVIGATION_SECTIONS,
@@ -103,8 +104,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto pt-6 px-3 text-white/35 text-[11px]">
-        © {new Date().getFullYear()} Engosoft
+      <div className="mt-auto space-y-3 px-1 pt-6">
+        <Link
+          to="/guide"
+          className="flex min-h-10 items-center gap-2.5 rounded-lg border border-white/10 px-3 text-[12px] font-semibold text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <BookOpen size={16} />
+          <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>
+        </Link>
+        <div className="px-3 text-[11px] text-white/35">© {new Date().getFullYear()} Engosoft</div>
       </div>
     </aside>
   );

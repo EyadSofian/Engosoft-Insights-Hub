@@ -779,10 +779,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }
     };
 
-    // Power BI's canonical CRM/Lost tabs are preferred. Keep the direct Odoo
-    // reader lazy: starting a 90-second Odoo scan on every healthy sheet refresh
-    // wastes time and can make parallel dashboard endpoints appear to hang.
-    // It is invoked only when one of the two canonical tabs is unavailable.
+    // CRM keeps the canonical Power BI tab as its stable reporting boundary,
+    // while Archived Lost is audited directly in Odoo on every cache refresh.
+    // The direct read starts beside the other remote work so it does not add a
+    // second serial wait to page loading.
     const directCrmWithTimeout = async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -812,6 +812,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         : Promise.resolve({
             error: "Odoo CRM is not configured; using Google Sheets fallback.",
           });
+    const directCrmPromise = loadDirectCrmCandidate();
 
     // Accounting follows the same fail-closed contract as CRM: start the Odoo
     // read while Google is loading, cap its wall time, and never turn an Odoo
@@ -867,11 +868,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       fetchGoogleAds().catch((error: unknown) => ({
         configured: Boolean(
           process.env.GOOGLE_ADS_CLIENT_ID?.trim() &&
-            process.env.GOOGLE_ADS_CLIENT_SECRET?.trim() &&
-            process.env.GOOGLE_ADS_REFRESH_TOKEN?.trim() &&
-            process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim() &&
-            process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.trim() &&
-            process.env.GOOGLE_ADS_CUSTOMER_IDS?.trim(),
+          process.env.GOOGLE_ADS_CLIENT_SECRET?.trim() &&
+          process.env.GOOGLE_ADS_REFRESH_TOKEN?.trim() &&
+          process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim() &&
+          process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.trim() &&
+          process.env.GOOGLE_ADS_CUSTOMER_IDS?.trim(),
         ),
         rows: [],
         syncedAt: "",
@@ -884,15 +885,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       tiktokRaw,
       tiktokResult,
       googleResult,
-    ] =
-      await Promise.all([
-        safeFetch(TAB.accounting, looksLikeAccountingExport),
-        safeFetch(TAB.websiteSales),
-        safeFetch(TAB.lost),
-        safeFetch(TAB.tiktok, looksLikeAdsExport),
-        safeTikTok(),
-        safeGoogle(),
-      ]);
+    ] = await Promise.all([
+      safeFetch(TAB.accounting, looksLikeAccountingExport),
+      safeFetch(TAB.websiteSales),
+      safeFetch(TAB.lost),
+      safeFetch(TAB.tiktok, looksLikeAdsExport),
+      safeTikTok(),
+      safeGoogle(),
+    ]);
     fetchErrors.push(...tiktokResult.errors.map((error) => `TikTok Ads: ${error}`));
     const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
     fetchErrors.push(...googleResult.errors.map((error) => `Google Ads: ${error}`));
@@ -1052,38 +1052,51 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
 
     let crmRaw: Raw[] = crmSheetRaw;
-    let lostRaw: Raw[] = lostSheetRaw;
-    const sheetCrmComplete = crmSheetRaw.length > 0 && lostSheetRaw.length > 0;
-    const directCrm = sheetCrmComplete ? {} : await loadDirectCrmCandidate();
-    let crmAuthority: DataHealth["crmAuthority"] = sheetCrmComplete
+    // Archived Lost is fail-closed. The legacy sheet lacks Odoo date_closed,
+    // so using it would silently put old leads in the wrong month.
+    let lostRaw: Raw[] = [];
+    const directCrm = await directCrmPromise;
+    let crmAuthority: DataHealth["crmAuthority"] = crmSheetRaw.length
       ? "google-sheet"
       : "google-sheet-fallback";
+    let lostAuthority: DataHealth["lostAuthority"] = "unavailable";
     let crmExclusions = blankExclusions();
     let lostExclusions = blankExclusions();
-    const directComplete =
+    const directCrmComplete =
       !!directCrm.value &&
       directCrm.value.crm.length > 0 &&
-      directCrm.value.lost.length > 0 &&
-      (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75) &&
-      (!lostSheetRaw.length || directCrm.value.lost.length >= lostSheetRaw.length * 0.75);
-    // Power BI is built from these two canonical tabs. Prefer the exact same
-    // population and refresh boundary so headline lead counts cannot drift by
-    // a handful of records merely because direct Odoo finished at a different
-    // instant. Direct Odoo remains the automatic continuity fallback.
-    if (!sheetCrmComplete && directCrm.value && directComplete) {
+      (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75);
+    // Odoo and the legacy sheet use different date populations (Close Date vs
+    // creation date), so comparing their row counts is not a valid completeness
+    // test. A successful non-empty Odoo read is the direct archive authority.
+    const directLostComplete = !!directCrm.value && directCrm.value.lost.length > 0;
+
+    // CRM remains on the reporting tab while it is healthy. Odoo is its
+    // continuity fallback only, avoiding day-boundary drift in current leads.
+    if (!crmSheetRaw.length && directCrm.value && directCrmComplete) {
       crmRaw = enrichDirectRows(directCrm.value.crm, crmSheetRaw);
-      lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
       crmAuthority = "odoo-direct";
       crmExclusions = directCrm.value.diagnostics.crm;
-      lostExclusions = directCrm.value.diagnostics.lost;
-    } else if (!sheetCrmComplete) {
-      // Only call this a missing source when neither authority can supply the
-      // complete CRM + Lost population. A healthy sheet fallback is valid data,
-      // not an excluded source.
+    } else if (!crmSheetRaw.length) {
       fetchErrors.push(
         directCrm.value
-          ? `CRM/Lost unavailable: direct Odoo failed completeness and the Google Sheets fallback is incomplete.`
-          : `CRM/Lost unavailable: ${directCrm.error}`,
+          ? "CRM unavailable: direct Odoo failed completeness and the Google Sheets fallback is empty."
+          : `CRM unavailable: ${directCrm.error}`,
+      );
+    }
+
+    // Lost is an operational archive, so only Odoo's current population is
+    // reportable. The Google tab remains available for reconciliation only;
+    // it is never promoted into dashboard facts because it has no Close Date.
+    if (directCrm.value && directLostComplete) {
+      lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
+      lostAuthority = "odoo-direct";
+      lostExclusions = directCrm.value.diagnostics.lost;
+    } else {
+      fetchErrors.push(
+        directCrm.value
+          ? "Archived Lost unavailable: direct Odoo returned no reportable closed opportunities. No legacy fallback was shown."
+          : "Archived Lost unavailable: direct Odoo is not configured or could not be reached. No legacy fallback was shown.",
       );
     }
 
@@ -1095,9 +1108,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // in the existing Meta tab. They must never enter ad aggregates: doing so
     // would move adsDateMax and source freshness despite carrying zero spend.
     const metaStateRaw = metaRaw.filter((row) => str(row["__meta_key"]).startsWith("state|"));
-    const metaHistoryRaw = metaRaw.filter(
-      (row) => !str(row["__meta_key"]).startsWith("state|"),
-    );
+    const metaHistoryRaw = metaRaw.filter((row) => !str(row["__meta_key"]).startsWith("state|"));
 
     for (const r of metaRaw) {
       keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]));
@@ -1660,7 +1671,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           currency,
           event: str(r["Event"]),
           eventStage: str(r["Event Stage"]),
-          month: accountingReportingDate({ paymentDate, invoiceDate, isCreditNote }, "payment").slice(0, 7),
+          month: accountingReportingDate(
+            { paymentDate, invoiceDate, isCreditNote },
+            "payment",
+          ).slice(0, 7),
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),
@@ -1749,6 +1763,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           sourceKey: normalizeSource(source),
           stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
           createdAt: parseDate(r["أنشئ في"]),
+          closeDate: parseDate(r["Closing Date"]) || parseDate(r["التاريخ المقفل"]),
         };
       })
       // Dialler residue is excluded from the lead total on both tabs, otherwise
@@ -1975,7 +1990,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       },
       {
         key: "lost",
-        label: crmAuthority === "odoo-direct" ? "Odoo Archived CRM (direct)" : TAB.lost,
+        label: "Odoo Archived CRM (direct)",
         syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")),
       },
     ].filter((s) => !!s.syncedAt);
@@ -2057,6 +2072,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     const health: DataHealth = {
       crmAuthority,
+      lostAuthority,
+      lostDateBasis: lostAuthority === "odoo-direct" ? "close_date" : "unavailable",
       accountingAuthority,
       accountingDirect: accountingDirectHealth,
       crmExclusions,

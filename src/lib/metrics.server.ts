@@ -476,7 +476,10 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     });
 
   const lost = all.lost.filter((r) => {
-    if (!inRange(r.createdAt, from, to)) return false;
+    // Archived Lost belongs to the period in which Odoo closed it. Creation
+    // date answers a different question and made old leads disappear from the
+    // month in which they were actually lost.
+    if (!inRange(archivedLostReportingDate(r, all), from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
     if (!matchesStableFact(r)) return false;
@@ -558,6 +561,20 @@ export function archivedCrmLeads(data: FilteredData): LostRow[] {
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * Reporting date for the archived population.
+ *
+ * Direct Odoo is the only authority and uses `date_closed`. Missing Close Date
+ * means the row cannot enter a date-filtered Lost report; creation date answers
+ * a different business question and is never substituted.
+ */
+export function archivedLostReportingDate(
+  row: LostRow,
+  _source: { health: import("./types").DataHealth },
+): string {
+  return row.closeDate;
 }
 
 const isArchivedWon = (row: LostRow): boolean => row.stage.trim().toLowerCase() === "won";
@@ -1137,8 +1154,7 @@ export async function computeRecentCampaignActivity(
       linkClicks: null,
       ctrAll: pctOf(state.clicks24h, state.impressions24h),
       ctrLink: null,
-      cpm:
-        state.impressions24h > 0 ? (state.spend24h / state.impressions24h) * 1000 : null,
+      cpm: state.impressions24h > 0 ? (state.spend24h / state.impressions24h) * 1000 : null,
       cpc: div(state.spend24h, state.clicks24h),
       platformLeads: state.platformLeads24h,
       crmLeads: 0,
@@ -1150,8 +1166,7 @@ export async function computeRecentCampaignActivity(
       invoices: 0,
       salesOrders: 0,
       revenuePerLead: null,
-      cpl:
-        state.platformLeads24h === null ? null : div(state.spend24h, state.platformLeads24h),
+      cpl: state.platformLeads24h === null ? null : div(state.spend24h, state.platformLeads24h),
       cpa: null,
       roas: null,
       acos: null,
@@ -1320,7 +1335,8 @@ export async function computeRecentCampaignActivity(
     return {
       ...empty,
       source: stateSource,
-      generatedAt: googleDirect.health.checkedAt || live?.generatedAt || fallbackStates[0]?.checkedAt || "",
+      generatedAt:
+        googleDirect.health.checkedAt || live?.generatedAt || fallbackStates[0]?.checkedAt || "",
       platformHealth,
       delivery,
       period,
@@ -1397,7 +1413,11 @@ export async function computeRecentCampaignActivity(
   const rankedActive = [...rows].sort((a, b) => {
     const lifeA = lifetimeRows.get(a.key);
     const lifeB = lifetimeRows.get(b.key);
-    return b.spend - a.spend || (lifeB?.revenue ?? 0) - (lifeA?.revenue ?? 0) || a.name.localeCompare(b.name);
+    return (
+      b.spend - a.spend ||
+      (lifeB?.revenue ?? 0) - (lifeA?.revenue ?? 0) ||
+      a.name.localeCompare(b.name)
+    );
   });
   // The headline count and detail list must describe the same population.
   // Never cut this list to a UI-friendly sample: every Active campaign belongs.
@@ -1428,7 +1448,10 @@ export async function computeRecentCampaignActivity(
       const windows = Object.values(platformWindows);
       if (!windows.length) return null;
       return {
-        from: windows.reduce((min, window) => (window.from < min ? window.from : min), windows[0].from),
+        from: windows.reduce(
+          (min, window) => (window.from < min ? window.from : min),
+          windows[0].from,
+        ),
         to: windows.reduce((max, window) => (window.to > max ? window.to : max), windows[0].to),
       };
     })(),
@@ -1438,19 +1461,21 @@ export async function computeRecentCampaignActivity(
     generatedAt:
       googleDirect.health.checkedAt ||
       live?.generatedAt ||
-      Object.values(delivery).reduce((max, state) => (state.checkedAt > max ? state.checkedAt : max), ""),
+      Object.values(delivery).reduce(
+        (max, state) => (state.checkedAt > max ? state.checkedAt : max),
+        "",
+      ),
     platformHealth:
       platformHealth.length > 0
         ? platformHealth
-        :
-      PLATFORMS.map((platform) => ({
-        platform,
-        ok: fallbackStates.some((state) => state.platform === platform),
-        active: fallbackStates.filter((state) => state.platform === platform).length,
-        total: fallbackStates.filter((state) => state.platform === platform).length,
-        message: "",
-        checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
-      })),
+        : PLATFORMS.map((platform) => ({
+            platform,
+            ok: fallbackStates.some((state) => state.platform === platform),
+            active: fallbackStates.filter((state) => state.platform === platform).length,
+            total: fallbackStates.filter((state) => state.platform === platform).length,
+            message: "",
+            checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
+          })),
     delivery,
     period,
     rows: selectedRows,
@@ -1500,7 +1525,10 @@ export function dailyTrend(
     e.leads++;
     if (c.isWon) e.won++;
   }
-  for (const l of archivedCrmLeads(data)) if (l.createdAt) at(l.createdAt).leads++;
+  for (const l of archivedCrmLeads(data)) {
+    const date = archivedLostReportingDate(l, data.snapshot);
+    if (date) at(date).leads++;
+  }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, v]) => ({ date, ...v }));
@@ -1864,8 +1892,8 @@ export function computeLost(data: FilteredData): LostBreakdown {
   return {
     byReason: groupBy(rows, (r) => r.lossReason || "—"),
     byCourse: groupBy(rows, (r) => r.course || "—"),
-    byMonth: groupBy(rows, (r) => monthOf(r.createdAt)).sort((a, b) =>
-      a.label.localeCompare(b.label),
+    byMonth: groupBy(rows, (r) => monthOf(archivedLostReportingDate(r, data.snapshot))).sort(
+      (a, b) => a.label.localeCompare(b.label),
     ),
     byTeam: groupBy(rows, (r) => r.salesTeam || "—"),
     bySalesperson: groupBy(rows, (r) => r.salesperson || "—"),
@@ -2035,7 +2063,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const leadsOf = (y: number, m?: string) =>
     all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length +
-    all.lost.filter((l) => inYear(l.createdAt, y) && (!m || l.createdAt.slice(5, 7) === m)).length;
+    all.lost.filter((l) => {
+      const d = archivedLostReportingDate(l, all);
+      return inYear(d, y) && (!m || d.slice(5, 7) === m);
+    }).length;
   const wonOf = (y: number, m?: string) =>
     all.crm.filter(
       (c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m),
@@ -2098,7 +2129,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     );
   const ytdLeads = (y: number) =>
     all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
-    all.lost.filter((l) => inYear(l.createdAt, y) && l.createdAt.slice(5) <= ytdCut).length;
+    all.lost.filter((l) => {
+      const d = archivedLostReportingDate(l, all);
+      return inYear(d, y) && d.slice(5) <= ytdCut;
+    }).length;
   const ytdWon = (y: number) =>
     all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
       .length;

@@ -3,7 +3,17 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
-import { BarList, Card, ErrorState, KpiCard, Notice, PageHeader, SectionTitle, Segmented, Skeleton } from "@/components/ui-bits";
+import {
+  BarList,
+  Card,
+  ErrorState,
+  KpiCard,
+  Notice,
+  PageHeader,
+  SectionTitle,
+  Segmented,
+  Skeleton,
+} from "@/components/ui-bits";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
 
@@ -11,6 +21,8 @@ export const Route = createFileRoute("/lost")({ component: Lost });
 
 interface LostRowView {
   createdAt: string;
+  closeDate: string;
+  reportingDate: string;
   campaign: string;
   adName: string;
   reason: string;
@@ -38,20 +50,84 @@ function Lost() {
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const cols: Col<LostRowView>[] = [
-    { key: "createdAt", header: t("created"), sticky: true, width: "120px", sortValue: (r) => r.createdAt, render: (r) => fmtDate(r.createdAt, lang) },
-    { key: "reason", header: t("loss_reason"), sortValue: (r) => r.reason, render: (r) => <span className="truncate block max-w-[220px]" title={r.reason}>{r.reason || "—"}</span> },
-    { key: "course", header: t("course"), sortValue: (r) => r.course, render: (r) => r.course || "—" },
-    { key: "salesTeam", header: t("sales_team"), sortValue: (r) => r.salesTeam, render: (r) => <span className="truncate block max-w-[160px]" title={r.salesTeam}>{r.salesTeam || "—"}</span> },
-    { key: "salesperson", header: t("salesperson"), sortValue: (r) => r.salesperson, render: (r) => <span className="truncate block max-w-[150px]" title={r.salesperson}>{r.salesperson || "—"}</span> },
-    { key: "source", header: t("source"), sortValue: (r) => r.source, render: (r) => r.source || "—" },
-    { key: "campaign", header: t("campaign"), sortValue: (r) => r.campaign, render: (r) => <span className="truncate block max-w-[180px]" title={r.campaign}>{r.campaign || "—"}</span> },
+    {
+      key: "reportingDate",
+      header: lang === "ar" ? "تاريخ التقرير" : "Reporting date",
+      sticky: true,
+      width: "120px",
+      sortValue: (r) => r.reportingDate,
+      render: (r) => fmtDate(r.reportingDate, lang),
+    },
+    {
+      key: "createdAt",
+      header: t("created"),
+      width: "120px",
+      sortValue: (r) => r.createdAt,
+      render: (r) => fmtDate(r.createdAt, lang),
+    },
+    {
+      key: "reason",
+      header: t("loss_reason"),
+      sortValue: (r) => r.reason,
+      render: (r) => (
+        <span className="truncate block max-w-[220px]" title={r.reason}>
+          {r.reason || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "course",
+      header: t("course"),
+      sortValue: (r) => r.course,
+      render: (r) => r.course || "—",
+    },
+    {
+      key: "salesTeam",
+      header: t("sales_team"),
+      sortValue: (r) => r.salesTeam,
+      render: (r) => (
+        <span className="truncate block max-w-[160px]" title={r.salesTeam}>
+          {r.salesTeam || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "salesperson",
+      header: t("salesperson"),
+      sortValue: (r) => r.salesperson,
+      render: (r) => (
+        <span className="truncate block max-w-[150px]" title={r.salesperson}>
+          {r.salesperson || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "source",
+      header: t("source"),
+      sortValue: (r) => r.source,
+      render: (r) => r.source || "—",
+    },
+    {
+      key: "campaign",
+      header: t("campaign"),
+      sortValue: (r) => r.campaign,
+      render: (r) => (
+        <span className="truncate block max-w-[180px]" title={r.campaign}>
+          {r.campaign || "—"}
+        </span>
+      ),
+    },
   ];
 
   return (
     <div className="space-y-5">
       <PageHeader
         title={t("lost")}
-        subtitle={lang === "ar" ? "كل تقسيم يعرض النسبة إلى جانب العدد" : "Every breakdown shows share alongside count"}
+        subtitle={
+          lang === "ar"
+            ? "كل تقسيم يعرض النسبة إلى جانب العدد"
+            : "Every breakdown shows share alongside count"
+        }
       />
 
       {isLoading || !data ? (
@@ -61,17 +137,39 @@ function Lost() {
         </>
       ) : (
         <>
-          <Notice tone="info" title={t("data_notes")} icon={<Info size={16} />}>
-            {lang === "ar"
-              ? `هذه الصفحة وكل مؤشرات الضياع تعتمد حصرياً على ${fmtNum(data.breakdown.total)} فرصة مؤرشفة في Lost Analysis. Stage=Lost داخل CRM مستبعد ولا يدخل في العدد أو النسبة.`
-              : `This page and every Lost KPI use only the ${fmtNum(data.breakdown.total)} archived opportunities in Lost Analysis. CRM Stage=Lost is excluded from both count and rate.`}
-          </Notice>
+          {data.health.lostAuthority !== "odoo-direct" && (
+            <Notice tone="danger" title={t("data_notes")} icon={<Info size={16} />}>
+              {lang === "ar"
+                ? "تعذّر قراءة أرشيف Odoo المباشر، لذلك أوقفنا أرقام Lost بدل ما نعرض نسخة قديمة بتاريخ غلط. جرّب تحديث الصفحة أو راجع اتصال Odoo."
+                : "Direct Odoo archive is unavailable, so Lost figures are stopped instead of showing a legacy file under the wrong date. Refresh or check the Odoo connection."}
+            </Notice>
+          )}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard index={0} label={t("total_lost")} value={fmtNum(data.breakdown.total)} sub={lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} />
-            <KpiCard index={1} label={lang === "ar" ? "CRM بدون Lost" : "Non-lost CRM"} value={fmtNum(data.totals.crmLeads)} />
-            <KpiCard index={2} label={t("lost_rate")} value={fmtPct(data.totals.lostRate, 2)} sub={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`} />
-            <KpiCard index={3} label={lang === "ar" ? "عدد الأسباب" : "Distinct reasons"} value={fmtNum(data.breakdown.byReason.length)} />
+            <KpiCard
+              index={0}
+              label={t("total_lost")}
+              value={fmtNum(data.breakdown.total)}
+              sub={
+                lang === "ar" ? "أرشيف Odoo مباشر • Close Date" : "Direct Odoo archive • Close Date"
+              }
+            />
+            <KpiCard
+              index={1}
+              label={lang === "ar" ? "CRM بدون Lost" : "Non-lost CRM"}
+              value={fmtNum(data.totals.crmLeads)}
+            />
+            <KpiCard
+              index={2}
+              label={t("lost_rate")}
+              value={fmtPct(data.totals.lostRate, 2)}
+              sub={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`}
+            />
+            <KpiCard
+              index={3}
+              label={lang === "ar" ? "عدد الأسباب" : "Distinct reasons"}
+              value={fmtNum(data.breakdown.byReason.length)}
+            />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -106,7 +204,9 @@ function Lost() {
                 <tbody>
                   {data.teamLostRates.map((r) => (
                     <tr key={r.team} className="border-t border-border">
-                      <td className="py-2.5 pe-3 truncate max-w-[220px]" title={r.team}>{r.team}</td>
+                      <td className="py-2.5 pe-3 truncate max-w-[220px]" title={r.team}>
+                        {r.team}
+                      </td>
                       <td className="py-2.5 text-end num">{fmtNum(r.leads)}</td>
                       <td className="py-2.5 text-end num">{fmtNum(r.lost)}</td>
                       <td className="py-2.5 text-end num font-medium">{fmtPct(r.rate, 1)}</td>
@@ -129,23 +229,35 @@ function Lost() {
                   ]}
                 />
               }
-              hint={lang === "ar" ? "النسبة من إجمالي الخسائر في كل خلية" : "Each cell is a share of total lost"}
+              hint={
+                lang === "ar"
+                  ? "النسبة من إجمالي الخسائر في كل خلية"
+                  : "Each cell is a share of total lost"
+              }
             >
               {lang === "ar" ? "سبب الضياع × " : "Loss reason × "}
               {matrixView === "team" ? t("team") : t("course")}
             </SectionTitle>
-            <MatrixTable matrix={matrixView === "team" ? data.breakdown.reasonByTeam : data.breakdown.reasonByCourse} />
+            <MatrixTable
+              matrix={
+                matrixView === "team" ? data.breakdown.reasonByTeam : data.breakdown.reasonByCourse
+              }
+            />
           </Card>
 
           <DataTable
             rows={data.detail.rows}
             cols={cols}
-            searchable={(r) => `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`}
-            initialSort={{ key: "createdAt", dir: -1 }}
+            searchable={(r) =>
+              `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
+            }
+            initialSort={{ key: "reportingDate", dir: -1 }}
             csvFilename="engosoft-lost"
             maxHeight={620}
             csvRow={(r) => ({
               created: r.createdAt,
+              close_date: r.closeDate,
+              reporting_date: r.reportingDate,
               reason: r.reason,
               course: r.course,
               main_category: r.mainCategory,
@@ -238,17 +350,23 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
                   }}
                   title={`${v} · ${fmtPct(share(v), 1)}`}
                 >
-                  {v === 0 ? <span className="text-text-subtle">—</span> : (
+                  {v === 0 ? (
+                    <span className="text-text-subtle">—</span>
+                  ) : (
                     <>
                       {fmtNum(v)}
-                      <span className="text-[10px] text-text-muted ms-1">{share(v).toFixed(1)}%</span>
+                      <span className="text-[10px] text-text-muted ms-1">
+                        {share(v).toFixed(1)}%
+                      </span>
                     </>
                   )}
                 </td>
               ))}
               <td className="px-3 py-2 border-b border-border text-end num font-semibold bg-surface-2/60">
                 {fmtNum(matrix.rowTotals[i])}
-                <span className="text-[10px] text-text-muted ms-1">{share(matrix.rowTotals[i]).toFixed(1)}%</span>
+                <span className="text-[10px] text-text-muted ms-1">
+                  {share(matrix.rowTotals[i]).toFixed(1)}%
+                </span>
               </td>
             </tr>
           ))}

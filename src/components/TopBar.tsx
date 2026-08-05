@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, SlidersHorizontal, Languages, X, Moon, Sun, Check } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Languages,
+  Moon,
+  RefreshCw,
+  SlidersHorizontal,
+  Sun,
+  X,
+} from "lucide-react";
 import { fmtDateTime, useI18n } from "@/lib/i18n";
 import {
   activeDimensionCount,
@@ -149,6 +159,15 @@ export function TopBar({ title }: { title?: string }) {
 
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
             <SyncBadge data={data} />
+
+            <Link
+              to="/guide"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg"
+              aria-label={lang === "ar" ? "دليل الاستخدام" : "User guide"}
+              title={lang === "ar" ? "دليل الاستخدام" : "User guide"}
+            >
+              <BookOpen size={16} />
+            </Link>
 
             <button
               onClick={() => setSheetOpen(true)}

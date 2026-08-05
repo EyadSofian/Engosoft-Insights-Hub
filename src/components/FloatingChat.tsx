@@ -13,7 +13,7 @@ interface Msg {
 const STORAGE = "engo_chat_v2";
 
 export function FloatingChat() {
-  const { t, lang, dir } = useI18n();
+  const { t, lang } = useI18n();
   const filters = useFilters();
   const anyModalOpen = useAnyModalOpen();
   const [open, setOpen] = useState(false);
@@ -58,8 +58,13 @@ export function FloatingChat() {
   const suggestions = useMemo(
     () =>
       lang === "ar"
-        ? ["أفضل حملة؟", "أعلى ROAS؟", "أين أهدر الميزانية؟", "أرخص تكلفة عميل؟"]
-        : ["Best campaign?", "Highest ROAS?", "Where am I wasting budget?", "Cheapest CPL?"],
+        ? ["أفضل حملة؟", "الرقم ده جاي منين؟", "دورة PMP صرفت وباعت كام؟", "كام حملة شغالة؟"]
+        : [
+            "Best campaign?",
+            "Where does this number come from?",
+            "How did PMP perform?",
+            "How many campaigns are active?",
+          ],
     [lang],
   );
 
@@ -74,7 +79,13 @@ export function FloatingChat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question, filters, history: next.slice(-8), lang }),
+        body: JSON.stringify({
+          question,
+          filters,
+          history: next.slice(-8),
+          lang,
+          page: window.location.pathname,
+        }),
       });
       const data = await res.json();
       setMessages((m) => [...m, { role: "assistant", content: data.answer ?? "—" }]);
@@ -93,19 +104,18 @@ export function FloatingChat() {
 
   return (
     <>
-      {/* FAB — sits on the end side so it never covers the mobile nav labels. */}
+      {/* Logical end is left in Arabic and right in English: opposite the sidebar. */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={t("ai_assistant")}
         aria-expanded={open}
-        className={`fixed z-40 bottom-20 lg:bottom-6 ${
-          dir === "rtl" ? "start-3.5 lg:start-6" : "end-3.5 lg:end-6"
-        } w-12 h-12 lg:w-14 lg:h-14 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
+        className={`fixed z-40 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] end-3 lg:bottom-5 lg:end-5 w-11 h-11 lg:w-12 lg:h-12 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
           open || anyModalOpen ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
         }`}
         style={{
           background: "linear-gradient(140deg, var(--brand), var(--electric))",
-          boxShadow: "0 12px 32px -8px rgba(22, 86, 160, 0.55), 0 0 0 1px rgba(255,255,255,0.12) inset",
+          boxShadow:
+            "0 12px 32px -8px rgba(22, 86, 160, 0.55), 0 0 0 1px rgba(255,255,255,0.12) inset",
         }}
       >
         <Sparkles size={19} />
@@ -126,7 +136,7 @@ export function FloatingChat() {
             aria-label={t("ai_assistant")}
             className={`fixed z-50 flex flex-col overflow-hidden glass
               inset-0 rounded-none animate-fade-in
-              lg:inset-auto lg:bottom-6 lg:${dir === "rtl" ? "start-6" : "end-6"}
+              lg:inset-auto lg:bottom-5 lg:end-5
               lg:w-[400px] lg:h-[min(640px,calc(100dvh-96px))] lg:rounded-3xl lg:animate-scale-in`}
           >
             {/* header */}
@@ -139,8 +149,15 @@ export function FloatingChat() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-text truncate">{t("ai_assistant")}</div>
-                <div className="text-[11px] text-text-muted truncate">
-                  {filters.from && filters.to ? `${filters.from} → ${filters.to}` : "Engosoft"}
+                <div className="flex items-center gap-1.5 text-[11px] text-text-muted truncate">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
+                  <span className="truncate">
+                    {filters.from && filters.to
+                      ? `${filters.from} → ${filters.to}`
+                      : lang === "ar"
+                        ? "بيانات الداشبورد"
+                        : "Dashboard data"}
+                  </span>
                 </div>
               </div>
               {messages.length > 0 && (
@@ -194,6 +211,7 @@ export function FloatingChat() {
                         className="[&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0
                           [&_ul]:my-1.5 [&_ul]:ps-4 [&_ul]:list-disc [&_ol]:my-1.5 [&_ol]:ps-4 [&_ol]:list-decimal
                           [&_li]:my-0.5 [&_strong]:font-semibold [&_strong]:text-text
+                          [&_a]:font-semibold [&_a]:text-brand [&_a]:underline [&_a]:underline-offset-2
                           [&_code]:text-[12px] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-surface-2"
                       >
                         <ReactMarkdown>{m.content}</ReactMarkdown>

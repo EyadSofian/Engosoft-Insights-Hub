@@ -270,6 +270,8 @@ export interface LostRow {
   sourceKey: string;
   stage: string;
   createdAt: string;
+  /** Odoo `date_closed`; this is the reporting/filter date for archived Lost. */
+  closeDate: string;
 }
 
 /* --- aggregates ----------------------------------------------------------- */
@@ -446,10 +448,7 @@ export interface CampaignLifetime {
 
 export type CampaignDeliveryState = "active" | "paused" | "ended" | "unknown";
 export type CampaignStateSource =
-  | "n8n_live"
-  | "platform_direct"
-  | "google_snapshot"
-  | "daily_proxy";
+  "n8n_live" | "platform_direct" | "google_snapshot" | "daily_proxy";
 
 export interface CampaignPlatformHealth {
   platform: Platform;
@@ -607,6 +606,10 @@ export interface FunnelStep {
 export interface DataHealth {
   /** Authoritative CRM source used for this snapshot. */
   crmAuthority: "google-sheet" | "odoo-direct" | "google-sheet-fallback";
+  /** Archived Lost is fail-closed: only the direct Odoo archive is reportable. */
+  lostAuthority: "odoo-direct" | "unavailable";
+  /** Lost is always filtered by Odoo `date_closed`; no creation-date fallback is allowed. */
+  lostDateBasis: "close_date" | "unavailable";
   /** Paid invoice-line source selected only after the strict reconciliation gate. */
   accountingAuthority: "odoo-direct" | "google-sheet-fallback";
   /**

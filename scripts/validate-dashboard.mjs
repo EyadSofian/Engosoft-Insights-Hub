@@ -139,15 +139,16 @@ check(
 );
 check(
   "Accounting document export has every invoice and credit note",
-  accountingInvoiceExport.rows.length === accounting.summary.invoices + accounting.summary.creditNotes,
+  accountingInvoiceExport.rows.length ===
+    accounting.summary.invoices + accounting.summary.creditNotes,
   accountingInvoiceExport.rows.length,
   accounting.summary.invoices + accounting.summary.creditNotes,
 );
 check(
-  "Accounting export excludes Sales Order columns",
-  !accountingLineExport.headers.some((header) => /sales\s*order|order\s*ref/i.test(header)),
+  "Accounting export includes the reconciled Sales Order reference",
+  accountingLineExport.headers.some((header) => /sales\s*order|order\s*ref/i.test(header)),
   accountingLineExport.headers,
-  "no Sales Order columns",
+  "Sales Order column",
 );
 const exportedPaidUsd = accountingLineExport.rows.reduce(
   (sum, row) => sum + Number(row["USD Paid"] || 0),
@@ -172,10 +173,16 @@ check(
   3.7453,
 );
 const managedFxRows = accountingLineExport.rows.filter((row) =>
-  ["EGP", "SAR"].includes(String(row.Currency || "").trim().toUpperCase()),
+  ["EGP", "SAR"].includes(
+    String(row.Currency || "")
+      .trim()
+      .toUpperCase(),
+  ),
 );
 const invalidManagedFxRows = managedFxRows.filter((row) => {
-  const currency = String(row.Currency || "").trim().toUpperCase();
+  const currency = String(row.Currency || "")
+    .trim()
+    .toUpperCase();
   const rate = currency === "EGP" ? 50.5 : 3.7453;
   return !same(Number(row["USD Paid"]), Number(row["Total in Currency"]) / rate);
 });
@@ -246,11 +253,34 @@ check(
   [],
 );
 check(
-  "CRM and Lost use the same canonical Google Sheets source as Power BI",
+  "Current CRM keeps the canonical Google Sheets authority",
   filters.health?.crmAuthority === "google-sheet",
   filters.health?.crmAuthority,
   "google-sheet",
 );
+check(
+  "Archived Lost is direct Odoo or safely unavailable with zero rows",
+  filters.health?.lostAuthority === "odoo-direct" ||
+    (filters.health?.lostAuthority === "unavailable" && lost.detail.rows.length === 0),
+  { authority: filters.health?.lostAuthority, rows: lost.detail.rows.length },
+  "odoo-direct, or unavailable with no fallback rows",
+);
+if (from || to) {
+  check(
+    "Every returned Lost detail row follows the declared reporting date",
+    lost.detail.rows.every(
+      (row) =>
+        Boolean(row.reportingDate) &&
+        (!from || row.reportingDate >= from) &&
+        (!to || row.reportingDate <= to),
+    ),
+    lost.detail.rows.filter(
+      (row) =>
+        !row.reportingDate || (from && row.reportingDate < from) || (to && row.reportingDate > to),
+    ).length,
+    0,
+  );
+}
 check(
   "Spend = sum of platform spend",
   same(totals.spend, platformSpend),
@@ -334,9 +364,9 @@ const returnedCreditNotes = accountingLineExport.rows.filter((row) =>
 );
 check(
   "Customer credit-note rows are included in Accounting",
-  accounting.health.accountingCreditNoteRowsIncluded === 0 || returnedCreditNotes.length > 0,
+  accounting.summary.creditNotes === 0 || returnedCreditNotes.length > 0,
   returnedCreditNotes.length,
-  accounting.health.accountingCreditNoteRowsIncluded,
+  accounting.summary.creditNotes,
 );
 check(
   "Customer credit notes reduce revenue",
@@ -376,8 +406,7 @@ check(
 );
 check(
   "Website lead equation (active CRM + archived Lost)",
-  website.totals.leads ===
-    website.leadSources.activeCrm + website.leadSources.archivedLost,
+  website.totals.leads === website.leadSources.activeCrm + website.leadSources.archivedLost,
   website.totals.leads,
   website.leadSources.activeCrm + website.leadSources.archivedLost,
 );

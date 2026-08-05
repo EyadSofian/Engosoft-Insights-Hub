@@ -20,8 +20,10 @@ export interface Col<T> {
   header: ReactNode;
   render: (r: T) => ReactNode;
   sortValue?: (r: T) => number | string;
-  align?: "right" | "left";
+  align?: "right" | "left" | "center";
   width?: string;
+  /** Keeps dense numeric tables aligned when the viewport gets narrow. */
+  minWidth?: string;
   /** Pins the column while the table scrolls sideways. Use on the label column. */
   sticky?: boolean;
   /** Band this column belongs to, rendered as a grouped header above it. */
@@ -273,7 +275,9 @@ export function DataTable<T>({
       )}
 
       <div className="sm:hidden border-b border-border bg-surface-2/60 px-3 py-1.5 text-[10.5px] text-text-muted">
-        {lang === "ar" ? "اسحب الجدول يمينًا ويسارًا لعرض باقي الأعمدة" : "Swipe sideways to view the remaining columns"}
+        {lang === "ar"
+          ? "اسحب الجدول يمينًا ويسارًا لعرض باقي الأعمدة"
+          : "Swipe sideways to view the remaining columns"}
       </div>
 
       <div className="table-wrap scrollbar-thin" style={{ maxHeight }}>
@@ -312,17 +316,28 @@ export function DataTable<T>({
                     title={c.headerTitle}
                     className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
                       c.sortValue ? "cursor-pointer hover:text-text" : ""
-                    } ${c.align === "right" ? "text-end" : "text-start"} ${
+                    } ${
+                      c.align === "center"
+                        ? "text-center"
+                        : c.align === "right"
+                          ? "text-end"
+                          : "text-start"
+                    } ${
                       c.sticky ? "sticky-col z-20" : ""
                     } ${sorted ? "text-text" : "text-text-muted"}`}
                     style={{
                       width: c.width,
+                      minWidth: c.minWidth,
                       ...(c.sticky ? { background: "var(--surface-2)" } : {}),
                     }}
                   >
                     <span
                       className={`inline-flex items-center gap-1 ${
-                        c.align === "right" ? "flex-row-reverse" : ""
+                        c.align === "center"
+                          ? "justify-center"
+                          : c.align === "right"
+                            ? "flex-row-reverse"
+                            : ""
                       }`}
                     >
                       {c.header}
@@ -369,8 +384,13 @@ export function DataTable<T>({
                     className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
                       i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
                     } group-hover:bg-brand-soft ${
-                      c.align === "right" ? "text-end num whitespace-nowrap" : ""
+                      c.align === "center"
+                        ? "text-center num whitespace-nowrap"
+                        : c.align === "right"
+                          ? "text-end num whitespace-nowrap"
+                          : ""
                     } ${c.sticky ? "sticky-col font-medium" : ""}`}
+                    style={{ minWidth: c.minWidth }}
                   >
                     {c.render(r)}
                   </td>

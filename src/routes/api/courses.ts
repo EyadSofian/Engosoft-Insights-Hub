@@ -6,6 +6,8 @@ export const Route = createFileRoute("/api/courses")({
       GET: async ({ request }) => {
         const {
           attributedAdCourse,
+          archivedLostReportingDate,
+          authoritativeLostLeads,
           computeCourses,
           computeTotals,
           getFiltered,
@@ -38,6 +40,7 @@ export const Route = createFileRoute("/api/courses")({
             spend: number;
             platformLeads: number | null;
             leads: number;
+            lost: number;
             won: number;
             revenue: number;
             invoiceRefs: Set<string>;
@@ -52,6 +55,7 @@ export const Route = createFileRoute("/api/courses")({
                 spend: 0,
                 platformLeads: null,
                 leads: 0,
+                lost: 0,
                 won: 0,
                 revenue: 0,
                 invoiceRefs: new Set(),
@@ -73,6 +77,7 @@ export const Route = createFileRoute("/api/courses")({
             latestDates: Set<string>;
             platformLeads: number | null;
             crmLeads: number;
+            lost: number;
             won: number;
             revenue: number;
             invoiceRefs: Set<string>;
@@ -81,6 +86,10 @@ export const Route = createFileRoute("/api/courses")({
             spendDateMax: string;
             attributionSources: Set<string>;
             attributionConfidence: number;
+            officialActive: boolean;
+            statusSpend24h: number;
+            statusCheckedAt: string;
+            statusSource: import("@/lib/types").CampaignStateSource | "";
           };
           const campaignMap = new Map<string, CampaignAcc>();
           const campaignKey = (key: string, name: string) => key || `name:${normalizeName(name)}`;
@@ -99,6 +108,7 @@ export const Route = createFileRoute("/api/courses")({
                 latestDates: new Set(),
                 platformLeads: null,
                 crmLeads: 0,
+                lost: 0,
                 won: 0,
                 revenue: 0,
                 invoiceRefs: new Set(),
@@ -107,6 +117,10 @@ export const Route = createFileRoute("/api/courses")({
                 spendDateMax: "",
                 attributionSources: new Set(),
                 attributionConfidence: 1,
+                officialActive: false,
+                statusSpend24h: 0,
+                statusCheckedAt: "",
+                statusSource: "",
               };
               campaignMap.set(stableKey, value);
             }
@@ -114,8 +128,8 @@ export const Route = createFileRoute("/api/courses")({
             return value;
           };
 
-          // "Active" means spend on the latest available day from each platform.
-          // The feeds are daily, so claiming an hour-level status would be false precision.
+          // Latest-day spend remains available as reporting context, but never
+          // decides the operational Active/Previous split below.
           const latestByPlatform = new Map<import("@/lib/types").Platform, string>();
           for (const ad of data.ads) {
             if (!ad.date) continue;
@@ -129,6 +143,34 @@ export const Route = createFileRoute("/api/courses")({
             campaign_name: 0,
             crm_leads: 0,
           };
+
+          // Some generic campaign names carry the course only in the ad or ad
+          // set. Build the official-status join from full ad history so an
+          // Active campaign does not disappear just because the selected month
+          // has no spend for it.
+          const courseCampaignKeys = new Set<string>();
+          for (const ad of data.snapshot.ads) {
+            const attribution = attributedAdCourse(ad, data.snapshot);
+            if (isCourse(attribution.course)) courseCampaignKeys.add(ad.campaignKey);
+          }
+
+          // Course status follows the platform's official Active snapshot. It
+          // deliberately does not infer Active from spend. A campaign can be
+          // officially Active and spend zero in the selected period.
+          for (const state of data.snapshot.campaignStates) {
+            if (state.deliveryState !== "active") continue;
+            const meta = data.snapshot.campaigns.get(state.campaignKey);
+            if (!isCourse(meta?.course ?? "") && !courseCampaignKeys.has(state.campaignKey))
+              continue;
+            const campaign = atCampaign(state.campaignKey, state.name);
+            campaign.platforms.add(state.platform);
+            if (state.account) campaign.accounts.add(state.account);
+            if (meta && meta.objective !== "unknown") campaign.objective = meta.objective;
+            campaign.officialActive = true;
+            campaign.statusSpend24h = state.spend24h;
+            campaign.statusCheckedAt = state.checkedAt;
+            campaign.statusSource = state.source;
+          }
 
           for (const ad of data.ads) {
             const attribution = attributedAdCourse(ad, data.snapshot);
@@ -184,6 +226,23 @@ export const Route = createFileRoute("/api/courses")({
             if (row.isWon) campaign.won++;
           }
 
+          // Archived Odoo opportunities are the only Lost authority. They stay
+          // in the lead denominator and are attributed to the same course and
+          // campaign dimensions they carried before archival.
+          const lostRows = authoritativeLostLeads(data).filter((row) => isCourse(row.course));
+          for (const row of lostRows) {
+            const lostDate = archivedLostReportingDate(row, data.snapshot);
+            if (lostDate) {
+              const month = atMonth(lostDate.slice(0, 7));
+              month.leads++;
+              month.lost++;
+            }
+            if (!row.campaignKey && !row.campaignName) continue;
+            const campaign = atCampaign(row.campaignKey, row.campaignName);
+            campaign.crmLeads++;
+            campaign.lost++;
+          }
+
           const invoiceRows = data.accounting.filter((row) => isCourse(row.course));
           for (const row of invoiceRows) {
             const date = accountingReportingDate(row, data.applied.dateBasis ?? "payment");
@@ -207,7 +266,7 @@ export const Route = createFileRoute("/api/courses")({
           }
 
           const campaignRows = [...campaignMap.values()]
-            .filter((row) => row.spend > 0)
+            .filter((row) => row.spend > 0 || row.officialActive)
             .map((row) => ({
               key: row.key,
               name: row.name,
@@ -219,6 +278,7 @@ export const Route = createFileRoute("/api/courses")({
               latestDates: [...row.latestDates].sort(),
               platformLeads: row.platformLeads,
               crmLeads: row.crmLeads,
+              lost: row.lost,
               won: row.won,
               revenue: row.revenue,
               invoices: row.invoiceRefs.size,
@@ -228,19 +288,22 @@ export const Route = createFileRoute("/api/courses")({
               spendDateMax: row.spendDateMax,
               attributionSources: [...row.attributionSources],
               attributionConfidence: row.attributionConfidence,
+              officialActive: row.officialActive,
+              statusSpend24h: row.statusSpend24h,
+              statusCheckedAt: row.statusCheckedAt,
+              statusSource: row.statusSource,
             }));
 
           drill = {
             course: detail,
             latestWindow: Object.fromEntries(latestByPlatform),
             activeCampaigns: campaignRows
-              .filter((row) => row.latestSpend > 0)
-              .sort((a, b) => b.latestSpend - a.latestSpend),
+              .filter((row) => row.officialActive)
+              .sort((a, b) => b.statusSpend24h - a.statusSpend24h || b.spend - a.spend),
             previousCampaigns: campaignRows
-              .filter((row) => row.latestSpend <= 0)
-              .sort((a, b) => b.spendDateMax.localeCompare(a.spendDateMax) || b.spend - a.spend)
-              .slice(0, 12),
-            previousCampaignCount: campaignRows.filter((row) => row.latestSpend <= 0).length,
+              .filter((row) => !row.officialActive)
+              .sort((a, b) => b.spendDateMax.localeCompare(a.spendDateMax) || b.spend - a.spend),
+            previousCampaignCount: campaignRows.filter((row) => !row.officialActive).length,
             attribution: {
               spendBySource,
               totalAttributedSpend: Object.values(spendBySource).reduce(
@@ -261,6 +324,7 @@ export const Route = createFileRoute("/api/courses")({
                 spend: row.spend,
                 platformLeads: row.platformLeads,
                 leads: row.leads,
+                lost: row.lost,
                 won: row.won,
                 salesOrders: row.salesOrderRefs.size,
                 invoices: row.invoiceRefs.size,

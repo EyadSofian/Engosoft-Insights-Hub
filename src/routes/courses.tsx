@@ -46,6 +46,7 @@ interface CourseCampaign {
   latestDates: string[];
   platformLeads: number | null;
   crmLeads: number;
+  lost: number;
   won: number;
   revenue: number;
   invoices: number;
@@ -55,6 +56,10 @@ interface CourseCampaign {
   spendDateMax: string;
   attributionSources: AttributionSource[];
   attributionConfidence: number;
+  officialActive: boolean;
+  statusSpend24h: number;
+  statusCheckedAt: string;
+  statusSource: string;
 }
 
 interface CourseMonth {
@@ -62,6 +67,7 @@ interface CourseMonth {
   spend: number;
   platformLeads: number | null;
   leads: number;
+  lost: number;
   won: number;
   salesOrders: number;
   invoices: number;
@@ -132,6 +138,7 @@ function Courses() {
       sticky: true,
       always: true,
       width: "220px",
+      minWidth: "220px",
       sortValue: (row) => row.name,
       render: (row) => (
         <div className="flex max-w-[240px] items-start gap-2">
@@ -158,7 +165,8 @@ function Courses() {
       key: "spend",
       header: lang === "ar" ? "مصروف عليها" : "Ad spend",
       label: lang === "ar" ? "مصروف عليها" : "Ad spend",
-      align: "right",
+      align: "center",
+      minWidth: "112px",
       sortValue: (row) => row.spend,
       render: (row) => <span className="num font-medium">{fmtUSD(row.spend)}</span>,
     },
@@ -166,15 +174,35 @@ function Courses() {
       key: "crmLeads",
       header: lang === "ar" ? "الليدز" : "CRM leads",
       label: lang === "ar" ? "الليدز" : "CRM leads",
-      align: "right",
+      align: "center",
+      minWidth: "92px",
       sortValue: (row) => row.crmLeads,
       render: (row) => <span className="num">{fmtNum(row.crmLeads)}</span>,
+    },
+    {
+      key: "lost",
+      header: lang === "ar" ? "Lost" : "Lost",
+      label: lang === "ar" ? "الفرص المؤرشفة Lost" : "Archived Lost",
+      align: "center",
+      minWidth: "92px",
+      sortValue: (row) => row.lost,
+      render: (row) => <span className="num text-danger">{fmtNum(row.lost)}</span>,
+    },
+    {
+      key: "won",
+      header: lang === "ar" ? "Won" : "Won",
+      label: lang === "ar" ? "الصفقات المكسبة" : "Won deals",
+      align: "center",
+      minWidth: "88px",
+      sortValue: (row) => row.won,
+      render: (row) => <span className="num text-success">{fmtNum(row.won)}</span>,
     },
     {
       key: "salesOrders",
       header: lang === "ar" ? "أوامر البيع" : "Sales orders",
       label: lang === "ar" ? "أوامر البيع" : "Sales orders",
-      align: "right",
+      align: "center",
+      minWidth: "112px",
       sortValue: (row) => row.salesOrders,
       render: (row) => <span className="num font-medium">{fmtNum(row.salesOrders)}</span>,
     },
@@ -182,7 +210,8 @@ function Courses() {
       key: "invoices",
       header: lang === "ar" ? "الفواتير" : "Paid invoices",
       label: lang === "ar" ? "الفواتير" : "Paid invoices",
-      align: "right",
+      align: "center",
+      minWidth: "100px",
       sortValue: (row) => row.invoices,
       render: (row) => <span className="num font-medium">{fmtNum(row.invoices)}</span>,
     },
@@ -190,7 +219,8 @@ function Courses() {
       key: "revenue",
       header: lang === "ar" ? "المحصل" : "Collected revenue",
       label: lang === "ar" ? "المحصل" : "Collected revenue",
-      align: "right",
+      align: "center",
+      minWidth: "122px",
       sortValue: (row) => row.revenue,
       render: (row) => <span className="num font-semibold">{fmtUSD(row.revenue)}</span>,
     },
@@ -198,7 +228,8 @@ function Courses() {
       key: "roas",
       header: "ROAS",
       label: "ROAS",
-      align: "right",
+      align: "center",
+      minWidth: "88px",
       sortValue: (row) => row.roas ?? -1,
       render: (row) =>
         row.spend > 0 && row.roas !== null ? (
@@ -213,25 +244,18 @@ function Courses() {
       key: "platformLeads",
       header: lang === "ar" ? "ليدز المنصات" : "Platform leads",
       label: lang === "ar" ? "ليدز المنصات" : "Platform leads",
-      align: "right",
+      align: "center",
+      minWidth: "112px",
       hideByDefault: true,
       sortValue: (row) => row.platformLeads ?? -1,
       render: (row) => <span className="num">{fmtNum(row.platformLeads)}</span>,
     },
     {
-      key: "won",
-      header: lang === "ar" ? "الصفقات المكسبة" : "Won deals",
-      label: lang === "ar" ? "الصفقات المكسبة" : "Won deals",
-      align: "right",
-      hideByDefault: true,
-      sortValue: (row) => row.won,
-      render: (row) => <span className="num">{fmtNum(row.won)}</span>,
-    },
-    {
       key: "conversionRate",
       header: lang === "ar" ? "نسبة الإغلاق" : "Close rate",
       label: lang === "ar" ? "نسبة الإغلاق" : "Close rate",
-      align: "right",
+      align: "center",
+      minWidth: "104px",
       hideByDefault: true,
       sortValue: (row) => row.conversionRate ?? -1,
       render: (row) => <span className="num">{fmtPct(row.conversionRate)}</span>,
@@ -350,6 +374,8 @@ function Courses() {
                           label={lang === "ar" ? "الليدز" : "Leads"}
                           value={fmtNum(course.crmLeads)}
                         />
+                        <MobileMetric label="Lost" value={fmtNum(course.lost)} />
+                        <MobileMetric label="Won" value={fmtNum(course.won)} />
                         <MobileMetric
                           label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
                           value={fmtNum(course.salesOrders)}
@@ -408,6 +434,8 @@ function Courses() {
                 [lang === "ar" ? "الدورة" : "Course"]: row.name,
                 [lang === "ar" ? "مصروف عليها" : "Ad spend"]: row.spend,
                 [lang === "ar" ? "الليدز" : "CRM leads"]: row.crmLeads,
+                Lost: row.lost,
+                Won: row.won,
                 [lang === "ar" ? "أوامر البيع" : "Sales orders"]: row.salesOrders,
                 [lang === "ar" ? "الفواتير" : "Paid invoices"]: row.invoices,
                 [lang === "ar" ? "المحصل" : "Collected revenue"]: row.revenue,
@@ -499,18 +527,24 @@ function CourseDetailPanel({
               <h2 className="mt-0.5 truncate text-xl font-semibold text-text">{course.name}</h2>
               <p className="mt-1 text-xs text-text-muted">
                 {lang === "ar"
-                  ? `${drill.activeCampaigns.length} حملة سجلت إنفاقًا في أحدث يوم متاح، و${drill.previousCampaignCount} حملة سابقة.`
-                  : `${drill.activeCampaigns.length} campaigns spent on the latest available day, with ${drill.previousCampaignCount} previous campaigns.`}
+                  ? `${drill.activeCampaigns.length} حملة حالتها Active رسميًا على المنصة، و${drill.previousCampaignCount} حملة سابقة في الفترة.`
+                  : `${drill.activeCampaigns.length} campaigns are officially Active on-platform, with ${drill.previousCampaignCount} previous campaigns in the period.`}
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             <HeaderStat
-              label={lang === "ar" ? "إجمالي الإنفاق" : "Total spend"}
+              label={lang === "ar" ? "إنفاق الفترة" : "Period spend"}
               value={fmtUSD(course.spend)}
             />
             <HeaderStat
-              label={lang === "ar" ? "المحصل" : "Revenue"}
+              label={lang === "ar" ? "ليدز الفترة" : "Period leads"}
+              value={fmtNum(course.crmLeads)}
+            />
+            <HeaderStat label="Lost" value={fmtNum(course.lost)} />
+            <HeaderStat label="Won" value={fmtNum(course.won)} />
+            <HeaderStat
+              label={lang === "ar" ? "محصل الفترة" : "Period revenue"}
               value={fmtUSD(course.revenue)}
             />
             <HeaderStat label={lang === "ar" ? "ROAS" : "ROAS"} value={fmtRoas(course.roas)} />
@@ -549,14 +583,12 @@ function CourseDetailPanel({
         <SectionHeading
           icon={<Activity size={18} />}
           title={
-            lang === "ar"
-              ? "الحملات الشغالة في أحدث 24 ساعة متاحة"
-              : "Campaigns active in the latest available 24 hours"
+            lang === "ar" ? "الحملات الـActive رسميًا دلوقتي" : "Campaigns officially Active now"
           }
           hint={
             lang === "ar"
-              ? "بنعتبر الحملة شغالة لما تسجل إنفاقًا في أحدث يوم وصل من منصتها. المصدر يومي، مش Live بالساعة."
-              : "A campaign is active when it records spend on its platform's latest available day. Feeds are daily, not live hourly data."
+              ? "الحالة جاية من Status المنصة نفسها؛ صرف آخر 24 ساعة ظاهر للمعلومة فقط ومش هو اللي بيقرر إن الحملة Active."
+              : "Status comes from the platform itself. Last-24-hour spend is context only and never decides whether a campaign is Active."
           }
           count={drill.activeCampaigns.length}
         />
@@ -571,8 +603,8 @@ function CourseDetailPanel({
             <EmptyState
               label={
                 lang === "ar"
-                  ? "مفيش حملة للدورة سجلت إنفاقًا في أحدث يوم متاح"
-                  : "No course campaign spent on the latest available day"
+                  ? "مفيش حملة للدورة حالتها Active على المنصة حاليًا"
+                  : "No course campaign is currently Active on-platform"
               }
               compact
             />
@@ -586,8 +618,8 @@ function CourseDetailPanel({
           title={lang === "ar" ? "الحملات السابقة للدورة" : "Previous course campaigns"}
           hint={
             lang === "ar"
-              ? "آخر الحملات التي صرفت في الفترة، لكنها لم تسجل إنفاقًا في أحدث يوم متاح."
-              : "The latest campaigns with period spend but no spend on the newest available day."
+              ? "حملات ظهرت وصرفت في الفترة المختارة، لكن حالتها الحالية ليست Active على المنصة."
+              : "Campaigns with spend in the selected period whose current platform status is not Active."
           }
           count={drill.previousCampaignCount}
         />
@@ -645,7 +677,7 @@ function CourseDetailPanel({
         </div>
 
         {compareA && compareB ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
             <MonthMetricCard
               label={lang === "ar" ? "الإنفاق" : "Spend"}
               first={compareA.spend}
@@ -659,6 +691,23 @@ function CourseDetailPanel({
               label={lang === "ar" ? "ليدز CRM" : "CRM leads"}
               first={compareA.leads}
               second={compareB.leads}
+              firstLabel={formatMonth(monthA, lang)}
+              secondLabel={formatMonth(monthB, lang)}
+              format={fmtNum}
+            />
+            <MonthMetricCard
+              label="Lost"
+              first={compareA.lost}
+              second={compareB.lost}
+              firstLabel={formatMonth(monthA, lang)}
+              secondLabel={formatMonth(monthB, lang)}
+              format={fmtNum}
+              invert
+            />
+            <MonthMetricCard
+              label="Won"
+              first={compareA.won}
+              second={compareB.won}
               firstLabel={formatMonth(monthA, lang)}
               secondLabel={formatMonth(monthB, lang)}
               format={fmtNum}
@@ -763,22 +812,24 @@ function CampaignCard({ campaign, active }: { campaign: CourseCampaign; active: 
           label={
             active
               ? lang === "ar"
-                ? "إنفاق أحدث يوم"
-                : "Latest-day spend"
+                ? "صرف آخر 24 ساعة (للمعلومة)"
+                : "Last 24h spend (context)"
               : lang === "ar"
                 ? "آخر يوم صرف"
                 : "Last spend day"
           }
-          value={active ? fmtUSD(campaign.latestSpend) : fmtDate(campaign.spendDateMax, lang)}
+          value={active ? fmtUSD(campaign.statusSpend24h) : fmtDate(campaign.spendDateMax, lang)}
         />
         <MobileMetric
           label={lang === "ar" ? "إنفاق الفترة" : "Period spend"}
           value={fmtUSD(campaign.spend)}
         />
         <MobileMetric
-          label={lang === "ar" ? "ليدز CRM" : "CRM leads"}
+          label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
           value={fmtNum(campaign.crmLeads)}
         />
+        <MobileMetric label="Lost" value={fmtNum(campaign.lost)} />
+        <MobileMetric label="Won" value={fmtNum(campaign.won)} />
         <MobileMetric
           label={lang === "ar" ? "أوامر / فواتير" : "Orders / invoices"}
           value={`${fmtNum(campaign.salesOrders)} / ${fmtNum(campaign.invoices)}`}
