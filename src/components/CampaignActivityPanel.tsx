@@ -11,7 +11,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CampaignActivity, CampaignDeliveryState, PerfRow } from "@/lib/types";
+import type {
+  CampaignActivity,
+  CampaignDeliveryState,
+  CampaignPeriodSummary,
+  PerfRow,
+} from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { mutedRiskCount, riskAlertPrefs, useRiskAlertPrefs } from "@/lib/campaign-risk-prefs";
@@ -27,6 +32,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
   const zeroKeys = new Set(activity.zeroResult.map((row) => row.key));
   const atRiskKeys = new Set(activity.atRisk.map((row) => row.key));
   const lifetime = activity.lifetime ?? {};
+  const period = activity.period ?? {};
   const delivery = activity.delivery ?? {};
   const states = Object.values(delivery);
   const activeCount = states.filter((state) => state.deliveryState === "active").length;
@@ -75,8 +81,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         }
         hint={
           lang === "ar"
-            ? "Active هنا جاي من الحالة الرسمية داخل ميتا أو سناب أو تيك توك أو جوجل. أرقام الصرف والليدز معلومات زيادة فقط، ومش بنستخدمها علشان نحكم إن الحملة شغالة أو واقفة."
-            : "Active comes from each platform's official campaign status. Spend and lead figures are extra context only; they never decide whether a campaign is active or paused."
+            ? "قائمة Active لا تتأثر بفلتر التاريخ: بنقرأ الحالة وجدول التشغيل من المنصة نفسها. أرقام كل حملة تحت محسوبة على الفترة اللي اخترتها، والسهم يفتح إجمالي تاريخ الحملة."
+            : "The Active list ignores the date filter and follows each platform's status and schedule. Each row shows the selected period; expand it for lifetime results."
         }
       >
         <span className="inline-flex items-center gap-1.5">
@@ -139,8 +145,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               icon={<AlertTriangle size={16} />}
             >
               {lang === "ar"
-                ? `دي قائمة المراجعة فقط، مش كل الحملات الـ Active. الحملات دي Active على منصتها، وعندها صرف حديث، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
-                : "This is only the review list, not every active campaign. These campaigns are officially active, have recent spend, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
+                ? `دي قائمة المراجعة فقط، مش كل الحملات الـ Active. الحملات دي Active على منصتها وصرفت في الفترة المختارة، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
+                : "This is only the review list, not every active campaign. These campaigns are officially active, spent in the selected period, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
               {muted > 0 && (
                 <button
                   type="button"
@@ -160,8 +166,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               tone="danger"
               title={
                 lang === "ar"
-                  ? `${fmtNum(activity.zeroResult.length)} حملة Active صرفت مؤخرًا بلا أي ليد`
-                  : `${fmtNum(activity.zeroResult.length)} active campaigns with recent spend and zero leads`
+                  ? `${fmtNum(activity.zeroResult.length)} حملة Active صرفت في الفترة بدون ليدز من المنصة`
+                  : `${fmtNum(activity.zeroResult.length)} active campaigns spent in the period with zero platform leads`
               }
               icon={<AlertTriangle size={16} />}
             >
@@ -180,19 +186,22 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
           <div className="grid gap-3 md:grid-cols-2">
             <ActivitySpotlight
               row={activity.best}
+              period={activity.best ? period[activity.best.key] : undefined}
               tone="success"
-              title={lang === "ar" ? "أفضل أداء حالي" : "Best current performance"}
+              title={lang === "ar" ? "أفضل أداء في الفترة" : "Best performance in period"}
             />
             <ActivitySpotlight
               row={activity.worst}
+              period={activity.worst ? period[activity.worst.key] : undefined}
               tone="danger"
-              title={lang === "ar" ? "أولوية المراجعة" : "Review priority"}
+              title={lang === "ar" ? "أولوية المراجعة في الفترة" : "Review priority in period"}
             />
           </div>
 
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
             {activity.rows.map((row) => {
               const life = lifetime[row.key];
+              const inPeriod = period[row.key];
               const state = delivery[row.key];
               const sold = !!life && (life.won > 0 || life.invoices > 0 || life.revenue > 0);
               return (
@@ -231,18 +240,21 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                         )}
                       </div>
                     </div>
-                    <Mini label={lang === "ar" ? "صرف حديث" : "Recent spend"} value={row.spend > 0 ? fmtUSD(row.spend) : "—"} />
                     <Mini
-                      label={lang === "ar" ? "ليدز حديثة" : "Recent leads"}
-                      value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
+                      label={lang === "ar" ? "صرف الفترة" : "Period spend"}
+                      value={fmtUSD(inPeriod?.spend ?? 0)}
                     />
                     <Mini
-                      label={lang === "ar" ? "إيراد تاريخي" : "Lifetime revenue"}
-                      value={life ? fmtUSD(life.revenue) : "—"}
+                      label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
+                      value={fmtNum(inPeriod?.crmLeads ?? 0)}
                     />
                     <Mini
-                      label={lang === "ar" ? "أوامر بيع تاريخية" : "Lifetime orders"}
-                      value={life ? fmtNum(life.salesOrders) : "—"}
+                      label="Won"
+                      value={fmtNum(inPeriod?.won ?? 0)}
+                    />
+                    <Mini
+                      label={lang === "ar" ? "أوامر بيع في الفترة" : "Period sales orders"}
+                      value={fmtNum(inPeriod?.salesOrders ?? 0)}
                     />
                     <ChevronDown
                       size={15}
@@ -253,16 +265,20 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   <div className="border-t border-border px-3 py-3 text-xs leading-relaxed text-text-muted">
                     <p className="text-text">
                       {lang === "ar"
-                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active. أرقام الصرف والليدز المعروضة منفصلة عن الـStatus ومش بتغيّره.`
-                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active. Spend and lead figures are separate from its status and never change it.`}
+                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. الأرقام اللي فوق للفترة المختارة؛ الأرقام الجاية لكل تاريخ الحملة.`
+                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. The row above is the selected period; the figures below are lifetime totals.`}
                     </p>
-                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-6">
-                      <Mini label={lang === "ar" ? "ليدز أودو — الكل" : "Odoo leads — all"} value={life ? fmtNum(life.crmLeads) : "—"} />
-                      <Mini label="Won" value={life ? fmtNum(life.won) : "—"} />
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+                      <Mini label={lang === "ar" ? "Won — كل التاريخ" : "Lifetime Won"} value={life ? fmtNum(life.won) : "—"} />
                       <Mini label={lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"} value={life ? fmtNum(life.invoices) : "—"} />
                       <Mini label={lang === "ar" ? "أوامر بيع" : "Sales orders"} value={life ? fmtNum(life.salesOrders) : "—"} />
                       <Mini label={lang === "ar" ? "إجمالي المصروف" : "Lifetime spend"} value={life ? fmtUSD(life.spend) : "—"} />
+                      <Mini label={lang === "ar" ? "إجمالي الإيراد" : "Lifetime revenue"} value={life ? fmtUSD(life.revenue) : "—"} />
                       <Mini label="ROAS" value={life?.roas === null || life?.roas === undefined ? "—" : `${life.roas.toFixed(2)}×`} />
+                      <Mini
+                        label={lang === "ar" ? "آخر يوم صرف" : "Last spend date"}
+                        value={life?.lastSpendDate || "—"}
+                      />
                     </div>
                     {state && (
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-subtle">
@@ -292,10 +308,12 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
 }
 function ActivitySpotlight({
   row,
+  period,
   tone,
   title,
 }: {
   row: PerfRow | null;
+  period?: CampaignPeriodSummary;
   tone: "success" | "danger";
   title: string;
 }) {
@@ -323,16 +341,16 @@ function ActivitySpotlight({
         {row.name}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
-        <Mini label={lang === "ar" ? "صرف حديث" : "Recent spend"} value={fmtUSD(row.spend)} />
+        <Mini label={lang === "ar" ? "صرف الفترة" : "Period spend"} value={fmtUSD(period?.spend ?? row.spend)} />
         <Mini
-          label={lang === "ar" ? "ليدز حديثة" : "Recent leads"}
-          value={row.platformLeads === null ? "—" : fmtNum(row.platformLeads)}
+          label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
+          value={fmtNum(period?.crmLeads ?? 0)}
         />
-        <Mini label={lang === "ar" ? "Won" : "Won"} value={fmtNum(row.won)} />
-        <Mini label={lang === "ar" ? "فواتير" : "Invoices"} value={fmtNum(row.invoices)} />
+        <Mini label="Won" value={fmtNum(period?.won ?? row.won)} />
+        <Mini label={lang === "ar" ? "فواتير" : "Invoices"} value={fmtNum(period?.invoices ?? row.invoices)} />
         <Mini
           label={lang === "ar" ? "أوامر بيع" : "Sales orders"}
-          value={fmtNum(row.salesOrders)}
+          value={fmtNum(period?.salesOrders ?? row.salesOrders)}
         />
       </div>
     </div>

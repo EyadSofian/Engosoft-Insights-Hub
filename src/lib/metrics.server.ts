@@ -1029,16 +1029,6 @@ export function topLeaks(rows: PerfRow[], n = 5): PerfRow[] {
     .slice(0, n);
 }
 
-function shiftIsoDay(value: string, days: number): string {
-  const ms = Date.parse(`${value}T00:00:00Z`);
-  // An undated source row would otherwise reach toISOString() as Invalid Date
-  // and throw, taking the whole overview response down with it.
-  if (!Number.isFinite(ms)) return value;
-  const date = new Date(ms);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 function campaignActivityIdentity(row: PerfRow): string {
   return `${row.platforms.slice().sort().join("|")}:${row.key}`;
 }
@@ -1087,7 +1077,6 @@ export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
   current: FilteredData,
 ): Promise<import("./types").CampaignActivity> {
-  void current;
   const empty: import("./types").CampaignActivity = {
     window: null,
     platformWindows: {},
@@ -1096,6 +1085,7 @@ export async function computeRecentCampaignActivity(
     generatedAt: "",
     platformHealth: [],
     delivery: {},
+    period: {},
     rows: [],
     best: null,
     worst: null,
@@ -1113,7 +1103,17 @@ export async function computeRecentCampaignActivity(
   const selectedPlatforms = filters.platform ? [filters.platform] : PLATFORMS;
   const platformWindows: Partial<Record<Platform, { from: string; to: string }>> = {};
   const delivery: Record<string, CampaignOperationalState> = {};
+  const period: Record<string, import("./types").CampaignPeriodSummary> = {};
   const rows: PerfRow[] = [];
+
+  if (current.applied.from && current.applied.to) {
+    for (const platform of selectedPlatforms) {
+      platformWindows[platform] = {
+        from: current.applied.from,
+        to: current.applied.to,
+      };
+    }
+  }
 
   const operationalRow = (state: CampaignOperationalState): PerfRow => {
     const life = lifetimeRows.get(state.campaignKey);
@@ -1205,62 +1205,114 @@ export async function computeRecentCampaignActivity(
           .map((state) => ({ ...state, campaignKey: `id:${state.campaignId}` })),
       ];
   const fallbackStates = history.snapshot.campaignStates;
-  const officialStates = (live || googleDirect.health.ok ? directStates : fallbackStates).filter(
-    acceptsState,
-  );
-  const platformHealth = (() => {
+  const usingDirectState = !!(live || googleDirect.health.ok);
+  const statePool = usingDirectState ? directStates : fallbackStates;
+  const scheduleTime = (value: string, endOfDay: boolean): number => {
+    if (!value) return Number.NaN;
+    const candidate = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? `${value}T${endOfDay ? "23:59:59" : "00:00:00"}Z`
+      : value;
+    return Date.parse(candidate);
+  };
+  const now = Date.now();
+  const scheduledStates = statePool.filter((state) => {
+    const start = scheduleTime(state.startTime, false);
+    const stop = scheduleTime(state.stopTime, true);
+    if (Number.isFinite(start) && start > now) return false;
+    if (Number.isFinite(stop) && stop < now) return false;
+    return true;
+  });
+  const officialStates = scheduledStates.filter(acceptsState);
+  const rawPlatformHealth = (() => {
     const collectorHealth = (live?.platformHealth ?? []).filter(
       (entry) => entry.platform !== "google",
     );
     return [...collectorHealth, googleDirect.health];
   })();
-  const stateSource = googleDirect.health.ok ? "platform_direct" : live ? "n8n_live" : "daily_proxy";
+  const platformHealth = usingDirectState
+    ? rawPlatformHealth.map((entry) => ({
+        ...entry,
+        active: entry.ok
+          ? scheduledStates.filter((state) => state.platform === entry.platform).length
+          : 0,
+      }))
+    : PLATFORMS.map((platform) => ({
+        platform,
+        ok: fallbackStates.some((state) => state.platform === platform),
+        active: scheduledStates.filter((state) => state.platform === platform).length,
+        total: fallbackStates.filter((state) => state.platform === platform).length,
+        message: "",
+        checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
+      }));
+  const stateSource = googleDirect.health.ok
+    ? "platform_direct"
+    : live
+      ? "n8n_live"
+      : fallbackStates.length
+        ? "google_snapshot"
+        : "daily_proxy";
 
-  // Recent figures are context only. Most feeds are daily, so the UI calls
-  // them "latest recorded" rather than pretending every value is a rolling
-  // real-time window.
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Cairo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const yesterday = shiftIsoDay(today, -1);
-  const recentByKey = new Map<string, PerfRow>();
-  const recentByName = new Map<string, PerfRow>();
-  for (const platform of selectedPlatforms) {
-    const recent = await getFiltered({
-      ...filters,
-      platform,
-      from: yesterday,
-      to: today,
-      range: undefined,
-    });
-    const recentRows = computePerf(recent, "campaign").filter((row) =>
-      row.platforms.includes(platform),
-    );
-    if (recentRows.length) platformWindows[platform] = { from: yesterday, to: today };
-    for (const row of recentRows) {
-      recentByKey.set(`${platform}|${row.key}`, row);
-      recentByName.set(`${platform}|${normalizeName(row.name)}`, row);
+  // The campaign switch ignores the date filter; only these business figures
+  // follow it. This is the central distinction the UI communicates.
+  const periodRows = computePerf(current, "campaign");
+  const periodByKey = new Map<string, PerfRow>();
+  const periodByName = new Map<string, PerfRow>();
+  const periodAnyByKey = new Map<string, PerfRow>();
+  const periodAnyByName = new Map<string, PerfRow>();
+  for (const row of periodRows) {
+    periodAnyByKey.set(row.key, row);
+    periodAnyByName.set(normalizeName(row.name), row);
+    for (const platform of row.platforms) {
+      periodByKey.set(`${platform}|${row.key}`, row);
+      periodByName.set(`${platform}|${normalizeName(row.name)}`, row);
     }
   }
 
+  const activeCrmLeadsByKey = new Map<string, number>();
+  const activeCrmLeadsByName = new Map<string, number>();
+  for (const lead of current.crm) {
+    if (!lead.fromCampaign) continue;
+    if (lead.campaignKey) {
+      activeCrmLeadsByKey.set(
+        lead.campaignKey,
+        (activeCrmLeadsByKey.get(lead.campaignKey) ?? 0) + 1,
+      );
+    }
+    const name = normalizeName(lead.campaignName);
+    if (name) activeCrmLeadsByName.set(name, (activeCrmLeadsByName.get(name) ?? 0) + 1);
+  }
+
   for (const original of officialStates) {
-    const recent =
-      recentByKey.get(`${original.platform}|${original.campaignKey}`) ||
-      recentByName.get(`${original.platform}|${normalizeName(original.name)}`);
-    const campaignKey = recent?.key || original.campaignKey;
+    const inPeriod =
+      periodByKey.get(`${original.platform}|${original.campaignKey}`) ||
+      periodByName.get(`${original.platform}|${normalizeName(original.name)}`) ||
+      periodAnyByKey.get(original.campaignKey) ||
+      periodAnyByName.get(normalizeName(original.name));
+    const campaignKey = inPeriod?.key || original.campaignKey;
     const state: CampaignOperationalState = {
       ...original,
       campaignKey,
-      spend24h: recent?.spend ?? 0,
-      impressions24h: recent?.impressions ?? 0,
-      clicks24h: recent?.clicksAll ?? 0,
-      platformLeads24h: recent?.platformLeads ?? null,
+      spend24h: inPeriod?.spend ?? 0,
+      impressions24h: inPeriod?.impressions ?? 0,
+      clicks24h: inPeriod?.clicksAll ?? 0,
+      platformLeads24h: inPeriod?.platformLeads ?? null,
     };
     delivery[campaignKey] = state;
-    rows.push(recent ?? operationalRow(state));
+    const crmLeads =
+      activeCrmLeadsByKey.get(campaignKey) ??
+      activeCrmLeadsByKey.get(original.campaignKey) ??
+      activeCrmLeadsByName.get(normalizeName(original.name)) ??
+      0;
+    period[campaignKey] = {
+      spend: inPeriod?.spend ?? 0,
+      crmLeads,
+      won: inPeriod?.won ?? 0,
+      invoices: inPeriod?.invoices ?? 0,
+      salesOrders: inPeriod?.salesOrders ?? 0,
+      revenue: inPeriod?.revenue ?? 0,
+      roas: inPeriod?.roas ?? null,
+    };
+    rows.push(inPeriod ?? operationalRow(state));
   }
 
   if (!rows.length) {
@@ -1270,6 +1322,7 @@ export async function computeRecentCampaignActivity(
       generatedAt: googleDirect.health.checkedAt || live?.generatedAt || fallbackStates[0]?.checkedAt || "",
       platformHealth,
       delivery,
+      period,
       platformWindows,
     };
   }
@@ -1345,7 +1398,9 @@ export async function computeRecentCampaignActivity(
     const lifeB = lifetimeRows.get(b.key);
     return b.spend - a.spend || (lifeB?.revenue ?? 0) - (lifeA?.revenue ?? 0) || a.name.localeCompare(b.name);
   });
-  const selectedRows = platformBalancedRows(rankedActive, 16);
+  // The headline count and detail list must describe the same population.
+  // Never cut this list to a UI-friendly sample: every Active campaign belongs.
+  const selectedRows = rankedActive;
   const selectedZeroResult = platformBalancedRows(zeroResult, 12);
   const selectedAtRisk = platformBalancedRows(atRisk, 12);
   const lifetime: Record<string, import("./types").CampaignLifetime> = {};
@@ -1396,6 +1451,7 @@ export async function computeRecentCampaignActivity(
         checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
       })),
     delivery,
+    period,
     rows: selectedRows,
     best,
     worst,

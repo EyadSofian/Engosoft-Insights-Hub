@@ -114,8 +114,8 @@ export function CampaignRiskPopup() {
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-text-muted sm:text-sm">
                 {lang === "ar"
-                  ? "دي مش قائمة كل الحملات الشغالة. دي بس الحملات الـActive على منصتها وعندها صرف حديث، لكن لسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل."
-                  : "This is not the full active-campaign list. It only shows officially Active campaigns with recent spend but no Won, paid invoice, or fully invoiced sales order."}
+                  ? "دي مش قائمة كل الحملات الشغالة. دي بس الحملات الـActive على منصتها وصرفت في الفترة المختارة، لكن لسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل."
+                  : "This is not the full active-campaign list. It only shows officially Active campaigns that spent in the selected period but have no Won, paid invoice, or fully invoiced sales order."}
               </p>
             </div>
           </div>
@@ -227,7 +227,7 @@ function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <RiskMetric
           icon={<BadgeDollarSign size={14} />}
-          label={lang === "ar" ? "صرف حديث مسجل" : "Recent recorded spend"}
+          label={lang === "ar" ? "صرف الفترة المختارة" : "Selected-period spend"}
           value={fmtUSD(row.spend)}
         />
         <RiskMetric

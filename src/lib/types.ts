@@ -490,6 +490,18 @@ export interface CampaignOperationalState {
   source: CampaignStateSource;
 }
 
+/** Business result attributed to an Active campaign inside the selected date filter. */
+export interface CampaignPeriodSummary {
+  spend: number;
+  /** Reportable CRM rows only; archived Lost rows are deliberately excluded. */
+  crmLeads: number;
+  won: number;
+  invoices: number;
+  salesOrders: number;
+  revenue: number;
+  roas: Maybe;
+}
+
 export interface CampaignActivity {
   /** Broadest window retained for older summary UI. */
   window: { from: string; to: string } | null;
@@ -503,6 +515,8 @@ export interface CampaignActivity {
   platformHealth: CampaignPlatformHealth[];
   /** Current official state for every active campaign returned by the platforms. */
   delivery: Record<string, CampaignOperationalState>;
+  /** Selected-period numbers, kept separate from whole-history outcomes. */
+  period: Record<string, CampaignPeriodSummary>;
   rows: PerfRow[];
   best: PerfRow | null;
   worst: PerfRow | null;
