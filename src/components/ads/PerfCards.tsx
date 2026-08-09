@@ -7,6 +7,7 @@ import { AdSetOriginBadge, InferredCourse } from "@/components/metric-bits";
 import { VerdictChip } from "./MetricCard";
 import { roasVerdict } from "./verdict";
 import { ratioCell } from "./cells";
+import { ownerStatusLabel, type OwnerCampaignVerdict } from "./owner-campaign-verdict";
 
 /**
  * The same rows as the table, as tiles.
@@ -27,6 +28,8 @@ export function PerfCards({
   spendNote,
   activeCampaignKeys,
   showLivePerformance = false,
+  ownerMode = false,
+  ownerVerdicts,
   onRowClick,
   emptyState,
 }: {
@@ -37,6 +40,8 @@ export function PerfCards({
   spendNote?: string;
   activeCampaignKeys?: ReadonlySet<string>;
   showLivePerformance?: boolean;
+  ownerMode?: boolean;
+  ownerVerdicts?: ReadonlyMap<string, OwnerCampaignVerdict>;
   onRowClick?: (r: PerfRow) => void;
   emptyState?: React.ReactNode;
 }) {
@@ -44,9 +49,12 @@ export function PerfCards({
   if (!rows.length) return <>{emptyState ?? <EmptyState label="—" compact />}</>;
 
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <ul
+      className={`grid gap-3 sm:grid-cols-2 ${ownerMode ? "lg:grid-cols-3 2xl:grid-cols-4" : "xl:grid-cols-3"}`}
+    >
       {rows.map((r, i) => {
         const verdict = roasVerdict(r.roas, r.spend);
+        const ownerVerdict = ownerVerdicts?.get(r.key);
         const running =
           activeCampaignKeys?.has(r.campaignKey) === true ||
           activeCampaignKeys?.has(r.key) === true;
@@ -67,7 +75,7 @@ export function PerfCards({
               type="button"
               onClick={() => onRowClick?.(r)}
               disabled={!onRowClick}
-              className="card w-full h-full text-start p-3.5 flex flex-col gap-2.5 card-hover hover:shadow-md hover:-translate-y-0.5 disabled:cursor-default cursor-pointer"
+              className={`card w-full h-full text-start flex flex-col card-hover hover:shadow-md hover:-translate-y-0.5 disabled:cursor-default cursor-pointer ${ownerMode ? "p-3 gap-2" : "p-3.5 gap-2.5"}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
@@ -107,7 +115,9 @@ export function PerfCards({
                     </span>
                   )}
                 </span>
-                {verdict && (
+                {ownerMode && ownerVerdict ? (
+                  <OwnerVerdictChip verdict={ownerVerdict} />
+                ) : verdict ? (
                   <VerdictChip
                     verdict={verdict}
                     label={`${
@@ -124,7 +134,7 @@ export function PerfCards({
                             : "Weak"
                     } · ${r.roas!.toFixed(2)}×`}
                   />
-                )}
+                ) : null}
               </div>
 
               <div className="min-w-0">
@@ -151,7 +161,15 @@ export function PerfCards({
                 )}
               </div>
 
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-auto pt-1.5 border-t border-border/70">
+              {ownerMode && ownerVerdict && (
+                <p className="min-h-9 text-[10.5px] leading-[1.15rem] text-text-muted line-clamp-2">
+                  {ownerVerdict.reason[lang]}
+                </p>
+              )}
+
+              <dl
+                className={`grid grid-cols-2 gap-x-3 mt-auto pt-1.5 border-t border-border/70 ${ownerMode ? "gap-y-1" : "gap-y-1.5"}`}
+              >
                 <Fact
                   metric="spend"
                   value={
@@ -165,33 +183,71 @@ export function PerfCards({
                   }
                 />
                 <Fact metric="revenue" value={fmtUSD(r.revenue)} />
-                <Fact
-                  metric="platformLeads"
-                  value={r.platformLeads === null ? <Dash /> : fmtNum(r.platformLeads)}
-                />
                 <Fact metric="crmLeads" value={fmtNum(r.crmLeads)} />
-                <Fact
-                  metric="won"
-                  value={
-                    <>
-                      {fmtNum(r.won)}
-                      {/* Bracketed: "34" next to "3.1%" scans as 343.1%. */}
-                      <span className="text-text-subtle text-[10px] ms-1">
-                        ({fmtPct(r.conversionRate, 1)})
-                      </span>
-                    </>
-                  }
-                />
-                <SimpleFact
-                  label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
-                  value={fmtNum(r.invoices)}
-                />
-                <SimpleFact
-                  label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
-                  value={fmtNum(r.salesOrders)}
-                />
-                <Fact metric="cpl" value={ratioCell(r.cpl, r.spend, fmtUSDFull, spendNote)} />
+                {ownerMode ? (
+                  <>
+                    <SimpleFact
+                      label={lang === "ar" ? "نسبة الإغلاق" : "Conversion"}
+                      value={fmtPct(r.conversionRate, 1)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "Lost" : "Lost rate"}
+                      value={fmtPct(r.lostRate, 1)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "دورة البيع" : "Sales cycle"}
+                      value={
+                        r.avgCloseDays === null ? (
+                          <Dash />
+                        ) : (
+                          <>
+                            {r.avgCloseDays.toFixed(1)} {lang === "ar" ? "يوم" : "days"}
+                          </>
+                        )
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Fact
+                      metric="platformLeads"
+                      value={r.platformLeads === null ? <Dash /> : fmtNum(r.platformLeads)}
+                    />
+                    <Fact
+                      metric="won"
+                      value={
+                        <>
+                          {fmtNum(r.won)}
+                          <span className="text-text-subtle text-[10px] ms-1">
+                            ({fmtPct(r.conversionRate, 1)})
+                          </span>
+                        </>
+                      }
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
+                      value={fmtNum(r.invoices)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
+                      value={fmtNum(r.salesOrders)}
+                    />
+                    <Fact metric="cpl" value={ratioCell(r.cpl, r.spend, fmtUSDFull, spendNote)} />
+                  </>
+                )}
               </dl>
+
+              {ownerMode && ownerVerdict && (
+                <p className="text-[9.5px] text-text-subtle">
+                  {ownerVerdict.benchmark.relatedCampaigns > 0
+                    ? lang === "ar"
+                      ? `${fmtNum(ownerVerdict.benchmark.relatedCampaigns)} حملات مرتبطة بنفس الدورة — اضغط للتفاصيل`
+                      : `${fmtNum(ownerVerdict.benchmark.relatedCampaigns)} related course campaigns — open for details`
+                    : lang === "ar"
+                      ? "اضغط لفهم الحساب والتفاصيل"
+                      : "Open to inspect the calculation"}
+                </p>
+              )}
 
               {r.partialSpend && (
                 <p className="text-[10px] leading-snug" style={{ color: "var(--warning)" }}>
@@ -210,6 +266,27 @@ export function PerfCards({
 
 function Dash() {
   return <span className="text-text-subtle">—</span>;
+}
+
+function OwnerVerdictChip({ verdict }: { verdict: OwnerCampaignVerdict }) {
+  const { lang } = useI18n();
+  const label = ownerStatusLabel(verdict.status, lang);
+  if (verdict.status === "early") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-1 text-[10px] font-semibold text-text-muted whitespace-nowrap">
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <VerdictChip
+      verdict={
+        verdict.status === "successful" ? "good" : verdict.status === "watch" ? "watch" : "weak"
+      }
+      label={label}
+    />
+  );
 }
 
 function Fact({ metric, value }: { metric: MetricKey; value: React.ReactNode }) {

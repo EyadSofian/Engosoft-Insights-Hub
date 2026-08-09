@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ChevronDown,
   ChevronLeft,
   CircleDollarSign,
   Download,
   Layers,
   PanelRightOpen,
   Search,
+  SlidersHorizontal,
   Target,
   X,
 } from "lucide-react";
@@ -13,7 +15,7 @@ import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n, type DictKey, type Lang } 
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { useApi } from "@/lib/use-api";
 import { METRIC_GROUP_LABEL, METRICS, type MetricKey } from "@/lib/metric-catalog";
-import type { PerfRow } from "@/lib/types";
+import type { CampaignOperationalState, PerfRow } from "@/lib/types";
 import { DataTable, type Col } from "@/components/DataTable";
 import { exportCsv } from "@/lib/csv";
 import { EmptyState, Segmented, Skeleton } from "@/components/ui-bits";
@@ -24,6 +26,12 @@ import { Unavailable, VerdictChip } from "./MetricCard";
 import { PerfCards } from "./PerfCards";
 import { acosVerdict, roasVerdict } from "./verdict";
 import { csvMaybe, csvRatio, maybeCell, ratioCell, sortMaybe, sortRatio } from "./cells";
+import {
+  ownerCampaignVerdict,
+  ownerStatusLabel,
+  type OwnerCampaignStatus,
+  type OwnerCampaignVerdict,
+} from "./owner-campaign-verdict";
 
 export type Grain = "campaign" | "adset" | "ad";
 
@@ -101,6 +109,10 @@ function buildCsvRow(
 type QuickViewKey =
   | "all"
   | "attributedRevenue"
+  | "successful"
+  | "watch"
+  | "weak"
+  | "early"
   | "bestRoas"
   | "worst"
   | "topSpend"
@@ -110,6 +122,10 @@ type QuickViewKey =
   | "leadsNoWon"
   | "noCreative"
   | "unmatched";
+
+const OWNER_VIEW_KEYS: OwnerCampaignStatus[] = ["successful", "watch", "weak", "early"];
+const isOwnerView = (value: QuickViewKey): value is OwnerCampaignStatus =>
+  OWNER_VIEW_KEYS.includes(value as OwnerCampaignStatus);
 
 interface QuickView {
   key: QuickViewKey;
@@ -127,6 +143,46 @@ const QUICK_VIEWS: QuickView[] = [
     ar: "الكل",
     en: "All",
     hint: { ar: "كل الصفوف في النطاق الحالي", en: "Every row in the current scope" },
+    apply: (rows) => rows,
+  },
+  {
+    key: "successful",
+    ar: "ناجحة",
+    en: "Successful",
+    hint: {
+      ar: "حملات Live وعدّت حد العينة وحققت معايير الجودة والإغلاق والعائد",
+      en: "Live campaigns with enough data that meet quality, conversion and return targets",
+    },
+    apply: (rows) => rows,
+  },
+  {
+    key: "watch",
+    ar: "متابعة",
+    en: "Watch",
+    hint: {
+      ar: "حملات Live نتيجتها مختلطة أو عندها معيار محتاج تدخل",
+      en: "Live campaigns with mixed results or one area that needs attention",
+    },
+    apply: (rows) => rows,
+  },
+  {
+    key: "weak",
+    ar: "ضعيفة",
+    en: "Weak",
+    hint: {
+      ar: "حملات Live عدّت وقت الحكم وفشلت في معيارين أو في استرداد المصروف",
+      en: "Live campaigns mature enough to judge that fail two rules or break-even",
+    },
+    apply: (rows) => rows,
+  },
+  {
+    key: "early",
+    ar: "بدري للحكم",
+    en: "Too early",
+    hint: {
+      ar: "أقل من 30 ليد أو لسه ماكملتش دورة بيع كاملة",
+      en: "Fewer than 30 leads or not through a full sales cycle yet",
+    },
     apply: (rows) => rows,
   },
   {
@@ -152,7 +208,7 @@ const QUICK_VIEWS: QuickView[] = [
     },
     apply: (rows) =>
       rows
-        .filter((r) => r.spend > 0 && r.roas !== null && !r.partialSpend)
+        .filter((r) => r.spend > 0 && r.roas !== null && r.roas >= 2 && !r.partialSpend)
         .sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0)),
   },
   {
@@ -254,7 +310,8 @@ export function PerfExplorer({
   spendAvailable = true,
   /** Extra context appended to every spend-derived metric explanation. */
   spendNote,
-  activeCampaignKeys,
+  activeCampaignStates,
+  lostAvailable = true,
   title,
   subtitle,
   initialView,
@@ -268,7 +325,9 @@ export function PerfExplorer({
   spendAvailable?: boolean;
   spendNote?: string;
   /** Campaigns the live platform-status collector says are eligible to run now. */
-  activeCampaignKeys?: string[];
+  activeCampaignStates?: CampaignOperationalState[];
+  /** False while the direct Odoo Lost archive is unavailable. */
+  lostAvailable?: boolean;
   title?: string;
   subtitle?: string;
   /** Deep-link from the overview into one decision-ready quick view. */
@@ -283,6 +342,7 @@ export function PerfExplorer({
   const [cardSort, setCardSort] = useState<CardSortKey>("spend");
   const [cardLimit, setCardLimit] = useState(CARD_PAGE);
   const [detail, setDetail] = useState<PerfRow | null>(null);
+  const [showAdvancedViews, setShowAdvancedViews] = useState(false);
 
   // Cards by default on a phone, where a twenty-column table is a sideways
   // scroll with the labels left behind on the far edge. Once the reader picks a
@@ -291,30 +351,101 @@ export function PerfExplorer({
 
   const nameOf = (r: PerfRow) => (r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM);
 
-  const views = QUICK_VIEWS.filter(
-    (v) => (!v.adOnly || grain === "ad") && (v.key !== "attributedRevenue" || grain === "campaign"),
-  );
+  const decisionMode = grain === "campaign" && activeCampaignStates !== undefined;
+  const ownerViewMode = decisionMode && (view === "all" || isOwnerView(view));
+  const views = QUICK_VIEWS.filter((v) => {
+    if (v.adOnly && grain !== "ad") return false;
+    if (v.key === "attributedRevenue" && grain !== "campaign") return false;
+    if (decisionMode && (v.key === "bestRoas" || v.key === "worst")) return false;
+    if (!decisionMode && isOwnerView(v.key)) return false;
+    return true;
+  });
   const activeView = views.find((v) => v.key === view) ?? views[0];
+  const activeCampaignStateByKey = useMemo(() => {
+    const map = new Map<string, CampaignOperationalState>();
+    for (const state of activeCampaignStates ?? []) {
+      if (state.campaignKey) map.set(state.campaignKey, state);
+      if (state.campaignId) map.set(`id:${state.campaignId}`, state);
+    }
+    return map;
+  }, [activeCampaignStates]);
   const activeCampaignKeySet = useMemo(
-    () => new Set(activeCampaignKeys ?? []),
-    [activeCampaignKeys],
+    () => new Set(activeCampaignStateByKey.keys()),
+    [activeCampaignStateByKey],
+  );
+  const ownerVerdicts = useMemo(() => {
+    const map = new Map<string, OwnerCampaignVerdict>();
+    for (const row of rows) {
+      const state =
+        activeCampaignStateByKey.get(row.campaignKey) ?? activeCampaignStateByKey.get(row.key);
+      map.set(row.key, ownerCampaignVerdict(row, rows, state?.startTime, lostAvailable));
+    }
+    return map;
+  }, [activeCampaignStateByKey, lostAvailable, rows]);
+  const ownerCounts = useMemo(() => {
+    const counts: Record<OwnerCampaignStatus, number> = {
+      successful: 0,
+      watch: 0,
+      weak: 0,
+      early: 0,
+    };
+    for (const row of rows) {
+      if (!activeCampaignKeySet.has(row.campaignKey) && !activeCampaignKeySet.has(row.key))
+        continue;
+      const status = ownerVerdicts.get(row.key)?.status;
+      if (status) counts[status]++;
+    }
+    return counts;
+  }, [activeCampaignKeySet, ownerVerdicts, rows]);
+  const evaluatedLiveCount = OWNER_VIEW_KEYS.reduce((sum, status) => sum + ownerCounts[status], 0);
+  const activePlatformCount = useMemo(
+    () => new Set((activeCampaignStates ?? []).map((state) => state.campaignKey)).size,
+    [activeCampaignStates],
   );
   const shown = useMemo(() => {
     const applied = activeView.apply(rows);
-    // "Worst" is an action list, not a history report. On the campaigns page
-    // it must contain only campaigns the live collector says can run now.
-    if (view !== "worst" || activeCampaignKeys === undefined) return applied;
-    return applied.filter(
-      (row) => activeCampaignKeySet.has(row.campaignKey) || activeCampaignKeySet.has(row.key),
-    );
-  }, [activeCampaignKeySet, activeCampaignKeys, activeView, rows, view]);
+    if (decisionMode && view === "all") {
+      return applied
+        .filter(
+          (row) => activeCampaignKeySet.has(row.campaignKey) || activeCampaignKeySet.has(row.key),
+        )
+        .sort((a, b) => b.spend - a.spend);
+    }
+    if (decisionMode && isOwnerView(view)) {
+      return applied
+        .filter(
+          (row) =>
+            (activeCampaignKeySet.has(row.campaignKey) || activeCampaignKeySet.has(row.key)) &&
+            ownerVerdicts.get(row.key)?.status === view,
+        )
+        .sort((a, b) => {
+          const va = ownerVerdicts.get(a.key)!;
+          const vb = ownerVerdicts.get(b.key)!;
+          if (view === "successful") return vb.passes - va.passes || (b.roas ?? 0) - (a.roas ?? 0);
+          if (view === "weak")
+            return vb.failures - va.failures || b.spend - b.revenue - (a.spend - a.revenue);
+          if (view === "watch")
+            return vb.failures - va.failures || vb.watches - va.watches || b.spend - a.spend;
+          return b.crmLeads - a.crmLeads || b.spend - a.spend;
+        });
+    }
+    if (view === "worst" && activeCampaignStates !== undefined) {
+      return applied.filter(
+        (row) => activeCampaignKeySet.has(row.campaignKey) || activeCampaignKeySet.has(row.key),
+      );
+    }
+    return applied;
+  }, [
+    activeCampaignKeySet,
+    activeCampaignStates,
+    activeView,
+    decisionMode,
+    ownerVerdicts,
+    rows,
+    view,
+  ]);
 
-  const quickViewHint =
-    view === "worst" && activeCampaignKeys !== undefined
-      ? lang === "ar"
-        ? "معروض بس الحملات الشغالة فعليًا دلوقتي، والحكم على نتيجة الفترة اللي اخترتها."
-        : "Only campaigns eligible to run now, judged on the selected period."
-      : activeView.hint[lang];
+  const quickViewHint = activeView.hint[lang];
 
   const searchable = (r: PerfRow) =>
     `${nameOf(r)} ${r.campaignName} ${r.adsetName} ${r.course}`.toLowerCase();
@@ -325,10 +456,11 @@ export function PerfExplorer({
   const cardRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = q ? shown.filter((r) => searchable(r).includes(q)) : shown;
+    if (decisionMode && isOwnerView(view)) return filtered;
     const pick = CARD_SORTS[cardSort].value;
     return [...filtered].sort((a, b) => pick(b) - pick(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, query, cardSort, unknownAdsetKey]);
+  }, [shown, query, cardSort, unknownAdsetKey, decisionMode, view]);
 
   useEffect(() => {
     setCardLimit(CARD_PAGE);
@@ -340,8 +472,26 @@ export function PerfExplorer({
 
   useEffect(() => {
     if (grain !== "campaign")
-      setView((current) => (current === "attributedRevenue" ? "all" : current));
+      setView((current) =>
+        current === "attributedRevenue" || isOwnerView(current) ? "all" : current,
+      );
   }, [grain]);
+
+  useEffect(() => {
+    if (decisionMode && (view === "bestRoas" || view === "worst")) setView("all");
+  }, [decisionMode, view]);
+
+  const relatedRows = useMemo(() => {
+    if (!detail?.course || grain !== "campaign") return [];
+    const course = detail.course.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+    return rows
+      .filter(
+        (row) =>
+          row.key !== detail.key &&
+          row.course.trim().toLocaleLowerCase().replace(/\s+/g, " ") === course,
+      )
+      .sort((a, b) => b.spend - a.spend);
+  }, [detail, grain, rows]);
 
   const csvRow = (r: PerfRow) => buildCsvRow(r, nameOf, lang, spendAvailable);
 
@@ -353,11 +503,11 @@ export function PerfExplorer({
       hint={
         view !== "all"
           ? lang === "ar"
-            ? view === "worst" && activeCampaignKeys !== undefined
-              ? "مفيش حملة شغالة فعليًا وأداؤها ضعيف في الفترة دي."
+            ? decisionMode && isOwnerView(view)
+              ? `مفيش حملة Live في تصنيف «${ownerStatusLabel(view, lang)}» حسب الفترة الحالية.`
               : "جرّب ترجع لعرض «الكل» أو توسّع الفترة."
-            : view === "worst" && activeCampaignKeys !== undefined
-              ? "No currently running campaign is underperforming in this period."
+            : decisionMode && isOwnerView(view)
+              ? `No live campaign is classified as “${ownerStatusLabel(view, lang)}” in this period.`
               : "Try the All view, or widen the period."
           : lang === "ar"
             ? "غيّر المنصة أو الفترة من فوق."
@@ -366,34 +516,82 @@ export function PerfExplorer({
     />
   );
 
+  const primaryViews = decisionMode
+    ? views.filter((item) => item.key === "all" || isOwnerView(item.key))
+    : views;
+  const advancedViews = decisionMode
+    ? views.filter((item) => item.key !== "all" && !isOwnerView(item.key))
+    : [];
+  const advancedOpen = showAdvancedViews || advancedViews.some((item) => item.key === view);
+  const viewButton = (v: QuickView) => {
+    const active = v.key === view;
+    return (
+      <button
+        key={v.key}
+        onClick={() => setView(v.key)}
+        title={v.hint[lang]}
+        aria-pressed={active}
+        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11.5px] font-medium whitespace-nowrap transition-colors cursor-pointer touch-manipulation ${
+          active
+            ? "border-transparent text-white"
+            : "border-border text-text-muted hover:bg-surface-2"
+        }`}
+        style={active ? { background: "var(--brand)" } : undefined}
+      >
+        {decisionMode && v.key === "all" ? (lang === "ar" ? "كل الـLive" : "All live") : v[lang]}
+        {decisionMode && v.key === "all" && (
+          <span className="opacity-75 num">{evaluatedLiveCount}</span>
+        )}
+        {decisionMode && isOwnerView(v.key) && (
+          <span className="ms-1 opacity-75 num">{ownerCounts[v.key]}</span>
+        )}
+      </button>
+    );
+  };
+
   const quickViews = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {views.map((v) => {
-        const active = v.key === view;
-        return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {primaryViews.map(viewButton)}
+        {decisionMode && advancedViews.length > 0 && (
           <button
-            key={v.key}
-            onClick={() => setView(v.key)}
-            title={
-              v.key === "worst" && activeCampaignKeys !== undefined ? quickViewHint : v.hint[lang]
-            }
-            aria-pressed={active}
-            className={`px-3 py-1.5 rounded-full text-[11.5px] font-medium border transition-colors cursor-pointer whitespace-nowrap touch-manipulation ${
-              active
-                ? "text-white border-transparent"
-                : "border-border text-text-muted hover:bg-surface-2"
-            }`}
-            style={active ? { background: "var(--brand)" } : undefined}
+            type="button"
+            onClick={() => setShowAdvancedViews((open) => !open)}
+            className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-[11.5px] font-medium text-text-muted transition-colors hover:bg-surface-2 cursor-pointer"
+            aria-expanded={advancedOpen}
           >
-            {v[lang]}
+            <SlidersHorizontal size={12} />
+            {lang === "ar" ? "فلاتر إضافية" : "More filters"}
+            <ChevronDown
+              size={12}
+              className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+            />
           </button>
-        );
-      })}
-      {view !== "all" && (
-        <span className="text-[11px] text-text-muted ms-1 basis-full sm:basis-auto">
-          {quickViewHint}
-        </span>
+        )}
+      </div>
+      {decisionMode && advancedOpen && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/60 p-2">
+          {advancedViews.map(viewButton)}
+        </div>
       )}
+      {decisionMode && !lostAvailable && (
+        <p
+          className="rounded-lg px-2.5 py-1.5 text-[10.5px] leading-5"
+          style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
+        >
+          {lang === "ar"
+            ? "بيانات Lost المباشرة مش متاحة حاليًا؛ علشان مانضللكش، الحملات الناضجة مش هتظهر «ناجحة» لحد ما المصدر يرجع."
+            : "Direct Lost data is unavailable. To avoid a misleading result, mature campaigns will not be marked Successful until the source recovers."}
+        </p>
+      )}
+      {decisionMode && activePlatformCount > evaluatedLiveCount && (
+        <p className="text-[10.5px] leading-5 text-text-subtle">
+          {lang === "ar"
+            ? `${fmtNum(activePlatformCount - evaluatedLiveCount)} حملة Live ظاهرة في حالة المنصات فوق، لكن ملهاش صف أداء قابل للربط في الفترة؛ مش داخلة في الحكم.`
+            : `${fmtNum(activePlatformCount - evaluatedLiveCount)} live campaigns appear in platform status above but have no linkable performance row in this period, so they are not classified.`}
+        </p>
+      )}
+      {view !== "all" && <p className="text-[11px] leading-5 text-text-muted">{quickViewHint}</p>}
     </div>
   );
 
@@ -551,6 +749,7 @@ export function PerfExplorer({
             rows={cardRows}
             csvRow={csvRow}
             csvFilename={`${csvPrefix}-${grain}`}
+            hideSort={ownerViewMode}
           />
           {quickViews}
           <PerfCards
@@ -560,7 +759,9 @@ export function PerfExplorer({
             spendAvailable={spendAvailable}
             spendNote={spendNote}
             activeCampaignKeys={activeCampaignKeySet}
-            showLivePerformance={view === "worst" && activeCampaignKeys !== undefined}
+            showLivePerformance={ownerViewMode}
+            ownerMode={ownerViewMode}
+            ownerVerdicts={ownerVerdicts}
             onRowClick={setDetail}
             emptyState={emptyState}
           />
@@ -584,6 +785,8 @@ export function PerfExplorer({
           nameOf={nameOf}
           spendAvailable={spendAvailable}
           spendNote={spendNote}
+          ownerVerdict={ownerViewMode ? ownerVerdicts.get(detail.key) : undefined}
+          relatedRows={relatedRows}
           onClose={() => setDetail(null)}
           onDrill={() => drillTo(detail)}
         />
@@ -603,6 +806,7 @@ function CardToolbar({
   rows,
   csvRow,
   csvFilename,
+  hideSort = false,
 }: {
   query: string;
   onQuery: (v: string) => void;
@@ -612,6 +816,7 @@ function CardToolbar({
   rows: PerfRow[];
   csvRow: (r: PerfRow) => Record<string, string | number>;
   csvFilename: string;
+  hideSort?: boolean;
 }) {
   const { t, lang } = useI18n();
   return (
@@ -627,21 +832,23 @@ function CardToolbar({
         />
       </div>
 
-      <label className="inline-flex items-center gap-1.5 text-[12px] text-text-muted">
-        <span className="hidden sm:inline">{lang === "ar" ? "رتّب حسب" : "Sort by"}</span>
-        <select
-          value={sort}
-          onChange={(e) => onSort(e.target.value as CardSortKey)}
-          aria-label={lang === "ar" ? "ترتيب الكروت" : "Sort cards"}
-          className="px-2.5 py-2 rounded-lg bg-surface border border-border text-[13px] min-h-[38px] cursor-pointer"
-        >
-          {(Object.keys(CARD_SORTS) as CardSortKey[]).map((k) => (
-            <option key={k} value={k}>
-              {CARD_SORTS[k][lang]}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!hideSort && (
+        <label className="inline-flex items-center gap-1.5 text-[12px] text-text-muted">
+          <span className="hidden sm:inline">{lang === "ar" ? "رتّب حسب" : "Sort by"}</span>
+          <select
+            value={sort}
+            onChange={(e) => onSort(e.target.value as CardSortKey)}
+            aria-label={lang === "ar" ? "ترتيب الكروت" : "Sort cards"}
+            className="px-2.5 py-2 rounded-lg bg-surface border border-border text-[13px] min-h-[38px] cursor-pointer"
+          >
+            {(Object.keys(CARD_SORTS) as CardSortKey[]).map((k) => (
+              <option key={k} value={k}>
+                {CARD_SORTS[k][lang]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="ms-auto flex items-center gap-2">
         <span className="text-xs text-text-muted num whitespace-nowrap">
@@ -768,6 +975,8 @@ function RowDrawer({
   nameOf,
   spendAvailable,
   spendNote,
+  ownerVerdict,
+  relatedRows,
   onClose,
   onDrill,
 }: {
@@ -776,6 +985,8 @@ function RowDrawer({
   nameOf: (r: PerfRow) => string;
   spendAvailable: boolean;
   spendNote?: string;
+  ownerVerdict?: OwnerCampaignVerdict;
+  relatedRows: PerfRow[];
   onClose: () => void;
   onDrill: () => void;
 }) {
@@ -902,7 +1113,24 @@ function RowDrawer({
             <div className="flex items-center gap-2 flex-wrap">
               <PlatformBadges platforms={row.platforms} />
               {row.adsetOrigin && <AdSetOriginBadge origin={row.adsetOrigin} />}
-              {roas && (
+              {ownerVerdict ? (
+                ownerVerdict.status === "early" ? (
+                  <span className="rounded-full bg-surface-2 px-2 py-1 text-[10px] font-semibold text-text-muted">
+                    {ownerStatusLabel(ownerVerdict.status, lang)}
+                  </span>
+                ) : (
+                  <VerdictChip
+                    verdict={
+                      ownerVerdict.status === "successful"
+                        ? "good"
+                        : ownerVerdict.status === "watch"
+                          ? "watch"
+                          : "weak"
+                    }
+                    label={ownerStatusLabel(ownerVerdict.status, lang)}
+                  />
+                )
+              ) : roas ? (
                 <VerdictChip
                   verdict={roas}
                   label={
@@ -919,7 +1147,7 @@ function RowDrawer({
                           : "Weak"
                   }
                 />
-              )}
+              ) : null}
             </div>
             <h3 className="text-[15px] font-semibold text-text mt-1.5 leading-snug break-words">
               {nameOf(row)}
@@ -940,6 +1168,31 @@ function RowDrawer({
         </div>
 
         <div className="p-4 space-y-4">
+          {ownerVerdict && (
+            <section className="rounded-xl border border-border bg-surface-2/60 p-3">
+              <h4 className="text-[12px] font-semibold text-text">
+                {lang === "ar" ? "ليه أخدت الحكم ده؟" : "Why this verdict?"}
+              </h4>
+              <p className="mt-1 text-[11.5px] leading-5 text-text-muted">
+                {ownerVerdict.reason[lang]}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-text-subtle">
+                <span>
+                  {lang === "ar"
+                    ? `الحكم مبني على ${fmtNum(row.crmLeads)} ليد`
+                    : `Based on ${fmtNum(row.crmLeads)} leads`}
+                </span>
+                {ownerVerdict.benchmark.days !== null && (
+                  <span>
+                    {lang === "ar"
+                      ? `مرجع دورة البيع ${ownerVerdict.benchmark.days.toFixed(1)} يوم`
+                      : `Sales-cycle benchmark ${ownerVerdict.benchmark.days.toFixed(1)} days`}
+                  </span>
+                )}
+              </div>
+            </section>
+          )}
+
           {row.partialSpend && (
             <p
               className="text-[11.5px] leading-relaxed rounded-lg px-3 py-2"
@@ -1005,6 +1258,35 @@ function RowDrawer({
               )}
             </section>
           ))}
+
+          {grain === "campaign" && relatedRows.length > 0 && (
+            <details className="group rounded-xl border border-border bg-surface">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-semibold text-text">
+                <span>
+                  {lang === "ar"
+                    ? `حملات مرتبطة بنفس الدورة (${fmtNum(relatedRows.length)})`
+                    : `Related campaigns for the same course (${fmtNum(relatedRows.length)})`}
+                </span>
+                <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+              </summary>
+              <ul className="border-t border-border px-2 py-2 space-y-1">
+                {relatedRows.slice(0, 10).map((related) => (
+                  <li
+                    key={related.key}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-2.5 py-2 text-[11px]"
+                  >
+                    <span className="min-w-0 truncate text-text" dir="auto" title={nameOf(related)}>
+                      {nameOf(related)}
+                    </span>
+                    <span className="num shrink-0 text-text-muted">
+                      {fmtUSD(related.spend)} · {fmtPct(related.conversionRate, 1)} ·{" "}
+                      {related.roas === null ? "—" : `${related.roas.toFixed(2)}×`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
 
           <button
             onClick={onDrill}
