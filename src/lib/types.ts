@@ -453,6 +453,8 @@ export type CampaignStateSource =
 export interface CampaignPlatformHealth {
   platform: Platform;
   ok: boolean;
+  /** Platform switches that are enabled, before schedule/child checks. */
+  enabled?: number;
   active: number;
   total: number;
   message: string;
@@ -489,7 +491,7 @@ export interface CampaignOperationalState {
   source: CampaignStateSource;
 }
 
-/** Business result attributed to an Active campaign inside the selected date filter. */
+/** Business result attributed to a currently eligible campaign inside the selected date filter. */
 export interface CampaignPeriodSummary {
   spend: number;
   /** Reportable CRM rows only; archived Lost rows are deliberately excluded. */

@@ -1,8 +1,4 @@
-import type {
-  CampaignOperationalState,
-  CampaignPlatformHealth,
-  Platform,
-} from "./types";
+import type { CampaignOperationalState, CampaignPlatformHealth, Platform } from "./types";
 
 const DEFAULT_LIVE_STATUS_URL =
   "https://n8n.engosoft.com/webhook/engosoft-meta-campaign-live-status-v1-4fbe7508";
@@ -55,33 +51,34 @@ export async function loadMetaLiveStatus(): Promise<LiveStatusResponse | null> {
             ? (row.platform as Platform)
             : ("meta" as const);
           return {
-          platform,
-          accountId: text(row.accountId),
-          account: text(row.account),
-          accountTimezone: text(row.accountTimezone),
-          campaignId: text(row.campaignId),
-          name: text(row.name),
-          configuredStatus: text(row.configuredStatus) || "UNKNOWN",
-          effectiveStatus: text(row.effectiveStatus) || "UNKNOWN",
-          servingStatus: text(row.servingStatus),
-          statusReason: text(row.statusReason),
-          startTime: text(row.startTime),
-          stopTime: text(row.stopTime),
-          updatedTime: text(row.updatedTime),
-          activeAdsets: finite(row.activeAdsets),
-          activeAds: finite(row.activeAds),
-          spend24h: finite(row.spend24h),
-          impressions24h: finite(row.impressions24h),
-          clicks24h: finite(row.clicks24h),
-          platformLeads24h:
-            row.platformLeads24h === null || row.platformLeads24h === undefined
-              ? null
-              : finite(row.platformLeads24h),
-          deliveryState:
-            row.deliveryState === "active" ? ("active" as const) : ("unknown" as const),
-          checkedAt: text(row.checkedAt) || text(raw.generatedAt),
-          source: "n8n_live" as const,
-        }})
+            platform,
+            accountId: text(row.accountId),
+            account: text(row.account),
+            accountTimezone: text(row.accountTimezone),
+            campaignId: text(row.campaignId),
+            name: text(row.name),
+            configuredStatus: text(row.configuredStatus) || "UNKNOWN",
+            effectiveStatus: text(row.effectiveStatus) || "UNKNOWN",
+            servingStatus: text(row.servingStatus),
+            statusReason: text(row.statusReason),
+            startTime: text(row.startTime),
+            stopTime: text(row.stopTime),
+            updatedTime: text(row.updatedTime),
+            activeAdsets: finite(row.activeAdsets),
+            activeAds: finite(row.activeAds),
+            spend24h: finite(row.spend24h),
+            impressions24h: finite(row.impressions24h),
+            clicks24h: finite(row.clicks24h),
+            platformLeads24h:
+              row.platformLeads24h === null || row.platformLeads24h === undefined
+                ? null
+                : finite(row.platformLeads24h),
+            deliveryState:
+              row.deliveryState === "active" ? ("active" as const) : ("unknown" as const),
+            checkedAt: text(row.checkedAt) || text(raw.generatedAt),
+            source: "n8n_live" as const,
+          };
+        })
         .filter((row) => !!row.campaignId && row.deliveryState === "active");
 
       const value: LiveStatusResponse = {
@@ -96,13 +93,18 @@ export async function loadMetaLiveStatus(): Promise<LiveStatusResponse | null> {
                   ? (entry.platform as Platform)
                   : ("meta" as const),
                 ok: entry.ok === true,
+                enabled:
+                  entry.enabled === undefined || entry.enabled === null
+                    ? undefined
+                    : finite(entry.enabled),
                 active: finite(entry.active),
                 total: finite(entry.total),
                 message: text(entry.message),
                 checkedAt: text(entry.checkedAt) || text(raw.generatedAt),
               }))
-              .filter((entry, index, list) =>
-                list.findIndex((candidate) => candidate.platform === entry.platform) === index,
+              .filter(
+                (entry, index, list) =>
+                  list.findIndex((candidate) => candidate.platform === entry.platform) === index,
               )
           : [],
         accountsWithErrors: Array.isArray(raw.accountsWithErrors)

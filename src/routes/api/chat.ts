@@ -114,8 +114,8 @@ export const Route = createFileRoute("/api/chat")({
 
           if (has("what can you do", "تقدر تعمل ايه", "تعمل ايه", "بتعرف ايه", "ممكن اسالك")) {
             return ar
-              ? "أقدر أشرح أي رقم في الداشبورد ومصدره، ألخّص حملة أو دورة، أقارن الإنفاق بالمبيعات، أعدّ الحملات الـActive، وأوصلك للصفحة الصح. أنا ملتزم بالفترة والفلاتر الظاهرة ومش بخمّن رقم ناقص. جرّب: **دورة PMP صرفت وباعت كام؟**"
-              : "I can explain dashboard figures and sources, summarize campaigns or courses, compare spend with sales, count officially active campaigns, and link you to the right page. I follow the visible filters and never invent missing values.";
+              ? "أقدر أشرح أي رقم في الداشبورد ومصدره، ألخّص حملة أو دورة، أقارن الإنفاق بالمبيعات، أعدّ الحملات الجاهزة للتشغيل، وأوصلك للصفحة الصح. أنا ملتزم بالفترة والفلاتر الظاهرة ومش بخمّن رقم ناقص. جرّب: **دورة PMP صرفت وباعت كام؟**"
+              : "I can explain dashboard figures and sources, summarize campaigns or courses, compare spend with sales, count campaigns eligible to run now, and link you to the right page. I follow the visible filters and never invent missing values.";
           }
           if (
             has(
@@ -179,8 +179,8 @@ export const Route = createFileRoute("/api/chat")({
               ([platform, count]) => `${labels[platform] ?? platform} ${count}`,
             );
             return ar
-              ? `الحملات اللي المنصات نفسها معلّماها Active: **${activeStates.length}** (${parts.join("، ") || "لا يوجد"}). الصرف مش هو اللي بيحدد الحالة. افتح [الحملات](/campaigns) للتفاصيل.`
-              : `Officially Active campaigns: **${activeStates.length}** (${parts.join(", ") || "none"}). Spend does not decide status. Open [Campaigns](/campaigns) for details.`;
+              ? `الحملات الجاهزة للتشغيل دلوقتي: **${activeStates.length}** (${parts.join("، ") || "لا يوجد"}). بنراجع زر التشغيل والجدول ووجود إعلان شغّال؛ الصرف مش هو اللي بيحدد الحالة. افتح [الحملات](/campaigns) للتفاصيل.`
+              : `Campaigns eligible to run now: **${activeStates.length}** (${parts.join(", ") || "none"}). We check the switch, schedule, and a live ad; spend does not decide status. Open [Campaigns](/campaigns) for details.`;
           }
           if (courseMention) {
             return ar

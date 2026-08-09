@@ -81,13 +81,13 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         }
         hint={
           lang === "ar"
-            ? "قائمة Active لا تتأثر بفلتر التاريخ: بنقرأ الحالة وجدول التشغيل من المنصة نفسها. أرقام كل حملة تحت محسوبة على الفترة اللي اخترتها، والسهم يفتح إجمالي تاريخ الحملة."
-            : "The Active list ignores the date filter and follows each platform's status and schedule. Each row shows the selected period; expand it for lifetime results."
+            ? "القائمة لا تتأثر بفلتر التاريخ: الحملة لازم تكون مفعّلة، داخل جدولها الحالي، وجواها إعلان شغّال. أرقام كل حملة محسوبة على الفترة اللي اخترتها، والسهم يفتح إجمالي تاريخها."
+            : "This list ignores the date filter: a campaign must be enabled, currently scheduled, and contain a live ad. Each row shows the selected period; expand it for lifetime results."
         }
       >
         <span className="inline-flex items-center gap-1.5">
           <Activity size={16} className="text-brand" />
-          {lang === "ar" ? "الحملات الـ Active الآن" : "Active campaigns now"}
+          {lang === "ar" ? "الحملات الجاهزة للتشغيل الآن" : "Campaigns eligible to run now"}
         </span>
       </SectionTitle>
 
@@ -104,7 +104,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         <div className="mb-4 grid grid-cols-3 gap-2">
           <StatusCount
             icon={<Radio size={15} />}
-            label={lang === "ar" ? "إجمالي Active" : "Total active"}
+            label={lang === "ar" ? "جاهزة للتشغيل" : "Eligible now"}
             value={activeCount}
             tone="success"
           />
@@ -145,8 +145,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
               icon={<AlertTriangle size={16} />}
             >
               {lang === "ar"
-                ? `دي قائمة المراجعة فقط، مش كل الحملات الـ Active. الحملات دي Active على منصتها وصرفت في الفترة المختارة، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
-                : "This is only the review list, not every active campaign. These campaigns are officially active, spent in the selected period, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
+                ? `دي قائمة المراجعة فقط، مش كل الحملات الجاهزة. الحملات دي مفعّلة وجدولها مفتوح وجواها إعلان شغّال، وصرفت في الفترة المختارة، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
+                : "This is only the review list. These campaigns are enabled, currently scheduled, contain a live ad, spent in the selected period, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
               {muted > 0 && (
                 <button
                   type="button"
@@ -269,8 +269,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                   <div className="border-t border-border px-3 py-3 text-xs leading-relaxed text-text-muted">
                     <p className="text-text">
                       {lang === "ar"
-                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة Active وجدولها لسه مفتوح. فوق: صرف، ليدز CRM، Lost، Won، والإيراد المدفوع في الفترة المختارة. تحت: إجمالي تاريخ الحملة.`
-                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as Active and still in schedule. Above: selected-period spend, CRM leads, archived Lost, Won, and paid revenue. Below: lifetime totals.`}
+                        ? `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} بتقول إن الحملة مفعّلة، جدولها لسه مفتوح، وجواها إعلان شغّال. فوق: صرف، ليدز CRM، Lost، Won، والإيراد المدفوع في الفترة المختارة. تحت: إجمالي تاريخ الحملة.`
+                        : `${PLATFORM_LABEL[state?.platform ?? row.platforms[0]][lang]} reports this campaign as enabled, currently scheduled, and containing a live ad. Above: selected-period results. Below: lifetime totals.`}
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
                       <Mini
@@ -424,7 +424,7 @@ function Mini({ label, value }: { label: string; value: string }) {
 function DeliveryPill({ state }: { state: CampaignDeliveryState }) {
   const { lang } = useI18n();
   if (state === "active")
-    return <Pill tone="success">{lang === "ar" ? "Active على المنصة" : "Active on platform"}</Pill>;
+    return <Pill tone="success">{lang === "ar" ? "جاهزة للتشغيل" : "Eligible now"}</Pill>;
   return <Pill tone="neutral">{lang === "ar" ? "الحالة غير واضحة" : "Status unclear"}</Pill>;
 }
 
@@ -458,8 +458,12 @@ function PlatformHealthCard({
       <div className="mt-0.5 text-[10px] leading-relaxed text-text-muted">
         {ok
           ? lang === "ar"
-            ? "حملة Active رسميًا"
-            : "officially Active"
+            ? health.enabled !== undefined && health.enabled !== health.active
+              ? `جاهزة الآن · ${fmtNum(health.enabled)} مفعّلة`
+              : "جاهزة للتشغيل الآن"
+            : health.enabled !== undefined && health.enabled !== health.active
+              ? `eligible now · ${fmtNum(health.enabled)} enabled`
+              : "eligible to run now"
           : googleHelp
             ? lang === "ar"
               ? "محتاج تسجيل دخول بحساب Engosoft الصحيح"

@@ -78,8 +78,8 @@ async function fetchOfficialCampaignStatus() {
     }
     return output;
   };
-  const addHealth = (platform, ok, active, total, message = "") =>
-    health.push({ platform, ok, active, total, message, checkedAt });
+  const addHealth = (platform, ok, active, total, message = "", extra = {}) =>
+    health.push({ platform, ok, active, total, message, checkedAt, ...extra });
   const addRow = ({
     platform,
     accountId,
@@ -119,22 +119,37 @@ async function fetchOfficialCampaignStatus() {
     });
   };
 
-  // Meta: effective_status is the platform's official current campaign state.
+  // Meta's campaign switch alone is not the same as "running now". Old
+  // campaigns can remain ACTIVE after their stop_time, and an ACTIVE campaign
+  // can contain no ACTIVE ads. Discover every accessible account, then require
+  // a current schedule plus at least one ACTIVE ad set and one ACTIVE ad.
   try {
     const token = text(config.META_TOKEN);
-    const accounts = parseList(config.META_ACCOUNTS_JSON);
+    const configuredAccounts = parseList(config.META_ACCOUNTS_JSON);
     const version = text(config.META_API_VERSION) || "v25.0";
-    if (!token || !accounts.length) throw new Error("Meta credentials are not configured");
+    if (!token) throw new Error("Meta credentials are not configured");
+    let discoveredAccounts = [];
+    try {
+      discoveredAccounts = await fetchPaged(
+        `https://graph.facebook.com/${version}/me/adaccounts`,
+        {
+          fields: "id,name,account_status,disable_reason,timezone_name",
+          limit: 200,
+          access_token: token,
+        },
+      );
+    } catch (error) {
+      if (!configuredAccounts.length) throw error;
+    }
+    const accounts = discoveredAccounts.length ? discoveredAccounts : configuredAccounts;
+    if (!accounts.length) throw new Error("Meta returned no accessible ad accounts");
+    const now = Date.now();
     let active = 0;
+    let enabled = 0;
     let total = 0;
     for (const configured of accounts) {
       const rawId = text(configured?.id);
       const accountId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
-      const info = await request({
-        method: "GET",
-        url: `https://graph.facebook.com/${version}/${accountId}`,
-        qs: { fields: "id,name", access_token: token },
-      });
       const [campaigns, adsets, ads] = await Promise.all([
         fetchPaged(
           `https://graph.facebook.com/${version}/${accountId}/campaigns`,
@@ -168,25 +183,40 @@ async function fetchOfficialCampaignStatus() {
       }
       for (const campaign of campaigns) {
         if (text(campaign?.effective_status) !== "ACTIVE") continue;
-        active += 1;
+        enabled += 1;
         const campaignId = text(campaign?.id);
+        const start = Date.parse(text(campaign?.start_time));
+        const stop = Date.parse(text(campaign?.stop_time));
+        const scheduleIsCurrent =
+          (!Number.isFinite(start) || start <= now) &&
+          (!Number.isFinite(stop) || stop > now);
+        const activeAdsets = adsetCounts.get(campaignId) || 0;
+        const activeAds = adCounts.get(campaignId) || 0;
+        if (!scheduleIsCurrent || activeAdsets < 1 || activeAds < 1) continue;
+        active += 1;
         addRow({
           platform: "meta",
           accountId,
-          account: text(info?.name || configured?.name || accountId),
+          account: text(configured?.name || accountId),
           campaignId,
           name: campaign?.name,
           configuredStatus: campaign?.status,
           effectiveStatus: campaign?.effective_status,
+          servingStatus: "ELIGIBLE",
+          statusReason: "Campaign, schedule, ad set and ad are ACTIVE",
           startTime: campaign?.start_time,
           stopTime: campaign?.stop_time,
           updatedTime: campaign?.updated_time,
-          activeAdsets: adsetCounts.get(campaignId) || 0,
-          activeAds: adCounts.get(campaignId) || 0,
+          activeAdsets,
+          activeAds,
         });
       }
     }
-    addHealth("meta", true, active, total);
+    addHealth("meta", true, active, total, "", {
+      enabled,
+      accountCount: accounts.length,
+      definition: "current_schedule_with_active_children",
+    });
   } catch (error) {
     const message = safeMessage(error);
     errors.push({ platform: "meta", message });
@@ -516,7 +546,7 @@ const workflow = {
     { id: "status-webhook-kind", name: "Is Refresh Webhook", type: "n8n-nodes-base.if", typeVersion: 2, position: [1320, 30], parameters: { conditions: { options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 }, conditions: [{ id: "status-webhook-check", leftValue: "={{ $json.requestMode }}", rightValue: "refresh_webhook", operator: { type: "string", operation: "equals" } }], combinator: "and" }, options: {} } },
     { id: "status-get-response", name: "Return Official Campaign Status", type: "n8n-nodes-base.respondToWebhook", typeVersion: 1.4, position: [570, -60], parameters: { respondWith: "json", responseBody: "={{ JSON.stringify($json) }}", options: {} } },
     { id: "status-refresh-response", name: "Return Fresh Official Status", type: "n8n-nodes-base.respondToWebhook", typeVersion: 1.4, position: [1570, 40], parameters: { respondWith: "json", responseBody: "={{ JSON.stringify($json) }}", options: {} } },
-    { id: "status-note", name: "Status rules", type: "n8n-nodes-base.stickyNote", typeVersion: 1, position: [720, -230], parameters: { width: 780, height: 200, content: "## Official status first\n- Meta: `effective_status=ACTIVE`\n- Snapchat: `status=ACTIVE` plus `delivery_status`\n- TikTok: `operation_status=ENABLE` plus `secondary_status`\n- Google Ads: `campaign.status=ENABLED` plus primary/serving status\n- Spend is displayed as context only. It never decides whether a campaign is active.\n- n8n is primary; Google Sheets is backup only." } },
+    { id: "status-note", name: "Status rules", type: "n8n-nodes-base.stickyNote", typeVersion: 1, position: [720, -230], parameters: { width: 780, height: 220, content: "## Current status without misleading counts\n- Meta: discover every accessible ad account; require campaign `effective_status=ACTIVE`, a current start/stop schedule, an ACTIVE ad set, and an ACTIVE ad.\n- Snapchat: `status=ACTIVE` plus `delivery_status`.\n- TikTok: `operation_status=ENABLE` plus `secondary_status`.\n- Google Ads: `campaign.status=ENABLED` plus primary/serving status.\n- Spend is context only. It never decides whether a campaign is active.\n- n8n is primary; Google Sheets is backup only." } },
   ],
   connections: {
     "Dashboard Official Status Webhook": { main: [[{ node: "Read n8n Official Cache", type: "main", index: 0 }]] },

@@ -527,8 +527,8 @@ function CourseDetailPanel({
               <h2 className="mt-0.5 truncate text-xl font-semibold text-text">{course.name}</h2>
               <p className="mt-1 text-xs text-text-muted">
                 {lang === "ar"
-                  ? `${drill.activeCampaigns.length} حملة حالتها Active رسميًا على المنصة، و${drill.previousCampaignCount} حملة سابقة في الفترة.`
-                  : `${drill.activeCampaigns.length} campaigns are officially Active on-platform, with ${drill.previousCampaignCount} previous campaigns in the period.`}
+                  ? `${drill.activeCampaigns.length} حملة جاهزة للتشغيل حاليًا، و${drill.previousCampaignCount} حملة سابقة في الفترة.`
+                  : `${drill.activeCampaigns.length} campaigns are eligible to run now, with ${drill.previousCampaignCount} previous campaigns in the period.`}
               </p>
             </div>
           </div>
@@ -582,13 +582,11 @@ function CourseDetailPanel({
       <div>
         <SectionHeading
           icon={<Activity size={18} />}
-          title={
-            lang === "ar" ? "الحملات الـActive رسميًا دلوقتي" : "Campaigns officially Active now"
-          }
+          title={lang === "ar" ? "الحملات الجاهزة للتشغيل دلوقتي" : "Campaigns eligible to run now"}
           hint={
             lang === "ar"
-              ? "الحالة جاية من Status المنصة نفسها؛ صرف آخر 24 ساعة ظاهر للمعلومة فقط ومش هو اللي بيقرر إن الحملة Active."
-              : "Status comes from the platform itself. Last-24-hour spend is context only and never decides whether a campaign is Active."
+              ? "الحملة لازم تكون مفعّلة، جدولها مفتوح، وجواها إعلان شغّال. الصرف ظاهر للمعلومة فقط ومش هو اللي بيقرر الحالة."
+              : "A campaign must be enabled, currently scheduled, and contain a live ad. Spend is context only and never decides status."
           }
           count={drill.activeCampaigns.length}
         />
@@ -603,8 +601,8 @@ function CourseDetailPanel({
             <EmptyState
               label={
                 lang === "ar"
-                  ? "مفيش حملة للدورة حالتها Active على المنصة حاليًا"
-                  : "No course campaign is currently Active on-platform"
+                  ? "مفيش حملة للدورة جاهزة للتشغيل حاليًا"
+                  : "No course campaign is currently eligible to run"
               }
               compact
             />
@@ -618,8 +616,8 @@ function CourseDetailPanel({
           title={lang === "ar" ? "الحملات السابقة للدورة" : "Previous course campaigns"}
           hint={
             lang === "ar"
-              ? "حملات ظهرت وصرفت في الفترة المختارة، لكن حالتها الحالية ليست Active على المنصة."
-              : "Campaigns with spend in the selected period whose current platform status is not Active."
+              ? "حملات ظهرت وصرفت في الفترة المختارة، لكنها مش جاهزة للتشغيل حاليًا."
+              : "Campaigns with spend in the selected period that aren't eligible to run now."
           }
           count={drill.previousCampaignCount}
         />
