@@ -245,6 +245,7 @@ function Campaigns() {
             initialView={initialView}
             unknownAdsetKey={data.unknownAdsetKey}
             csvPrefix="engosoft"
+            activeCampaignKeys={Object.keys(data.activity.delivery)}
             spendAvailable={spend > 0}
             spendNote={
               spend <= 0

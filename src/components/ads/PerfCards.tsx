@@ -25,6 +25,8 @@ export function PerfCards({
   nameOf,
   spendAvailable,
   spendNote,
+  activeCampaignKeys,
+  showLivePerformance = false,
   onRowClick,
   emptyState,
 }: {
@@ -33,6 +35,8 @@ export function PerfCards({
   nameOf: (r: PerfRow) => string;
   spendAvailable: boolean;
   spendNote?: string;
+  activeCampaignKeys?: ReadonlySet<string>;
+  showLivePerformance?: boolean;
   onRowClick?: (r: PerfRow) => void;
   emptyState?: React.ReactNode;
 }) {
@@ -43,6 +47,9 @@ export function PerfCards({
     <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {rows.map((r, i) => {
         const verdict = roasVerdict(r.roas, r.spend);
+        const running =
+          activeCampaignKeys?.has(r.campaignKey) === true ||
+          activeCampaignKeys?.has(r.key) === true;
         // At campaign grain the "parent" is the campaign itself, which would
         // print the title twice.
         const parent =
@@ -87,8 +94,37 @@ export function PerfCards({
                     </span>
                   )}
                   {grain === "adset" && <AdSetOriginBadge origin={r.adsetOrigin} />}
+                  {showLivePerformance && running && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+                      style={{ background: "var(--success-soft)", color: "var(--success)" }}
+                    >
+                      <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-40" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+                      </span>
+                      {lang === "ar" ? "شغالة فعليًا" : "Running now"}
+                    </span>
+                  )}
                 </span>
-                {verdict && <VerdictChip verdict={verdict} label={`${r.roas!.toFixed(2)}×`} />}
+                {verdict && (
+                  <VerdictChip
+                    verdict={verdict}
+                    label={`${
+                      verdict === "good"
+                        ? lang === "ar"
+                          ? "أداء كويس"
+                          : "Good"
+                        : verdict === "watch"
+                          ? lang === "ar"
+                            ? "محتاج متابعة"
+                            : "Watch"
+                          : lang === "ar"
+                            ? "أداء ضعيف"
+                            : "Weak"
+                    } · ${r.roas!.toFixed(2)}×`}
+                  />
+                )}
               </div>
 
               <div className="min-w-0">

@@ -254,6 +254,7 @@ export function PerfExplorer({
   spendAvailable = true,
   /** Extra context appended to every spend-derived metric explanation. */
   spendNote,
+  activeCampaignKeys,
   title,
   subtitle,
   initialView,
@@ -266,6 +267,8 @@ export function PerfExplorer({
   csvPrefix: string;
   spendAvailable?: boolean;
   spendNote?: string;
+  /** Campaigns the live platform-status collector says are eligible to run now. */
+  activeCampaignKeys?: string[];
   title?: string;
   subtitle?: string;
   /** Deep-link from the overview into one decision-ready quick view. */
@@ -292,7 +295,26 @@ export function PerfExplorer({
     (v) => (!v.adOnly || grain === "ad") && (v.key !== "attributedRevenue" || grain === "campaign"),
   );
   const activeView = views.find((v) => v.key === view) ?? views[0];
-  const shown = useMemo(() => activeView.apply(rows), [activeView, rows]);
+  const activeCampaignKeySet = useMemo(
+    () => new Set(activeCampaignKeys ?? []),
+    [activeCampaignKeys],
+  );
+  const shown = useMemo(() => {
+    const applied = activeView.apply(rows);
+    // "Worst" is an action list, not a history report. On the campaigns page
+    // it must contain only campaigns the live collector says can run now.
+    if (view !== "worst" || activeCampaignKeys === undefined) return applied;
+    return applied.filter(
+      (row) => activeCampaignKeySet.has(row.campaignKey) || activeCampaignKeySet.has(row.key),
+    );
+  }, [activeCampaignKeySet, activeCampaignKeys, activeView, rows, view]);
+
+  const quickViewHint =
+    view === "worst" && activeCampaignKeys !== undefined
+      ? lang === "ar"
+        ? "معروض بس الحملات الشغالة فعليًا دلوقتي، والحكم على نتيجة الفترة اللي اخترتها."
+        : "Only campaigns eligible to run now, judged on the selected period."
+      : activeView.hint[lang];
 
   const searchable = (r: PerfRow) =>
     `${nameOf(r)} ${r.campaignName} ${r.adsetName} ${r.course}`.toLowerCase();
@@ -331,8 +353,12 @@ export function PerfExplorer({
       hint={
         view !== "all"
           ? lang === "ar"
-            ? "جرّب ترجع لعرض «الكل» أو توسّع الفترة."
-            : "Try the All view, or widen the period."
+            ? view === "worst" && activeCampaignKeys !== undefined
+              ? "مفيش حملة شغالة فعليًا وأداؤها ضعيف في الفترة دي."
+              : "جرّب ترجع لعرض «الكل» أو توسّع الفترة."
+            : view === "worst" && activeCampaignKeys !== undefined
+              ? "No currently running campaign is underperforming in this period."
+              : "Try the All view, or widen the period."
           : lang === "ar"
             ? "غيّر المنصة أو الفترة من فوق."
             : "Change the platform or period above."
@@ -348,7 +374,9 @@ export function PerfExplorer({
           <button
             key={v.key}
             onClick={() => setView(v.key)}
-            title={v.hint[lang]}
+            title={
+              v.key === "worst" && activeCampaignKeys !== undefined ? quickViewHint : v.hint[lang]
+            }
             aria-pressed={active}
             className={`px-3 py-1.5 rounded-full text-[11.5px] font-medium border transition-colors cursor-pointer whitespace-nowrap touch-manipulation ${
               active
@@ -363,7 +391,7 @@ export function PerfExplorer({
       })}
       {view !== "all" && (
         <span className="text-[11px] text-text-muted ms-1 basis-full sm:basis-auto">
-          {activeView.hint[lang]}
+          {quickViewHint}
         </span>
       )}
     </div>
@@ -476,7 +504,9 @@ export function PerfExplorer({
           </div>
           <div className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-start sm:min-w-[160px]">
             <div className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-              {lang === "ar" ? `${fmtNum(shown.length)} حملات · مجموع الصفوف` : `${fmtNum(shown.length)} campaigns · row total`}
+              {lang === "ar"
+                ? `${fmtNum(shown.length)} حملات · مجموع الصفوف`
+                : `${fmtNum(shown.length)} campaigns · row total`}
             </div>
             <div className="num mt-0.5 text-lg font-semibold text-text">
               {fmtUSDFull(shown.reduce((sum, row) => sum + row.revenue, 0))}
@@ -529,6 +559,8 @@ export function PerfExplorer({
             nameOf={nameOf}
             spendAvailable={spendAvailable}
             spendNote={spendNote}
+            activeCampaignKeys={activeCampaignKeySet}
+            showLivePerformance={view === "worst" && activeCampaignKeys !== undefined}
             onRowClick={setDetail}
             emptyState={emptyState}
           />
