@@ -252,7 +252,9 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "Ad ID": custom(lead, fields.adId),
     "Ad Set Name": custom(lead, fields.adsetName),
     "Ad Set ID": custom(lead, fields.adsetId),
-    "Campaign Name": custom(lead, fields.campaignName) || m2oName(lead.campaign_id),
+    // Odoo's visible Campaign field (`utm.campaign`) is the authority. The
+    // legacy custom text remains a fallback for older imported records only.
+    "Campaign Name": m2oName(lead.campaign_id) || custom(lead, fields.campaignName),
     "Campaign ID": custom(lead, fields.campaignId),
     "اسم جهة الاتصال":
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
@@ -289,7 +291,7 @@ function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "Ad ID": custom(lead, fields.adId),
     "Ad Set Name": custom(lead, fields.adsetName),
     "Ad Set ID": custom(lead, fields.adsetId),
-    "Campaign Name": custom(lead, fields.campaignName) || m2oName(lead.campaign_id),
+    "Campaign Name": m2oName(lead.campaign_id) || custom(lead, fields.campaignName),
     "Campaign ID": custom(lead, fields.campaignId),
     "اسم جهة الاتصال":
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),

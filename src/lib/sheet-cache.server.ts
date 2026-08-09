@@ -615,6 +615,23 @@ function classifyAccount(name: string): CampaignObjective {
   return "leads";
 }
 
+/**
+ * `web-con` is Engosoft's naming convention for a website-conversion campaign.
+ * Those rows report purchases/conversions, not lead-form submissions. Keeping
+ * the override at campaign level matters because the same ad account can run
+ * both lead-generation and website-conversion campaigns.
+ */
+function classifyCampaign(name: string, account: string): CampaignObjective {
+  const normalized = normalizeName(name);
+  if (
+    /(^|[\s_-])web[\s_-]*con(?:v(?:ersion)?)?(?=$|[\s_-])/i.test(normalized) ||
+    /(^|\s)website\s*conversion(?:s)?(\s|$)/i.test(normalized)
+  ) {
+    return "website_conversion";
+  }
+  return classifyAccount(account);
+}
+
 /* --- campaign key unification --------------------------------------------- */
 
 /**
@@ -1156,8 +1173,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     const meta: AdRow[] = metaHistoryRaw.map((r) => {
       const account = str(r["اسم الحساب الإعلاني"]) || str(r["__account_name"]);
-      const objective = classifyAccount(account);
-      objectiveByAccount.set(account, objective);
+      const objective = classifyCampaign(str(r["اسم الكامبين"]), account);
+      objectiveByAccount.set(account, classifyAccount(account));
       return {
         platform: "meta" as Platform,
         date: parseDate(r["التاريخ"]),
@@ -1232,9 +1249,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
 
     const snap: AdRow[] = snapRaw.map((r) => {
       const account = str(r["اسم الحساب الإعلاني"]) || str(r["__account_name"]);
-      const objective = classifyAccount(account);
+      const objective = classifyCampaign(str(r["اسم الكامبين"]), account);
       const snapLeads = str(r["Leads (Native)"]) || str(r["Leads"]) || str(r["On-Facebook leads"]);
-      objectiveByAccount.set(account, objective);
+      objectiveByAccount.set(account, classifyAccount(account));
       return {
         platform: "snapchat" as Platform,
         date: parseDate(r["التاريخ"]),
@@ -1274,10 +1291,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const tiktokFromSheet: AdRow[] = tiktokRaw.map((r) => {
       const account =
         pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
-      const objective = classifyAccount(account);
-      const leads = pick(r, "Leads (Native)", "Leads", "On-Facebook leads", "Leads (Total)");
-      objectiveByAccount.set(account, objective);
       const campaign = pick(r, "اسم الكامبين", "Campaign name", "Campaign Name");
+      const objective = classifyCampaign(campaign, account);
+      const leads = pick(r, "Leads (Native)", "Leads", "On-Facebook leads", "Leads (Total)");
+      objectiveByAccount.set(account, classifyAccount(account));
       const campaignId = pick(r, "__campaign_id", "Campaign ID");
       return {
         platform: "tiktok" as Platform,
@@ -1302,8 +1319,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       };
     });
     const tiktokFromApi: AdRow[] = tiktokResult.rows.map((r) => {
-      const objective = classifyAccount(r.account);
-      objectiveByAccount.set(r.account, objective);
+      const objective = classifyCampaign(r.campaign, r.account);
+      objectiveByAccount.set(r.account, classifyAccount(r.account));
       return {
         platform: "tiktok" as Platform,
         date: r.date,
@@ -1339,10 +1356,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       // Google uses one website account for mixed campaign goals. A campaign
       // that has produced conversions is a lead campaign even though the
       // account name itself contains "Website".
-      const objective = googleLeadCampaigns.has(r.campaignId || r.campaign)
-        ? ("leads" as CampaignObjective)
-        : classifyAccount(r.account);
-      objectiveByAccount.set(r.account, objective);
+      const namedObjective = classifyCampaign(r.campaign, r.account);
+      const objective =
+        namedObjective === "website_conversion"
+          ? namedObjective
+          : googleLeadCampaigns.has(r.campaignId || r.campaign)
+            ? ("leads" as CampaignObjective)
+            : namedObjective;
+      objectiveByAccount.set(r.account, classifyAccount(r.account));
       return {
         platform: "google" as Platform,
         date: r.date,

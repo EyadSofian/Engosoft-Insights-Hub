@@ -3,7 +3,7 @@
 export type Platform = "meta" | "snapchat" | "tiktok" | "google";
 
 /** Why an ad account spends. Traffic/unknown accounts poison efficiency metrics. */
-export type CampaignObjective = "leads" | "traffic" | "unknown";
+export type CampaignObjective = "leads" | "website_conversion" | "traffic" | "unknown";
 
 /** How an ad-set value was obtained for a CRM/invoice row. */
 export type AdSetOrigin =

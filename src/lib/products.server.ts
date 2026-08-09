@@ -611,6 +611,70 @@ function selectLines(snapshot: ProductSnapshot, f: ProductFilters): SaleLine[] {
   });
 }
 
+export interface WebsiteCampaignSale {
+  campaign: string;
+  orders: number;
+  units: number;
+  revenueUsd: number;
+}
+
+/**
+ * Confirmed website orders grouped by Odoo's standard UTM Campaign field.
+ * This is intentionally exact: a blank or differently-spelled campaign stays
+ * unlinked instead of being guessed into an ad campaign.
+ */
+export function websiteCampaignSales(snapshot: ProductSnapshot, f: ProductFilters) {
+  const websiteLines = selectLines(snapshot, f).filter((line) => line.fromWebsite);
+  const byCampaign = new Map<
+    string,
+    { campaign: string; orders: Set<number>; units: number; revenueUsd: number }
+  >();
+  const allOrders = new Set<number>();
+  const attributedOrders = new Set<number>();
+  let totalRevenue = 0;
+  let attributedRevenue = 0;
+
+  for (const line of websiteLines) {
+    allOrders.add(line.orderId);
+    if (line.convertible) totalRevenue += line.usd;
+    const campaign = line.campaign.trim();
+    if (!campaign) continue;
+    attributedOrders.add(line.orderId);
+    let row = byCampaign.get(campaign);
+    if (!row) {
+      row = { campaign, orders: new Set(), units: 0, revenueUsd: 0 };
+      byCampaign.set(campaign, row);
+    }
+    row.orders.add(line.orderId);
+    if (countsAsUnit(line)) row.units += line.qty;
+    if (line.convertible) {
+      row.revenueUsd += line.usd;
+      attributedRevenue += line.usd;
+    }
+  }
+
+  const rows: WebsiteCampaignSale[] = [...byCampaign.values()]
+    .map((row) => ({
+      campaign: row.campaign,
+      orders: row.orders.size,
+      units: row.units,
+      revenueUsd: row.revenueUsd,
+    }))
+    .sort((a, b) => b.revenueUsd - a.revenueUsd || b.orders - a.orders);
+
+  return {
+    rows,
+    totals: {
+      websiteOrders: allOrders.size,
+      attributedOrders: attributedOrders.size,
+      unattributedOrders: allOrders.size - attributedOrders.size,
+      websiteRevenue: totalRevenue,
+      attributedRevenue,
+      unattributedRevenue: totalRevenue - attributedRevenue,
+    },
+  };
+}
+
 /** Units count courses, so discount and fee lines are excluded from them. */
 const countsAsUnit = (l: SaleLine) => !l.isDiscount && l.variantKey !== "fee";
 

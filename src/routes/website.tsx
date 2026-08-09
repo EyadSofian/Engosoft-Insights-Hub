@@ -7,6 +7,10 @@ import {
   Clock3,
   GitMerge,
   Globe2,
+  Gauge,
+  MousePointerClick,
+  ShoppingCart,
+  Target,
 } from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
@@ -21,6 +25,8 @@ import {
 } from "@/components/ui-bits";
 import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
+import type { Platform } from "@/lib/types";
 
 export const Route = createFileRoute("/website")({ component: Website });
 
@@ -68,6 +74,25 @@ interface SalesOrderRow {
   priceDifference: number | null;
 }
 
+interface WebsiteCampaignRow {
+  key: string;
+  campaign: string;
+  platforms: Platform[];
+  spend: number;
+  spendDays: number;
+  averageDailySpend: number | null;
+  conversions: number | null;
+  costPerConversion: number | null;
+  websiteOrders: number;
+  websiteUnits: number;
+  websiteRevenue: number;
+  websiteRoas: number | null;
+  odooCampaign: string;
+  salesLinked: boolean;
+  spendFrom: string;
+  spendTo: string;
+}
+
 interface Resp {
   totals: {
     leads: number;
@@ -80,6 +105,19 @@ interface Resp {
     soldCourses: number;
     unsoldCourses: number;
     averageOrder: number | null;
+    websiteCampaignSpend: number;
+    websiteCampaignConversions: number;
+  };
+  websiteCampaigns: WebsiteCampaignRow[];
+  websiteCampaignAttribution: {
+    websiteOrders?: number;
+    attributedOrders?: number;
+    unattributedOrders?: number;
+    websiteRevenue?: number;
+    attributedRevenue?: number;
+    unattributedRevenue?: number;
+    sourceAvailable: boolean;
+    error: string;
   };
   specialties: SpecialtyRow[];
   waitingBuckets: { label: string; count: number }[];
@@ -130,7 +168,22 @@ function Website() {
       ? {
           subtitle: "تحليل ليدز الموقع ومبيعاته الموحّدة من Odoo وشيت المبيعات الإضافي",
           sourceNote:
-            "المصدر: ليدز الموقع من Odoo CRM. المبيعات تُدمج حسب Order ID بين Odoo وشيت Website Sales الخارجي؛ الأوردر المتطابق لا يُحسب مرتين، والجديد فقط يُضاف للإيراد. بيانات Meta وSnap غير مستخدمة هنا.",
+            "المصدر: ليدز ومبيعات الموقع من Odoo، وصرف وتحويلات حملات web-con من منصات الإعلانات. البيع يُنسب للحملة فقط لما حقل Campaign في Odoo يطابق اسم الحملة؛ من غير تطابق هنظهره كربط ناقص مش كصفر مبيعات.",
+          websiteCampaigns: "حملات تحويلات الموقع",
+          websiteCampaignsHint:
+            "حملات web-con مش حملات جمع ليدز. الحكم هنا على تحويلات الموقع وتكلفتها، والبيع المربوط بحقل Campaign في Odoo.",
+          campaignSpend: "صرف web-con",
+          campaignConversions: "تحويلات الموقع",
+          campaignFieldCoverage: "أوردرات عليها Campaign",
+          campaignDateBasis:
+            "صرف وتحويلات الحملة حسب الفترة المختارة، والأوردرات المربوطة حسب تاريخ تأكيد أمر البيع في Odoo.",
+          averageDailySpend: "متوسط الصرف / يوم",
+          costPerConversion: "تكلفة التحويل",
+          linkedOrders: "أوردرات مربوطة",
+          linkedRevenue: "إيراد مربوط",
+          exactCampaignMatch: "اسم Campaign متطابق في Odoo",
+          missingCampaignMatch:
+            "في تحويلات على المنصة، لكن مفيش أوردر موقع بنفس اسم Campaign في Odoo؛ راجع تعبئة الحقل قبل الحكم على البيع.",
           orders: "أوامر بيع",
           quickAnalysis: "ملخص تنفيذي",
           bestSelling: "الأكثر مبيعًا",
@@ -170,7 +223,22 @@ function Website() {
           subtitle:
             "Engosoft website leads and reconciled sales from Odoo and the external sales sheet",
           sourceNote:
-            "Source: Odoo CRM website leads. Sales are reconciled by Order ID across Odoo and the external Website Sales sheet; matched orders are never counted twice, and only external-only orders add revenue. Meta and Snap are not used here.",
+            "Source: Odoo website leads and sales, plus web-con spend and conversions from the ad platforms. Sales are assigned only when Odoo Campaign exactly matches the ad campaign; an unmatched name is shown as an attribution gap, not zero sales.",
+          websiteCampaigns: "Website conversion campaigns",
+          websiteCampaignsHint:
+            "web-con campaigns optimise for website conversions, not lead forms. They are judged on conversion volume/cost and sales linked through Odoo Campaign.",
+          campaignSpend: "web-con spend",
+          campaignConversions: "Website conversions",
+          campaignFieldCoverage: "Orders with Campaign",
+          campaignDateBasis:
+            "Campaign spend and conversions use the selected period; linked orders use the Odoo sales-order confirmation date.",
+          averageDailySpend: "Average spend / day",
+          costPerConversion: "Cost / conversion",
+          linkedOrders: "Linked orders",
+          linkedRevenue: "Linked revenue",
+          exactCampaignMatch: "Exact Odoo Campaign match",
+          missingCampaignMatch:
+            "The platform has conversions, but no website order carries the same Odoo Campaign name. Fix attribution before judging sales.",
           orders: "sales orders",
           quickAnalysis: "Executive summary",
           bestSelling: "Best-selling course",
@@ -212,9 +280,7 @@ function Website() {
     const normalized = (value || "").trim().toLowerCase();
     if (
       !normalized ||
-      ["other", "others", "unknown", "unspecified", "not specified", "-", "—"].includes(
-        normalized,
-      )
+      ["other", "others", "unknown", "unspecified", "not specified", "-", "—"].includes(normalized)
     ) {
       return lang === "ar"
         ? "غير محدد في أودو (حقل الكورس فارغ)"
@@ -435,6 +501,141 @@ function Website() {
             </div>
           </div>
 
+          <Card className="overflow-hidden border-brand/15">
+            <SectionTitle
+              hint={copy.websiteCampaignsHint}
+              action={
+                <Pill tone="brand">
+                  {fmtNum(data.websiteCampaigns.length)} {t("campaigns")}
+                </Pill>
+              }
+            >
+              <span className="inline-flex items-center gap-2">
+                <Target size={17} className="text-brand" />
+                {copy.websiteCampaigns}
+              </span>
+            </SectionTitle>
+
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-border bg-surface-2/50 p-3">
+                <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <Gauge size={14} className="text-brand" />
+                  {copy.campaignSpend}
+                </div>
+                <div className="num mt-1 text-lg font-semibold text-text">
+                  {fmtUSDFull(data.totals.websiteCampaignSpend)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2/50 p-3">
+                <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <MousePointerClick size={14} className="text-brand" />
+                  {copy.campaignConversions}
+                </div>
+                <div className="num mt-1 text-lg font-semibold text-text">
+                  {fmtNum(data.totals.websiteCampaignConversions)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2/50 p-3">
+                <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <ShoppingCart size={14} className="text-brand" />
+                  {copy.campaignFieldCoverage}
+                </div>
+                <div className="num mt-1 text-lg font-semibold text-text">
+                  {data.websiteCampaignAttribution.sourceAvailable
+                    ? `${fmtNum(data.websiteCampaignAttribution.attributedOrders ?? 0)} / ${fmtNum(data.websiteCampaignAttribution.websiteOrders ?? 0)}`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+            <p className="mb-4 rounded-lg bg-surface-2/60 px-3 py-2 text-[10.5px] leading-5 text-text-muted">
+              {copy.campaignDateBasis}
+            </p>
+
+            {data.websiteCampaigns.length ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {data.websiteCampaigns.map((campaign) => (
+                  <article
+                    key={campaign.key}
+                    className="rounded-2xl border border-border bg-surface p-3.5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3
+                          className="truncate text-[13px] font-semibold text-text"
+                          dir="auto"
+                          title={campaign.campaign}
+                        >
+                          {campaign.campaign}
+                        </h3>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {campaign.platforms.map((platform) => (
+                            <span
+                              key={platform}
+                              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                              style={{
+                                background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
+                                color: PLATFORM_COLOR[platform],
+                              }}
+                            >
+                              <span
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ background: PLATFORM_COLOR[platform] }}
+                              />
+                              {PLATFORM_LABEL[platform][lang]}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <Pill tone={campaign.salesLinked ? "success" : "warning"}>
+                        {campaign.salesLinked
+                          ? copy.exactCampaignMatch
+                          : lang === "ar"
+                            ? "البيع مش مربوط"
+                            : "Sales not linked"}
+                      </Pill>
+                    </div>
+
+                    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border/70 pt-3">
+                      <WebsiteCampaignFact label={t("spend")} value={fmtUSD(campaign.spend)} />
+                      <WebsiteCampaignFact
+                        label={copy.campaignConversions}
+                        value={campaign.conversions === null ? "—" : fmtNum(campaign.conversions)}
+                      />
+                      <WebsiteCampaignFact
+                        label={copy.averageDailySpend}
+                        value={fmtUSDFull(campaign.averageDailySpend)}
+                      />
+                      <WebsiteCampaignFact
+                        label={copy.costPerConversion}
+                        value={fmtUSDFull(campaign.costPerConversion)}
+                      />
+                      <WebsiteCampaignFact
+                        label={copy.linkedOrders}
+                        value={campaign.salesLinked ? fmtNum(campaign.websiteOrders) : "—"}
+                      />
+                      <WebsiteCampaignFact
+                        label={copy.linkedRevenue}
+                        value={campaign.salesLinked ? fmtUSD(campaign.websiteRevenue) : "—"}
+                      />
+                    </dl>
+
+                    <p
+                      className={`mt-3 text-[10.5px] leading-5 ${campaign.salesLinked ? "text-success" : "text-warning"}`}
+                    >
+                      {campaign.salesLinked
+                        ? `${copy.exactCampaignMatch} · ROAS ${campaign.websiteRoas === null ? "—" : `${campaign.websiteRoas.toFixed(2)}×`}`
+                        : copy.missingCampaignMatch}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-text-muted">
+                {copy.noData}
+              </p>
+            )}
+          </Card>
+
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             <KpiCard
               index={0}
@@ -568,9 +769,7 @@ function Website() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 text-[11px] text-text-subtle">
-                  {copy.reconciliationHint}
-                </div>
+                <div className="mt-2 text-[11px] text-text-subtle">{copy.reconciliationHint}</div>
               </div>
             </div>
           </Card>
@@ -736,6 +935,15 @@ function Website() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function WebsiteCampaignFact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+      <dd className="num mt-0.5 text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );
 }

@@ -58,6 +58,7 @@ export function PerfCards({
         const running =
           activeCampaignKeys?.has(r.campaignKey) === true ||
           activeCampaignKeys?.has(r.key) === true;
+        const websiteConversion = r.objective === "website_conversion";
         // At campaign grain the "parent" is the campaign itself, which would
         // print the title twice.
         const parent =
@@ -102,6 +103,11 @@ export function PerfCards({
                     </span>
                   )}
                   {grain === "adset" && <AdSetOriginBadge origin={r.adsetOrigin} />}
+                  {websiteConversion && (
+                    <span className="inline-flex items-center rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand whitespace-nowrap">
+                      {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
+                    </span>
+                  )}
                   {showLivePerformance && running && (
                     <span
                       className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
@@ -182,10 +188,33 @@ export function PerfCards({
                     )
                   }
                 />
-                <Fact metric="revenue" value={fmtUSD(r.revenue)} />
-                <Fact metric="crmLeads" value={fmtNum(r.crmLeads)} />
-                {ownerMode ? (
+                {ownerMode && websiteConversion ? (
                   <>
+                    <SimpleFact
+                      label={lang === "ar" ? "تحويلات الموقع" : "Website conversions"}
+                      value={r.platformLeads === null ? <Dash /> : fmtNum(r.platformLeads)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "تكلفة التحويل" : "Cost / conversion"}
+                      value={ratioCell(r.cpl, r.spend, fmtUSDFull, spendNote)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "إيراد مربوط" : "Linked revenue"}
+                      value={fmtUSD(r.revenue)}
+                    />
+                    <SimpleFact
+                      label={lang === "ar" ? "أوامر بيع مربوطة" : "Linked sales orders"}
+                      value={fmtNum(r.salesOrders)}
+                    />
+                    <SimpleFact
+                      label="ROAS"
+                      value={r.roas === null ? <Dash /> : `${r.roas.toFixed(2)}×`}
+                    />
+                  </>
+                ) : ownerMode ? (
+                  <>
+                    <Fact metric="revenue" value={fmtUSD(r.revenue)} />
+                    <Fact metric="crmLeads" value={fmtNum(r.crmLeads)} />
                     <SimpleFact
                       label={lang === "ar" ? "نسبة الإغلاق" : "Conversion"}
                       value={fmtPct(r.conversionRate, 1)}
@@ -209,9 +238,27 @@ export function PerfCards({
                   </>
                 ) : (
                   <>
+                    <Fact metric="revenue" value={fmtUSD(r.revenue)} />
+                    <Fact metric="crmLeads" value={fmtNum(r.crmLeads)} />
                     <Fact
                       metric="platformLeads"
-                      value={r.platformLeads === null ? <Dash /> : fmtNum(r.platformLeads)}
+                      value={
+                        r.platformLeads === null ? (
+                          <Dash />
+                        ) : (
+                          <span
+                            title={
+                              websiteConversion
+                                ? lang === "ar"
+                                  ? "تحويلات الموقع"
+                                  : "Website conversions"
+                                : undefined
+                            }
+                          >
+                            {fmtNum(r.platformLeads)}
+                          </span>
+                        )
+                      }
                     />
                     <Fact
                       metric="won"

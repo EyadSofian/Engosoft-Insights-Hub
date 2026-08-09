@@ -980,6 +980,8 @@ function MobileMetric({ label, value }: { label: string; value: string }) {
 
 function objectiveLabel(objective: CampaignObjective, lang: "ar" | "en") {
   if (objective === "leads") return lang === "ar" ? "جمع ليدز" : "Lead generation";
+  if (objective === "website_conversion")
+    return lang === "ar" ? "تحويلات الموقع" : "Website conversions";
   if (objective === "traffic") return lang === "ar" ? "زيارات وترافيك" : "Traffic";
   return lang === "ar" ? "الهدف غير متاح" : "Objective unavailable";
 }

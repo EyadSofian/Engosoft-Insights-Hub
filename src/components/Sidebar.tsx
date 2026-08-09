@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Sparkles } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
   NAVIGATION_SECTIONS,
@@ -150,6 +150,17 @@ export function MobileNav() {
           </Link>
         );
       })}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("engosoft:open-chat"))}
+        aria-label={lang === "ar" ? "فتح المساعد الذكي" : "Open AI assistant"}
+        className="flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-white/60 transition-colors active:scale-[0.97]"
+      >
+        <Sparkles size={19} aria-hidden="true" />
+        <span className="max-w-full truncate text-[10px] font-medium leading-none">
+          {lang === "ar" ? "اسأل" : "Ask"}
+        </span>
+      </button>
     </nav>
   );
 }

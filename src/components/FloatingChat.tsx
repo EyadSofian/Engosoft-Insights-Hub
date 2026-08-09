@@ -38,6 +38,12 @@ export function FloatingChat() {
     window.localStorage.setItem(STORAGE, JSON.stringify(messages.slice(-40)));
   }, [messages]);
 
+  useEffect(() => {
+    const openFromMobileNav = () => setOpen(true);
+    window.addEventListener("engosoft:open-chat", openFromMobileNav);
+    return () => window.removeEventListener("engosoft:open-chat", openFromMobileNav);
+  }, []);
+
   // Always land on the newest message.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -109,7 +115,7 @@ export function FloatingChat() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("ai_assistant")}
         aria-expanded={open}
-        className={`fixed z-40 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] end-3 lg:bottom-5 lg:end-5 w-11 h-11 lg:w-12 lg:h-12 rounded-full grid place-items-center text-white cursor-pointer transition-all duration-300 ${
+        className={`fixed z-40 bottom-5 end-5 hidden h-12 w-12 place-items-center rounded-full text-white cursor-pointer transition-all duration-300 lg:grid ${
           open || anyModalOpen ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
         }`}
         style={{

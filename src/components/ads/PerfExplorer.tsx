@@ -1112,6 +1112,11 @@ function RowDrawer({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <PlatformBadges platforms={row.platforms} />
+              {row.objective === "website_conversion" && (
+                <span className="rounded-full bg-brand-soft px-2 py-1 text-[10px] font-semibold text-brand">
+                  {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
+                </span>
+              )}
               {row.adsetOrigin && <AdSetOriginBadge origin={row.adsetOrigin} />}
               {ownerVerdict ? (
                 ownerVerdict.status === "early" ? (
@@ -1179,10 +1184,14 @@ function RowDrawer({
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-text-subtle">
                 <span>
                   {lang === "ar"
-                    ? `الحكم مبني على ${fmtNum(row.crmLeads)} ليد`
-                    : `Based on ${fmtNum(row.crmLeads)} leads`}
+                    ? row.objective === "website_conversion"
+                      ? `الحكم مبني على ${fmtNum(row.platformLeads ?? 0)} تحويل موقع، مش ليدز CRM`
+                      : `الحكم مبني على ${fmtNum(row.crmLeads)} ليد`
+                    : row.objective === "website_conversion"
+                      ? `Based on ${fmtNum(row.platformLeads ?? 0)} website conversions, not CRM leads`
+                      : `Based on ${fmtNum(row.crmLeads)} leads`}
                 </span>
-                {ownerVerdict.benchmark.days !== null && (
+                {row.objective !== "website_conversion" && ownerVerdict.benchmark.days !== null && (
                   <span>
                     {lang === "ar"
                       ? `مرجع دورة البيع ${ownerVerdict.benchmark.days.toFixed(1)} يوم`

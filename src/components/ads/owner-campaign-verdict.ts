@@ -84,6 +84,12 @@ function confidence(leads: number): OwnerCampaignVerdict["confidence"] {
   return "low";
 }
 
+function websiteConfidence(conversions: number): OwnerCampaignVerdict["confidence"] {
+  if (conversions >= 10) return "high";
+  if (conversions >= 3) return "medium";
+  return "low";
+}
+
 /**
  * An explainable owner verdict. No opaque score: every result is a short list
  * of passed, watch and failed business rules.
@@ -97,7 +103,11 @@ export function ownerCampaignVerdict(
 ): OwnerCampaignVerdict {
   const benchmark = cycleBenchmarkFor(row, allRows);
   const ageDays = ageInDays(startTime, row.spendDateMin, now);
-  const level = confidence(row.crmLeads);
+  const isWebsiteConversion = row.objective === "website_conversion";
+  const websiteConversions = row.platformLeads ?? 0;
+  const level = isWebsiteConversion
+    ? websiteConfidence(websiteConversions)
+    : confidence(row.crmLeads);
 
   const result = (
     status: OwnerCampaignStatus,
@@ -122,6 +132,73 @@ export function ownerCampaignVerdict(
       {
         ar: "بيانات الإنفاق مش مغطية نفس فترة الإيراد؛ الحكم المالي محتاج مراجعة.",
         en: "Spend and revenue cover different windows, so the financial verdict needs review.",
+      },
+      0,
+      1,
+    );
+  }
+
+  // Website-conversion campaigns do not promise CRM leads. Their platform
+  // metric is a purchase/conversion event, so applying Lost and CRM close-rate
+  // rules would manufacture an attribution problem and call it bad performance.
+  if (isWebsiteConversion) {
+    if (websiteConversions <= 0) {
+      if (row.spend <= 0 || ageDays === null || ageDays < 7) {
+        return result("early", {
+          ar: "دي حملة تحويلات موقع ولسه مفيش عينة كفاية للحكم.",
+          en: "This is a website-conversion campaign without enough data to judge yet.",
+        });
+      }
+      return result(
+        "weak",
+        {
+          ar: `صرفت $${row.spend.toFixed(0)} ومفيش تحويل موقع مسجّل في الفترة.`,
+          en: `It spent $${row.spend.toFixed(0)} with no website conversion recorded in the period.`,
+        },
+        1,
+      );
+    }
+
+    if (row.revenue > 0 || row.salesOrders > 0 || row.invoices > 0) {
+      if (row.roas !== null && row.roas >= GOOD_ROAS) {
+        return result(
+          "successful",
+          {
+            ar: `${websiteConversions} تحويل موقع، والعائد المربوط ${row.roas.toFixed(2)}×.`,
+            en: `${websiteConversions} website conversions with ${row.roas.toFixed(2)}× linked ROAS.`,
+          },
+          0,
+          0,
+          2,
+        );
+      }
+      if (row.roas !== null && row.roas < 1) {
+        return result(
+          "weak",
+          {
+            ar: `${websiteConversions} تحويل موقع، لكن الإيراد المربوط لسه أقل من المصروف.`,
+            en: `${websiteConversions} website conversions, but linked revenue is still below spend.`,
+          },
+          1,
+        );
+      }
+      return result(
+        "watch",
+        {
+          ar: `${websiteConversions} تحويل موقع؛ البيع مربوط، لكن العائد لسه تحت هدف ${GOOD_ROAS}×.`,
+          en: `${websiteConversions} website conversions are linked to sales, but ROAS is below ${GOOD_ROAS}×.`,
+        },
+        0,
+        1,
+        1,
+      );
+    }
+
+    return result(
+      "watch",
+      {
+        ar: `المنصة سجلت ${websiteConversions} تحويل موقع، لكن أوردر الموقع مش مربوط بنفس Campaign في Odoo؛ دي فجوة ربط مش حكم فشل.`,
+        en: `The platform reports ${websiteConversions} website conversions, but no website order carries the same Odoo Campaign; this is an attribution gap, not a failure verdict.`,
       },
       0,
       1,

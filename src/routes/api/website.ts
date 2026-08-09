@@ -4,15 +4,16 @@ export const Route = createFileRoute("/api/website")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, authoritativeLostLeads } = await import("@/lib/metrics.server");
+        const { getFiltered, authoritativeLostLeads, computePerf } =
+          await import("@/lib/metrics.server");
         const { normalizeName } = await import("@/lib/sheet-cache.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
 
         // Website leads come from Odoo CRM Source=Website. Website revenue is
         // reconciled by Order ID across Odoo and the approved external Website
-        // Sales sheet. Matching orders keep Odoo line revenue; only external-only
-        // orders add revenue. Meta/Snap never participate in this endpoint.
+        // Sales sheet. Ad platforms participate only for campaigns explicitly
+        // classified as website conversions (Engosoft's `web-con` convention).
         const websiteFilters = {
           from: filters.from,
           to: filters.to,
@@ -23,6 +24,68 @@ export const Route = createFileRoute("/api/website")({
           salesperson: filters.salesperson,
         };
         const data = await getFiltered(websiteFilters);
+
+        // `web-con` campaigns optimise for website conversions, not CRM lead
+        // forms. Their ad spend therefore belongs on this page and must never be
+        // judged by CRM-lead or Lost thresholds.
+        const campaignPerf = computePerf(data, "campaign").filter(
+          (row) => row.objective === "website_conversion",
+        );
+        const spendDaysByCampaign = new Map<string, Set<string>>();
+        for (const ad of data.ads) {
+          if (ad.objective !== "website_conversion" || ad.spend <= 0 || !ad.date) continue;
+          const dates = spendDaysByCampaign.get(ad.campaignKey) ?? new Set<string>();
+          dates.add(ad.date);
+          spendDaysByCampaign.set(ad.campaignKey, dates);
+        }
+
+        let directWebsiteCampaignSales: Awaited<
+          ReturnType<(typeof import("@/lib/products.server"))["websiteCampaignSales"]>
+        > | null = null;
+        let campaignSalesError = "";
+        try {
+          const { getProductSnapshot, websiteCampaignSales } =
+            await import("@/lib/products.server");
+          directWebsiteCampaignSales = websiteCampaignSales(await getProductSnapshot(), {
+            from: filters.from,
+            to: filters.to,
+            basis: "all",
+          });
+        } catch (error) {
+          campaignSalesError = error instanceof Error ? error.message : String(error);
+        }
+
+        const directSalesByName = new Map(
+          (directWebsiteCampaignSales?.rows ?? []).map((row) => [normalizeName(row.campaign), row]),
+        );
+        const websiteCampaigns = campaignPerf
+          .map((row) => {
+            const conversions = row.platformLeads;
+            const spendDays = spendDaysByCampaign.get(row.campaignKey)?.size ?? 0;
+            const directSales = directSalesByName.get(normalizeName(row.name));
+            const websiteRevenue = directSales?.revenueUsd ?? 0;
+            const websiteOrders = directSales?.orders ?? 0;
+            return {
+              key: row.key,
+              campaign: row.name,
+              platforms: row.platforms,
+              spend: row.spend,
+              spendDays,
+              averageDailySpend: spendDays ? row.spend / spendDays : null,
+              conversions,
+              costPerConversion:
+                conversions !== null && conversions > 0 ? row.spend / conversions : null,
+              websiteOrders,
+              websiteUnits: directSales?.units ?? 0,
+              websiteRevenue,
+              websiteRoas: row.spend > 0 && websiteRevenue > 0 ? websiteRevenue / row.spend : null,
+              odooCampaign: directSales?.campaign ?? "",
+              salesLinked: Boolean(directSales),
+              spendFrom: row.spendDateMin,
+              spendTo: row.spendDateMax,
+            };
+          })
+          .sort((a, b) => b.spend - a.spend);
 
         const uniqueById = <T extends { id: string }>(rows: T[]): T[] => {
           const seen = new Set<string>();
@@ -298,6 +361,17 @@ export const Route = createFileRoute("/api/website")({
             soldCourses: soldCourses.length,
             unsoldCourses: unsoldCourses.length,
             averageOrder: orderCount ? salesTotal / orderCount : null,
+            websiteCampaignSpend: websiteCampaigns.reduce((sum, row) => sum + row.spend, 0),
+            websiteCampaignConversions: websiteCampaigns.reduce(
+              (sum, row) => sum + (row.conversions ?? 0),
+              0,
+            ),
+          },
+          websiteCampaigns,
+          websiteCampaignAttribution: {
+            ...directWebsiteCampaignSales?.totals,
+            sourceAvailable: directWebsiteCampaignSales !== null,
+            error: campaignSalesError,
           },
           specialties: specialtyRows,
           waitingBuckets: buckets.map(({ label, count }) => ({ label, count })),
