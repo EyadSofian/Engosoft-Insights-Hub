@@ -16,10 +16,23 @@ export const Route = createFileRoute("/api/lost")({
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const closedData = await getFiltered({ ...filters, lostDateBasis: "closed" });
         const labels = data.snapshot.sourceLabels;
 
         const lostRows = authoritativeLostLeads(data);
         const archivedRows = archivedCrmLeads(data);
+        const closedLostRows = authoritativeLostLeads(closedData);
+        const createdInsideWindow = (createdAt: string) => {
+          if (!createdAt) return false;
+          if (filters.from && createdAt < filters.from) return false;
+          if (filters.to && createdAt > filters.to) return false;
+          return true;
+        };
+        const hasCampaign = (row: (typeof closedLostRows)[number]) =>
+          Boolean(row.campaignId || row.campaignName.trim());
+        const closedCreatedInPeriod = closedLostRows.filter((row) =>
+          createdInsideWindow(row.createdAt),
+        );
 
         // Each team's denominator is its clean CRM population plus that team's
         // archived losses. The numerator is never inferred from CRM stage text.
@@ -48,6 +61,13 @@ export const Route = createFileRoute("/api/lost")({
           breakdown: computeLost(data),
           teamLostRates,
           totals: computeTotals(data),
+          closureMovement: {
+            closedLost: closedLostRows.length,
+            fromCampaign: closedLostRows.filter(hasCampaign).length,
+            createdInPeriod: closedCreatedInPeriod.length,
+            campaignCreatedInPeriod: closedCreatedInPeriod.filter(hasCampaign).length,
+            fromOlderCohorts: closedLostRows.length - closedCreatedInPeriod.length,
+          },
           detail: capped(
             lostRows.map((l) => ({
               createdAt: l.createdAt,

@@ -615,18 +615,31 @@ function classifyAccount(name: string): CampaignObjective {
   return "leads";
 }
 
+const campaignNameTokens = (name: string): string[] =>
+  normalizeName(name)
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean);
+
+/** Engosoft routes any campaign explicitly tagged `web` or `con` to Website. */
+export function isWebsiteCampaignName(name: string): boolean {
+  const tokens = campaignNameTokens(name);
+  return tokens.includes("web") || tokens.includes("con");
+}
+
 /**
- * `web-con` is Engosoft's naming convention for a website-conversion campaign.
- * Those rows report purchases/conversions, not lead-form submissions. Keeping
- * the override at campaign level matters because the same ad account can run
- * both lead-generation and website-conversion campaigns.
+ * `con`/`web-con` identifies conversion campaigns. A `web`-only name still
+ * appears on the Website page, but keeps its original lead/traffic objective so
+ * the dashboard does not relabel a lead campaign as a purchase campaign.
  */
+export function isWebsiteConversionCampaignName(name: string): boolean {
+  const tokens = campaignNameTokens(name);
+  return (
+    tokens.includes("con") || /(^|\s)website\s*conversion(?:s)?(\s|$)/i.test(normalizeName(name))
+  );
+}
+
 function classifyCampaign(name: string, account: string): CampaignObjective {
-  const normalized = normalizeName(name);
-  if (
-    /(^|[\s_-])web[\s_-]*con(?:v(?:ersion)?)?(?=$|[\s_-])/i.test(normalized) ||
-    /(^|\s)website\s*conversion(?:s)?(\s|$)/i.test(normalized)
-  ) {
+  if (isWebsiteConversionCampaignName(name)) {
     return "website_conversion";
   }
   return classifyAccount(account);
@@ -1069,8 +1082,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
 
     let crmRaw: Raw[] = crmSheetRaw;
-    // Archived Lost is fail-closed. The legacy sheet lacks Odoo date_closed,
-    // so using it would silently put old leads in the wrong month.
+    // Archived Lost is fail-closed. Direct Odoo is required so both creation
+    // cohorts and the separate Close Date movement remain auditable.
     let lostRaw: Raw[] = [];
     const directCrm = await directCrmPromise;
     let crmAuthority: DataHealth["crmAuthority"] = crmSheetRaw.length
@@ -1083,8 +1096,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       !!directCrm.value &&
       directCrm.value.crm.length > 0 &&
       (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75);
-    // Odoo and the legacy sheet use different date populations (Close Date vs
-    // creation date), so comparing their row counts is not a valid completeness
+    // Comparing the legacy sheet and Odoo row counts is not a valid completeness
     // test. A successful non-empty Odoo read is the direct archive authority.
     const directLostComplete = !!directCrm.value && directCrm.value.lost.length > 0;
 
@@ -2094,7 +2106,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const health: DataHealth = {
       crmAuthority,
       lostAuthority,
-      lostDateBasis: lostAuthority === "odoo-direct" ? "close_date" : "unavailable",
+      lostDateBasis: lostAuthority === "odoo-direct" ? "creation_date" : "unavailable",
       accountingAuthority,
       accountingDirect: accountingDirectHealth,
       crmExclusions,

@@ -127,8 +127,8 @@ export const Route = createFileRoute("/api/chat")({
           ) {
             const sourceByPage: Record<string, { ar: string; en: string }> = {
               "/lost": {
-                ar: "أرقام Lost من **أرشيف Odoo المباشر فقط**، والفترة ماشية على `Close Date`. مفيش Google Sheet fallback داخل الرقم.",
-                en: "Lost comes only from the **direct Odoo archive**, filtered by `Close Date`; no Google Sheet fallback enters the number.",
+                ar: "تحليل Lost التسويقي من **أرشيف Odoo المباشر فقط** ويمشي بتاريخ إنشاء الليد. حركة الليدز اللي اتقفلت Lost خلال الفترة ظاهرة لوحدها بتاريخ `Close Date` عشان ما نخلطش جودة الحملة بالحركة التشغيلية.",
+                en: "Marketing Lost analysis comes only from the **direct Odoo archive** and follows lead creation date. Leads closed Lost in the period are shown separately by `Close Date` so acquisition quality is not mixed with operational movement.",
               },
               "/courses": {
                 ar: "صرف الدورة من منصات الإعلان بعد ربط اسم الإعلان ثم Ad set ثم الحملة؛ الليدز وWon/Lost من Odoo، والإيراد والفواتير من Accounting حسب `Payment Date`.",

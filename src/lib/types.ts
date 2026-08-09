@@ -50,6 +50,8 @@ export interface GlobalFilters {
   /** Local-currency units per 1 USD. Accounting-only business settings. */
   fxEgp?: string;
   fxSar?: string;
+  /** Internal Lost view: marketing cohort by creation date, or operational closures. */
+  lostDateBasis?: "creation" | "closed";
 }
 
 export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
@@ -270,7 +272,7 @@ export interface LostRow {
   sourceKey: string;
   stage: string;
   createdAt: string;
-  /** Odoo `date_closed`; this is the reporting/filter date for archived Lost. */
+  /** Odoo `date_closed`; used for the separate operational closure movement report. */
   closeDate: string;
 }
 
@@ -610,8 +612,8 @@ export interface DataHealth {
   crmAuthority: "google-sheet" | "odoo-direct" | "google-sheet-fallback";
   /** Archived Lost is fail-closed: only the direct Odoo archive is reportable. */
   lostAuthority: "odoo-direct" | "unavailable";
-  /** Lost is always filtered by Odoo `date_closed`; no creation-date fallback is allowed. */
-  lostDateBasis: "close_date" | "unavailable";
+  /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
+  lostDateBasis: "creation_date" | "unavailable";
   /** Paid invoice-line source selected only after the strict reconciliation gate. */
   accountingAuthority: "odoo-direct" | "google-sheet-fallback";
   /**

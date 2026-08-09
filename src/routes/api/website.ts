@@ -6,14 +6,14 @@ export const Route = createFileRoute("/api/website")({
       GET: async ({ request }) => {
         const { getFiltered, authoritativeLostLeads, computePerf } =
           await import("@/lib/metrics.server");
-        const { normalizeName } = await import("@/lib/sheet-cache.server");
+        const { normalizeName, isWebsiteCampaignName } = await import("@/lib/sheet-cache.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const filters = await parseFilters(request);
 
         // Website leads come from Odoo CRM Source=Website. Website revenue is
         // reconciled by Order ID across Odoo and the approved external Website
-        // Sales sheet. Ad platforms participate only for campaigns explicitly
-        // classified as website conversions (Engosoft's `web-con` convention).
+        // Sales sheet. Ad campaigns tagged `web` or `con` by Engosoft's naming
+        // convention are collected on this page.
         const websiteFilters = {
           from: filters.from,
           to: filters.to,
@@ -25,15 +25,16 @@ export const Route = createFileRoute("/api/website")({
         };
         const data = await getFiltered(websiteFilters);
 
-        // `web-con` campaigns optimise for website conversions, not CRM lead
-        // forms. Their ad spend therefore belongs on this page and must never be
-        // judged by CRM-lead or Lost thresholds.
+        // `con` campaigns are website conversions. `web`-only campaigns are
+        // included too, but preserve their original objective to avoid calling
+        // a lead-form result a purchase conversion.
         const campaignPerf = computePerf(data, "campaign").filter(
-          (row) => row.objective === "website_conversion",
+          (row) => row.objective === "website_conversion" || isWebsiteCampaignName(row.name),
         );
+        const websiteCampaignKeys = new Set(campaignPerf.map((row) => row.campaignKey));
         const spendDaysByCampaign = new Map<string, Set<string>>();
         for (const ad of data.ads) {
-          if (ad.objective !== "website_conversion" || ad.spend <= 0 || !ad.date) continue;
+          if (!websiteCampaignKeys.has(ad.campaignKey) || ad.spend <= 0 || !ad.date) continue;
           const dates = spendDaysByCampaign.get(ad.campaignKey) ?? new Set<string>();
           dates.add(ad.date);
           spendDaysByCampaign.set(ad.campaignKey, dates);
@@ -68,6 +69,7 @@ export const Route = createFileRoute("/api/website")({
             return {
               key: row.key,
               campaign: row.name,
+              objective: row.objective,
               platforms: row.platforms,
               spend: row.spend,
               spendDays,

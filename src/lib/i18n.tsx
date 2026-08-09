@@ -185,8 +185,8 @@ export const DICT = {
     en: "Website-only leads and paid sales, with contact status and specialty",
   },
   website_filter_note: {
-    ar: "اختيار «من / إلى» بالأعلى يفلتر الليدز بتاريخ الإنشاء، ومبيعات الموقع بتاريخ الدفع عند توفره وإلا تاريخ المصدر أو الأوردر. بيانات ميتا وسناب لا تدخل في هذه الصفحة.",
-    en: "The From / To selector filters leads by creation date and website sales by payment date when available, otherwise source or order date. Meta and Snapchat data are excluded from this page.",
+    ar: "اختيار «من / إلى» يفلتر الليدز بتاريخ الإنشاء، والمبيعات بتاريخ الدفع عند توفره وإلا تاريخ المصدر أو الأوردر، وحملات web أو con بتاريخ صرف الإعلان.",
+    en: "The From / To selector filters leads by creation date, website sales by payment date when available (otherwise source/order date), and web or con campaigns by ad-spend date.",
   },
   website_leads: { ar: "إجمالي ليدز الموقع", en: "Website leads" },
   open_leads: { ar: "ليدز مفتوحة", en: "Open leads" },

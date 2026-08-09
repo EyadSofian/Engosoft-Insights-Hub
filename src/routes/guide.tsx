@@ -157,8 +157,8 @@ function GuidePage() {
           }
           description={
             ar
-              ? "العملاء المحتملون يعرض CRM الحالي. الـLost منفصل ومقروء مباشرة من أرشيف Odoo، وفلتر الفترة فيه يمشي بتاريخ الإغلاق مش تاريخ إنشاء الليد. Won المؤرشف لا يتحسب Lost."
-              : "Leads shows current CRM. Lost is separate and read directly from Odoo's archive; its period filter follows Close Date, not creation date. Archived Won is never counted as Lost."
+              ? "العملاء المحتملون يعرض CRM الحالي. تحليل الـLost التسويقي يمشي بتاريخ إنشاء الليد عشان يقيس جودة ليدز نفس الفترة، وتحت منه حركة مستقلة للي اتقفل Lost بتاريخ الإغلاق. Won المؤرشف لا يتحسب Lost."
+              : "Leads shows current CRM. Marketing Lost follows lead creation date to measure the same acquisition cohort; a separate movement card shows what closed Lost by close date. Archived Won is never counted as Lost."
           }
           to="/lost"
         >

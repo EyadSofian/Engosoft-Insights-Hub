@@ -407,9 +407,10 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const lostDomain: Domain = [
     ["active", "=", false],
     ["probability", "=", 0],
-    // Lost reporting is based on when the opportunity was actually closed,
-    // not when the lead was first created. This also keeps an old lead that was
-    // closed during the selected reporting period in the correct month.
+    // Pull both marketing cohorts (create_date) and operational closures
+    // (date_closed). The dashboard keeps the two questions separate.
+    "|",
+    ["create_date", ">=", floor],
     ["date_closed", ">=", floor],
   ];
 
@@ -449,7 +450,9 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   crmDiagnostics.accepted = crm.length;
 
   const lostDiagnostics = emptyDiagnostics();
-  const lostInPeriod = lostCandidates.filter((lead) => date(lead.date_closed) >= cfg.startDate);
+  const lostInPeriod = lostCandidates.filter(
+    (lead) => date(lead.create_date) >= cfg.startDate || date(lead.date_closed) >= cfg.startDate,
+  );
   lostDiagnostics.candidates = lostInPeriod.length;
   const lost = lostInPeriod
     .filter((lead) => {

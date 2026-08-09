@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Info } from "lucide-react";
+import { CalendarClock, Info } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
@@ -38,6 +38,13 @@ interface Resp {
   breakdown: LostBreakdown;
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
+  closureMovement: {
+    closedLost: number;
+    fromCampaign: number;
+    createdInPeriod: number;
+    campaignCreatedInPeriod: number;
+    fromOlderCohorts: number;
+  };
   detail: { rows: LostRowView[]; total: number; truncated: boolean };
   health: DataHealth;
 }
@@ -52,18 +59,18 @@ function Lost() {
   const cols: Col<LostRowView>[] = [
     {
       key: "reportingDate",
-      header: lang === "ar" ? "تاريخ التقرير" : "Reporting date",
+      header: lang === "ar" ? "تاريخ إنشاء الليد" : "Lead creation date",
       sticky: true,
       width: "120px",
       sortValue: (r) => r.reportingDate,
       render: (r) => fmtDate(r.reportingDate, lang),
     },
     {
-      key: "createdAt",
-      header: t("created"),
+      key: "closeDate",
+      header: lang === "ar" ? "اتقفل Lost إمتى" : "Lost close date",
       width: "120px",
-      sortValue: (r) => r.createdAt,
-      render: (r) => fmtDate(r.createdAt, lang),
+      sortValue: (r) => r.closeDate,
+      render: (r) => fmtDate(r.closeDate, lang),
     },
     {
       key: "reason",
@@ -125,8 +132,8 @@ function Lost() {
         title={t("lost")}
         subtitle={
           lang === "ar"
-            ? "كل تقسيم يعرض النسبة إلى جانب العدد"
-            : "Every breakdown shows share alongside count"
+            ? "تحليل جودة التسويق حسب تاريخ دخول الليد، وحركة الإغلاق ظاهرة لوحدها"
+            : "Marketing quality by lead creation date, with closures reported separately"
         }
       />
 
@@ -151,7 +158,9 @@ function Lost() {
               label={t("total_lost")}
               value={fmtNum(data.breakdown.total)}
               sub={
-                lang === "ar" ? "أرشيف Odoo مباشر • Close Date" : "Direct Odoo archive • Close Date"
+                lang === "ar"
+                  ? "ليدز الفترة دي حسب تاريخ الإنشاء"
+                  : "This period's lead cohort by creation date"
               }
             />
             <KpiCard
@@ -171,6 +180,55 @@ function Lost() {
               value={fmtNum(data.breakdown.byReason.length)}
             />
           </div>
+
+          <Card className="border-brand/20 bg-brand-soft/35">
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "ده تقرير حركة تشغيلية بتاريخ الإغلاق؛ منفصل عن تحليل جودة حملات الفترة اللي فوق."
+                  : "This operational movement uses close date and stays separate from the acquisition cohort above."
+              }
+            >
+              <span className="inline-flex items-center gap-2">
+                <CalendarClock size={17} className="text-brand" />
+                {lang === "ar"
+                  ? "إيه اللي اتقفل Lost خلال الفترة؟"
+                  : "What closed Lost in the period?"}
+              </span>
+            </SectionTitle>
+            <p className="mb-4 text-sm leading-7 text-text-muted">
+              {lang === "ar"
+                ? `خلال الفترة اتقفل ${fmtNum(data.closureMovement.closedLost)} ليد Lost. منهم ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} جايين من Campaign واتعملوا أصلًا في نفس الفترة، و${fmtNum(data.closureMovement.fromOlderCohorts)} كانوا ليدز أقدم واتقفلوا دلوقتي.`
+                : `${fmtNum(data.closureMovement.closedLost)} leads closed Lost in the period. ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} were campaign leads created in the same period, while ${fmtNum(data.closureMovement.fromOlderCohorts)} came from older cohorts.`}
+            </p>
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              {[
+                [lang === "ar" ? "اتقفل Lost" : "Closed Lost", data.closureMovement.closedLost],
+                [
+                  lang === "ar" ? "عليه Campaign" : "With campaign",
+                  data.closureMovement.fromCampaign,
+                ],
+                [
+                  lang === "ar" ? "اتعمل في نفس الفترة" : "Created in period",
+                  data.closureMovement.createdInPeriod,
+                ],
+                [
+                  lang === "ar" ? "Campaign من نفس الفترة" : "Period campaign cohort",
+                  data.closureMovement.campaignCreatedInPeriod,
+                ],
+              ].map(([label, value]) => (
+                <div
+                  key={String(label)}
+                  className="rounded-xl border border-border bg-surface/85 p-3"
+                >
+                  <div className="text-[11px] text-text-muted">{label}</div>
+                  <div className="num mt-1 text-xl font-semibold text-text">
+                    {fmtNum(Number(value))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Share title={t("loss_reason")} rows={data.breakdown.byReason} />

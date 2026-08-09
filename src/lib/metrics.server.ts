@@ -476,10 +476,12 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     });
 
   const lost = all.lost.filter((r) => {
-    // Archived Lost belongs to the period in which Odoo closed it. Creation
-    // date answers a different question and made old leads disappear from the
-    // month in which they were actually lost.
-    if (!inRange(archivedLostReportingDate(r, all), from, to)) return false;
+    // Marketing analysis follows the lead cohort (creation date). The Lost page
+    // can request the operational closure movement separately without mixing
+    // old leads closed this month into this month's acquisition quality.
+    const reportingDate =
+      f.lostDateBasis === "closed" ? r.closeDate : archivedLostReportingDate(r, all);
+    if (!inRange(reportingDate, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
     if (!matchesStableFact(r)) return false;
@@ -566,15 +568,15 @@ export function archivedCrmLeads(data: FilteredData): LostRow[] {
 /**
  * Reporting date for the archived population.
  *
- * Direct Odoo is the only authority and uses `date_closed`. Missing Close Date
- * means the row cannot enter a date-filtered Lost report; creation date answers
- * a different business question and is never substituted.
+ * Marketing Lost reporting follows the lead's Odoo creation date so the loss is
+ * attributed to the acquisition cohort that produced it. Close Date remains
+ * available for the separate operational movement report.
  */
 export function archivedLostReportingDate(
   row: LostRow,
   _source: { health: import("./types").DataHealth },
 ): string {
-  return row.closeDate;
+  return row.createdAt;
 }
 
 const isArchivedWon = (row: LostRow): boolean => row.stage.trim().toLowerCase() === "won";
