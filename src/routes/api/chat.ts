@@ -37,6 +37,7 @@ export const Route = createFileRoute("/api/chat")({
           computePerf,
           computeCourses,
           computeTotals,
+          computeRecentCampaignActivity,
           bestCampaign,
           moneyLeak,
           bestCPL,
@@ -65,21 +66,16 @@ export const Route = createFileRoute("/api/chat")({
         const leak = moneyLeak(campaigns);
         const cheap = bestCPL(campaigns);
         const health = data.snapshot.health;
+        const campaignActivity = await computeRecentCampaignActivity(filters, data);
 
         const isArabic = /[؀-ۿ]/.test(question);
         const ar = body.lang === "ar" || isArabic;
         const qNormalized = normalized(question);
         const page = body.page || "/";
 
-        const selectedActiveStates = data.snapshot.campaignStates.filter((state) => {
-          if (state.deliveryState !== "active") return false;
-          if (filters.platform && state.platform !== filters.platform) return false;
-          if (filters.account && state.account !== filters.account) return false;
-          return true;
-        });
         const activeStates = [
           ...new Map(
-            selectedActiveStates.map((state) => [
+            Object.values(campaignActivity.delivery).map((state) => [
               `${state.platform}:${state.campaignId || state.campaignKey}`,
               state,
             ]),
