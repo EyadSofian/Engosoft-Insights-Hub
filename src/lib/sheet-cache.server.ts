@@ -2391,9 +2391,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       emptied(next.invoiced, "invoiced") ||
       emptied(next.accounting, "accounting") ||
       emptied(next.ads, "ads");
-    if ((empty || next.fetchErrors.length > 0) && previous) {
-      // Back off before retrying, but leave `fetchedAt` alone — bumping it here
-      // is what made a failed reload report the old snapshot as freshly loaded.
+    if (empty && previous) {
+      // Dataset-level fallbacks above already preserve every healthy source.
+      // A named non-critical error (for example Archived Lost being temporarily
+      // unavailable) must not freeze Meta, Accounting and every other source at
+      // the previous snapshot. Only reject the reload when a previously
+      // populated critical dataset actually became empty.
+      // Leave `fetchedAt` alone so the rejected attempt is never shown as fresh.
       cache = {
         ...previous,
         lastAttemptAt: Date.now(),
