@@ -116,12 +116,11 @@ function normalizedEquals(left: string | null | undefined, right: string | undef
 }
 
 function slaRowIncluded(
-  row: { month: string; user_name?: string | null; team_name?: string | null },
+  row: { month: string; user_name?: string | null },
   filters: GlobalFilters,
 ): boolean {
   if (!monthIncluded(row.month, filters)) return false;
   if (!normalizedEquals(row.user_name, filters.salesperson)) return false;
-  if (!normalizedEquals(row.team_name, filters.salesTeam)) return false;
   return true;
 }
 
@@ -377,6 +376,10 @@ export async function buildAgentAnalytics(
     for (const row of snapshot.repMonthly) if (row.month) availableMonths.add(monthKey(row.month));
     for (const row of snapshot.salesSummary)
       if (row.month) availableMonths.add(monthKey(row.month));
+    // Yeastar knows the extension/employee, not the Odoo sales team. Filtering
+    // SLA rows by `team_name` here used to remove every call whenever a team was
+    // selected. Merge by employee first; the Odoo team membership is applied
+    // below after all sources have been joined.
     const selectedRep = snapshot.repMonthly.filter((row) => slaRowIncluded(row, filters));
     const selectedSales = snapshot.salesSummary.filter((row) => slaRowIncluded(row, filters));
     const callsThrough = latestMetricMonth(
@@ -384,10 +387,6 @@ export async function buildAgentAnalytics(
       (row) => num(row.outbound_calls) > 0 || num(row.answered_calls) > 0 || num(row.talk_sec) > 0,
     );
     const salesThrough = latestMetricMonth(snapshot.salesSummary, () => true);
-    const callsAvailable = selectedRep.some(
-      (row) => num(row.outbound_calls) > 0 || num(row.answered_calls) > 0 || num(row.talk_sec) > 0,
-    );
-    const salesAvailable = selectedSales.length > 0;
     mergeSlaRep(map, selectedRep);
     mergeSlaSales(map, selectedSales);
     slaStatus = {
@@ -397,14 +396,37 @@ export async function buildAgentAnalytics(
       grain: "month",
       callsThrough,
       salesThrough,
-      callsAvailable,
-      salesAvailable,
+      callsAvailable: false,
+      salesAvailable: false,
     };
   } catch (error) {
     slaStatus.error = error instanceof Error ? error.message : String(error);
   }
 
-  const agents = [...map.values()]
+  const selectedAgents = [...map.values()].filter((row) => {
+    if (!normalizedEquals(row.name, filters.salesperson)) return false;
+    if (
+      filters.salesTeam &&
+      ![...row.teams].some((team) => normalizedEquals(team, filters.salesTeam))
+    )
+      return false;
+    return true;
+  });
+  if (slaStatus.ok) {
+    slaStatus.callsAvailable = selectedAgents.some(
+      (row) =>
+        num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
+    );
+    slaStatus.salesAvailable = selectedAgents.some(
+      (row) =>
+        num(row.operationalSales) !== 0 ||
+        num(row.operationalDeals) > 0 ||
+        num(row.quotations) > 0 ||
+        num(row.pipeline) !== 0,
+    );
+  }
+
+  const agents = selectedAgents
     .map((row): AgentAnalyticsRow => {
       row.invoices = row.invoiceRefs.size;
       row.team = [...row.teams].filter(Boolean).join(" · ") || "—";
