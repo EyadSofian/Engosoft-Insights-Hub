@@ -8,7 +8,16 @@ export const Route = createFileRoute("/api/health")({
           await import("@/lib/dashboard-db.server");
         const datasets = databaseConfigured()
           ? await Promise.all(
-              (["meta_ads", "snap_ads", "accounting"] as const).map(async (dataset) => {
+              (
+                [
+                  "meta_ads",
+                  "snap_ads",
+                  "accounting",
+                  "crm",
+                  "invoiced",
+                  "website_sales",
+                ] as const
+              ).map(async (dataset) => {
                 try {
                   const state = await readDashboardDataset(dataset);
                   return {
