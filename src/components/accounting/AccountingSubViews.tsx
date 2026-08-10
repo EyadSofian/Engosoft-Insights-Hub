@@ -46,14 +46,17 @@ interface AgentRow {
   won: number;
   lost: number;
   conversionRate: number | null;
+  slaWon: number;
+  slaLost: number;
+  decidedConversionRate: number | null;
   openLeads: number;
   uncontactedLeads: number;
-  outboundCalls: number;
-  answeredCalls: number;
+  outboundCalls: number | null;
+  answeredCalls: number | null;
   answerRate: number | null;
   avgFirstCallMinutes: number | null;
-  operationalSales: number;
-  operationalDeals: number;
+  operationalSales: number | null;
+  operationalDeals: number | null;
 }
 
 interface AgentsResponse {
@@ -73,8 +76,11 @@ interface AgentsResponse {
     won: number;
     lost: number;
     conversionRate: number | null;
-    outboundCalls: number;
-    answeredCalls: number;
+    periodClosedWon: number;
+    periodClosedLost: number;
+    decidedConversionRate: number | null;
+    outboundCalls: number | null;
+    answeredCalls: number | null;
     answerRate: number | null;
   };
   sla: {
@@ -82,6 +88,10 @@ interface AgentsResponse {
     source: string;
     fetchedAt: string;
     error?: string;
+    callsThrough: string;
+    salesThrough: string;
+    callsAvailable: boolean;
+    salesAvailable: boolean;
   };
 }
 
@@ -228,9 +238,12 @@ export function AccountingAgentsView() {
   const { lang } = useI18n();
   const filters = useFilters();
   const [display, setDisplay] = useState<"cards" | "table">("cards");
-  const [sortBy, setSortBy] = useState<"revenue" | "conversion" | "calls">("revenue");
+  const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls">("revenue");
   const [search, setSearch] = useState("");
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
+  useEffect(() => {
+    if (data && !data.sla.callsAvailable && sortBy === "calls") setSortBy("revenue");
+  }, [data, sortBy]);
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (isLoading || !data) return <><Skeleton className="h-28" /><Skeleton className="mt-4 h-96" /></>;
 
@@ -249,11 +262,13 @@ export function AccountingAgentsView() {
         : true,
     )
     .sort((a, b) =>
-      sortBy === "conversion"
-        ? (b.conversionRate ?? -1) - (a.conversionRate ?? -1) ||
+      sortBy === "closing"
+        ? (b.decidedConversionRate ?? -1) - (a.decidedConversionRate ?? -1) ||
+          b.slaWon - a.slaWon ||
           b.paidRevenue - a.paidRevenue
         : sortBy === "calls"
-          ? b.outboundCalls - a.outboundCalls || b.answeredCalls - a.answeredCalls
+          ? (b.outboundCalls ?? -1) - (a.outboundCalls ?? -1) ||
+            (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
           : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
     );
 
@@ -266,12 +281,22 @@ export function AccountingAgentsView() {
     <div className="space-y-4">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
-          ? `التحصيل والفواتير من الحسابات حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. المكالمات والعملاء من SLA وCRM، ولا تُنسب تكلفة إعلانية لموظف من غير قاعدة توزيع معتمدة.`
-          : `Collections and invoices use ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Calls and leads come from SLA and CRM; ad spend is not assigned without an approved allocation rule.`}
+          ? `التحصيل والفواتير من حسابات Odoo حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. الليدز والإغلاقات من Odoo، والمكالمات من Yeastar بعد تخزينها في PostgreSQL على Railway.`
+          : `Collections use Odoo ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Leads and closures come from Odoo; Yeastar calls are stored in Railway PostgreSQL.`}
       </Notice>
       {!data.sla.ok && (
         <Notice tone="warning" title={lang === "ar" ? "بيانات المكالمات غير متاحة مؤقتًا" : "Call data temporarily unavailable"}>
           {data.sla.error || (lang === "ar" ? "تظهر مؤشرات الحسابات والعملاء فقط." : "Accounting and CRM metrics remain available.")}
+        </Notice>
+      )}
+      {data.sla.ok && !data.sla.callsAvailable && (
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "مكالمات الفترة دي لسه ماوصلتش Railway" : "Calls have not reached Railway for this period"}
+        >
+          {lang === "ar"
+            ? `${data.sla.callsThrough ? `آخر مكالمات مكتملة عندنا: ${monthLabel(data.sla.callsThrough, lang)}. ` : ""}مش هنعرض صفر علشان ما نظلمش الموظفين؛ باقي أرقام Odoo شغالة عادي.`
+            : `${data.sla.callsThrough ? `Latest complete calls: ${monthLabel(data.sla.callsThrough, lang)}. ` : ""}Calls are shown as unavailable rather than a misleading zero; Odoo metrics remain available.`}
         </Notice>
       )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -291,23 +316,28 @@ export function AccountingAgentsView() {
         />
         <KpiCard
           index={2}
-          label={lang === "ar" ? "الصفقات المغلقة" : "Closed won"}
-          value={fmtNum(data.summary.won)}
-          sub={fmtPct(data.summary.conversionRate, 1)}
-          icon={<Trophy size={18} />}
+          label={lang === "ar" ? "ليدز دخلت الفترة" : "Leads created in period"}
+          value={fmtNum(data.summary.cleanLeads)}
+          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "منهم Won" : "became Won"}`}
+          icon={<UserRound size={18} />}
         />
         <KpiCard
           index={3}
-          label={lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"}
-          value={fmtNum(data.summary.outboundCalls)}
-          icon={<PhoneCall size={18} />}
+          label={lang === "ar" ? "إغلاقات تمت في الفترة" : "Closures during period"}
+          value={fmtNum(data.summary.periodClosedWon)}
+          sub={`${fmtNum(data.summary.periodClosedLost)} Lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`}
+          icon={<Trophy size={18} />}
         />
         <KpiCard
           index={4}
-          label={lang === "ar" ? "المكالمات المجاب عنها" : "Answered calls"}
-          value={fmtNum(data.summary.answeredCalls)}
-          sub={fmtPct(data.summary.answerRate, 1)}
-          icon={<UserRound size={18} />}
+          label={lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"}
+          value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
+          sub={
+            data.summary.answeredCalls === null
+              ? lang === "ar" ? "غير متاحة للفترة" : "Unavailable for period"
+              : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`
+          }
+          icon={<PhoneCall size={18} />}
         />
       </div>
 
@@ -353,17 +383,22 @@ export function AccountingAgentsView() {
 
           <div className="overflow-x-auto">
             <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "الترتيب" : "Sort by"}
+              {lang === "ar" ? "رتّب الكروت حسب" : "Rank cards by"}
             </span>
             <Segmented
               value={sortBy}
               onChange={setSortBy}
               options={[
                 { value: "revenue", label: lang === "ar" ? "التحصيل" : "Revenue" },
-                { value: "conversion", label: lang === "ar" ? "الإغلاق" : "Conversion" },
-                { value: "calls", label: lang === "ar" ? "المكالمات" : "Calls" },
+                { value: "closing", label: lang === "ar" ? "الإغلاقات" : "Closures" },
+                ...(data.sla.callsAvailable
+                  ? [{ value: "calls" as const, label: lang === "ar" ? "المكالمات" : "Calls" }]
+                  : []),
               ]}
             />
+            <p className="mt-1.5 text-[10px] text-text-subtle">
+              {lang === "ar" ? "بيغيّر الترتيب وأهم رقم في الكارت، مش إجمالي الفترة." : "Changes card order and emphasis, not period totals."}
+            </p>
           </div>
 
           <div className="overflow-x-auto">
@@ -383,7 +418,7 @@ export function AccountingAgentsView() {
       </Card>
 
       {display === "cards" ? (
-        <AgentCards rows={visibleAgents} />
+        <AgentCards rows={visibleAgents} sortBy={sortBy} callsAvailable={data.sla.callsAvailable} />
       ) : (
         <AgentTable rows={visibleAgents} />
       )}
@@ -391,7 +426,15 @@ export function AccountingAgentsView() {
   );
 }
 
-function AgentCards({ rows }: { rows: AgentRow[] }) {
+function AgentCards({
+  rows,
+  sortBy,
+  callsAvailable,
+}: {
+  rows: AgentRow[];
+  sortBy: "revenue" | "closing" | "calls";
+  callsAvailable: boolean;
+}) {
   const { lang } = useI18n();
   return (
     <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -416,50 +459,61 @@ function AgentCards({ rows }: { rows: AgentRow[] }) {
                 </div>
               </div>
             </div>
-            <Pill tone={row.conversionRate !== null && row.conversionRate >= 10 ? "success" : "neutral"}>
-              {lang === "ar" ? "إغلاق" : "CVR"} {fmtPct(row.conversionRate, 1)}
+            <Pill tone={row.decidedConversionRate !== null && row.decidedConversionRate >= 10 ? "success" : "neutral"}>
+              {lang === "ar" ? "إغلاق الفترة" : "Period close"} {fmtPct(row.decidedConversionRate, 1)}
             </Pill>
           </div>
 
           <div className="mt-4 rounded-2xl bg-surface-2 p-3">
             <div className="text-[11px] font-medium text-text-muted">
-              {lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+              {sortBy === "closing"
+                ? lang === "ar" ? "إغلاقات Won تمت في الفترة" : "Won closures in period"
+                : sortBy === "calls"
+                  ? lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"
+                  : lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
             </div>
             <div className="num mt-1 text-xl font-semibold text-text">
-              {fmtUSDExact(row.paidRevenue)}
+              {sortBy === "closing"
+                ? fmtNum(row.slaWon)
+                : sortBy === "calls"
+                  ? row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)
+                  : fmtUSDExact(row.paidRevenue)}
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-2">
             <MiniMetric label={lang === "ar" ? "الفواتير" : "Invoices"} value={fmtNum(row.invoices)} />
-            <MiniMetric label={lang === "ar" ? "العملاء" : "Leads"} value={fmtNum(row.cleanLeads)} />
-            <MiniMetric label="Won" value={fmtNum(row.won)} />
-            <MiniMetric label="Lost" value={fmtNum(row.lost)} />
-            <MiniMetric label={lang === "ar" ? "المكالمات" : "Calls"} value={fmtNum(row.outboundCalls)} />
-            <MiniMetric label={lang === "ar" ? "تم الرد" : "Answered"} value={fmtNum(row.answeredCalls)} />
+            <MiniMetric label={lang === "ar" ? "ليدز دخلت" : "New leads"} value={fmtNum(row.cleanLeads)} />
+            <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDExact(row.paidRevenue)} />
+            <MiniMetric label={lang === "ar" ? "إغلاقات Won" : "Won closures"} value={fmtNum(row.slaWon)} />
+            <MiniMetric label={lang === "ar" ? "إغلاقات Lost" : "Lost closures"} value={fmtNum(row.slaLost)} />
+            <MiniMetric
+              label={lang === "ar" ? "المكالمات" : "Calls"}
+              value={!callsAvailable || row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}
+            />
           </div>
 
           <div className="mt-4 space-y-2.5">
             <ProgressMetric
-              label={lang === "ar" ? "نسبة الإغلاق" : "Conversion rate"}
-              value={row.conversionRate}
+              label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
+              value={row.decidedConversionRate}
               color="var(--success)"
             />
             <ProgressMetric
               label={lang === "ar" ? "نسبة الرد" : "Answer rate"}
-              value={row.answerRate}
+              value={callsAvailable ? row.answerRate : null}
               color="var(--chart-1)"
             />
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-text-muted">
             <span>
-              {lang === "ar" ? "لم يتم التواصل" : "Uncontacted"}:{" "}
-              <b className="num text-text">{fmtNum(row.uncontactedLeads)}</b>
+              {lang === "ar" ? "Won من ليدز الفترة" : "Cohort Won"}:{" "}
+              <b className="num text-text">{fmtNum(row.won)}</b>
             </span>
             <span>
-              {lang === "ar" ? "صفقات SLA" : "SLA deals"}:{" "}
-              <b className="num text-text">{fmtNum(row.operationalDeals)}</b>
+              {lang === "ar" ? "تم الرد" : "Answered"}:{" "}
+              <b className="num text-text">{row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}</b>
             </span>
           </div>
         </article>
@@ -487,6 +541,7 @@ function AgentTable({ rows }: { rows: AgentRow[] }) {
                 "Won",
                 "Lost",
                 lang === "ar" ? "نسبة الإغلاق" : "Conversion",
+                lang === "ar" ? "إغلاقات الفترة" : "Period closures",
                 lang === "ar" ? "المكالمات" : "Calls",
                 lang === "ar" ? "تم الرد" : "Answered",
                 lang === "ar" ? "نسبة الرد" : "Answer rate",
@@ -510,12 +565,15 @@ function AgentTable({ rows }: { rows: AgentRow[] }) {
                 <td className="num px-3 py-3 text-end">{fmtNum(row.won)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.lost)}</td>
                 <td className="px-3 py-3 text-end"><Pill tone={row.conversionRate !== null && row.conversionRate >= 10 ? "success" : "neutral"}>{fmtPct(row.conversionRate, 1)}</Pill></td>
-                <td className="num px-3 py-3 text-end">{fmtNum(row.outboundCalls)}</td>
-                <td className="num px-3 py-3 text-end">{fmtNum(row.answeredCalls)}</td>
+                <td className="num px-3 py-3 text-end">{fmtNum(row.slaWon)} / {fmtNum(row.slaLost)}</td>
+                <td className="num px-3 py-3 text-end">{row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}</td>
+                <td className="num px-3 py-3 text-end">{row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}</td>
                 <td className="num px-3 py-3 text-end">{fmtPct(row.answerRate, 1)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.uncontactedLeads)}</td>
                 <td className="num px-3 py-3 text-end">
-                  {row.operationalSales.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  {row.operationalSales === null
+                    ? "—"
+                    : row.operationalSales.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                   <span className="ms-1 text-[10px] text-text-muted">{lang === "ar" ? "عملة أودو" : "Odoo currency"}</span>
                 </td>
               </tr>

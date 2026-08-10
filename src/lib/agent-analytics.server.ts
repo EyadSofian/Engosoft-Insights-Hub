@@ -24,20 +24,20 @@ export interface AgentAnalyticsRow {
   newLeads: number;
   contactedLeads: number;
   uncontactedLeads: number;
-  outboundCalls: number;
-  answeredCalls: number;
+  outboundCalls: number | null;
+  answeredCalls: number | null;
   answerRate: number | null;
   contactRate: number | null;
-  talkSeconds: number;
+  talkSeconds: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
   slaLost: number;
   decidedConversionRate: number | null;
-  operationalSales: number;
-  operationalUntaxed: number;
-  operationalDeals: number;
-  quotations: number;
-  pipeline: number;
+  operationalSales: number | null;
+  operationalUntaxed: number | null;
+  operationalDeals: number | null;
+  quotations: number | null;
+  pipeline: number | null;
   slaMonths: number;
 }
 
@@ -58,8 +58,11 @@ export interface AgentAnalyticsResult {
     won: number;
     lost: number;
     conversionRate: number | null;
-    outboundCalls: number;
-    answeredCalls: number;
+    periodClosedWon: number;
+    periodClosedLost: number;
+    decidedConversionRate: number | null;
+    outboundCalls: number | null;
+    answeredCalls: number | null;
     answerRate: number | null;
   };
   sla: {
@@ -68,6 +71,10 @@ export interface AgentAnalyticsResult {
     fetchedAt: string;
     error?: string;
     grain: "month";
+    callsThrough: string;
+    salesThrough: string;
+    callsAvailable: boolean;
+    salesAvailable: boolean;
   };
 }
 
@@ -101,6 +108,33 @@ function monthIncluded(monthValue: string, filters: GlobalFilters): boolean {
   if (filters.from && end < filters.from) return false;
   if (filters.to && start > filters.to) return false;
   return true;
+}
+
+function normalizedEquals(left: string | null | undefined, right: string | undefined): boolean {
+  if (!right) return true;
+  return normalizePersonName(left || "") === normalizePersonName(right);
+}
+
+function slaRowIncluded(
+  row: { month: string; user_name?: string | null; team_name?: string | null },
+  filters: GlobalFilters,
+): boolean {
+  if (!monthIncluded(row.month, filters)) return false;
+  if (!normalizedEquals(row.user_name, filters.salesperson)) return false;
+  if (!normalizedEquals(row.team_name, filters.salesTeam)) return false;
+  return true;
+}
+
+function latestMetricMonth<T extends { month: string }>(
+  rows: T[],
+  hasMetric: (row: T) => boolean,
+): string {
+  return rows
+    .filter(hasMetric)
+    .map((row) => monthKey(row.month))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || "";
 }
 
 interface MutableAgent extends AgentAnalyticsRow {
@@ -202,9 +236,9 @@ function mergeSlaRep(map: Map<string, MutableAgent>, rows: SlaRepMonthly[]) {
     row.newLeads += num(source.new_leads);
     row.contactedLeads += num(source.contacted_leads);
     row.uncontactedLeads += num(source.uncontacted_leads);
-    row.outboundCalls += num(source.outbound_calls);
-    row.answeredCalls += num(source.answered_calls);
-    row.talkSeconds += num(source.talk_sec);
+    row.outboundCalls = (row.outboundCalls ?? 0) + num(source.outbound_calls);
+    row.answeredCalls = (row.answeredCalls ?? 0) + num(source.answered_calls);
+    row.talkSeconds = (row.talkSeconds ?? 0) + num(source.talk_sec);
     row.slaWon += num(source.won_leads);
     row.slaLost += num(source.lost_leads);
     if (source.avg_first_call_minutes !== null && num(source.contacted_leads) > 0) {
@@ -222,11 +256,83 @@ function mergeSlaSales(map: Map<string, MutableAgent>, rows: SlaSalesSummary[]) 
     const row = map.get(key) ?? blank(key, source.user_name || "—");
     if (source.team_name) row.teams.add(source.team_name);
     row.months.add(monthKey(source.month));
-    row.operationalSales += num(source.achieved_total);
-    row.operationalUntaxed += num(source.achieved_untaxed);
-    row.operationalDeals += num(source.deals_count);
-    row.quotations += num(source.quotations_count);
-    row.pipeline += num(source.pipeline_value);
+    row.operationalSales = (row.operationalSales ?? 0) + num(source.achieved_total);
+    row.operationalUntaxed = (row.operationalUntaxed ?? 0) + num(source.achieved_untaxed);
+    row.operationalDeals = (row.operationalDeals ?? 0) + num(source.deals_count);
+    row.quotations = (row.quotations ?? 0) + num(source.quotations_count);
+    row.pipeline = (row.pipeline ?? 0) + num(source.pipeline_value);
+    map.set(key, row);
+  }
+}
+
+function dateIncluded(value: string, filters: GlobalFilters): boolean {
+  if (!value) return false;
+  if (filters.from && value < filters.from) return false;
+  if (filters.to && value > filters.to) return false;
+  return true;
+}
+
+/**
+ * Operational closures are dated by their actual close date. This is separate
+ * from marketing cohort conversion, where Won/Lost belongs to the lead's
+ * creation month. Mixing the two was why an early month looked artificially
+ * weak on the employee page.
+ */
+function mergeOperationalClosures(
+  map: Map<string, MutableAgent>,
+  data: FilteredData,
+  filters: GlobalFilters,
+) {
+  const sourceKey = filters.source?.trim().toLocaleLowerCase("en") || "";
+  const platformCampaigns = filters.platform
+    ? new Set(
+        data.snapshot.ads
+          .filter((row) => row.platform === filters.platform)
+          .map((row) => row.campaignKey),
+      )
+    : null;
+  const commonMatch = (row: {
+    campaignName: string;
+    campaignKey: string;
+    sourceKey: string;
+    course: string;
+    mainCategory: string;
+    salesperson: string;
+  }) => {
+    if (filters.platform && !platformCampaigns?.has(row.campaignKey)) return false;
+    if (filters.campaign && row.campaignName !== filters.campaign) return false;
+    if (filters.campaignKey && row.campaignKey !== filters.campaignKey) return false;
+    if (sourceKey && row.sourceKey !== sourceKey) return false;
+    if (filters.course && row.course !== filters.course) return false;
+    if (filters.mainCategory && row.mainCategory !== filters.mainCategory) return false;
+    if (!normalizedEquals(row.salesperson, filters.salesperson)) return false;
+    return true;
+  };
+
+  for (const lead of data.snapshot.crm) {
+    if (!lead.isWon || !dateIncluded(lead.closedAt, filters) || !commonMatch(lead)) continue;
+    if (
+      filters.salesTeam &&
+      !normalizedEquals(lead.salesTeam, filters.salesTeam) &&
+      !normalizedEquals(lead.subTeam, filters.salesTeam)
+    )
+      continue;
+    const key = normalizePersonName(lead.salesperson);
+    if (!key) continue;
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    if (lead.salesTeam) row.teams.add(lead.salesTeam);
+    row.slaWon += 1;
+    map.set(key, row);
+  }
+
+  for (const lead of data.snapshot.lost) {
+    if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
+    if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
+    const key = normalizePersonName(lead.salesperson);
+    if (!key) continue;
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    if (lead.salesTeam) row.teams.add(lead.salesTeam);
+    row.slaLost += 1;
     map.set(key, row);
   }
 }
@@ -246,12 +352,17 @@ export async function buildAgentAnalytics(
   }
   mergeMainPeople(map, teams);
   mergeInvoiceRefs(map, data);
+  mergeOperationalClosures(map, data, filters);
 
   let slaStatus: AgentAnalyticsResult["sla"] = {
     ok: false,
-    source: "https://sla-engosoft-production.up.railway.app/sales",
+    source: "Railway PostgreSQL · Yeastar",
     fetchedAt: "",
     grain: "month",
+    callsThrough: "",
+    salesThrough: "",
+    callsAvailable: false,
+    salesAvailable: false,
   };
   try {
     const snapshot = await Promise.race([
@@ -260,19 +371,34 @@ export async function buildAgentAnalytics(
     ]);
     if (!snapshot) {
       throw new Error(
-        "SLA is still refreshing in the background. Accounting and CRM figures remain available.",
+        "Yeastar calls are still refreshing in Railway. Odoo accounting and CRM figures remain available.",
       );
     }
     for (const row of snapshot.repMonthly) if (row.month) availableMonths.add(monthKey(row.month));
     for (const row of snapshot.salesSummary)
       if (row.month) availableMonths.add(monthKey(row.month));
-    mergeSlaRep(map, snapshot.repMonthly.filter((row) => monthIncluded(row.month, filters)));
-    mergeSlaSales(map, snapshot.salesSummary.filter((row) => monthIncluded(row.month, filters)));
+    const selectedRep = snapshot.repMonthly.filter((row) => slaRowIncluded(row, filters));
+    const selectedSales = snapshot.salesSummary.filter((row) => slaRowIncluded(row, filters));
+    const callsThrough = latestMetricMonth(
+      snapshot.repMonthly,
+      (row) => num(row.outbound_calls) > 0 || num(row.answered_calls) > 0 || num(row.talk_sec) > 0,
+    );
+    const salesThrough = latestMetricMonth(snapshot.salesSummary, () => true);
+    const callsAvailable = selectedRep.some(
+      (row) => num(row.outbound_calls) > 0 || num(row.answered_calls) > 0 || num(row.talk_sec) > 0,
+    );
+    const salesAvailable = selectedSales.length > 0;
+    mergeSlaRep(map, selectedRep);
+    mergeSlaSales(map, selectedSales);
     slaStatus = {
       ok: true,
       source: snapshot.source,
       fetchedAt: snapshot.fetchedAt,
       grain: "month",
+      callsThrough,
+      salesThrough,
+      callsAvailable,
+      salesAvailable,
     };
   } catch (error) {
     slaStatus.error = error instanceof Error ? error.message : String(error);
@@ -285,7 +411,9 @@ export async function buildAgentAnalytics(
       row.conversionRate = row.cleanLeads > 0 ? (row.won / row.cleanLeads) * 100 : null;
       row.lostRate = row.cleanLeads > 0 ? (row.lost / row.cleanLeads) * 100 : null;
       row.answerRate =
-        row.outboundCalls > 0 ? (row.answeredCalls / row.outboundCalls) * 100 : null;
+        (row.outboundCalls ?? 0) > 0
+          ? ((row.answeredCalls ?? 0) / (row.outboundCalls ?? 1)) * 100
+          : null;
       row.contactRate =
         row.newLeads > 0 ? (row.contactedLeads / row.newLeads) * 100 : null;
       row.decidedConversionRate =
@@ -293,8 +421,36 @@ export async function buildAgentAnalytics(
       row.avgFirstCallMinutes =
         row.firstCallWeight > 0 ? row.firstCallWeighted / row.firstCallWeight : null;
       row.slaMonths = row.months.size;
+      if (!slaStatus.callsAvailable) {
+        row.outboundCalls = null;
+        row.answeredCalls = null;
+        row.talkSeconds = null;
+      }
+      if (!slaStatus.salesAvailable) {
+        row.operationalSales = null;
+        row.operationalUntaxed = null;
+        row.operationalDeals = null;
+        row.quotations = null;
+        row.pipeline = null;
+      }
       return row;
     })
+    .filter(
+      (row) =>
+        row.paidRevenue !== 0 ||
+        row.invoices > 0 ||
+        row.cleanLeads > 0 ||
+        row.won > 0 ||
+        row.lost > 0 ||
+        row.newLeads > 0 ||
+        row.contactedLeads > 0 ||
+        row.slaWon > 0 ||
+        row.slaLost > 0 ||
+        (row.outboundCalls ?? 0) > 0 ||
+        (row.answeredCalls ?? 0) > 0 ||
+        (row.operationalSales ?? 0) !== 0 ||
+        (row.operationalDeals ?? 0) > 0,
+    )
     .sort((a, b) => b.paidRevenue - a.paidRevenue || b.cleanLeads - a.cleanLeads);
 
   const summary = agents.reduce(
@@ -304,8 +460,10 @@ export async function buildAgentAnalytics(
       acc.cleanLeads += row.cleanLeads;
       acc.won += row.won;
       acc.lost += row.lost;
-      acc.outboundCalls += row.outboundCalls;
-      acc.answeredCalls += row.answeredCalls;
+      acc.periodClosedWon += row.slaWon;
+      acc.periodClosedLost += row.slaLost;
+      if (row.outboundCalls !== null) acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
+      if (row.answeredCalls !== null) acc.answeredCalls = (acc.answeredCalls ?? 0) + row.answeredCalls;
       return acc;
     },
     {
@@ -315,16 +473,25 @@ export async function buildAgentAnalytics(
       cleanLeads: 0,
       won: 0,
       lost: 0,
+      periodClosedWon: 0,
+      periodClosedLost: 0,
       conversionRate: null as number | null,
-      outboundCalls: 0,
-      answeredCalls: 0,
+      decidedConversionRate: null as number | null,
+      outboundCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
+      answeredCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
       answerRate: null as number | null,
     },
   );
   summary.conversionRate =
     summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
+  summary.decidedConversionRate =
+    summary.periodClosedWon + summary.periodClosedLost > 0
+      ? (summary.periodClosedWon / (summary.periodClosedWon + summary.periodClosedLost)) * 100
+      : null;
   summary.answerRate =
-    summary.outboundCalls > 0 ? (summary.answeredCalls / summary.outboundCalls) * 100 : null;
+    (summary.outboundCalls ?? 0) > 0
+      ? ((summary.answeredCalls ?? 0) / (summary.outboundCalls ?? 1)) * 100
+      : null;
 
   return {
     agents,

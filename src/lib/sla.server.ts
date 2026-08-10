@@ -1,9 +1,8 @@
-// Server-only reader for the operational SLA dashboard.
-//
-// The upstream project intentionally exposes read-only Supabase views through
-// a publishable key. Environment variables are preferred. When this dashboard
-// is deployed without them, we discover the same public configuration from the
-// deployed SLA application's JavaScript bundle and cache it.
+// Server-only Yeastar call reader backed by this application's Railway
+// PostgreSQL database. n8n pulls directly from Yeastar and posts raw call rows
+// through /api/ingest/dataset; no Google Sheet or Supabase read is involved.
+
+import { readDashboardDataset } from "./dashboard-db.server";
 
 export interface SlaRepMonthly {
   month: string;
@@ -40,11 +39,6 @@ export interface SlaSalesSummary {
   team_attainment_pct: number | null;
 }
 
-interface PublicConfig {
-  base: string;
-  key: string;
-}
-
 export interface SlaSnapshot {
   repMonthly: SlaRepMonthly[];
   salesSummary: SlaSalesSummary[];
@@ -52,82 +46,109 @@ export interface SlaSnapshot {
   source: string;
 }
 
-const APP_URL = (process.env.SLA_APP_URL || "https://sla-engosoft-production.up.railway.app")
-  .replace(/\/+$/, "");
+interface MutableMonth extends SlaRepMonthly {}
 
-let configCache: { value: PublicConfig; expiresAt: number } | null = null;
+const num = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const text = (value: unknown): string => String(value ?? "").trim();
+
+const monthOf = (value: string): string => {
+  const matched = value.match(/^(\d{4}-\d{2})/);
+  return matched ? `${matched[1]}-01` : "";
+};
+
+const blank = (month: string, userId: number, userName: string): MutableMonth => ({
+  month,
+  user_id: userId,
+  user_name: userName,
+  team_name: null,
+  open_leads: 0,
+  new_leads: 0,
+  contacted_leads: 0,
+  uncontacted_leads: 0,
+  avg_first_call_minutes: null,
+  won_leads: 0,
+  lost_leads: 0,
+  outbound_calls: 0,
+  answered_calls: 0,
+  talk_sec: 0,
+  new_pipeline: 0,
+  won_revenue: 0,
+  contact_pct: null,
+  conversion_pct: null,
+  answer_pct: null,
+});
+
 let dataCache: { value: SlaSnapshot; expiresAt: number } | null = null;
 let inFlight: Promise<SlaSnapshot> | null = null;
 
-const timeout = (ms: number) => AbortSignal.timeout(ms);
-
-async function discoverPublicConfig(): Promise<PublicConfig> {
-  const envBase = (process.env.SLA_SUPABASE_URL || "").replace(/\/+$/, "");
-  const envKey = process.env.SLA_SUPABASE_ANON_KEY || "";
-  if (envBase && envKey) return { base: envBase, key: envKey };
-
-  if (configCache && configCache.expiresAt > Date.now()) return configCache.value;
-
-  const htmlResponse = await fetch(`${APP_URL}/sales`, { signal: timeout(20_000) });
-  if (!htmlResponse.ok) throw new Error(`SLA application responded ${htmlResponse.status}`);
-  const html = await htmlResponse.text();
-  const scripts = [...html.matchAll(/(?:src|href)=["']([^"']+\.js[^"']*)["']/g)].map(
-    (match) => new URL(match[1], APP_URL).href,
-  );
-
-  for (const script of scripts) {
-    const response = await fetch(script, { signal: timeout(30_000) });
-    if (!response.ok) continue;
-    const source = await response.text();
-    const base = source.match(/https:\/\/[a-z0-9-]+\.supabase\.co/i)?.[0] || "";
-    const key = source.match(/sb_publishable_[A-Za-z0-9_-]+/)?.[0] || "";
-    if (!base || !key) continue;
-    const value = { base: base.replace(/\/+$/, ""), key };
-    configCache = { value, expiresAt: Date.now() + 6 * 60 * 60 * 1000 };
-    return value;
-  }
-
-  throw new Error(
-    "SLA public connection was not found. Set SLA_SUPABASE_URL and SLA_SUPABASE_ANON_KEY.",
-  );
-}
-
-async function readView<T>(view: string, order: string): Promise<T[]> {
-  const cfg = await discoverPublicConfig();
-  const query = new URLSearchParams({ select: "*", order, limit: "10000" });
-  const response = await fetch(`${cfg.base}/rest/v1/${view}?${query}`, {
-    headers: {
-      apikey: cfg.key,
-      Authorization: `Bearer ${cfg.key}`,
-    },
-    signal: timeout(35_000),
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 180);
-    throw new Error(`SLA ${view} responded ${response.status}: ${detail}`);
-  }
-  const rows = (await response.json()) as unknown;
-  if (!Array.isArray(rows)) throw new Error(`SLA ${view} did not return rows`);
-  return rows as T[];
-}
-
 async function refresh(): Promise<SlaSnapshot> {
-  const [repMonthly, salesSummary] = await Promise.all([
-    readView<SlaRepMonthly>("sales_rep_monthly", "month.asc,user_name.asc"),
-    readView<SlaSalesSummary>("sales_summary", "month.asc,user_name.asc"),
+  const [calls, extensions] = await Promise.all([
+    readDashboardDataset("sla_calls"),
+    readDashboardDataset("pbx_extensions"),
   ]);
-  const value = {
+  if (!calls.configured || !extensions.configured) {
+    throw new Error("Railway PostgreSQL is not configured for Yeastar calls.");
+  }
+
+  const extensionMap = new Map(
+    extensions.rows
+      .map((row) => [
+        text(row.extension),
+        { userId: num(row.user_id), userName: text(row.user_name) },
+      ] as const)
+      .filter(([extension, person]) => extension && person.userName),
+  );
+  const monthly = new Map<string, MutableMonth>();
+
+  for (const call of calls.rows) {
+    const month = monthOf(text(call.started_at || call["Started At"]));
+    const extension = text(call.extension);
+    const mapped = extensionMap.get(extension);
+    const userName = text(call.user_name) || mapped?.userName || "";
+    const userId = num(call.user_id) || mapped?.userId || 0;
+    if (!month || !userName) continue;
+    const direction = text(call.direction).toLowerCase();
+    if (direction && direction !== "outbound") continue;
+
+    const key = `${month}\u0000${userName}`;
+    const row = monthly.get(key) ?? blank(month, userId, userName);
+    const talkSeconds = num(call.talk_sec);
+    const disposition = text(call.disposition).toUpperCase();
+    row.outbound_calls += 1;
+    row.talk_sec += talkSeconds;
+    if (talkSeconds > 0 || disposition === "ANSWERED") row.answered_calls += 1;
+    monthly.set(key, row);
+  }
+
+  const repMonthly = [...monthly.values()]
+    .map((row) => ({
+      ...row,
+      answer_pct:
+        row.outbound_calls > 0 ? (row.answered_calls / row.outbound_calls) * 100 : null,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month) || a.user_name.localeCompare(b.user_name));
+  const fetchedAt = [calls.syncedAt, extensions.syncedAt].filter(Boolean).sort().at(-1) || "";
+  return {
     repMonthly,
-    salesSummary,
-    fetchedAt: new Date().toISOString(),
-    source: `${APP_URL}/sales`,
+    salesSummary: [],
+    fetchedAt,
+    source: "Railway PostgreSQL · Yeastar",
   };
-  dataCache = { value, expiresAt: Date.now() + 5 * 60 * 1000 };
-  return value;
 }
 
 export async function getSlaSnapshot(): Promise<SlaSnapshot> {
   if (dataCache && dataCache.expiresAt > Date.now()) return dataCache.value;
-  if (!inFlight) inFlight = refresh().finally(() => (inFlight = null));
+  if (!inFlight) {
+    inFlight = refresh()
+      .then((value) => {
+        dataCache = { value, expiresAt: Date.now() + 60_000 };
+        return value;
+      })
+      .finally(() => (inFlight = null));
+  }
   return inFlight;
 }

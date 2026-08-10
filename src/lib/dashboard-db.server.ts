@@ -9,7 +9,14 @@ import { createHash } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 
 export type DashboardDataset =
-  "meta_ads" | "snap_ads" | "accounting" | "crm" | "invoiced" | "website_sales";
+  | "meta_ads"
+  | "snap_ads"
+  | "accounting"
+  | "crm"
+  | "invoiced"
+  | "website_sales"
+  | "pbx_extensions"
+  | "sla_calls";
 
 export type DashboardRow = Record<string, string>;
 
@@ -38,6 +45,8 @@ const DATASETS = new Set<DashboardDataset>([
   "crm",
   "invoiced",
   "website_sales",
+  "pbx_extensions",
+  "sla_calls",
 ]);
 
 let pool: Pool | null = null;
@@ -153,6 +162,8 @@ function stableKey(dataset: DashboardDataset, row: DashboardRow): string {
     "Move",
     "id",
     "ID",
+    "call_id",
+    "extension",
   ]);
   if (explicit) return `${dataset}:${explicit}`;
   return `${dataset}:sha256:${createHash("sha256").update(canonicalJson(row)).digest("hex")}`;
@@ -168,6 +179,8 @@ function recordDate(row: DashboardRow): string | null {
     "Creation Date",
     "Create Date",
     "__date",
+    "started_at",
+    "Started At",
   ]);
   const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (iso) return iso[1];

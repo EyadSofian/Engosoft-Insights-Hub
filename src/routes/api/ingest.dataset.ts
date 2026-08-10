@@ -16,6 +16,49 @@ function authorized(request: Request): boolean {
 export const Route = createFileRoute("/api/ingest/dataset")({
   server: {
     handlers: {
+      GET: async ({ request }) => {
+        if (!process.env.DATABASE_URL?.trim() || !process.env.DASHBOARD_INGEST_SECRET?.trim()) {
+          return Response.json(
+            { ok: false, error: "Dashboard ingestion is not configured." },
+            { status: 503, headers: { "cache-control": "no-store" } },
+          );
+        }
+        if (!authorized(request)) {
+          return Response.json(
+            { ok: false, error: "Unauthorized." },
+            { status: 401, headers: { "cache-control": "no-store" } },
+          );
+        }
+        const dataset = new URL(request.url).searchParams.get("dataset");
+        const { isDashboardDataset, readDashboardDataset } =
+          await import("@/lib/dashboard-db.server");
+        if (!isDashboardDataset(dataset)) {
+          return Response.json({ ok: false, error: "Unknown dataset." }, { status: 400 });
+        }
+        // Workers only need the small PBX directory to attach an extension to
+        // an Odoo user. Large reporting datasets are deliberately write-only.
+        if (dataset !== "pbx_extensions") {
+          return Response.json({ ok: false, error: "Dataset is not readable here." }, { status: 403 });
+        }
+        try {
+          const snapshot = await readDashboardDataset(dataset);
+          return Response.json(
+            {
+              ok: true,
+              dataset,
+              rows: snapshot.rows,
+              rowCount: snapshot.rowCount,
+              syncedAt: snapshot.syncedAt,
+            },
+            { headers: { "cache-control": "no-store" } },
+          );
+        } catch {
+          return Response.json(
+            { ok: false, error: "Dataset read failed." },
+            { status: 500, headers: { "cache-control": "no-store" } },
+          );
+        }
+      },
       POST: async ({ request }) => {
         if (!process.env.DATABASE_URL?.trim() || !process.env.DASHBOARD_INGEST_SECRET?.trim()) {
           return Response.json(

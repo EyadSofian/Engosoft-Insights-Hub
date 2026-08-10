@@ -16,6 +16,8 @@ export const Route = createFileRoute("/api/health")({
                   "crm",
                   "invoiced",
                   "website_sales",
+                  "pbx_extensions",
+                  "sla_calls",
                 ] as const
               ).map(async (dataset) => {
                 try {
