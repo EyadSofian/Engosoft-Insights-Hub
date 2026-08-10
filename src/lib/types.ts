@@ -609,17 +609,20 @@ export interface FunnelStep {
 
 export interface DataHealth {
   /** Authoritative CRM source used for this snapshot. */
-  crmAuthority: "google-sheet" | "odoo-direct" | "google-sheet-fallback";
+  crmAuthority:
+    | "google-sheet"
+    | "odoo-direct"
+    | "postgres-last-good"
+    | "google-sheet-fallback";
   /** Archived Lost is fail-closed: only the direct Odoo archive is reportable. */
   lostAuthority: "odoo-direct" | "unavailable";
   /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
   lostDateBasis: "creation_date" | "unavailable";
-  /** Paid invoice-line source selected only after the strict reconciliation gate. */
-  accountingAuthority: "odoo-direct" | "google-sheet-fallback";
+  /** Paid invoice-line source, with PostgreSQL retaining the last good Odoo read. */
+  accountingAuthority: "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
   /**
-   * Non-sensitive direct-Odoo reconciliation diagnostics. Direct Accounting is
-   * accepted only when rows and distinct invoices are at least 98% of the
-   * canonical sheet and USD revenue is within the reported tolerance.
+   * Non-sensitive direct-Odoo diagnostics. The sheet comparison remains visible
+   * for audit only; a stale Google export can no longer veto a healthy Odoo read.
    */
   accountingDirect: {
     attempted: boolean;

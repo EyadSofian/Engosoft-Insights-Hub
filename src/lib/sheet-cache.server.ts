@@ -13,6 +13,13 @@ import { accountingReportingDate, signedCreditAmount } from "./accounting-policy
 import { odooConfigured } from "./odoo.server";
 import { fetchGoogleAds } from "./google-ads.server";
 import { fetchTikTokAds } from "./tiktok.server";
+import {
+  databaseConfigured,
+  readDashboardDataset,
+  writeDashboardDataset,
+  type DashboardDataset,
+  type DatasetSnapshot,
+} from "./dashboard-db.server";
 import type {
   AdRow,
   AdSetOrigin,
@@ -129,6 +136,11 @@ export interface Snapshot {
 
 let cache: Snapshot | null = null;
 let inflight: Promise<Snapshot> | null = null;
+
+/** Make newly-ingested database batches visible on the next request. */
+export function invalidateDataCache(): void {
+  cache = null;
+}
 /**
  * Last successful raw rows per tab. A tab that fails or comes back empty is
  * served from here rather than as an empty array, so one bad read cannot blank
@@ -752,6 +764,33 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // pull and bypass Google's CDN cache together.
     const bust = Date.now();
 
+    const readStored = async (dataset: DashboardDataset): Promise<DatasetSnapshot | null> => {
+      try {
+        return await readDashboardDataset(dataset);
+      } catch {
+        fetchErrors.push(`PostgreSQL ${dataset}: last-good read failed.`);
+        return null;
+      }
+    };
+    // Read durable sources first. Once a dataset has landed in PostgreSQL its
+    // Google tab is no longer fetched at all; Sheets remains a migration-only
+    // bootstrap for installations that have not run the new n8n path yet.
+    const [
+      metaStored,
+      snapStored,
+      accountingStored,
+      crmStored,
+      invoicedStored,
+      websiteSalesStored,
+    ] = await Promise.all([
+      readStored("meta_ads"),
+      readStored("snap_ads"),
+      readStored("accounting"),
+      readStored("crm"),
+      readStored("invoiced"),
+      readStored("website_sales"),
+    ]);
+
     /**
      * A tab is only allowed to reach the parser as empty when it has *never*
      * held rows. Otherwise an empty read is treated as a failed read and the
@@ -879,12 +918,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // Seven simultaneous requests to one document is what triggers Google's
     // rate limiting in the first place. Two smaller waves cost a few hundred
     // milliseconds and remove the burst.
-    const [metaRaw, snapRaw, crmSheetRaw, invRaw] = await Promise.all([
-      safeFetch(TAB.meta),
-      safeFetch(TAB.snap),
-      safeFetch(TAB.crm),
-      safeFetch(TAB.invoiced),
+    const [metaSheetRaw, snapSheetRaw, crmSheetRaw, invoicedSheetRaw] = await Promise.all([
+      metaStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.meta),
+      snapStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.snap),
+      crmStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.crm),
+      invoicedStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.invoiced),
     ]);
+    const metaRaw = metaStored?.rows.length ? metaStored.rows : metaSheetRaw;
+    const snapRaw = snapStored?.rows.length ? snapStored.rows : snapSheetRaw;
+    const crmFallbackRaw = crmStored?.rows.length ? crmStored.rows : crmSheetRaw;
+    const invRaw = invoicedStored?.rows.length ? invoicedStored.rows : invoicedSheetRaw;
     const safeTikTok = () =>
       fetchTikTokAds().catch((error: unknown) => ({
         configured: Boolean(
@@ -910,19 +953,24 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }));
     const [
       accountingPrimaryRaw,
-      websiteSalesRaw,
+      websiteSalesRawFromSheet,
       lostSheetRaw,
       tiktokRaw,
       tiktokResult,
       googleResult,
     ] = await Promise.all([
-      safeFetch(TAB.accounting, looksLikeAccountingExport),
-      safeFetch(TAB.websiteSales),
+      accountingStored?.rows.length
+        ? Promise.resolve([])
+        : safeFetch(TAB.accounting, looksLikeAccountingExport),
+      websiteSalesStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.websiteSales),
       safeFetch(TAB.lost),
       safeFetch(TAB.tiktok, looksLikeAdsExport),
       safeTikTok(),
       safeGoogle(),
     ]);
+    const websiteSalesRaw = websiteSalesStored?.rows.length
+      ? websiteSalesStored.rows
+      : websiteSalesRawFromSheet;
     fetchErrors.push(...tiktokResult.errors.map((error) => `TikTok Ads: ${error}`));
     const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
     fetchErrors.push(...googleResult.errors.map((error) => `Google Ads: ${error}`));
@@ -931,7 +979,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // Always read it as an acceptance baseline: a newly-created Accounting tab
     // may contain a valid header and only part of the year. Switching on the
     // first valid row would silently cut recognised revenue.
-    const legacySalesRaw = await safeFetch(TAB.legacySales, looksLikeAccountingExport);
+    const legacySalesRaw = accountingStored?.rows.length
+      ? []
+      : await safeFetch(TAB.legacySales, looksLikeAccountingExport);
     // Compare like with like: invoices and credit notes are canonicalised
     // together before deciding whether Accounting can replace legacy Sales.
     const primaryCanonical = canonicalizeAccountingRows(accountingPrimaryRaw);
@@ -984,15 +1034,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const revenueTolerance = Math.max(1, Math.abs(referenceRevenue) * 0.001);
     const accountingDirectAccepted =
       !!directAccounting.value &&
-      referenceRows > 0 &&
-      referenceMoves > 0 &&
-      rowRatio >= NEAR_COMPLETE_RATIO &&
-      moveRatio >= NEAR_COMPLETE_RATIO &&
-      Math.abs(revenueDelta) <= revenueTolerance &&
+      directRows > 0 &&
+      directMoves > 0 &&
       directAccounting.value.diagnostics.missingCurrencyRate === 0;
 
+    const accountingEnrichmentRaw = accountingStored?.rows.length
+      ? accountingStored.rows
+      : sheetAccountingSelection.rows;
     const sheetAccountingById = new Map(
-      sheetAccountingSelection.rows
+      accountingEnrichmentRaw
         .map((row) => [accountingStableLineId(row), row] as const)
         .filter(([id]) => !!id),
     );
@@ -1002,21 +1052,54 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       // with campaign/custom dimensions not present on account.invoice.report.
       return prior ? { ...prior, ...row } : row;
     });
+    // A successful direct read becomes the durable financial last-good copy.
+    // Persist the enriched rows so campaign attribution also survives after the
+    // Google migration fallback is removed.
+    if (accountingDirectAccepted && databaseConfigured()) {
+      await writeDashboardDataset("accounting", directAccountingRows, {
+        mode: "replace",
+        syncedAt: new Date().toISOString(),
+        metadata: {
+          source: "odoo-direct",
+          moves: directMoves,
+          revenue: directRevenue,
+        },
+      }).catch(() => {
+        fetchErrors.push("PostgreSQL accounting: last-good write failed.");
+      });
+    }
+    const storedAccountingCanonical = canonicalizeAccountingRows(accountingStored?.rows ?? []);
+    const accountingStoredAvailable =
+      !accountingDirectAccepted && storedAccountingCanonical.rows.length > 0;
+    const storedAccountingRows = storedAccountingCanonical.rows.map((row) => {
+      const prior = sheetAccountingById.get(accountingStableLineId(row));
+      return prior ? { ...prior, ...row } : row;
+    });
     const accountingSelection = accountingDirectAccepted
       ? directCanonical
-      : sheetAccountingSelection;
+      : accountingStoredAvailable
+        ? storedAccountingCanonical
+        : sheetAccountingSelection;
     const accountingSourceRaw = accountingDirectAccepted
       ? directAccounting.value!.rows
-      : sheetAccountingSourceRaw;
+      : accountingStoredAvailable
+        ? accountingStored!.rows
+        : sheetAccountingSourceRaw;
     const accountingRaw = accountingDirectAccepted
       ? directAccountingRows
-      : sheetAccountingSelection.rows;
+      : accountingStoredAvailable
+        ? storedAccountingRows
+        : sheetAccountingSelection.rows;
     const accountingTab = accountingDirectAccepted
       ? "Paid Invoices (Odoo direct)"
-      : "Paid Invoices (Payment Date)";
+      : accountingStoredAvailable
+        ? "Paid Invoices (Postgres last-good)"
+        : "Paid Invoices (Payment Date — migration fallback)";
     const accountingAuthority: DataHealth["accountingAuthority"] = accountingDirectAccepted
       ? "odoo-direct"
-      : "google-sheet-fallback";
+      : accountingStoredAvailable
+        ? "postgres-last-good"
+        : "google-sheet-fallback";
     const accountingDirectError = directAccounting.error
       ? /not configured/i.test(directAccounting.error)
         ? "Direct Odoo Accounting is not configured."
@@ -1024,7 +1107,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           ? "Direct Odoo Accounting timed out after 90 seconds."
           : "Direct Odoo Accounting request failed."
       : directAccounting.value && !accountingDirectAccepted
-        ? "Strict Accounting reconciliation gate failed."
+        ? "Direct Odoo Accounting returned no usable paid rows or unresolved currency."
         : "";
     const accountingDirectHealth: DataHealth["accountingDirect"] = {
       attempted: odooConfigured(),
@@ -1081,35 +1164,43 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       });
     };
 
-    let crmRaw: Raw[] = crmSheetRaw;
+    let crmRaw: Raw[] = crmFallbackRaw;
     // Archived Lost is fail-closed. Direct Odoo is required so both creation
     // cohorts and the separate Close Date movement remain auditable.
     let lostRaw: Raw[] = [];
     const directCrm = await directCrmPromise;
-    let crmAuthority: DataHealth["crmAuthority"] = crmSheetRaw.length
-      ? "google-sheet"
-      : "google-sheet-fallback";
+    let crmAuthority: DataHealth["crmAuthority"] = crmStored?.rows.length
+      ? "postgres-last-good"
+      : crmSheetRaw.length
+        ? "google-sheet"
+        : "google-sheet-fallback";
     let lostAuthority: DataHealth["lostAuthority"] = "unavailable";
     let crmExclusions = blankExclusions();
     let lostExclusions = blankExclusions();
-    const directCrmComplete =
-      !!directCrm.value &&
-      directCrm.value.crm.length > 0 &&
-      (!crmSheetRaw.length || directCrm.value.crm.length >= crmSheetRaw.length * 0.75);
+    const directCrmComplete = !!directCrm.value && directCrm.value.crm.length > 0;
     // Comparing the legacy sheet and Odoo row counts is not a valid completeness
     // test. A successful non-empty Odoo read is the direct archive authority.
     const directLostComplete = !!directCrm.value && directCrm.value.lost.length > 0;
 
-    // CRM remains on the reporting tab while it is healthy. Odoo is its
-    // continuity fallback only, avoiding day-boundary drift in current leads.
-    if (!crmSheetRaw.length && directCrm.value && directCrmComplete) {
-      crmRaw = enrichDirectRows(directCrm.value.crm, crmSheetRaw);
+    // Odoo now owns the CRM population. PostgreSQL holds its last successful
+    // snapshot; Google is only the one-time migration fallback/enrichment.
+    if (directCrm.value && directCrmComplete) {
+      crmRaw = enrichDirectRows(directCrm.value.crm, crmFallbackRaw);
       crmAuthority = "odoo-direct";
       crmExclusions = directCrm.value.diagnostics.crm;
-    } else if (!crmSheetRaw.length) {
+      if (databaseConfigured()) {
+        await writeDashboardDataset("crm", crmRaw, {
+          mode: "replace",
+          syncedAt: new Date().toISOString(),
+          metadata: { source: "odoo-direct", rows: crmRaw.length },
+        }).catch(() => {
+          fetchErrors.push("PostgreSQL CRM: last-good write failed.");
+        });
+      }
+    } else if (!crmFallbackRaw.length) {
       fetchErrors.push(
         directCrm.value
-          ? "CRM unavailable: direct Odoo failed completeness and the Google Sheets fallback is empty."
+          ? "CRM unavailable: direct Odoo returned no usable rows and no last-good copy exists."
           : `CRM unavailable: ${directCrm.error}`,
       );
     }
@@ -1978,7 +2069,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
 
     const tabSyncs: SourceFreshness[] = [
-      { key: "meta", label: TAB.meta, syncedAt: maxOf(metaHistoryRaw, "__synced_at") },
+      {
+        key: "meta",
+        label: metaStored?.rows.length ? "Meta Ads (PostgreSQL)" : `${TAB.meta} — migration fallback`,
+        syncedAt: metaStored?.rows.length
+          ? metaStored.syncedAt
+          : maxOf(metaHistoryRaw, "__synced_at"),
+      },
       ...(campaignStates.length
         ? [
             {
@@ -1991,7 +2088,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
             },
           ]
         : []),
-      { key: "snap", label: TAB.snap, syncedAt: maxOf(snapRaw, "__synced_at") },
+      {
+        key: "snap",
+        label: snapStored?.rows.length
+          ? "Snapchat Ads (PostgreSQL)"
+          : `${TAB.snap} — migration fallback`,
+        syncedAt: snapStored?.rows.length ? snapStored.syncedAt : maxOf(snapRaw, "__synced_at"),
+      },
       {
         key: "tiktok",
         label: tiktokApiUsable ? "TikTok Marketing API" : TAB.tiktok,
@@ -2008,18 +2111,36 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         : []),
       {
         key: "crm",
-        label: crmAuthority === "odoo-direct" ? "Odoo CRM (direct)" : TAB.crm,
-        syncedAt: asIso(maxOf(crmRaw, "__odoo_write_date")),
+        label:
+          crmAuthority === "odoo-direct"
+            ? "Odoo CRM (direct)"
+            : crmAuthority === "postgres-last-good"
+              ? "Odoo CRM (Postgres last-good)"
+              : `${TAB.crm} — migration fallback`,
+        syncedAt:
+          crmAuthority === "odoo-direct"
+            ? new Date().toISOString()
+            : crmAuthority === "postgres-last-good"
+              ? crmStored!.syncedAt
+              : asIso(maxOf(crmRaw, "__odoo_write_date")),
       },
       {
         key: "accounting",
         label: accountingTab,
-        syncedAt: asIso(maxOf(accountingRaw, "__odoo_write_date")),
+        syncedAt: accountingDirectAccepted
+          ? new Date().toISOString()
+          : accountingStoredAvailable
+            ? accountingStored!.syncedAt
+            : asIso(maxOf(accountingRaw, "__odoo_write_date")),
       },
       {
         key: "websiteSales",
-        label: TAB.websiteSales,
-        syncedAt: asIso(maxOf(websiteSalesRaw, "__odoo_write_date")),
+        label: websiteSalesStored?.rows.length
+          ? "Website Sales (PostgreSQL)"
+          : `${TAB.websiteSales} — migration fallback`,
+        syncedAt: websiteSalesStored?.rows.length
+          ? websiteSalesStored.syncedAt
+          : asIso(maxOf(websiteSalesRaw, "__odoo_write_date")),
       },
       {
         key: "lost",
