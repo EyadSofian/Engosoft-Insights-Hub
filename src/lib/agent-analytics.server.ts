@@ -70,7 +70,7 @@ export interface AgentAnalyticsResult {
     source: string;
     fetchedAt: string;
     error?: string;
-    grain: "month";
+    grain: "day";
     callsThrough: string;
     salesThrough: string;
     callsAvailable: boolean;
@@ -101,6 +101,12 @@ function monthEnd(month: string): string {
 }
 
 function monthIncluded(monthValue: string, filters: GlobalFilters): boolean {
+  const exactDate = monthValue.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(exactDate)) {
+    if (filters.from && exactDate < filters.from) return false;
+    if (filters.to && exactDate > filters.to) return false;
+    return true;
+  }
   const month = monthKey(monthValue);
   if (!month) return false;
   const start = `${month}-01`;
@@ -357,7 +363,7 @@ export async function buildAgentAnalytics(
     ok: false,
     source: "Railway PostgreSQL · Yeastar",
     fetchedAt: "",
-    grain: "month",
+    grain: "day",
     callsThrough: "",
     salesThrough: "",
     callsAvailable: false,
@@ -393,7 +399,7 @@ export async function buildAgentAnalytics(
       ok: true,
       source: snapshot.source,
       fetchedAt: snapshot.fetchedAt,
-      grain: "month",
+      grain: "day",
       callsThrough,
       salesThrough,
       callsAvailable: false,

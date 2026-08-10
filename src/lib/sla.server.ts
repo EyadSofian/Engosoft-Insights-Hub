@@ -55,9 +55,9 @@ const num = (value: unknown): number => {
 
 const text = (value: unknown): string => String(value ?? "").trim();
 
-const monthOf = (value: string): string => {
-  const matched = value.match(/^(\d{4}-\d{2})/);
-  return matched ? `${matched[1]}-01` : "";
+const dateOf = (value: string): string => {
+  const matched = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return matched?.[1] || "";
 };
 
 const blank = (month: string, userId: number, userName: string): MutableMonth => ({
@@ -102,29 +102,32 @@ async function refresh(): Promise<SlaSnapshot> {
       ] as const)
       .filter(([extension, person]) => extension && person.userName),
   );
-  const monthly = new Map<string, MutableMonth>();
+  // Keep the existing `month` field name for the API contract, but aggregate
+  // at day grain. The employee screen supports arbitrary date windows; a
+  // monthly bucket made Aug 1–5 accidentally include calls from Aug 6 onward.
+  const daily = new Map<string, MutableMonth>();
 
   for (const call of calls.rows) {
-    const month = monthOf(text(call.started_at || call["Started At"]));
+    const day = dateOf(text(call.started_at || call["Started At"]));
     const extension = text(call.extension);
     const mapped = extensionMap.get(extension);
     const userName = text(call.user_name) || mapped?.userName || "";
     const userId = num(call.user_id) || mapped?.userId || 0;
-    if (!month || !userName) continue;
+    if (!day || !userName) continue;
     const direction = text(call.direction).toLowerCase();
     if (direction && direction !== "outbound") continue;
 
-    const key = `${month}\u0000${userName}`;
-    const row = monthly.get(key) ?? blank(month, userId, userName);
+    const key = `${day}\u0000${userName}`;
+    const row = daily.get(key) ?? blank(day, userId, userName);
     const talkSeconds = num(call.talk_sec);
     const disposition = text(call.disposition).toUpperCase();
     row.outbound_calls += 1;
     row.talk_sec += talkSeconds;
     if (talkSeconds > 0 || disposition === "ANSWERED") row.answered_calls += 1;
-    monthly.set(key, row);
+    daily.set(key, row);
   }
 
-  const repMonthly = [...monthly.values()]
+  const repMonthly = [...daily.values()]
     .map((row) => ({
       ...row,
       answer_pct:

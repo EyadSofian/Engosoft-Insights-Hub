@@ -253,10 +253,10 @@ check(
   [],
 );
 check(
-  "Current CRM keeps the canonical Google Sheets authority",
-  filters.health?.crmAuthority === "google-sheet",
+  "Current CRM uses direct Odoo authority",
+  filters.health?.crmAuthority === "odoo-direct",
   filters.health?.crmAuthority,
-  "google-sheet",
+  "odoo-direct",
 );
 check(
   "Archived Lost is direct Odoo or safely unavailable with zero rows",
