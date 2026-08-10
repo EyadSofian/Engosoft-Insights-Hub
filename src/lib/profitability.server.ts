@@ -96,7 +96,7 @@ async function fetchProfitability(
     report_id: REPORT_ID,
   });
 
-  const options = await odooCallWithPolicy<OdooReportOptions>(
+  const initialOptions = await odooCallWithPolicy<OdooReportOptions>(
     "account.report",
     "get_options",
     [REPORT_ID, {}],
@@ -104,7 +104,7 @@ async function fetchProfitability(
     { attempts: 1, timeoutMs: 45_000 },
   );
   const availableCompanies =
-    options.companies ?? cfg.companyIds.map((id) => ({ id, name: String(id) }));
+    initialOptions.companies ?? cfg.companyIds.map((id) => ({ id, name: String(id) }));
   const selectedCompanies = company
     ? availableCompanies.filter((item) => clean(item.name) === clean(company))
     : availableCompanies;
@@ -112,32 +112,47 @@ async function fetchProfitability(
     throw new Error(`Odoo Profit and Loss company was not found: ${company}`);
   }
   const selectedCompanyIds = selectedCompanies.map((item) => Number(item.id));
-  options.companies = selectedCompanies;
   const reportContext = companyContext({
     lang: "en_US",
     tz: "Africa/Cairo",
     report_id: REPORT_ID,
     allowed_company_ids: selectedCompanyIds,
   });
-  options.date = {
-    ...(options.date ?? {}),
-    string: `${from} - ${to}`,
-    period_type: "custom",
-    mode: "range",
-    date_from: from,
-    date_to: to,
-    filter: "custom",
+  // `get_options()` builds the report's column groups. Mutating only
+  // `options.date` afterwards leaves each column's `forced_options.date` on
+  // Odoo's default fiscal year, so the UI says "custom range" while the
+  // figures are actually year-to-date. Feed the desired range back through
+  // Odoo once so it rebuilds the columns and computes the exact P&L itself.
+  const previousOptions: OdooReportOptions = {
+    ...initialOptions,
+    companies: selectedCompanies,
+    date: {
+      ...(initialOptions.date ?? {}),
+      string: `${from} - ${to}`,
+      period_type: "custom",
+      mode: "range",
+      date_from: from,
+      date_to: to,
+      filter: "custom",
+    },
+    comparison: {
+      ...(initialOptions.comparison ?? {}),
+      filter: "no_comparison",
+      date_from: from,
+      date_to: to,
+      periods: [],
+    },
+    all_entries: false,
+    unfold_all: false,
+    unfolded_lines: [],
   };
-  options.comparison = {
-    ...(options.comparison ?? {}),
-    filter: "no_comparison",
-    date_from: from,
-    date_to: to,
-    periods: [],
-  };
-  options.all_entries = false;
-  options.unfold_all = false;
-  options.unfolded_lines = [];
+  const options = await odooCallWithPolicy<OdooReportOptions>(
+    "account.report",
+    "get_options",
+    [REPORT_ID, previousOptions],
+    { context: reportContext },
+    { attempts: 1, timeoutMs: 45_000 },
+  );
 
   const report = await odooCallWithPolicy<OdooReportInformation>(
     "account.report",
