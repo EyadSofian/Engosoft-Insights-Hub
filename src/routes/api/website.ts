@@ -224,6 +224,7 @@ export const Route = createFileRoute("/api/website")({
         const websiteOrders = [...websiteOrdersByKey.values()]
           .map((order) => ({
             ...order,
+            courseList: [...order.courses],
             courses: [...order.courses].join(", "),
             salesperson: [...order.salespeople].join(", "),
           }))
@@ -351,6 +352,111 @@ export const Route = createFileRoute("/api/website")({
         const conversionRate =
           crm.length + lost.length ? (won.length / (crm.length + lost.length)) * 100 : null;
 
+        type SheetSalesChannel = "direct" | "sales" | "other";
+        const sheetSalesChannel = (source: string): SheetSalesChannel => {
+          const normalized = normalizeName(source);
+          if (normalized === "direct") return "direct";
+          if (/(^|\s)(digital\s+sales|resales|sales)(\s|$)/i.test(normalized)) return "sales";
+          return "other";
+        };
+        const salesOwner = (source: string) => {
+          if (sheetSalesChannel(source) === "direct") return "Direct";
+          const owner = source.match(/\(([^)]+)\)/)?.[1]?.trim();
+          return owner || source.trim() || "Unspecified";
+        };
+        const sheetOrders = websiteOrders.filter((order) =>
+          /external google sheet/i.test(order.source),
+        );
+        const sheetRevenue = sheetOrders.reduce((sum, order) => sum + order.usdSales, 0);
+        const sheetChannels = new Map<
+          SheetSalesChannel,
+          { channel: SheetSalesChannel; orders: number; revenue: number }
+        >(
+          (["direct", "sales", "other"] as const).map((channel) => [
+            channel,
+            { channel, orders: 0, revenue: 0 },
+          ]),
+        );
+        const sheetOwners = new Map<
+          string,
+          {
+            owner: string;
+            channel: SheetSalesChannel;
+            orders: number;
+            revenue: number;
+          }
+        >();
+        const sheetCourses = new Map<
+          string,
+          {
+            label: string;
+            orders: Set<string>;
+            directOrders: Set<string>;
+            salesOrders: Set<string>;
+            attributedRevenue: number;
+          }
+        >();
+        for (const order of sheetOrders) {
+          const channel = sheetSalesChannel(order.externalSalesSource);
+          const channelRow = sheetChannels.get(channel)!;
+          channelRow.orders++;
+          channelRow.revenue += order.usdSales;
+
+          const owner = salesOwner(order.externalSalesSource);
+          const ownerKey = normalizeName(owner) || "unspecified";
+          const ownerRow = sheetOwners.get(ownerKey) ?? {
+            owner,
+            channel,
+            orders: 0,
+            revenue: 0,
+          };
+          ownerRow.orders++;
+          ownerRow.revenue += order.usdSales;
+          sheetOwners.set(ownerKey, ownerRow);
+
+          const courseList = order.courseList.length ? order.courseList : ["—"];
+          const allocatedRevenue = courseList.length ? order.usdSales / courseList.length : 0;
+          for (const course of courseList) {
+            const key = normalizeName(course) || "—";
+            const courseRow = sheetCourses.get(key) ?? {
+              label: course || "—",
+              orders: new Set<string>(),
+              directOrders: new Set<string>(),
+              salesOrders: new Set<string>(),
+              attributedRevenue: 0,
+            };
+            courseRow.orders.add(order.orderRef);
+            if (channel === "direct") courseRow.directOrders.add(order.orderRef);
+            if (channel === "sales") courseRow.salesOrders.add(order.orderRef);
+            courseRow.attributedRevenue += allocatedRevenue;
+            sheetCourses.set(key, courseRow);
+          }
+        }
+        const sheetSalesAnalysis = {
+          totalOrders: sheetOrders.length,
+          totalRevenue: sheetRevenue,
+          averageOrder: sheetOrders.length ? sheetRevenue / sheetOrders.length : null,
+          channels: [...sheetChannels.values()].map((row) => ({
+            ...row,
+            orderShare: sheetOrders.length ? (row.orders / sheetOrders.length) * 100 : 0,
+          })),
+          owners: [...sheetOwners.values()]
+            .map((row) => ({
+              ...row,
+              orderShare: sheetOrders.length ? (row.orders / sheetOrders.length) * 100 : 0,
+            }))
+            .sort((a, b) => b.orders - a.orders || b.revenue - a.revenue),
+          courses: [...sheetCourses.values()]
+            .map((row) => ({
+              label: row.label,
+              orders: row.orders.size,
+              directOrders: row.directOrders.size,
+              salesOrders: row.salesOrders.size,
+              attributedRevenue: row.attributedRevenue,
+            }))
+            .sort((a, b) => b.orders - a.orders || b.attributedRevenue - a.attributedRevenue),
+        };
+
         return json({
           totals: {
             leads: crm.length + lost.length,
@@ -395,6 +501,7 @@ export const Route = createFileRoute("/api/website")({
             matchedSales: matchedOrders.reduce((sum, order) => sum + order.usdSales, 0),
             externalOnlySales: externalOnlyOrders.reduce((sum, order) => sum + order.usdSales, 0),
           },
+          sheetSalesAnalysis,
           leadSources: {
             activeCrm: crm.length,
             activeWon: won.length,

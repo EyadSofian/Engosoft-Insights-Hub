@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Banknote,
+  BookOpen,
   CircleCheckBig,
   CircleDot,
   CircleX,
@@ -14,6 +15,7 @@ import {
   MousePointerClick,
   ShoppingCart,
   Target,
+  UsersRound,
 } from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
@@ -149,6 +151,31 @@ interface Resp {
     matchedSales: number;
     externalOnlySales: number;
   };
+  sheetSalesAnalysis: {
+    totalOrders: number;
+    totalRevenue: number;
+    averageOrder: number | null;
+    channels: {
+      channel: "direct" | "sales" | "other";
+      orders: number;
+      revenue: number;
+      orderShare: number;
+    }[];
+    owners: {
+      owner: string;
+      channel: "direct" | "sales" | "other";
+      orders: number;
+      revenue: number;
+      orderShare: number;
+    }[];
+    courses: {
+      label: string;
+      orders: number;
+      directOrders: number;
+      salesOrders: number;
+      attributedRevenue: number;
+    }[];
+  };
   leadSources: {
     activeCrm: number;
     activeWon: number;
@@ -209,6 +236,22 @@ function Website() {
           matchedOrders: "متطابق بين المصدرين",
           externalOnlyOrders: "من الشيت فقط",
           discrepancyOrders: "يحتاج مراجعة",
+          sheetSalesTitle: "مبيعات شيت الموقع",
+          sheetSalesHint:
+            "أوردرات الشيت بعد منع تكرار Order ID ومطابقتها مع Odoo. الأرقام تتغير مع الفترة والفلاتر المختارة.",
+          sheetOrders: "أوردر من الشيت",
+          reconciledSheetRevenue: "إيراد الأوردرات بعد المطابقة",
+          directSales: "شراء مباشر",
+          salesTeamSales: "عن طريق فريق المبيعات",
+          otherSales: "مصدر غير محدد",
+          salesOwners: "مين قفل البيع؟",
+          sourceShare: "من أوردرات الشيت",
+          sheetCourses: "الدورات المباعة من الشيت",
+          sheetCoursesHint:
+            "عدد الأوردرات التي ظهر فيها كل كورس. لو الأوردر فيه أكثر من كورس بيتحسب مرة لكل كورس.",
+          directShort: "مباشر",
+          salesShort: "سيلز",
+          averageSheetOrder: "متوسط الأوردر",
           activeCrm: "ليد نشط من Odoo CRM",
           archivedLost: "Lost مؤكد من الأرشيف",
           wonDefinition: "من Odoo CRM وحالته Won",
@@ -273,6 +316,22 @@ function Website() {
           matchedOrders: "Matched across both sources",
           externalOnlyOrders: "External sheet only",
           discrepancyOrders: "Needs review",
+          sheetSalesTitle: "Website-sheet sales",
+          sheetSalesHint:
+            "Sheet orders after Order-ID deduplication and Odoo reconciliation. Selected dates and filters apply.",
+          sheetOrders: "sheet orders",
+          reconciledSheetRevenue: "Reconciled order revenue",
+          directSales: "Direct purchase",
+          salesTeamSales: "Closed by sales",
+          otherSales: "Unspecified source",
+          salesOwners: "Who closed the sale?",
+          sourceShare: "of sheet orders",
+          sheetCourses: "Courses sold from the sheet",
+          sheetCoursesHint:
+            "Orders containing each course. A multi-course order appears once under every included course.",
+          directShort: "Direct",
+          salesShort: "Sales",
+          averageSheetOrder: "Average order",
           activeCrm: "active leads from Odoo CRM",
           archivedLost: "confirmed archived lost",
           wonDefinition: "Odoo CRM leads whose status is Won",
@@ -524,6 +583,11 @@ function Website() {
       icon: <ListChecks size={17} />,
     },
   ];
+  const sheetChannelLabels = {
+    direct: copy.directSales,
+    sales: copy.salesTeamSales,
+    other: copy.otherSales,
+  } as const;
 
   return (
     <div className="space-y-5">
@@ -775,6 +839,139 @@ function Website() {
                 icon={<Banknote size={18} />}
               />
             </div>
+
+            <Card className="overflow-hidden border-brand/15">
+              <SectionTitle
+                hint={copy.sheetSalesHint}
+                action={
+                  <Pill tone="brand">
+                    {fmtNum(data.sheetSalesAnalysis.totalOrders)} {copy.sheetOrders}
+                  </Pill>
+                }
+              >
+                <span className="inline-flex items-center gap-2">
+                  <ShoppingCart size={17} className="text-brand" />
+                  {copy.sheetSalesTitle}
+                </span>
+              </SectionTitle>
+
+              <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                {data.sheetSalesAnalysis.channels.map((channel) => (
+                  <div
+                    key={channel.channel}
+                    className={`rounded-xl border p-3 ${
+                      channel.channel === "direct"
+                        ? "border-brand/20 bg-brand-soft/45"
+                        : channel.channel === "sales"
+                          ? "border-success/20 bg-success-soft/45"
+                          : "border-warning/20 bg-warning-soft/45"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                      <span className="truncate">{sheetChannelLabels[channel.channel]}</span>
+                      <span className="num shrink-0">{fmtPct(channel.orderShare, 0)}</span>
+                    </div>
+                    <div className="mt-1 flex items-end justify-between gap-3">
+                      <div className="num text-2xl font-bold text-text">
+                        {fmtNum(channel.orders)}
+                      </div>
+                      <div className="num text-xs font-semibold text-text-muted">
+                        {fmtUSDFull(channel.revenue)}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-text-subtle">{copy.sourceShare}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <section className="rounded-2xl border border-border bg-surface-2/35 p-3.5">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                        <UsersRound size={16} className="text-brand" />
+                        {copy.salesOwners}
+                      </div>
+                      <div className="mt-1 text-[10.5px] text-text-muted">
+                        {copy.reconciledSheetRevenue}:{" "}
+                        {fmtUSDFull(data.sheetSalesAnalysis.totalRevenue)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-surface px-2.5 py-1.5 text-end shadow-sm ring-1 ring-border">
+                      <div className="text-[9.5px] text-text-muted">{copy.averageSheetOrder}</div>
+                      <div className="num text-xs font-semibold text-text">
+                        {fmtUSDFull(data.sheetSalesAnalysis.averageOrder)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {data.sheetSalesAnalysis.owners.slice(0, 7).map((owner) => (
+                      <div key={`${owner.channel}:${owner.owner}`}>
+                        <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                          <span className="min-w-0 truncate font-medium text-text" dir="auto">
+                            {owner.owner}
+                          </span>
+                          <span className="num shrink-0 text-text-muted">
+                            {fmtNum(owner.orders)} · {fmtUSDFull(owner.revenue)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-surface">
+                          <div
+                            className={`h-full rounded-full ${
+                              owner.channel === "direct"
+                                ? "bg-brand"
+                                : owner.channel === "sales"
+                                  ? "bg-success"
+                                  : "bg-warning"
+                            }`}
+                            style={{ width: `${Math.max(owner.orderShare, 1.5)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-surface-2/35 p-3.5">
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                      <BookOpen size={16} className="text-brand" />
+                      {copy.sheetCourses}
+                    </div>
+                    <p className="mt-1 text-[10.5px] leading-5 text-text-muted">
+                      {copy.sheetCoursesHint}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {data.sheetSalesAnalysis.courses.slice(0, 8).map((course) => (
+                      <div
+                        key={course.label}
+                        className="min-w-0 rounded-xl border border-border/80 bg-surface px-3 py-2.5"
+                      >
+                        <div
+                          className="truncate text-[11.5px] font-semibold text-text"
+                          dir="auto"
+                          title={displayCourseLabel(course.label)}
+                        >
+                          {displayCourseLabel(course.label)}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-text-muted">
+                          <span className="num font-semibold text-text">
+                            {fmtNum(course.orders)} {copy.orders}
+                          </span>
+                          <span>
+                            {copy.directShort} {fmtNum(course.directOrders)} · {copy.salesShort}{" "}
+                            {fmtNum(course.salesOrders)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </Card>
 
             <Card>
               <SectionTitle>{copy.quickAnalysis}</SectionTitle>
