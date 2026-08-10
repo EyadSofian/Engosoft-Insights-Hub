@@ -971,6 +971,54 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const websiteSalesRaw = websiteSalesStored?.rows.length
       ? websiteSalesStored.rows
       : websiteSalesRawFromSheet;
+
+    // One-time migration bootstrap. A deployment that already has the new
+    // PostgreSQL schema but has not yet had its n8n writers switched over must
+    // not keep serving Google forever. Preserve each accepted raw snapshot
+    // once, then every later load reads the durable copy above. Keep the
+    // original source timestamp so an import never makes old data look fresh.
+    const sourceSyncedAt = (rows: Raw[]): string => {
+      let latest = 0;
+      for (const row of rows) {
+        const raw = str(
+          firstPresent(
+            row["__synced_at"],
+            row["__odoo_write_date"],
+            row["__source_updated_at"],
+          ),
+        );
+        if (!raw) continue;
+        const parsed = Date.parse(raw.includes("T") ? raw : `${raw.replace(" ", "T")}Z`);
+        if (Number.isFinite(parsed) && parsed > latest) latest = parsed;
+      }
+      return latest ? new Date(latest).toISOString() : new Date().toISOString();
+    };
+    const bootstrapStoredDataset = async (
+      dataset: DashboardDataset,
+      stored: DatasetSnapshot | null,
+      rows: Raw[],
+      sourceTab: string,
+    ) => {
+      if (!databaseConfigured() || stored?.rows.length || !rows.length) return;
+      await writeDashboardDataset(dataset, rows, {
+        mode: "replace",
+        syncedAt: sourceSyncedAt(rows),
+        metadata: { source: "google-migration-bootstrap", sourceTab },
+      }).catch(() => {
+        fetchErrors.push(`PostgreSQL ${dataset}: migration bootstrap write failed.`);
+      });
+    };
+    await Promise.all([
+      bootstrapStoredDataset("meta_ads", metaStored, metaSheetRaw, TAB.meta),
+      bootstrapStoredDataset("snap_ads", snapStored, snapSheetRaw, TAB.snap),
+      bootstrapStoredDataset("invoiced", invoicedStored, invoicedSheetRaw, TAB.invoiced),
+      bootstrapStoredDataset(
+        "website_sales",
+        websiteSalesStored,
+        websiteSalesRawFromSheet,
+        TAB.websiteSales,
+      ),
+    ]);
     fetchErrors.push(...tiktokResult.errors.map((error) => `TikTok Ads: ${error}`));
     const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
     fetchErrors.push(...googleResult.errors.map((error) => `Google Ads: ${error}`));
@@ -1067,6 +1115,13 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }).catch(() => {
         fetchErrors.push("PostgreSQL accounting: last-good write failed.");
       });
+    } else if (!accountingStored?.rows.length && sheetAccountingSelection.rows.length) {
+      await bootstrapStoredDataset(
+        "accounting",
+        accountingStored,
+        sheetAccountingSelection.rows,
+        accountingPrimaryComplete ? TAB.accounting : TAB.legacySales,
+      );
     }
     const storedAccountingCanonical = canonicalizeAccountingRows(accountingStored?.rows ?? []);
     const accountingStoredAvailable =
@@ -1197,6 +1252,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           fetchErrors.push("PostgreSQL CRM: last-good write failed.");
         });
       }
+    } else if (crmSheetRaw.length) {
+      await bootstrapStoredDataset("crm", crmStored, crmSheetRaw, TAB.crm);
     } else if (!crmFallbackRaw.length) {
       fetchErrors.push(
         directCrm.value
