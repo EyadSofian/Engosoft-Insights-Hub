@@ -289,7 +289,7 @@ check(
 );
 check(
   "Platform leads = sum of reported platform leads",
-  totals.platformLeads === platformLeads,
+  platformLeads !== null && same(totals.platformLeads, platformLeads),
   totals.platformLeads,
   platformLeads,
 );
