@@ -909,16 +909,22 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         if (timer) clearTimeout(timer);
       }
     };
+    // Accounting is owned by the hardened n8n -> PostgreSQL workflow. Once a
+    // durable snapshot exists, do not launch a second broad Odoo read on every
+    // dashboard refresh; it adds load and can only be rejected by the guard.
+    const directAccountingAttempted = !accountingStored?.rows.length && odooConfigured();
     const directAccountingPromise: Promise<
       { value: DirectAccountingSnapshot; error?: never } | { value?: never; error: string }
-    > = odooConfigured()
+    > = directAccountingAttempted
       ? directAccountingWithTimeout()
           .then((value) => ({ value }))
           .catch((error: unknown) => ({
             error: error instanceof Error ? error.message : String(error),
           }))
       : Promise.resolve({
-          error: "Odoo Accounting is not configured; using Google Sheets fallback.",
+          error: accountingStored?.rows.length
+            ? ""
+            : "Odoo Accounting is not configured; using the migration fallback.",
         });
 
     // Seven simultaneous requests to one document is what triggers Google's
@@ -1198,7 +1204,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           : "Direct Odoo Accounting returned no usable paid rows or unresolved currency."
         : "";
     const accountingDirectHealth: DataHealth["accountingDirect"] = {
-      attempted: odooConfigured(),
+      attempted: directAccountingAttempted,
       accepted: accountingDirectAccepted,
       reportCandidates: directAccounting.value?.diagnostics.reportCandidates ?? 0,
       acceptedRows: directAccounting.value?.diagnostics.acceptedRows ?? 0,
