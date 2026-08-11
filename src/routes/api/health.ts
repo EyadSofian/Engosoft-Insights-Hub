@@ -14,6 +14,7 @@ export const Route = createFileRoute("/api/health")({
                   "snap_ads",
                   "accounting",
                   "crm",
+                  "lost",
                   "invoiced",
                   "website_sales",
                   "pbx_extensions",
