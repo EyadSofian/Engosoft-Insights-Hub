@@ -67,7 +67,18 @@ export const Route = createFileRoute("/api/accounting-export")({
 
         if (view === "summary") {
           const revenue = rows.reduce((sum, row) => sum + row.usdPaid, 0);
-          const invoices = new Set(rows.map((row) => row.movement).filter(Boolean)).size;
+          const invoices = new Set(
+            rows
+              .filter((row) => !row.isCreditNote)
+              .map((row) => row.movement)
+              .filter(Boolean),
+          ).size;
+          const creditNotes = new Set(
+            rows
+              .filter((row) => row.isCreditNote)
+              .map((row) => row.movement)
+              .filter(Boolean),
+          ).size;
           const negativeRows = rows.filter((row) => row.usdPaid < 0);
           const withoutSource = rows
             .filter((row) => !row.source)
@@ -87,7 +98,13 @@ export const Route = createFileRoute("/api/accounting-export")({
             [
               ar ? "عدد الفواتير" : "Distinct invoices",
               invoices,
-              ar ? "عدد Move المميز" : "Distinct Move count",
+              ar ? "عدد Move المميز بدون الإشعارات الدائنة" : "Distinct non-credit Move count",
+              source,
+            ],
+            [
+              ar ? "عدد الإشعارات الدائنة" : "Distinct credit notes",
+              creditNotes,
+              ar ? "عدد Move الدائن المميز" : "Distinct credit-note Move count",
               source,
             ],
             [

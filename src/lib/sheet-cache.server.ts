@@ -2178,18 +2178,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           ? metaStored.syncedAt
           : maxOf(metaHistoryRaw, "__synced_at"),
       },
-      ...(campaignStates.length
-        ? [
-            {
-              key: "metaLive",
-              label: "Meta live status (Google backup)",
-              syncedAt: campaignStates.reduce(
-                (max, state) => (state.checkedAt > max ? state.checkedAt : max),
-                "",
-              ),
-            },
-          ]
-        : []),
+      // `campaignStates` is only a recovery snapshot for the official live-status
+      // endpoint. Its age must not make fresh PostgreSQL ad facts look stale.
       {
         key: "snap",
         label: snapStored?.rows.length
@@ -2234,6 +2224,15 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           : accountingStoredAvailable
             ? accountingStored!.syncedAt
             : asIso(maxOf(accountingRaw, "__odoo_write_date")),
+      },
+      {
+        key: "invoiced",
+        label: invoicedStored?.rows.length
+          ? "Full Invoiced Orders (PostgreSQL)"
+          : `${TAB.invoiced} — migration fallback`,
+        syncedAt: invoicedStored?.rows.length
+          ? invoicedStored.syncedAt
+          : asIso(maxOf(invRaw, "__odoo_write_date")),
       },
       {
         key: "websiteSales",
