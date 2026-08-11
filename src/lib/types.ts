@@ -621,8 +621,8 @@ export interface DataHealth {
   /** Paid invoice-line source, with PostgreSQL retaining the last good Odoo read. */
   accountingAuthority: "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
   /**
-   * Non-sensitive direct-Odoo diagnostics. The sheet comparison remains visible
-   * for audit only; a stale Google export can no longer veto a healthy Odoo read.
+   * Non-sensitive direct-Odoo diagnostics. PostgreSQL is the preferred audit
+   * baseline; a partial or differently re-rated direct read cannot replace it.
    */
   accountingDirect: {
     attempted: boolean;

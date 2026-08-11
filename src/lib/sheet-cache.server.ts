@@ -9,6 +9,10 @@
 import Papa from "papaparse";
 import { loadDirectCrm, type CrmExclusionDiagnostics, type CrmRawRow } from "./crm-odoo.server";
 import { loadDirectAccounting, type DirectAccountingSnapshot } from "./accounting-odoo.server";
+import {
+  authoritativeAccountingUsd,
+  directAccountingPassesCompletenessGate,
+} from "./accounting-authority";
 import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
 import { odooConfigured } from "./odoo.server";
 import { fetchGoogleAds } from "./google-ads.server";
@@ -1058,7 +1062,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           sum +
           signedCreditAmount(
             usdValue(
-              firstPresent(row["USD Paid"], row["$ paid"], row["$ Paid"], row["$ Sales"]),
+              authoritativeAccountingUsd(row),
               firstPresent(row["Total in Currency"], row["Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¨Ø§Ù„Ø¹Ù…Ù„Ø©"]),
               firstPresent(row["Currency"], row["Ø§Ù„Ø¹Ù…Ù„Ø©"]),
             ),
@@ -1066,9 +1070,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           ),
         0,
       );
-    const referenceRows = sheetAccountingSelection.rows.length;
-    const referenceMoves = distinctMoves(sheetAccountingSelection.rows);
-    const referenceRevenue = rawAccountingRevenue(sheetAccountingSelection.rows);
+    const storedAccountingCanonical = canonicalizeAccountingRows(accountingStored?.rows ?? []);
+    // PostgreSQL is the durable n8n authority. It must be the reconciliation
+    // baseline whenever it exists; using the intentionally skipped Google read
+    // here produced a zero-row baseline and let a six-row Odoo response replace
+    // thousands of good accounting lines.
+    const accountingReference = storedAccountingCanonical.rows.length
+      ? storedAccountingCanonical
+      : sheetAccountingSelection;
+    const referenceRows = accountingReference.rows.length;
+    const referenceMoves = distinctMoves(accountingReference.rows);
+    const referenceRevenue = rawAccountingRevenue(accountingReference.rows);
     const directAccounting = await directAccountingPromise;
     const directCanonical = canonicalizeAccountingRows(directAccounting.value?.rows ?? []);
     const directRows = directCanonical.rows.length;
@@ -1082,9 +1094,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const revenueTolerance = Math.max(1, Math.abs(referenceRevenue) * 0.001);
     const accountingDirectAccepted =
       !!directAccounting.value &&
-      directRows > 0 &&
-      directMoves > 0 &&
-      directAccounting.value.diagnostics.missingCurrencyRate === 0;
+      directAccountingPassesCompletenessGate({
+        directRows,
+        directMoves,
+        directRevenue,
+        missingCurrencyRate: directAccounting.value.diagnostics.missingCurrencyRate,
+        referenceRows,
+        referenceMoves,
+        referenceRevenue,
+        nearCompleteRatio: NEAR_COMPLETE_RATIO,
+        revenueTolerance,
+      });
 
     const accountingEnrichmentRaw = accountingStored?.rows.length
       ? accountingStored.rows
@@ -1096,9 +1116,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     );
     const directAccountingRows = directCanonical.rows.map((row) => {
       const prior = sheetAccountingById.get(accountingStableLineId(row));
-      // Odoo owns dates and money; the sheet can still enrich a matching line
-      // with campaign/custom dimensions not present on account.invoice.report.
-      return prior ? { ...prior, ...row } : row;
+      if (!prior) return row;
+      // Odoo owns dates and dimensions, but n8n/PostgreSQL owns the recognised
+      // USD value because it uses Odoo's current FX lookup. Preserve that value
+      // explicitly so the direct reader's emergency static-rate value cannot
+      // win merely because both column names exist after the merge.
+      const recognisedUsd = authoritativeAccountingUsd(prior);
+      return {
+        ...prior,
+        ...row,
+        ...(String(recognisedUsd).trim() === "" ? {} : { "USD Paid": recognisedUsd }),
+      };
     });
     // A successful direct read becomes the durable financial last-good copy.
     // Persist the enriched rows so campaign attribution also survives after the
@@ -1123,7 +1151,6 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         accountingPrimaryComplete ? TAB.accounting : TAB.legacySales,
       );
     }
-    const storedAccountingCanonical = canonicalizeAccountingRows(accountingStored?.rows ?? []);
     const accountingStoredAvailable =
       !accountingDirectAccepted && storedAccountingCanonical.rows.length > 0;
     const storedAccountingRows = storedAccountingCanonical.rows.map((row) => {
@@ -1162,7 +1189,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           ? "Direct Odoo Accounting timed out after 90 seconds."
           : "Direct Odoo Accounting request failed."
       : directAccounting.value && !accountingDirectAccepted
-        ? "Direct Odoo Accounting returned no usable paid rows or unresolved currency."
+        ? referenceRows > 0
+          ? `Direct Odoo Accounting failed the completeness gate (${directRows}/${referenceRows} rows, ${directMoves}/${referenceMoves} invoices).`
+          : "Direct Odoo Accounting returned no usable paid rows or unresolved currency."
         : "";
     const accountingDirectHealth: DataHealth["accountingDirect"] = {
       attempted: odooConfigured(),
@@ -1802,11 +1831,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         );
         const currency = str(firstPresent(r["Currency"], r["العملة"]));
         const usdPaid = signedCreditAmount(
-          usdValue(
-            firstPresent(r["USD Paid"], r["$ paid"], r["$ Paid"], r["$ Sales"]),
-            totalInCurrency,
-            currency,
-          ),
+          usdValue(authoritativeAccountingUsd(r), totalInCurrency, currency),
           isCreditNote,
         );
         const untaxedTotal = signedCreditAmount(

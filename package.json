@@ -13,6 +13,7 @@
     "start": "node .output/server/index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test:accounting-authority": "node --experimental-strip-types scripts/test-accounting-authority.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
     "lint": "eslint .",
