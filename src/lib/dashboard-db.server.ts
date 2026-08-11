@@ -13,6 +13,7 @@ export type DashboardDataset =
   | "snap_ads"
   | "accounting"
   | "crm"
+  | "lost"
   | "invoiced"
   | "website_sales"
   | "pbx_extensions"
@@ -43,6 +44,7 @@ const DATASETS = new Set<DashboardDataset>([
   "snap_ads",
   "accounting",
   "crm",
+  "lost",
   "invoiced",
   "website_sales",
   "pbx_extensions",

@@ -784,6 +784,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       snapStored,
       accountingStored,
       crmStored,
+      lostStored,
       invoicedStored,
       websiteSalesStored,
     ] = await Promise.all([
@@ -791,6 +792,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       readStored("snap_ads"),
       readStored("accounting"),
       readStored("crm"),
+      readStored("lost"),
       readStored("invoiced"),
       readStored("website_sales"),
     ]);
@@ -967,7 +969,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         ? Promise.resolve([])
         : safeFetch(TAB.accounting, looksLikeAccountingExport),
       websiteSalesStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.websiteSales),
-      safeFetch(TAB.lost),
+      // Archived Lost is an Odoo/PostgreSQL fact table. The old Sheet did not
+      // carry a reliable Close Date, so it is never used as a reporting fallback.
+      lostStored?.rows.length ? Promise.resolve(lostStored.rows) : Promise.resolve([]),
       safeFetch(TAB.tiktok, looksLikeAdsExport),
       safeTikTok(),
       safeGoogle(),
@@ -1249,16 +1253,18 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
 
     let crmRaw: Raw[] = crmFallbackRaw;
-    // Archived Lost is fail-closed. Direct Odoo is required so both creation
-    // cohorts and the separate Close Date movement remain auditable.
-    let lostRaw: Raw[] = [];
+    // Archived Lost is fail-closed. Direct Odoo owns the live population and
+    // PostgreSQL retains the last successful archive when Odoo is unavailable.
+    let lostRaw: Raw[] = lostStored?.rows.length ? lostStored.rows : [];
     const directCrm = await directCrmPromise;
     let crmAuthority: DataHealth["crmAuthority"] = crmStored?.rows.length
       ? "postgres-last-good"
       : crmSheetRaw.length
         ? "google-sheet"
         : "google-sheet-fallback";
-    let lostAuthority: DataHealth["lostAuthority"] = "unavailable";
+    let lostAuthority: DataHealth["lostAuthority"] = lostStored?.rows.length
+      ? "postgres-last-good"
+      : "unavailable";
     let crmExclusions = blankExclusions();
     let lostExclusions = blankExclusions();
     const directCrmComplete = !!directCrm.value && directCrm.value.crm.length > 0;
@@ -1298,7 +1304,21 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
       lostAuthority = "odoo-direct";
       lostExclusions = directCrm.value.diagnostics.lost;
-    } else {
+      if (databaseConfigured()) {
+        await writeDashboardDataset("lost", lostRaw, {
+          mode: "replace",
+          syncedAt: new Date().toISOString(),
+          metadata: {
+            source: "odoo-direct",
+            rows: lostRaw.length,
+            dateBasis: "creation_date",
+            movementDate: "close_date",
+          },
+        }).catch(() => {
+          fetchErrors.push("PostgreSQL Archived Lost: last-good write failed.");
+        });
+      }
+    } else if (!lostStored?.rows.length) {
       fetchErrors.push(
         directCrm.value
           ? "Archived Lost unavailable: direct Odoo returned no reportable closed opportunities. No legacy fallback was shown."
@@ -2226,8 +2246,14 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       },
       {
         key: "lost",
-        label: "Odoo Archived CRM (direct)",
-        syncedAt: asIso(maxOf(lostRaw, "__odoo_write_date")),
+        label:
+          lostAuthority === "odoo-direct"
+            ? "Odoo Archived CRM (direct)"
+            : "Odoo Archived CRM (PostgreSQL last-good)",
+        syncedAt:
+          lostAuthority === "odoo-direct"
+            ? new Date().toISOString()
+            : lostStored?.syncedAt || asIso(maxOf(lostRaw, "__odoo_write_date")),
       },
     ].filter((s) => !!s.syncedAt);
 
@@ -2309,7 +2335,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const health: DataHealth = {
       crmAuthority,
       lostAuthority,
-      lostDateBasis: lostAuthority === "odoo-direct" ? "creation_date" : "unavailable",
+      lostDateBasis:
+        lostAuthority === "odoo-direct" || lostAuthority === "postgres-last-good"
+          ? "creation_date"
+          : "unavailable",
       accountingAuthority,
       accountingDirect: accountingDirectHealth,
       crmExclusions,

@@ -614,8 +614,8 @@ export interface DataHealth {
     | "odoo-direct"
     | "postgres-last-good"
     | "google-sheet-fallback";
-  /** Archived Lost is fail-closed: only the direct Odoo archive is reportable. */
-  lostAuthority: "odoo-direct" | "unavailable";
+  /** Archived Lost is fail-closed and falls back only to its PostgreSQL last-good copy. */
+  lostAuthority: "odoo-direct" | "postgres-last-good" | "unavailable";
   /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
   lostDateBasis: "creation_date" | "unavailable";
   /** Paid invoice-line source, with PostgreSQL retaining the last good Odoo read. */
