@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
-const MAX_ROWS_PER_REQUEST = 2_000;
+// A complete Accounting rebuild currently contains roughly 6.5k invoice lines.
+// Keep the payload below the existing 10 MB request guard, but allow n8n to
+// replace that dataset atomically in one request. Splitting a `replace` across
+// several requests would delete the earlier chunks and leave an incomplete
+// accounting snapshot.
+const MAX_ROWS_PER_REQUEST = 15_000;
 
 function authorized(request: Request): boolean {
   const expected = process.env.DASHBOARD_INGEST_SECRET?.trim() ?? "";
