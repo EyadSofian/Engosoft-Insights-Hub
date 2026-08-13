@@ -13,6 +13,8 @@ export const Route = createFileRoute("/api/health")({
                   "meta_ads",
                   "snap_ads",
                   "accounting",
+                  "accounting_legacy",
+                  "ads_legacy",
                   "crm",
                   "lost",
                   "invoiced",
@@ -36,12 +38,29 @@ export const Route = createFileRoute("/api/health")({
               }),
             )
           : [];
+        const rowsFor = (dataset: (typeof datasets)[number]["dataset"]) =>
+          datasets.find((state) => state.dataset === dataset)?.rows ?? 0;
         return Response.json(
           {
             ok: true,
             service: "engosoft-insights-hub",
             checkedAt: new Date().toISOString(),
-            storage: { configured: databaseConfigured(), datasets },
+            storage: {
+              configured: databaseConfigured(),
+              datasets,
+              merged: {
+                accounting: {
+                  currentRows: rowsFor("accounting"),
+                  legacyRows: rowsFor("accounting_legacy"),
+                  inputRows: rowsFor("accounting") + rowsFor("accounting_legacy"),
+                },
+                ads: {
+                  currentRows: rowsFor("meta_ads") + rowsFor("snap_ads"),
+                  legacyRows: rowsFor("ads_legacy"),
+                  inputRows: rowsFor("meta_ads") + rowsFor("snap_ads") + rowsFor("ads_legacy"),
+                },
+              },
+            },
           },
           { headers: { "cache-control": "no-store" } },
         );

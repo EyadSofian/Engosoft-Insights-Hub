@@ -138,6 +138,7 @@ export const Route = createFileRoute("/api/courses")({
           }
 
           const spendBySource: Record<string, number> = {
+            source_mapping: 0,
             ad_name: 0,
             adset_name: 0,
             campaign_name: 0,

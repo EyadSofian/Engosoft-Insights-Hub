@@ -33,7 +33,8 @@ import { useApi } from "@/lib/use-api";
 
 export const Route = createFileRoute("/courses")({ component: Courses });
 
-type AttributionSource = "ad_name" | "adset_name" | "campaign_name" | "crm_leads";
+type AttributionSource =
+  "source_mapping" | "ad_name" | "adset_name" | "campaign_name" | "crm_leads";
 
 interface CourseCampaign {
   key: string;
@@ -988,6 +989,7 @@ function objectiveLabel(objective: CampaignObjective, lang: "ar" | "en") {
 
 function sourceLabel(source: AttributionSource, lang: "ar" | "en") {
   const labels: Record<AttributionSource, { ar: string; en: string }> = {
+    source_mapping: { ar: "تصنيف المصدر التاريخي", en: "Historical source mapping" },
     ad_name: { ar: "اسم الإعلان", en: "Ad name" },
     adset_name: { ar: "اسم مجموعة الإعلانات", en: "Ad-set name" },
     campaign_name: { ar: "اسم الحملة", en: "Campaign name" },

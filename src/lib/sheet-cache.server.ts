@@ -14,6 +14,12 @@ import {
   directAccountingPassesCompletenessGate,
 } from "./accounting-authority";
 import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
+import {
+  legacyAdCourseValue,
+  legacyAdLeadValue,
+  legacyAdPlatform,
+  lockedLegacyAccountingUsd,
+} from "./legacy-datasets";
 import { odooConfigured } from "./odoo.server";
 import { fetchGoogleAds } from "./google-ads.server";
 import { fetchTikTokAds } from "./tiktok.server";
@@ -783,6 +789,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       metaStored,
       snapStored,
       accountingStored,
+      accountingLegacyStored,
+      adsLegacyStored,
       crmStored,
       lostStored,
       invoicedStored,
@@ -791,6 +799,8 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       readStored("meta_ads"),
       readStored("snap_ads"),
       readStored("accounting"),
+      readStored("accounting_legacy"),
+      readStored("ads_legacy"),
       readStored("crm"),
       readStored("lost"),
       readStored("invoiced"),
@@ -937,8 +947,29 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       crmStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.crm),
       invoicedStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.invoiced),
     ]);
-    const metaRaw = metaStored?.rows.length ? metaStored.rows : metaSheetRaw;
-    const snapRaw = snapStored?.rows.length ? snapStored.rows : snapSheetRaw;
+    const currentMetaRaw = metaStored?.rows.length ? metaStored.rows : metaSheetRaw;
+    const currentSnapRaw = snapStored?.rows.length ? snapStored.rows : snapSheetRaw;
+    // Historical spend lives under its own dataset, so the scheduled Meta and
+    // Snapchat `replace` jobs can rebuild their current snapshots without ever
+    // deleting 2025. Imports must identify their source with `__platform`,
+    // `platform`, `Platform`, or `المنصة`; unknown rows fail closed below.
+    const legacyAdsRaw = (adsLegacyStored?.rows ?? []).filter(
+      // Operational state is current truth and must never be restored from a
+      // historical workbook even if it happens to carry a reserved state row.
+      (row) => !str(row["__meta_key"]).startsWith("state|"),
+    );
+    const metaRaw = currentMetaRaw;
+    const snapRaw = currentSnapRaw;
+    // A historical accounting import must carry a source-calculated USD value.
+    // Rows without it are excluded rather than silently re-priced by today's
+    // emergency FX table, which would rewrite 2025 every time rates change.
+    const accountingLegacyRaw = (accountingLegacyStored?.rows ?? [])
+      .map((row) => ({
+        ...row,
+        __legacy_usd_locked: lockedLegacyAccountingUsd(row),
+        __odoo_write_date: "",
+      }))
+      .filter((row) => str(row.__legacy_usd_locked) !== "");
     const crmFallbackRaw = crmStored?.rows.length ? crmStored.rows : crmSheetRaw;
     const invRaw = invoicedStored?.rows.length ? invoicedStored.rows : invoicedSheetRaw;
     const safeTikTok = () =>
@@ -996,11 +1027,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       let latest = 0;
       for (const row of rows) {
         const raw = str(
-          firstPresent(
-            row["__synced_at"],
-            row["__odoo_write_date"],
-            row["__source_updated_at"],
-          ),
+          firstPresent(row["__synced_at"], row["__odoo_write_date"], row["__source_updated_at"]),
         );
         if (!raw) continue;
         const parsed = Date.parse(raw.includes("T") ? raw : `${raw.replace(" ", "T")}Z`);
@@ -1086,6 +1113,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // baseline whenever it exists; using the intentionally skipped Google read
     // here produced a zero-row baseline and let a six-row Odoo response replace
     // thousands of good accounting lines.
+    // Reconcile a direct Odoo candidate against the replaceable current
+    // snapshot only. Legacy history is intentionally outside this gate: its
+    // purpose is to retain rows the current sync can no longer reproduce.
     const accountingReference = storedAccountingCanonical.rows.length
       ? storedAccountingCanonical
       : sheetAccountingSelection;
@@ -1117,6 +1147,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         revenueTolerance,
       });
 
+    // Enrichment must come only from the replaceable current snapshot.
+    // Historical rows have source-row keys rather than Odoo line ids; allowing
+    // an empty id into this map could attach an arbitrary 2025 row to a direct
+    // Odoo row that is also missing its id.
     const accountingEnrichmentRaw = accountingStored?.rows.length
       ? accountingStored.rows
       : sheetAccountingSelection.rows;
@@ -1168,17 +1202,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       const prior = sheetAccountingById.get(accountingStableLineId(row));
       return prior ? { ...prior, ...row } : row;
     });
-    const accountingSelection = accountingDirectAccepted
-      ? directCanonical
-      : accountingStoredAvailable
-        ? storedAccountingCanonical
-        : sheetAccountingSelection;
-    const accountingSourceRaw = accountingDirectAccepted
+    const accountingCurrentSourceRaw = accountingDirectAccepted
       ? directAccounting.value!.rows
       : accountingStoredAvailable
         ? accountingStored!.rows
         : sheetAccountingSourceRaw;
-    const accountingRaw = accountingDirectAccepted
+    const accountingCurrentRaw = accountingDirectAccepted
       ? directAccountingRows
       : accountingStoredAvailable
         ? storedAccountingRows
@@ -1187,20 +1216,45 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       const synced = Date.parse(accountingStored?.syncedAt ?? "");
       return Number.isFinite(synced) && Date.now() - synced <= 45 * 60_000;
     })();
-    const accountingTab = accountingDirectAccepted
+    // Merge only at read time. `accounting` remains the n8n-owned replaceable
+    // snapshot, while `accounting_legacy` is a durable archive. Historical rows
+    // have source-row keys and current rows have Odoo line ids, so ids alone
+    // cannot reveal overlap. A movement already present in the authoritative
+    // current snapshot is therefore current-owned and its legacy lines are
+    // excluded as one complete invoice/credit-note unit.
+    const currentMovements = new Set(
+      accountingCurrentRaw.map(accountingMovement).filter((movement) => movement !== ""),
+    );
+    const nonOverlappingLegacyAccounting = accountingLegacyRaw.filter((row) => {
+      const movement = accountingMovement(row);
+      return movement === "" || !currentMovements.has(movement);
+    });
+    const accountingSelection = canonicalizeAccountingRows([
+      ...accountingCurrentRaw,
+      ...nonOverlappingLegacyAccounting,
+    ]);
+    const accountingRaw = accountingSelection.rows;
+    const accountingSourceRaw = [...accountingCurrentSourceRaw, ...nonOverlappingLegacyAccounting];
+    const hasLegacyAccounting = accountingLegacyRaw.length > 0;
+    const currentAccountingLabel = accountingDirectAccepted
       ? "Paid Invoices (Odoo direct)"
       : accountingStoredAvailable
         ? accountingStoredIsFresh
           ? "Paid Invoices (PostgreSQL live sync)"
           : "Paid Invoices (Postgres last-good)"
         : "Paid Invoices (Payment Date — migration fallback)";
+    const accountingTab = hasLegacyAccounting
+      ? `${currentAccountingLabel.replace(/\)$/, "")} + history)`
+      : currentAccountingLabel;
     const accountingAuthority: DataHealth["accountingAuthority"] = accountingDirectAccepted
       ? "odoo-direct"
       : accountingStoredAvailable
         ? accountingStoredIsFresh
           ? "postgres-live"
           : "postgres-last-good"
-        : "google-sheet-fallback";
+        : hasLegacyAccounting
+          ? "postgres-last-good"
+          : "google-sheet-fallback";
     const accountingDirectError = directAccounting.error
       ? /not configured/i.test(directAccounting.error)
         ? "Direct Odoo Accounting is not configured."
@@ -1367,6 +1421,17 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         str(r["Ad set name"]) || str(r["Ad Set Name"]),
       );
     }
+    for (const r of legacyAdsRaw) {
+      keys.learn(
+        str(firstPresent(r["__campaign_id"], r["Campaign ID"])),
+        str(firstPresent(r["اسم الكامبين"], r["Campaign name"], r["Campaign Name"])),
+      );
+      adsets.learn(
+        str(firstPresent(r["__ad_id"], r["Ad ID"])),
+        str(firstPresent(r["Ad Name"], r["Ad name"])),
+        str(firstPresent(r["Ad set name"], r["Ad Set Name"])),
+      );
+    }
     for (const r of tiktokResult.rows) {
       keys.learn(r.campaignId, r.campaign);
       adsets.learn(r.adId, r.ad, r.adset);
@@ -1512,6 +1577,53 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       }
       return "";
     };
+    const legacyAds: AdRow[] = legacyAdsRaw.flatMap((r) => {
+      const platform = legacyAdPlatform(r);
+      if (!platform) return [];
+      const account =
+        pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name", "Account Name") ||
+        (platform === "meta"
+          ? "Meta Ads"
+          : platform === "snapchat"
+            ? "Snapchat Ads"
+            : "TikTok Ads");
+      const campaign = pick(r, "اسم الكامبين", "Campaign name", "Campaign Name");
+      const campaignId = pick(r, "__campaign_id", "Campaign ID");
+      const objective = classifyCampaign(campaign, account);
+      objectiveByAccount.set(account, classifyAccount(account));
+
+      // TikTok exports in the supplied historical workbook carry a misleading
+      // `On-Facebook leads` value. Keep the original cell in `ads_legacy`
+      // unchanged for audit, but never turn it into a reportable TikTok lead.
+      const leadValue = legacyAdLeadValue(r, platform);
+      return [
+        {
+          platform,
+          date: parseDate(pick(r, "التاريخ", "Date", "date")),
+          account,
+          accountId: pick(r, "__account_id", "Account ID"),
+          objective,
+          campaign,
+          campaignId,
+          campaignKey: keys.key(campaignId, campaign),
+          courseHint: canonicalCourse(legacyAdCourseValue(r)),
+          adset: pick(r, "Ad set name", "Ad Set Name"),
+          adsetId: pick(r, "__adset_id", "Ad Set ID"),
+          ad: pick(r, "Ad Name", "Ad name"),
+          adId: pick(r, "__ad_id", "Ad ID"),
+          spend: num(pick(r, "Spend (Cost)", "Cost", "Spend")),
+          impressions: num(pick(r, "Impressions")),
+          clicksAll: num(pick(r, "Clicks (all)", "Ad clicks", "Clicks")),
+          linkClicks: platform === "meta" ? num(pick(r, "Link Clicks", "Link clicks")) : null,
+          platformLeads: leadValue === null ? null : num(leadValue),
+          viewCompletions:
+            platform === "snapchat"
+              ? num(pick(r, "View Completions", "Video views at 100%"))
+              : null,
+          syncedAt: pick(r, "__synced_at", "Synced At"),
+        },
+      ];
+    });
     const tiktokFromSheet: AdRow[] = tiktokRaw.map((r) => {
       const account =
         pick(r, "اسم الحساب الإعلاني", "__account_name", "Account name") || "TikTok Ads";
@@ -1612,7 +1724,21 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       };
     });
 
-    const ads = [...meta, ...snap, ...tiktok, ...google];
+    const currentAds = [...meta, ...snap, ...tiktok, ...google];
+    const adFactKey = (row: AdRow) =>
+      [
+        row.platform,
+        row.date,
+        row.accountId || normalizeName(row.account),
+        row.campaignId || normalizeName(row.campaign),
+        row.adsetId || normalizeName(row.adset),
+        row.adId || normalizeName(row.ad),
+      ].join("\u001f");
+    // Current API/n8n facts win on overlap; the archive only fills dates the
+    // replaceable snapshots no longer retain.
+    const adsByFact = new Map(legacyAds.map((row) => [adFactKey(row), row] as const));
+    for (const row of currentAds) adsByFact.set(adFactKey(row), row);
+    const ads = [...adsByFact.values()];
 
     /* -- CRM --------------------------------------------------------------- */
     // What the stage guard removed, so the number is explainable on the page
@@ -1865,8 +1991,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           isCreditNote,
         );
         const currency = str(firstPresent(r["Currency"], r["العملة"]));
+        const lockedLegacyUsd = str(r["__legacy_usd_locked"]);
         const usdPaid = signedCreditAmount(
-          usdValue(authoritativeAccountingUsd(r), totalInCurrency, currency),
+          lockedLegacyUsd !== ""
+            ? num(lockedLegacyUsd)
+            : usdValue(authoritativeAccountingUsd(r), totalInCurrency, currency),
           isCreditNote,
         );
         const untaxedTotal = signedCreditAmount(
@@ -1901,6 +2030,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           untaxedTotal,
           totalInCurrency,
           usdPaid,
+          reportingUsdLocked: lockedLegacyUsd !== "",
           // Existing marketing/course analysis reads these compatibility names.
           course,
           category: productCategory,
@@ -2188,7 +2318,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     const tabSyncs: SourceFreshness[] = [
       {
         key: "meta",
-        label: metaStored?.rows.length ? "Meta Ads (PostgreSQL)" : `${TAB.meta} — migration fallback`,
+        label: metaStored?.rows.length
+          ? "Meta Ads (PostgreSQL)"
+          : `${TAB.meta} — migration fallback`,
         syncedAt: metaStored?.rows.length
           ? metaStored.syncedAt
           : maxOf(metaHistoryRaw, "__synced_at"),

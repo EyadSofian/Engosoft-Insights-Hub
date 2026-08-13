@@ -296,7 +296,8 @@ export interface FilteredData {
   attributionScoped: boolean;
 }
 
-export type CourseAttributionSource = "ad_name" | "adset_name" | "campaign_name" | "crm_leads" | "";
+export type CourseAttributionSource =
+  "source_mapping" | "ad_name" | "adset_name" | "campaign_name" | "crm_leads" | "";
 
 /**
  * Course attribution for one daily ad row, ordered from the most specific ad
@@ -307,6 +308,7 @@ export function attributedAdCourse(
   row: AdRow,
   snapshot: Snapshot,
 ): { course: string; source: CourseAttributionSource; confidence: number } {
+  if (row.courseHint) return { course: row.courseHint, source: "source_mapping", confidence: 1 };
   const adCourse = knownCourseFromText(row.ad);
   if (adCourse) return { course: adCourse, source: "ad_name", confidence: 1 };
   const adsetCourse = knownCourseFromText(row.adset);

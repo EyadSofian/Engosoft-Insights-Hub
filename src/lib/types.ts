@@ -68,6 +68,8 @@ export interface AdRow {
   campaign: string;
   campaignId: string;
   campaignKey: string;
+  /** Explicit reporting course supplied by an authoritative historical mapping. */
+  courseHint?: string;
   adset: string;
   adsetId: string;
   ad: string;
@@ -183,6 +185,8 @@ export interface AccountingRow {
   untaxedTotal: number;
   totalInCurrency: number;
   usdPaid: number;
+  /** Historical imports keep the workbook's recognised USD and ignore UI FX overrides. */
+  reportingUsdLocked: boolean;
   course: string;
   category: string;
   partner: string;
@@ -609,21 +613,14 @@ export interface FunnelStep {
 
 export interface DataHealth {
   /** Authoritative CRM source used for this snapshot. */
-  crmAuthority:
-    | "google-sheet"
-    | "odoo-direct"
-    | "postgres-last-good"
-    | "google-sheet-fallback";
+  crmAuthority: "google-sheet" | "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
   /** Archived Lost is fail-closed and falls back only to its PostgreSQL last-good copy. */
   lostAuthority: "odoo-direct" | "postgres-last-good" | "unavailable";
   /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
   lostDateBasis: "creation_date" | "unavailable";
   /** Paid invoice-line source, with PostgreSQL retaining the last good Odoo read. */
   accountingAuthority:
-    | "odoo-direct"
-    | "postgres-live"
-    | "postgres-last-good"
-    | "google-sheet-fallback";
+    "odoo-direct" | "postgres-live" | "postgres-last-good" | "google-sheet-fallback";
   /**
    * Non-sensitive direct-Odoo diagnostics. PostgreSQL is the preferred audit
    * baseline; a partial or differently re-rated direct read cannot replace it.

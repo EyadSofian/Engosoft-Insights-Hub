@@ -28,6 +28,7 @@ export function fxRatesFromFilters(filters: Pick<GlobalFilters, "fxEgp" | "fxSar
  * USD is already USD. Other currencies keep the authoritative source value.
  */
 export function accountingUsdPaid(row: AccountingRow, rates: FxRates): number {
+  if (row.reportingUsdLocked) return row.usdPaid;
   const currency = row.currency.trim().toUpperCase();
   if (currency === "EGP") return row.totalInCurrency / rates.EGP;
   if (currency === "SAR") return row.totalInCurrency / rates.SAR;
