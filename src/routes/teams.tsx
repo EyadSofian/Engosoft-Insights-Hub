@@ -210,7 +210,7 @@ function PeopleList({ rows, tone }: { rows: TeamAgg[]; tone: "success" | "danger
   return (
     <ol className="space-y-2">
       {rows.map((p, i) => (
-        <li key={p.key} className="flex items-center justify-between gap-3 py-1.5 border-b border-border/60 last:border-0">
+        <li key={`${p.parent ?? ""}:${p.key}:${i}`} className="flex items-center justify-between gap-3 py-1.5 border-b border-border/60 last:border-0">
           <span className="flex items-center gap-2.5 min-w-0">
             <span className="num text-[11px] text-text-subtle w-4 shrink-0">{i + 1}</span>
             <span className="min-w-0">

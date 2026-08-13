@@ -1,16 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
+  ArrowUpRight,
   Calculator,
+  ChartNoAxesCombined,
   Info,
+  Layers3,
   PhoneCall,
   ReceiptText,
   RefreshCw,
   Search,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
   Trophy,
   UserRound,
   Users,
 } from "lucide-react";
-import { MultiLineChart } from "@/components/charts";
+import { DonutChart, HBarChart, MultiLineChart } from "@/components/charts";
 import {
   Card,
   ErrorState,
@@ -21,9 +27,22 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { filterStore, useFilters } from "@/lib/filter-store";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import type {
+  AgentAnalyticsResult as AgentsResponse,
+  AgentAnalyticsRow as AgentRow,
+  AgentCoursePerformance,
+  AgentSpecializationPerformance,
+} from "@/lib/agent-analytics.server";
 
 export interface AccountingMonth {
   month: string;
@@ -34,65 +53,6 @@ export interface AccountingMonth {
   productLines: number;
   averageInvoice: number | null;
   growthPct: number | null;
-}
-
-interface AgentRow {
-  key: string;
-  name: string;
-  team: string;
-  paidRevenue: number;
-  invoices: number;
-  cleanLeads: number;
-  won: number;
-  lost: number;
-  conversionRate: number | null;
-  slaWon: number;
-  slaLost: number;
-  decidedConversionRate: number | null;
-  openLeads: number;
-  uncontactedLeads: number;
-  outboundCalls: number | null;
-  answeredCalls: number | null;
-  answerRate: number | null;
-  avgFirstCallMinutes: number | null;
-  operationalSales: number | null;
-  operationalDeals: number | null;
-}
-
-interface AgentsResponse {
-  agents: AgentRow[];
-  months: string[];
-  selected: {
-    from?: string;
-    to?: string;
-    dateBasis: "payment" | "invoice";
-    company: string;
-  };
-  summary: {
-    agents: number;
-    paidRevenue: number;
-    invoices: number;
-    cleanLeads: number;
-    won: number;
-    lost: number;
-    conversionRate: number | null;
-    periodClosedWon: number;
-    periodClosedLost: number;
-    decidedConversionRate: number | null;
-    outboundCalls: number | null;
-    answeredCalls: number | null;
-    answerRate: number | null;
-  };
-  sla: {
-    ok: boolean;
-    source: string;
-    fetchedAt: string;
-    error?: string;
-    callsThrough: string;
-    salesThrough: string;
-    callsAvailable: boolean;
-    salesAvailable: boolean;
-  };
 }
 
 interface ProfitabilityResponse {
@@ -240,6 +200,7 @@ export function AccountingAgentsView() {
   const [display, setDisplay] = useState<"cards" | "table">("cards");
   const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls">("revenue");
   const [search, setSearch] = useState("");
+  const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
     if (data && !data.sla.callsAvailable && sortBy === "calls") setSortBy("revenue");
@@ -271,6 +232,7 @@ export function AccountingAgentsView() {
             (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
           : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
     );
+  const selectedAgent = data.agents.find((row) => row.key === selectedAgentKey) ?? null;
 
   const selectMonth = (month: string) => {
     if (!month) return;
@@ -418,10 +380,23 @@ export function AccountingAgentsView() {
       </Card>
 
       {display === "cards" ? (
-        <AgentCards rows={visibleAgents} sortBy={sortBy} callsAvailable={data.sla.callsAvailable} />
+        <AgentCards
+          rows={visibleAgents}
+          sortBy={sortBy}
+          callsAvailable={data.sla.callsAvailable}
+          onSelect={(row) => setSelectedAgentKey(row.key)}
+        />
       ) : (
-        <AgentTable rows={visibleAgents} />
+        <AgentTable rows={visibleAgents} onSelect={(row) => setSelectedAgentKey(row.key)} />
       )}
+
+      <AgentPerformanceSheet
+        row={selectedAgent}
+        open={selectedAgent !== null}
+        onOpenChange={(next) => {
+          if (!next) setSelectedAgentKey(null);
+        }}
+      />
     </div>
   );
 }
@@ -430,18 +405,23 @@ function AgentCards({
   rows,
   sortBy,
   callsAvailable,
+  onSelect,
 }: {
   rows: AgentRow[];
   sortBy: "revenue" | "closing" | "calls";
   callsAvailable: boolean;
+  onSelect: (row: AgentRow) => void;
 }) {
   const { lang } = useI18n();
   return (
     <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
       {rows.map((row, index) => (
-        <article
+        <button
+          type="button"
           key={row.key}
-          className="card overflow-hidden p-4 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md sm:p-5"
+          onClick={() => onSelect(row)}
+          className="card w-full overflow-hidden p-4 text-start transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35 sm:p-5"
+          aria-label={lang === "ar" ? `فتح تحليل ${row.name}` : `Open ${row.name} analysis`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -516,13 +496,17 @@ function AgentCards({
               <b className="num text-text">{row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}</b>
             </span>
           </div>
-        </article>
+          <div className="mt-3 flex items-center justify-end gap-1 text-[11px] font-semibold text-brand">
+            {lang === "ar" ? "تحليل الكورسات والتخصصات" : "Course and specialization analysis"}
+            <ArrowUpRight size={14} className="rtl:-rotate-90" />
+          </div>
+        </button>
       ))}
     </div>
   );
 }
 
-function AgentTable({ rows }: { rows: AgentRow[] }) {
+function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: AgentRow) => void }) {
   const { lang } = useI18n();
   return (
     <Card padded={false}>
@@ -554,9 +538,19 @@ function AgentTable({ rows }: { rows: AgentRow[] }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="border-t border-border">
+              <tr
+                key={row.key}
+                className="cursor-pointer border-t border-border transition-colors hover:bg-brand-soft/45 focus-within:bg-brand-soft/45"
+                onClick={() => onSelect(row)}
+              >
                 <td className="px-3 py-3">
-                  <div className="font-semibold text-text">{row.name}</div>
+                  <button
+                    type="button"
+                    className="text-start font-semibold text-text outline-none focus-visible:text-brand"
+                    onClick={() => onSelect(row)}
+                  >
+                    {row.name}
+                  </button>
                   <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted" title={row.team}>{row.team}</div>
                 </td>
                 <td className="num px-3 py-3 text-end font-semibold">{fmtUSDExact(row.paidRevenue)}</td>
@@ -583,6 +577,394 @@ function AgentTable({ rows }: { rows: AgentRow[] }) {
       </div>
     </Card>
   );
+}
+
+function AgentPerformanceSheet({
+  row,
+  open,
+  onOpenChange,
+}: {
+  row: AgentRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { lang } = useI18n();
+  const [courseMetric, setCourseMetric] = useState<"revenue" | "invoices" | "leads">("revenue");
+  useEffect(() => setCourseMetric("revenue"), [row?.key]);
+  if (!row) return null;
+
+  const { courseProfile } = row;
+  const metricConfig = {
+    revenue: {
+      value: (course: AgentCoursePerformance) => course.paidRevenue,
+      format: fmtUSDFull,
+    },
+    invoices: {
+      value: (course: AgentCoursePerformance) => course.invoices,
+      format: fmtNum,
+    },
+    leads: {
+      value: (course: AgentCoursePerformance) => course.leads,
+      format: fmtNum,
+    },
+  }[courseMetric];
+  const courseChart = [...courseProfile.courses]
+    .filter((course) => metricConfig.value(course) > 0)
+    .sort((left, right) => metricConfig.value(right) - metricConfig.value(left))
+    .slice(0, 10)
+    .map((course) => ({ label: course.label, value: metricConfig.value(course) }));
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side={lang === "ar" ? "left" : "right"}
+        className="w-[min(100vw,1040px)] max-w-none overflow-y-auto border-border bg-surface p-0 text-text [&>button]:z-30 [&>button]:text-white [&>button]:opacity-100 rtl:[&>button]:left-4 rtl:[&>button]:right-auto sm:max-w-[1040px]"
+        dir={lang === "ar" ? "rtl" : "ltr"}
+      >
+        <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,var(--brand),color-mix(in_srgb,var(--brand)_72%,#08142e))] px-5 py-6 text-white sm:px-7">
+          <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[34px] border-white/8" />
+          <SheetHeader className="relative pe-8 text-start sm:text-start">
+            <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/70">
+              <span className="rounded-full bg-white/12 px-2.5 py-1">
+                {lang === "ar" ? "ملف أداء الموظف" : "Employee performance profile"}
+              </span>
+              <span>{row.team}</span>
+            </div>
+            <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">{row.name}</SheetTitle>
+            <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
+              {lang === "ar"
+                ? "تفصيل التحصيل والليدز والتحويل حسب كل كورس وتخصص داخل الفترة والفلاتر المختارة."
+                : "Paid collections, leads, and conversion by course and specialization for the selected period and filters."}
+            </SheetDescription>
+          </SheetHeader>
+        </div>
+
+        <div className="space-y-5 p-4 sm:p-7">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <ProfileMetric
+              label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+              value={fmtUSDFull(row.paidRevenue)}
+              sub={`${fmtNum(row.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+              icon={<ReceiptText size={17} />}
+              hero
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
+              value={fmtNum(row.cleanLeads)}
+              sub={`${fmtNum(row.won)} Won · ${fmtNum(row.lost)} Lost`}
+              icon={<Users size={17} />}
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
+              value={fmtPct(row.conversionRate, 1)}
+              sub={lang === "ar" ? "Won ÷ إجمالي الليدز" : "Won ÷ all leads"}
+              icon={<ChartNoAxesCombined size={17} />}
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "تحويل الحالات المحسومة" : "Decided conversion"}
+              value={fmtPct(row.decidedConversionRate, 1)}
+              sub={lang === "ar" ? "Won ÷ (Won + Lost)" : "Won ÷ (Won + Lost)"}
+              icon={<Trophy size={17} />}
+            />
+          </div>
+
+          {!courseProfile.lostDataAvailable && (
+            <Notice
+              tone="warning"
+              title={lang === "ar" ? "بيانات Lost غير مكتملة حاليًا" : "Lost data is currently incomplete"}
+            >
+              {lang === "ar"
+                ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
+                : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until Archived Lost returns; current rates are directional only."}
+            </Notice>
+          )}
+
+          <section>
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-brand">
+                  {lang === "ar" ? "الخلاصة التنفيذية" : "Executive summary"}
+                </div>
+                <h3 className="mt-0.5 text-lg font-bold text-text">
+                  {lang === "ar" ? "فين الموظف قوي وفين محتاج دعم؟" : "Where is this employee strongest?"}
+                </h3>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <CourseInsight
+                icon={<TrendingUp size={18} />}
+                eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
+                course={courseProfile.bestSellingCourse}
+                value={(course) => fmtUSDFull(course.paidRevenue)}
+                sub={(course) => `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`}
+                tone="success"
+              />
+              <CourseInsight
+                icon={<TrendingDown size={18} />}
+                eyebrow={lang === "ar" ? "أقل مبيعات" : "Lowest sales"}
+                course={courseProfile.leastSellingCourse}
+                value={(course) => fmtUSDFull(course.paidRevenue)}
+                sub={(course) => `${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+                tone="neutral"
+              />
+              <CourseInsight
+                icon={<Sparkles size={18} />}
+                eyebrow={lang === "ar" ? "أفضل تحويل بعينة كافية" : "Best reliable conversion"}
+                course={courseProfile.bestConvertingCourse}
+                value={(course) => fmtPct(course.conversionRate, 1)}
+                sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
+                tone="brand"
+              />
+              <CourseInsight
+                icon={<Layers3 size={18} />}
+                eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
+                course={courseProfile.needsSupportCourse}
+                value={(course) => fmtPct(course.conversionRate, 1)}
+                sub={(course) => `${fmtNum(course.leads)} ${lang === "ar" ? "ليد بعينة قابلة للحكم" : "leads in a reliable sample"}`}
+                tone="danger"
+              />
+            </div>
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+            <Card>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                <SectionTitle className="mb-0">
+                  {lang === "ar" ? "أداء كل كورس" : "Performance by course"}
+                </SectionTitle>
+                <Segmented
+                  value={courseMetric}
+                  onChange={setCourseMetric}
+                  options={[
+                    { value: "revenue", label: lang === "ar" ? "المبيعات" : "Sales" },
+                    { value: "invoices", label: lang === "ar" ? "الفواتير" : "Invoices" },
+                    { value: "leads", label: lang === "ar" ? "الليدز" : "Leads" },
+                  ]}
+                />
+              </div>
+              <HBarChart
+                data={courseChart}
+                height={Math.max(260, courseChart.length * 34)}
+                color="var(--chart-1)"
+                format={metricConfig.format}
+                labelWidth={118}
+              />
+            </Card>
+
+            <Card>
+              <SectionTitle hint={lang === "ar" ? "حسب عدد الليدز" : "By lead count"}>
+                {lang === "ar" ? "توزيع الليدز حسب التخصص" : "Lead distribution by specialization"}
+              </SectionTitle>
+              <DonutChart
+                data={courseProfile.specializations
+                  .filter((item) => item.leads > 0)
+                  .map((item) => ({ label: displayDimension(item.label, lang), value: item.leads }))}
+                height={Math.max(280, courseProfile.specializations.length * 28)}
+                format={fmtNum}
+              />
+            </Card>
+          </div>
+
+          <Card padded={false}>
+            <div className="border-b border-border p-4 sm:p-5">
+              <SectionTitle className="mb-0">
+                {lang === "ar" ? "تحليل التخصصات" : "Specialization analysis"}
+              </SectionTitle>
+              <p className="mt-1 text-xs text-text-muted">
+                {lang === "ar"
+                  ? "الحجم يوضح توزيع الفرص، والتحويل يوضح النتيجة بعد مراعاة عدد الليدز."
+                  : "Volume shows opportunity distribution; conversion shows outcomes relative to lead count."}
+              </p>
+            </div>
+            <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+              {courseProfile.specializations.map((item) => (
+                <SpecializationCard key={item.key} item={item} lang={lang} />
+              ))}
+            </div>
+          </Card>
+
+          <Card padded={false}>
+            <div className="border-b border-border p-4 sm:p-5">
+              <SectionTitle className="mb-0">
+                {lang === "ar" ? "التفاصيل الكاملة حسب الكورس" : "Full course detail"}
+              </SectionTitle>
+            </div>
+            <div className="max-h-[620px] overflow-auto">
+              <table className="w-full min-w-[1180px] text-sm">
+                <thead className="sticky top-0 z-10 bg-surface-2">
+                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                    {[
+                      lang === "ar" ? "الكورس" : "Course",
+                      lang === "ar" ? "التخصص" : "Specialization",
+                      lang === "ar" ? "الليدز" : "Leads",
+                      "Won",
+                      "Lost",
+                      lang === "ar" ? "مفتوح" : "Open",
+                      lang === "ar" ? "تحويل الليدز" : "Lead conversion",
+                      lang === "ar" ? "تحويل المحسوم" : "Decided conversion",
+                      lang === "ar" ? "الفواتير" : "Invoices",
+                      lang === "ar" ? "المبيعات" : "Sales",
+                      lang === "ar" ? "% المبيعات" : "Sales share",
+                      lang === "ar" ? "حجم العينة" : "Sample",
+                    ].map((label, index) => (
+                      <th key={`${label}-${index}`} className={`px-3 py-2.5 ${index < 2 ? "text-start" : "text-end"}`}>
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {courseProfile.courses.map((course) => (
+                    <tr key={course.key} className="border-t border-border hover:bg-surface-2/70">
+                      <td className="px-3 py-3 font-semibold text-text">{displayDimension(course.label, lang)}</td>
+                      <td className="px-3 py-3 text-text-muted">{displayDimension(course.mainCategory, lang)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(course.leads)}</td>
+                      <td className="num px-3 py-3 text-end text-success">{fmtNum(course.won)}</td>
+                      <td className="num px-3 py-3 text-end text-danger">{fmtNum(course.lost)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(course.openLeads)}</td>
+                      <td className="px-3 py-3 text-end"><Pill tone={conversionTone(course)}>{fmtPct(course.conversionRate, 1)}</Pill></td>
+                      <td className="num px-3 py-3 text-end">{fmtPct(course.decidedConversionRate, 1)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(course.invoices)}</td>
+                      <td className="num px-3 py-3 text-end font-semibold">{fmtUSDFull(course.paidRevenue)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtPct(course.salesShare, 1)}</td>
+                      <td className="px-3 py-3 text-end">
+                        <Pill tone={course.sampleStatus === "reliable" ? "success" : "neutral"}>
+                          {course.sampleStatus === "reliable"
+                            ? lang === "ar" ? "كافية" : "Reliable"
+                            : lang === "ar" ? "استرشادية" : "Directional"}
+                        </Pill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Notice tone="info" icon={<Info size={16} />}>
+            {lang === "ar"
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة. تحويل الليدز = Won ÷ كل ليدز الكورس. التصنيف قوي/يحتاج دعم لا يعمل إلا عند ${courseProfile.minimumLeadSample} ليدز و${courseProfile.minimumDecidedSample} حالات Won/Lost على الأقل؛ العينات الأصغر تظهر استرشادية فقط.`
+              : `Sales are net paid Odoo collections. Lead conversion = Won ÷ all course leads. Strong/needs-support labels require at least ${courseProfile.minimumLeadSample} leads and ${courseProfile.minimumDecidedSample} Won/Lost decisions; smaller samples remain directional.`}
+          </Notice>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ProfileMetric({
+  label,
+  value,
+  sub,
+  icon,
+  hero = false,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  icon: ReactNode;
+  hero?: boolean;
+}) {
+  return (
+    <div className={`rounded-2xl border p-3.5 ${hero ? "border-brand/20 bg-brand-soft" : "border-border bg-surface"}`}>
+      <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
+        <span>{label}</span>
+        <span className="text-brand">{icon}</span>
+      </div>
+      <div className="num mt-2 text-xl font-bold text-text sm:text-2xl">{value}</div>
+      <div className="mt-1 text-[11px] text-text-muted">{sub}</div>
+    </div>
+  );
+}
+
+function CourseInsight({
+  icon,
+  eyebrow,
+  course,
+  value,
+  sub,
+  tone,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  course: AgentCoursePerformance | null;
+  value: (course: AgentCoursePerformance) => string;
+  sub: (course: AgentCoursePerformance) => string;
+  tone: "success" | "danger" | "brand" | "neutral";
+}) {
+  const { lang } = useI18n();
+  const styles = {
+    success: "border-success/20 bg-success/7 text-success",
+    danger: "border-danger/20 bg-danger/7 text-danger",
+    brand: "border-brand/20 bg-brand-soft text-brand",
+    neutral: "border-border bg-surface-2 text-text-muted",
+  }[tone];
+  return (
+    <article className={`rounded-2xl border p-4 ${styles}`}>
+      <div className="flex items-center gap-2 text-[11px] font-semibold">
+        {icon}
+        <span>{eyebrow}</span>
+      </div>
+      {course ? (
+        <>
+          <div className="mt-3 truncate text-base font-bold text-text" title={course.label}>
+            {displayDimension(course.label, lang)}
+          </div>
+          <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
+          <div className="mt-1 text-[11px] text-text-muted">{sub(course)}</div>
+        </>
+      ) : (
+        <div className="mt-4 text-sm font-medium text-text-muted">
+          {lang === "ar" ? "لا توجد عينة كافية" : "No reliable sample yet"}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function SpecializationCard({
+  item,
+  lang,
+}: {
+  item: AgentSpecializationPerformance;
+  lang: "ar" | "en";
+}) {
+  return (
+    <article className="bg-surface p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-semibold text-text">{displayDimension(item.label, lang)}</h4>
+          <p className="mt-0.5 text-[11px] text-text-muted">
+            {fmtPct(item.leadShare, 1)} {lang === "ar" ? "من ليدز الموظف" : "of employee leads"}
+          </p>
+        </div>
+        <Pill tone={item.sampleStatus === "reliable" ? "success" : "neutral"}>
+          {fmtPct(item.conversionRate, 1)}
+        </Pill>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <MiniMetric label={lang === "ar" ? "الليدز" : "Leads"} value={fmtNum(item.leads)} />
+        <MiniMetric label="Won / Lost" value={`${fmtNum(item.won)} / ${fmtNum(item.lost)}`} />
+        <MiniMetric label={lang === "ar" ? "المبيعات" : "Sales"} value={fmtUSDFull(item.paidRevenue)} />
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div
+          className="h-full rounded-full bg-brand"
+          style={{ width: `${Math.max(1.5, Math.min(100, item.leadShare))}%` }}
+        />
+      </div>
+    </article>
+  );
+}
+
+function conversionTone(course: AgentCoursePerformance): "success" | "neutral" | "danger" {
+  if (course.sampleStatus !== "reliable") return "neutral";
+  if ((course.conversionRate ?? 0) >= 10) return "success";
+  return "danger";
+}
+
+function displayDimension(value: string, lang: "ar" | "en") {
+  return value === "Uncategorized" && lang === "ar" ? "غير مصنف" : value;
 }
 
 function monthEnd(month: string): string {

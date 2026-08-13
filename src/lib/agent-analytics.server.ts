@@ -39,6 +39,52 @@ export interface AgentAnalyticsRow {
   quotations: number | null;
   pipeline: number | null;
   slaMonths: number;
+  courseProfile: AgentCourseProfile;
+}
+
+export interface AgentCoursePerformance {
+  key: string;
+  label: string;
+  mainCategory: string;
+  leads: number;
+  won: number;
+  lost: number;
+  openLeads: number;
+  paidRevenue: number;
+  invoices: number;
+  leadShare: number;
+  salesShare: number;
+  conversionRate: number | null;
+  decidedConversionRate: number | null;
+  sampleStatus: "reliable" | "insufficient";
+}
+
+export interface AgentSpecializationPerformance {
+  key: string;
+  label: string;
+  leads: number;
+  won: number;
+  lost: number;
+  openLeads: number;
+  paidRevenue: number;
+  invoices: number;
+  leadShare: number;
+  salesShare: number;
+  conversionRate: number | null;
+  decidedConversionRate: number | null;
+  sampleStatus: "reliable" | "insufficient";
+}
+
+export interface AgentCourseProfile {
+  courses: AgentCoursePerformance[];
+  specializations: AgentSpecializationPerformance[];
+  bestSellingCourse: AgentCoursePerformance | null;
+  leastSellingCourse: AgentCoursePerformance | null;
+  bestConvertingCourse: AgentCoursePerformance | null;
+  needsSupportCourse: AgentCoursePerformance | null;
+  minimumLeadSample: number;
+  minimumDecidedSample: number;
+  lostDataAvailable: boolean;
 }
 
 export interface AgentAnalyticsResult {
@@ -151,6 +197,38 @@ interface MutableAgent extends AgentAnalyticsRow {
   latestOpenMonth: string;
 }
 
+interface MutableDimension {
+  key: string;
+  label: string;
+  mainCategory: string;
+  categoryWeight: Map<string, number>;
+  leads: number;
+  won: number;
+  lost: number;
+  paidRevenue: number;
+  invoiceRefs: Set<string>;
+}
+
+interface MutableAgentProfile {
+  courses: Map<string, MutableDimension>;
+  specializations: Map<string, MutableDimension>;
+}
+
+const MINIMUM_LEAD_SAMPLE = 10;
+const MINIMUM_DECIDED_SAMPLE = 5;
+
+const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
+  courses: [],
+  specializations: [],
+  bestSellingCourse: null,
+  leastSellingCourse: null,
+  bestConvertingCourse: null,
+  needsSupportCourse: null,
+  minimumLeadSample: MINIMUM_LEAD_SAMPLE,
+  minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
+  lostDataAvailable,
+});
+
 const blank = (key: string, name: string): MutableAgent => ({
   key,
   name,
@@ -184,12 +262,249 @@ const blank = (key: string, name: string): MutableAgent => ({
   quotations: 0,
   pipeline: 0,
   slaMonths: 0,
+  courseProfile: blankCourseProfile(),
   firstCallWeighted: 0,
   firstCallWeight: 0,
   invoiceRefs: new Set(),
   months: new Set(),
   latestOpenMonth: "",
 });
+
+const normalizeDimension = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .toLocaleLowerCase("en")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+const cleanDimensionLabel = (value: string): string => value.trim() || "Uncategorized";
+const cleanCategoryLabel = (value: string): string =>
+  cleanDimensionLabel(value).replace(/^revenue\s*\/\s*miscellaneous\s*\/\s*/i, "");
+
+function profileFor(map: Map<string, MutableAgentProfile>, person: string) {
+  const key = normalizePersonName(person);
+  if (!key) return null;
+  let profile = map.get(key);
+  if (!profile) {
+    profile = { courses: new Map(), specializations: new Map() };
+    map.set(key, profile);
+  }
+  return profile;
+}
+
+function dimensionFor(
+  map: Map<string, MutableDimension>,
+  labelValue: string,
+  mainCategoryValue = "",
+) {
+  const label = cleanDimensionLabel(labelValue);
+  const key = normalizeDimension(label) || "uncategorized";
+  let row = map.get(key);
+  if (!row) {
+    row = {
+      key,
+      label,
+      mainCategory: cleanDimensionLabel(mainCategoryValue),
+      categoryWeight: new Map(),
+      leads: 0,
+      won: 0,
+      lost: 0,
+      paidRevenue: 0,
+      invoiceRefs: new Set(),
+    };
+    map.set(key, row);
+  }
+  const category = cleanDimensionLabel(mainCategoryValue);
+  row.categoryWeight.set(category, (row.categoryWeight.get(category) ?? 0) + 1);
+  return row;
+}
+
+function addLeadToProfile(
+  profiles: Map<string, MutableAgentProfile>,
+  source: {
+    salesperson: string;
+    course: string;
+    mainCategory: string;
+  },
+  outcome: "won" | "lost" | "open",
+) {
+  const profile = profileFor(profiles, source.salesperson);
+  if (!profile) return;
+  const category = cleanCategoryLabel(source.mainCategory);
+  const course = dimensionFor(profile.courses, source.course, category);
+  const specialization = dimensionFor(profile.specializations, category, category);
+  for (const row of [course, specialization]) {
+    row.leads += 1;
+    if (outcome === "won") row.won += 1;
+    if (outcome === "lost") row.lost += 1;
+  }
+}
+
+function addSaleToProfile(
+  profiles: Map<string, MutableAgentProfile>,
+  source: {
+    salesperson: string;
+    course: string;
+    mainCategory: string;
+    productCategory: string;
+    category: string;
+    usdPaid: number;
+    movement: string;
+    isCreditNote: boolean;
+  },
+) {
+  const profile = profileFor(profiles, source.salesperson);
+  if (!profile) return;
+  const category = cleanCategoryLabel(
+    source.mainCategory || source.productCategory || source.category,
+  );
+  const courseLabel = source.course || source.productCategory || source.category;
+  const course = dimensionFor(profile.courses, courseLabel, category);
+  const specialization = dimensionFor(profile.specializations, category, category);
+  for (const row of [course, specialization]) {
+    row.paidRevenue += source.usdPaid;
+    if (source.movement && !source.isCreditNote) row.invoiceRefs.add(source.movement);
+  }
+}
+
+function finishDimension(
+  source: MutableDimension,
+  totalLeads: number,
+  positiveRevenue: number,
+  lostDataAvailable: boolean,
+): AgentCoursePerformance {
+  const decided = source.won + source.lost;
+  const mainCategory = [...source.categoryWeight.entries()].sort(
+    (left, right) => right[1] - left[1],
+  )[0]?.[0] || source.mainCategory;
+  const base = {
+    key: source.key,
+    label: source.label,
+    mainCategory,
+    leads: source.leads,
+    won: source.won,
+    lost: source.lost,
+    openLeads: Math.max(0, source.leads - decided),
+    paidRevenue: source.paidRevenue,
+    invoices: source.invoiceRefs.size,
+    leadShare: totalLeads > 0 ? (source.leads / totalLeads) * 100 : 0,
+    salesShare:
+      positiveRevenue > 0 && source.paidRevenue > 0
+        ? (source.paidRevenue / positiveRevenue) * 100
+        : 0,
+    conversionRate: source.leads > 0 ? (source.won / source.leads) * 100 : null,
+    decidedConversionRate: decided > 0 ? (source.won / decided) * 100 : null,
+    sampleStatus:
+      lostDataAvailable &&
+      source.leads >= MINIMUM_LEAD_SAMPLE &&
+      decided >= MINIMUM_DECIDED_SAMPLE
+        ? ("reliable" as const)
+        : ("insufficient" as const),
+  };
+  return base;
+}
+
+function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile> {
+  const mutable = new Map<string, MutableAgentProfile>();
+  const lostDataAvailable = data.snapshot.health.lostAuthority !== "unavailable";
+  for (const lead of data.crm) {
+    addLeadToProfile(mutable, lead, lead.isWon ? "won" : "open");
+  }
+
+  const seenArchived = new Set<string>();
+  for (const lead of data.lost) {
+    const id = lead.id || `${lead.salesperson}|${lead.createdAt}|${lead.contact}`;
+    if (seenArchived.has(id)) continue;
+    seenArchived.add(id);
+    addLeadToProfile(
+      mutable,
+      lead,
+      lead.stage.trim().toLocaleLowerCase("en") === "won" ? "open" : "lost",
+    );
+  }
+  for (const invoice of data.accounting) addSaleToProfile(mutable, invoice);
+
+  const profiles = new Map<string, AgentCourseProfile>();
+  for (const [personKey, profile] of mutable) {
+    const totalLeads = [...profile.courses.values()].reduce((sum, row) => sum + row.leads, 0);
+    const positiveRevenue = [...profile.courses.values()].reduce(
+      (sum, row) => sum + Math.max(0, row.paidRevenue),
+      0,
+    );
+    const courses = [...profile.courses.values()]
+      .map((row) => finishDimension(row, totalLeads, positiveRevenue, lostDataAvailable))
+      .sort(
+        (left, right) =>
+          right.paidRevenue - left.paidRevenue || right.leads - left.leads ||
+          left.label.localeCompare(right.label),
+      );
+
+    const specializationLeads = [...profile.specializations.values()].reduce(
+      (sum, row) => sum + row.leads,
+      0,
+    );
+    const specializationRevenue = [...profile.specializations.values()].reduce(
+      (sum, row) => sum + Math.max(0, row.paidRevenue),
+      0,
+    );
+    const specializations = [...profile.specializations.values()]
+      .map((row) => {
+        const finished = finishDimension(
+          row,
+          specializationLeads,
+          specializationRevenue,
+          lostDataAvailable,
+        );
+        const { mainCategory: _mainCategory, ...specialization } = finished;
+        return specialization;
+      })
+      .sort(
+        (left, right) =>
+          right.leads - left.leads || right.paidRevenue - left.paidRevenue ||
+          left.label.localeCompare(right.label),
+      );
+
+    const sellingCourses = courses.filter((row) => row.invoices > 0 || row.paidRevenue !== 0);
+    const reliableCourses = courses.filter((row) => row.sampleStatus === "reliable");
+    const bestSellingCourse = sellingCourses[0] ?? null;
+    const leastSellingCourse =
+      sellingCourses.length > 1
+        ? [...sellingCourses].sort(
+            (left, right) =>
+              left.paidRevenue - right.paidRevenue || left.invoices - right.invoices,
+          )[0]
+        : null;
+    const bestConvertingCourse =
+      [...reliableCourses].sort(
+        (left, right) =>
+          (right.conversionRate ?? -1) - (left.conversionRate ?? -1) ||
+          right.leads - left.leads,
+      )[0] ?? null;
+    const needsSupportCourse =
+      reliableCourses.length > 1
+        ? [...reliableCourses].sort(
+            (left, right) =>
+              (left.conversionRate ?? Infinity) - (right.conversionRate ?? Infinity) ||
+              right.leads - left.leads,
+          )[0]
+        : null;
+
+    profiles.set(personKey, {
+      courses,
+      specializations,
+      bestSellingCourse,
+      leastSellingCourse,
+      bestConvertingCourse,
+      needsSupportCourse,
+      minimumLeadSample: MINIMUM_LEAD_SAMPLE,
+      minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
+      lostDataAvailable,
+    });
+  }
+  return profiles;
+}
 
 function mergeMainPeople(map: Map<string, MutableAgent>, teams: TeamAgg[]) {
   for (const team of teams) {
@@ -358,6 +673,7 @@ export async function buildAgentAnalytics(
   mergeMainPeople(map, teams);
   mergeInvoiceRefs(map, data);
   mergeOperationalClosures(map, data, filters);
+  const courseProfiles = buildCourseProfiles(data);
 
   let slaStatus: AgentAnalyticsResult["sla"] = {
     ok: false,
@@ -449,6 +765,9 @@ export async function buildAgentAnalytics(
       row.avgFirstCallMinutes =
         row.firstCallWeight > 0 ? row.firstCallWeighted / row.firstCallWeight : null;
       row.slaMonths = row.months.size;
+      row.courseProfile =
+        courseProfiles.get(row.key) ??
+        blankCourseProfile(data.snapshot.health.lostAuthority !== "unavailable");
       if (!slaStatus.callsAvailable) {
         row.outboundCalls = null;
         row.answeredCalls = null;
