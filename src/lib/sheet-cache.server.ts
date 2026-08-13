@@ -909,10 +909,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         if (timer) clearTimeout(timer);
       }
     };
-    // Accounting is owned by the hardened n8n -> PostgreSQL workflow. Once a
-    // durable snapshot exists, do not launch a second broad Odoo read on every
-    // dashboard refresh; it adds load and can only be rejected by the guard.
-    const directAccountingAttempted = !accountingStored?.rows.length && odooConfigured();
+    // Normal page loads use the hardened n8n -> PostgreSQL authority. An
+    // explicit forced refresh is different: the manager asked for a live Odoo
+    // reconciliation now, so attempt it even when a durable snapshot exists.
+    // The completeness/revenue gate below still fails closed and keeps the
+    // last-good PostgreSQL copy if the live candidate is partial or re-rated.
+    const directAccountingAttempted = (force || !accountingStored?.rows.length) && odooConfigured();
     const directAccountingPromise: Promise<
       { value: DirectAccountingSnapshot; error?: never } | { value?: never; error: string }
     > = directAccountingAttempted

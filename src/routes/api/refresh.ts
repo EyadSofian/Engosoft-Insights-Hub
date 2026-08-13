@@ -28,6 +28,11 @@ export const Route = createFileRoute("/api/refresh")({
             },
             fetchErrors: data.fetchErrors,
             staleTabs: data.staleTabs,
+            accounting: {
+              authority: data.health.accountingAuthority,
+              direct: data.health.accountingDirect,
+              syncedAt: data.tabSyncs.find((source) => source.key === "accounting")?.syncedAt ?? "",
+            },
           },
           { headers: { "cache-control": "no-store" } },
         );
