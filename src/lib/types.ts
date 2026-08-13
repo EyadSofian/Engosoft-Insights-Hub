@@ -742,6 +742,8 @@ export interface YoyPoint {
 
 export interface YoyResult {
   available: boolean;
+  /** Availability is source-specific: historical accounting/ads can be compared even when CRM history is absent. */
+  metricAvailability: Record<"spend" | "revenue" | "leads" | "won", boolean>;
   currentYear: number;
   previousYear: number;
   reason?: string;

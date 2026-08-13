@@ -2076,11 +2076,9 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
       (c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m),
     ).length;
 
-  // Every source must carry a real prior year, not just one of them. The sheet
-  // currently holds 109 invoice rows for 2025 and nothing else, which is enough
-  // to pass a naive row-count check and then report +577,109% revenue growth
-  // against a $134 baseline. A comparison is only possible when spend, leads and
-  // revenue all exist for the prior year.
+  // Availability is source-specific. A complete historical accounting/ads
+  // import must remain reportable even when no historical CRM snapshot exists;
+  // absent CRM must never be presented as zero leads or zero Won.
   const MIN_PRIOR_ROWS = 100;
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
@@ -2089,17 +2087,20 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
       inYear(accountingReportingDate(row, "payment"), prevYear),
     ).length,
   };
-  const available =
-    priorCounts.ads >= MIN_PRIOR_ROWS &&
-    priorCounts.crm >= MIN_PRIOR_ROWS &&
-    priorCounts.accounting >= MIN_PRIOR_ROWS;
+  const metricAvailability = {
+    spend: priorCounts.ads >= MIN_PRIOR_ROWS,
+    revenue: priorCounts.accounting >= MIN_PRIOR_ROWS,
+    leads: priorCounts.crm >= MIN_PRIOR_ROWS,
+    won: priorCounts.crm >= MIN_PRIOR_ROWS,
+  };
+  const available = Object.values(metricAvailability).some(Boolean);
 
   // Growth is only emitted when the prior year is comparable at all, so no
   // consumer of this payload can render a percentage the data cannot support.
-  const growthOf = (current: number, previous: number): Maybe =>
-    available && previous > 0 ? ((current - previous) / previous) * 100 : null;
+  const growthOf = (current: number, previous: number, metricAvailable: boolean): Maybe =>
+    metricAvailable && previous > 0 ? ((current - previous) / previous) * 100 : null;
 
-  const series = (fn: (y: number, m?: string) => number) =>
+  const series = (fn: (y: number, m?: string) => number, metricAvailable: boolean) =>
     months.map((m) => {
       const current = fn(year, m);
       const previous = fn(prevYear, m);
@@ -2108,15 +2109,20 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
         current,
         previous,
         delta: current - previous,
-        growth: growthOf(current, previous),
+        growth: growthOf(current, previous, metricAvailable),
       };
     });
 
   const ytdCut = latest ? latest.slice(5) : "12-31";
-  const ytd = (fn: (y: number) => number, name: string) => {
+  const ytd = (fn: (y: number) => number, name: string, metricAvailable: boolean) => {
     const current = fn(year);
     const previous = fn(prevYear);
-    return { metric: name, current, previous, growth: growthOf(current, previous) };
+    return {
+      metric: name,
+      current,
+      previous,
+      growth: growthOf(current, previous, metricAvailable),
+    };
   };
   const ytdSpend = (y: number) =>
     sum(
@@ -2163,26 +2169,27 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
         current,
         previous,
         delta: current - previous,
-        growth: growthOf(current, previous),
+        growth: growthOf(current, previous, metricAvailability.revenue),
       };
     })
     .sort((a, b) => b.current - a.current);
 
   return {
     available,
+    metricAvailability,
     currentYear: year,
     previousYear: prevYear,
     reason: available ? undefined : "no_prior_year",
-    spend: series(spendOf),
-    revenue: series(revenueOf),
-    leads: series(leadsOf),
-    won: series(wonOf),
+    spend: series(spendOf, metricAvailability.spend),
+    revenue: series(revenueOf, metricAvailability.revenue),
+    leads: series(leadsOf, metricAvailability.leads),
+    won: series(wonOf, metricAvailability.won),
     byCourse,
     ytd: [
-      ytd(ytdSpend, "spend"),
-      ytd(ytdRevenue, "revenue"),
-      ytd(ytdLeads, "leads"),
-      ytd(ytdWon, "won"),
+      ytd(ytdSpend, "spend", metricAvailability.spend),
+      ytd(ytdRevenue, "revenue", metricAvailability.revenue),
+      ytd(ytdLeads, "leads", metricAvailability.leads),
+      ytd(ytdWon, "won", metricAvailability.won),
     ],
   };
 }

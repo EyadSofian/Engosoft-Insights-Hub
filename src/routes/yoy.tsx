@@ -2,7 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarOff } from "lucide-react";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
-import { Card, ErrorState, EmptyState, PageHeader, SectionTitle, Skeleton } from "@/components/ui-bits";
+import {
+  Card,
+  ErrorState,
+  EmptyState,
+  PageHeader,
+  SectionTitle,
+  Skeleton,
+} from "@/components/ui-bits";
 import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
 
 export const Route = createFileRoute("/yoy")({ component: Yoy });
@@ -14,7 +21,20 @@ interface Resp extends YoyResult {
 }
 
 const MONTHS = {
-  ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
+  ar: [
+    "يناير",
+    "فبراير",
+    "مارس",
+    "أبريل",
+    "مايو",
+    "يونيو",
+    "يوليو",
+    "أغسطس",
+    "سبتمبر",
+    "أكتوبر",
+    "نوفمبر",
+    "ديسمبر",
+  ],
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
 };
 
@@ -38,7 +58,11 @@ function Yoy() {
     <div className="space-y-5">
       <PageHeader
         title={t("yoy")}
-        subtitle={data ? `${data.currentYear} ${lang === "ar" ? "مقابل" : "vs"} ${data.previousYear}` : undefined}
+        subtitle={
+          data
+            ? `${data.currentYear} ${lang === "ar" ? "مقابل" : "vs"} ${data.previousYear}`
+            : undefined
+        }
       />
 
       {isLoading || !data ? (
@@ -53,12 +77,20 @@ function Yoy() {
                   ? `لا توجد بيانات كافية لعام ${data.previousYear}`
                   : `Not enough ${data.previousYear} data`}
               </p>
-              <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">{t("yoy_empty")}</p>
+              <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
+                {t("yoy_empty")}
+              </p>
             </div>
           </Card>
 
           <Card>
-            <SectionTitle hint={lang === "ar" ? "تغطية البيانات المتاحة لكل عام" : "Available data coverage per year"}>
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "تغطية البيانات المتاحة لكل عام"
+                  : "Available data coverage per year"
+              }
+            >
               {lang === "ar" ? "تغطية البيانات" : "Data coverage"}
             </SectionTitle>
             <div className="overflow-x-auto">
@@ -95,23 +127,49 @@ function Yoy() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {data.ytd.map((m) => (
               <Card key={m.metric}>
-                <div className="text-[11px] uppercase tracking-wide text-text-muted">{m.metric}</div>
+                <div className="text-[11px] uppercase tracking-wide text-text-muted">
+                  {m.metric}
+                </div>
                 <div className="num text-xl font-semibold mt-1">
-                  {m.metric === "spend" || m.metric === "revenue" ? fmtUSD(m.current) : fmtNum(m.current)}
+                  {isAvailable(data, m.metric)
+                    ? m.metric === "spend" || m.metric === "revenue"
+                      ? fmtUSD(m.current)
+                      : fmtNum(m.current)
+                    : "—"}
                 </div>
                 <div className="text-[11px] text-text-muted mt-1">
                   {data.previousYear}:{" "}
-                  {m.metric === "spend" || m.metric === "revenue" ? fmtUSD(m.previous) : fmtNum(m.previous)}
+                  {isAvailable(data, m.metric)
+                    ? m.metric === "spend" || m.metric === "revenue"
+                      ? fmtUSD(m.previous)
+                      : fmtNum(m.previous)
+                    : lang === "ar"
+                      ? "غير متاح"
+                      : "Unavailable"}
                 </div>
                 <Growth value={m.growth} />
               </Card>
             ))}
           </div>
 
-          <MonthTable title={t("spend")} points={data.spend} money />
-          <MonthTable title={t("revenue")} points={data.revenue} money />
-          <MonthTable title={t("crm_leads")} points={data.leads} />
-          <MonthTable title={t("won")} points={data.won} />
+          <MonthTable
+            title={t("spend")}
+            points={data.spend}
+            money
+            available={data.metricAvailability.spend}
+          />
+          <MonthTable
+            title={t("revenue")}
+            points={data.revenue}
+            money
+            available={data.metricAvailability.revenue}
+          />
+          <MonthTable
+            title={t("crm_leads")}
+            points={data.leads}
+            available={data.metricAvailability.leads}
+          />
+          <MonthTable title={t("won")} points={data.won} available={data.metricAvailability.won} />
 
           <Card>
             <SectionTitle>{t("by_course")}</SectionTitle>
@@ -150,38 +208,65 @@ function Yoy() {
   );
 }
 
-function MonthTable({ title, points, money }: { title: string; points: YoyPoint[]; money?: boolean }) {
+function isAvailable(data: Resp, metric: string): boolean {
+  return metric in data.metricAvailability
+    ? data.metricAvailability[metric as keyof Resp["metricAvailability"]]
+    : false;
+}
+
+function MonthTable({
+  title,
+  points,
+  money,
+  available,
+}: {
+  title: string;
+  points: YoyPoint[];
+  money?: boolean;
+  available: boolean;
+}) {
   const { lang } = useI18n();
   const fmt = money ? fmtUSD : fmtNum;
   return (
     <Card>
       <SectionTitle>{title}</SectionTitle>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[420px]">
-          <thead>
-            <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-              <th className="text-start py-2">{lang === "ar" ? "الشهر" : "Month"}</th>
-              <th className="text-end py-2">{lang === "ar" ? "الحالي" : "Current"}</th>
-              <th className="text-end py-2">{lang === "ar" ? "السابق" : "Previous"}</th>
-              <th className="text-end py-2">{lang === "ar" ? "الفرق" : "Delta"}</th>
-              <th className="text-end py-2">%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {points.map((p, i) => (
-              <tr key={p.key} className="border-t border-border">
-                <td className="py-2">{MONTHS[lang][i]}</td>
-                <td className="py-2 text-end num">{fmt(p.current)}</td>
-                <td className="py-2 text-end num">{fmt(p.previous)}</td>
-                <td className="py-2 text-end num">{fmt(p.delta)}</td>
-                <td className="py-2 text-end">
-                  <Growth value={p.growth} inline />
-                </td>
+      {!available ? (
+        <EmptyState
+          label={
+            lang === "ar"
+              ? `بيانات ${title} التاريخية غير متاحة للمقارنة`
+              : `Historical ${title} data is unavailable for comparison`
+          }
+          compact
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[420px]">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                <th className="text-start py-2">{lang === "ar" ? "الشهر" : "Month"}</th>
+                <th className="text-end py-2">{lang === "ar" ? "الحالي" : "Current"}</th>
+                <th className="text-end py-2">{lang === "ar" ? "السابق" : "Previous"}</th>
+                <th className="text-end py-2">{lang === "ar" ? "الفرق" : "Delta"}</th>
+                <th className="text-end py-2">%</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {points.map((p, i) => (
+                <tr key={p.key} className="border-t border-border">
+                  <td className="py-2">{MONTHS[lang][i]}</td>
+                  <td className="py-2 text-end num">{fmt(p.current)}</td>
+                  <td className="py-2 text-end num">{fmt(p.previous)}</td>
+                  <td className="py-2 text-end num">{fmt(p.delta)}</td>
+                  <td className="py-2 text-end">
+                    <Growth value={p.growth} inline />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   );
 }
@@ -189,7 +274,9 @@ function MonthTable({ title, points, money }: { title: string; points: YoyPoint[
 /** An em dash where the baseline was zero — a growth % there is not a fact. */
 function Growth({ value, inline }: { value: Maybe; inline?: boolean }) {
   if (value === null || !isFinite(value))
-    return <span className={`text-text-subtle num ${inline ? "" : "block mt-1 text-[11px]"}`}>—</span>;
+    return (
+      <span className={`text-text-subtle num ${inline ? "" : "block mt-1 text-[11px]"}`}>—</span>
+    );
   const good = value >= 0;
   return (
     <span
