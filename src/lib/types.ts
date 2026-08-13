@@ -619,7 +619,11 @@ export interface DataHealth {
   /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
   lostDateBasis: "creation_date" | "unavailable";
   /** Paid invoice-line source, with PostgreSQL retaining the last good Odoo read. */
-  accountingAuthority: "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
+  accountingAuthority:
+    | "odoo-direct"
+    | "postgres-live"
+    | "postgres-last-good"
+    | "google-sheet-fallback";
   /**
    * Non-sensitive direct-Odoo diagnostics. PostgreSQL is the preferred audit
    * baseline; a partial or differently re-rated direct read cannot replace it.

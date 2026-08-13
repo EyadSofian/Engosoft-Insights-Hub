@@ -909,12 +909,11 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         if (timer) clearTimeout(timer);
       }
     };
-    // Normal page loads use the hardened n8n -> PostgreSQL authority. An
-    // explicit forced refresh is different: the manager asked for a live Odoo
-    // reconciliation now, so attempt it even when a durable snapshot exists.
-    // The completeness/revenue gate below still fails closed and keeps the
-    // last-good PostgreSQL copy if the live candidate is partial or re-rated.
-    const directAccountingAttempted = (force || !accountingStored?.rows.length) && odooConfigured();
+    // Accounting is owned by the hardened n8n -> PostgreSQL workflow. Once a
+    // durable snapshot exists, do not launch the lower-privilege direct reader;
+    // it cannot see the full invoice population. Dashboard live-sync requests
+    // trigger the authoritative n8n workflow itself.
+    const directAccountingAttempted = !accountingStored?.rows.length && odooConfigured();
     const directAccountingPromise: Promise<
       { value: DirectAccountingSnapshot; error?: never } | { value?: never; error: string }
     > = directAccountingAttempted
@@ -1184,15 +1183,23 @@ export async function loadAllData(force = false): Promise<Snapshot> {
       : accountingStoredAvailable
         ? storedAccountingRows
         : sheetAccountingSelection.rows;
+    const accountingStoredIsFresh = (() => {
+      const synced = Date.parse(accountingStored?.syncedAt ?? "");
+      return Number.isFinite(synced) && Date.now() - synced <= 45 * 60_000;
+    })();
     const accountingTab = accountingDirectAccepted
       ? "Paid Invoices (Odoo direct)"
       : accountingStoredAvailable
-        ? "Paid Invoices (Postgres last-good)"
+        ? accountingStoredIsFresh
+          ? "Paid Invoices (PostgreSQL live sync)"
+          : "Paid Invoices (Postgres last-good)"
         : "Paid Invoices (Payment Date — migration fallback)";
     const accountingAuthority: DataHealth["accountingAuthority"] = accountingDirectAccepted
       ? "odoo-direct"
       : accountingStoredAvailable
-        ? "postgres-last-good"
+        ? accountingStoredIsFresh
+          ? "postgres-live"
+          : "postgres-last-good"
         : "google-sheet-fallback";
     const accountingDirectError = directAccounting.error
       ? /not configured/i.test(directAccounting.error)
