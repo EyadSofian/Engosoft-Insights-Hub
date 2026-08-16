@@ -3,6 +3,7 @@
 // through /api/ingest/dataset; no Google Sheet or Supabase read is involved.
 
 import { readDashboardDataset } from "./dashboard-db.server";
+import { readSalesReport, type SalesReportRow } from "./sales-report.ts";
 
 export interface SlaRepMonthly {
   month: string;
@@ -26,35 +27,24 @@ export interface SlaRepMonthly {
   answer_pct: number | null;
 }
 
-export interface SlaSalesSummary {
-  month: string;
-  team_name: string | null;
-  user_name: string | null;
-  achieved_untaxed: number | null;
-  achieved_total: number | null;
-  deals_count: number | null;
-  quotations_count: number | null;
-  pipeline_value: number | null;
-  team_target: number | null;
-  team_attainment_pct: number | null;
-}
+/**
+ * Kept as an alias rather than a second copy of the same fields: two identical
+ * interfaces, one here and one beside the parser, would drift the first time a
+ * column is added to the report.
+ */
+export type SlaSalesSummary = SalesReportRow;
 
 export interface SlaSnapshot {
   repMonthly: SlaRepMonthly[];
   salesSummary: SlaSalesSummary[];
   /**
-   * Whether `salesSummary` has a feed behind it at all.
+   * Whether `salesSummary` has a feed behind it at all — the database is
+   * reachable *and* the `sales_summary` dataset has been ingested at least once.
    *
-   * It does not: this reader was narrowed to Yeastar call rows, and Odoo's
-   * monthly sales report has no ingested dataset — `DashboardDataset` in
-   * `dashboard-db.server.ts` does not define one. So `salesSummary` is
-   * permanently empty, and the operational-achievement figure it feeds can
-   * never resolve for any employee in any window.
-   *
-   * The flag exists so the screen can say *that*, rather than telling the user
-   * the number is "unavailable for this period" — which reads as a gap in the
-   * month and sends them looking for data that was never wired up. Wiring the
-   * report means adding the dataset, reading it here, and flipping this to true.
+   * The screen has to tell a missing integration apart from a quiet month.
+   * Before the dataset existed this was permanently false, and the operational
+   * figure still rendered as "unavailable for this period" — which sent readers
+   * hunting for a gap in the month rather than a feed nobody had wired up.
    */
   salesSummaryConfigured: boolean;
   fetchedAt: string;
@@ -101,9 +91,10 @@ let dataCache: { value: SlaSnapshot; expiresAt: number } | null = null;
 let inFlight: Promise<SlaSnapshot> | null = null;
 
 async function refresh(): Promise<SlaSnapshot> {
-  const [calls, extensions] = await Promise.all([
+  const [calls, extensions, sales] = await Promise.all([
     readDashboardDataset("sla_calls"),
     readDashboardDataset("pbx_extensions"),
+    readDashboardDataset("sales_summary"),
   ]);
   if (!calls.configured || !extensions.configured) {
     throw new Error("Railway PostgreSQL is not configured for Yeastar calls.");
@@ -149,13 +140,17 @@ async function refresh(): Promise<SlaSnapshot> {
         row.outbound_calls > 0 ? (row.answered_calls / row.outbound_calls) * 100 : null,
     }))
     .sort((a, b) => a.month.localeCompare(b.month) || a.user_name.localeCompare(b.user_name));
-  const fetchedAt = [calls.syncedAt, extensions.syncedAt].filter(Boolean).sort().at(-1) || "";
+  const fetchedAt =
+    [calls.syncedAt, extensions.syncedAt, sales.syncedAt].filter(Boolean).sort().at(-1) || "";
   return {
     repMonthly,
-    salesSummary: [],
-    salesSummaryConfigured: false,
+    salesSummary: readSalesReport(sales.rows),
+    // A dataset that has never been posted to is a missing feed, not an empty
+    // month — `status` is the only thing that separates the two, since both
+    // leave `rows` empty.
+    salesSummaryConfigured: sales.configured && sales.status !== "never",
     fetchedAt,
-    source: "Railway PostgreSQL · Yeastar",
+    source: "Railway PostgreSQL · Yeastar · Odoo sales report",
   };
 }
 

@@ -557,10 +557,9 @@ function AgentTargetPanel({
               sub={gapLabel(target.gapPaid)}
               icon={<ReceiptText size={17} />}
             />
-            {/* "Unavailable for period" sent people hunting for a gap in the
-                month. The number is not missing for August — Odoo's operational
-                sales report has no feed into this dashboard at all, so it is
-                blank for every employee in every window. Say which it is. */}
+            {/* Two different silences, two different sentences. "Unavailable for
+                period" covered both and sent readers hunting for a gap in the
+                month, when the cause was a feed nobody had connected. */}
             <ProfileMetric
               label={lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target"}
               value={fmtPct(target.achievementOperational, 1)}
@@ -569,8 +568,8 @@ function AgentTargetPanel({
                   ? gapLabel(target.gapOperational)
                   : operationalConfigured
                     ? lang === "ar"
-                      ? "مفيش بيانات تشغيلية للفترة دي"
-                      : "No operational rows for this window"
+                      ? "الموظف ده مش موجود في تقرير أودو للفترة دي"
+                      : "This employee has no row in the report for this window"
                     : lang === "ar"
                       ? "تقرير Odoo التشغيلي مش موصّل بالداشبورد"
                       : "Odoo's operational report is not connected"

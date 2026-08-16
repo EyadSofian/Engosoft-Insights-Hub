@@ -20,7 +20,9 @@ export type DashboardDataset =
   | "website_sales"
   | "pbx_extensions"
   | "sla_calls"
-  | "sales_targets";
+  | "sales_targets"
+  /** Odoo's monthly operational sales report, one row per salesperson-month. */
+  | "sales_summary";
 
 export type DashboardRow = Record<string, string>;
 
@@ -55,6 +57,7 @@ const DATASETS = new Set<DashboardDataset>([
   "pbx_extensions",
   "sla_calls",
   "sales_targets",
+  "sales_summary",
 ]);
 
 let pool: Pool | null = null;
