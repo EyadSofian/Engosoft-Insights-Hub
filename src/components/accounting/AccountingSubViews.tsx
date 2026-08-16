@@ -301,7 +301,7 @@ export function AccountingAgentsView() {
           index={1}
           label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
           value={fmtUSDExact(data.summary.paidRevenue)}
-          sub={`${fmtNum(data.summary.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+          sub={invoiceCount(data.summary.invoices, lang)}
           icon={<ReceiptText size={18} />}
           hero
         />
@@ -842,10 +842,18 @@ function AgentPerformanceSheet({
   const { totals } = courseProfile;
   // The second fact on every summary card. Whichever basis a card ranks on, the
   // other one sits underneath it, so no card can be read out of context.
+  //
+  // These read "X Won من Y ليد" rather than "X Won / Y ليد". A slash between a
+  // Latin word and an Arabic one has no direction of its own, so the two
+  // numbers can land either way round on screen and the line degenerates into
+  // "2 10" with nothing saying which is which. An Arabic connective carries the
+  // relationship regardless of how the runs are ordered.
   const cohortLine = (course: AgentCoursePerformance) =>
-    `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"} · ${fmtPct(course.conversionRate, 1)}`;
+    lang === "ar"
+      ? `${fmtNum(course.won)} Won من ${fmtNum(course.leads)} ليد · ${fmtPct(course.conversionRate, 1)}`
+      : `${fmtNum(course.won)} Won of ${fmtNum(course.leads)} leads · ${fmtPct(course.conversionRate, 1)}`;
   const moneyLine = (course: AgentCoursePerformance) =>
-    `${fmtUSDFull(course.paidRevenue)} · ${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`;
+    `${fmtUSDFull(course.paidRevenue)} · ${invoiceCount(course.invoices, lang)}`;
   const metricConfig = {
     revenue: {
       value: (course: AgentCoursePerformance) => course.paidRevenue,
@@ -901,7 +909,7 @@ function AgentPerformanceSheet({
               label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
               explain="paidCollections"
               value={fmtUSDFull(row.paidRevenue)}
-              sub={`${fmtNum(row.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+              sub={invoiceCount(row.invoices, lang)}
               icon={<ReceiptText size={17} />}
               hero
             />
@@ -985,7 +993,7 @@ function AgentPerformanceSheet({
                 explain="leastSelling"
                 course={courseProfile.leastSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
-                sub={(course) => `${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+                sub={(course) => invoiceCount(course.invoices, lang)}
                 foot={cohortLine}
                 tone="neutral"
                 empty={
@@ -1000,7 +1008,11 @@ function AgentPerformanceSheet({
                 explain="bestConverting"
                 course={courseProfile.bestConvertingCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
-                sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
+                sub={(course) =>
+                  lang === "ar"
+                    ? `${fmtNum(course.won)} Won من ${fmtNum(course.leads)} ليد`
+                    : `${fmtNum(course.won)} Won of ${fmtNum(course.leads)} leads`
+                }
                 foot={moneyLine}
                 tone="brand"
                 // Three different reasons, three different sentences. A cohort
@@ -1488,6 +1500,21 @@ const SPECIALIZATION_COLORS: Record<string, string> = {
   "non engineering": "var(--chart-5)",
   uncategorized: "var(--chart-muted)",
 };
+
+/**
+ * "فاتورة واحدة" / "فاتورتين" / "٧ فواتير".
+ *
+ * Arabic pluralises on four bands, not two. "7 فاتورة" everywhere is the kind
+ * of small wrongness that makes a page read as machine-written, and the dual
+ * especially — "2 فاتورة" is not something anyone says.
+ */
+function invoiceCount(count: number, lang: "ar" | "en"): string {
+  if (lang === "en") return `${fmtNum(count)} ${count === 1 ? "invoice" : "invoices"}`;
+  if (count === 1) return "فاتورة واحدة";
+  if (count === 2) return "فاتورتين";
+  if (count >= 3 && count <= 10) return `${fmtNum(count)} فواتير`;
+  return `${fmtNum(count)} فاتورة`;
+}
 
 function displayDimension(value: string, lang: "ar" | "en") {
   return value === "Uncategorized" && lang === "ar" ? "غير مصنف" : value;
