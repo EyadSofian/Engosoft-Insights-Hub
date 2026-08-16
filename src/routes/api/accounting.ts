@@ -154,6 +154,12 @@ export const Route = createFileRoute("/api/accounting")({
                 product: row.product,
                 productCategory: row.productCategory,
                 mainCategory: row.mainCategory,
+                // The course every course-level card is grouped by. Without it
+                // on the line, a figure like "PMP · 7 invoices · $1,440.93"
+                // cannot be traced back to the invoices behind it — the reader
+                // can see the products but not the bucket they were counted in,
+                // and re-deriving it from the product name is a guess.
+                course: row.course,
                 productCode: row.productCode,
                 quantity: row.quantity,
                 untaxedTotal: row.untaxedTotal,

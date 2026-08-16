@@ -393,6 +393,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               "رقم الموظف",
               "كود المنتج",
               "المنتج",
+              "الكورس",
               "فئة المنتج",
               "الفئة الرئيسية",
               "الكمية",
@@ -420,6 +421,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               "Employee Code",
               "Product Code",
               "Product",
+              "Course",
               "Product Category",
               "Main Category",
               "Quantity",
@@ -456,6 +458,11 @@ export const Route = createFileRoute("/api/accounting-export")({
               row.code,
               row.productCode,
               row.product,
+              // The bucket the course cards group this line into. Exporting the
+              // product without it leaves an auditor re-deriving the course
+              // from the product name, which is exactly the step that can
+              // disagree with what the screen counted.
+              row.course,
               row.productCategory,
               row.mainCategory,
               row.quantity,
