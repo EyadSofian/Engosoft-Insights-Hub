@@ -264,7 +264,7 @@ export function AccountingAgentsView() {
         </Notice>
       )}
       <TargetNotices targets={data.targets} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           index={0}
           label={lang === "ar" ? "الموظفون النشطون" : "Active employees"}
@@ -289,7 +289,7 @@ export function AccountingAgentsView() {
           label={lang === "ar" ? "تارجت الفترة" : "Target for period"}
           // Prorated, so half a month shows half the quota. An em dash means no
           // target is published for this window — never a zero.
-          value={data.targets.totalTarget === null ? "—" : fmtUSDExact(data.targets.totalTarget)}
+          value={data.targets.totalTarget === null ? "—" : fmtUSDFull(data.targets.totalTarget)}
           sub={
             data.targets.totalTarget === null
               ? lang === "ar" ? "لا يوجد تارجت منشور للفترة" : "No target published for this window"
@@ -665,8 +665,8 @@ function AgentCards({
               <ProgressMetric
                 label={
                   lang === "ar"
-                    ? `إنجاز التارجت (${fmtUSDExact(row.target.target)}${row.target.wholeMonths ? "" : " موزّع بالأيام"})`
-                    : `Target achievement (${fmtUSDExact(row.target.target)}${row.target.wholeMonths ? "" : ", prorated"})`
+                    ? `إنجاز التارجت (${fmtUSDFull(row.target.target)}${row.target.wholeMonths ? "" : " موزّع بالأيام"})`
+                    : `Target achievement (${fmtUSDFull(row.target.target)}${row.target.wholeMonths ? "" : ", prorated"})`
                 }
                 value={row.target.achievementPaid}
                 color="var(--brand)"
@@ -756,7 +756,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 </td>
                 <td className="px-3 py-3 text-end">
                   <div className="num font-semibold">
-                    {row.target?.target === null || !row.target ? "—" : fmtUSDExact(row.target.target)}
+                    {row.target?.target === null || !row.target ? "—" : fmtUSDFull(row.target.target)}
                   </div>
                   <div className="mt-0.5 text-[10px] text-text-muted">
                     {!row.target
@@ -767,7 +767,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                         ? row.target.note || (lang === "ar" ? "غير مستهدف" : "Untargeted")
                         : row.target.wholeMonths
                           ? row.target.teamLeader
-                          : `${lang === "ar" ? "من" : "of"} ${fmtUSDExact(row.target.monthlyTarget ?? 0)} ${lang === "ar" ? "شهرياً" : "monthly"}`}
+                          : `${lang === "ar" ? "من" : "of"} ${fmtUSDFull(row.target.monthlyTarget ?? 0)} ${lang === "ar" ? "شهرياً" : "monthly"}`}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end font-semibold">
@@ -940,13 +940,13 @@ function AgentPerformanceSheet({
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
                 tone="brand"
-                // The sample can be perfectly adequate and still contain no win,
-                // so this must not read as "not enough data".
+                // A cohort can be perfectly large and still hold no win yet, so
+                // this must not read as "not enough data".
                 empty={
-                  courseProfile.courses.some((course) => course.sampleStatus === "reliable")
+                  courseProfile.bestReason === "no_win_yet"
                     ? lang === "ar"
-                      ? "لا يوجد كورس بتحويل موجب في هذه الفترة"
-                      : "No course converted in this period"
+                      ? "لسه مفيش Won في أي كورس من ليدز الفترة دي"
+                      : "No lead from this period's cohort has been won yet"
                     : undefined
                 }
               />
@@ -955,8 +955,20 @@ function AgentPerformanceSheet({
                 eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
                 course={courseProfile.needsSupportCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
-                sub={(course) => `${fmtNum(course.leads)} ${lang === "ar" ? "ليد بعينة قابلة للحكم" : "leads in a reliable sample"}`}
+                sub={(course) =>
+                  `${fmtNum(course.won + course.lost)} ${lang === "ar" ? "محسومة من" : "decided of"} ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`
+                }
                 tone="danger"
+                // A course whose cohort is mostly still open is not a proven
+                // weakness. Saying "not enough sample" would be wrong — the
+                // sample is large, it just has not finished.
+                empty={
+                  courseProfile.needsSupportReason === "cohort_still_open"
+                    ? lang === "ar"
+                      ? `لسه بدري — أغلب الليدز مفتوحة ولسه بتتشغل. الحكم بيبدأ بعد ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من الليدز تتحسم.`
+                      : `Too early — most leads are still open. Judging starts once ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort is decided.`
+                    : undefined
+                }
               />
             </div>
           </section>
@@ -1078,8 +1090,8 @@ function AgentPerformanceSheet({
 
           <Notice tone="info" icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة. تحويل الليدز = Won ÷ كل ليدز الكورس. التصنيف قوي/يحتاج دعم لا يعمل إلا عند ${courseProfile.minimumLeadSample} ليدز و${courseProfile.minimumDecidedSample} حالات Won/Lost على الأقل؛ العينات الأصغر تظهر استرشادية فقط.`
-              : `Sales are net paid Odoo collections. Lead conversion = Won ÷ all course leads. Strong/needs-support labels require at least ${courseProfile.minimumLeadSample} leads and ${courseProfile.minimumDecidedSample} Won/Lost decisions; smaller samples remain directional.`}
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد؛ و«يحتاج دعم» محتاج كمان إن ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من ليدز الكورس تكون اتحسمت — الكورس اللي لسه أغلب ليدزه مفتوحة ما يتحاسبش على إنه ضعيف.`
+              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. "Best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win; "needs support" additionally requires ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort to be decided — a course still mostly in play is never marked weak.`}
           </Notice>
         </div>
       </SheetContent>

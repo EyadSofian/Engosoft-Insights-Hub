@@ -2,7 +2,13 @@ import type { GlobalFilters, TeamAgg } from "./types";
 import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
 import { normalizePersonName } from "./person-name.ts";
-import { rankCourseInsights } from "./course-insight.ts";
+import {
+  MIN_DECIDED_SHARE,
+  MIN_INSIGHT_LEADS,
+  rankCourseInsights,
+  type BestReason,
+  type SupportReason,
+} from "./course-insight.ts";
 import { targetMonths, targetsByPerson, windowTarget } from "./sales-targets.ts";
 import {
   getSlaSnapshot,
@@ -146,8 +152,14 @@ export interface AgentCourseProfile {
   leastSellingCourse: AgentCoursePerformance | null;
   bestConvertingCourse: AgentCoursePerformance | null;
   needsSupportCourse: AgentCoursePerformance | null;
+  /** Why the strength card is empty — small cohort, or no win landed yet. */
+  bestReason: BestReason;
+  /** Why the weakness card is empty — small cohort, or still being worked. */
+  needsSupportReason: SupportReason;
   minimumLeadSample: number;
   minimumDecidedSample: number;
+  /** Share of a cohort that must be decided before a course can be called weak. */
+  minimumDecidedShare: number;
   lostDataAvailable: boolean;
 }
 
@@ -272,7 +284,7 @@ interface MutableAgentProfile {
   specializations: Map<string, MutableDimension>;
 }
 
-const MINIMUM_LEAD_SAMPLE = 10;
+const MINIMUM_LEAD_SAMPLE = MIN_INSIGHT_LEADS;
 const MINIMUM_DECIDED_SAMPLE = 5;
 
 const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
@@ -282,8 +294,11 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   leastSellingCourse: null,
   bestConvertingCourse: null,
   needsSupportCourse: null,
+  bestReason: "no_sample",
+  needsSupportReason: "no_sample",
   minimumLeadSample: MINIMUM_LEAD_SAMPLE,
   minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
+  minimumDecidedShare: MIN_DECIDED_SHARE,
   lostDataAvailable,
 });
 
@@ -535,8 +550,12 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
               left.paidRevenue - right.paidRevenue || left.invoices - right.invoices,
           )[0]
         : null;
-    const { best: bestConvertingCourse, needsSupport: needsSupportCourse } =
-      rankCourseInsights(courses);
+    const {
+      best: bestConvertingCourse,
+      needsSupport: needsSupportCourse,
+      bestReason,
+      needsSupportReason,
+    } = rankCourseInsights(courses);
 
     profiles.set(personKey, {
       courses,
@@ -545,8 +564,11 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       leastSellingCourse,
       bestConvertingCourse,
       needsSupportCourse,
+      bestReason,
+      needsSupportReason,
       minimumLeadSample: MINIMUM_LEAD_SAMPLE,
       minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
+      minimumDecidedShare: MIN_DECIDED_SHARE,
       lostDataAvailable,
     });
   }

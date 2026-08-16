@@ -1,59 +1,89 @@
 /**
  * Which course an employee is strongest and weakest at.
  *
- * Split out of the profile builder so the ranking rule can be tested directly:
- * it only fires on a sample large enough to judge, which live data rarely
- * reproduces on demand.
+ * Split out of the profile builder so the rule can be tested directly: live data
+ * rarely reproduces a judgeable cohort on demand.
  *
- * The rule this file exists to enforce is that **a course nobody converted is
- * never "best"**. Taking the plain maximum over the reliable courses meant that
- * an employee with a single judgeable course sitting at 0% had it announced as
- * their best conversion, while the "needs support" card — which required a
- * second course before it would say anything — stayed empty. The two headline
- * cards then read as the exact opposite of what the numbers said.
+ * **The two cards ask different questions and therefore need different tests.**
+ * Using one "reliable sample" flag for both produced two wrong answers at once,
+ * observed on a real profile in August 2026:
+ *
+ * - PMP had 11 leads and 2 wins — his only converting course — but was rejected
+ *   for having fewer than 5 decided leads, so the page announced that no course
+ *   converted at all.
+ * - CFM had 22 leads of which 16 were still open, 6 decided and all lost, while
+ *   collecting $3,130. It was named the course needing support, when in truth
+ *   three quarters of its cohort had simply not been decided yet. Meanwhile
+ *   Management — 11 leads, 6 decided, none won, no revenue at all — went unnamed.
+ *
+ * So strength is judged on evidence that conversion happens (a real cohort and
+ * at least one win), and weakness on evidence that it is failing (a real cohort
+ * that has actually been decided). A cohort still in play is neither.
  */
+
+/** Below this, one lucky lead would decide the answer. */
+export const MIN_INSIGHT_LEADS = 10;
+
+/**
+ * Share of a course's cohort that must be Won or Lost before the course can be
+ * called weak. A monthly window is usually shorter than the sales cycle, so most
+ * leads created in it are still open — counting those as failures marks every
+ * employee down for deals they are still working.
+ */
+export const MIN_DECIDED_SHARE = 0.5;
+
 export interface RankableCourse {
   key: string;
   conversionRate: number | null;
   leads: number;
-  sampleStatus: "reliable" | "insufficient";
+  won: number;
+  lost: number;
 }
+
+export type BestReason = "" | "no_sample" | "no_win_yet";
+export type SupportReason = "" | "no_sample" | "cohort_still_open";
 
 export interface CourseInsights<T extends RankableCourse> {
-  /** Highest converting course with a judgeable sample and a rate above zero. */
+  /** Highest converting course proven on a real cohort with at least one win. */
   best: T | null;
-  /**
-   * Lowest converting course with a judgeable sample, as long as it is not the
-   * same row already shown as the best one. A single reliable course still
-   * qualifies — that is the case a manager most needs to see.
-   */
+  /** Weakest course whose cohort has actually been decided. */
   needsSupport: T | null;
+  /** Why `best` is empty, so the UI never blames the sample size wrongly. */
+  bestReason: BestReason;
+  /** Why `needsSupport` is empty. */
+  needsSupportReason: SupportReason;
 }
 
-export function rankCourseInsights<T extends RankableCourse>(courses: T[]): CourseInsights<T> {
-  const reliable = courses.filter((course) => course.sampleStatus === "reliable");
+const decidedShare = (course: RankableCourse): number =>
+  course.leads > 0 ? (course.won + course.lost) / course.leads : 0;
 
-  // Both ends break ties on the larger sample, which means the opposite thing on
-  // each side and has to be spelled out rather than derived by reversing one
-  // list: the strongest course should be the one proven over more leads, and the
-  // weakest should be the one wasting more of them.
+export function rankCourseInsights<T extends RankableCourse>(courses: T[]): CourseInsights<T> {
+  const sized = courses.filter((course) => course.leads >= MIN_INSIGHT_LEADS);
+
+  // Strength: a win actually happened, on a cohort big enough to mean something.
   const best =
-    [...reliable]
+    [...sized]
+      .filter((course) => course.won > 0)
       .sort(
         (left, right) =>
           (right.conversionRate ?? -1) - (left.conversionRate ?? -1) || right.leads - left.leads,
-      )
-      .find((course) => (course.conversionRate ?? 0) > 0) ?? null;
+      )[0] ?? null;
 
+  // Weakness: the cohort has been decided, and it went badly. Ties break on the
+  // larger cohort, because more decided leads is the bigger problem.
+  const decided = sized.filter((course) => decidedShare(course) >= MIN_DECIDED_SHARE);
   const weakest =
-    [...reliable].sort(
+    [...decided].sort(
       (left, right) =>
         (left.conversionRate ?? Infinity) - (right.conversionRate ?? Infinity) ||
         right.leads - left.leads,
     )[0] ?? null;
+  const needsSupport = weakest && weakest.key !== best?.key ? weakest : null;
 
   return {
     best,
-    needsSupport: weakest && weakest.key !== best?.key ? weakest : null,
+    needsSupport,
+    bestReason: best ? "" : sized.length ? "no_win_yet" : "no_sample",
+    needsSupportReason: needsSupport ? "" : sized.length ? "cohort_still_open" : "no_sample",
   };
 }
