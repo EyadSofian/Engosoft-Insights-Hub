@@ -62,14 +62,16 @@ export interface AgentTarget {
   branch: string;
   note: string;
   /**
-   * The quota for the selected window: each covered month's target scaled by the
-   * share of its days the window spans. `null` means no month in the window
-   * publishes a target — deliberately not `0`, which would read as a real quota
-   * the employee failed to meet.
+   * The published quota, whole. `null` means no month in the window publishes
+   * one — deliberately not `0`, which would read as a real quota the employee
+   * failed to meet.
    */
   target: number | null;
-  /** The unprorated monthly quota for the covered months, for context. */
-  monthlyTarget: number | null;
+  /**
+   * What the elapsed days imply should be collected by now. A pace marker
+   * beside the real quota, never the denominator of achievement.
+   */
+  expectedToDate: number | null;
   monthsCovered: string[];
   /** Months the window spans with no published target at all. */
   monthsMissing: string[];
@@ -77,13 +79,21 @@ export interface AgentTarget {
   complete: boolean;
   /** True when the window covers every published month end to end. */
   wholeMonths: boolean;
-  /** Achievement against the paid-invoice revenue, %. */
+  /** Paid collections ÷ the whole quota, %. */
   achievementPaid: number | null;
-  /** Achievement against Odoo's operational sales figure, %. */
+  /** Odoo's operational sales ÷ the whole quota, %. */
   achievementOperational: number | null;
   /** Remaining amount on each basis. Negative once the quota is beaten. */
   gapPaid: number | null;
   gapOperational: number | null;
+  /**
+   * Paid collections against the pace marker, %. Above 100 means ahead of
+   * schedule for the days elapsed — which is a different statement from having
+   * hit the quota, and is labelled as such.
+   */
+  pacePaid: number | null;
+  /** Amount still owed against the pace marker. Negative when ahead. */
+  paceGapPaid: number | null;
 }
 
 export interface TargetCoverage {
@@ -91,10 +101,15 @@ export interface TargetCoverage {
   publishedMonths: string[];
   /** Employees in the current selection matched to a published quota. */
   matched: number;
-  /** Prorated quota total across every matched employee. */
+  /** Whole published quota across every matched employee. */
   totalTarget: number | null;
+  /** What the elapsed days imply should be collected by now. Pace only. */
+  totalExpectedToDate: number | null;
   totalPaidRevenue: number;
+  /** Collections ÷ the whole quota, %. */
   totalAchievementPaid: number | null;
+  /** Collections ÷ the pace marker, %. Above 100 = ahead of schedule. */
+  totalPacePaid: number | null;
   /** False when the window spans a month with no published quota. */
   complete: boolean;
   wholeMonths: boolean;
@@ -755,12 +770,10 @@ function buildTargetCoverage(
     const person = byName.get(normalizePersonName(row.name));
     if (!person) continue;
     const resolved = windowTarget(person.monthly, filters.from, filters.to);
-    const monthlyTarget = resolved.monthsCovered.length
-      ? person.monthly
-          .filter((month) => resolved.monthsCovered.includes(month.month))
-          .reduce((sum, month) => sum + (month.target ?? 0), 0)
-      : null;
-    const target = resolved.target;
+    const { target, expectedToDate } = resolved;
+    // Achievement always divides by the whole published quota. The pace marker
+    // is reported separately so "ahead of schedule" can never be mistaken for
+    // "target met".
     const share = (value: number | null): number | null =>
       target !== null && target > 0 && value !== null ? (value / target) * 100 : null;
     const gap = (value: number | null): number | null =>
@@ -775,7 +788,7 @@ function buildTargetCoverage(
       branch: person.entry.branch,
       note: person.entry.note,
       target,
-      monthlyTarget,
+      expectedToDate,
       monthsCovered: resolved.monthsCovered,
       monthsMissing: resolved.monthsMissing,
       complete: resolved.complete,
@@ -784,6 +797,11 @@ function buildTargetCoverage(
       achievementOperational: share(row.operationalSales),
       gapPaid: gap(row.paidRevenue),
       gapOperational: gap(row.operationalSales),
+      pacePaid:
+        expectedToDate !== null && expectedToDate > 0
+          ? (row.paidRevenue / expectedToDate) * 100
+          : null,
+      paceGapPaid: expectedToDate !== null ? expectedToDate - row.paidRevenue : null,
     };
   }
 
@@ -813,15 +831,23 @@ function buildTargetCoverage(
   const totalTarget = targeted.length
     ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
     : null;
+  const totalExpectedToDate = targeted.length
+    ? targeted.reduce((sum, row) => sum + (row.target?.expectedToDate ?? 0), 0)
+    : null;
   const totalPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
 
   return {
     publishedMonths,
     matched: matchedEmployeeIds.size,
     totalTarget,
+    totalExpectedToDate,
     totalPaidRevenue,
     totalAchievementPaid:
       totalTarget !== null && totalTarget > 0 ? (totalPaidRevenue / totalTarget) * 100 : null,
+    totalPacePaid:
+      totalExpectedToDate !== null && totalExpectedToDate > 0
+        ? (totalPaidRevenue / totalExpectedToDate) * 100
+        : null,
     complete: targeted.every((row) => row.target?.complete ?? false),
     wholeMonths: targeted.every((row) => row.target?.wholeMonths ?? false),
     monthsMissing: [...new Set(targeted.flatMap((row) => row.target?.monthsMissing ?? []))].sort(),

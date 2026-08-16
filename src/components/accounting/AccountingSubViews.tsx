@@ -294,7 +294,11 @@ export function AccountingAgentsView() {
             data.targets.totalTarget === null
               ? lang === "ar" ? "لا يوجد تارجت منشور للفترة" : "No target published for this window"
               : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}${
-                  data.targets.wholeMonths ? "" : lang === "ar" ? " · موزّع بالأيام" : " · prorated"
+                  data.targets.wholeMonths
+                    ? ""
+                    : lang === "ar"
+                      ? ` · الإيقاع ${fmtPct(data.targets.totalPacePaid, 0)}`
+                      : ` · pace ${fmtPct(data.targets.totalPacePaid, 0)}`
                 }`
           }
           icon={<Target size={18} />}
@@ -521,11 +525,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
             <ProfileMetric
               label={lang === "ar" ? "التارجت" : "Target"}
               value={money(target.target)}
-              sub={
-                target.wholeMonths
-                  ? target.monthsCovered.map((month) => monthLabel(month, lang)).join(" · ")
-                  : `${lang === "ar" ? "موزّع بالأيام من" : "prorated from"} ${money(target.monthlyTarget)}`
-              }
+              sub={target.monthsCovered.map((month) => monthLabel(month, lang)).join(" · ")}
               icon={<Target size={17} />}
               hero
             />
@@ -558,13 +558,28 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
             <ProgressMetric
               label={
                 lang === "ar"
-                  ? "نسبة إنجاز التارجت (تحصيل مدفوع)"
-                  : "Target achievement (paid collections)"
+                  ? `نسبة إنجاز التارجت — ${money(row.paidRevenue)} من ${money(target.target)}`
+                  : `Target achievement — ${money(row.paidRevenue)} of ${money(target.target)}`
               }
               value={target.achievementPaid}
               color="var(--brand)"
             />
           </div>
+          {!target.wholeMonths && target.expectedToDate !== null && (
+            <p className="mt-3 text-[11px] text-text-muted">
+              {lang === "ar"
+                ? `الإيقاع: المفروض ${money(target.expectedToDate)} لحد نهاية الفترة المختارة — ${
+                    (target.paceGapPaid ?? 0) <= 0
+                      ? `متقدّم بـ ${money(Math.abs(target.paceGapPaid ?? 0))}`
+                      : `متأخّر بـ ${money(target.paceGapPaid ?? 0)}`
+                  }. ده مؤشر سرعة مش إنجاز — التارجت الكامل لسه ${money(target.gapPaid)} باقي عليه.`
+                : `Pace: ${money(target.expectedToDate)} expected by the end of this window — ${
+                    (target.paceGapPaid ?? 0) <= 0
+                      ? `${money(Math.abs(target.paceGapPaid ?? 0))} ahead`
+                      : `${money(target.paceGapPaid ?? 0)} behind`
+                  }. That is speed, not achievement: ${money(target.gapPaid)} of the full quota remains.`}
+            </p>
+          )}
           {!target.complete && (
             <p className="mt-3 text-[11px] text-text-muted">
               {lang === "ar"
@@ -767,7 +782,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                         ? row.target.note || (lang === "ar" ? "غير مستهدف" : "Untargeted")
                         : row.target.wholeMonths
                           ? row.target.teamLeader
-                          : `${lang === "ar" ? "من" : "of"} ${fmtUSDFull(row.target.monthlyTarget ?? 0)} ${lang === "ar" ? "شهرياً" : "monthly"}`}
+                          : `${lang === "ar" ? "الإيقاع" : "pace"} ${fmtUSDFull(row.target.expectedToDate ?? 0)}`}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end font-semibold">

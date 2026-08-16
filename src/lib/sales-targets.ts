@@ -470,8 +470,19 @@ export function monthsInWindow(
 }
 
 export interface WindowTarget {
-  /** Prorated target for the window, or `null` when no month in it publishes one. */
+  /**
+   * The quota as management published it, for the months the window covers.
+   * This is the number an employee is measured against — it does not shrink
+   * because the month is only half over.
+   */
   target: number | null;
+  /**
+   * The share of that quota the elapsed days imply. A pace marker only: on
+   * 16 August a $9,000 month expects $4,645 by now. Never the denominator of
+   * achievement — dividing 16 days of revenue by 16 days of quota reported
+   * 141% for someone sitting at 73% of their actual target.
+   */
+  expectedToDate: number | null;
   /** Months in the window that carry a published target. */
   monthsCovered: string[];
   /**
@@ -490,11 +501,16 @@ export interface WindowTarget {
 /**
  * A monthly quota measured against an arbitrary dashboard window.
  *
- * The window is rarely a clean calendar month, so each month's quota is
- * prorated by the share of its days the window covers: half of August against
- * a $9,000 August target is $4,500, not $9,000. Comparing a full monthly quota
- * to twelve days of revenue is the single easiest way to make every employee
- * look like they are failing.
+ * Returns two numbers, and which one is the denominator matters:
+ *
+ * - `target` is the published quota, whole. It is what achievement divides by,
+ *   because "did he hit his $9,000?" is the question managers are asking.
+ * - `expectedToDate` prorates that quota by the days the window covers, and is
+ *   only ever a pace marker shown beside the real figure.
+ *
+ * Dividing by the prorated figure was the original design and it was wrong in
+ * the more damaging direction: on 16 August it reported 141.5% achievement for
+ * an employee who had collected $6,573 of a $9,000 quota — 73%.
  */
 export function windowTarget(
   monthlyTargets: { month: string; target: number | null }[],
@@ -514,6 +530,7 @@ export function windowTarget(
   if (!covered.length) {
     return {
       target: null,
+      expectedToDate: null,
       monthsCovered: [],
       monthsMissing: spanned,
       complete: false,
@@ -523,7 +540,11 @@ export function windowTarget(
   const publishedMonths = new Set(published.map((row) => row.month));
   const coverages = covered.map((row) => monthCoverage(row.month, from, to));
   return {
-    target: covered.reduce((sum, row, index) => sum + (row.target ?? 0) * coverages[index], 0),
+    target: covered.reduce((sum, row) => sum + (row.target ?? 0), 0),
+    expectedToDate: covered.reduce(
+      (sum, row, index) => sum + (row.target ?? 0) * coverages[index],
+      0,
+    ),
     monthsCovered: covered.map((row) => row.month),
     monthsMissing: spanned.filter((month) => !publishedMonths.has(month)),
     complete: spanned.every((month) => publishedMonths.has(month)),
