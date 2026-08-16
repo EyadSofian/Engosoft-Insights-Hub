@@ -3,7 +3,7 @@ import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
 import { normalizePersonName } from "./person-name.ts";
 import {
-  MIN_DECIDED_SHARE,
+  MIN_DECIDED_OUTCOMES,
   MIN_INSIGHT_LEADS,
   isSoldCourse,
   rankCourseInsights,
@@ -187,8 +187,6 @@ export interface AgentCourseProfile {
   needsSupportReason: SupportReason;
   minimumLeadSample: number;
   minimumDecidedSample: number;
-  /** Share of a cohort that must be decided before a course can be called weak. */
-  minimumDecidedShare: number;
   lostDataAvailable: boolean;
 }
 
@@ -329,7 +327,7 @@ interface MutableAgentProfile {
 }
 
 const MINIMUM_LEAD_SAMPLE = MIN_INSIGHT_LEADS;
-const MINIMUM_DECIDED_SAMPLE = 5;
+const MINIMUM_DECIDED_SAMPLE = MIN_DECIDED_OUTCOMES;
 
 const blankTotals = (): AgentCourseTotals => ({
   courses: 0,
@@ -376,7 +374,6 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   needsSupportReason: "no_book",
   minimumLeadSample: MINIMUM_LEAD_SAMPLE,
   minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
-  minimumDecidedShare: MIN_DECIDED_SHARE,
   lostDataAvailable,
 });
 
@@ -655,7 +652,6 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       needsSupportReason,
       minimumLeadSample: MINIMUM_LEAD_SAMPLE,
       minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
-      minimumDecidedShare: MIN_DECIDED_SHARE,
       lostDataAvailable,
     });
   }

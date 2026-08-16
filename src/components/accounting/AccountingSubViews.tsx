@@ -1043,10 +1043,10 @@ function AgentPerformanceSheet({
                 // weakness. Saying "not enough sample" would be wrong — the
                 // sample is large, it just has not finished.
                 empty={
-                  courseProfile.needsSupportReason === "cohort_still_open"
+                  courseProfile.needsSupportReason === "too_few_decided"
                     ? lang === "ar"
-                      ? `لسه بدري — أغلب الليدز مفتوحة ولسه بتتشغل. الحكم بيبدأ بعد ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من الليدز تتحسم.`
-                      : `Too early — most leads are still open. Judging starts once ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort is decided.`
+                      ? `لسه مفيش كورس اتحسم فيه ${fmtNum(courseProfile.minimumDecidedSample)} ليدز — أقل من كده الرقم بيبقى صدفة مش نتيجة.`
+                      : `No course has ${fmtNum(courseProfile.minimumDecidedSample)} settled leads yet — below that the rate is chance, not a result.`
                     : courseProfile.needsSupportReason === "no_book"
                       ? lang === "ar"
                         ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
@@ -1218,8 +1218,8 @@ function AgentPerformanceSheet({
 
           <Notice tone="info" icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد، و«يحتاج دعم» محتاج كمان إن ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من ليدز الكورس تكون اتحسمت — الكورس اللي لسه أغلب ليدزه مفتوحة ما يتحاسبش على إنه ضعيف، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً.`
-              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort to be decided — a course still mostly in play is never marked weak, and a course he never sold is never judged at all.`}
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً.`
+              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
           </Notice>
         </div>
       </SheetContent>
