@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  Target,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -42,6 +43,7 @@ import type {
   AgentAnalyticsRow as AgentRow,
   AgentCoursePerformance,
   AgentSpecializationPerformance,
+  AgentTarget,
 } from "@/lib/agent-analytics.server";
 
 export interface AccountingMonth {
@@ -261,11 +263,17 @@ export function AccountingAgentsView() {
             : `${data.sla.callsThrough ? `Latest complete calls: ${monthLabel(data.sla.callsThrough, lang)}. ` : ""}Calls are shown as unavailable rather than a misleading zero; Odoo metrics remain available.`}
         </Notice>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <TargetNotices targets={data.targets} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <KpiCard
           index={0}
           label={lang === "ar" ? "الموظفون النشطون" : "Active employees"}
           value={fmtNum(data.summary.agents)}
+          sub={
+            data.targets.matched > 0
+              ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "بتارجت منشور" : "with a published target"}`
+              : undefined
+          }
           icon={<Users size={18} />}
         />
         <KpiCard
@@ -278,20 +286,35 @@ export function AccountingAgentsView() {
         />
         <KpiCard
           index={2}
+          label={lang === "ar" ? "تارجت الفترة" : "Target for period"}
+          // Prorated, so half a month shows half the quota. An em dash means no
+          // target is published for this window — never a zero.
+          value={data.targets.totalTarget === null ? "—" : fmtUSDExact(data.targets.totalTarget)}
+          sub={
+            data.targets.totalTarget === null
+              ? lang === "ar" ? "لا يوجد تارجت منشور للفترة" : "No target published for this window"
+              : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}${
+                  data.targets.wholeMonths ? "" : lang === "ar" ? " · موزّع بالأيام" : " · prorated"
+                }`
+          }
+          icon={<Target size={18} />}
+        />
+        <KpiCard
+          index={3}
           label={lang === "ar" ? "ليدز دخلت الفترة" : "Leads created in period"}
           value={fmtNum(data.summary.cleanLeads)}
           sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "منهم Won" : "became Won"}`}
           icon={<UserRound size={18} />}
         />
         <KpiCard
-          index={3}
+          index={4}
           label={lang === "ar" ? "إغلاقات تمت في الفترة" : "Closures during period"}
           value={fmtNum(data.summary.periodClosedWon)}
           sub={`${fmtNum(data.summary.periodClosedLost)} Lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`}
           icon={<Trophy size={18} />}
         />
         <KpiCard
-          index={4}
+          index={5}
           label={lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"}
           value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
           sub={
@@ -401,6 +424,170 @@ export function AccountingAgentsView() {
   );
 }
 
+/**
+ * Everything the target comparison cannot answer, said out loud.
+ *
+ * A quota that silently fails to reach its employee is worse than no quota at
+ * all: the page still shows a plausible number, just for fewer people than the
+ * manager thinks. So an unmatched name and a partially covered window each get
+ * a named notice rather than a footnote.
+ */
+function TargetNotices({ targets }: { targets: AgentsResponse["targets"] }) {
+  const { lang } = useI18n();
+  if (!targets.publishedMonths.length) return null;
+  return (
+    <>
+      {targets.unmatched.length > 0 && (
+        <Notice
+          tone="warning"
+          title={
+            lang === "ar"
+              ? `${fmtNum(targets.unmatched.length)} تارجت منشور بلا موظف مطابق`
+              : `${fmtNum(targets.unmatched.length)} published targets matched no employee`
+          }
+        >
+          {lang === "ar"
+            ? `${targets.unmatched.map((row) => row.name).join("، ")} — يا إما مفيش أي نشاط ليهم في الفترة دي، يا إما الاسم مكتوب في ملف التارجت غير المكتوب في أودو ومحتاج يتضاف كاسم بديل. مش بنوزّع التارجت ده على حد تاني.`
+            : `${targets.unmatched.map((row) => row.name).join(", ")} — either they had no activity in this period, or the workbook spells them differently from Odoo and needs an alias. Their quota is never reassigned to anyone else.`}
+        </Notice>
+      )}
+      {!targets.complete && targets.monthsMissing.length > 0 && (
+        <Notice
+          tone="warning"
+          title={
+            lang === "ar"
+              ? "التارجت يغطي جزءاً من الفترة فقط"
+              : "The target covers only part of this window"
+          }
+        >
+          {lang === "ar"
+            ? `التارجت منشور لـ ${targets.publishedMonths.map((month) => monthLabel(month, lang)).join("، ")} بس، والفترة المختارة بتمتد لـ ${fmtNum(targets.monthsMissing.length)} شهر تاني بلا تارجت. نسبة الإنجاز هنا بتقارن مبيعات الفترة كلها بتارجت الشهور المنشورة فقط — اختر شهراً بعينه عشان تبقى المقارنة عادلة.`
+            : `Targets exist for ${targets.publishedMonths.join(", ")} only, while this window spans ${fmtNum(targets.monthsMissing.length)} further month(s) with none. The percentage therefore compares whole-window sales against the published months alone — pick a single month for a fair comparison.`}
+        </Notice>
+      )}
+      {targets.duplicates.length > 0 && (
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "تعارض في ملف التارجت" : "Target workbook conflict"}
+        >
+          {targets.duplicates.join(" · ")}
+        </Notice>
+      )}
+    </>
+  );
+}
+
+/**
+ * The employee's quota for the selected window, on both revenue bases.
+ *
+ * The two bases genuinely disagree: paid collections come from Odoo invoice
+ * lines dated by Payment Date, while the operational figure is Odoo's own
+ * monthly sales report. Showing them side by side is deliberate — picking one
+ * silently would make the dashboard argue with the sheet management already
+ * circulates, with no way to see which number moved.
+ */
+function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow }) {
+  const { lang } = useI18n();
+  const money = (value: number | null) => (value === null ? "—" : fmtUSDFull(value));
+  const gapLabel = (gap: number | null) => {
+    if (gap === null) return "—";
+    return gap > 0
+      ? `${lang === "ar" ? "باقي" : "remaining"} ${fmtUSDFull(gap)}`
+      : `${lang === "ar" ? "تخطّى بـ" : "over by"} ${fmtUSDFull(Math.abs(gap))}`;
+  };
+
+  return (
+    <section className="rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-brand">
+          <Target size={16} />
+          <span>{lang === "ar" ? "تارجت الفترة" : "Target for this period"}</span>
+        </div>
+        <div className="text-[11px] text-text-muted">
+          {[target.teamLeader, target.branch, target.note].filter(Boolean).join(" · ")}
+        </div>
+      </div>
+
+      {target.target === null ? (
+        <p className="mt-3 text-sm font-medium text-text-muted">
+          {target.note ||
+            (lang === "ar"
+              ? "لا يوجد تارجت منشور لهذا الموظف في الفترة المختارة."
+              : "No target is published for this employee in the selected window.")}
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <ProfileMetric
+              label={lang === "ar" ? "التارجت" : "Target"}
+              value={money(target.target)}
+              sub={
+                target.wholeMonths
+                  ? target.monthsCovered.map((month) => monthLabel(month, lang)).join(" · ")
+                  : `${lang === "ar" ? "موزّع بالأيام من" : "prorated from"} ${money(target.monthlyTarget)}`
+              }
+              icon={<Target size={17} />}
+              hero
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "إنجاز التحصيل" : "Collections vs target"}
+              value={fmtPct(target.achievementPaid, 1)}
+              sub={gapLabel(target.gapPaid)}
+              icon={<ReceiptText size={17} />}
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target"}
+              value={fmtPct(target.achievementOperational, 1)}
+              sub={
+                row.operationalSales === null
+                  ? lang === "ar"
+                    ? "غير متاح للفترة"
+                    : "Unavailable for period"
+                  : gapLabel(target.gapOperational)
+              }
+              icon={<Calculator size={17} />}
+            />
+            <ProfileMetric
+              label={lang === "ar" ? "كود الموظف" : "Employee code"}
+              value={target.employeeId}
+              sub={target.supervisor}
+              icon={<UserRound size={17} />}
+            />
+          </div>
+          <div className="mt-4">
+            <ProgressMetric
+              label={
+                lang === "ar"
+                  ? "نسبة إنجاز التارجت (تحصيل مدفوع)"
+                  : "Target achievement (paid collections)"
+              }
+              value={target.achievementPaid}
+              color="var(--brand)"
+            />
+          </div>
+          {!target.complete && (
+            <p className="mt-3 text-[11px] text-text-muted">
+              {lang === "ar"
+                ? `التارجت منشور لـ ${target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ")} فقط، والفترة المختارة أطول من كده — النسبة جزئية.`
+                : `A target exists only for ${target.monthsCovered.join(", ")}, while the window is longer — the percentage is partial.`}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Achievement pill: green once the prorated quota is met, grey while short. */
+function TargetPill({ value }: { value: number | null }) {
+  if (value === null) return <span className="num text-text-muted">—</span>;
+  return (
+    <Pill tone={value >= 100 ? "success" : value >= 70 ? "brand" : "neutral"}>
+      {fmtPct(value, 1)}
+    </Pill>
+  );
+}
+
 function AgentCards({
   rows,
   sortBy,
@@ -474,6 +661,17 @@ function AgentCards({
           </div>
 
           <div className="mt-4 space-y-2.5">
+            {row.target && row.target.target !== null && (
+              <ProgressMetric
+                label={
+                  lang === "ar"
+                    ? `إنجاز التارجت (${fmtUSDExact(row.target.target)}${row.target.wholeMonths ? "" : " موزّع بالأيام"})`
+                    : `Target achievement (${fmtUSDExact(row.target.target)}${row.target.wholeMonths ? "" : ", prorated"})`
+                }
+                value={row.target.achievementPaid}
+                color="var(--brand)"
+              />
+            )}
             <ProgressMetric
               label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
               value={row.decidedConversionRate}
@@ -514,12 +712,15 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
         <SectionTitle className="mb-0">{lang === "ar" ? "كل الموظفين" : "All employees"}</SectionTitle>
       </div>
       <div className="max-h-[680px] overflow-auto">
-        <table className="w-full min-w-[1120px] text-sm">
+        <table className="w-full min-w-[1400px] text-sm">
           <thead className="sticky top-0 z-10 bg-surface-2">
             <tr className="text-[11px] uppercase tracking-wide text-text-muted">
               {[
                 lang === "ar" ? "الموظف" : "Employee",
+                lang === "ar" ? "التارجت" : "Target",
                 lang === "ar" ? "التحصيل المدفوع" : "Paid collections",
+                lang === "ar" ? "إنجاز التحصيل" : "Collections vs target",
+                lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target",
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
                 "Won",
@@ -553,7 +754,31 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                   </button>
                   <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted" title={row.team}>{row.team}</div>
                 </td>
-                <td className="num px-3 py-3 text-end font-semibold">{fmtUSDExact(row.paidRevenue)}</td>
+                <td className="px-3 py-3 text-end">
+                  <div className="num font-semibold">
+                    {row.target?.target === null || !row.target ? "—" : fmtUSDExact(row.target.target)}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-text-muted">
+                    {!row.target
+                      ? lang === "ar"
+                        ? "بدون تارجت"
+                        : "No target"
+                      : row.target.target === null
+                        ? row.target.note || (lang === "ar" ? "غير مستهدف" : "Untargeted")
+                        : row.target.wholeMonths
+                          ? row.target.teamLeader
+                          : `${lang === "ar" ? "من" : "of"} ${fmtUSDExact(row.target.monthlyTarget ?? 0)} ${lang === "ar" ? "شهرياً" : "monthly"}`}
+                  </div>
+                </td>
+                <td className="num px-3 py-3 text-end font-semibold">
+                  {fmtUSDExact(row.paidRevenue)}
+                </td>
+                <td className="px-3 py-3 text-end">
+                  <TargetPill value={row.target?.achievementPaid ?? null} />
+                </td>
+                <td className="px-3 py-3 text-end">
+                  <TargetPill value={row.target?.achievementOperational ?? null} />
+                </td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.invoices)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.won)}</td>
@@ -640,6 +865,7 @@ function AgentPerformanceSheet({
         </div>
 
         <div className="space-y-5 p-4 sm:p-7">
+          {row.target && <AgentTargetPanel target={row.target} row={row} />}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
               label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
@@ -714,6 +940,15 @@ function AgentPerformanceSheet({
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
                 tone="brand"
+                // The sample can be perfectly adequate and still contain no win,
+                // so this must not read as "not enough data".
+                empty={
+                  courseProfile.courses.some((course) => course.sampleStatus === "reliable")
+                    ? lang === "ar"
+                      ? "لا يوجد كورس بتحويل موجب في هذه الفترة"
+                      : "No course converted in this period"
+                    : undefined
+                }
               />
               <CourseInsight
                 icon={<Layers3 size={18} />}
@@ -884,6 +1119,7 @@ function CourseInsight({
   value,
   sub,
   tone,
+  empty,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -891,6 +1127,8 @@ function CourseInsight({
   value: (course: AgentCoursePerformance) => string;
   sub: (course: AgentCoursePerformance) => string;
   tone: "success" | "danger" | "brand" | "neutral";
+  /** Why the card is empty, when "no reliable sample" is not the real reason. */
+  empty?: string;
 }) {
   const { lang } = useI18n();
   const styles = {
@@ -915,7 +1153,7 @@ function CourseInsight({
         </>
       ) : (
         <div className="mt-4 text-sm font-medium text-text-muted">
-          {lang === "ar" ? "لا توجد عينة كافية" : "No reliable sample yet"}
+          {empty ?? (lang === "ar" ? "لا توجد عينة كافية" : "No reliable sample yet")}
         </div>
       )}
     </article>

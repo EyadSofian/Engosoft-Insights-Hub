@@ -1,6 +1,9 @@
 import type { GlobalFilters, TeamAgg } from "./types";
 import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
+import { normalizePersonName } from "./person-name.ts";
+import { rankCourseInsights } from "./course-insight.ts";
+import { targetMonths, targetsByPerson, windowTarget } from "./sales-targets.ts";
 import {
   getSlaSnapshot,
   type SlaRepMonthly,
@@ -40,6 +43,67 @@ export interface AgentAnalyticsRow {
   pipeline: number | null;
   slaMonths: number;
   courseProfile: AgentCourseProfile;
+  /** Published quota for this window, or `null` when none is published. */
+  target: AgentTarget | null;
+}
+
+export interface AgentTarget {
+  employeeId: string;
+  /** Workbook spelling, kept so a renamed employee is still recognisable. */
+  name: string;
+  teamLeader: string;
+  supervisor: string;
+  branch: string;
+  note: string;
+  /**
+   * The quota for the selected window: each covered month's target scaled by the
+   * share of its days the window spans. `null` means no month in the window
+   * publishes a target — deliberately not `0`, which would read as a real quota
+   * the employee failed to meet.
+   */
+  target: number | null;
+  /** The unprorated monthly quota for the covered months, for context. */
+  monthlyTarget: number | null;
+  monthsCovered: string[];
+  /** Months the window spans with no published target at all. */
+  monthsMissing: string[];
+  /** False when part of the window has no target — the ratio is then partial. */
+  complete: boolean;
+  /** True when the window covers every published month end to end. */
+  wholeMonths: boolean;
+  /** Achievement against the paid-invoice revenue, %. */
+  achievementPaid: number | null;
+  /** Achievement against Odoo's operational sales figure, %. */
+  achievementOperational: number | null;
+  /** Remaining amount on each basis. Negative once the quota is beaten. */
+  gapPaid: number | null;
+  gapOperational: number | null;
+}
+
+export interface TargetCoverage {
+  /** Months that publish a quota at all. */
+  publishedMonths: string[];
+  /** Employees in the current selection matched to a published quota. */
+  matched: number;
+  /** Prorated quota total across every matched employee. */
+  totalTarget: number | null;
+  totalPaidRevenue: number;
+  totalAchievementPaid: number | null;
+  /** False when the window spans a month with no published quota. */
+  complete: boolean;
+  wholeMonths: boolean;
+  monthsMissing: string[];
+  /**
+   * Published quotas with no employee anywhere in the data. Either the person
+   * produced nothing at all this period, or the workbook spells their name
+   * differently from Odoo and needs an alias — both must be named, never
+   * silently dropped.
+   */
+  unmatched: { employeeId: string; name: string; teamLeader: string; target: number | null }[];
+  /** People selling in this window with no published quota. */
+  untargeted: { name: string; paidRevenue: number }[];
+  /** Workbook contradictions, e.g. one name resolving to two employees. */
+  duplicates: string[];
 }
 
 export interface AgentCoursePerformance {
@@ -111,6 +175,7 @@ export interface AgentAnalyticsResult {
     answeredCalls: number | null;
     answerRate: number | null;
   };
+  targets: TargetCoverage;
   sla: {
     ok: boolean;
     source: string;
@@ -129,14 +194,7 @@ const num = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const normalizePersonName = (value: string): string =>
-  value
-    .normalize("NFKD")
-    .toLocaleLowerCase("en")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
+export { normalizePersonName };
 
 const monthKey = (value: string): string => value.slice(0, 7);
 
@@ -263,6 +321,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   pipeline: 0,
   slaMonths: 0,
   courseProfile: blankCourseProfile(),
+  target: null,
   firstCallWeighted: 0,
   firstCallWeight: 0,
   invoiceRefs: new Set(),
@@ -476,20 +535,8 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
               left.paidRevenue - right.paidRevenue || left.invoices - right.invoices,
           )[0]
         : null;
-    const bestConvertingCourse =
-      [...reliableCourses].sort(
-        (left, right) =>
-          (right.conversionRate ?? -1) - (left.conversionRate ?? -1) ||
-          right.leads - left.leads,
-      )[0] ?? null;
-    const needsSupportCourse =
-      reliableCourses.length > 1
-        ? [...reliableCourses].sort(
-            (left, right) =>
-              (left.conversionRate ?? Infinity) - (right.conversionRate ?? Infinity) ||
-              right.leads - left.leads,
-          )[0]
-        : null;
+    const { best: bestConvertingCourse, needsSupport: needsSupportCourse } =
+      rankCourseInsights(courses);
 
     profiles.set(personKey, {
       courses,
@@ -655,6 +702,114 @@ function mergeOperationalClosures(
     row.slaLost += 1;
     map.set(key, row);
   }
+}
+
+/**
+ * Attaches the published quota to each selected employee.
+ *
+ * Two rules keep this honest:
+ *
+ * - **Never divide by a quota that does not exist.** A window with no published
+ *   target yields `null`, which renders as an em dash. Returning `0` would make
+ *   every employee read as having missed a target nobody set.
+ * - **Never resolve a name by guessing.** Only the workbook spelling and its
+ *   declared aliases match. Anything left over is reported in `unmatched` so a
+ *   renamed employee shows up as a question instead of a silent zero.
+ *
+ * `allAgents` is the unfiltered population on purpose: a quota whose owner is
+ * merely outside the current team filter is not a data problem, and must not be
+ * reported as one.
+ */
+function buildTargetCoverage(
+  agents: AgentAnalyticsRow[],
+  allAgents: MutableAgent[],
+  filters: GlobalFilters,
+): TargetCoverage {
+  const { byName, duplicates } = targetsByPerson();
+  const publishedMonths = targetMonths();
+
+  const matchedEmployeeIds = new Set<string>();
+  for (const row of agents) {
+    const person = byName.get(normalizePersonName(row.name));
+    if (!person) continue;
+    const resolved = windowTarget(person.monthly, filters.from, filters.to);
+    const monthlyTarget = resolved.monthsCovered.length
+      ? person.monthly
+          .filter((month) => resolved.monthsCovered.includes(month.month))
+          .reduce((sum, month) => sum + (month.target ?? 0), 0)
+      : null;
+    const target = resolved.target;
+    const share = (value: number | null): number | null =>
+      target !== null && target > 0 && value !== null ? (value / target) * 100 : null;
+    const gap = (value: number | null): number | null =>
+      target !== null && value !== null ? target - value : null;
+
+    matchedEmployeeIds.add(person.entry.employeeId);
+    row.target = {
+      employeeId: person.entry.employeeId,
+      name: person.entry.name,
+      teamLeader: person.entry.teamLeader,
+      supervisor: person.entry.supervisor,
+      branch: person.entry.branch,
+      note: person.entry.note,
+      target,
+      monthlyTarget,
+      monthsCovered: resolved.monthsCovered,
+      monthsMissing: resolved.monthsMissing,
+      complete: resolved.complete,
+      wholeMonths: resolved.wholeMonths,
+      achievementPaid: share(row.paidRevenue),
+      achievementOperational: share(row.operationalSales),
+      gapPaid: gap(row.paidRevenue),
+      gapOperational: gap(row.operationalSales),
+    };
+  }
+
+  // Measured against everyone in the data, so a team filter cannot manufacture
+  // a "missing employee" warning.
+  const knownNames = new Set(allAgents.map((row) => normalizePersonName(row.name)));
+  const unmatched: TargetCoverage["unmatched"] = [];
+  const seenUnmatched = new Set<string>();
+  for (const person of byName.values()) {
+    if (seenUnmatched.has(person.entry.employeeId)) continue;
+    seenUnmatched.add(person.entry.employeeId);
+    // An employee the workbook deliberately leaves untargeted is not missing.
+    if (person.monthly.every((month) => month.target === null)) continue;
+    const found = [person.entry.name, ...person.entry.aliases].some((name) =>
+      knownNames.has(normalizePersonName(name)),
+    );
+    if (found) continue;
+    unmatched.push({
+      employeeId: person.entry.employeeId,
+      name: person.entry.name,
+      teamLeader: person.entry.teamLeader,
+      target: windowTarget(person.monthly, filters.from, filters.to).target,
+    });
+  }
+
+  const targeted = agents.filter((row) => row.target?.target !== null && row.target !== null);
+  const totalTarget = targeted.length
+    ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
+    : null;
+  const totalPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
+
+  return {
+    publishedMonths,
+    matched: matchedEmployeeIds.size,
+    totalTarget,
+    totalPaidRevenue,
+    totalAchievementPaid:
+      totalTarget !== null && totalTarget > 0 ? (totalPaidRevenue / totalTarget) * 100 : null,
+    complete: targeted.every((row) => row.target?.complete ?? false),
+    wholeMonths: targeted.every((row) => row.target?.wholeMonths ?? false),
+    monthsMissing: [...new Set(targeted.flatMap((row) => row.target?.monthsMissing ?? []))].sort(),
+    unmatched: unmatched.sort((left, right) => (right.target ?? 0) - (left.target ?? 0)),
+    untargeted: agents
+      .filter((row) => !row.target && row.paidRevenue !== 0)
+      .map((row) => ({ name: row.name, paidRevenue: row.paidRevenue }))
+      .sort((left, right) => right.paidRevenue - left.paidRevenue),
+    duplicates,
+  };
 }
 
 export async function buildAgentAnalytics(
@@ -840,8 +995,13 @@ export async function buildAgentAnalytics(
       ? ((summary.answeredCalls ?? 0) / (summary.outboundCalls ?? 1)) * 100
       : null;
 
+  // After `agents` is final, so every row that reaches the screen carries its
+  // quota, and before the response is built so coverage can be reported with it.
+  const targets = buildTargetCoverage(agents, [...map.values()], filters);
+
   return {
     agents,
+    targets,
     months: [...availableMonths].filter(Boolean).sort(),
     selected: {
       from: filters.from,
