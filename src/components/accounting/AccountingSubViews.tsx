@@ -312,13 +312,7 @@ export function AccountingAgentsView() {
           sub={
             data.targets.totalTarget === null
               ? lang === "ar" ? "لا يوجد تارجت منشور للفترة" : "No target published for this window"
-              : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}${
-                  data.targets.wholeMonths
-                    ? ""
-                    : lang === "ar"
-                      ? ` · الإيقاع ${fmtPct(data.targets.totalPacePaid, 0)}`
-                      : ` · pace ${fmtPct(data.targets.totalPacePaid, 0)}`
-                }`
+              : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`
           }
           icon={<Target size={18} />}
         />
@@ -584,21 +578,6 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
               color="var(--brand)"
             />
           </div>
-          {!target.wholeMonths && target.expectedToDate !== null && (
-            <p className="mt-3 text-[11px] text-text-muted">
-              {lang === "ar"
-                ? `الإيقاع: المفروض ${money(target.expectedToDate)} لحد نهاية الفترة المختارة — ${
-                    (target.paceGapPaid ?? 0) <= 0
-                      ? `متقدّم بـ ${money(Math.abs(target.paceGapPaid ?? 0))}`
-                      : `متأخّر بـ ${money(target.paceGapPaid ?? 0)}`
-                  }. ده مؤشر سرعة مش إنجاز — التارجت الكامل لسه ${money(target.gapPaid)} باقي عليه.`
-                : `Pace: ${money(target.expectedToDate)} expected by the end of this window — ${
-                    (target.paceGapPaid ?? 0) <= 0
-                      ? `${money(Math.abs(target.paceGapPaid ?? 0))} ahead`
-                      : `${money(target.paceGapPaid ?? 0)} behind`
-                  }. That is speed, not achievement: ${money(target.gapPaid)} of the full quota remains.`}
-            </p>
-          )}
           {!target.complete && (
             <p className="mt-3 text-[11px] text-text-muted">
               {lang === "ar"
@@ -699,8 +678,8 @@ function AgentCards({
               <ProgressMetric
                 label={
                   lang === "ar"
-                    ? `إنجاز التارجت (${fmtUSDFull(row.target.target)}${row.target.wholeMonths ? "" : " موزّع بالأيام"})`
-                    : `Target achievement (${fmtUSDFull(row.target.target)}${row.target.wholeMonths ? "" : ", prorated"})`
+                    ? `إنجاز التارجت (${fmtUSDFull(row.target.target)})`
+                    : `Target achievement (${fmtUSDFull(row.target.target)})`
                 }
                 value={row.target.achievementPaid}
                 color="var(--brand)"
@@ -799,9 +778,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                         : "No target"
                       : row.target.target === null
                         ? row.target.note || (lang === "ar" ? "غير مستهدف" : "Untargeted")
-                        : row.target.wholeMonths
-                          ? row.target.teamLeader
-                          : `${lang === "ar" ? "الإيقاع" : "pace"} ${fmtUSDFull(row.target.expectedToDate ?? 0)}`}
+                        : row.target.teamLeader}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end font-semibold">
