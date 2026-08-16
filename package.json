@@ -18,6 +18,8 @@
     "test:fx-rates": "node --experimental-strip-types scripts/test-fx-rates.mjs",
     "test:sales-targets": "node --experimental-strip-types scripts/test-sales-targets.mjs",
     "test:course-insight": "node --experimental-strip-types scripts/test-course-insight.mjs",
+    "test:admin-auth": "node --experimental-strip-types scripts/test-admin-auth.mjs",
+    "test:target-overrides": "node --experimental-strip-types scripts/test-target-overrides.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
     "lint": "eslint .",

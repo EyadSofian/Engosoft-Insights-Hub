@@ -327,9 +327,16 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
   ],
 };
 
+/**
+ * A month-keyed set of quotas. The seed below is the default; the server merges
+ * PostgreSQL overrides on top and passes the result in, so every function here
+ * stays pure and directly testable.
+ */
+export type TargetSource = Record<string, SalesTarget[]>;
+
 /** Months that carry a published target, oldest first. */
-export function targetMonths(): string[] {
-  return Object.keys(SALES_TARGETS).sort();
+export function targetMonths(source: TargetSource = SALES_TARGETS): string[] {
+  return Object.keys(source).sort();
 }
 
 /** Every spelling that must resolve to this person. */
@@ -342,13 +349,16 @@ export function targetNameKeys(entry: SalesTarget): string[] {
  * month is a workbook error: the first entry wins and the duplicate is returned
  * so the caller can surface it rather than silently overwriting a quota.
  */
-export function targetIndexForMonth(month: string): {
+export function targetIndexForMonth(
+  month: string,
+  source: TargetSource = SALES_TARGETS,
+): {
   byName: Map<string, SalesTarget>;
   duplicates: string[];
 } {
   const byName = new Map<string, SalesTarget>();
   const duplicates: string[] = [];
-  for (const entry of SALES_TARGETS[month] ?? []) {
+  for (const entry of source[month] ?? []) {
     for (const key of targetNameKeys(entry)) {
       if (byName.has(key)) {
         duplicates.push(entry.name);
@@ -371,12 +381,15 @@ export interface PersonTargets {
  * Every person who appears in any published month, keyed by normalized name and
  * by each declared alias, so a lookup by the Odoo spelling finds them.
  */
-export function targetsByPerson(): { byName: Map<string, PersonTargets>; duplicates: string[] } {
+export function targetsByPerson(source: TargetSource = SALES_TARGETS): {
+  byName: Map<string, PersonTargets>;
+  duplicates: string[];
+} {
   const byEmployee = new Map<string, PersonTargets>();
   const duplicates: string[] = [];
-  for (const month of targetMonths()) {
+  for (const month of targetMonths(source)) {
     const seen = new Set<string>();
-    for (const entry of SALES_TARGETS[month] ?? []) {
+    for (const entry of source[month] ?? []) {
       if (seen.has(entry.employeeId)) {
         duplicates.push(`${entry.name} (${month})`);
         continue;

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { TargetEditor } from "@/components/accounting/TargetEditor";
 import {
   ArrowUpRight,
   Calculator,
@@ -203,6 +204,7 @@ export function AccountingAgentsView() {
   const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls">("revenue");
   const [search, setSearch] = useState("");
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
+  const [editingTargets, setEditingTargets] = useState(false);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
     if (data && !data.sla.callsAvailable && sortBy === "calls") setSortBy("revenue");
@@ -263,7 +265,24 @@ export function AccountingAgentsView() {
             : `${data.sla.callsThrough ? `Latest complete calls: ${monthLabel(data.sla.callsThrough, lang)}. ` : ""}Calls are shown as unavailable rather than a misleading zero; Odoo metrics remain available.`}
         </Notice>
       )}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setEditingTargets(true)}
+          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-brand/30 bg-brand-soft px-4 text-sm font-semibold text-brand transition-colors hover:bg-brand/10"
+        >
+          <Target size={16} />
+          {lang === "ar" ? "تعديل التارجت" : "Edit targets"}
+        </button>
+      </div>
       <TargetNotices targets={data.targets} />
+      <TargetEditor
+        open={editingTargets}
+        onOpenChange={setEditingTargets}
+        // A saved quota changes every achievement figure on the page, so the
+        // report is re-read rather than left showing the previous numbers.
+        onSaved={() => refetch()}
+      />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           index={0}
@@ -1270,7 +1289,7 @@ function monthEnd(month: string): string {
   return new Date(Date.UTC(year, rawMonth, 0)).toISOString().slice(0, 10);
 }
 
-function monthLabel(month: string, lang: "ar" | "en"): string {
+export function monthLabel(month: string, lang: "ar" | "en"): string {
   const [year, rawMonth] = month.split("-").map(Number);
   if (!year || !rawMonth) return month;
   return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {

@@ -42,9 +42,11 @@ import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
+import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
@@ -216,6 +218,11 @@ const ApiSalesRoute = ApiSalesRouteImport.update({
   path: '/api/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTargetsRoute = ApiTargetsRouteImport.update({
+  id: '/api/targets',
+  path: '/api/targets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTeamsRoute = ApiTeamsRouteImport.update({
   id: '/api/teams',
   path: '/api/teams',
@@ -229,6 +236,11 @@ const ApiWebsiteRoute = ApiWebsiteRouteImport.update({
 const ApiYoyRoute = ApiYoyRouteImport.update({
   id: '/api/yoy',
   path: '/api/yoy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
+  id: '/api/auth/sso',
+  path: '/api/auth/sso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
@@ -291,9 +303,11 @@ export interface FileRoutesByFullPath {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -334,9 +348,11 @@ export interface FileRoutesByTo {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -378,9 +394,11 @@ export interface FileRoutesById {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -423,9 +441,11 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/targets'
     | '/api/teams'
     | '/api/website'
     | '/api/yoy'
+    | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -466,9 +486,11 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/targets'
     | '/api/teams'
     | '/api/website'
     | '/api/yoy'
+    | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -509,9 +531,11 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/targets'
     | '/api/teams'
     | '/api/website'
     | '/api/yoy'
+    | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-daily'
@@ -553,9 +577,11 @@ export interface RootRouteChildren {
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
+  ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
@@ -796,6 +822,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/targets': {
+      id: '/api/targets'
+      path: '/api/targets'
+      fullPath: '/api/targets'
+      preLoaderRoute: typeof ApiTargetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/teams': {
       id: '/api/teams'
       path: '/api/teams'
@@ -815,6 +848,13 @@ declare module '@tanstack/react-router' {
       path: '/api/yoy'
       fullPath: '/api/yoy'
       preLoaderRoute: typeof ApiYoyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/sso': {
+      id: '/api/auth/sso'
+      path: '/api/auth/sso'
+      fullPath: '/api/auth/sso'
+      preLoaderRoute: typeof ApiAuthSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ingest/dataset': {
@@ -889,9 +929,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
+  ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
