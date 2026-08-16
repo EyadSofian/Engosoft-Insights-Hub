@@ -9,7 +9,13 @@ import {
   type BestReason,
   type SupportReason,
 } from "./course-insight.ts";
-import { targetMonths, targetsByPerson, windowTarget } from "./sales-targets.ts";
+import {
+  targetMonths,
+  targetsByPerson,
+  windowTarget,
+  type TargetSource,
+} from "./sales-targets.ts";
+import { loadTargetSource } from "./sales-targets.server";
 import {
   getSlaSnapshot,
   type SlaRepMonthly,
@@ -761,9 +767,10 @@ function buildTargetCoverage(
   agents: AgentAnalyticsRow[],
   allAgents: MutableAgent[],
   filters: GlobalFilters,
+  source: TargetSource,
 ): TargetCoverage {
-  const { byName, duplicates } = targetsByPerson();
-  const publishedMonths = targetMonths();
+  const { byName, duplicates } = targetsByPerson(source);
+  const publishedMonths = targetMonths(source);
 
   const matchedEmployeeIds = new Set<string>();
   for (const row of agents) {
@@ -1045,7 +1052,10 @@ export async function buildAgentAnalytics(
 
   // After `agents` is final, so every row that reaches the screen carries its
   // quota, and before the response is built so coverage can be reported with it.
-  const targets = buildTargetCoverage(agents, [...map.values()], filters);
+  // The source is the seed with any saved edits applied; a store that cannot be
+  // read falls back to the seed rather than reporting everyone as untargeted.
+  const { source: targetSource } = await loadTargetSource();
+  const targets = buildTargetCoverage(agents, [...map.values()], filters, targetSource);
 
   return {
     agents,

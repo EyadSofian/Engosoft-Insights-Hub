@@ -19,7 +19,8 @@ export type DashboardDataset =
   | "invoiced"
   | "website_sales"
   | "pbx_extensions"
-  | "sla_calls";
+  | "sla_calls"
+  | "sales_targets";
 
 export type DashboardRow = Record<string, string>;
 
@@ -53,6 +54,7 @@ const DATASETS = new Set<DashboardDataset>([
   "website_sales",
   "pbx_extensions",
   "sla_calls",
+  "sales_targets",
 ]);
 
 let pool: Pool | null = null;
