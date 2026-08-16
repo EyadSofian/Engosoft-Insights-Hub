@@ -300,6 +300,15 @@ interface MutableAgent extends AgentAnalyticsRow {
   invoiceRefs: Set<string>;
   months: Set<string>;
   latestOpenMonth: string;
+  /**
+   * How many rows the operational report actually carried for this employee.
+   *
+   * The totals alone cannot answer it: an employee the report never mentions
+   * and an employee it reports at zero both leave `operationalSales` at 0, and
+   * those two mean opposite things on screen — "we have no figure for him" and
+   * "he sold nothing". Only the row count separates them.
+   */
+  operationalRows: number;
 }
 
 interface MutableDimension {
@@ -411,6 +420,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   invoiceRefs: new Set(),
   months: new Set(),
   latestOpenMonth: "",
+  operationalRows: 0,
 });
 
 const normalizeDimension = (value: string): string =>
@@ -722,6 +732,7 @@ function mergeSlaSales(map: Map<string, MutableAgent>, rows: SlaSalesSummary[]) 
     const row = map.get(key) ?? blank(key, source.user_name || "—");
     if (source.team_name) row.teams.add(source.team_name);
     row.months.add(monthKey(source.month));
+    row.operationalRows += 1;
     row.operationalSales = (row.operationalSales ?? 0) + num(source.achieved_total);
     row.operationalUntaxed = (row.operationalUntaxed ?? 0) + num(source.achieved_untaxed);
     row.operationalDeals = (row.operationalDeals ?? 0) + num(source.deals_count);
@@ -990,13 +1001,11 @@ export async function buildAgentAnalytics(
       (row) =>
         num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
     );
-    slaStatus.salesAvailable = selectedAgents.some(
-      (row) =>
-        num(row.operationalSales) !== 0 ||
-        num(row.operationalDeals) > 0 ||
-        num(row.quotations) > 0 ||
-        num(row.pipeline) !== 0,
-    );
+    // Row count, not value. Testing for a non-zero total was the only signal
+    // available while the report had no feed, but it reads a real reported zero
+    // as "no data" — which now matters, because a zero month is a fact about
+    // the employee and blanking it hides a miss behind an em dash.
+    slaStatus.salesAvailable = selectedAgents.some((row) => row.operationalRows > 0);
   }
 
   const agents = selectedAgents
@@ -1024,7 +1033,10 @@ export async function buildAgentAnalytics(
         row.answeredCalls = null;
         row.talkSeconds = null;
       }
-      if (!slaStatus.salesAvailable) {
+      // Per employee, not per selection: the report can cover the team and
+      // still not mention this person, and his card must say so rather than
+      // borrow a colleague's coverage to imply he sold nothing.
+      if (!slaStatus.salesAvailable || row.operationalRows === 0) {
         row.operationalSales = null;
         row.operationalUntaxed = null;
         row.operationalDeals = null;
