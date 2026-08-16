@@ -111,39 +111,53 @@ assert.equal(monthCoverage("2026-08", undefined, undefined), 1);
 assert.deepEqual(monthsInWindow("2026-06-15", "2026-08-03", []), ["2026-06", "2026-07", "2026-08"]);
 assert.deepEqual(monthsInWindow(undefined, undefined, ["2026-08"]), ["2026-08"]);
 
-/* --- prorating a monthly quota onto a dashboard window --------------------- */
+/* --- the quota, and the pace marker beside it ------------------------------ */
 
 const monthly = [{ month: "2026-08", target: 9000 }];
 
 const wholeMonth = windowTarget(monthly, "2026-08-01", "2026-08-31");
 assert.equal(wholeMonth.target, 9000);
+assert.equal(wholeMonth.expectedToDate, 9000, "a whole month expects the whole quota");
 assert.equal(wholeMonth.complete, true);
 assert.equal(wholeMonth.wholeMonths, true);
 
-// "Rank till 12 Aug" is 12 of 31 days — comparing it to the full quota is the
-// mistake this proration exists to prevent.
-const partial = windowTarget(monthly, "2026-08-01", "2026-08-12");
-assert.equal(Math.round(partial.target), Math.round((9000 * 12) / 31));
-assert.equal(partial.wholeMonths, false);
-assert.equal(partial.complete, true);
+// The reported case: Sherif Waleed on 16 August 2026. The dashboard showed
+// $4,645.16 as "the target" and 141.5% achievement, for someone who had
+// collected $6,573.18 of a $9,000 quota. The quota does not shrink because the
+// month is half over.
+const midMonth = windowTarget(monthly, "2026-08-01", "2026-08-16");
+assert.equal(midMonth.target, 9000, "the published quota is never prorated away");
+assert.equal(
+  Number(midMonth.expectedToDate.toFixed(2)),
+  4645.16,
+  "the prorated figure survives, but only as a pace marker",
+);
 
-// Year to date: only August publishes a target, so the comparison covers part
-// of the window and must say so.
+const collected = 6573.18;
+assert.equal(Number(((collected / midMonth.target) * 100).toFixed(1)), 73.0, "the honest answer");
+assert.equal(
+  Number(((collected / midMonth.expectedToDate) * 100).toFixed(1)),
+  141.5,
+  "ahead of pace — a different statement, and never labelled as achievement",
+);
+
+// Year to date: only August publishes a quota, so the comparison covers part of
+// the window and must say so.
 const ytd = windowTarget(monthly, "2026-01-01", "2026-08-31");
 assert.equal(ytd.target, 9000);
 assert.equal(ytd.complete, false);
 assert.equal(ytd.monthsMissing.length, 7);
 
-// A window entirely outside the published months yields no target at all,
-// rather than a zero that would read as "achieved nothing".
+// A window entirely outside the published months yields no quota at all, rather
+// than a zero that would read as "achieved nothing".
 const outside = windowTarget(monthly, "2026-09-01", "2026-09-30");
 assert.equal(outside.target, null);
+assert.equal(outside.expectedToDate, null);
 assert.equal(outside.monthsCovered.length, 0);
 
 // An untargeted employee stays untargeted whatever the window.
-assert.equal(
-  windowTarget([{ month: "2026-08", target: null }], "2026-08-01", "2026-08-31").target,
-  null,
-);
+const untargeted = windowTarget([{ month: "2026-08", target: null }], "2026-08-01", "2026-08-31");
+assert.equal(untargeted.target, null);
+assert.equal(untargeted.expectedToDate, null);
 
 console.log("sales target tests passed.");
