@@ -52,13 +52,33 @@ export interface CourseInsights<T extends RankableCourse> {
   bestReason: BestReason;
   /** Why `needsSupport` is empty. */
   needsSupportReason: SupportReason;
+  /**
+   * Large lead piles carrying a label the company has never sold. Excluded from
+   * both verdicts and reported instead, because they describe the CRM, not the
+   * employee.
+   */
+  unsellable: T[];
 }
 
 const decidedShare = (course: RankableCourse): number =>
   course.leads > 0 ? (course.won + course.lost) / course.leads : 0;
 
-export function rankCourseInsights<T extends RankableCourse>(courses: T[]): CourseInsights<T> {
-  const sized = courses.filter((course) => course.leads >= MIN_INSIGHT_LEADS);
+/**
+ * @param sellable Course keys the company has ever invoiced. A label with leads
+ *   but no sale anywhere is not part of anyone's course package: "Management"
+ *   carries 1,549 leads and 0 invoices in the whole history, so naming it as
+ *   someone's weak course describes a mislabelled lead pile, not a seller who
+ *   needs coaching. Pass `null` to skip the check.
+ */
+export function rankCourseInsights<T extends RankableCourse>(
+  courses: T[],
+  sellable: ReadonlySet<string> | null = null,
+): CourseInsights<T> {
+  const sellableOnly = sellable ? courses.filter((course) => sellable.has(course.key)) : courses;
+  const unsellable = sellable
+    ? courses.filter((course) => !sellable.has(course.key) && course.leads >= MIN_INSIGHT_LEADS)
+    : [];
+  const sized = sellableOnly.filter((course) => course.leads >= MIN_INSIGHT_LEADS);
 
   // Strength: a win actually happened, on a cohort big enough to mean something.
   const best =
@@ -85,5 +105,6 @@ export function rankCourseInsights<T extends RankableCourse>(courses: T[]): Cour
     needsSupport,
     bestReason: best ? "" : sized.length ? "no_win_yet" : "no_sample",
     needsSupportReason: needsSupport ? "" : sized.length ? "cohort_still_open" : "no_sample",
+    unsellable: [...unsellable].sort((left, right) => right.leads - left.leads),
   };
 }

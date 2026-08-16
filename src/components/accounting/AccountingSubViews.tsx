@@ -815,6 +815,14 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
   );
 }
 
+/** "Management (12 ليد)، Other (11 ليد)" — the piles kept out of the verdict. */
+function unsellableLabels(courses: AgentCoursePerformance[], lang: "ar" | "en"): string {
+  const unit = lang === "ar" ? "ليد" : "leads";
+  return courses
+    .map((course) => `${displayDimension(course.label, lang)} (${fmtNum(course.leads)} ${unit})`)
+    .join(lang === "ar" ? "، " : ", ");
+}
+
 function AgentPerformanceSheet({
   row,
   open,
@@ -916,6 +924,19 @@ function AgentPerformanceSheet({
               {lang === "ar"
                 ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
                 : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until Archived Lost returns; current rates are directional only."}
+            </Notice>
+          )}
+
+          {courseProfile.unsellableCourses.length > 0 && (
+            <Notice
+              tone="warning"
+              title={
+                lang === "ar" ? "ليدز على تصنيف مش بيتباع" : "Leads on a label that never sells"
+              }
+            >
+              {lang === "ar"
+                ? `${unsellableLabels(courseProfile.unsellableCourses, lang)} — التصنيف ده ماجابش ولا فاتورة واحدة في تاريخ الشركة كله، فمش داخل في تقييم «أفضل/يحتاج دعم». ده تصنيف ناقص في أودو مش ضعف في الموظف.`
+                : `${unsellableLabels(courseProfile.unsellableCourses, lang)} — this label has never produced a single invoice company-wide, so it is excluded from the strong/needs-support verdict. It points at CRM labelling, not at the employee.`}
             </Notice>
           )}
 

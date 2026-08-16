@@ -157,6 +157,12 @@ export interface AgentCourseProfile {
   bestReason: BestReason;
   /** Why the weakness card is empty — small cohort, or still being worked. */
   needsSupportReason: SupportReason;
+  /**
+   * Big lead piles whose label the company has never invoiced. Kept out of both
+   * verdicts and surfaced instead: they say the CRM needs tidying, not that the
+   * employee needs coaching.
+   */
+  unsellableCourses: AgentCoursePerformance[];
   minimumLeadSample: number;
   minimumDecidedSample: number;
   /** Share of a cohort that must be decided before a course can be called weak. */
@@ -297,6 +303,7 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   needsSupportCourse: null,
   bestReason: "no_sample",
   needsSupportReason: "no_sample",
+  unsellableCourses: [],
   minimumLeadSample: MINIMUM_LEAD_SAMPLE,
   minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
   minimumDecidedShare: MIN_DECIDED_SHARE,
@@ -481,9 +488,29 @@ function finishDimension(
   return base;
 }
 
+/**
+ * Course labels the company has ever actually invoiced.
+ *
+ * Read from the whole snapshot rather than the filtered window, so a course
+ * that simply had no sale this month is still recognised as sellable. A label
+ * that has never produced an invoice is not part of anyone's course package —
+ * it is a lead pile with the wrong name on it.
+ */
+function sellableCourseKeys(data: FilteredData): Set<string> {
+  const keys = new Set<string>();
+  for (const invoice of data.snapshot.accounting) {
+    if (invoice.usdPaid === 0 && !invoice.movement) continue;
+    const label = invoice.course || invoice.productCategory || invoice.category;
+    const key = normalizeDimension(cleanDimensionLabel(label));
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
 function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile> {
   const mutable = new Map<string, MutableAgentProfile>();
   const lostDataAvailable = data.snapshot.health.lostAuthority !== "unavailable";
+  const sellable = sellableCourseKeys(data);
   for (const lead of data.crm) {
     addLeadToProfile(mutable, lead, lead.isWon ? "won" : "open");
   }
@@ -556,7 +583,8 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       needsSupport: needsSupportCourse,
       bestReason,
       needsSupportReason,
-    } = rankCourseInsights(courses);
+      unsellable: unsellableCourses,
+    } = rankCourseInsights(courses, sellable);
 
     profiles.set(personKey, {
       courses,
@@ -567,6 +595,7 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       needsSupportCourse,
       bestReason,
       needsSupportReason,
+      unsellableCourses,
       minimumLeadSample: MINIMUM_LEAD_SAMPLE,
       minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
       minimumDecidedShare: MIN_DECIDED_SHARE,
