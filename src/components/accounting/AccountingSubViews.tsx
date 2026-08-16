@@ -432,7 +432,6 @@ export function AccountingAgentsView() {
 
       <AgentPerformanceSheet
         row={selectedAgent}
-        operationalConfigured={data.sla.salesConfigured}
         open={selectedAgent !== null}
         onOpenChange={(next) => {
           if (!next) setSelectedAgentKey(null);
@@ -504,15 +503,7 @@ function TargetNotices({ targets }: { targets: AgentsResponse["targets"] }) {
  * silently would make the dashboard argue with the sheet management already
  * circulates, with no way to see which number moved.
  */
-function AgentTargetPanel({
-  target,
-  row,
-  operationalConfigured,
-}: {
-  target: AgentTarget;
-  row: AgentRow;
-  operationalConfigured: boolean;
-}) {
+function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow }) {
   const { lang } = useI18n();
   const money = (value: number | null) => (value === null ? "—" : fmtUSDFull(value));
   const gapLabel = (gap: number | null) => {
@@ -561,18 +552,14 @@ function AgentTargetPanel({
                 period" covered both and sent readers hunting for a gap in the
                 month, when the cause was a feed nobody had connected. */}
             <ProfileMetric
-              label={lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target"}
-              value={fmtPct(target.achievementOperational, 1)}
+              label={lang === "ar" ? "إنجاز أوامر البيع" : "Orders vs target"}
+              value={fmtPct(target.achievementOrders, 1)}
               sub={
-                row.operationalSales !== null
-                  ? gapLabel(target.gapOperational)
-                  : operationalConfigured
-                    ? lang === "ar"
-                      ? "الموظف ده مش موجود في تقرير أودو للفترة دي"
-                      : "This employee has no row in the report for this window"
-                    : lang === "ar"
-                      ? "تقرير Odoo التشغيلي مش موصّل بالداشبورد"
-                      : "Odoo's operational report is not connected"
+                row.orderRevenue
+                  ? `${gapLabel(target.gapOrders)} · ${fmtNum(row.orderCount)} ${lang === "ar" ? "أمر بيع" : "orders"}`
+                  : lang === "ar"
+                    ? "مفيش أوامر بيع باسمه في الفترة دي"
+                    : "No sale orders on his name in this window"
               }
               icon={<Calculator size={17} />}
             />
@@ -749,7 +736,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 lang === "ar" ? "التارجت" : "Target",
                 lang === "ar" ? "التحصيل المدفوع" : "Paid collections",
                 lang === "ar" ? "إنجاز التحصيل" : "Collections vs target",
-                lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target",
+                lang === "ar" ? "إنجاز أوامر البيع" : "Orders vs target",
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
                 "Won",
@@ -804,7 +791,7 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                   <TargetPill value={row.target?.achievementPaid ?? null} />
                 </td>
                 <td className="px-3 py-3 text-end">
-                  <TargetPill value={row.target?.achievementOperational ?? null} />
+                  <TargetPill value={row.target?.achievementOrders ?? null} />
                 </td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.invoices)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
@@ -833,13 +820,11 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
 
 function AgentPerformanceSheet({
   row,
-  operationalConfigured,
   open,
   onOpenChange,
 }: {
   row: AgentRow | null;
   /** False when Odoo's operational sales report has no feed behind it at all. */
-  operationalConfigured: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -905,13 +890,7 @@ function AgentPerformanceSheet({
         </div>
 
         <div className="space-y-5 p-4 sm:p-7">
-          {row.target && (
-            <AgentTargetPanel
-              target={row.target}
-              row={row}
-              operationalConfigured={operationalConfigured}
-            />
-          )}
+          {row.target && <AgentTargetPanel target={row.target} row={row} />}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
               label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
