@@ -37,12 +37,22 @@
 export const MIN_INSIGHT_LEADS = 10;
 
 /**
- * Share of a course's cohort that must be Won or Lost before the course can be
- * called weak. A monthly window is usually shorter than the sales cycle, so most
- * leads created in it are still open — counting those as failures marks every
- * employee down for deals they are still working.
+ * How many of a course's leads must have been Won or Lost before it can be
+ * called weak.
+ *
+ * This was a *share* of the cohort — half of it had to be settled. That is the
+ * stricter test, and it made the card useless on the month people actually
+ * read: leads are dated by creation, so on the 16th most of the month's leads
+ * are days old and still open by definition. Every rep read "too early", every
+ * time, until the month was over.
+ *
+ * An absolute floor answers the question the manager is really asking — of the
+ * leads he is holding right now, where is he losing them — while still needing
+ * more than one or two outcomes before it will name a course. The card shows
+ * the decided count beside the rate, so a thin verdict is visible as a thin
+ * verdict rather than presented as settled.
  */
-export const MIN_DECIDED_SHARE = 0.5;
+export const MIN_DECIDED_OUTCOMES = 5;
 
 export interface RankableCourse {
   key: string;
@@ -71,12 +81,12 @@ export const isSoldCourse = (course: RankableCourse): boolean =>
   course.paidRevenue !== 0 || course.invoices > 0 || course.won > 0;
 
 export type BestReason = "" | "no_book" | "no_sample" | "no_win_yet";
-export type SupportReason = "" | "no_book" | "no_sample" | "cohort_still_open";
+export type SupportReason = "" | "no_book" | "no_sample" | "too_few_decided";
 
 export interface CourseInsights<T extends RankableCourse> {
   /** Highest converting sold course, proven on a real cohort with a real win. */
   best: T | null;
-  /** Weakest sold course whose cohort has actually been decided. */
+  /** Weakest sold course with enough settled leads to say so. */
   needsSupport: T | null;
   /** Why `best` is empty, so the UI never blames the sample size wrongly. */
   bestReason: BestReason;
@@ -84,8 +94,7 @@ export interface CourseInsights<T extends RankableCourse> {
   needsSupportReason: SupportReason;
 }
 
-const decidedShare = (course: RankableCourse): number =>
-  course.leads > 0 ? (course.won + course.lost) / course.leads : 0;
+const decidedCount = (course: RankableCourse): number => course.won + course.lost;
 
 export function rankCourseInsights<T extends RankableCourse>(courses: T[]): CourseInsights<T> {
   // Only his own book is judgeable. A course he has never sold cannot make him
@@ -102,9 +111,10 @@ export function rankCourseInsights<T extends RankableCourse>(courses: T[]): Cour
           (right.conversionRate ?? -1) - (left.conversionRate ?? -1) || right.leads - left.leads,
       )[0] ?? null;
 
-  // Weakness: the cohort has been decided, and it went badly. Ties break on the
-  // larger cohort, because more decided leads is the bigger problem.
-  const decided = sized.filter((course) => decidedShare(course) >= MIN_DECIDED_SHARE);
+  // Weakness: enough of his current leads have settled, and they went badly.
+  // Ties break on the larger cohort, because more leads at the same bad rate is
+  // the bigger problem.
+  const decided = sized.filter((course) => decidedCount(course) >= MIN_DECIDED_OUTCOMES);
   const weakest =
     [...decided].sort(
       (left, right) =>
@@ -121,6 +131,6 @@ export function rankCourseInsights<T extends RankableCourse>(courses: T[]): Cour
     best,
     needsSupport,
     bestReason: best ? "" : sized.length ? "no_win_yet" : emptyReason,
-    needsSupportReason: needsSupport ? "" : sized.length ? "cohort_still_open" : emptyReason,
+    needsSupportReason: needsSupport ? "" : sized.length ? "too_few_decided" : emptyReason,
   };
 }

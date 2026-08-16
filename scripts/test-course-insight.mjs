@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { isSoldCourse, rankCourseInsights } from "../src/lib/course-insight.ts";
+import {
+  MIN_DECIDED_OUTCOMES,
+  isSoldCourse,
+  rankCourseInsights,
+} from "../src/lib/course-insight.ts";
 
 /** `revenue` and `invoices` default to a course he has never sold. */
 const course = (key, won, lost, leads, revenue = 0, invoices = 0) => ({
@@ -12,39 +16,31 @@ const course = (key, won, lost, leads, revenue = 0, invoices = 0) => ({
   conversionRate: leads > 0 ? (won / leads) * 100 : null,
 });
 
-/* --- the profile shape this rule was rewritten for ------------------------- */
-// Modelled on Bahaa Ramdan, August 2026. The figures the screen actually
-// reported are exact: CFM $3,797.09 (57.8% of his sales), Interior $480.67 on
-// one invoice, PMP 20% on 2 Won of 10 leads, Management 0% on 8 decided of 12.
-// Invoice counts, the CFM cohort split, and the BIM row are representative
-// rather than read from production — they exercise the rule, they are not a
-// record of his month.
-const bahaa = [
-  course("cfm", 0, 6, 22, 3797.09, 9), //  his biggest seller, cohort still open
-  course("pmp", 2, 0, 10, 1_100, 2), //   his only converting course
-  course("interior", 0, 2, 27, 480.67, 1),
-  course("bim", 0, 4, 17), //             leads only, never sold
-  course("management", 0, 8, 12), //      leads only, never sold, cohort decided
-  course("elec", 0, 0, 1),
+/* --- the profile this rule was rewritten for ------------------------------- */
+// Sherif Waleed, August 2026, read from production on the 16th. Every figure
+// below is his, including the invoice counts.
+const sherif = [
+  course("cfm", 0, 6, 22, 3797.09, 7), //   his biggest seller
+  course("pmp", 2, 0, 10, 1440.93, 7), //   his only converting course
+  course("bim", 0, 6, 17, 854.49, 3),
+  course("interior", 0, 6, 27, 480.67, 1), // most leads, none won
+  course("management", 0, 8, 12), //        never sold — routed, not his
+  course("elec", 0, 1, 3), //               never sold, and too small anyway
 ];
 {
-  const { best, needsSupport, bestReason, needsSupportReason } = rankCourseInsights(bahaa);
+  const { best, needsSupport, bestReason, needsSupportReason } = rankCourseInsights(sherif);
   assert.equal(best?.key, "pmp", "a course with real wins must not be hidden by a decided gate");
   assert.equal(bestReason, "");
-  // The whole point of the rewrite: Management is 0% on a fully decided cohort,
-  // but he has never sold a seat of it. Twelve leads were routed to a rep who
-  // sells CFM and PMP; that is a routing fact, not a verdict on him.
-  assert.notEqual(
-    needsSupport?.key,
-    "management",
-    "a course he has never sold can never be his weakness",
-  );
-  assert.equal(needsSupport, null);
-  assert.equal(
-    needsSupportReason,
-    "cohort_still_open",
-    "nothing he sells has a decided cohort yet, so the honest answer is 'too early'",
-  );
+
+  // Management is 0% on the most settled cohort he has, but he has never sold a
+  // seat of it: twelve leads routed to a rep who sells CFM, PMP, BIM, Interior.
+  assert.notEqual(needsSupport?.key, "management", "a course he never sold is never his weakness");
+
+  // Among the courses he does sell, three sit at 0% with six settled leads
+  // each. The tie goes to the biggest pile, which is where the loss is largest.
+  assert.equal(needsSupport?.key, "interior");
+  assert.equal(needsSupport.leads, 27);
+  assert.equal(needsSupportReason, "");
 }
 
 /* --- but a course he does sell is still judged, once decided --------------- */
@@ -58,15 +54,18 @@ const bahaa = [
   assert.equal(needsSupportReason, "");
 }
 
-/* --- a cohort still in play is neither strength nor weakness --------------- */
+/* --- how many settled leads before a course can be called weak ------------- */
 {
-  // 22 leads, 6 decided (27%), all lost — too early to call it a failure.
-  const { best, needsSupport, needsSupportReason } = rankCourseInsights([
-    course("cfm", 0, 6, 22, 3_130, 8),
-  ]);
-  assert.equal(best, null);
-  assert.equal(needsSupport, null);
-  assert.equal(needsSupportReason, "cohort_still_open");
+  // Four settled outcomes is still chance, whatever the cohort size.
+  const thin = rankCourseInsights([course("cfm", 0, 4, 22, 3_130, 8)]);
+  assert.equal(thin.needsSupport, null);
+  assert.equal(thin.needsSupportReason, "too_few_decided");
+
+  // One more, and the same course is judgeable — the open leads behind it are
+  // not held against him, they are simply not counted yet.
+  const enough = rankCourseInsights([course("cfm", 0, MIN_DECIDED_OUTCOMES, 22, 3_130, 8)]);
+  assert.equal(enough.needsSupport?.key, "cfm");
+  assert.equal(enough.needsSupportReason, "");
 }
 
 /* --- a course with no win is never the strength ---------------------------- */
