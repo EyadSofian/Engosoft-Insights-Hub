@@ -5,6 +5,7 @@ import { normalizePersonName } from "./person-name.ts";
 import {
   MIN_DECIDED_SHARE,
   MIN_INSIGHT_LEADS,
+  isSoldCourse,
   rankCourseInsights,
   type BestReason,
   type SupportReason,
@@ -146,6 +147,21 @@ export interface AgentSpecializationPerformance {
   sampleStatus: "reliable" | "insufficient";
 }
 
+/** Leads and money rolled up over a set of courses, for the profile's totals. */
+export interface AgentCourseTotals {
+  courses: number;
+  leads: number;
+  won: number;
+  lost: number;
+  openLeads: number;
+  paidRevenue: number;
+  invoices: number;
+  /** Won ÷ leads, %. `null` when the set holds no leads at all. */
+  conversionRate: number | null;
+  /** Won ÷ (Won + Lost), %. `null` until something has been decided. */
+  decidedConversionRate: number | null;
+}
+
 export interface AgentCourseProfile {
   courses: AgentCoursePerformance[];
   specializations: AgentSpecializationPerformance[];
@@ -153,6 +169,18 @@ export interface AgentCourseProfile {
   leastSellingCourse: AgentCoursePerformance | null;
   bestConvertingCourse: AgentCoursePerformance | null;
   needsSupportCourse: AgentCoursePerformance | null;
+  /** Every course he touched this window: the denominator behind the cards. */
+  totals: AgentCourseTotals;
+  /** The courses he actually sells — the only ones the two verdicts rank. */
+  soldTotals: AgentCourseTotals;
+  /**
+   * Courses that took leads but produced no sale and no win. Reported on their
+   * own rather than ranked: a rep is not "weak" at a course he was never
+   * selling, but a manager still needs to see where the leads went.
+   */
+  unsoldTotals: AgentCourseTotals;
+  /** Those same courses, largest cohort first, for the routing callout. */
+  unsoldCourses: AgentCoursePerformance[];
   /** Why the strength card is empty — small cohort, or no win landed yet. */
   bestReason: BestReason;
   /** Why the weakness card is empty — small cohort, or still being worked. */
@@ -199,6 +227,12 @@ export interface AgentAnalyticsResult {
     salesThrough: string;
     callsAvailable: boolean;
     salesAvailable: boolean;
+    /**
+     * False when no feed exists for Odoo's operational sales report at all, as
+     * opposed to a feed that simply has nothing for this window. The screen has
+     * to tell those apart: one is a missing integration, the other a quiet month.
+     */
+    salesConfigured: boolean;
   };
 }
 
@@ -288,6 +322,36 @@ interface MutableAgentProfile {
 const MINIMUM_LEAD_SAMPLE = MIN_INSIGHT_LEADS;
 const MINIMUM_DECIDED_SAMPLE = 5;
 
+const blankTotals = (): AgentCourseTotals => ({
+  courses: 0,
+  leads: 0,
+  won: 0,
+  lost: 0,
+  openLeads: 0,
+  paidRevenue: 0,
+  invoices: 0,
+  conversionRate: null,
+  decidedConversionRate: null,
+});
+
+/** Roll a set of courses up into one row of leads, outcomes, and money. */
+function totalsOf(courses: AgentCoursePerformance[]): AgentCourseTotals {
+  const totals = courses.reduce((sum, course) => {
+    sum.courses += 1;
+    sum.leads += course.leads;
+    sum.won += course.won;
+    sum.lost += course.lost;
+    sum.openLeads += course.openLeads;
+    sum.paidRevenue += course.paidRevenue;
+    sum.invoices += course.invoices;
+    return sum;
+  }, blankTotals());
+  const decided = totals.won + totals.lost;
+  totals.conversionRate = totals.leads > 0 ? (totals.won / totals.leads) * 100 : null;
+  totals.decidedConversionRate = decided > 0 ? (totals.won / decided) * 100 : null;
+  return totals;
+}
+
 const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   courses: [],
   specializations: [],
@@ -295,8 +359,12 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   leastSellingCourse: null,
   bestConvertingCourse: null,
   needsSupportCourse: null,
-  bestReason: "no_sample",
-  needsSupportReason: "no_sample",
+  totals: blankTotals(),
+  soldTotals: blankTotals(),
+  unsoldTotals: blankTotals(),
+  unsoldCourses: [],
+  bestReason: "no_book",
+  needsSupportReason: "no_book",
   minimumLeadSample: MINIMUM_LEAD_SAMPLE,
   minimumDecidedSample: MINIMUM_DECIDED_SAMPLE,
   minimumDecidedShare: MIN_DECIDED_SHARE,
@@ -541,8 +609,12 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
           left.label.localeCompare(right.label),
       );
 
-    const sellingCourses = courses.filter((row) => row.invoices > 0 || row.paidRevenue !== 0);
-    const reliableCourses = courses.filter((row) => row.sampleStatus === "reliable");
+    // One population behind all four summary cards. `courses` is already sorted
+    // by revenue, so the head of the book is the best seller.
+    const sellingCourses = courses.filter(isSoldCourse);
+    const unsoldCourses = courses
+      .filter((row) => !isSoldCourse(row))
+      .sort((left, right) => right.leads - left.leads || left.label.localeCompare(right.label));
     const bestSellingCourse = sellingCourses[0] ?? null;
     const leastSellingCourse =
       sellingCourses.length > 1
@@ -565,6 +637,10 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       leastSellingCourse,
       bestConvertingCourse,
       needsSupportCourse,
+      totals: totalsOf(courses),
+      soldTotals: totalsOf(sellingCourses),
+      unsoldTotals: totalsOf(unsoldCourses),
+      unsoldCourses,
       bestReason,
       needsSupportReason,
       minimumLeadSample: MINIMUM_LEAD_SAMPLE,
@@ -857,6 +933,7 @@ export async function buildAgentAnalytics(
     salesThrough: "",
     callsAvailable: false,
     salesAvailable: false,
+    salesConfigured: false,
   };
   try {
     const snapshot = await Promise.race([
@@ -893,6 +970,7 @@ export async function buildAgentAnalytics(
       salesThrough,
       callsAvailable: false,
       salesAvailable: false,
+      salesConfigured: snapshot.salesSummaryConfigured,
     };
   } catch (error) {
     slaStatus.error = error instanceof Error ? error.message : String(error);

@@ -42,6 +42,21 @@ export interface SlaSalesSummary {
 export interface SlaSnapshot {
   repMonthly: SlaRepMonthly[];
   salesSummary: SlaSalesSummary[];
+  /**
+   * Whether `salesSummary` has a feed behind it at all.
+   *
+   * It does not: this reader was narrowed to Yeastar call rows, and Odoo's
+   * monthly sales report has no ingested dataset — `DashboardDataset` in
+   * `dashboard-db.server.ts` does not define one. So `salesSummary` is
+   * permanently empty, and the operational-achievement figure it feeds can
+   * never resolve for any employee in any window.
+   *
+   * The flag exists so the screen can say *that*, rather than telling the user
+   * the number is "unavailable for this period" — which reads as a gap in the
+   * month and sends them looking for data that was never wired up. Wiring the
+   * report means adding the dataset, reading it here, and flipping this to true.
+   */
+  salesSummaryConfigured: boolean;
   fetchedAt: string;
   source: string;
 }
@@ -138,6 +153,7 @@ async function refresh(): Promise<SlaSnapshot> {
   return {
     repMonthly,
     salesSummary: [],
+    salesSummaryConfigured: false,
     fetchedAt,
     source: "Railway PostgreSQL · Yeastar",
   };

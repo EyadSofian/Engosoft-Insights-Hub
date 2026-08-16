@@ -432,6 +432,7 @@ export function AccountingAgentsView() {
 
       <AgentPerformanceSheet
         row={selectedAgent}
+        operationalConfigured={data.sla.salesConfigured}
         open={selectedAgent !== null}
         onOpenChange={(next) => {
           if (!next) setSelectedAgentKey(null);
@@ -503,7 +504,15 @@ function TargetNotices({ targets }: { targets: AgentsResponse["targets"] }) {
  * silently would make the dashboard argue with the sheet management already
  * circulates, with no way to see which number moved.
  */
-function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow }) {
+function AgentTargetPanel({
+  target,
+  row,
+  operationalConfigured,
+}: {
+  target: AgentTarget;
+  row: AgentRow;
+  operationalConfigured: boolean;
+}) {
   const { lang } = useI18n();
   const money = (value: number | null) => (value === null ? "—" : fmtUSDFull(value));
   const gapLabel = (gap: number | null) => {
@@ -548,15 +557,23 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
               sub={gapLabel(target.gapPaid)}
               icon={<ReceiptText size={17} />}
             />
+            {/* "Unavailable for period" sent people hunting for a gap in the
+                month. The number is not missing for August — Odoo's operational
+                sales report has no feed into this dashboard at all, so it is
+                blank for every employee in every window. Say which it is. */}
             <ProfileMetric
               label={lang === "ar" ? "إنجاز التشغيلي" : "Operational vs target"}
               value={fmtPct(target.achievementOperational, 1)}
               sub={
-                row.operationalSales === null
-                  ? lang === "ar"
-                    ? "غير متاح للفترة"
-                    : "Unavailable for period"
-                  : gapLabel(target.gapOperational)
+                row.operationalSales !== null
+                  ? gapLabel(target.gapOperational)
+                  : operationalConfigured
+                    ? lang === "ar"
+                      ? "مفيش بيانات تشغيلية للفترة دي"
+                      : "No operational rows for this window"
+                    : lang === "ar"
+                      ? "تقرير Odoo التشغيلي مش موصّل بالداشبورد"
+                      : "Odoo's operational report is not connected"
               }
               icon={<Calculator size={17} />}
             />
@@ -817,10 +834,13 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
 
 function AgentPerformanceSheet({
   row,
+  operationalConfigured,
   open,
   onOpenChange,
 }: {
   row: AgentRow | null;
+  /** False when Odoo's operational sales report has no feed behind it at all. */
+  operationalConfigured: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -830,6 +850,13 @@ function AgentPerformanceSheet({
   if (!row) return null;
 
   const { courseProfile } = row;
+  const { totals } = courseProfile;
+  // The second fact on every summary card. Whichever basis a card ranks on, the
+  // other one sits underneath it, so no card can be read out of context.
+  const cohortLine = (course: AgentCoursePerformance) =>
+    `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"} · ${fmtPct(course.conversionRate, 1)}`;
+  const moneyLine = (course: AgentCoursePerformance) =>
+    `${fmtUSDFull(course.paidRevenue)} · ${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`;
   const metricConfig = {
     revenue: {
       value: (course: AgentCoursePerformance) => course.paidRevenue,
@@ -879,7 +906,13 @@ function AgentPerformanceSheet({
         </div>
 
         <div className="space-y-5 p-4 sm:p-7">
-          {row.target && <AgentTargetPanel target={row.target} row={row} />}
+          {row.target && (
+            <AgentTargetPanel
+              target={row.target}
+              row={row}
+              operationalConfigured={operationalConfigured}
+            />
+          )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
               label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
@@ -926,18 +959,37 @@ function AgentPerformanceSheet({
                   {lang === "ar" ? "الخلاصة التنفيذية" : "Executive summary"}
                 </div>
                 <h3 className="mt-0.5 text-lg font-bold text-text">
-                  {lang === "ar" ? "فين الموظف قوي وفين محتاج دعم؟" : "Where is this employee strongest?"}
+                  {lang === "ar"
+                    ? "قوي في إيه وضعيف في إيه — من الكورسات اللي بيبيعها"
+                    : "Strongest and weakest — within the courses he sells"}
                 </h3>
+                {/* The population is stated on the section, not buried in a
+                    footnote: all four cards below rank the same courses. */}
+                <p className="mt-1 text-[11px] text-text-muted">
+                  {lang === "ar"
+                    ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس فيهم بيع فعلي للموظف — الكورسات اللي جاتله ليدز ومباعش فيها حاجة متحسبش عليه، وموضّحة تحت لوحدها.`
+                    : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has actually sold. Courses that only received leads are never counted against him; they are reported separately below.`}
+                </p>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Each card carries money *and* cohort, because the row is read
+                  left to right as one comparison. Showing revenue on two cards
+                  and a bare percentage on the others is what let a $0 course sit
+                  beside the best seller looking like its peer. */}
               <CourseInsight
                 icon={<TrendingUp size={18} />}
                 eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
                 course={courseProfile.bestSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
                 sub={(course) => `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`}
+                foot={cohortLine}
                 tone="success"
+                empty={
+                  lang === "ar"
+                    ? "مفيش أي بيع للموظف في الفترة دي"
+                    : "No sale at all in this period"
+                }
               />
               <CourseInsight
                 icon={<TrendingDown size={18} />}
@@ -945,23 +997,37 @@ function AgentPerformanceSheet({
                 course={courseProfile.leastSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
                 sub={(course) => `${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
+                foot={cohortLine}
                 tone="neutral"
+                empty={
+                  lang === "ar"
+                    ? "كورس واحد بس فيه بيع — مفيش مقارنة"
+                    : "Only one course sold — nothing to compare"
+                }
               />
               <CourseInsight
                 icon={<Sparkles size={18} />}
-                eyebrow={lang === "ar" ? "أفضل تحويل بعينة كافية" : "Best reliable conversion"}
+                eyebrow={lang === "ar" ? "أفضل تحويل" : "Best conversion"}
                 course={courseProfile.bestConvertingCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
+                foot={moneyLine}
                 tone="brand"
-                // A cohort can be perfectly large and still hold no win yet, so
-                // this must not read as "not enough data".
+                // Three different reasons, three different sentences. A cohort
+                // can be perfectly large and still hold no win yet, so this must
+                // never read as "not enough data".
                 empty={
                   courseProfile.bestReason === "no_win_yet"
                     ? lang === "ar"
-                      ? "لسه مفيش Won في أي كورس من ليدز الفترة دي"
-                      : "No lead from this period's cohort has been won yet"
-                    : undefined
+                      ? "لسه مفيش Won في أي كورس بيبيعه من ليدز الفترة دي"
+                      : "No lead from this period has been won yet in a course he sells"
+                    : courseProfile.bestReason === "no_book"
+                      ? lang === "ar"
+                        ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
+                        : "He sold no course in this period, so there is nothing to rank"
+                      : lang === "ar"
+                        ? `مفيش كورس باعه وصل ${fmtNum(courseProfile.minimumLeadSample)} ليدز في الفترة دي`
+                        : `No course he sells reached ${fmtNum(courseProfile.minimumLeadSample)} leads in this period`
                 }
               />
               <CourseInsight
@@ -972,6 +1038,7 @@ function AgentPerformanceSheet({
                 sub={(course) =>
                   `${fmtNum(course.won + course.lost)} ${lang === "ar" ? "محسومة من" : "decided of"} ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`
                 }
+                foot={moneyLine}
                 tone="danger"
                 // A course whose cohort is mostly still open is not a proven
                 // weakness. Saying "not enough sample" would be wrong — the
@@ -981,11 +1048,20 @@ function AgentPerformanceSheet({
                     ? lang === "ar"
                       ? `لسه بدري — أغلب الليدز مفتوحة ولسه بتتشغل. الحكم بيبدأ بعد ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من الليدز تتحسم.`
                       : `Too early — most leads are still open. Judging starts once ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort is decided.`
-                    : undefined
+                    : courseProfile.needsSupportReason === "no_book"
+                      ? lang === "ar"
+                        ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
+                        : "He sold no course in this period, so there is nothing to rank"
+                      : lang === "ar"
+                        ? "مفيش كورس بيبيعه اتحسمت ليدزه وطلع ضعيف"
+                        : "No course he sells has a decided cohort that went badly"
                 }
               />
             </div>
           </section>
+
+          <CourseLeadTotals profile={courseProfile} />
+          <UnsoldCoursesNotice profile={courseProfile} />
 
           <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_.8fr]">
             <Card>
@@ -1109,14 +1185,42 @@ function AgentPerformanceSheet({
                     </tr>
                   ))}
                 </tbody>
+                {/* The totals the summary cards are a slice of. Without them the
+                    reader cannot tell whether a named course is most of his
+                    volume or a rounding error. */}
+                <tfoot className="sticky bottom-0 bg-surface-2">
+                  <tr className="border-t-2 border-border text-[12px] font-semibold text-text">
+                    <td className="px-3 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
+                    <td className="px-3 py-3 text-text-muted">
+                      {fmtNum(totals.courses)} {lang === "ar" ? "كورس" : "courses"}
+                    </td>
+                    <td className="num px-3 py-3 text-end">{fmtNum(totals.leads)}</td>
+                    <td className="num px-3 py-3 text-end text-success">{fmtNum(totals.won)}</td>
+                    <td className="num px-3 py-3 text-end text-danger">{fmtNum(totals.lost)}</td>
+                    <td className="num px-3 py-3 text-end">{fmtNum(totals.openLeads)}</td>
+                    <td className="num px-3 py-3 text-end">{fmtPct(totals.conversionRate, 1)}</td>
+                    <td className="num px-3 py-3 text-end">{fmtPct(totals.decidedConversionRate, 1)}</td>
+                    <td className="num px-3 py-3 text-end">{fmtNum(totals.invoices)}</td>
+                    <td className="num px-3 py-3 text-end">{fmtUSDFull(totals.paidRevenue)}</td>
+                    {/* Shares are taken over positive revenue while this row is
+                        net of credit notes, so they do not add to a meaningful
+                        total. Better blank than a 100% that is not true. */}
+                    <td className="num px-3 py-3 text-end text-text-muted">—</td>
+                    <td className="px-3 py-3 text-end text-[11px] font-normal text-text-muted">
+                      {lang === "ar"
+                        ? `${fmtNum(courseProfile.soldTotals.courses)} فيها بيع`
+                        : `${fmtNum(courseProfile.soldTotals.courses)} sold`}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </Card>
 
           <Notice tone="info" icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد؛ و«يحتاج دعم» محتاج كمان إن ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من ليدز الكورس تكون اتحسمت — الكورس اللي لسه أغلب ليدزه مفتوحة ما يتحاسبش على إنه ضعيف.`
-              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. "Best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win; "needs support" additionally requires ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort to be decided — a course still mostly in play is never marked weak.`}
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد، و«يحتاج دعم» محتاج كمان إن ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} من ليدز الكورس تكون اتحسمت — الكورس اللي لسه أغلب ليدزه مفتوحة ما يتحاسبش على إنه ضعيف، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً.`
+              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires ${fmtPct(courseProfile.minimumDecidedShare * 100, 0)} of the cohort to be decided — a course still mostly in play is never marked weak, and a course he never sold is never judged at all.`}
           </Notice>
         </div>
       </SheetContent>
@@ -1155,6 +1259,7 @@ function CourseInsight({
   course,
   value,
   sub,
+  foot,
   tone,
   empty,
 }: {
@@ -1163,6 +1268,12 @@ function CourseInsight({
   course: AgentCoursePerformance | null;
   value: (course: AgentCoursePerformance) => string;
   sub: (course: AgentCoursePerformance) => string;
+  /**
+   * The basis this card does *not* rank on. A money card shows its cohort here
+   * and a conversion card shows its money, so four cards on different scales
+   * can still be compared without opening the table.
+   */
+  foot?: (course: AgentCoursePerformance) => string;
   tone: "success" | "danger" | "brand" | "neutral";
   /** Why the card is empty, when "no reliable sample" is not the real reason. */
   empty?: string;
@@ -1187,6 +1298,11 @@ function CourseInsight({
           </div>
           <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
           <div className="mt-1 text-[11px] text-text-muted">{sub(course)}</div>
+          {foot && (
+            <div className="num mt-2 border-t border-current/12 pt-2 text-[11px] text-text-muted">
+              {foot(course)}
+            </div>
+          )}
         </>
       ) : (
         <div className="mt-4 text-sm font-medium text-text-muted">
@@ -1194,6 +1310,122 @@ function CourseInsight({
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * How many leads the employee's courses took, and how many of them converted.
+ *
+ * The summary cards each name one course, which answers "where" but never "how
+ * much". Without this strip a manager had to add the table up by hand to learn
+ * whether the flagged course was two leads or two hundred, and the split below
+ * is what separates "he is losing his own deals" from "he is being fed leads
+ * for courses he does not sell".
+ */
+function CourseLeadTotals({ profile }: { profile: AgentRow["courseProfile"] }) {
+  const { lang } = useI18n();
+  const { totals, soldTotals, unsoldTotals } = profile;
+  if (!totals.leads && !totals.courses) return null;
+  const share = (part: number) => (totals.leads > 0 ? (part / totals.leads) * 100 : null);
+
+  return (
+    <Card>
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? `${fmtNum(totals.courses)} كورس في الفترة`
+            : `${fmtNum(totals.courses)} courses in this period`
+        }
+      >
+        {lang === "ar"
+          ? "ليدز الكورسات اللي معاه وكام اتحوّلت"
+          : "Leads across his courses, and how many converted"}
+      </SectionTitle>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ProfileMetric
+          label={lang === "ar" ? "إجمالي ليدز الكورسات" : "Total course leads"}
+          value={fmtNum(totals.leads)}
+          sub={`${fmtNum(totals.won)} Won · ${fmtNum(totals.lost)} Lost · ${fmtNum(totals.openLeads)} ${lang === "ar" ? "مفتوحة" : "open"}`}
+          icon={<Users size={17} />}
+          hero
+        />
+        <ProfileMetric
+          label={lang === "ar" ? "اتحوّلت Won" : "Converted to Won"}
+          value={fmtNum(totals.won)}
+          sub={`${fmtPct(totals.conversionRate, 1)} ${lang === "ar" ? "من كل الليدز" : "of all leads"} · ${fmtPct(totals.decidedConversionRate, 1)} ${lang === "ar" ? "من المحسوم" : "of decided"}`}
+          icon={<Trophy size={17} />}
+        />
+        <ProfileMetric
+          label={lang === "ar" ? "في كورسات بيبيعها" : "In courses he sells"}
+          value={fmtNum(soldTotals.leads)}
+          sub={`${fmtPct(share(soldTotals.leads), 1)} ${lang === "ar" ? "من ليدزه" : "of his leads"} · ${fmtNum(soldTotals.won)} Won · ${fmtPct(soldTotals.conversionRate, 1)}`}
+          icon={<ChartNoAxesCombined size={17} />}
+        />
+        <ProfileMetric
+          label={lang === "ar" ? "في كورسات مباعش فيها" : "In courses he never sold"}
+          value={fmtNum(unsoldTotals.leads)}
+          sub={
+            unsoldTotals.leads > 0
+              ? `${fmtPct(share(unsoldTotals.leads), 1)} ${lang === "ar" ? "من ليدزه" : "of his leads"} · ${fmtNum(unsoldTotals.won + unsoldTotals.lost)} ${lang === "ar" ? "محسومة بلا بيع" : "decided, no sale"}`
+              : lang === "ar"
+                ? "كل ليدزه في كورسات بيبيعها"
+                : "every lead sits in a course he sells"
+          }
+          icon={<Layers3 size={17} />}
+        />
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Courses that took leads and produced nothing.
+ *
+ * These used to be ranked against him, which is how a rep who sells CFM and PMP
+ * was told he "needs support" in Management — a course he had never sold a seat
+ * of. They are a routing question for the manager, so they are still shown, just
+ * not as a verdict on the employee.
+ */
+function UnsoldCoursesNotice({ profile }: { profile: AgentRow["courseProfile"] }) {
+  const { lang } = useI18n();
+  const courses = profile.unsoldCourses.filter((course) => course.leads > 0);
+  if (!courses.length) return null;
+  const { unsoldTotals } = profile;
+
+  return (
+    <Notice
+      tone="warning"
+      title={
+        lang === "ar"
+          ? `${fmtNum(unsoldTotals.leads)} ليد في ${fmtNum(courses.length)} كورس مفيش فيهم أي بيع`
+          : `${fmtNum(unsoldTotals.leads)} leads across ${fmtNum(courses.length)} courses with no sale at all`
+      }
+    >
+      <p>
+        {lang === "ar"
+          ? "دي كورسات جاتله فيها ليدز ولا باع فيها ولا كسب ولا ليدة. مش محسوبة عليه كضعف — لكنها سؤال توزيع: يا إما الليدز دي مش المفروض تروح له، يا إما محتاج تدريب على المنتج ده قبل ما نحاسبه عليه."
+          : "These courses received leads and produced neither a sale nor a single win. They are not counted against him — but they are a routing question: either the leads should not be reaching him, or he needs product training before he can be measured on them."}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {courses.slice(0, 6).map((course) => (
+          <li key={course.key} className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
+            <b className="text-text">{displayDimension(course.label, lang)}</b>
+            <span className="num text-text-muted">
+              {fmtNum(course.leads)} {lang === "ar" ? "ليد" : "leads"} ·{" "}
+              {fmtNum(course.won + course.lost)} {lang === "ar" ? "محسومة" : "decided"} ·{" "}
+              {fmtNum(course.openLeads)} {lang === "ar" ? "لسه مفتوحة" : "still open"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {courses.length > 6 && (
+        <p className="mt-1 text-[11px] text-text-muted">
+          {lang === "ar"
+            ? `و${fmtNum(courses.length - 6)} كورس تاني — التفاصيل في جدول الكورسات تحت.`
+            : `and ${fmtNum(courses.length - 6)} more — see the course table below.`}
+        </p>
+      )}
+    </Notice>
   );
 }
 
