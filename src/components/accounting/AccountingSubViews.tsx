@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { TargetEditor } from "@/components/accounting/TargetEditor";
+import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
+import type { EmployeeMetricKey } from "@/lib/employee-metric-catalog";
 import {
   ArrowUpRight,
   Calculator,
@@ -537,6 +539,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
           <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
               label={lang === "ar" ? "التارجت" : "Target"}
+              explain="target"
               value={money(target.target)}
               sub={target.monthsCovered.map((month) => monthLabel(month, lang)).join(" · ")}
               icon={<Target size={17} />}
@@ -544,6 +547,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
             />
             <ProfileMetric
               label={lang === "ar" ? "إنجاز التحصيل" : "Collections vs target"}
+              explain="achievementPaid"
               value={fmtPct(target.achievementPaid, 1)}
               sub={gapLabel(target.gapPaid)}
               icon={<ReceiptText size={17} />}
@@ -553,6 +557,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
                 month, when the cause was a feed nobody had connected. */}
             <ProfileMetric
               label={lang === "ar" ? "إنجاز أوامر البيع" : "Orders vs target"}
+              explain="achievementOrders"
               value={fmtPct(target.achievementOrders, 1)}
               sub={
                 row.orderRevenue
@@ -894,6 +899,7 @@ function AgentPerformanceSheet({
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
               label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+              explain="paidCollections"
               value={fmtUSDFull(row.paidRevenue)}
               sub={`${fmtNum(row.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
               icon={<ReceiptText size={17} />}
@@ -901,18 +907,21 @@ function AgentPerformanceSheet({
             />
             <ProfileMetric
               label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
+              explain="totalLeads"
               value={fmtNum(row.cleanLeads)}
               sub={`${fmtNum(row.won)} Won · ${fmtNum(row.lost)} Lost`}
               icon={<Users size={17} />}
             />
             <ProfileMetric
               label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
+              explain="conversionAll"
               value={fmtPct(row.conversionRate, 1)}
               sub={lang === "ar" ? "Won ÷ إجمالي الليدز" : "Won ÷ all leads"}
               icon={<ChartNoAxesCombined size={17} />}
             />
             <ProfileMetric
               label={lang === "ar" ? "تحويل الحالات المحسومة" : "Decided conversion"}
+              explain="conversionDecided"
               value={fmtPct(row.decidedConversionRate, 1)}
               sub={lang === "ar" ? "Won ÷ (Won + Lost)" : "Won ÷ (Won + Lost)"}
               icon={<Trophy size={17} />}
@@ -958,6 +967,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<TrendingUp size={18} />}
                 eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
+                explain="bestSelling"
                 course={courseProfile.bestSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
                 sub={(course) => `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`}
@@ -972,6 +982,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<TrendingDown size={18} />}
                 eyebrow={lang === "ar" ? "أقل مبيعات" : "Lowest sales"}
+                explain="leastSelling"
                 course={courseProfile.leastSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
                 sub={(course) => `${fmtNum(course.invoices)} ${lang === "ar" ? "فاتورة" : "invoices"}`}
@@ -986,6 +997,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<Sparkles size={18} />}
                 eyebrow={lang === "ar" ? "أفضل تحويل" : "Best conversion"}
+                explain="bestConverting"
                 course={courseProfile.bestConvertingCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) => `${fmtNum(course.won)} Won / ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`}
@@ -1011,6 +1023,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<Layers3 size={18} />}
                 eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
+                explain="needsSupport"
                 course={courseProfile.needsSupportCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) =>
@@ -1212,17 +1225,23 @@ function ProfileMetric({
   sub,
   icon,
   hero = false,
+  explain,
 }: {
   label: string;
   value: string;
   sub: string;
   icon: ReactNode;
   hero?: boolean;
+  /** Shows the "where does this number come from?" popover next to the label. */
+  explain?: EmployeeMetricKey;
 }) {
   return (
     <div className={`rounded-2xl border p-3.5 ${hero ? "border-brand/20 bg-brand-soft" : "border-border bg-surface"}`}>
       <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
-        <span>{label}</span>
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {explain && <EmployeeMetricInfo metric={explain} />}
+        </span>
         <span className="text-brand">{icon}</span>
       </div>
       <div className="num mt-2 text-xl font-bold text-text sm:text-2xl">{value}</div>
@@ -1240,6 +1259,7 @@ function CourseInsight({
   foot,
   tone,
   empty,
+  explain,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -1255,6 +1275,8 @@ function CourseInsight({
   tone: "success" | "danger" | "brand" | "neutral";
   /** Why the card is empty, when "no reliable sample" is not the real reason. */
   empty?: string;
+  /** Shows the "where does this number come from?" popover next to the eyebrow. */
+  explain?: EmployeeMetricKey;
 }) {
   const { lang } = useI18n();
   const styles = {
@@ -1268,6 +1290,7 @@ function CourseInsight({
       <div className="flex items-center gap-2 text-[11px] font-semibold">
         {icon}
         <span>{eyebrow}</span>
+        {explain && <EmployeeMetricInfo metric={explain} align="end" />}
       </div>
       {course ? (
         <>
