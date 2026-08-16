@@ -46,6 +46,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
+  --color-chart-muted: var(--chart-muted);
 
   /* shadcn compatibility — the ui/ primitives read these names */
   --color-background: var(--bg);
@@ -110,12 +111,18 @@
   --danger: #b3261e;
   --danger-soft: #fdecea;
 
+  /* Categorical only. No chart colour may equal a semantic one: a red slice
+     next to a red error state reads as "this category is broken". --chart-5 is
+     therefore rose, not the danger red it used to sit on top of. --chart-muted
+     is reserved for buckets that carry no category of their own (unclassified,
+     "other") so a data gap never looks like a real segment. */
   --chart-1: #0050dc;
   --chart-2: #ff9100;
   --chart-3: #00a3a3;
   --chart-4: #7c4dff;
-  --chart-5: #e5484d;
+  --chart-5: #d6336c;
   --chart-6: #3aa655;
+  --chart-muted: #94a3b8;
 
   --shadow-xs: 0 1px 2px rgba(11, 31, 56, 0.05);
   --shadow-sm: 0 1px 3px rgba(11, 31, 56, 0.07), 0 1px 2px rgba(11, 31, 56, 0.04);
@@ -168,8 +175,11 @@
   --chart-2: #ffa733;
   --chart-3: #2fd4c8;
   --chart-4: #a78bfa;
-  --chart-5: #f0645c;
+  /* was #f0645c — byte-identical to --danger in this theme, so every fifth
+     category rendered in the error colour. */
+  --chart-5: #f472a0;
   --chart-6: #56cc74;
+  --chart-muted: #6b7f96;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
@@ -255,6 +265,25 @@
     direction: ltr;
     unicode-bidi: embed;
     text-align: right;
+  }
+
+  /* A plotted chart is a picture, not a paragraph: its axes are placed in
+   * visual coordinates and must not mirror with the page.
+   *
+   * SVG resolves `text-anchor` against the *inline base direction*, not against
+   * left/right. recharts anchors a left-hand y-axis with `text-anchor: end`
+   * (CartesianAxis.getTickTextAnchor), so under the page's `dir="rtl"` the
+   * "end" of each tick became its LEFT edge — the label was pinned at the axis
+   * line and spilled rightwards into the plot, where the bars painted straight
+   * over it. Course names showed as a single stranded letter ("C" for CFM)
+   * while the 118px reserved for them sat empty on the other side.
+   *
+   * Scoped to the <svg> on purpose. The legend and tooltip are HTML siblings
+   * outside it, and they lay out correctly RTL — forcing LTR on the wrapper
+   * would fix the axis and break those instead. Arabic tick labels still shape
+   * RTL inside the run; only the anchor point stops flipping. */
+  [dir="rtl"] .recharts-wrapper svg {
+    direction: ltr;
   }
 
   input[type="date"] {

@@ -823,14 +823,17 @@ function AgentPerformanceSheet({
     revenue: {
       value: (course: AgentCoursePerformance) => course.paidRevenue,
       format: fmtUSDFull,
+      name: lang === "ar" ? "المبيعات" : "Sales",
     },
     invoices: {
       value: (course: AgentCoursePerformance) => course.invoices,
       format: fmtNum,
+      name: lang === "ar" ? "الفواتير" : "Invoices",
     },
     leads: {
       value: (course: AgentCoursePerformance) => course.leads,
       format: fmtNum,
+      name: lang === "ar" ? "الليدز" : "Leads",
     },
   }[courseMetric];
   const courseChart = [...courseProfile.courses]
@@ -973,28 +976,32 @@ function AgentPerformanceSheet({
             </div>
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+          <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_.8fr]">
             <Card>
-              <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-                <SectionTitle className="mb-0">
-                  {lang === "ar" ? "أداء كل كورس" : "Performance by course"}
-                </SectionTitle>
-                <Segmented
-                  value={courseMetric}
-                  onChange={setCourseMetric}
-                  options={[
-                    { value: "revenue", label: lang === "ar" ? "المبيعات" : "Sales" },
-                    { value: "invoices", label: lang === "ar" ? "الفواتير" : "Invoices" },
-                    { value: "leads", label: lang === "ar" ? "الليدز" : "Leads" },
-                  ]}
-                />
-              </div>
+              <SectionTitle
+                hint={lang === "ar" ? "أعلى 10 كورسات في الفترة" : "Top 10 courses in the period"}
+                action={
+                  <Segmented
+                    value={courseMetric}
+                    onChange={setCourseMetric}
+                    options={[
+                      { value: "revenue", label: lang === "ar" ? "المبيعات" : "Sales" },
+                      { value: "invoices", label: lang === "ar" ? "الفواتير" : "Invoices" },
+                      { value: "leads", label: lang === "ar" ? "الليدز" : "Leads" },
+                    ]}
+                  />
+                }
+              >
+                {lang === "ar" ? "أداء كل كورس" : "Performance by course"}
+              </SectionTitle>
               <HBarChart
                 data={courseChart}
-                height={Math.max(260, courseChart.length * 34)}
+                height={Math.max(260, courseChart.length * 38)}
                 color="var(--chart-1)"
                 format={metricConfig.format}
-                labelWidth={118}
+                name={metricConfig.name}
+                labelWidth={132}
+                showValues
               />
             </Card>
 
@@ -1005,9 +1012,16 @@ function AgentPerformanceSheet({
               <DonutChart
                 data={courseProfile.specializations
                   .filter((item) => item.leads > 0)
-                  .map((item) => ({ label: displayDimension(item.label, lang), value: item.leads }))}
-                height={Math.max(280, courseProfile.specializations.length * 28)}
+                  .map((item) => ({
+                    label: displayDimension(item.label, lang),
+                    value: item.leads,
+                    color: SPECIALIZATION_COLORS[item.key],
+                  }))}
+                /* Fixed: the ring no longer grows with the slice count now that
+                   the legend is a list beneath it rather than wrapped inside. */
+                height={244}
                 format={fmtNum}
+                centerCaption={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
               />
             </Card>
           </div>
@@ -1212,6 +1226,24 @@ function conversionTone(course: AgentCoursePerformance): "success" | "neutral" |
   if ((course.conversionRate ?? 0) >= 10) return "success";
   return "danger";
 }
+
+/**
+ * Specialization colours are pinned to the specialization, never to its rank.
+ * The donut sorts by lead count, so a positional palette painted Engineering
+ * teal for one employee and blue for the next — which quietly made two profiles
+ * impossible to read against each other. Keys are the normalized ones from
+ * `agent-analytics.server`; anything unlisted falls through to the chart's own
+ * palette, and the bucket that means "we don't know" is grey on purpose so a
+ * gap in the data never looks like another specialization.
+ */
+const SPECIALIZATION_COLORS: Record<string, string> = {
+  "professional certificate": "var(--chart-1)",
+  "interior decor": "var(--chart-2)",
+  engineering: "var(--chart-3)",
+  technology: "var(--chart-4)",
+  "non engineering": "var(--chart-5)",
+  uncategorized: "var(--chart-muted)",
+};
 
 function displayDimension(value: string, lang: "ar" | "en") {
   return value === "Uncategorized" && lang === "ar" ? "غير مصنف" : value;

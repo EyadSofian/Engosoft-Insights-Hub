@@ -462,6 +462,7 @@ function Overview() {
             <HBarChart
               data={data.origin.otherBySource.slice(0, 8).map((g) => ({ label: g.label, value: g.count }))}
               format={fmtNum}
+              name={t("leads")}
               color="var(--chart-3)"
               height={200}
             />

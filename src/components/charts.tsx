@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -19,7 +20,7 @@ import {
   YAxis,
   ZAxis,
 } from "recharts";
-import { fmtCompact, fmtDayShort, fmtUSD, useI18n } from "@/lib/i18n";
+import { fmtCompact, fmtDayShort, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { EmptyState } from "./ui-bits";
 
 export function useIsNarrow(breakpoint = 640) {
@@ -186,26 +187,41 @@ export function HBarChart({
   color = "var(--chart-1)",
   format = fmtUSD,
   labelWidth,
+  name,
+  showValues = false,
 }: {
   data: { label: string; value: number }[];
   height?: number;
   color?: string;
   format?: (n: number) => string;
   labelWidth?: number;
+  /**
+   * Series name in the tooltip. Defaults to revenue because most callers plot
+   * money — but a chart whose metric is switchable must pass the current one,
+   * or the tooltip keeps announcing "revenue" over a count of leads.
+   */
+  name?: string;
+  /** Print each value at the end of its bar, so reading the chart costs no hover. */
+  showValues?: boolean;
 }) {
   const { t } = useI18n();
   const narrow = useIsNarrow();
   if (!data.length) return <EmptyState label={t("no_data")} compact />;
 
   const width = labelWidth ?? (narrow ? 84 : 130);
-  const trim = (s: string) => {
-    const max = narrow ? 12 : 20;
-    return s.length > max ? s.slice(0, max) + "…" : s;
-  };
+  // Ellipsis tied to the gutter that was actually reserved, at ~6.2px per
+  // character for the 11px ticks. A fixed character count either clipped inside
+  // a wide gutter or overflowed a narrow one.
+  const maxChars = Math.max(6, Math.floor((width - 12) / 6.2));
+  const trim = (s: string) => (s.length > maxChars ? s.slice(0, maxChars - 1) + "…" : s);
 
   return (
     <ChartFrame height={height}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
+      <BarChart
+        data={data}
+        layout="vertical"
+        margin={{ top: 0, right: showValues ? 48 : 12, left: 0, bottom: 0 }}
+      >
         <CartesianGrid stroke={gridStroke} horizontal={false} strokeDasharray="3 3" />
         <XAxis
           type="number"
@@ -221,6 +237,7 @@ export function HBarChart({
           tickLine={false}
           axisLine={false}
           width={width}
+          tickMargin={8}
           tickFormatter={trim}
         />
         <Tooltip
@@ -229,11 +246,21 @@ export function HBarChart({
         />
         <Bar
           dataKey="value"
-          name={t("revenue")}
+          name={name ?? t("revenue")}
           fill={color}
           radius={[0, 6, 6, 0]}
           maxBarSize={22}
-        />
+        >
+          {showValues && (
+            <LabelList
+              dataKey="value"
+              position="right"
+              fill="var(--text-muted)"
+              fontSize={11}
+              formatter={(v: number) => fmtCompact(v)}
+            />
+          )}
+        </Bar>
       </BarChart>
     </ChartFrame>
   );
@@ -520,43 +547,95 @@ export function DonutChart({
   data,
   height = 260,
   format = fmtCompact,
+  centerCaption,
 }: {
-  data: { label: string; value: number }[];
+  /**
+   * `color` pins a slice to one colour. Without it the palette is positional,
+   * so a category that slips a rank between two views changes colour and the
+   * two views stop being comparable — callers that own the categories should
+   * assign, and keep, their own.
+   */
+  data: { label: string; value: number; color?: string }[];
   height?: number;
   format?: (n: number) => string;
+  /** Labels the total shown in the hole. Omit and the hole stays empty. */
+  centerCaption?: string;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   if (!data.length) return <EmptyState label={t("no_data")} compact />;
 
   // Beyond 6 slices a donut stops being readable — fold the rest into "Other".
   const top = data.slice(0, 6);
   const rest = data.slice(6).reduce((s, d) => s + d.value, 0);
-  const slices = rest > 0 ? [...top, { label: "—", value: rest }] : top;
+  const slices =
+    rest > 0
+      ? [
+          ...top,
+          { label: lang === "ar" ? "أخرى" : "Other", value: rest, color: "var(--chart-muted)" },
+        ]
+      : top;
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const painted = slices.map((slice, i) => ({
+    ...slice,
+    fill: slice.color ?? DONUT_COLORS[i % DONUT_COLORS.length],
+    share: total > 0 ? (slice.value / total) * 100 : 0,
+  }));
 
   return (
-    <ChartFrame height={height}>
-      <PieChart>
-        <Pie
-          data={slices}
-          dataKey="value"
-          nameKey="label"
-          innerRadius="52%"
-          outerRadius="78%"
-          paddingAngle={2}
-          stroke="var(--surface)"
-          strokeWidth={2}
-        >
-          {slices.map((_, i) => (
-            <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip content={<ChartTooltip formatter={(v) => format(v)} />} />
-        <Legend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 11, color: "var(--text-muted)" }}
-        />
-      </PieChart>
-    </ChartFrame>
+    <div className="flex min-w-0 flex-col">
+      <div className="relative">
+        <ChartFrame height={height}>
+          <PieChart>
+            <Pie
+              data={painted}
+              dataKey="value"
+              nameKey="label"
+              innerRadius="58%"
+              outerRadius="82%"
+              paddingAngle={2}
+              stroke="var(--surface)"
+              strokeWidth={2}
+            >
+              {painted.map((slice) => (
+                <Cell key={slice.label} fill={slice.fill} />
+              ))}
+            </Pie>
+            <Tooltip content={<ChartTooltip formatter={(v) => format(v)} />} />
+          </PieChart>
+        </ChartFrame>
+        {/* The hole is the only place a donut can state its own total without
+            stealing room from the ring. */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="num text-xl font-bold text-text sm:text-2xl">{format(total)}</span>
+          {centerCaption && (
+            <span className="mt-0.5 max-w-[9rem] text-center text-[11px] leading-tight text-text-muted">
+              {centerCaption}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Replaces recharts' inline legend, which wrapped into ragged rows and
+          could only name the slices. A column can also carry each value and
+          share, which is what the ring itself cannot show. */}
+      <ul className="mt-1 space-y-2 border-t border-border pt-3">
+        {painted.map((slice) => (
+          <li key={slice.label} className="flex items-center gap-2 text-xs">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: slice.fill }}
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1 truncate text-text-muted" title={slice.label}>
+              {slice.label}
+            </span>
+            <span className="num shrink-0 font-semibold text-text">{format(slice.value)}</span>
+            <span className="num w-12 shrink-0 text-end text-text-subtle">
+              {fmtPct(slice.share, 0)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
