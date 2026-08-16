@@ -49,6 +49,17 @@ export interface AgentAnalyticsRow {
   slaWon: number;
   slaLost: number;
   decidedConversionRate: number | null;
+  /**
+   * Sale orders confirmed on his name in this window, in USD.
+   *
+   * The second revenue basis on the employee screen. Collections answer "what
+   * was paid this month", which can be money from deals closed long before it;
+   * orders answer "what did he sell this month". They disagree exactly where
+   * payment timing does, which is the point of showing both.
+   */
+  orderRevenue: number | null;
+  /** Distinct sale orders behind `orderRevenue`. */
+  orderCount: number;
   operationalSales: number | null;
   operationalUntaxed: number | null;
   operationalDeals: number | null;
@@ -81,11 +92,11 @@ export interface AgentTarget {
   complete: boolean;
   /** Paid collections ÷ the whole quota, %. */
   achievementPaid: number | null;
-  /** Odoo's operational sales ÷ the whole quota, %. */
-  achievementOperational: number | null;
+  /** Sale orders ÷ the whole quota, %. */
+  achievementOrders: number | null;
   /** Remaining amount on each basis. Negative once the quota is beaten. */
   gapPaid: number | null;
-  gapOperational: number | null;
+  gapOrders: number | null;
 }
 
 export interface TargetCoverage {
@@ -296,6 +307,7 @@ interface MutableAgent extends AgentAnalyticsRow {
   firstCallWeighted: number;
   firstCallWeight: number;
   invoiceRefs: Set<string>;
+  orderRefs: Set<string>;
   months: Set<string>;
   latestOpenMonth: string;
   /**
@@ -404,6 +416,8 @@ const blank = (key: string, name: string): MutableAgent => ({
   slaWon: 0,
   slaLost: 0,
   decidedConversionRate: null,
+  orderRevenue: 0,
+  orderCount: 0,
   operationalSales: 0,
   operationalUntaxed: 0,
   operationalDeals: 0,
@@ -415,6 +429,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   firstCallWeighted: 0,
   firstCallWeight: 0,
   invoiceRefs: new Set(),
+  orderRefs: new Set(),
   months: new Set(),
   latestOpenMonth: "",
   operationalRows: 0,
@@ -693,6 +708,27 @@ function mergeInvoiceRefs(map: Map<string, MutableAgent>, data: FilteredData) {
   }
 }
 
+/**
+ * Sale orders per salesperson, from the `invoiced` dataset Odoo already feeds.
+ *
+ * This used to come from the SLA project's `sales_summary` view, which no
+ * longer runs. The order lines carry the same fact — a confirmed sale on a
+ * named rep — and are already synced every few minutes, so the second basis is
+ * computed here rather than waiting on a pipeline that has no source left.
+ */
+function mergeOrderRevenue(map: Map<string, MutableAgent>, data: FilteredData) {
+  for (const order of data.invoiced) {
+    if (!order.salesperson) continue;
+    const key = normalizePersonName(order.salesperson);
+    if (!key) continue;
+    const row = map.get(key) ?? blank(key, order.salesperson);
+    row.orderRevenue = (row.orderRevenue ?? 0) + order.usdSales;
+    if (order.orderRef) row.orderRefs.add(order.orderRef);
+    if (order.salesTeam) row.teams.add(order.salesTeam);
+    map.set(key, row);
+  }
+}
+
 function mergeSlaRep(map: Map<string, MutableAgent>, rows: SlaRepMonthly[]) {
   for (const source of rows) {
     const key = normalizePersonName(source.user_name || "");
@@ -861,9 +897,9 @@ function buildTargetCoverage(
       monthsMissing: resolved.monthsMissing,
       complete: resolved.complete,
       achievementPaid: share(row.paidRevenue),
-      achievementOperational: share(row.operationalSales),
+      achievementOrders: share(row.orderRevenue),
       gapPaid: gap(row.paidRevenue),
-      gapOperational: gap(row.operationalSales),
+      gapOrders: gap(row.orderRevenue),
     };
   }
 
@@ -928,6 +964,7 @@ export async function buildAgentAnalytics(
   }
   mergeMainPeople(map, teams);
   mergeInvoiceRefs(map, data);
+  mergeOrderRevenue(map, data);
   mergeOperationalClosures(map, data, filters);
   const courseProfiles = buildCourseProfiles(data);
 
@@ -1007,6 +1044,7 @@ export async function buildAgentAnalytics(
   const agents = selectedAgents
     .map((row): AgentAnalyticsRow => {
       row.invoices = row.invoiceRefs.size;
+      row.orderCount = row.orderRefs.size;
       row.team = [...row.teams].filter(Boolean).join(" · ") || "—";
       row.conversionRate = row.cleanLeads > 0 ? (row.won / row.cleanLeads) * 100 : null;
       row.lostRate = row.cleanLeads > 0 ? (row.lost / row.cleanLeads) * 100 : null;
