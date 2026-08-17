@@ -170,4 +170,20 @@ for (const code of ["Auto", "Web", "PMP", "Interior", "Safety"])
 // Odoo category spellings count as known, so a hint written as a category works.
 assert.equal(isKnownCourse("Facility Management"), true);
 
+/* --- a product line written into a course column is not a course ----------- */
+// `Full Invoiced Orders.Course` carries the product name on discount rows. The
+// rule that keeps an unrecognised course value visible then produced two
+// courses on the live dashboard, holding eight sales orders between them.
+assert.equal(canonicalCourseValue("[851] 100% on The Freelance Masterclass"), "");
+assert.equal(canonicalCourseValue("[841] 20% on specific products", "", "All"), "");
+assert.equal(canonicalCourseValue("20% on specific products"), "");
+assert.equal(canonicalCourseValue("Free Product - CFM notes"), "CFM");
+// A product code in front of a real course still resolves to that course.
+assert.equal(canonicalCourseValue("[855] PMP Preparation Course - 8th Edition"), "PMP");
+// Unrecognised course values that are not product lines are still preserved,
+// so a genuinely new course appears as itself rather than vanishing.
+for (const value of ["Technical / Safety", "civil", "."])
+  assert.equal(canonicalCourseValue(value), canonicalCourseValue(value));
+assert.equal(canonicalCourseValue("Freelance Masterclass"), "Freelance Masterclass");
+
 console.log("course taxonomy: all assertions passed");

@@ -1635,8 +1635,10 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
 
   const salesOrderRefs = new Map<string, Set<string>>();
   for (const sale of data.invoiced) {
-    if (!sale.course || !sale.orderRef) continue;
-    const a = get(sale.course, sale.mainCategory);
+    if (!sale.orderRef) continue;
+    // Same bucket the paid lines use, so a discount order is counted once and
+    // in one place instead of under a course named after its own product.
+    const a = get(sale.course || UNATTRIBUTED_COURSE, sale.mainCategory);
     let refs = salesOrderRefs.get(a.key);
     if (!refs) {
       refs = new Set();
