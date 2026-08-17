@@ -245,6 +245,10 @@ const LEADING_NOISE = new Set([
   "new",
   "traffic",
   "engagement",
+  // Product names get the same treatment, and carry their own wrappers:
+  // `Free Product - CFM Preparation Course` is a CFM line.
+  "free",
+  "product",
 ]);
 
 const tokenize = (name: string): string[] =>
@@ -254,6 +258,21 @@ const tokenize = (name: string): string[] =>
 
 /** A leading number is a product code or a date, never a course. */
 const isNumeric = (token: string): boolean => /^\d+$/.test(token);
+
+/**
+ * An Odoo product line written into a course column, rather than a course.
+ *
+ * `Full Invoiced Orders.Course` carries the product name on discount rows, so
+ * "keep an unrecognised course value as itself" — which exists so a genuinely
+ * new course stays visible — produced two courses called
+ * `[851] 100% on The Freelance Masterclass` and `[841] 20% on specific
+ * products`, each holding a couple of sales orders and no money.
+ *
+ * Narrow on purpose: a leading `[code]` or promo wrapper only. Every real
+ * course value in the workbook is a plain word or an `Odoo / category / path`.
+ */
+const isProductLine = (value: string): boolean =>
+  /^\s*(?:\[[^\]]*\]|\d+(?:\.\d+)?\s*%\s*on\b|free\s+product\b)/i.test(value);
 
 /**
  * The course a campaign / ad-set / ad name declares, or `""` when it declares
@@ -300,5 +319,5 @@ export function canonicalCourseValue(courseValue: unknown, ...context: unknown[]
     const named = courseFromMarketingName(candidate);
     if (named) return named;
   }
-  return primary;
+  return isProductLine(primary) ? "" : primary;
 }
