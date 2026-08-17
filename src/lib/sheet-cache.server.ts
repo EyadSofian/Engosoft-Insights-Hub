@@ -24,6 +24,12 @@ import { odooConfigured } from "./odoo.server";
 import { fetchGoogleAds } from "./google-ads.server";
 import { fetchTikTokAds } from "./tiktok.server";
 import {
+  canonicalCourseValue,
+  courseFromMarketingName,
+  isKnownCourse,
+  mainCategoryForCourse,
+} from "./course-taxonomy";
+import {
   databaseConfigured,
   readDashboardDataset,
   writeDashboardDataset,
@@ -252,32 +258,21 @@ export function normalizeName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-const COURSE_RULES: { label: string; test: RegExp }[] = [
-  { label: "CMRP", test: /\bcmrp\b|certified maintenance (?:and|&) reliability/i },
-  { label: "CFM", test: /\bcfm\b|certified facility manager|facility management/i },
-  { label: "PMP", test: /\bpmp\b|project management professional/i },
-  { label: "BIM", test: /\bbim\b|building information model/i },
-  { label: "Interior", test: /\binterior\b|تصميم داخلي/i },
-  { label: "Auto", test: /\bautomotive\b|\bauto(?:mobile)?\b|سيارات/i },
-  { label: "Mech", test: /\bmechanical\b|\bmech\b|ميكانيك/i },
-  { label: "Elec", test: /\belectrical\b|\belec\b|كهرب/i },
-  { label: "Struc", test: /\bstructur(?:al|e)\b|\bstruc\b|إنشائ/i },
-  { label: "Arch", test: /\barchitect(?:ure|ural)?\b|\barch\b|معمار/i },
-  { label: "Infra", test: /\binfrastructure\b|\binfra\b|بنية تحتية/i },
-  { label: "Tech", test: /\btechnology\b|\btech\b|تقني/i },
-];
-
 /**
- * Returns a known course only when the supplied text names exactly one course.
- * A campaign such as "PMP + CFM" is deliberately left unresolved instead of
- * assigning all of its spend to whichever rule happens to appear first.
+ * The course a campaign / ad-set / ad name declares, or `""` when it declares
+ * none. Ads carry no course column on every feed, so the name is the only
+ * signal available for those rows.
+ *
+ * Resolution lives in `course-taxonomy.ts`; see the note at the top of that file
+ * for why the course is read off the *leading* token rather than searched for
+ * anywhere in the string, and why a bare `auto` is no longer a course token.
  */
 export function knownCourseFromText(...values: unknown[]): string {
-  const searchable = values.map(str).filter(Boolean).join(" ");
-  if (!searchable) return "";
-  const matches = new Set<string>();
-  for (const rule of COURSE_RULES) if (rule.test.test(searchable)) matches.add(rule.label);
-  return matches.size === 1 ? [...matches][0] : "";
+  for (const value of values) {
+    const course = courseFromMarketingName(str(value));
+    if (course) return course;
+  }
+  return "";
 }
 
 /**
@@ -286,10 +281,17 @@ export function knownCourseFromText(...values: unknown[]): string {
  * a generic "Other" bucket.
  */
 function canonicalCourse(...values: unknown[]): string {
-  const real = values.map(str).filter(Boolean);
-  const searchable = real.join(" ");
-  for (const rule of COURSE_RULES) if (rule.test.test(searchable)) return rule.label;
-  return real[0] ?? "";
+  return canonicalCourseValue(values[0], ...values.slice(1));
+}
+
+/**
+ * The course column on an ads feed, accepted only when it names a course we
+ * recognise. Ads have a campaign name to fall back on, so a spreadsheet error
+ * is better dropped than turned into a course carrying a real budget.
+ */
+function adCourseHint(raw: unknown): string {
+  const course = canonicalCourse(raw);
+  return isKnownCourse(course) ? course : "";
 }
 
 function canonicalMainCategory(
@@ -299,11 +301,10 @@ function canonicalMainCategory(
 ): string {
   const explicit = str(raw);
   if (explicit) return explicit;
-  if (["CFM", "PMP", "CMRP"].includes(course)) return "Professional Certificate";
-  if (course === "Interior") return "Interior & Decor";
-  if (["BIM", "Auto", "Mech", "Elec", "Struc", "Arch", "Infra"].includes(course))
-    return "Engineering";
-  if (course === "Tech") return "Technology";
+  // The workbook's Courses tab assigns a Main Category per course; that mapping
+  // is transcribed once, in the taxonomy module, rather than restated here.
+  const known = mainCategoryForCourse(course);
+  if (known) return known;
   const category = normalizeName(str(productCategory));
   if (category.includes("non-engineering")) return "Non-Engineering";
   if (category.includes("engineering")) return "Engineering";
@@ -1473,6 +1474,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         campaign: str(r["اسم الكامبين"]),
         campaignId: str(r["__campaign_id"]),
         campaignKey: keys.key(str(r["__campaign_id"]), str(r["اسم الكامبين"])),
+        // The sync already resolves the course for every Meta row and writes it
+        // to `Course` — `Automotive - Riyadh - 4/7/26 - CBO - sh` → `Auto`,
+        // `web-con-all-1/7/26-sa` → `Web`. Reading it makes the name-based
+        // inference a fallback for feeds that have no such column (TikTok's API)
+        // rather than the primary path for every row.
+        courseHint: adCourseHint(str(r["Course"])),
         adset: str(r["Ad set name"]),
         adsetId: str(r["__adset_id"]),
         ad: str(r["Ad Name"]),
@@ -1550,6 +1557,9 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         campaign: str(r["اسم الكامبين"]),
         campaignId: str(r["__campaign_id"]),
         campaignKey: keys.key(str(r["__campaign_id"]), str(r["اسم الكامبين"])),
+        // Snap's export has no `Course` column today; read it anyway so the
+        // column starts counting the day the sync adds it.
+        courseHint: adCourseHint(str(r["Course"])),
         adset: str(r["Ad set name"]),
         adsetId: str(r["__adset_id"]),
         ad: str(r["Ad Name"]),
@@ -1606,7 +1616,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           campaign,
           campaignId,
           campaignKey: keys.key(campaignId, campaign),
-          courseHint: canonicalCourse(legacyAdCourseValue(r)),
+          courseHint: adCourseHint(legacyAdCourseValue(r)),
           adset: pick(r, "Ad set name", "Ad Set Name"),
           adsetId: pick(r, "__adset_id", "Ad Set ID"),
           ad: pick(r, "Ad Name", "Ad name"),
@@ -1641,6 +1651,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
         campaign,
         campaignId,
         campaignKey: keys.key(campaignId, campaign),
+        courseHint: adCourseHint(pick(r, "Course", "Course Name")),
         adset: pick(r, "Ad set name", "Ad Set Name"),
         adsetId: pick(r, "__adset_id", "Ad Set ID"),
         ad: pick(r, "Ad Name", "Ad name"),

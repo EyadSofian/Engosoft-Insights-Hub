@@ -1,0 +1,304 @@
+// Pure, isomorphic course taxonomy: how a raw column value or a marketing name
+// becomes one of the course codes the business actually reports on.
+//
+// It replaces a list of twelve substring regexes that searched anywhere in any
+// string. That list attributed spend by accident. Two properties of the real
+// data broke it:
+//
+// **1. `Auto` is a course code, not the English word "auto".**
+// The rule `/\bauto(?:mobile)?\b/` matched `auto profile`, `auto-generated ad`,
+// `Auto CAD`, `Auto Desk`, `ad-auto-2026` and `old auto dialer`. Every TikTok ad
+// carrying one of those names pulled its whole campaign into the Automotive
+// course — which is how `pmp-23-12-25-sayed t`, `interior-31-5-26 sayed t` and
+// `web-sign-14/7/26` came to be listed as Automotive campaigns, spending
+// Automotive money against zero Automotive leads. No real campaign is named with
+// a bare `auto`: all 174 named ones spell it `Automotive`. So the token is gone.
+//
+// **2. The course is the LEADING token of a campaign name, not any token.**
+// `BIm - CBO - Arch - 17/7/26` is a BIM campaign whose creative angle is
+// architecture; `pmp-1/4/26-sayed-web` is a PMP campaign running to the website.
+// Searching the whole string made the first ambiguous (two rules matched, so the
+// old code gave up and returned nothing) and would make the second a Web
+// campaign. Everything after the leading token is geography, owner, team, funnel
+// stage or creative variant — never the course. Anchoring on the first
+// non-noise token resolves 161 of the 174 campaigns exactly; the other 13 name
+// no course at all (`Leads -hiring - sales`, `FB-Engagement-…`) and correctly
+// fall through to the CRM modal-course fallback.
+//
+// Column values and marketing names are resolved by *different* mechanisms and
+// must not be mixed. A column value is looked up exactly against the workbook's
+// `Courses` tab; a campaign name is tokenised. The old `canonicalCourse` joined
+// an authoritative course column with free product text into one string and
+// returned whichever rule sat earliest in the array — which silently moved every
+// Maint invoice into CMRP ("Individual Preparation CMRP") and every Marketing
+// invoice into Tech ("Technology - Digital Marketing").
+
+/** Trim, lower-case and collapse whitespace and dash variants for comparison. */
+export function normalizeCourseKey(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[‐-―]/g, "-")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Every course code the business reports on, taken from the workbook's `Courses`
+ * tab. `Web` is the ads-side code for website conversion/signup campaigns and is
+ * kept distinct from the revenue-side `Website` product category, because no
+ * source in the workbook asserts they are the same bucket.
+ */
+export const COURSE_CODES = [
+  "Arch",
+  "Auto",
+  "BIM",
+  "CFM",
+  "CMRP",
+  "Certificate",
+  "Deliveries",
+  "Elec",
+  "English",
+  "Infra",
+  "Interior",
+  "Maint",
+  "Marketing",
+  "Mech",
+  "Other",
+  "PMP",
+  "Private",
+  "Safety",
+  "Steel",
+  "Struc",
+  "Tech",
+  "Web",
+  "Website",
+] as const;
+
+/**
+ * `Product Category` / `Course Categories` → course, mirroring the workbook's
+ * `Courses` tab (42 non-blank pairs as of 2026-08).
+ *
+ * This is a transcription, not an inference. When the tab gains a row, add it
+ * here — or wire the tab into `TAB` and build this map from it, which is the
+ * durable fix. Until then a category that is missing here keeps its own raw
+ * value rather than being guessed into a neighbouring course.
+ */
+const CATEGORY_TO_COURSE: Record<string, string> = {
+  "all / deliveries": "Deliveries",
+  automotive: "Auto",
+  cmrp: "CMRP",
+  english: "English",
+  fmp: "CFM",
+  "facility management": "CFM",
+  "interior design": "Interior",
+  management: "PMP",
+  marketing: "Marketing",
+  other: "Other",
+  "technical / architecture": "Arch",
+  "technical / bim architecture": "BIM",
+  "technical / bim mep / coordinator": "BIM",
+  "technical / bim mep / modeler": "BIM",
+  "technical / bim structure": "BIM",
+  "technical / electrical": "Elec",
+  "technical / infrastructure": "Infra",
+  "technical / mechanical": "Mech",
+  "technical / safety": "Safety",
+  "technical / steel": "Steel",
+  "technical / structure": "Struc",
+  technology: "Tech",
+  cfm: "CFM",
+  civil: "civil",
+  pmp: "PMP",
+  "revenue / miscellaneous / certificate": "Certificate",
+  "revenue / miscellaneous / private": "Private",
+  "revenue / miscellaneous / website": "Website",
+  "revenue / engineering / architecture": "Arch",
+  "revenue / engineering / bim": "BIM",
+  "revenue / engineering / electrical": "Elec",
+  "revenue / engineering / facility management": "CFM",
+  "revenue / engineering / mechanical": "Mech",
+  "revenue / engineering / automotive": "Auto",
+  "revenue / engineering / civil / infrastructure": "Infra",
+  "revenue / engineering / civil / structure": "Struc",
+  "revenue / engineering / maintenance": "Maint",
+  "revenue / engineering / safety": "Safety",
+  "revenue / non-engineering / english": "English",
+  "revenue / non-engineering / interior": "Interior",
+  "revenue / non-engineering / management": "PMP",
+  "revenue / non-engineering / marketing": "Marketing",
+};
+
+const VALUE_ALIASES = new Map<string, string>();
+for (const [category, course] of Object.entries(CATEGORY_TO_COURSE))
+  VALUE_ALIASES.set(category, course);
+// A row that already carries the canonical code resolves to itself.
+for (const code of COURSE_CODES) VALUE_ALIASES.set(normalizeCourseKey(code), code);
+
+/**
+ * Bucket for paid lines that genuinely belong to no course — discounts,
+ * delivery, gift cards. It exists so the course breakdown reconciles to the
+ * headline revenue total without inventing a course per product string.
+ */
+export const UNATTRIBUTED_COURSE = "Unattributed";
+
+/**
+ * Whether a value names a course this taxonomy recognises.
+ *
+ * Used to gate the ads-side course column, which is a spreadsheet formula and
+ * therefore ships spreadsheet errors: the live `Meta Ads Daily` tab currently
+ * carries `#REF!` on some rows. A CRM or invoice row keeps an unrecognised
+ * course so a genuinely new course stays visible, but an ad row has a campaign
+ * name to fall back on, and `#REF!` should never become a course with a budget.
+ */
+export const isKnownCourse = (value: unknown): boolean =>
+  VALUE_ALIASES.has(normalizeCourseKey(value));
+
+/** `Main Category` per course, also from the `Courses` tab. */
+const COURSE_MAIN_CATEGORY: Record<string, string> = {
+  Arch: "Engineering",
+  Auto: "Engineering",
+  BIM: "Engineering",
+  CFM: "Professional Certificate",
+  CMRP: "Professional Certificate",
+  Certificate: "Non-Engineering",
+  Deliveries: "Non-Engineering",
+  Elec: "Engineering",
+  English: "Non-Engineering",
+  Infra: "Engineering",
+  Interior: "Interior & Decor",
+  Maint: "Engineering",
+  Marketing: "Non-Engineering",
+  Mech: "Engineering",
+  Other: "Non-Engineering",
+  PMP: "Professional Certificate",
+  Private: "Non-Engineering",
+  Safety: "Professional Certificate",
+  Steel: "Engineering",
+  Struc: "Engineering",
+  Tech: "Non-Engineering",
+  Web: "Non-Engineering",
+  Website: "Non-Engineering",
+  civil: "Engineering",
+};
+
+export const mainCategoryForCourse = (course: string): string => COURSE_MAIN_CATEGORY[course] ?? "";
+
+/**
+ * Leading tokens used by the marketing naming convention, verified against every
+ * campaign name in the live workbook.
+ *
+ * `auto` is deliberately absent — see the note at the top of this file.
+ * `nterior` is a live typo on `nterior-1/1/26-sayed-sn`, which carries real
+ * Interior leads; naming it here is cheaper than losing them.
+ */
+const NAME_TOKENS: Record<string, string> = {
+  cfm: "CFM",
+  fmp: "CFM",
+  bim: "BIM",
+  pmp: "PMP",
+  cmrp: "CMRP",
+  interior: "Interior",
+  nterior: "Interior",
+  automotive: "Auto",
+  automobile: "Auto",
+  سيارات: "Auto",
+  mech: "Mech",
+  mechanical: "Mech",
+  elec: "Elec",
+  electrical: "Elec",
+  struc: "Struc",
+  structural: "Struc",
+  structure: "Struc",
+  arch: "Arch",
+  architecture: "Arch",
+  architectural: "Arch",
+  infra: "Infra",
+  infrastructure: "Infra",
+  steel: "Steel",
+  web: "Web",
+  tech: "Tech",
+  technology: "Tech",
+  safety: "Safety",
+  maint: "Maint",
+  maintenance: "Maint",
+  marketing: "Marketing",
+  english: "English",
+};
+
+/**
+ * Campaign-type words that legitimately precede the course token:
+ * `Lead Automotive riyadh …`, `LEAD Interior Offline …`, `off- interior-27-3-26`,
+ * `Copy of web-sign-4/6-sn`.
+ *
+ * They are skipped, not treated as a licence to scan the rest of the name. The
+ * scan stops at the first word that is neither noise nor a course, so
+ * `Leads -hiring - sales -11/5` resolves to nothing rather than to a course
+ * mentioned later in the string.
+ */
+const LEADING_NOISE = new Set([
+  "lead",
+  "leads",
+  "copy",
+  "of",
+  "off",
+  "on",
+  "new",
+  "traffic",
+  "engagement",
+]);
+
+const tokenize = (name: string): string[] =>
+  normalizeCourseKey(name)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+
+/** A leading number is a product code or a date, never a course. */
+const isNumeric = (token: string): boolean => /^\d+$/.test(token);
+
+/**
+ * The course a campaign / ad-set / ad name declares, or `""` when it declares
+ * none. Never guesses from a token buried in the middle of the name.
+ *
+ * Product names are read the same way, once their `[841]`-style code is skipped:
+ * `[855] PMP Preparation Course - 8th Edition` is a PMP line, while
+ * `[841] 20% on specific products` is a discount that belongs to no course and
+ * must stay unresolved rather than become one.
+ */
+export function courseFromMarketingName(name: unknown): string {
+  for (const token of tokenize(String(name ?? ""))) {
+    if (isNumeric(token) || LEADING_NOISE.has(token)) continue;
+    return NAME_TOKENS[token] ?? "";
+  }
+  return "";
+}
+
+/**
+ * The course for a row that carries a course column.
+ *
+ * `courseValue` is the authoritative column (`Course`, `Course Name`,
+ * `Course Categories`); `context` is supporting text such as the product name
+ * and product category. They are resolved **in order and independently** — an
+ * authoritative value is never concatenated with free product text, which is
+ * what let "Individual Preparation CMRP" overwrite an explicit `Maint`.
+ *
+ * An unrecognised course value keeps its own name, so a new course appears as
+ * itself instead of hiding inside a neighbouring one. Unrecognised *context*
+ * does not: falling back to a product string invented courses called
+ * "[841] 20% on specific products".
+ */
+export function canonicalCourseValue(courseValue: unknown, ...context: unknown[]): string {
+  const primary = String(courseValue ?? "").trim();
+  const candidates = [primary, ...context.map((value) => String(value ?? "").trim())].filter(
+    Boolean,
+  );
+
+  for (const candidate of candidates) {
+    const exact = VALUE_ALIASES.get(normalizeCourseKey(candidate));
+    if (exact) return exact;
+  }
+  for (const candidate of candidates) {
+    const named = courseFromMarketingName(candidate);
+    if (named) return named;
+  }
+  return primary;
+}

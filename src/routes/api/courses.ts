@@ -149,11 +149,45 @@ export const Route = createFileRoute("/api/courses")({
           // set. Build the official-status join from full ad history so an
           // Active campaign does not disappear just because the selected month
           // has no spend for it.
-          const courseCampaignKeys = new Set<string>();
+          //
+          // Membership needs the course to *dominate* the campaign, not merely
+          // to appear in it once. A single matching ad row used to be enough,
+          // over unfiltered all-time history — so one mislabelled creative from
+          // last November kept its campaign in the wrong course's "eligible to
+          // run now" list permanently, whatever date range was selected.
+          const campaignCourseWeight = new Map<string, Map<string, number>>();
+          const campaignCourseSource = new Map<
+            string,
+            import("@/lib/metrics.server").CourseAttributionSource
+          >();
           for (const ad of data.snapshot.ads) {
             const attribution = attributedAdCourse(ad, data.snapshot);
-            if (isCourse(attribution.course)) courseCampaignKeys.add(ad.campaignKey);
+            if (!attribution.course) continue;
+            let byCourse = campaignCourseWeight.get(ad.campaignKey);
+            if (!byCourse) {
+              byCourse = new Map();
+              campaignCourseWeight.set(ad.campaignKey, byCourse);
+            }
+            // Weight by spend, and by row count for campaigns that never spent
+            // — an organic campaign still belongs to exactly one course.
+            byCourse.set(
+              attribution.course,
+              (byCourse.get(attribution.course) ?? 0) + ad.spend + 1,
+            );
+            if (isCourse(attribution.course) && attribution.source)
+              campaignCourseSource.set(ad.campaignKey, attribution.source);
           }
+          const dominatedByCourse = (campaignKey: string): boolean => {
+            const byCourse = campaignCourseWeight.get(campaignKey);
+            if (!byCourse) return false;
+            let total = 0;
+            let mine = 0;
+            for (const [course, weight] of byCourse) {
+              total += weight;
+              if (isCourse(course)) mine += weight;
+            }
+            return total > 0 && mine / total > 0.5;
+          };
 
           // Course status follows the platform's official Active snapshot. It
           // deliberately does not infer Active from spend. A campaign can be
@@ -161,12 +195,19 @@ export const Route = createFileRoute("/api/courses")({
           for (const state of data.snapshot.campaignStates) {
             if (state.deliveryState !== "active") continue;
             const meta = data.snapshot.campaigns.get(state.campaignKey);
-            if (!isCourse(meta?.course ?? "") && !courseCampaignKeys.has(state.campaignKey))
-              continue;
+            const namedCourse = isCourse(meta?.course ?? "");
+            if (!namedCourse && !dominatedByCourse(state.campaignKey)) continue;
             const campaign = atCampaign(state.campaignKey, state.name);
             campaign.platforms.add(state.platform);
             if (state.account) campaign.accounts.add(state.account);
             if (meta && meta.objective !== "unknown") campaign.objective = meta.objective;
+            // Without this an Active campaign with no spend in the window
+            // rendered "Course match: —", which reads as an unattributed row
+            // rather than one that simply did not spend this month.
+            const source = namedCourse
+              ? meta?.courseSource || "campaign_name"
+              : campaignCourseSource.get(state.campaignKey);
+            if (source) campaign.attributionSources.add(source);
             campaign.officialActive = true;
             campaign.statusSpend24h = state.spend24h;
             campaign.statusCheckedAt = state.checkedAt;

@@ -173,6 +173,27 @@ rates to it. Currency conversion is only a fallback for legacy rows where
 **16. Prefer `attributedRoas` over `roas`.** Only ~42% of revenue carries a campaign at
 all, and only ~26% maps to a campaign present in the ads tabs.
 
+**17. The course lives in the campaign name, and only the campaign name.**
+CRM, Lost and Accounting each arrive with a resolved `Course` column. The ad feeds do
+not — `Meta Ads Daily` has one but it ships `#REF!` on live rows, Snapchat has none, and
+TikTok's API has no such field at all. So for ads the name is the signal, and
+`src/lib/course-taxonomy.ts` reads it off the **leading token**: `pmp-23-12-25-sayed t`,
+`BIm - CBO - Arch - 17/7/26` (a BIM campaign whose angle is architecture),
+`web-con-all-1/7/26-sa`. Everything after that token is geography, owner, team, funnel
+stage or creative variant.
+
+Two failures this replaced, both live: `attributedAdCourse` read the **ad** name before
+the campaign name, so a creative called `auto profile` moved an entire PMP campaign into
+Automotive — spend followed the guessed name while leads and revenue followed the row's
+own course, and the courses page showed PMP campaigns filed under Auto with 0 leads and
+$0 revenue. And `canonicalCourse` joined the course column with the product name into one
+string, then returned whichever regex sat earliest in the array, which reported 100% of
+Maint revenue as CMRP and 100% of Marketing revenue as Tech.
+
+A bare `auto` is therefore no longer a course token — `Auto` needs `automotive`,
+`automobile` or `سيارات`. Nothing is lost: all 174 named campaigns spell it in full.
+`scripts/test-course-taxonomy.mjs` pins every one of these cases.
+
 ## Metric definitions
 
 Every ratio goes through `div()`, which returns `null` when the denominator is zero.
