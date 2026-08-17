@@ -18,6 +18,7 @@
     "test:fx-rates": "node --experimental-strip-types scripts/test-fx-rates.mjs",
     "test:sales-targets": "node --experimental-strip-types scripts/test-sales-targets.mjs",
     "test:course-insight": "node --experimental-strip-types scripts/test-course-insight.mjs",
+    "test:course-taxonomy": "node --experimental-strip-types scripts/test-course-taxonomy.mjs",
     "test:sales-report": "node --experimental-strip-types scripts/test-sales-report.mjs",
     "test:admin-auth": "node --experimental-strip-types scripts/test-admin-auth.mjs",
     "test:target-overrides": "node --experimental-strip-types scripts/test-target-overrides.mjs",

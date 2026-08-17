@@ -12,6 +12,7 @@ import {
   PLATFORM_SOURCE_KEYS,
   type Snapshot,
 } from "./sheet-cache.server";
+import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
@@ -300,21 +301,34 @@ export type CourseAttributionSource =
   "source_mapping" | "ad_name" | "adset_name" | "campaign_name" | "crm_leads" | "";
 
 /**
- * Course attribution for one daily ad row, ordered from the most specific ad
- * dimension to the campaign fallback. This prevents a multi-course campaign
- * from putting every ad dollar under one course.
+ * Course attribution for one daily ad row.
+ *
+ * **The campaign name outranks the ad name.** Engosoft names the course in the
+ * campaign — `pmp-23-12-25-sayed t`, `Automotive - Riyadh - 4/7/26 - CBO - sh`,
+ * `cmrp-16/7/26-sayed-t` — and names the creative freely underneath it. This
+ * used to run the other way, on the theory that a campaign may hold several
+ * courses; in practice no campaign does, and the inversion let a creative called
+ * `auto profile` move an entire PMP campaign's spend into Automotive. The
+ * courses page showed the result plainly: a PMP campaign filed under Auto,
+ * spending Auto money against 0 leads, 0 won and $0 revenue, because spend
+ * followed the guessed name while leads and revenue followed the row's own
+ * course. One join key now serves both.
+ *
+ * Ad-set and ad names are still read, but only for a campaign whose own name
+ * declares nothing — a generic `Engagement Campaign 15/6/26` may still be
+ * resolved by what runs inside it.
  */
 export function attributedAdCourse(
   row: AdRow,
   snapshot: Snapshot,
 ): { course: string; source: CourseAttributionSource; confidence: number } {
   if (row.courseHint) return { course: row.courseHint, source: "source_mapping", confidence: 1 };
-  const adCourse = knownCourseFromText(row.ad);
-  if (adCourse) return { course: adCourse, source: "ad_name", confidence: 1 };
-  const adsetCourse = knownCourseFromText(row.adset);
-  if (adsetCourse) return { course: adsetCourse, source: "adset_name", confidence: 1 };
   const campaignCourse = knownCourseFromText(row.campaign);
   if (campaignCourse) return { course: campaignCourse, source: "campaign_name", confidence: 1 };
+  const adsetCourse = knownCourseFromText(row.adset);
+  if (adsetCourse) return { course: adsetCourse, source: "adset_name", confidence: 1 };
+  const adCourse = knownCourseFromText(row.ad);
+  if (adCourse) return { course: adCourse, source: "ad_name", confidence: 1 };
   const meta = snapshot.campaigns.get(row.campaignKey);
   return {
     course: meta?.course ?? "",
@@ -1601,8 +1615,12 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
 
   const invoiceRefs = new Map<string, Set<string>>();
   for (const sale of data.accounting) {
-    if (!sale.course) continue;
-    const a = get(sale.course, sale.mainCategory);
+    // Paid lines that name no course are still money, and the course breakdown
+    // has to reconcile to the headline total. They used to be named after their
+    // product, which invented courses called "[841] 20% on specific products";
+    // dropping them instead opened a $453 gap between this table and
+    // `computeTotals`. They get one honest shared bucket.
+    const a = get(sale.course || UNATTRIBUTED_COURSE, sale.mainCategory);
     a.revenue += sale.usdPaid;
     const ref = sale.movement;
     if (ref) {
