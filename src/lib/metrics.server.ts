@@ -297,26 +297,35 @@ export interface FilteredData {
   attributionScoped: boolean;
 }
 
-export type CourseAttributionSource =
-  "source_mapping" | "ad_name" | "adset_name" | "campaign_name" | "crm_leads" | "";
+export type CourseAttributionSource = "source_mapping" | "campaign_name" | "crm_leads" | "";
 
 /**
  * Course attribution for one daily ad row.
  *
- * **The campaign name outranks the ad name.** Engosoft names the course in the
- * campaign — `pmp-23-12-25-sayed t`, `Automotive - Riyadh - 4/7/26 - CBO - sh`,
- * `cmrp-16/7/26-sayed-t` — and names the creative freely underneath it. This
- * used to run the other way, on the theory that a campaign may hold several
- * courses; in practice no campaign does, and the inversion let a creative called
- * `auto profile` move an entire PMP campaign's spend into Automotive. The
- * courses page showed the result plainly: a PMP campaign filed under Auto,
- * spending Auto money against 0 leads, 0 won and $0 revenue, because spend
- * followed the guessed name while leads and revenue followed the row's own
- * course. One join key now serves both.
+ * **Only the campaign declares the course.** Engosoft names it there —
+ * `pmp-23-12-25-sayed t`, `Automotive - Riyadh - 4/7/26 - CBO - sh`,
+ * `cmrp-16/7/26-sayed-t` — and names ad sets and creatives freely underneath.
  *
- * Ad-set and ad names are still read, but only for a campaign whose own name
- * declares nothing — a generic `Engagement Campaign 15/6/26` may still be
- * resolved by what runs inside it.
+ * This once ran ad-first, on the theory that a campaign may hold several
+ * courses, which let a creative called `auto profile` move an entire PMP
+ * campaign's spend into Automotive. Reversing the order fixed that case and left
+ * the mechanism intact: with ad-set and ad names kept as a fallback for
+ * campaigns that name no course, `Traffic-all-web-20/7/26` — a Traffic campaign
+ * on the `Engo soft website` account — still charged $172 to Interior and $31 to
+ * CFM, because its ad sets are named `interior` and `cfm`.
+ *
+ * That is not a mis-parse, it is the whole idea being wrong. Awareness campaigns
+ * are segmented by topic, so their ad sets carry course words while the campaign
+ * sells nothing: `IG-traffic-11/1/26-SAYED`, `FB-Engagement-7/1/26-SAYED`,
+ * `Video views-11/1/26-S`, `Demand Gen - 2026-01-06-SAYED`. Every one of them
+ * produced zero CRM leads and zero revenue, so the ad-level fallback could only
+ * ever add cost to a course's CPL and ROAS, never results. Across the live
+ * workbook it moved $800 that way, and nothing else — no campaign that genuinely
+ * sells a course depends on it.
+ *
+ * So a campaign whose name declares nothing now falls through to the modal
+ * course of its own CRM leads, which is evidence rather than a guess, and to
+ * nothing at all when it has no leads either.
  */
 export function attributedAdCourse(
   row: AdRow,
@@ -325,10 +334,6 @@ export function attributedAdCourse(
   if (row.courseHint) return { course: row.courseHint, source: "source_mapping", confidence: 1 };
   const campaignCourse = knownCourseFromText(row.campaign);
   if (campaignCourse) return { course: campaignCourse, source: "campaign_name", confidence: 1 };
-  const adsetCourse = knownCourseFromText(row.adset);
-  if (adsetCourse) return { course: adsetCourse, source: "adset_name", confidence: 1 };
-  const adCourse = knownCourseFromText(row.ad);
-  if (adCourse) return { course: adCourse, source: "ad_name", confidence: 1 };
   const meta = snapshot.campaigns.get(row.campaignKey);
   return {
     course: meta?.course ?? "",

@@ -139,16 +139,13 @@ export const Route = createFileRoute("/api/courses")({
 
           const spendBySource: Record<string, number> = {
             source_mapping: 0,
-            ad_name: 0,
-            adset_name: 0,
             campaign_name: 0,
             crm_leads: 0,
           };
 
-          // Some generic campaign names carry the course only in the ad or ad
-          // set. Build the official-status join from full ad history so an
-          // Active campaign does not disappear just because the selected month
-          // has no spend for it.
+          // Build the official-status join from full ad history so an Active
+          // campaign does not disappear just because the selected month has no
+          // spend for it.
           //
           // Membership needs the course to *dominate* the campaign, not merely
           // to appear in it once. A single matching ad row used to be enough,

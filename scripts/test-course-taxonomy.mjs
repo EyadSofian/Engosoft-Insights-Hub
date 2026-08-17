@@ -186,4 +186,33 @@ for (const value of ["Technical / Safety", "civil", "."])
   assert.equal(canonicalCourseValue(value), canonicalCourseValue(value));
 assert.equal(canonicalCourseValue("Freelance Masterclass"), "Freelance Masterclass");
 
+/* --- awareness campaigns are segmented by topic, and sell nothing ---------- */
+// Their ad sets carry course words while the campaign does not. Reading a course
+// off an ad set charged $172 of `Traffic-all-web-20/7/26` (a Traffic campaign on
+// the `Engo soft website` account, ad sets `interior` and `cfm`) to Interior and
+// CFM. `attributedAdCourse` no longer consults ad-set or ad names at all; these
+// names must therefore keep declaring no course, so that when a campaign name is
+// checked directly the answer is honestly empty.
+for (const name of [
+  "Traffic-all-web-20/7/26",
+  "IG-traffic-11/1/26-SAYED",
+  "FB-Engagement-7/1/26-SAYED",
+  "IG-Engagement-11/1/26-SAYED",
+  "Video views-11/1/26-S",
+  "Demand Gen - 2026-01-06-SAYED",
+  "Demand Gen - 2026-07-16 - Kuwit",
+  "QATAR -2",
+])
+  assert.equal(courseFromMarketingName(name), "", `${name} sells no course`);
+
+// The ad-set names that used to leak, checked directly: they do name a course,
+// which is exactly why they must never be consulted for one.
+for (const [adset, course] of [
+  ["interior", "Interior"],
+  ["cfm", "CFM"],
+  ["BIM", "BIM"],
+  ["PMP", "PMP"],
+])
+  assert.equal(courseFromMarketingName(adset), course);
+
 console.log("course taxonomy: all assertions passed");
