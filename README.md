@@ -192,7 +192,19 @@ Maint revenue as CMRP and 100% of Marketing revenue as Tech.
 
 A bare `auto` is therefore no longer a course token — `Auto` needs `automotive`,
 `automobile` or `سيارات`. Nothing is lost: all 174 named campaigns spell it in full.
-`scripts/test-course-taxonomy.mjs` pins every one of these cases.
+
+**Ad-set and ad names are never read for a course, not even as a fallback.** Keeping them
+for campaigns that name no course looked harmless and was not: awareness campaigns are
+segmented by topic, so their ad sets carry course words while the campaign sells nothing.
+`Traffic-all-web-20/7/26` — a Traffic campaign on the `Engo soft website` account — has ad
+sets named `interior` and `cfm`, and charged $172 and $31 to those courses against zero
+leads and zero revenue. `IG-traffic-…`, `FB-Engagement-…`, `Video views-…` and
+`Demand Gen - …` all did the same. A campaign that names no course now falls through to
+the modal course of its own CRM leads, and to nothing when it has none.
+
+`scripts/test-course-taxonomy.mjs` pins every one of these cases. Live check: 100% of
+course spend resolves through the campaign name, no campaign lands under two courses, and
+no campaign's name contradicts the course it was filed under.
 
 ## Metric definitions
 
