@@ -322,15 +322,21 @@ export function AccountingAgentsView() {
           index={3}
           label={lang === "ar" ? "ليدز دخلت الفترة" : "Leads created in period"}
           value={fmtNum(data.summary.cleanLeads)}
-          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "منهم Won" : "became Won"}`}
+          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "منهم رابحة" : "became won"}`}
           icon={<UserRound size={18} />}
+          info={<EmployeeMetricInfo metric="cohortWon" />}
         />
         <KpiCard
           index={4}
-          label={lang === "ar" ? "إغلاقات تمت في الفترة" : "Closures during period"}
+          label={lang === "ar" ? "إغلاقات رابحة تمت في الفترة" : "Won closures during period"}
           value={fmtNum(data.summary.periodClosedWon)}
-          sub={`${fmtNum(data.summary.periodClosedLost)} Lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · ${fmtPct(data.summary.decidedConversionRate, 1)}`
+              : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`
+          }
           icon={<Trophy size={18} />}
+          info={<EmployeeMetricInfo metric="periodClosures" />}
         />
         <KpiCard
           index={5}
@@ -655,7 +661,7 @@ function AgentCards({
           <div className="mt-4 rounded-2xl bg-surface-2 p-3">
             <div className="text-[11px] font-medium text-text-muted">
               {sortBy === "closing"
-                ? lang === "ar" ? "إغلاقات Won تمت في الفترة" : "Won closures in period"
+                ? lang === "ar" ? "إغلاقات رابحة تمت في الفترة" : "Won closures in period"
                 : sortBy === "calls"
                   ? lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"
                   : lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
@@ -673,8 +679,24 @@ function AgentCards({
             <MiniMetric label={lang === "ar" ? "الفواتير" : "Invoices"} value={fmtNum(row.invoices)} />
             <MiniMetric label={lang === "ar" ? "ليدز دخلت" : "New leads"} value={fmtNum(row.cleanLeads)} />
             <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDExact(row.paidRevenue)} />
-            <MiniMetric label={lang === "ar" ? "إغلاقات Won" : "Won closures"} value={fmtNum(row.slaWon)} />
-            <MiniMetric label={lang === "ar" ? "إغلاقات Lost" : "Lost closures"} value={fmtNum(row.slaLost)} />
+            <MiniMetric
+              label={lang === "ar" ? "إغلاقات رابحة" : "Won closures"}
+              value={fmtNum(row.slaWon)}
+              hint={
+                lang === "ar"
+                  ? "صفقات قفلها رابحة، محسوبة بتاريخ القفل مش بتاريخ دخول الليد."
+                  : "Deals he closed won, dated by close date — not by when the lead arrived."
+              }
+            />
+            <MiniMetric
+              label={lang === "ar" ? "إغلاقات خاسرة" : "Lost closures"}
+              value={fmtNum(row.slaLost)}
+              hint={
+                lang === "ar"
+                  ? "صفقات قفلها خاسرة، محسوبة بتاريخ القفل مش بتاريخ دخول الليد."
+                  : "Deals he closed lost, dated by close date — not by when the lead arrived."
+              }
+            />
             <MiniMetric
               label={lang === "ar" ? "المكالمات" : "Calls"}
               value={!callsAvailable || row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}
@@ -695,6 +717,11 @@ function AgentCards({
             )}
             <ProgressMetric
               label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
+              hint={
+                lang === "ar"
+                  ? "الرابحة ÷ (الرابحة + الخاسرة) من الصفقات اللي اتقفلت في الفترة — بتاريخ القفل، مش بتاريخ دخول الليد. عشان كده مش هتساوي نسبة تحويل الليدز."
+                  : "Won ÷ (won + lost) among deals closed inside the window, dated by close date rather than lead date — which is why it will not match lead conversion."
+              }
               value={row.decidedConversionRate}
               color="var(--success)"
             />
@@ -707,7 +734,7 @@ function AgentCards({
 
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-text-muted">
             <span>
-              {lang === "ar" ? "Won من ليدز الفترة" : "Cohort Won"}:{" "}
+              {lang === "ar" ? "رابحة من ليدز الفترة" : "Cohort won"}:{" "}
               <b className="num text-text">{fmtNum(row.won)}</b>
             </span>
             <span>
@@ -744,8 +771,8 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 lang === "ar" ? "إنجاز أوامر البيع" : "Orders vs target",
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
-                "Won",
-                "Lost",
+                lang === "ar" ? "رابحة" : "Won",
+                lang === "ar" ? "خاسرة" : "Lost",
                 lang === "ar" ? "نسبة الإغلاق" : "Conversion",
                 lang === "ar" ? "إغلاقات الفترة" : "Period closures",
                 lang === "ar" ? "المكالمات" : "Calls",
@@ -843,15 +870,18 @@ function AgentPerformanceSheet({
   // The second fact on every summary card. Whichever basis a card ranks on, the
   // other one sits underneath it, so no card can be read out of context.
   //
-  // These read "X Won من Y ليد" rather than "X Won / Y ليد". A slash between a
-  // Latin word and an Arabic one has no direction of its own, so the two
-  // numbers can land either way round on screen and the line degenerates into
-  // "2 10" with nothing saying which is which. An Arabic connective carries the
-  // relationship regardless of how the runs are ordered.
+  // These read "X رابحة من Y ليد" rather than "X Won / Y ليد". Two problems were
+  // fixed here at once. A slash between a Latin word and an Arabic one has no
+  // direction of its own, so the numbers could land either way round and the
+  // line degenerated into "2 10" with nothing saying which was which. And the
+  // bare Latin "Won" was its own reversal: an English run inside an Arabic
+  // paragraph is laid out left-to-right within a right-to-left line, so "1 Won"
+  // read as "Won 1" on screen. An Arabic word carries the relationship in the
+  // direction the rest of the sentence is already going.
   const cohortLine = (course: AgentCoursePerformance) =>
     lang === "ar"
-      ? `${fmtNum(course.won)} Won من ${fmtNum(course.leads)} ليد · ${fmtPct(course.conversionRate, 1)}`
-      : `${fmtNum(course.won)} Won of ${fmtNum(course.leads)} leads · ${fmtPct(course.conversionRate, 1)}`;
+      ? `${fmtNum(course.won)} رابحة من ${fmtNum(course.leads)} ليد · ${fmtPct(course.conversionRate, 1)}`
+      : `${fmtNum(course.won)} won of ${fmtNum(course.leads)} leads · ${fmtPct(course.conversionRate, 1)}`;
   const moneyLine = (course: AgentCoursePerformance) =>
     `${fmtUSDFull(course.paidRevenue)} · ${invoiceCount(course.invoices, lang)}`;
   const metricConfig = {
@@ -917,21 +947,29 @@ function AgentPerformanceSheet({
               label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
               explain="totalLeads"
               value={fmtNum(row.cleanLeads)}
-              sub={`${fmtNum(row.won)} Won · ${fmtNum(row.lost)} Lost`}
+              sub={
+                lang === "ar"
+                  ? `${fmtNum(row.won)} رابحة · ${fmtNum(row.lost)} خاسرة`
+                  : `${fmtNum(row.won)} won · ${fmtNum(row.lost)} lost`
+              }
               icon={<Users size={17} />}
             />
             <ProfileMetric
               label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
               explain="conversionAll"
               value={fmtPct(row.conversionRate, 1)}
-              sub={lang === "ar" ? "Won ÷ إجمالي الليدز" : "Won ÷ all leads"}
+              sub={lang === "ar" ? "الرابحة ÷ إجمالي الليدز" : "Won ÷ all leads"}
               icon={<ChartNoAxesCombined size={17} />}
             />
             <ProfileMetric
-              label={lang === "ar" ? "تحويل الحالات المحسومة" : "Decided conversion"}
-              explain="conversionDecided"
+              label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
+              explain="periodClosureRate"
               value={fmtPct(row.decidedConversionRate, 1)}
-              sub={lang === "ar" ? "Won ÷ (Won + Lost)" : "Won ÷ (Won + Lost)"}
+              sub={
+                lang === "ar"
+                  ? `${fmtNum(row.slaWon)} رابحة · ${fmtNum(row.slaLost)} خاسرة · اتقفلوا في الفترة`
+                  : `${fmtNum(row.slaWon)} won · ${fmtNum(row.slaLost)} lost · closed in period`
+              }
               icon={<Trophy size={17} />}
             />
           </div>
@@ -962,8 +1000,8 @@ function AgentPerformanceSheet({
                     footnote: all four cards below rank the same courses. */}
                 <p className="mt-1 text-[11px] text-text-muted">
                   {lang === "ar"
-                    ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس فيهم بيع فعلي للموظف — الكورسات اللي جاتله ليدز ومباعش فيها حاجة متحسبش عليه، وموضّحة تحت لوحدها.`
-                    : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has actually sold. Courses that only received leads are never counted against him; they are reported separately below.`}
+                    ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس دخل فيهم بيع أو قفل فيهم صفقة رابحة — الكورسات اللي جاتله ليدز ومحصلش فيها لا بيع ولا صفقة رابحة متحسبش عليه، وموضّحة تحت لوحدها. الكورس اللي قفل فيه صفقة لسه فاتورتها مجتش بيبان بـ$0، وده مش خطأ: الفلوس محسوبة بتاريخ الدفع.`
+                    : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has either sold or won a deal in. Courses that only received leads are never counted against him; they are reported separately below. A course he won but whose invoice has not landed yet shows $0 — collections are dated by payment, so that is timing, not an error.`}
                 </p>
               </div>
             </div>
@@ -993,7 +1031,16 @@ function AgentPerformanceSheet({
                 explain="leastSelling"
                 course={courseProfile.leastSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
-                sub={(course) => invoiceCount(course.invoices, lang)}
+                // $0 here means a course he won in but has not been paid for
+                // yet, not a course he was never selling — those are excluded
+                // from this row entirely.
+                sub={(course) =>
+                  course.paidRevenue === 0 && course.invoices === 0
+                    ? lang === "ar"
+                      ? `${fmtNum(course.won)} صفقة رابحة لسه فاتورتها مجتش`
+                      : `${fmtNum(course.won)} won, not yet invoiced`
+                    : invoiceCount(course.invoices, lang)
+                }
                 foot={cohortLine}
                 tone="neutral"
                 empty={
@@ -1010,8 +1057,8 @@ function AgentPerformanceSheet({
                 value={(course) => fmtPct(course.conversionRate, 1)}
                 sub={(course) =>
                   lang === "ar"
-                    ? `${fmtNum(course.won)} Won من ${fmtNum(course.leads)} ليد`
-                    : `${fmtNum(course.won)} Won of ${fmtNum(course.leads)} leads`
+                    ? `${fmtNum(course.won)} رابحة من ${fmtNum(course.leads)} ليد`
+                    : `${fmtNum(course.won)} won of ${fmtNum(course.leads)} leads`
                 }
                 foot={moneyLine}
                 tone="brand"
@@ -1021,7 +1068,7 @@ function AgentPerformanceSheet({
                 empty={
                   courseProfile.bestReason === "no_win_yet"
                     ? lang === "ar"
-                      ? "لسه مفيش Won في أي كورس بيبيعه من ليدز الفترة دي"
+                      ? "لسه مفيش ولا صفقة رابحة في أي كورس بيبيعه من ليدز الفترة دي"
                       : "No lead from this period has been won yet in a course he sells"
                     : courseProfile.bestReason === "no_book"
                       ? lang === "ar"
@@ -1148,8 +1195,8 @@ function AgentPerformanceSheet({
                       lang === "ar" ? "الكورس" : "Course",
                       lang === "ar" ? "التخصص" : "Specialization",
                       lang === "ar" ? "الليدز" : "Leads",
-                      "Won",
-                      "Lost",
+                      lang === "ar" ? "رابحة" : "Won",
+                      lang === "ar" ? "خاسرة" : "Lost",
                       lang === "ar" ? "مفتوح" : "Open",
                       lang === "ar" ? "تحويل الليدز" : "Lead conversion",
                       lang === "ar" ? "تحويل المحسوم" : "Decided conversion",
@@ -1167,7 +1214,12 @@ function AgentPerformanceSheet({
                 <tbody>
                   {courseProfile.courses.map((course) => (
                     <tr key={course.key} className="border-t border-border hover:bg-surface-2/70">
-                      <td className="px-3 py-3 font-semibold text-text">{displayDimension(course.label, lang)}</td>
+                      <td
+                        className="px-3 py-3 font-semibold text-text"
+                        title={dimensionNote(course.label, lang)}
+                      >
+                        {displayDimension(course.label, lang)}
+                      </td>
                       <td className="px-3 py-3 text-text-muted">{displayDimension(course.mainCategory, lang)}</td>
                       <td className="num px-3 py-3 text-end">{fmtNum(course.leads)}</td>
                       <td className="num px-3 py-3 text-end text-success">{fmtNum(course.won)}</td>
@@ -1222,7 +1274,7 @@ function AgentPerformanceSheet({
 
           <Notice tone="info" icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = Won ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم Won حقيقي واحد، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً.`
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
               : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
           </Notice>
         </div>
@@ -1306,7 +1358,10 @@ function CourseInsight({
       </div>
       {course ? (
         <>
-          <div className="mt-3 truncate text-base font-bold text-text" title={course.label}>
+          <div
+            className="mt-3 truncate text-base font-bold text-text"
+            title={dimensionNote(course.label, lang) ?? course.label}
+          >
             {displayDimension(course.label, lang)}
           </div>
           <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
@@ -1358,12 +1413,16 @@ function CourseLeadTotals({ profile }: { profile: AgentRow["courseProfile"] }) {
         <ProfileMetric
           label={lang === "ar" ? "إجمالي ليدز الكورسات" : "Total course leads"}
           value={fmtNum(totals.leads)}
-          sub={`${fmtNum(totals.won)} Won · ${fmtNum(totals.lost)} Lost · ${fmtNum(totals.openLeads)} ${lang === "ar" ? "مفتوحة" : "open"}`}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(totals.won)} رابحة · ${fmtNum(totals.lost)} خاسرة · ${fmtNum(totals.openLeads)} مفتوحة`
+              : `${fmtNum(totals.won)} won · ${fmtNum(totals.lost)} lost · ${fmtNum(totals.openLeads)} open`
+          }
           icon={<Users size={17} />}
           hero
         />
         <ProfileMetric
-          label={lang === "ar" ? "اتحوّلت Won" : "Converted to Won"}
+          label={lang === "ar" ? "اتحوّلت لصفقة رابحة" : "Converted to won"}
           value={fmtNum(totals.won)}
           sub={`${fmtPct(totals.conversionRate, 1)} ${lang === "ar" ? "من كل الليدز" : "of all leads"} · ${fmtPct(totals.decidedConversionRate, 1)} ${lang === "ar" ? "من المحسوم" : "of decided"}`}
           icon={<Trophy size={17} />}
@@ -1371,7 +1430,7 @@ function CourseLeadTotals({ profile }: { profile: AgentRow["courseProfile"] }) {
         <ProfileMetric
           label={lang === "ar" ? "في كورسات بيبيعها" : "In courses he sells"}
           value={fmtNum(soldTotals.leads)}
-          sub={`${fmtPct(share(soldTotals.leads), 1)} ${lang === "ar" ? "من ليدزه" : "of his leads"} · ${fmtNum(soldTotals.won)} Won · ${fmtPct(soldTotals.conversionRate, 1)}`}
+          sub={`${fmtPct(share(soldTotals.leads), 1)} ${lang === "ar" ? "من ليدزه" : "of his leads"} · ${fmtNum(soldTotals.won)} ${lang === "ar" ? "رابحة" : "won"} · ${fmtPct(soldTotals.conversionRate, 1)}`}
           icon={<ChartNoAxesCombined size={17} />}
         />
         <ProfileMetric
@@ -1422,7 +1481,9 @@ function UnsoldCoursesNotice({ profile }: { profile: AgentRow["courseProfile"] }
       <ul className="mt-2 space-y-1">
         {courses.slice(0, 6).map((course) => (
           <li key={course.key} className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
-            <b className="text-text">{displayDimension(course.label, lang)}</b>
+            <b className="text-text" title={dimensionNote(course.label, lang)}>
+              {displayDimension(course.label, lang)}
+            </b>
             <span className="num text-text-muted">
               {fmtNum(course.leads)} {lang === "ar" ? "ليد" : "leads"} ·{" "}
               {fmtNum(course.won + course.lost)} {lang === "ar" ? "محسومة" : "decided"} ·{" "}
@@ -1453,7 +1514,9 @@ function SpecializationCard({
     <article className="bg-surface p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-semibold text-text">{displayDimension(item.label, lang)}</h4>
+          <h4 className="font-semibold text-text" title={dimensionNote(item.label, lang)}>
+            {displayDimension(item.label, lang)}
+          </h4>
           <p className="mt-0.5 text-[11px] text-text-muted">
             {fmtPct(item.leadShare, 1)} {lang === "ar" ? "من ليدز الموظف" : "of employee leads"}
           </p>
@@ -1464,7 +1527,10 @@ function SpecializationCard({
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
         <MiniMetric label={lang === "ar" ? "الليدز" : "Leads"} value={fmtNum(item.leads)} />
-        <MiniMetric label="Won / Lost" value={`${fmtNum(item.won)} / ${fmtNum(item.lost)}`} />
+        <MiniMetric
+          label={lang === "ar" ? "رابحة / خاسرة" : "Won / Lost"}
+          value={`${fmtNum(item.won)} / ${fmtNum(item.lost)}`}
+        />
         <MiniMetric label={lang === "ar" ? "المبيعات" : "Sales"} value={fmtUSDFull(item.paidRevenue)} />
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -1516,8 +1582,39 @@ function invoiceCount(count: number, lang: "ar" | "en"): string {
   return `${fmtNum(count)} فاتورة`;
 }
 
+/**
+ * Two labels on this screen look like the same thing and are not.
+ *
+ * `Other` is a real course code, transcribed from the workbook's own `Courses`
+ * tab: the lead or the invoice carries `Other` in its category column in Odoo.
+ * `Uncategorized` is ours — it means the row arrived with that column blank.
+ * The taxonomy deliberately keeps an unrecognised course under its own name
+ * rather than sweeping it into `Other`, so the two never blur together.
+ *
+ * Both get an Arabic label, because a manager reading a card called `Other`
+ * reasonably assumes the dashboard failed to classify something. `DIMENSION_NOTE`
+ * carries that distinction to the tooltips.
+ */
+const OTHER_COURSE = "Other";
+
 function displayDimension(value: string, lang: "ar" | "en") {
-  return value === "Uncategorized" && lang === "ar" ? "غير مصنف" : value;
+  if (lang !== "ar") return value;
+  if (value === "Uncategorized") return "غير مصنف";
+  if (value === OTHER_COURSE) return "أخرى";
+  return value;
+}
+
+/** Hover text for the two labels above, so neither reads as a dashboard bug. */
+function dimensionNote(value: string, lang: "ar" | "en"): string | undefined {
+  if (value === OTHER_COURSE)
+    return lang === "ar"
+      ? "«أخرى» تصنيف حقيقي موجود في أودو نفسه — الليد أو الفاتورة متسجّلة على تصنيف اسمه Other في المصدر. مش معناها إن الداشبورد معرفش يصنّفها."
+      : "“Other” is a real category in Odoo itself — the lead or invoice is filed under a category named Other at source. It does not mean the dashboard failed to classify it.";
+  if (value === "Uncategorized")
+    return lang === "ar"
+      ? "الصف ده جه من أودو وخانة التصنيف فيه فاضية، فمحطّهناش على كورس بالتخمين."
+      : "This row arrived from Odoo with its category column empty, so it was not guessed onto a course.";
+  return undefined;
 }
 
 function monthEnd(month: string): string {
@@ -1536,10 +1633,19 @@ export function monthLabel(month: string, lang: "ar" | "en"): string {
   }).format(new Date(Date.UTC(year, rawMonth - 1, 1)));
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+/**
+ * `hint` explains the label on hover rather than in a popover.
+ *
+ * These sit inside the employee card, which is itself one big `<button>`. The
+ * info popover used in the drawer renders a button of its own, and a button
+ * inside a button is invalid markup that React will not hydrate cleanly — so
+ * the short version lives in the title here, and the full breakdown lives on
+ * the matching metric inside the drawer.
+ */
+function MiniMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">
-      <div className="truncate text-[10px] text-text-muted" title={label}>
+      <div className="truncate text-[10px] text-text-muted" title={hint ? `${label} — ${hint}` : label}>
         {label}
       </div>
       <div className="num mt-1 truncate text-sm font-semibold text-text" title={value}>
@@ -1553,16 +1659,21 @@ function ProgressMetric({
   label,
   value,
   color,
+  hint,
 }: {
   label: string;
   value: number | null;
   color: string;
+  /** Hover explanation. See the note on `MiniMetric` for why not a popover. */
+  hint?: string;
 }) {
   const safe = value === null ? 0 : Math.max(0, Math.min(100, value));
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
-        <span className="text-text-muted">{label}</span>
+        <span className="text-text-muted" title={hint ? `${label} — ${hint}` : undefined}>
+          {label}
+        </span>
         <span className="num font-semibold text-text">{fmtPct(value, 1)}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">

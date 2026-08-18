@@ -190,8 +190,8 @@ function Overview() {
                 </strong>
                 <span>
                   {lang === "ar"
-                    ? `${fmtNum(T.lostArchived)} من Lost Analysis فقط${T.archivedWon > 0 ? `، و${fmtNum(T.archivedWon)} مؤرشف Won داخل الإجمالي وليس Lost` : ""}.`
-                    : `${fmtNum(T.lostArchived)} from Lost Analysis only${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows in total leads, not Lost` : ""}.`}
+                    ? `${fmtNum(T.lostArchived)} من Lost Analysis فقط${T.archivedWon > 0 ? `، و${fmtNum(T.archivedWon)} مؤرشف Won محسوب صفقة رابحة داخل الإجمالي وليس Lost` : ""}.`
+                    : `${fmtNum(T.lostArchived)} from Lost Analysis only${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows counted as wins in total leads, not Lost` : ""}.`}
                 </span>
               </div>
             )}
@@ -258,7 +258,7 @@ function Overview() {
       {T.lostArchived > 0 && (
         <Notice tone="info" icon={<Info size={16} />}>
           {lang === "ar"
-            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
+            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز وفي الصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
             : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
         </Notice>
       )}

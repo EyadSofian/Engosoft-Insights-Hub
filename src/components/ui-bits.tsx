@@ -150,6 +150,7 @@ export function KpiCard({
   icon,
   index = 0,
   subWrap = false,
+  info,
 }: {
   label: string;
   value: ReactNode;
@@ -161,6 +162,8 @@ export function KpiCard({
   index?: number;
   /** Allow explanatory KPI source text to wrap instead of silently truncating. */
   subWrap?: boolean;
+  /** Optional "where does this number come from?" control, shown by the label. */
+  info?: ReactNode;
 }) {
   return (
     <div
@@ -178,8 +181,11 @@ export function KpiCard({
       }
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="min-h-7 text-[10.5px] sm:min-h-0 sm:text-[11px] font-medium uppercase tracking-wide text-text-muted leading-snug line-clamp-2 sm:block sm:truncate">
-          {label}
+        <span className="inline-flex min-w-0 items-center gap-1">
+          <span className="min-h-7 text-[10.5px] sm:min-h-0 sm:text-[11px] font-medium uppercase tracking-wide text-text-muted leading-snug line-clamp-2 sm:block sm:truncate">
+            {label}
+          </span>
+          {info}
         </span>
         {icon && (
           <span className="text-text-subtle shrink-0" style={hero ? { color: "var(--accent-ink)" } : undefined}>

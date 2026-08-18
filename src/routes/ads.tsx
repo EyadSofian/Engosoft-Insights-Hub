@@ -329,7 +329,7 @@ function Ads() {
                     note={spendNote}
                     sub={
                       lang === "ar"
-                        ? `الأساس: ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات المكسوبة"}`
+                        ? `الأساس: ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}`
                         : `Basis: ${filters.cpaBasis === "invoices" ? "invoice count" : "won deals"}`
                     }
                   />
@@ -597,7 +597,7 @@ function PlatformState({
         icon={<Info size={16} />}
       >
         {lang === "ar"
-          ? `اللي متاح دلوقتي هو ${fmtNum(coverage.crmLeads)} عميل محتمل جايين من الـCRM، منهم ${fmtNum(coverage.won)} صفقة مكسوبة و${fmtNum(coverage.lost)} ضايعة، وتحصيل ${fmtUSD(coverage.revenue)}. مفيش تبويب إعلانات للمنصة دي، فتكلفة العميل وتكلفة الصفقة والعائد ونسبة الإنفاق للإيراد كلها بتظهر شرطة — إحنا مش بنفترض إنفاق مش موجود.`
+          ? `اللي متاح دلوقتي هو ${fmtNum(coverage.crmLeads)} عميل محتمل جايين من الـCRM، منهم ${fmtNum(coverage.won)} صفقة رابحة و${fmtNum(coverage.lost)} ضايعة، وتحصيل ${fmtUSD(coverage.revenue)}. مفيش تبويب إعلانات للمنصة دي، فتكلفة العميل وتكلفة الصفقة والعائد ونسبة الإنفاق للإيراد كلها بتظهر شرطة — إحنا مش بنفترض إنفاق مش موجود.`
           : `What exists today is ${fmtNum(coverage.crmLeads)} CRM leads, of which ${fmtNum(coverage.won)} won and ${fmtNum(coverage.lost)} lost, plus ${fmtUSD(coverage.revenue)} collected. There is no ad tab for this platform, so CPL, CPA, ROAS and ACOS all render as a dash — no spend is assumed that the source does not have.`}
       </Notice>
     );

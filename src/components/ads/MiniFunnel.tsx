@@ -76,7 +76,7 @@ export function MiniFunnel({
       <div className="grid grid-cols-2 gap-2 pt-0.5">
         <Outcome
           metric="won"
-          label={lang === "ar" ? "مكسوبة" : "Won"}
+          label={lang === "ar" ? "رابحة" : "Won"}
           count={won}
           rate={conversionRate}
           color="var(--success)"

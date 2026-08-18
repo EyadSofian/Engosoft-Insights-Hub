@@ -49,7 +49,7 @@ const CARD_SORTS: Record<CardSortKey, { ar: string; en: string; value: (r: PerfR
   revenue: { ar: "الإيراد", en: "Revenue", value: (r) => r.revenue },
   roas: { ar: "العائد", en: "ROAS", value: (r) => sortRatio(r.roas, r.spend) },
   crmLeads: { ar: "عملاء النظام", en: "CRM leads", value: (r) => r.crmLeads },
-  won: { ar: "الصفقات المكسوبة", en: "Won", value: (r) => r.won },
+  won: { ar: "الصفقات الرابحة", en: "Won", value: (r) => r.won },
   cpl: { ar: "تكلفة العميل", en: "CPL", value: (r) => sortRatio(r.cpl, r.spend) },
 };
 

@@ -17,7 +17,9 @@ export type EmployeeMetricKey =
   | "paidCollections"
   | "totalLeads"
   | "conversionAll"
-  | "conversionDecided"
+  | "periodClosureRate"
+  | "periodClosures"
+  | "cohortWon"
   | "bestSelling"
   | "leastSelling"
   | "bestConverting"
@@ -51,6 +53,17 @@ const ORDER_WINDOW_AR = "بتاريخ أمر البيع. يعني اللي ات�
 const ORDER_WINDOW_EN = "Sale order date — what was sold inside the window.";
 const LEAD_WINDOW_AR = "بتاريخ إنشاء الليد. يعني الليدز اللي دخلت له في الفترة دي.";
 const LEAD_WINDOW_EN = "Lead creation date — leads that arrived inside the window.";
+/**
+ * The third window on this screen, and the one nobody expects.
+ *
+ * "إغلاق" هنا محسوب بتاريخ قفل الليد نفسه، مش بتاريخ دخوله. الليد ممكن يكون
+ * داخل من شهرين ويتقفل النهاردة، فيتحسب في إغلاقات الشهر ده ومش موجود في ليدز
+ * الشهر ده — وده سبب إن الرقمين اللي جنب بعض مش بيطلعوا من نفس المجموعة.
+ */
+const CLOSE_WINDOW_AR =
+  "بتاريخ قفل الليد (يوم ما اتحسم رابح أو خاسر) — مش بتاريخ دخوله. فليد داخل من شهرين واتقفل في الفترة دي بيتحسب هنا، وليد داخل في الفترة ولسه مفتوح مش بيتحسب.";
+const CLOSE_WINDOW_EN =
+  "Lead close date — the day it was settled won or lost, not the day it arrived. A lead created two months ago and closed inside this window counts here; a lead created inside the window and still open does not.";
 
 export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinition> = {
   target: {
@@ -151,7 +164,7 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
       label: "إجمالي الليدز",
       formula: "عدد الليدز اللي دخلت له",
       what: "كام ليد اتوزّع عليه في الفترة.",
-      how: "بنعد ليدز الـCRM النشطة + الأرشيف الخاسر، بعد استبعاد المراحل اللي مش ليدز تجارية.",
+      how: "بنعد ليدز الـCRM النشطة + الأرشيف (اللي فيه الخاسر واللي اتكسب واتأرشف)، بعد استبعاد المراحل اللي مش ليدز تجارية.",
       source: "Odoo CRM والأرشيف الخاسر.",
       dateBasis: LEAD_WINDOW_AR,
       whenEmpty: "صفر يعني مفيش ليدز دخلت له في الفترة.",
@@ -160,7 +173,7 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
       label: "Total leads",
       formula: "Count of leads routed to him",
       what: "How many leads he received in the window.",
-      how: "Active CRM leads plus the lost archive, after excluding stages that are not commercial leads.",
+      how: "Active CRM leads plus the archive — which holds both losses and deals won then filed away — after excluding stages that are not commercial leads.",
       source: "Odoo CRM and the lost archive.",
       dateBasis: LEAD_WINDOW_EN,
       whenEmpty: "Zero means no leads reached him in the window.",
@@ -171,10 +184,10 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
     key: "conversionAll",
     ar: {
       label: "تحويل كل الليدز",
-      formula: "Won ÷ كل الليدز × ١٠٠",
-      what: "من كل ١٠٠ ليد دخلت له، كام واحد قفل Won.",
-      how: "البسط: عدد اللي بقى Won. المقام: كل الليدز اللي دخلت له، بما فيها اللي لسه شغّال عليها.",
-      source: "Odoo CRM.",
+      formula: "الليدز الرابحة ÷ كل الليدز × ١٠٠",
+      what: "من كل ١٠٠ ليد دخلت له، كام واحد منهم كسبه.",
+      how: "البسط: عدد الليدز اللي بقت رابحة. المقام: كل الليدز اللي دخلت له، بما فيها اللي لسه شغّال عليها.",
+      source: "Odoo CRM والأرشيف.",
       dateBasis: LEAD_WINDOW_AR + " عشان كده الرقم بيبقى واطي في نص الشهر: أغلب الليدز لسه مفتوحة.",
       whenEmpty: "شرطة لو مفيش ليدز خالص.",
     },
@@ -189,25 +202,82 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
     },
   },
 
-  conversionDecided: {
-    key: "conversionDecided",
+  periodClosureRate: {
+    key: "periodClosureRate",
     ar: {
-      label: "تحويل الحالات المحسومة",
-      formula: "Won ÷ (Won + Lost) × ١٠٠",
-      what: "من الليدز اللي خلصت فعلاً، كام منها كسبها.",
-      how: "الليدز اللي لسه مفتوحة مش داخلة في الحساب أصلاً — لا في البسط ولا في المقام.",
-      source: "Odoo CRM والأرشيف الخاسر.",
-      dateBasis: LEAD_WINDOW_AR,
-      whenEmpty: "شرطة لو مفيش ولا ليد اتحسمت لسه.",
+      label: "نسبة الإغلاق في الفترة",
+      formula: "الصفقات الرابحة ÷ (الرابحة + الخاسرة) × ١٠٠ — من اللي اتقفل في الفترة",
+      what: "من الصفقات اللي قفلها فعلاً في الفترة دي، كام واحدة منها كسبها.",
+      how: "بنعد الصفقات اللي اتحسمت في الفترة: الرابحة على (الرابحة + الخاسرة). الليدز اللي لسه مفتوحة مش داخلة في الحساب لا في البسط ولا في المقام.",
+      source: "Odoo CRM (تاريخ القفل) والأرشيف.",
+      // The single most-asked question on this screen, answered in the field
+      // that answers it: the two numbers sitting beside each other are two
+      // different populations, not one number computed twice.
+      dateBasis:
+        CLOSE_WINDOW_AR +
+        " عشان كده الرقم ده مش هيساوي «الليدز الرابحة ÷ إجمالي الليدز» اللي فوقه: ده بيتكلم عن اللي اتقفل في الفترة، واللي فوقه بيتكلم عن اللي دخل في الفترة.",
+      whenEmpty: "شرطة لو مقفلش ولا صفقة في الفترة دي — لا رابحة ولا خاسرة.",
     },
     en: {
-      label: "Decided conversion",
-      formula: "Won ÷ (Won + Lost) × 100",
-      what: "Of the leads that have actually finished, how many he won.",
-      how: "Leads still open are excluded from both sides of the fraction.",
-      source: "Odoo CRM and the lost archive.",
-      dateBasis: LEAD_WINDOW_EN,
-      whenEmpty: "A dash until at least one lead has been decided.",
+      label: "Period closure rate",
+      formula: "Won ÷ (Won + Lost) × 100 — of what closed inside the window",
+      what: "Of the deals he actually closed in this window, how many he won.",
+      how: "Deals settled inside the window are counted: won over (won + lost). Leads still open are on neither side of the fraction.",
+      source: "Odoo CRM (close date) and the archive.",
+      dateBasis:
+        CLOSE_WINDOW_EN +
+        " That is why this will not equal the lead conversion above it: this one is about what closed in the window, that one about what arrived in it.",
+      whenEmpty: "A dash when nothing closed at all in this window, won or lost.",
+    },
+  },
+
+  periodClosures: {
+    key: "periodClosures",
+    ar: {
+      label: "إغلاقات تمت في الفترة",
+      formula: "عدد الصفقات اللي اتقفلت في الفترة",
+      what: "كام صفقة حسمها في الفترة دي — رابحة كانت أو خاسرة.",
+      how: "عدّ مباشر للصفقات اللي تاريخ قفلها واقع في الفترة. الصفقة اللي اتقفلت رابحة واتأرشفت بعدها لسه بتتحسب رابحة، لأن الأرشيف مكان الصفقة المقفولة مش مرادف للخسارة.",
+      source: "Odoo CRM (تاريخ القفل) والأرشيف.",
+      dateBasis: CLOSE_WINDOW_AR,
+      whenEmpty: "صفر يعني مقفلش أي صفقة في الفترة، مش إنه مشتغلش.",
+    },
+    en: {
+      label: "Closures in period",
+      formula: "Count of deals closed inside the window",
+      what: "How many deals he settled in this window, won or lost.",
+      how: "A straight count of deals whose close date falls inside the window. A deal closed won and then archived still counts as won — the archive is where closed deals live, not a synonym for lost.",
+      source: "Odoo CRM (close date) and the archive.",
+      dateBasis: CLOSE_WINDOW_EN,
+      whenEmpty: "Zero means nothing closed in the window, not that he did no work.",
+    },
+  },
+
+  cohortWon: {
+    key: "cohortWon",
+    ar: {
+      label: "الليدز الرابحة من ليدز الفترة",
+      formula: "عدد الليدز اللي دخلت في الفترة وبقت رابحة",
+      what: "من الليدز اللي اتوزّعت عليه في الفترة دي، كام واحد منها كسبه.",
+      how: "بنعد الليدز اللي اتعملت في الفترة وحالتها دلوقتي رابحة. الليد اللي كسبه واتأرشف بعدها لسه بيتحسب رابح.",
+      source: "Odoo CRM والأرشيف.",
+      // Named against its neighbour on purpose: this is the number that gets
+      // confused with the closure count sitting two cards away.
+      dateBasis:
+        LEAD_WINDOW_AR +
+        " دي مجموعة تانية غير «إغلاقات تمت في الفترة»: دي بتتبع الليد من يوم ما دخل، والتانية بتتبعه من يوم ما اتقفل.",
+      whenEmpty: "صفر يعني مفيش ليد من ليدز الفترة دي اتكسب لسه — وده طبيعي في نص الشهر.",
+    },
+    en: {
+      label: "Won from this window's leads",
+      formula: "Count of leads created in the window that are now won",
+      what: "Of the leads routed to him in this window, how many he has won.",
+      how: "Leads created inside the window whose current state is won. A lead he won and that was then archived still counts as won.",
+      source: "Odoo CRM and the archive.",
+      dateBasis:
+        LEAD_WINDOW_EN +
+        " This is a different population from closures in the window: this one follows the lead from the day it arrived, that one from the day it closed.",
+      whenEmpty: "Zero means none of this window's leads has been won yet — normal mid-month.",
     },
   },
 
@@ -239,7 +309,7 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
       label: "أقل مبيعات",
       formula: "أقل كورس في الفلوس المحصَّلة",
       what: "أضعف كورس من ناحية الفلوس، من بين الكورسات اللي باع فيها فعلاً.",
-      how: "الكورس اللي مباعش فيه ولا مرة مش داخل المقارنة أصلاً — مش منطقي نقارن كورس بصفر بكورس شغّال.",
+      how: "الكورس اللي مباعش فيه ولا قفل فيه صفقة رابحة مش داخل المقارنة أصلاً — مش منطقي نقارن كورس بصفر بكورس شغّال. لو ظهر هنا كورس بـ$0، ده كورس قفل فيه صفقة لسه فاتورتها مجتش: الفلوس بتتحسب بتاريخ الدفع.",
       source: "سطور الفواتير المدفوعة.",
       dateBasis: PAYMENT_WINDOW_AR,
       whenEmpty: "شرطة لو باع في كورس واحد بس — ساعتها هو الأفضل والأقل في نفس الوقت.",
@@ -248,7 +318,7 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
       label: "Lowest sales",
       formula: "Lowest collected course",
       what: "His weakest course by money, among the ones he actually sold.",
-      how: "A course he never sold is not in the comparison — comparing a zero against a working course says nothing.",
+      how: "A course he never sold and never won is not in the comparison — comparing a zero against a working course says nothing. A $0 here is a course he won but has not been paid for yet: collections are dated by payment.",
       source: "Paid invoice lines.",
       dateBasis: PAYMENT_WINDOW_EN,
       whenEmpty: "A dash when he sold only one course — it would be both best and worst.",
@@ -259,13 +329,13 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
     key: "bestConverting",
     ar: {
       label: "أفضل تحويل",
-      formula: "أعلى (Won ÷ ليدز الكورس)",
+      formula: "أعلى (الليدز الرابحة ÷ ليدز الكورس)",
       what: "الكورس اللي بيقفل فيه أحسن من غيره.",
-      how: "بنقارن الكورسات اللي بيبيعها بس، وبشرطين: ١٠ ليدز على الأقل، وفيه Won حقيقي واحد على الأقل. من غير الشرط التاني كان ممكن كورس تحويله صفر يطلع «الأفضل».",
+      how: "بنقارن الكورسات اللي بيبيعها بس، وبشرطين: ١٠ ليدز على الأقل، وفيه صفقة رابحة حقيقية واحدة على الأقل. من غير الشرط التاني كان ممكن كورس تحويله صفر يطلع «الأفضل».",
       source: "ليدز Odoo CRM.",
       dateBasis: LEAD_WINDOW_AR,
       whenEmpty:
-        "شرطة لو لسه مفيش Won في أي كورس من ليدز الفترة، أو مفيش كورس وصل لـ١٠ ليدز. لاحظ إن السطر اللي تحته (الفواتير والفلوس) بتاريخ الدفع مش بتاريخ الليد — عشان كده ممكن تلاقي ٢ Won جنبهم ٧ فواتير: الفواتير دي فلوس دخلت الشهر ده من ليدز أقدم.",
+        "شرطة لو لسه مفيش ولا صفقة رابحة في أي كورس من ليدز الفترة، أو مفيش كورس وصل لـ١٠ ليدز. لاحظ إن السطر اللي تحته (الفواتير والفلوس) بتاريخ الدفع مش بتاريخ الليد — عشان كده ممكن تلاقي ٢ رابحة جنبهم ٧ فواتير: الفواتير دي فلوس دخلت الشهر ده من ليدز أقدم.",
     },
     en: {
       label: "Best conversion",
@@ -283,10 +353,10 @@ export const EMPLOYEE_METRICS: Record<EmployeeMetricKey, EmployeeMetricDefinitio
     key: "needsSupport",
     ar: {
       label: "يحتاج دعم",
-      formula: "أقل (Won ÷ ليدز الكورس)",
+      formula: "أقل (الليدز الرابحة ÷ ليدز الكورس)",
       what: "الكورس اللي بيضيّع فيه ليدز أكتر من غيره.",
-      how: "بنقارن الكورسات اللي بيبيعها بس، وبشرطين: ١٠ ليدز على الأقل، و٥ ليدز على الأقل اتحسمت (Won أو Lost). الليدز اللي لسه مفتوحة مش محسوبة ضده — لسه شغّال عليها.",
-      source: "ليدز Odoo CRM والأرشيف الخاسر.",
+      how: "بنقارن الكورسات اللي بيبيعها بس، وبشرطين: ١٠ ليدز على الأقل، و٥ ليدز على الأقل اتحسمت (رابحة أو خاسرة). الليدز اللي لسه مفتوحة مش محسوبة ضده — لسه شغّال عليها.",
+      source: "ليدز Odoo CRM والأرشيف.",
       dateBasis: LEAD_WINDOW_AR,
       whenEmpty:
         "شرطة لو لسه مفيش كورس اتحسم فيه ٥ ليدز — أقل من كده الرقم بيبقى صدفة مش نتيجة. وكورس مباعش فيه خالص عمره ما هيظهر هنا، لأن ده بيقول إن الليدز اتوزّعت غلط مش إن الموظف ضعيف.",
