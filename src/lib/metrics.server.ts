@@ -13,6 +13,7 @@ import {
   type Snapshot,
 } from "./sheet-cache.server";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
+import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
@@ -600,7 +601,7 @@ export function archivedLostReportingDate(
   return row.createdAt;
 }
 
-const isArchivedWon = (row: LostRow): boolean => row.stage.trim().toLowerCase() === "won";
+const isArchivedWon = (row: LostRow): boolean => isArchivedWonStage(row.stage);
 
 /**
  * The authoritative Lost population.
@@ -610,6 +611,14 @@ const isArchivedWon = (row: LostRow): boolean => row.stage.trim().toLowerCase() 
  */
 export function authoritativeLostLeads(data: FilteredData): LostRow[] {
   return archivedCrmLeads(data).filter((row) => !isArchivedWon(row));
+}
+
+/**
+ * Does this archived row count as a win? See `archived-won.ts` for the rule and
+ * for the campaign that exposed its absence.
+ */
+export function archivedWinCounter(data: FilteredData): (row: LostRow) => boolean {
+  return archivedWinFilter(data.crm);
 }
 
 /* --- totals ---------------------------------------------------------------- */
@@ -665,7 +674,7 @@ export function computeTotals(data: FilteredData): Totals {
   const leadsFromCampaign =
     crm.filter((c) => c.fromCampaign).length +
     allArchived.filter((l) => !!l.campaignName || !!l.campaignId).length;
-  const won = crm.filter((c) => c.isWon).length;
+  const won = crm.filter((c) => c.isWon).length + allArchived.filter(archivedWinCounter(data)).length;
   const lostInCrm = 0;
   const lost = archived.length;
   // Close time stays on CRM rows: archived rows carry no closing date, and
@@ -895,13 +904,15 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
 
   // Lost counts and their denominators come exclusively from the authoritative
   // archived population. CRM stage text never increments this counter.
+  const archivedWin = archivedWinCounter(data);
   for (const l of archivedCrmLeads(data)) {
     const dimension = dimensions.fromFact(l, grain);
     if (!dimension.key || (grain === "campaign" && !l.campaignKey)) continue;
     if (grain !== "campaign" && !l.adName && !l.adId) continue;
     const b = touch(dimension);
     b.crmLeads++;
-    if (!isArchivedWon(l)) b.lost++;
+    if (archivedWin(l)) b.won++;
+    else if (!isArchivedWon(l)) b.lost++;
     if (!b.course && l.course) b.course = l.course;
   }
 
@@ -1548,9 +1559,12 @@ export function dailyTrend(
     e.leads++;
     if (c.isWon) e.won++;
   }
+  const archivedWinOnDay = archivedWinCounter(data);
   for (const l of archivedCrmLeads(data)) {
     const date = archivedLostReportingDate(l, data.snapshot);
-    if (date) at(date).leads++;
+    if (!date) continue;
+    at(date).leads++;
+    if (archivedWinOnDay(l)) at(date).won++;
   }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
@@ -1663,11 +1677,13 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     }
   }
 
+  const archivedWinForCourse = archivedWinCounter(data);
   for (const l of archivedCrmLeads(data)) {
     if (!l.course) continue;
     const a = get(l.course, l.mainCategory);
     a.crmLeads++;
-    if (!isArchivedWon(l)) a.lost++;
+    if (archivedWinForCourse(l)) a.won++;
+    else if (!isArchivedWon(l)) a.lost++;
   }
 
   // Ad/ad-set/campaign names are more precise than campaign-level lead inference.
@@ -1782,11 +1798,15 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
   }
 
+  const archivedWinForTeam = archivedWinCounter(data);
   for (const l of archivedCrmLeads(data)) {
     const teamName = l.salesTeam || "—";
     const t = getTeam(teamName);
+    const win = archivedWinForTeam(l);
+    const loss = !isArchivedWon(l);
     t.agg.crmLeads++;
-    if (!isArchivedWon(l)) t.agg.lost++;
+    if (win) t.agg.won++;
+    else if (loss) t.agg.lost++;
     const person = l.salesperson || "—";
     let p = t.people.get(person);
     if (!p) {
@@ -1794,7 +1814,8 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
       t.people.set(person, p);
     }
     p.agg.crmLeads++;
-    if (!isArchivedWon(l)) p.agg.lost++;
+    if (win) p.agg.won++;
+    else if (loss) p.agg.lost++;
   }
 
   // Paid accounting rows carry salesperson/team and are the authoritative
@@ -1964,6 +1985,7 @@ export function computeLeadOrigin(data: FilteredData): {
   // Archived lost leads belong to a cohort too, otherwise this card reports a
   // near-zero lost count while the Lost page reports hundreds.
   const archived = archivedCrmLeads(data);
+  const archivedWin = archivedWinCounter(data);
   const build = (
     key: "campaign" | "other",
     rows: CrmLeadRow[],
@@ -1972,7 +1994,7 @@ export function computeLeadOrigin(data: FilteredData): {
   ): OriginCohort => {
     const { avg, sample } = closeStats(rows);
     const leads = rows.length + archivedRows.length;
-    const won = rows.filter((r) => r.isWon).length;
+    const won = rows.filter((r) => r.isWon).length + archivedRows.filter(archivedWin).length;
     const lost = archivedRows.filter((row) => !isArchivedWon(row)).length;
     return {
       key,
@@ -2259,11 +2281,11 @@ export function execSummary(
   if (t.lostArchived > 0) {
     const wonNoteEn =
       t.archivedWon > 0
-        ? ` ${t.archivedWon} archived rows are still marked Won in Odoo and are counted as leads but not as losses.`
+        ? ` ${t.archivedWon} archived rows are still marked Won in Odoo: they count as leads and as wins, never as losses.`
         : "";
     const wonNoteAr =
       t.archivedWon > 0
-        ? ` وهناك ${t.archivedWon} صفاً مؤرشفاً ما زالت حالته Won في أودو، فيُحتسب ضمن العملاء ولا يُحتسب ضياعاً.`
+        ? ` وهناك ${t.archivedWon} صفاً مؤرشفاً ما زالت حالته Won في أودو، فيُحتسب ضمن العملاء وضمن الصفقات الرابحة، ولا يُحتسب ضياعاً.`
         : "";
     en.push(
       `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.${wonNoteEn}`,

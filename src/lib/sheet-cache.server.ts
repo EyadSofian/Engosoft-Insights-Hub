@@ -29,6 +29,7 @@ import {
   isKnownCourse,
   mainCategoryForCourse,
 } from "./course-taxonomy";
+import { isArchivedWonStage } from "./archived-won";
 import {
   databaseConfigured,
   readDashboardDataset,
@@ -1794,7 +1795,10 @@ export async function loadAllData(force = false): Promise<Snapshot> {
           cleanedStage,
           lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
           callingReply: str(r["Calling reply?"]),
-          isWon: cleanedStage.toLowerCase() === "won",
+          // Not `=== "won"`: that relies on the `Cleaned Stage` helper column
+          // being present, and the raw Odoo stage is `Won / ربح`. A workbook
+          // shipped without that column would silently zero every win.
+          isWon: isArchivedWonStage(cleanedStage),
           isLost: cleanedStage.toLowerCase() === "lost",
           source,
           sourceKey: normalizeSource(source),

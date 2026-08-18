@@ -2,6 +2,7 @@ import type { GlobalFilters, TeamAgg } from "./types";
 import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
 import { normalizePersonName } from "./person-name.ts";
+import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import {
   MIN_DECIDED_OUTCOMES,
   MIN_INSIGHT_LEADS,
@@ -579,15 +580,17 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
   }
 
   const seenArchived = new Set<string>();
+  // An archived row still marked Won is a deal he won and then filed away, so
+  // it is a win here. Calling it "open" left it in his lead count forever
+  // without ever crediting the close, which is how a course could show two paid
+  // invoices beside zero wins.
+  const archivedWin = archivedWinFilter(data.crm);
   for (const lead of data.lost) {
     const id = lead.id || `${lead.salesperson}|${lead.createdAt}|${lead.contact}`;
     if (seenArchived.has(id)) continue;
     seenArchived.add(id);
-    addLeadToProfile(
-      mutable,
-      lead,
-      lead.stage.trim().toLocaleLowerCase("en") === "won" ? "open" : "lost",
-    );
+    if (archivedWin(lead)) addLeadToProfile(mutable, lead, "won");
+    else if (!isArchivedWonStage(lead.stage)) addLeadToProfile(mutable, lead, "lost");
   }
   for (const invoice of data.accounting) addSaleToProfile(mutable, invoice);
 
@@ -818,6 +821,7 @@ function mergeOperationalClosures(
     return true;
   };
 
+  const countedWonIds = new Set<string>();
   for (const lead of data.snapshot.crm) {
     if (!lead.isWon || !dateIncluded(lead.closedAt, filters) || !commonMatch(lead)) continue;
     if (
@@ -831,17 +835,25 @@ function mergeOperationalClosures(
     const row = map.get(key) ?? blank(key, lead.salesperson);
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
     row.slaWon += 1;
+    if (lead.id) countedWonIds.add(lead.id);
     map.set(key, row);
   }
 
+  // The archive is not a synonym for Lost. A deal won in Odoo gets archived
+  // like any other closed record and keeps `stage = Won`; counting the whole
+  // archive as losses booked his own wins against him and pulled the period
+  // closure rate down with them.
   for (const lead of data.snapshot.lost) {
     if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
     if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
     const key = normalizePersonName(lead.salesperson);
     if (!key) continue;
+    const won = isArchivedWonStage(lead.stage);
+    if (won && lead.id && countedWonIds.has(lead.id)) continue;
     const row = map.get(key) ?? blank(key, lead.salesperson);
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
-    row.slaLost += 1;
+    if (won) row.slaWon += 1;
+    else row.slaLost += 1;
     map.set(key, row);
   }
 }
