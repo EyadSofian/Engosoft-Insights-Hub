@@ -1,7 +1,6 @@
 import {
   BarChart3,
   CalendarRange,
-  ChartNoAxesCombined,
   GraduationCap,
   Globe2,
   LayoutDashboard,
@@ -82,10 +81,10 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     icon: Receipt,
     defaultTo: "/accounting",
     aliases: ["/full-invoiced"],
-    items: [
-      { to: "/sales", key: "sales", icon: ChartNoAxesCombined },
-      { to: "/accounting", key: "accounting", icon: Receipt },
-    ],
+    // The sales-funnel report is hidden, not deleted: `/sales` still exists and
+    // redirects into Accounting. Listing it here is the only switch that brings
+    // it back into the sidebar and the section tabs.
+    items: [{ to: "/accounting", key: "accounting", icon: Receipt }],
   },
   {
     id: "website",

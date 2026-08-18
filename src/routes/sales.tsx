@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   BadgeDollarSign,
   FileCheck2,
@@ -29,7 +29,23 @@ import { fmtNum, fmtPct, fmtRoas, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { Platform } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
-export const Route = createFileRoute("/sales")({ component: SalesReport });
+/**
+ * Hidden report.
+ *
+ * Off the sidebar and off the section tabs, and an old bookmark or a pasted
+ * link lands in Accounting rather than here — hidden everywhere, not just in
+ * the menu, which is what "hide the page" has to mean for a report whose
+ * numbers are still being reconciled.
+ *
+ * Nothing below is deleted. Dropping this `beforeLoad` and relisting `/sales`
+ * in `navigation.ts` is the entire cost of bringing the report back.
+ */
+export const Route = createFileRoute("/sales")({
+  beforeLoad: () => {
+    throw redirect({ to: "/accounting", replace: true });
+  },
+  component: SalesReport,
+});
 
 interface SalesAttributionRow {
   key: string;
