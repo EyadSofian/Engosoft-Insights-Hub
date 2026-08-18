@@ -1594,6 +1594,18 @@ function invoiceCount(count: number, lang: "ar" | "en"): string {
  * Both get an Arabic label, because a manager reading a card called `Other`
  * reasonably assumes the dashboard failed to classify something. `DIMENSION_NOTE`
  * carries that distinction to the tooltips.
+ *
+ * `Other` is a lead-side value only. In the live workbook 348 of 18,405 CRM
+ * leads carry it, 346 of them with no campaign at all and most arriving through
+ * Website, UChat or Chatwoot — a lead that started a conversation without ever
+ * naming a course. The accounting side has no such category: `Other` appears in
+ * no product, no product category and no revenue line. So a course card under
+ * `Other` shows $0 by construction, and the tooltip has to say so, because the
+ * first thing it was read as was "paid invoices with no course name".
+ *
+ * Money genuinely detached from a course is a different bucket — the taxonomy's
+ * `Unattributed` — and it is real: $19,084.83 across 245 paid lines, being
+ * certificates, website sales, private engagements, deliveries and returns.
  */
 const OTHER_COURSE = "Other";
 
@@ -1608,8 +1620,8 @@ function displayDimension(value: string, lang: "ar" | "en") {
 function dimensionNote(value: string, lang: "ar" | "en"): string | undefined {
   if (value === OTHER_COURSE)
     return lang === "ar"
-      ? "«أخرى» تصنيف حقيقي موجود في أودو نفسه — الليد أو الفاتورة متسجّلة على تصنيف اسمه Other في المصدر. مش معناها إن الداشبورد معرفش يصنّفها."
-      : "“Other” is a real category in Odoo itself — the lead or invoice is filed under a category named Other at source. It does not mean the dashboard failed to classify it.";
+      ? "«أخرى» تصنيف بيتحط على الليد في أودو نفسه، مش عجز من الداشبورد — بياخده الليد اللي بيدخل من الشات أو الموقع من غير ما يقول عايز كورس إيه. جانب الفواتير مفيهوش تصنيف اسمه Other أصلاً، عشان كده الكارت ده بيفضل $0: الفلوس بتتكتب لما الليد يتحوّل لكورس حقيقي."
+      : "“Other” is a category Odoo records on the lead, not a gap in the dashboard — it is what a lead gets when it arrives from chat or the website without naming a course. No invoice ever carries it, which is why this card sits at $0: revenue is booked once the lead converts onto a real course.";
   if (value === "Uncategorized")
     return lang === "ar"
       ? "الصف ده جه من أودو وخانة التصنيف فيه فاضية، فمحطّهناش على كورس بالتخمين."
