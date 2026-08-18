@@ -80,6 +80,38 @@ export interface RankableCourse {
 export const isSoldCourse = (course: RankableCourse): boolean =>
   course.paidRevenue !== 0 || course.invoices > 0 || course.won > 0;
 
+/**
+ * Buckets that are not a course, keyed as `dimensionFor` normalises them.
+ *
+ * `other` is Odoo's own lead-side category — the value a lead gets when it
+ * arrives from chat or the website without ever naming a course. `uncategorized`
+ * is ours, for a row whose column was blank. `unattributed` is the taxonomy's
+ * bucket for paid lines that belong to no course at all: certificates, website
+ * sales, deliveries, refunds.
+ */
+const NON_COURSE_KEYS = new Set(["other", "uncategorized", "unattributed"]);
+
+/**
+ * Can a manager act on this course being the employee's best or worst?
+ *
+ * The four summary cards are a coaching instrument: each one names a course and
+ * implies "do more of this" or "sit with him on this". `Other` cannot carry
+ * either instruction. It is not a subject he can be trained on or a product he
+ * can be told to sell — it is the absence of a subject, recorded on the lead
+ * before anyone knew what the customer wanted.
+ *
+ * Ranking on it produced cards a manager could not read: "أقل مبيعات: أخرى $0"
+ * says the employee's weakest course is the one nobody ever chose. The bucket
+ * is still real and still his — it stays in the table, in the totals and in a
+ * line of its own under the cards — but it is reported, not ranked.
+ *
+ * Applied to the ranking population only. Excluding these rows from the totals
+ * as well would make the employee's course table stop reconciling with his own
+ * lead count, which is a worse lie than the one being fixed.
+ */
+export const isCoachableCourse = (course: RankableCourse): boolean =>
+  !NON_COURSE_KEYS.has(course.key.trim().toLocaleLowerCase("en"));
+
 export type BestReason = "" | "no_book" | "no_sample" | "no_win_yet";
 export type SupportReason = "" | "no_book" | "no_sample" | "too_few_decided";
 

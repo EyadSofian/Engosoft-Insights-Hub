@@ -6,6 +6,7 @@ import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import {
   MIN_DECIDED_OUTCOMES,
   MIN_INSIGHT_LEADS,
+  isCoachableCourse,
   isSoldCourse,
   rankCourseInsights,
   type BestReason,
@@ -117,6 +118,20 @@ export interface TargetCoverage {
   duplicates: string[];
 }
 
+/**
+ * One paid invoice behind a course figure, so the number on screen can be
+ * checked against Odoo without leaving the page. Keyed by move number: a single
+ * invoice can carry several lines of the same course, and they are one invoice.
+ */
+export interface AgentCourseInvoice {
+  /** Odoo move number, for example `INVNT/2026/001819`. */
+  movement: string;
+  paymentDate: string;
+  partner: string;
+  /** Sum of every line of this course on this invoice. */
+  usdPaid: number;
+}
+
 export interface AgentCoursePerformance {
   key: string;
   label: string;
@@ -132,6 +147,8 @@ export interface AgentCoursePerformance {
   conversionRate: number | null;
   decidedConversionRate: number | null;
   sampleStatus: "reliable" | "insufficient";
+  /** The invoices this course's revenue is made of, newest payment first. */
+  invoiceList: AgentCourseInvoice[];
 }
 
 export interface AgentSpecializationPerformance {
@@ -184,6 +201,13 @@ export interface AgentCourseProfile {
   unsoldTotals: AgentCourseTotals;
   /** Those same courses, largest cohort first, for the routing callout. */
   unsoldCourses: AgentCoursePerformance[];
+  /**
+   * Leads and money filed under a bucket that names no course — `Other` from
+   * Odoo, `Uncategorized` from a blank column, `Unattributed` from a paid line
+   * that is not a course. Held out of the four cards, reported under them.
+   */
+  nonCourseRows: AgentCoursePerformance[];
+  nonCourseTotals: AgentCourseTotals;
   /** Why the strength card is empty — small cohort, or no win landed yet. */
   bestReason: BestReason;
   /** Why the weakness card is empty — small cohort, or still being worked. */
@@ -324,7 +348,8 @@ interface MutableDimension {
   won: number;
   lost: number;
   paidRevenue: number;
-  invoiceRefs: Set<string>;
+  /** Move number → the invoice, so repeated lines collapse into one entry. */
+  invoiceRefs: Map<string, AgentCourseInvoice>;
 }
 
 interface MutableAgentProfile {
@@ -375,6 +400,8 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
   totals: blankTotals(),
   soldTotals: blankTotals(),
   unsoldTotals: blankTotals(),
+  nonCourseRows: [],
+  nonCourseTotals: blankTotals(),
   unsoldCourses: [],
   bestReason: "no_book",
   needsSupportReason: "no_book",
@@ -471,7 +498,7 @@ function dimensionFor(
       won: 0,
       lost: 0,
       paidRevenue: 0,
-      invoiceRefs: new Set(),
+      invoiceRefs: new Map(),
     };
     map.set(key, row);
   }
@@ -512,6 +539,8 @@ function addSaleToProfile(
     usdPaid: number;
     movement: string;
     isCreditNote: boolean;
+    paymentDate: string;
+    partner: string;
   },
 ) {
   const profile = profileFor(profiles, source.salesperson);
@@ -524,7 +553,19 @@ function addSaleToProfile(
   const specialization = dimensionFor(profile.specializations, category, category);
   for (const row of [course, specialization]) {
     row.paidRevenue += source.usdPaid;
-    if (source.movement && !source.isCreditNote) row.invoiceRefs.add(source.movement);
+    if (!source.movement || source.isCreditNote) continue;
+    // Several lines of one course can share a move number. They are one
+    // invoice with one total, which is what `invoices` has always counted and
+    // what a manager will look for in Odoo.
+    const seen = row.invoiceRefs.get(source.movement);
+    if (seen) seen.usdPaid += source.usdPaid;
+    else
+      row.invoiceRefs.set(source.movement, {
+        movement: source.movement,
+        paymentDate: source.paymentDate,
+        partner: source.partner,
+        usdPaid: source.usdPaid,
+      });
   }
 }
 
@@ -548,6 +589,11 @@ function finishDimension(
     openLeads: Math.max(0, source.leads - decided),
     paidRevenue: source.paidRevenue,
     invoices: source.invoiceRefs.size,
+    invoiceList: [...source.invoiceRefs.values()].sort(
+      (left, right) =>
+        right.paymentDate.localeCompare(left.paymentDate) ||
+        left.movement.localeCompare(right.movement),
+    ),
     leadShare: totalLeads > 0 ? (source.leads / totalLeads) * 100 : 0,
     salesShare:
       positiveRevenue > 0 && source.paidRevenue > 0
@@ -617,7 +663,11 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
           specializationRevenue,
           lostDataAvailable,
         );
-        const { mainCategory: _mainCategory, ...specialization } = finished;
+        const {
+          mainCategory: _mainCategory,
+          invoiceList: _invoiceList,
+          ...specialization
+        } = finished;
         return specialization;
       })
       .sort(
@@ -629,8 +679,15 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
 
     // One population behind all four summary cards. `courses` is already sorted
     // by revenue, so the head of the book is the best seller.
-    const sellingCourses = courses.filter(isSoldCourse);
-    const unsoldCourses = courses
+    //
+    // `Other` and the other non-course buckets are held out of the ranking
+    // entirely: a card naming one of them tells a manager to coach an employee
+    // on the absence of a subject. They keep their row in the table and their
+    // weight in the totals, and are reported on their own line instead.
+    const rankableCourses = courses.filter(isCoachableCourse);
+    const nonCourseRows = courses.filter((row) => !isCoachableCourse(row));
+    const sellingCourses = rankableCourses.filter(isSoldCourse);
+    const unsoldCourses = rankableCourses
       .filter((row) => !isSoldCourse(row))
       .sort((left, right) => right.leads - left.leads || left.label.localeCompare(right.label));
     const bestSellingCourse = sellingCourses[0] ?? null;
@@ -645,7 +702,7 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       needsSupport: needsSupportCourse,
       bestReason,
       needsSupportReason,
-    } = rankCourseInsights(courses);
+    } = rankCourseInsights(rankableCourses);
 
     profiles.set(personKey, {
       courses,
@@ -658,6 +715,8 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       soldTotals: totalsOf(sellingCourses),
       unsoldTotals: totalsOf(unsoldCourses),
       unsoldCourses,
+      nonCourseRows,
+      nonCourseTotals: totalsOf(nonCourseRows),
       bestReason,
       needsSupportReason,
       minimumLeadSample: MINIMUM_LEAD_SAMPLE,

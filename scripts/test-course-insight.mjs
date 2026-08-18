@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   MIN_DECIDED_OUTCOMES,
+  isCoachableCourse,
   isSoldCourse,
   rankCourseInsights,
 } from "../src/lib/course-insight.ts";
@@ -145,5 +146,50 @@ assert.deepEqual(rankCourseInsights([]), {
   bestReason: "no_book",
   needsSupportReason: "no_book",
 });
+
+/* --- buckets that name no course are reported, never ranked ---------------- */
+{
+  // Whole keys only. A real course must never be dropped for containing one.
+  assert.equal(isCoachableCourse(course("other", 2, 14, 37)), false);
+  assert.equal(isCoachableCourse(course("uncategorized", 1, 3, 9)), false);
+  assert.equal(isCoachableCourse(course("unattributed", 0, 0, 0, 19_084.83, 245)), false);
+  assert.equal(isCoachableCourse(course("cfm", 1, 5, 6, 2_040.67, 1)), true);
+  assert.equal(isCoachableCourse(course("other-engineering", 3, 4, 20)), true);
+  assert.equal(isCoachableCourse(course("mother", 3, 4, 20)), true);
+}
+
+{
+  // Asmaa Fathy, August 2026, read off the screen that prompted this: "أقل
+  // مبيعات: أخرى $0" and "يحتاج دعم: أخرى 5.4% — 16 محسومة من 37 ليد". `Other`
+  // is what a lead gets when it arrives from chat or the website without ever
+  // naming a course, so both cards were telling a manager to coach an employee
+  // on the absence of a subject.
+  const profile = [
+    course("other", 2, 14, 37, 0, 0),
+    course("mech", 2, 6, 13, 807.86, 4),
+    course("cfm", 1, 5, 6, 2_040.67, 1),
+  ];
+
+  // Unranked, the screen is reproduced exactly: Other takes the weakness card.
+  assert.equal(rankCourseInsights(profile).needsSupport?.key, "other");
+
+  // `Other` also passed for a course he "sells" — it carries wins — which is
+  // how a $0 bucket reached the lowest-sales card.
+  assert.ok(profile.filter(isSoldCourse).some((row) => row.key === "other"));
+
+  const ranked = profile.filter(isCoachableCourse);
+  assert.deepEqual(
+    ranked.map((row) => row.key),
+    ["mech", "cfm"],
+  );
+  assert.ok(!ranked.filter(isSoldCourse).some((row) => row.key === "other"));
+
+  // With it held out, the weakness card names no course rather than a false
+  // one: Mech is his only sized course, and a course cannot be his best and
+  // his worst at once.
+  const { best, needsSupport } = rankCourseInsights(ranked);
+  assert.equal(best?.key, "mech");
+  assert.equal(needsSupport, null);
+}
 
 console.log("course insight tests passed.");

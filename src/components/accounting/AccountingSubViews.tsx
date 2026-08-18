@@ -19,6 +19,7 @@ import {
   Trophy,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import { DonutChart, HBarChart, MultiLineChart } from "@/components/charts";
 import {
@@ -955,7 +956,14 @@ function AgentPerformanceSheet({
 }) {
   const { lang } = useI18n();
   const [courseMetric, setCourseMetric] = useState<"revenue" | "invoices" | "leads">("revenue");
-  useEffect(() => setCourseMetric("revenue"), [row?.key]);
+  const [invoiceCourse, setInvoiceCourse] = useState<AgentCoursePerformance | null>(null);
+  useEffect(() => {
+    setCourseMetric("revenue");
+    // Closing the sheet with the dialog open leaves it open. Without this it
+    // reopens on the next employee, showing one person's invoices under
+    // another person's name.
+    setInvoiceCourse(null);
+  }, [row?.key]);
   if (!row) return null;
 
   const { courseProfile } = row;
@@ -1112,6 +1120,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<TrendingUp size={18} />}
                 eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
+                onOpenInvoices={setInvoiceCourse}
                 explain="bestSelling"
                 course={courseProfile.bestSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
@@ -1129,6 +1138,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<TrendingDown size={18} />}
                 eyebrow={lang === "ar" ? "أقل مبيعات" : "Lowest sales"}
+                onOpenInvoices={setInvoiceCourse}
                 explain="leastSelling"
                 course={courseProfile.leastSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
@@ -1153,6 +1163,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<Sparkles size={18} />}
                 eyebrow={lang === "ar" ? "أفضل تحويل" : "Best conversion"}
+                onOpenInvoices={setInvoiceCourse}
                 explain="bestConverting"
                 course={courseProfile.bestConvertingCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
@@ -1183,6 +1194,7 @@ function AgentPerformanceSheet({
               <CourseInsight
                 icon={<Layers3 size={18} />}
                 eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
+                onOpenInvoices={setInvoiceCourse}
                 explain="needsSupport"
                 course={courseProfile.needsSupportCourse}
                 value={(course) => fmtPct(course.conversionRate, 1)}
@@ -1209,6 +1221,7 @@ function AgentPerformanceSheet({
                 }
               />
             </div>
+            <NonCourseLine profile={courseProfile} />
           </section>
 
           <CourseLeadTotals profile={courseProfile} />
@@ -1318,11 +1331,26 @@ function AgentPerformanceSheet({
                 <tbody>
                   {courseProfile.courses.map((course) => (
                     <tr key={course.key} className="border-t border-border hover:bg-surface-2/70">
-                      <td
-                        className="px-3 py-3 font-semibold text-text"
-                        title={dimensionNote(course.label, lang)}
-                      >
-                        {displayDimension(course.label, lang)}
+                      <td className="px-3 py-3 font-semibold text-text">
+                        {/* The course name is the handle for its invoices. A
+                            revenue figure with no way to reach the move numbers
+                            behind it cannot be checked against Odoo. */}
+                        <button
+                          type="button"
+                          onClick={() => setInvoiceCourse(course)}
+                          title={dimensionNote(course.label, lang)}
+                          className="inline-flex items-center gap-1.5 rounded text-start underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        >
+                          {displayDimension(course.label, lang)}
+                          <ReceiptText
+                            size={13}
+                            className="shrink-0 text-text-muted"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">
+                            {lang === "ar" ? "اعرض فواتير الكورس" : "Show this course's invoices"}
+                          </span>
+                        </button>
                       </td>
                       <td className="px-3 py-3 text-text-muted">
                         {displayDimension(course.mainCategory, lang)}
@@ -1394,10 +1422,17 @@ function AgentPerformanceSheet({
 
           <Notice tone="info" icon={<Info size={16} />}>
             {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
-              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
+              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس، والتصنيفات اللي مش كورس زي «أخرى» مستبعدة من الترتيب ومعروضة في سطر تحت الكروت؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
+              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold, and non-course buckets such as "Other" are held out of the ranking and reported on a line under the cards; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
           </Notice>
         </div>
+        {invoiceCourse && (
+          <CourseInvoicesDialog
+            course={invoiceCourse}
+            agent={row.name}
+            onClose={() => setInvoiceCourse(null)}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );
@@ -1446,6 +1481,7 @@ function CourseInsight({
   tone,
   empty,
   explain,
+  onOpenInvoices,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -1463,6 +1499,8 @@ function CourseInsight({
   empty?: string;
   /** Shows the "where does this number come from?" popover next to the eyebrow. */
   explain?: EmployeeMetricKey;
+  /** Opens the card's course invoice by invoice. Omitted, the name is plain text. */
+  onOpenInvoices?: (course: AgentCoursePerformance) => void;
 }) {
   const { lang } = useI18n();
   const styles = {
@@ -1480,12 +1518,27 @@ function CourseInsight({
       </div>
       {course ? (
         <>
-          <div
-            className="mt-3 truncate text-base font-bold text-text"
-            title={dimensionNote(course.label, lang) ?? course.label}
-          >
-            {displayDimension(course.label, lang)}
-          </div>
+          {onOpenInvoices ? (
+            <button
+              type="button"
+              onClick={() => onOpenInvoices(course)}
+              title={dimensionNote(course.label, lang) ?? course.label}
+              className="mt-3 flex w-full items-center gap-1.5 text-start text-base font-bold text-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <span className="truncate">{displayDimension(course.label, lang)}</span>
+              <ReceiptText size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
+              <span className="sr-only">
+                {lang === "ar" ? "اعرض فواتير الكورس" : "Show this course's invoices"}
+              </span>
+            </button>
+          ) : (
+            <div
+              className="mt-3 truncate text-base font-bold text-text"
+              title={dimensionNote(course.label, lang) ?? course.label}
+            >
+              {displayDimension(course.label, lang)}
+            </div>
+          )}
           <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
           <div className="mt-1 text-[11px] text-text-muted">{sub(course)}</div>
           {foot && (
@@ -1622,6 +1675,174 @@ function UnsoldCoursesNotice({ profile }: { profile: AgentRow["courseProfile"] }
         </p>
       )}
     </Notice>
+  );
+}
+
+/**
+ * The leads that never named a course, on their own line under the four cards.
+ *
+ * `Other` used to compete for a card, and it won one: "أقل مبيعات: أخرى $0".
+ * A manager cannot act on that — it names no subject to coach and no product to
+ * push, because the value is recorded before anyone knows what the customer
+ * wants. It is held out of the ranking now.
+ *
+ * Held out is not hidden. The leads are real, they are his, and they convert at
+ * a fraction of the rest, so they are stated here in one line with the number a
+ * manager would act on — where they came in from — rather than dropped.
+ */
+/**
+ * The invoices behind one course figure, by number.
+ *
+ * The table has always shown a course's revenue and an invoice count, and a
+ * manager checking either had nowhere to go: the count is not a receipt, and
+ * Odoo needs a move number to search on. This lists them — number, payment
+ * date, customer, amount — so the figure on the card can be verified line by
+ * line without leaving the page.
+ *
+ * A course with no invoices still opens: "$0 with 2 wons" and "$0 with nothing
+ * sold" are different situations and the empty state has to say which.
+ */
+function CourseInvoicesDialog({
+  course,
+  agent,
+  onClose,
+}: {
+  course: AgentCoursePerformance;
+  agent: string;
+  onClose: () => void;
+}) {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const invoices = course.invoiceList;
+  const listed = invoices.reduce((sum, invoice) => sum + invoice.usdPaid, 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[rgba(4,12,24,0.62)] p-4 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="agent-course-invoices-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-surface shadow-2xl"
+        onClick={(click) => click.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border p-5 sm:p-6">
+          <div className="min-w-0">
+            <Pill tone="brand">{ar ? "فواتير مدفوعة" : "Paid invoices"}</Pill>
+            <h3
+              id="agent-course-invoices-title"
+              className="mt-3 text-lg font-semibold text-text"
+              title={dimensionNote(course.label, lang)}
+            >
+              {displayDimension(course.label, lang)}
+            </h3>
+            <p className="mt-1 text-xs text-text-muted">{agent}</p>
+          </div>
+          <button
+            type="button"
+            autoFocus
+            onClick={onClose}
+            className="grid size-11 shrink-0 place-items-center rounded-full text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={ar ? "إغلاق" : "Close"}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto p-5 sm:p-6">
+          {invoices.length === 0 ? (
+            <div className="rounded-xl bg-surface-2 p-4 text-xs leading-relaxed text-text-muted">
+              {course.won > 0
+                ? ar
+                  ? `مفيش فاتورة مدفوعة على الكورس ده في الفترة، مع إن فيه ${fmtNum(course.won)} صفقة رابحة. التحصيل بيتحسب بتاريخ الدفع، فالفاتورة ممكن تكون لسه مجتش أو اتدفعت برّه الفترة.`
+                  : `No paid invoice for this course in the period, despite ${fmtNum(course.won)} won deals. Collections are dated by payment, so the invoice has either not landed yet or was paid outside the window.`
+                : ar
+                  ? "مفيش فاتورة ولا صفقة رابحة على الكورس ده في الفترة — ليدز بس."
+                  : "No invoice and no win on this course in the period — leads only."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                    <th className="px-3 py-2 text-start">{ar ? "رقم الفاتورة" : "Invoice no."}</th>
+                    <th className="px-3 py-2 text-start">{ar ? "تاريخ الدفع" : "Payment date"}</th>
+                    <th className="px-3 py-2 text-start">{ar ? "العميل" : "Customer"}</th>
+                    <th className="px-3 py-2 text-end">{ar ? "المبلغ" : "Amount"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.movement} className="border-t border-border">
+                      <td className="num px-3 py-2.5 font-semibold text-text">
+                        {invoice.movement}
+                      </td>
+                      <td className="num px-3 py-2.5 text-text-muted">
+                        {invoice.paymentDate || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-muted">{invoice.partner || "—"}</td>
+                      <td className="num px-3 py-2.5 text-end font-semibold text-text">
+                        {fmtUSDFull(invoice.usdPaid)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border p-5 text-xs text-text-muted sm:p-6">
+          <span>
+            {ar
+              ? `${fmtNum(invoices.length)} فاتورة · المجموع ${fmtUSDFull(listed)}`
+              : `${fmtNum(invoices.length)} invoices · ${fmtUSDFull(listed)} total`}
+          </span>
+          {/* The two can differ: a credit note is excluded from the list but
+              still moves the course total, so saying nothing would look like an
+              arithmetic error. */}
+          {Math.abs(listed - course.paidRevenue) >= 0.01 && (
+            <span>
+              {ar
+                ? `إجمالي الكورس ${fmtUSDFull(course.paidRevenue)} — الفرق إشعارات دائن مش متعروضة هنا.`
+                : `Course total is ${fmtUSDFull(course.paidRevenue)} — the difference is credit notes, not listed here.`}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NonCourseLine({ profile }: { profile: AgentRow["courseProfile"] }) {
+  const { lang } = useI18n();
+  const rows = profile.nonCourseRows.filter((row) => row.leads > 0 || row.paidRevenue !== 0);
+  if (!rows.length) return null;
+  const { nonCourseTotals } = profile;
+  const names = rows
+    .map((row) => displayDimension(row.label, lang))
+    .join(lang === "ar" ? "، " : ", ");
+
+  return (
+    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border pt-3 text-[11px] leading-relaxed text-text-muted">
+      <Info size={13} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" />
+      <span>
+        {lang === "ar"
+          ? `وكمان ${fmtNum(nonCourseTotals.leads)} ليد تحت «${names}» مش داخلة في ترتيب الكروت الأربعة —`
+          : `Plus ${fmtNum(nonCourseTotals.leads)} leads under “${names}”, held out of the four cards above —`}
+      </span>
+      <span>
+        {lang === "ar"
+          ? "دي ليدز دخلت من غير ما تحدد كورس، فمينفعش تترتب كأنها كورس بيبيعه. موجودة بالكامل في جدول الكورسات تحت."
+          : "these arrived without naming a course, so they cannot be ranked as a course he sells. They are in the course table below in full."}
+      </span>
+      <span className="num font-semibold text-text">
+        {fmtNum(nonCourseTotals.won)} {lang === "ar" ? "رابحة" : "won"} ·{" "}
+        {fmtUSDFull(nonCourseTotals.paidRevenue)}
+      </span>
+    </p>
   );
 }
 
