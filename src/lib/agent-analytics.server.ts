@@ -11,18 +11,9 @@ import {
   type BestReason,
   type SupportReason,
 } from "./course-insight.ts";
-import {
-  targetMonths,
-  targetsByPerson,
-  windowTarget,
-  type TargetSource,
-} from "./sales-targets.ts";
+import { targetMonths, targetsByPerson, windowTarget, type TargetSource } from "./sales-targets.ts";
 import { loadTargetSource } from "./sales-targets.server";
-import {
-  getSlaSnapshot,
-  type SlaRepMonthly,
-  type SlaSalesSummary,
-} from "./sla.server";
+import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 
 export interface AgentAnalyticsRow {
   key: string;
@@ -295,12 +286,14 @@ function latestMetricMonth<T extends { month: string }>(
   rows: T[],
   hasMetric: (row: T) => boolean,
 ): string {
-  return rows
-    .filter(hasMetric)
-    .map((row) => monthKey(row.month))
-    .filter(Boolean)
-    .sort()
-    .at(-1) || "";
+  return (
+    rows
+      .filter(hasMetric)
+      .map((row) => monthKey(row.month))
+      .filter(Boolean)
+      .sort()
+      .at(-1) || ""
+  );
 }
 
 interface MutableAgent extends AgentAnalyticsRow {
@@ -542,9 +535,9 @@ function finishDimension(
   lostDataAvailable: boolean,
 ): AgentCoursePerformance {
   const decided = source.won + source.lost;
-  const mainCategory = [...source.categoryWeight.entries()].sort(
-    (left, right) => right[1] - left[1],
-  )[0]?.[0] || source.mainCategory;
+  const mainCategory =
+    [...source.categoryWeight.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ||
+    source.mainCategory;
   const base = {
     key: source.key,
     label: source.label,
@@ -563,9 +556,7 @@ function finishDimension(
     conversionRate: source.leads > 0 ? (source.won / source.leads) * 100 : null,
     decidedConversionRate: decided > 0 ? (source.won / decided) * 100 : null,
     sampleStatus:
-      lostDataAvailable &&
-      source.leads >= MINIMUM_LEAD_SAMPLE &&
-      decided >= MINIMUM_DECIDED_SAMPLE
+      lostDataAvailable && source.leads >= MINIMUM_LEAD_SAMPLE && decided >= MINIMUM_DECIDED_SAMPLE
         ? ("reliable" as const)
         : ("insufficient" as const),
   };
@@ -605,7 +596,8 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       .map((row) => finishDimension(row, totalLeads, positiveRevenue, lostDataAvailable))
       .sort(
         (left, right) =>
-          right.paidRevenue - left.paidRevenue || right.leads - left.leads ||
+          right.paidRevenue - left.paidRevenue ||
+          right.leads - left.leads ||
           left.label.localeCompare(right.label),
       );
 
@@ -630,7 +622,8 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
       })
       .sort(
         (left, right) =>
-          right.leads - left.leads || right.paidRevenue - left.paidRevenue ||
+          right.leads - left.leads ||
+          right.paidRevenue - left.paidRevenue ||
           left.label.localeCompare(right.label),
       );
 
@@ -644,8 +637,7 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
     const leastSellingCourse =
       sellingCourses.length > 1
         ? [...sellingCourses].sort(
-            (left, right) =>
-              left.paidRevenue - right.paidRevenue || left.invoices - right.invoices,
+            (left, right) => left.paidRevenue - right.paidRevenue || left.invoices - right.invoices,
           )[0]
         : null;
     const {
@@ -1043,8 +1035,7 @@ export async function buildAgentAnalytics(
   });
   if (slaStatus.ok) {
     slaStatus.callsAvailable = selectedAgents.some(
-      (row) =>
-        num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
+      (row) => num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
     );
     // Row count, not value. Testing for a non-zero total was the only signal
     // available while the report had no feed, but it reads a real reported zero
@@ -1064,8 +1055,7 @@ export async function buildAgentAnalytics(
         (row.outboundCalls ?? 0) > 0
           ? ((row.answeredCalls ?? 0) / (row.outboundCalls ?? 1)) * 100
           : null;
-      row.contactRate =
-        row.newLeads > 0 ? (row.contactedLeads / row.newLeads) * 100 : null;
+      row.contactRate = row.newLeads > 0 ? (row.contactedLeads / row.newLeads) * 100 : null;
       row.decidedConversionRate =
         row.slaWon + row.slaLost > 0 ? (row.slaWon / (row.slaWon + row.slaLost)) * 100 : null;
       row.avgFirstCallMinutes =
@@ -1118,8 +1108,10 @@ export async function buildAgentAnalytics(
       acc.lost += row.lost;
       acc.periodClosedWon += row.slaWon;
       acc.periodClosedLost += row.slaLost;
-      if (row.outboundCalls !== null) acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
-      if (row.answeredCalls !== null) acc.answeredCalls = (acc.answeredCalls ?? 0) + row.answeredCalls;
+      if (row.outboundCalls !== null)
+        acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
+      if (row.answeredCalls !== null)
+        acc.answeredCalls = (acc.answeredCalls ?? 0) + row.answeredCalls;
       return acc;
     },
     {
@@ -1138,8 +1130,7 @@ export async function buildAgentAnalytics(
       answerRate: null as number | null,
     },
   );
-  summary.conversionRate =
-    summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
+  summary.conversionRate = summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
   summary.decidedConversionRate =
     summary.periodClosedWon + summary.periodClosedLost > 0
       ? (summary.periodClosedWon / (summary.periodClosedWon + summary.periodClosedLost)) * 100

@@ -125,7 +125,9 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
         />
       </div>
       <Card>
-        <SectionTitle>{lang === "ar" ? "اتجاه التحصيل وعدد الفواتير" : "Collections and invoice trend"}</SectionTitle>
+        <SectionTitle>
+          {lang === "ar" ? "اتجاه التحصيل وعدد الفواتير" : "Collections and invoice trend"}
+        </SectionTitle>
         <MultiLineChart
           data={monthly.map((row) => ({
             date: `${row.month}-01`,
@@ -133,7 +135,11 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
             invoices: row.invoices,
           }))}
           series={[
-            { key: "revenue", name: lang === "ar" ? "التحصيل" : "Collections", color: "var(--chart-2)" },
+            {
+              key: "revenue",
+              name: lang === "ar" ? "التحصيل" : "Collections",
+              color: "var(--chart-2)",
+            },
             {
               key: "invoices",
               name: lang === "ar" ? "الفواتير" : "Invoices",
@@ -145,7 +151,9 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
         />
       </Card>
       <Card>
-        <SectionTitle>{lang === "ar" ? "مقارنة شهر بشهر" : "Month-by-month comparison"}</SectionTitle>
+        <SectionTitle>
+          {lang === "ar" ? "مقارنة شهر بشهر" : "Month-by-month comparison"}
+        </SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {monthly.map((row, index) => (
             <article
@@ -163,14 +171,14 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
                 </div>
                 <Pill
                   tone={
-                    row.growthPct === null
-                      ? "neutral"
-                      : row.growthPct >= 0
-                        ? "success"
-                        : "danger"
+                    row.growthPct === null ? "neutral" : row.growthPct >= 0 ? "success" : "danger"
                   }
                 >
-                  {index === 0 ? (lang === "ar" ? "بداية القياس" : "Baseline") : fmtPct(row.growthPct, 1)}
+                  {index === 0
+                    ? lang === "ar"
+                      ? "بداية القياس"
+                      : "Baseline"
+                    : fmtPct(row.growthPct, 1)}
                 </Pill>
               </div>
               <div className="num mt-4 text-2xl font-semibold text-text">
@@ -188,7 +196,8 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
               </div>
               {row.creditNotes > 0 && (
                 <div className="mt-2 rounded-xl bg-danger/8 px-3 py-2 text-xs text-danger">
-                  {lang === "ar" ? "إلغاءات الشهر" : "Month cancellations"}: {fmtNum(row.creditNotes)} · {fmtUSDExact(row.creditNoteUsd)}
+                  {lang === "ar" ? "إلغاءات الشهر" : "Month cancellations"}:{" "}
+                  {fmtNum(row.creditNotes)} · {fmtUSDExact(row.creditNoteUsd)}
                 </div>
               )}
             </article>
@@ -212,20 +221,26 @@ export function AccountingAgentsView() {
     if (data && !data.sla.callsAvailable && sortBy === "calls") setSortBy("revenue");
   }, [data, sortBy]);
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  if (isLoading || !data) return <><Skeleton className="h-28" /><Skeleton className="mt-4 h-96" /></>;
+  if (isLoading || !data)
+    return (
+      <>
+        <Skeleton className="h-28" />
+        <Skeleton className="mt-4 h-96" />
+      </>
+    );
 
   const filterMonth = filters.from?.slice(0, 7) || "";
   const selectedMonth =
-    filterMonth &&
-    filters.from === `${filterMonth}-01` &&
-    filters.to === monthEnd(filterMonth)
+    filterMonth && filters.from === `${filterMonth}-01` && filters.to === monthEnd(filterMonth)
       ? filterMonth
       : "";
   const normalizedSearch = search.trim().toLocaleLowerCase(lang === "ar" ? "ar" : "en");
   const visibleAgents = data.agents
     .filter((row) =>
       normalizedSearch
-        ? `${row.name} ${row.team}`.toLocaleLowerCase(lang === "ar" ? "ar" : "en").includes(normalizedSearch)
+        ? `${row.name} ${row.team}`
+            .toLocaleLowerCase(lang === "ar" ? "ar" : "en")
+            .includes(normalizedSearch)
         : true,
     )
     .sort((a, b) =>
@@ -253,14 +268,28 @@ export function AccountingAgentsView() {
           : `Collections use Odoo ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Leads and closures come from Odoo; Yeastar calls are stored in Railway PostgreSQL.`}
       </Notice>
       {!data.sla.ok && (
-        <Notice tone="warning" title={lang === "ar" ? "بيانات المكالمات غير متاحة مؤقتًا" : "Call data temporarily unavailable"}>
-          {data.sla.error || (lang === "ar" ? "تظهر مؤشرات الحسابات والعملاء فقط." : "Accounting and CRM metrics remain available.")}
+        <Notice
+          tone="warning"
+          title={
+            lang === "ar"
+              ? "بيانات المكالمات غير متاحة مؤقتًا"
+              : "Call data temporarily unavailable"
+          }
+        >
+          {data.sla.error ||
+            (lang === "ar"
+              ? "تظهر مؤشرات الحسابات والعملاء فقط."
+              : "Accounting and CRM metrics remain available.")}
         </Notice>
       )}
       {data.sla.ok && !data.sla.callsAvailable && (
         <Notice
           tone="warning"
-          title={lang === "ar" ? "مكالمات الفترة دي لسه ماوصلتش Railway" : "Calls have not reached Railway for this period"}
+          title={
+            lang === "ar"
+              ? "مكالمات الفترة دي لسه ماوصلتش Railway"
+              : "Calls have not reached Railway for this period"
+          }
         >
           {lang === "ar"
             ? `${data.sla.callsThrough ? `آخر مكالمات مكتملة عندنا: ${monthLabel(data.sla.callsThrough, lang)}. ` : ""}مش هنعرض صفر علشان ما نظلمش الموظفين؛ باقي أرقام Odoo شغالة عادي.`
@@ -313,7 +342,9 @@ export function AccountingAgentsView() {
           value={data.targets.totalTarget === null ? "—" : fmtUSDFull(data.targets.totalTarget)}
           sub={
             data.targets.totalTarget === null
-              ? lang === "ar" ? "لا يوجد تارجت منشور للفترة" : "No target published for this window"
+              ? lang === "ar"
+                ? "لا يوجد تارجت منشور للفترة"
+                : "No target published for this window"
               : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`
           }
           icon={<Target size={18} />}
@@ -344,7 +375,9 @@ export function AccountingAgentsView() {
           value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
           sub={
             data.summary.answeredCalls === null
-              ? lang === "ar" ? "غير متاحة للفترة" : "Unavailable for period"
+              ? lang === "ar"
+                ? "غير متاحة للفترة"
+                : "Unavailable for period"
               : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`
           }
           icon={<PhoneCall size={18} />}
@@ -362,9 +395,7 @@ export function AccountingAgentsView() {
               onChange={(event) => selectMonth(event.target.value)}
               className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
             >
-              <option value="">
-                {lang === "ar" ? "الفترة الحالية" : "Current date range"}
-              </option>
+              <option value="">{lang === "ar" ? "الفترة الحالية" : "Current date range"}</option>
               {[...data.months].reverse().map((month) => (
                 <option key={month} value={month}>
                   {monthLabel(month, lang)}
@@ -407,7 +438,9 @@ export function AccountingAgentsView() {
               ]}
             />
             <p className="mt-1.5 text-[10px] text-text-subtle">
-              {lang === "ar" ? "بيغيّر الترتيب وأهم رقم في الكارت، مش إجمالي الفترة." : "Changes card order and emphasis, not period totals."}
+              {lang === "ar"
+                ? "بيغيّر الترتيب وأهم رقم في الكارت، مش إجمالي الفترة."
+                : "Changes card order and emphasis, not period totals."}
             </p>
           </div>
 
@@ -653,32 +686,56 @@ function AgentCards({
                 </div>
               </div>
             </div>
-            <Pill tone={row.decidedConversionRate !== null && row.decidedConversionRate >= 10 ? "success" : "neutral"}>
-              {lang === "ar" ? "إغلاق الفترة" : "Period close"} {fmtPct(row.decidedConversionRate, 1)}
+            <Pill
+              tone={
+                row.decidedConversionRate !== null && row.decidedConversionRate >= 10
+                  ? "success"
+                  : "neutral"
+              }
+            >
+              {lang === "ar" ? "إغلاق الفترة" : "Period close"}{" "}
+              {fmtPct(row.decidedConversionRate, 1)}
             </Pill>
           </div>
 
           <div className="mt-4 rounded-2xl bg-surface-2 p-3">
             <div className="text-[11px] font-medium text-text-muted">
               {sortBy === "closing"
-                ? lang === "ar" ? "إغلاقات رابحة تمت في الفترة" : "Won closures in period"
+                ? lang === "ar"
+                  ? "إغلاقات رابحة تمت في الفترة"
+                  : "Won closures in period"
                 : sortBy === "calls"
-                  ? lang === "ar" ? "المكالمات الصادرة" : "Outbound calls"
-                  : lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+                  ? lang === "ar"
+                    ? "المكالمات الصادرة"
+                    : "Outbound calls"
+                  : lang === "ar"
+                    ? "التحصيل المدفوع"
+                    : "Paid collections"}
             </div>
             <div className="num mt-1 text-xl font-semibold text-text">
               {sortBy === "closing"
                 ? fmtNum(row.slaWon)
                 : sortBy === "calls"
-                  ? row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)
+                  ? row.outboundCalls === null
+                    ? "—"
+                    : fmtNum(row.outboundCalls)
                   : fmtUSDExact(row.paidRevenue)}
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-            <MiniMetric label={lang === "ar" ? "الفواتير" : "Invoices"} value={fmtNum(row.invoices)} />
-            <MiniMetric label={lang === "ar" ? "ليدز دخلت" : "New leads"} value={fmtNum(row.cleanLeads)} />
-            <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDExact(row.paidRevenue)} />
+            <MiniMetric
+              label={lang === "ar" ? "الفواتير" : "Invoices"}
+              value={fmtNum(row.invoices)}
+            />
+            <MiniMetric
+              label={lang === "ar" ? "ليدز دخلت" : "New leads"}
+              value={fmtNum(row.cleanLeads)}
+            />
+            <MiniMetric
+              label={lang === "ar" ? "التحصيل" : "Collections"}
+              value={fmtUSDExact(row.paidRevenue)}
+            />
             <MiniMetric
               label={lang === "ar" ? "إغلاقات رابحة" : "Won closures"}
               value={fmtNum(row.slaWon)}
@@ -699,7 +756,9 @@ function AgentCards({
             />
             <MiniMetric
               label={lang === "ar" ? "المكالمات" : "Calls"}
-              value={!callsAvailable || row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}
+              value={
+                !callsAvailable || row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)
+              }
             />
           </div>
 
@@ -739,7 +798,9 @@ function AgentCards({
             </span>
             <span>
               {lang === "ar" ? "تم الرد" : "Answered"}:{" "}
-              <b className="num text-text">{row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}</b>
+              <b className="num text-text">
+                {row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}
+              </b>
             </span>
           </div>
           <div className="mt-3 flex items-center justify-end gap-1 text-[11px] font-semibold text-brand">
@@ -757,7 +818,9 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
   return (
     <Card padded={false}>
       <div className="border-b border-border p-4 sm:p-5">
-        <SectionTitle className="mb-0">{lang === "ar" ? "كل الموظفين" : "All employees"}</SectionTitle>
+        <SectionTitle className="mb-0">
+          {lang === "ar" ? "كل الموظفين" : "All employees"}
+        </SectionTitle>
       </div>
       <div className="max-h-[680px] overflow-auto">
         <table className="w-full min-w-[1400px] text-sm">
@@ -781,7 +844,12 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 lang === "ar" ? "لم يتم التواصل" : "Uncontacted",
                 lang === "ar" ? "مبيعات SLA التشغيلية" : "SLA operational sales",
               ].map((label, index) => (
-                <th key={label} className={`px-3 py-2.5 ${index === 0 ? "text-start" : "text-end"}`}>{label}</th>
+                <th
+                  key={label}
+                  className={`px-3 py-2.5 ${index === 0 ? "text-start" : "text-end"}`}
+                >
+                  {label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -800,11 +868,18 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                   >
                     {row.name}
                   </button>
-                  <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted" title={row.team}>{row.team}</div>
+                  <div
+                    className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted"
+                    title={row.team}
+                  >
+                    {row.team}
+                  </div>
                 </td>
                 <td className="px-3 py-3 text-end">
                   <div className="num font-semibold">
-                    {row.target?.target === null || !row.target ? "—" : fmtUSDFull(row.target.target)}
+                    {row.target?.target === null || !row.target
+                      ? "—"
+                      : fmtUSDFull(row.target.target)}
                   </div>
                   <div className="mt-0.5 text-[10px] text-text-muted">
                     {!row.target
@@ -829,17 +904,35 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.won)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.lost)}</td>
-                <td className="px-3 py-3 text-end"><Pill tone={row.conversionRate !== null && row.conversionRate >= 10 ? "success" : "neutral"}>{fmtPct(row.conversionRate, 1)}</Pill></td>
-                <td className="num px-3 py-3 text-end">{fmtNum(row.slaWon)} / {fmtNum(row.slaLost)}</td>
-                <td className="num px-3 py-3 text-end">{row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}</td>
-                <td className="num px-3 py-3 text-end">{row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}</td>
+                <td className="px-3 py-3 text-end">
+                  <Pill
+                    tone={
+                      row.conversionRate !== null && row.conversionRate >= 10
+                        ? "success"
+                        : "neutral"
+                    }
+                  >
+                    {fmtPct(row.conversionRate, 1)}
+                  </Pill>
+                </td>
+                <td className="num px-3 py-3 text-end">
+                  {fmtNum(row.slaWon)} / {fmtNum(row.slaLost)}
+                </td>
+                <td className="num px-3 py-3 text-end">
+                  {row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}
+                </td>
+                <td className="num px-3 py-3 text-end">
+                  {row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}
+                </td>
                 <td className="num px-3 py-3 text-end">{fmtPct(row.answerRate, 1)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.uncontactedLeads)}</td>
                 <td className="num px-3 py-3 text-end">
                   {row.operationalSales === null
                     ? "—"
                     : row.operationalSales.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                  <span className="ms-1 text-[10px] text-text-muted">{lang === "ar" ? "عملة أودو" : "Odoo currency"}</span>
+                  <span className="ms-1 text-[10px] text-text-muted">
+                    {lang === "ar" ? "عملة أودو" : "Odoo currency"}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -923,7 +1016,9 @@ function AgentPerformanceSheet({
               </span>
               <span>{row.team}</span>
             </div>
-            <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">{row.name}</SheetTitle>
+            <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">
+              {row.name}
+            </SheetTitle>
             <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
               {lang === "ar"
                 ? "تفصيل التحصيل والليدز والتحويل حسب كل كورس وتخصص داخل الفترة والفلاتر المختارة."
@@ -977,7 +1072,11 @@ function AgentPerformanceSheet({
           {!courseProfile.lostDataAvailable && (
             <Notice
               tone="warning"
-              title={lang === "ar" ? "بيانات Lost غير مكتملة حاليًا" : "Lost data is currently incomplete"}
+              title={
+                lang === "ar"
+                  ? "بيانات Lost غير مكتملة حاليًا"
+                  : "Lost data is currently incomplete"
+              }
             >
               {lang === "ar"
                 ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
@@ -1016,7 +1115,9 @@ function AgentPerformanceSheet({
                 explain="bestSelling"
                 course={courseProfile.bestSellingCourse}
                 value={(course) => fmtUSDFull(course.paidRevenue)}
-                sub={(course) => `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`}
+                sub={(course) =>
+                  `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`
+                }
                 foot={cohortLine}
                 tone="success"
                 empty={
@@ -1205,7 +1306,10 @@ function AgentPerformanceSheet({
                       lang === "ar" ? "% المبيعات" : "Sales share",
                       lang === "ar" ? "حجم العينة" : "Sample",
                     ].map((label, index) => (
-                      <th key={`${label}-${index}`} className={`px-3 py-2.5 ${index < 2 ? "text-start" : "text-end"}`}>
+                      <th
+                        key={`${label}-${index}`}
+                        className={`px-3 py-2.5 ${index < 2 ? "text-start" : "text-end"}`}
+                      >
                         {label}
                       </th>
                     ))}
@@ -1220,21 +1324,35 @@ function AgentPerformanceSheet({
                       >
                         {displayDimension(course.label, lang)}
                       </td>
-                      <td className="px-3 py-3 text-text-muted">{displayDimension(course.mainCategory, lang)}</td>
+                      <td className="px-3 py-3 text-text-muted">
+                        {displayDimension(course.mainCategory, lang)}
+                      </td>
                       <td className="num px-3 py-3 text-end">{fmtNum(course.leads)}</td>
                       <td className="num px-3 py-3 text-end text-success">{fmtNum(course.won)}</td>
                       <td className="num px-3 py-3 text-end text-danger">{fmtNum(course.lost)}</td>
                       <td className="num px-3 py-3 text-end">{fmtNum(course.openLeads)}</td>
-                      <td className="px-3 py-3 text-end"><Pill tone={conversionTone(course)}>{fmtPct(course.conversionRate, 1)}</Pill></td>
-                      <td className="num px-3 py-3 text-end">{fmtPct(course.decidedConversionRate, 1)}</td>
+                      <td className="px-3 py-3 text-end">
+                        <Pill tone={conversionTone(course)}>
+                          {fmtPct(course.conversionRate, 1)}
+                        </Pill>
+                      </td>
+                      <td className="num px-3 py-3 text-end">
+                        {fmtPct(course.decidedConversionRate, 1)}
+                      </td>
                       <td className="num px-3 py-3 text-end">{fmtNum(course.invoices)}</td>
-                      <td className="num px-3 py-3 text-end font-semibold">{fmtUSDFull(course.paidRevenue)}</td>
+                      <td className="num px-3 py-3 text-end font-semibold">
+                        {fmtUSDFull(course.paidRevenue)}
+                      </td>
                       <td className="num px-3 py-3 text-end">{fmtPct(course.salesShare, 1)}</td>
                       <td className="px-3 py-3 text-end">
                         <Pill tone={course.sampleStatus === "reliable" ? "success" : "neutral"}>
                           {course.sampleStatus === "reliable"
-                            ? lang === "ar" ? "كافية" : "Reliable"
-                            : lang === "ar" ? "استرشادية" : "Directional"}
+                            ? lang === "ar"
+                              ? "كافية"
+                              : "Reliable"
+                            : lang === "ar"
+                              ? "استرشادية"
+                              : "Directional"}
                         </Pill>
                       </td>
                     </tr>
@@ -1254,7 +1372,9 @@ function AgentPerformanceSheet({
                     <td className="num px-3 py-3 text-end text-danger">{fmtNum(totals.lost)}</td>
                     <td className="num px-3 py-3 text-end">{fmtNum(totals.openLeads)}</td>
                     <td className="num px-3 py-3 text-end">{fmtPct(totals.conversionRate, 1)}</td>
-                    <td className="num px-3 py-3 text-end">{fmtPct(totals.decidedConversionRate, 1)}</td>
+                    <td className="num px-3 py-3 text-end">
+                      {fmtPct(totals.decidedConversionRate, 1)}
+                    </td>
                     <td className="num px-3 py-3 text-end">{fmtNum(totals.invoices)}</td>
                     <td className="num px-3 py-3 text-end">{fmtUSDFull(totals.paidRevenue)}</td>
                     {/* Shares are taken over positive revenue while this row is
@@ -1300,7 +1420,9 @@ function ProfileMetric({
   explain?: EmployeeMetricKey;
 }) {
   return (
-    <div className={`rounded-2xl border p-3.5 ${hero ? "border-brand/20 bg-brand-soft" : "border-border bg-surface"}`}>
+    <div
+      className={`rounded-2xl border p-3.5 ${hero ? "border-brand/20 bg-brand-soft" : "border-border bg-surface"}`}
+    >
       <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
         <span className="inline-flex items-center gap-1">
           {label}
@@ -1531,7 +1653,10 @@ function SpecializationCard({
           label={lang === "ar" ? "رابحة / خاسرة" : "Won / Lost"}
           value={`${fmtNum(item.won)} / ${fmtNum(item.lost)}`}
         />
-        <MiniMetric label={lang === "ar" ? "المبيعات" : "Sales"} value={fmtUSDFull(item.paidRevenue)} />
+        <MiniMetric
+          label={lang === "ar" ? "المبيعات" : "Sales"}
+          value={fmtUSDFull(item.paidRevenue)}
+        />
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div
@@ -1657,7 +1782,10 @@ export function monthLabel(month: string, lang: "ar" | "en"): string {
 function MiniMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">
-      <div className="truncate text-[10px] text-text-muted" title={hint ? `${label} — ${hint}` : label}>
+      <div
+        className="truncate text-[10px] text-text-muted"
+        title={hint ? `${label} — ${hint}` : label}
+      >
         {label}
       </div>
       <div className="num mt-1 truncate text-sm font-semibold text-text" title={value}>
@@ -1709,12 +1837,21 @@ export function AccountingProfitabilityView() {
   }, [data?.status, refetch]);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  if (isLoading || !data) return <><Skeleton className="h-28" /><Skeleton className="mt-4 h-96" /></>;
+  if (isLoading || !data)
+    return (
+      <>
+        <Skeleton className="h-28" />
+        <Skeleton className="mt-4 h-96" />
+      </>
+    );
   if (!data.snapshot) {
     return (
       <Card>
         <div className="flex flex-col items-center gap-3 py-10 text-center">
-          <RefreshCw className={data.status === "loading" ? "animate-spin text-brand" : "text-danger"} size={28} />
+          <RefreshCw
+            className={data.status === "loading" ? "animate-spin text-brand" : "text-danger"}
+            size={28}
+          />
           <div className="font-semibold text-text">
             {data.status === "loading"
               ? lang === "ar"
@@ -1730,7 +1867,10 @@ export function AccountingProfitabilityView() {
                 ? "التقرير ثقيل ويعمل في الخلفية؛ باقي الحسابات لا تتوقف. ستتم إعادة المحاولة تلقائيًا."
                 : "The report is heavy and runs in the background; the rest of Accounting remains responsive. Retrying automatically.")}
           </p>
-          <button onClick={() => refetch()} className="min-h-11 rounded-xl bg-brand px-4 text-sm font-semibold text-white">
+          <button
+            onClick={() => refetch()}
+            className="min-h-11 rounded-xl bg-brand px-4 text-sm font-semibold text-white"
+          >
             {lang === "ar" ? "إعادة المحاولة" : "Retry"}
           </button>
         </div>
@@ -1741,31 +1881,77 @@ export function AccountingProfitabilityView() {
   const p = data.snapshot;
   return (
     <div className="space-y-4">
-      <Notice tone="info" title={lang === "ar" ? "المصدر المحاسبي للربحية" : "Profitability authority"} icon={<Calculator size={16} />}>
+      <Notice
+        tone="info"
+        title={lang === "ar" ? "المصدر المحاسبي للربحية" : "Profitability authority"}
+        icon={<Calculator size={16} />}
+      >
         {lang === "ar"
           ? `تقرير Profit and Loss مباشر من Odoo 17 للشركات 2 و3 و4، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. الربح = الدخل − المصروفات.`
           : `Direct Odoo 17 Profit and Loss for companies 2, 3 and 4, posted entries only, ${p.from} → ${p.to}. Profit = income − expenses.`}
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard index={0} label={lang === "ar" ? "صافي الربح" : "Net profit"} value={localMoney(p.netProfit, p.currency)} hero />
-        <KpiCard index={1} label={lang === "ar" ? "الدخل" : "Income"} value={localMoney(p.income, p.currency)} />
-        <KpiCard index={2} label={lang === "ar" ? "المصروفات" : "Expenses"} value={localMoney(p.expenses, p.currency)} />
-        <KpiCard index={3} label={lang === "ar" ? "إجمالي الربح" : "Gross profit"} value={localMoney(p.grossProfit, p.currency)} />
+        <KpiCard
+          index={0}
+          label={lang === "ar" ? "صافي الربح" : "Net profit"}
+          value={localMoney(p.netProfit, p.currency)}
+          hero
+        />
+        <KpiCard
+          index={1}
+          label={lang === "ar" ? "الدخل" : "Income"}
+          value={localMoney(p.income, p.currency)}
+        />
+        <KpiCard
+          index={2}
+          label={lang === "ar" ? "المصروفات" : "Expenses"}
+          value={localMoney(p.expenses, p.currency)}
+        />
+        <KpiCard
+          index={3}
+          label={lang === "ar" ? "إجمالي الربح" : "Gross profit"}
+          value={localMoney(p.grossProfit, p.currency)}
+        />
       </div>
       <Card>
-        <SectionTitle action={<Pill tone={data.status === "refreshing" ? "warning" : "success"}>{data.status === "refreshing" ? (lang === "ar" ? "تحديث في الخلفية" : "Refreshing") : (lang === "ar" ? "مباشر من Odoo" : "Live from Odoo")}</Pill>}>
+        <SectionTitle
+          action={
+            <Pill tone={data.status === "refreshing" ? "warning" : "success"}>
+              {data.status === "refreshing"
+                ? lang === "ar"
+                  ? "تحديث في الخلفية"
+                  : "Refreshing"
+                : lang === "ar"
+                  ? "مباشر من Odoo"
+                  : "Live from Odoo"}
+            </Pill>
+          }
+        >
           {lang === "ar" ? "تفاصيل الربح والخسارة" : "Profit and Loss details"}
         </SectionTitle>
         <div className="divide-y divide-border">
           {p.lines.map((line) => (
-            <div key={line.id} className="flex items-center justify-between gap-4 py-2.5" style={{ paddingInlineStart: `${Math.min(line.level, 4) * 12}px` }}>
-              <span className={line.level <= 1 ? "font-semibold text-text" : "text-sm text-text-muted"}>{line.label}</span>
-              <span className="num whitespace-nowrap font-semibold text-text">{localMoney(line.value, p.currency)}</span>
+            <div
+              key={line.id}
+              className="flex items-center justify-between gap-4 py-2.5"
+              style={{ paddingInlineStart: `${Math.min(line.level, 4) * 12}px` }}
+            >
+              <span
+                className={line.level <= 1 ? "font-semibold text-text" : "text-sm text-text-muted"}
+              >
+                {line.label}
+              </span>
+              <span className="num whitespace-nowrap font-semibold text-text">
+                {localMoney(line.value, p.currency)}
+              </span>
             </div>
           ))}
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-text-muted">
-          <span className="inline-flex items-center gap-1"><Users size={13} />{p.companies.map((company) => company.name).join(" · ")}</span>
+          <span className="inline-flex items-center gap-1">
+            <Users size={13} />
+            {p.companies.map((company) => company.name).join(" · ")}
+          </span>
         </div>
       </Card>
     </div>
