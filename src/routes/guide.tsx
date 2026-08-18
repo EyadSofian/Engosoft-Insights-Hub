@@ -306,7 +306,9 @@ function GuideSection({
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold text-text">{title}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <Pill tone="neutral">{path}</Pill>
+              <Pill tone="neutral" wrap>
+                {path}
+              </Pill>
               {to && (
                 <Link to={to} className="text-xs font-semibold text-brand hover:underline">
                   {lang === "ar" ? "فتح التقرير" : "Open report"}

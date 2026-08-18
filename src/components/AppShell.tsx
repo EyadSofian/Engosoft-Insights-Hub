@@ -17,8 +17,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar />
         <SectionTabs />
-        {/* Bottom padding clears the mobile nav bar and its safe area. */}
-        <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 pb-24 lg:pb-8 max-w-[1600px] w-full mx-auto overflow-x-clip">
+        {/* Bottom padding clears the mobile nav bar and its safe area; the
+            inline padding also clears the notch when the phone is on its side. */}
+        <main className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] flex-1 py-4 sm:py-5 pb-[calc(var(--mobile-nav-h)+1.5rem)] lg:pb-8 max-w-[1600px] w-full mx-auto overflow-x-clip">
           {children}
         </main>
       </div>

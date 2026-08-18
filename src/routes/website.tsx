@@ -610,7 +610,10 @@ function Website() {
           <div
             role="tablist"
             aria-label={lang === "ar" ? "أقسام الموقع" : "Website sections"}
-            className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-surface-2/70 p-1.5"
+            /* Three Arabic labels cannot share 375px without each being cut to
+               an ellipsis, so on a phone the row scrolls with every label
+               intact and only becomes an equal 3-up grid once it fits. */
+            className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2/70 p-1.5 sm:grid sm:grid-cols-3"
           >
             {websiteTabs.map((tab) => {
               const active = websiteTab === tab.value;
@@ -621,7 +624,7 @@ function Website() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setWebsiteTab(tab.value)}
-                  className={`min-w-0 rounded-xl px-2.5 py-2.5 text-start transition-all sm:px-4 ${
+                  className={`shrink-0 rounded-xl px-3 py-2.5 text-start transition-all sm:min-w-0 sm:shrink sm:px-4 ${
                     active
                       ? "bg-surface text-brand shadow-sm ring-1 ring-brand/15"
                       : "text-text-muted hover:bg-surface/70 hover:text-text"
@@ -629,7 +632,7 @@ function Website() {
                 >
                   <span className="flex items-center justify-center gap-2 text-xs font-semibold sm:justify-start sm:text-sm">
                     {tab.icon}
-                    <span className="truncate">{tab.label}</span>
+                    <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
                   </span>
                   <span className="mt-1 hidden truncate text-[10.5px] text-text-muted sm:block">
                     {tab.hint}
@@ -1034,7 +1037,7 @@ function Website() {
                       {fmtNum(data.reconciliation.discrepancyOrders)} {copy.discrepancyOrders}
                     </Pill>
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-text-muted">
+                  <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 text-[11px] text-text-muted">
                     <div>
                       <div>{copy.odooOnlyOrders}</div>
                       <div className="num mt-0.5 font-semibold text-text">

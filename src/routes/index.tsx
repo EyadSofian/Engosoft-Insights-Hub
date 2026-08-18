@@ -477,7 +477,7 @@ function Overview() {
         {data.topLeaks.length === 0 ? (
           <EmptyState label={lang === "ar" ? "لا توجد حملات خاسرة في هذه الفترة" : "No loss-making campaigns in this period"} compact />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrap scroll-hint-x">
             <table className="w-full text-sm min-w-[520px]">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-text-muted">
@@ -522,7 +522,7 @@ function Overview() {
         >
           {t("account")}
         </SectionTitle>
-        <div className="overflow-x-auto">
+        <div className="table-wrap scroll-hint-x">
           <table className="w-full text-sm min-w-[420px]">
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-text-muted">

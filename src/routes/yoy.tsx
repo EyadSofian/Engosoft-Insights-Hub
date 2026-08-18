@@ -93,7 +93,7 @@ function Yoy() {
             >
               {lang === "ar" ? "تغطية البيانات" : "Data coverage"}
             </SectionTitle>
-            <div className="overflow-x-auto">
+            <div className="table-wrap scroll-hint-x">
               <table className="w-full text-sm min-w-[460px]">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-text-muted">
@@ -176,7 +176,7 @@ function Yoy() {
             {data.byCourse.length === 0 ? (
               <EmptyState label={t("no_data")} compact />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-wrap scroll-hint-x">
                 <table className="w-full text-sm min-w-[460px]">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wide text-text-muted">
@@ -240,7 +240,7 @@ function MonthTable({
           compact
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="table-wrap scroll-hint-x">
           <table className="w-full text-sm min-w-[420px]">
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-text-muted">

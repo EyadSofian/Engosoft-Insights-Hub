@@ -236,7 +236,7 @@ export function TargetEditor({
           )}
 
           {!loading && !!data && (
-            <div className="overflow-x-auto rounded-2xl border border-border">
+            <div className="table-wrap scroll-hint-x rounded-2xl border border-border">
               <table className="w-full min-w-[560px] text-sm">
                 <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-text-muted">
                   <tr>

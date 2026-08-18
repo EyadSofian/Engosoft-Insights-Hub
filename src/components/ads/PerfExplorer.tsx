@@ -660,7 +660,10 @@ export function PerfExplorer({
 
       <div className="flex flex-wrap items-center gap-2">
         <Breadcrumbs grain={grain} onGrainChange={onGrainChange} />
-        <div className="ms-auto flex items-center gap-2">
+        {/* The layout switch and the three grain buttons together need ~355px,
+            which is wider than a small phone. Below `sm` they take the full row
+            and scroll rather than being clipped at the edge. */}
+        <div className="max-sm:hscroll flex w-full items-center gap-2 sm:ms-auto sm:w-auto">
           {layoutToggle}
           <Segmented
             value={grain}
@@ -1105,7 +1108,7 @@ function RowDrawer({
       aria-label={nameOf(row)}
     >
       <div
-        className="w-full sm:max-w-md h-full overflow-y-auto bg-surface border-s border-border shadow-xl animate-slide-up sm:animate-fade-in"
+        className="w-full sm:max-w-md h-dvh overflow-y-auto overscroll-contain bg-surface border-s border-border shadow-xl animate-slide-up sm:animate-fade-in pb-[env(safe-area-inset-bottom)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-4 py-3 border-b border-border bg-surface/95 backdrop-blur">

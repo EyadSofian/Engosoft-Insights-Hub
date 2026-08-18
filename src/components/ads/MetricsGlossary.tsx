@@ -67,7 +67,7 @@ function MetricsGlossary({ open, onClose }: { open: boolean; onClose: () => void
       aria-label={lang === "ar" ? "شرح المؤشرات" : "Metric reference"}
     >
       <div
-        className="w-full sm:max-w-4xl glass rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto animate-slide-up sm:animate-scale-in"
+        className="w-full sm:max-w-4xl glass rounded-t-3xl sm:rounded-3xl max-h-[90dvh] overflow-y-auto overscroll-contain animate-slide-up sm:animate-scale-in pb-[env(safe-area-inset-bottom)] sm:pb-0"
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         onClick={(e) => e.stopPropagation()}
       >

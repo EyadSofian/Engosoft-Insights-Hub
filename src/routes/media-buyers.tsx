@@ -221,7 +221,7 @@ function MediaBuyers() {
               {lang === "ar" ? `حملات ${buyer.name}` : `${buyer.name} campaigns`}
             </SectionTitle>
           </div>
-          <div className="overflow-x-auto">
+          <div className="table-wrap scroll-hint-x">
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-surface-2 text-xs text-text-muted">
                 <tr>

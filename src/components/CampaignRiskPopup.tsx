@@ -100,7 +100,7 @@ export function CampaignRiskPopup() {
       onClick={dismiss}
     >
       <section
-        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl border border-border bg-surface shadow-2xl sm:max-w-4xl sm:rounded-3xl"
+        className="max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-surface shadow-2xl pb-[env(safe-area-inset-bottom)] sm:max-w-4xl sm:rounded-3xl sm:pb-0"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-surface/95 p-4 backdrop-blur sm:p-6">

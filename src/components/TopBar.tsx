@@ -6,6 +6,7 @@ import {
   BookOpen,
   Check,
   Languages,
+  MoreHorizontal,
   Moon,
   RefreshCw,
   SlidersHorizontal,
@@ -25,6 +26,7 @@ import type { CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
 import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 export interface FiltersResp {
   accounts: {
@@ -141,13 +143,13 @@ export function TopBar({ title }: { title?: string }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 glass border-b border-border">
-        <div className="px-3 sm:px-6 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3">
+      <header className="app-topbar sticky top-0 z-30 glass border-b border-border pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]">
+        <div className="py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's PageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="lg:hidden font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">
+          <div className="flex shrink-0 items-center gap-2 min-w-0">
+            <span className="lg:hidden shrink-0 font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">
               ENGOSOFT
             </span>
             {title && (
@@ -157,12 +159,16 @@ export function TopBar({ title }: { title?: string }) {
             )}
           </div>
 
-          <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
+          {/* Below sm only the two controls a reader reaches for on a phone stay
+              on the bar — filters and refresh. Everything else moves into the
+              overflow menu rather than shrinking below a usable tap size, which
+              is what used to squeeze the wordmark off the left edge at 320px. */}
+          <div className="ms-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
             <SyncBadge data={data} />
 
             <Link
               to="/guide"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg"
+              className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97]"
               aria-label={lang === "ar" ? "دليل الاستخدام" : "User guide"}
               title={lang === "ar" ? "دليل الاستخدام" : "User guide"}
             >
@@ -198,7 +204,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={toggleTheme}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg cursor-pointer"
+              className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
               aria-label={t("theme")}
               title={t("theme")}
             >
@@ -207,23 +213,27 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-border bg-surface px-2.5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:rounded-lg cursor-pointer"
+              className="hidden sm:inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
               aria-label="Toggle language"
             >
               <Languages size={16} />
               <span>{lang === "ar" ? "EN" : "ع"}</span>
             </button>
+
+            <OverflowMenu data={data} />
           </div>
         </div>
 
         {/* Period and platform stay visible on every screen — the most-used controls.
             The date control is now a single button that opens a preset + calendar
-            picker, so custom ranges no longer hide inside the filter sheet. */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5 sm:flex sm:px-6">
+            picker, so custom ranges no longer hide inside the filter sheet.
+            On a phone the platform strip runs to the screen edge on purpose: the
+            item clipped by the edge is what tells the reader it scrolls. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex sm:pb-2.5">
           <div className="shrink-0">
             <DateFilter latest={latest} />
           </div>
-          <div className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-none">
+          <div className="hscroll bleed-x [--bleed:0.875rem] min-w-0 sm:[--bleed:0px]">
             <Segmented
               value={filters.platform ?? "all"}
               onChange={(v) => setPlatformFilter(v === "all" ? undefined : (v as Platform))}
@@ -240,6 +250,65 @@ export function TopBar({ title }: { title?: string }) {
 
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} data={data} />
     </>
+  );
+}
+
+/**
+ * The controls that do not fit a phone bar: theme, language, the user guide and
+ * the freshness readout that was previously invisible below `md`. Rendered only
+ * below `sm`, where the inline buttons are hidden — the two never both show.
+ */
+function OverflowMenu({ data }: { data?: FiltersResp }) {
+  const { t, lang, setLang, theme, toggleTheme } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  const rowClass =
+    "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm text-text transition-colors hover:bg-surface-2 cursor-pointer";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex sm:hidden h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
+          aria-label={lang === "ar" ? "خيارات إضافية" : "More options"}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-[min(16rem,calc(100vw-1.75rem))] rounded-xl p-1.5"
+        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      >
+        <button type="button" onClick={toggleTheme} className={rowClass}>
+          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          <span>{t("theme")}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+          className={rowClass}
+        >
+          <Languages size={16} />
+          <span>{lang === "ar" ? "English" : "العربية"}</span>
+        </button>
+        <Link to="/guide" onClick={() => setOpen(false)} className={rowClass}>
+          <BookOpen size={16} />
+          <span>{lang === "ar" ? "دليل الاستخدام" : "User guide"}</span>
+        </Link>
+        {data?.fetchedAt && (
+          <div className="mt-1 border-t border-border px-2.5 pt-2 pb-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+              {t("data_freshness")}
+            </div>
+            <div className="num mt-0.5 text-[12px] text-text-muted">
+              {fmtDateTime(data.fetchedAt, lang)}
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -268,7 +337,7 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
 
   return (
     <div
-      className="px-4 sm:px-6 py-1.5 text-[11px] font-medium flex items-center gap-2 border-t border-border"
+      className="py-1.5 text-[11px] font-medium flex items-center gap-2 border-t border-border"
       style={{
         background: danger
           ? "var(--danger-soft, rgba(220,38,38,.10))"
@@ -342,19 +411,24 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
 
   const lagging = tabSyncs.slice().sort((a, b) => a.syncedAt.localeCompare(b.syncedAt))[0];
 
+  // A lagging tab can push this badge past any width, and because it used to be
+  // both nowrap and unshrinkable it shoved the wordmark off the edge at tablet
+  // sizes. It now gives up width before anything else on the bar does.
   return (
     <span
-      className="hidden md:inline-flex items-center gap-1.5 text-[11px] px-2.5 h-10 rounded-lg bg-surface-2 border border-border whitespace-nowrap"
+      className="hidden md:inline-flex min-w-0 shrink items-center gap-1.5 text-[11px] px-2.5 h-10 rounded-lg bg-surface-2 border border-border whitespace-nowrap max-w-[34vw] xl:max-w-none"
       title={tooltip}
     >
       <span
-        className={`w-1.5 h-1.5 rounded-full ${level === "ok" ? "pulse-ring" : ""}`}
+        className={`w-1.5 h-1.5 shrink-0 rounded-full ${level === "ok" ? "pulse-ring" : ""}`}
         style={{ background: color }}
       />
-      <span className="text-text-muted">{t("data_freshness")}</span>
-      <span className="num text-text font-medium">{fmtDateTime(data.fetchedAt, lang)}</span>
+      <span className="hidden shrink-0 text-text-muted lg:inline">{t("data_freshness")}</span>
+      <span className="num shrink-0 text-text font-medium">
+        {fmtDateTime(data.fetchedAt, lang)}
+      </span>
       {level !== "ok" && lagging && (
-        <span className="num" style={{ color }} title={tooltip}>
+        <span className="num truncate" style={{ color }} title={tooltip}>
           · {lagging.label} {fmtAge(ageH(lagging.syncedAt))}
         </span>
       )}

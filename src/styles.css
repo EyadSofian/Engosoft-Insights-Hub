@@ -137,6 +137,18 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   --sidebar-w: 248px;
+
+  /* Height of the fixed mobile nav bar, safe area included. Anything that has
+     to clear it reads this instead of hard-coding a padding that drifts. */
+  --mobile-nav-h: calc(64px + env(safe-area-inset-bottom));
+}
+
+/* Between lg and xl the 248px rail plus a dense table is a tight fit; the rail
+   gives up the space first because it is chrome, not content. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root {
+    --sidebar-w: 212px;
+  }
 }
 
 .dark {
@@ -195,6 +207,8 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* An in-page anchor must not land under the sticky header. */
+    scroll-padding-top: 96px;
   }
 
   html,
@@ -218,6 +232,25 @@
   button,
   a {
     touch-action: manipulation;
+  }
+
+
+  /* Nothing in a data view is allowed to widen the page. Long unbroken tokens
+     — campaign keys, URLs, Odoo references — are the usual culprit. */
+  main :is(h1, h2, h3, h4, p, td, th, dd, dt, li) {
+    overflow-wrap: anywhere;
+  }
+  /* …except figures, which must stay on one line to read as numbers. */
+  main :is(.num, [class*="whitespace-nowrap"]) {
+    overflow-wrap: normal;
+  }
+
+  /* iOS zooms the page in when a focused field is under 16px. Controls are
+     sized down visually elsewhere; the font itself has to stay at 16 on touch. */
+  @media (max-width: 767px) {
+    :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+      font-size: 16px;
+    }
   }
 
   /* Arabic needs a touch more leading and no synthetic letter-spacing. */
@@ -440,6 +473,97 @@
   }
 }
 
+/* A phone on its side has roughly 360px of height. A 150px control bar that
+   stays pinned would leave almost nothing for the report, so below `lg` on a
+   short viewport the bar scrolls away with the page and the nav slims down;
+   both are one scroll-to-top away. Declared outside `@layer base` on purpose —
+   it has to outrank the `sticky` and `min-h` utilities on those elements. */
+@media (max-height: 520px) and (max-width: 1023px) {
+  :root {
+    --mobile-nav-h: calc(52px + env(safe-area-inset-bottom));
+  }
+  .app-topbar {
+    position: static;
+  }
+  .app-mobile-nav {
+    min-height: 52px;
+  }
+  .app-mobile-nav :is(a, button) {
+    min-height: 44px;
+  }
+}
+
+/* --- layout -------------------------------------------------------------- */
+
+/* A phone in landscape puts the notch on an inline edge, not the top. Anything
+   that runs the full width pads itself off that edge instead of sliding under
+   it. Set the ordinary padding through --pad-x so the two cannot fight. */
+@utility pad-safe-x {
+  padding-inline-start: max(var(--pad-x, 0px), env(safe-area-inset-left));
+  padding-inline-end: max(var(--pad-x, 0px), env(safe-area-inset-right));
+}
+
+/* --- horizontal scrolling ------------------------------------------------ */
+
+/* One sideways scroller for the whole app: a control strip, a tab row, a wide
+   table. On a phone the native bar is a grey slab across the layout, so it is
+   suppressed and the affordance is carried by `scroll-hint-x` instead. */
+@utility hscroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Tells the reader there is more to the side, and — because the two solid
+   layers scroll with the content while the two shadows do not — it fades out
+   by itself at whichever end has been reached. Works unchanged in RTL.
+   Override --scroll-hint-bg when the scroller does not sit on --surface. */
+@utility scroll-hint-x {
+  background:
+    linear-gradient(
+        to right,
+        var(--scroll-hint-bg, var(--surface)) 40%,
+        color-mix(in oklab, var(--scroll-hint-bg, var(--surface)) 0%, transparent)
+      )
+      left center / 24px 100% no-repeat local,
+    linear-gradient(
+        to left,
+        var(--scroll-hint-bg, var(--surface)) 40%,
+        color-mix(in oklab, var(--scroll-hint-bg, var(--surface)) 0%, transparent)
+      )
+      right center / 24px 100% no-repeat local,
+    radial-gradient(
+        farthest-side at 0 50%,
+        color-mix(in oklab, var(--text) 16%, transparent),
+        transparent
+      )
+      left center / 12px 100% no-repeat scroll,
+    radial-gradient(
+        farthest-side at 100% 50%,
+        color-mix(in oklab, var(--text) 16%, transparent),
+        transparent
+      )
+      right center / 12px 100% no-repeat scroll;
+  background-color: var(--scroll-hint-bg, var(--surface));
+}
+
+/* Full-bleed on a phone: a strip of chips or tabs runs to both screen edges so
+   the last item is visibly cut off — which is what reads as "scroll me" — and
+   returns to the content grid from `sm` up. */
+@utility bleed-x {
+  margin-inline: calc(var(--bleed, 0.875rem) * -1);
+  padding-inline: var(--bleed, 0.875rem);
+  @media (width >= 40rem) {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
+
 /* --- data tables --------------------------------------------------------- */
 
 @utility table-wrap {
@@ -447,6 +571,12 @@
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  @media (width < 40rem) {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 }
 
 /* Keeps the label column readable while scrolling a wide table sideways. */

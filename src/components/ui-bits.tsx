@@ -54,7 +54,9 @@ export function SectionTitle({
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-3.5 sm:mb-5">
-      <h1 className="text-[21px] sm:text-2xl font-semibold text-text">{title}</h1>
+      <h1 className="text-[19px] min-[420px]:text-[21px] sm:text-2xl font-semibold text-text text-balance">
+        {title}
+      </h1>
       {subtitle && <p className="text-[12px] sm:text-sm text-text-muted mt-0.5 sm:mt-1">{subtitle}</p>}
     </div>
   );
@@ -109,9 +111,13 @@ export function RoasPill({ roas, size = "sm" }: { roas: number; size?: "sm" | "m
 export function Pill({
   children,
   tone = "neutral",
+  wrap = false,
 }: {
   children: ReactNode;
   tone?: "neutral" | "brand" | "success" | "warning" | "danger";
+  /** For pills that carry a phrase rather than a figure — a nav path, a label
+   *  — which would otherwise run off the side of a narrow screen. */
+  wrap?: boolean;
 }) {
   const map = {
     neutral: { bg: "var(--surface-2)", color: "var(--text-muted)" },
@@ -122,7 +128,9 @@ export function Pill({
   }[tone];
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
+      className={`inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+        wrap ? "whitespace-normal text-start" : "whitespace-nowrap"
+      }`}
       style={{ background: map.bg, color: map.color }}
     >
       {children}
@@ -156,7 +164,7 @@ export function KpiCard({
 }) {
   return (
     <div
-      className="card stagger min-h-[118px] p-3.5 sm:min-h-0 sm:p-5 relative overflow-hidden"
+      className="card stagger min-h-[96px] p-3 min-[420px]:p-3.5 sm:min-h-0 sm:p-5 relative overflow-hidden"
       style={
         {
           "--i": index,
@@ -181,7 +189,7 @@ export function KpiCard({
       </div>
 
       <div
-        className="num mt-1.5 sm:mt-2 font-semibold leading-none text-[16px] min-[420px]:text-[19px] sm:text-[27px]"
+        className="num mt-1.5 sm:mt-2 font-semibold leading-none text-[15px] min-[360px]:text-[17px] min-[420px]:text-[19px] sm:text-[27px]"
         style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
       >
         {value}
@@ -304,9 +312,9 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 export function KpiSkeletonGrid({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
       {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-[104px]" />
+        <Skeleton key={i} className="h-[96px] sm:h-[118px]" />
       ))}
     </div>
   );

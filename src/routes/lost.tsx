@@ -249,7 +249,7 @@ function Lost() {
             >
               {lang === "ar" ? "نسبة الضياع لكل فريق" : "Lost rate per team"}
             </SectionTitle>
-            <div className="overflow-x-auto">
+            <div className="table-wrap scroll-hint-x">
               <table className="w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-text-muted">

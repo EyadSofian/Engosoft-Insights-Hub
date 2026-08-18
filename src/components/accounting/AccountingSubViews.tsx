@@ -385,7 +385,7 @@ export function AccountingAgentsView() {
             </span>
           </label>
 
-          <div className="overflow-x-auto">
+          <div className="table-wrap scroll-hint-x">
             <span className="mb-1.5 block text-xs font-medium text-text-muted">
               {lang === "ar" ? "رتّب الكروت حسب" : "Rank cards by"}
             </span>
@@ -405,7 +405,7 @@ export function AccountingAgentsView() {
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="table-wrap scroll-hint-x">
             <span className="mb-1.5 block text-xs font-medium text-text-muted">
               {lang === "ar" ? "طريقة العرض" : "View"}
             </span>
@@ -669,7 +669,7 @@ function AgentCards({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
             <MiniMetric label={lang === "ar" ? "الفواتير" : "Invoices"} value={fmtNum(row.invoices)} />
             <MiniMetric label={lang === "ar" ? "ليدز دخلت" : "New leads"} value={fmtNum(row.cleanLeads)} />
             <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDExact(row.paidRevenue)} />
@@ -1462,7 +1462,7 @@ function SpecializationCard({
           {fmtPct(item.conversionRate, 1)}
         </Pill>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
         <MiniMetric label={lang === "ar" ? "الليدز" : "Leads"} value={fmtNum(item.leads)} />
         <MiniMetric label="Won / Lost" value={`${fmtNum(item.won)} / ${fmtNum(item.lost)}`} />
         <MiniMetric label={lang === "ar" ? "المبيعات" : "Sales"} value={fmtUSDFull(item.paidRevenue)} />

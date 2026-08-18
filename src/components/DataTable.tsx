@@ -198,7 +198,7 @@ export function DataTable<T>({
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                className="w-64 max-h-[60vh] overflow-y-auto p-2 rounded-xl"
+                className="w-64 max-h-[60dvh] overflow-y-auto p-2 rounded-xl"
                 style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               >
                 <p className="px-2 py-1.5 text-[11px] text-text-muted leading-relaxed">
@@ -280,7 +280,9 @@ export function DataTable<T>({
           : "Swipe sideways to view the remaining columns"}
       </div>
 
-      <div className="table-wrap scrollbar-thin" style={{ maxHeight }}>
+      {/* `table-wrap` already carries the thin bar on a desktop and none on a
+          phone, where a native scrollbar reads as a grey slab across the data. */}
+      <div className="table-wrap" style={{ maxHeight }}>
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead className="sticky top-0 z-10">
             {bands && (

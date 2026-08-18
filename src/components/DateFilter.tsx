@@ -418,7 +418,7 @@ function BottomSheet({
       {/* A column that caps at the viewport so the header and footer stay put
           while only the middle scrolls — the Apply button can't be pushed off. */}
       <div
-        className="glass flex max-h-[90dvh] w-full animate-slide-up flex-col rounded-t-3xl px-5 pt-4 sm:max-h-[85vh] sm:max-w-md sm:animate-scale-in sm:rounded-3xl"
+        className="glass flex max-h-[90dvh] w-full animate-slide-up flex-col rounded-t-3xl px-5 pt-4 sm:max-h-[85dvh] sm:max-w-md sm:animate-scale-in sm:rounded-3xl"
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -101,7 +101,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
       )}
 
       {states.length > 0 && (
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
           <StatusCount
             icon={<Radio size={15} />}
             label={lang === "ar" ? "جاهزة للتشغيل" : "Eligible now"}

@@ -252,14 +252,14 @@ function CourseDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,12,24,0.58)] p-3 backdrop-blur-[2px] animate-fade-in sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(4,12,24,0.58)] backdrop-blur-[2px] animate-fade-in sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="accounting-course-title"
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl animate-slide-up sm:animate-fade-in"
+        className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-surface shadow-2xl animate-slide-up pb-[env(safe-area-inset-bottom)] sm:rounded-2xl sm:pb-0 sm:animate-fade-in"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
@@ -314,7 +314,7 @@ function CourseDrawer({
                 ? "المنتجات والأنواع داخل الكورس"
                 : "Products and types in this course"}
             </SectionTitle>
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="table-wrap scroll-hint-x rounded-xl border border-border">
               <table className="w-full min-w-[660px] text-sm">
                 <thead className="bg-surface-2 text-[11px] text-text-muted">
                   <tr>

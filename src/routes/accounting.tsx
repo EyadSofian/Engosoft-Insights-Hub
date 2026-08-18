@@ -385,7 +385,7 @@ function Accounting() {
         </div>
       </Card>
 
-      <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="hscroll bleed-x [--bleed:0.875rem] sm:[--bleed:0px] pb-1">
         <Segmented
           value={view}
           onChange={setView}
@@ -779,7 +779,7 @@ function AccountingExportDialog({
           </button>
         </header>
 
-        <div className="grid max-h-[70vh] gap-3 overflow-y-auto p-4 sm:grid-cols-2 sm:p-6">
+        <div className="grid max-h-[70dvh] gap-3 overflow-y-auto p-4 sm:grid-cols-2 sm:p-6">
           {options.map((option) => {
             const Icon = option.icon;
             return (

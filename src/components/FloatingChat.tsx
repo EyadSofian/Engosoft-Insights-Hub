@@ -141,8 +141,9 @@ export function FloatingChat() {
             aria-modal="false"
             aria-label={t("ai_assistant")}
             className={`fixed z-50 flex flex-col overflow-hidden glass
-              inset-0 rounded-none animate-fade-in
-              lg:inset-auto lg:bottom-5 lg:end-5
+              inset-0 rounded-none animate-fade-in pt-[env(safe-area-inset-top)]
+              ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)]
+              lg:inset-auto lg:bottom-5 lg:end-5 lg:p-0
               lg:w-[400px] lg:h-[min(640px,calc(100dvh-96px))] lg:rounded-3xl lg:animate-scale-in`}
           >
             {/* header */}

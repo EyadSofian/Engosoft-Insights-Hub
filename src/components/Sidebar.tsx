@@ -124,8 +124,12 @@ export function MobileNav() {
 
   return (
     <nav
-      className="glass-navy fixed inset-x-0 bottom-0 z-40 flex min-h-[64px] items-stretch justify-around gap-1 border-t border-white/10 px-1.5 pt-1.5 shadow-[0_-10px_28px_rgba(0,18,40,0.18)] lg:hidden"
-      style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
+      className="app-mobile-nav glass-navy fixed inset-x-0 bottom-0 z-40 flex min-h-[64px] items-stretch justify-around gap-1 border-t border-white/10 pt-1.5 shadow-[0_-10px_28px_rgba(0,18,40,0.18)] lg:hidden"
+      style={{
+        paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))",
+        paddingInlineStart: "max(0.375rem, env(safe-area-inset-left))",
+        paddingInlineEnd: "max(0.375rem, env(safe-area-inset-right))",
+      }}
       aria-label={lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}
     >
       {NAVIGATION_SECTIONS.map((section) => {
