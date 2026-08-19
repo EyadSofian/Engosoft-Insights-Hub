@@ -30,6 +30,7 @@ import {
   mainCategoryForCourse,
 } from "./course-taxonomy";
 import { isArchivedWonStage } from "./archived-won";
+import { decideSnapshotRead } from "./snapshot-freshness";
 import {
   databaseConfigured,
   readDashboardDataset,
@@ -153,6 +154,27 @@ export interface Snapshot {
 
 let cache: Snapshot | null = null;
 let inflight: Promise<Snapshot> | null = null;
+let inflightStartedAt = 0;
+
+/**
+ * How long a snapshot may keep being served past its TTL while the refresh runs
+ * behind the request.
+ *
+ * Past this the wait is taken instead of the number. Serving a stale snapshot
+ * is the right trade for a few minutes; quietly reporting half-hour-old
+ * collections on an accounting dashboard is not.
+ */
+const MAX_STALE_MS = 30 * 60 * 1000;
+
+/**
+ * After this a running refresh is treated as stuck and a new one may start.
+ *
+ * Nothing in the read path has a timeout, so without this a single hung
+ * PostgreSQL query would freeze the data permanently: `inflight` would never
+ * clear, no later request could ever start another load, and every page would
+ * go on serving the same snapshot with nothing on screen to say so.
+ */
+const REFRESH_STUCK_MS = 2 * 60 * 1000;
 
 /** Make newly-ingested database batches visible on the next request. */
 export function invalidateDataCache(): void {
@@ -760,15 +782,55 @@ class AdSetIndex {
 
 /* --- load ----------------------------------------------------------------- */
 
+/**
+ * The snapshot every server-side computation reads.
+ *
+ * Refreshing it is expensive in a way the aggregation on top of it is not.
+ * Every dataset is stored one `jsonb` row per record and read whole — 18,405
+ * rows and ~28 MB for CRM alone, before the other ten datasets — while the
+ * aggregation that follows costs tens of milliseconds.
+ *
+ * That refresh used to run *inside* whichever request first arrived after the
+ * TTL expired. One visitor per five-minute window therefore paid for the entire
+ * reload while everyone else was served from memory instantly. That is the
+ * "the page hangs sometimes" report: not a slow page, a slow request landing on
+ * an unlucky user at random.
+ *
+ * So a stale snapshot is served immediately and the refresh runs behind it.
+ * Nobody waits for data already in memory, and the next request gets the fresh
+ * copy. `force` — the Refresh button — still waits, because seeing the new
+ * numbers is the entire point of pressing it.
+ */
 export async function loadAllData(force = false): Promise<Snapshot> {
-  if (!force && cache && Date.now() - cache.lastAttemptAt < TTL_MS) return cache;
-  // A forced reload must never be handed an in-flight fetch: that request was
-  // already sent with an older cache-busting token, so the Refresh button would
-  // wait on it and return exactly the stale data the user was trying to escape.
-  if (inflight && !force) return inflight;
+  const now = Date.now();
+  const action = decideSnapshotRead(
+    {
+      hasCache: cache !== null,
+      cacheAgeMs: cache ? now - cache.lastAttemptAt : Number.POSITIVE_INFINITY,
+      refreshRunning: inflight !== null,
+      refreshAgeMs: inflight ? now - inflightStartedAt : 0,
+      force,
+    },
+    { ttlMs: TTL_MS, maxStaleMs: MAX_STALE_MS, stuckRefreshMs: REFRESH_STUCK_MS },
+  );
 
+  if (action === "serve-cached" && cache) return cache;
+  if (action === "serve-cached-refresh-behind" && cache) {
+    // Nothing awaits this promise, so its rejection has to be swallowed here or
+    // it surfaces as an unhandled rejection. A failed background refresh leaves
+    // the previous snapshot standing, exactly as a failed foreground one does,
+    // and still reports itself through `fetchErrors`.
+    void refreshSnapshot().catch(() => {});
+    return cache;
+  }
+  if (action === "join-refresh" && inflight) return inflight;
+  return refreshSnapshot();
+}
+
+async function refreshSnapshot(): Promise<Snapshot> {
   const sheetId = process.env.SHEET_ID || DEFAULT_SHEET_ID;
 
+  inflightStartedAt = Date.now();
   inflight = (async () => {
     const fetchErrors: string[] = [];
     const staleTabs: string[] = [];
@@ -2586,9 +2648,12 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     };
   })();
 
+  // Captured so a refresh that finishes after being declared stuck cannot clear
+  // the pointer to the one that replaced it.
+  const mine = inflight;
   const previous = cache;
   try {
-    const next = await inflight;
+    const next = await mine;
     // If a tab came back empty but a good snapshot is still held, keep serving
     // the stale one rather than blanking the dashboard.
     //
@@ -2627,7 +2692,7 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     if (previous) return previous;
     throw e;
   } finally {
-    inflight = null;
+    if (inflight === mine) inflight = null;
   }
 }
 

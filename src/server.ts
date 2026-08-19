@@ -8,6 +8,25 @@ import { startScheduler } from "./lib/scheduler.server";
 // early unless both Telegram variables are present.
 startScheduler();
 
+/**
+ * Pull the data snapshot into memory while the process is starting, rather than
+ * inside the first request that needs it.
+ *
+ * Reading it costs a full pass over every dataset in PostgreSQL — ~28 MB for
+ * CRM alone. Without this the first visitor after every deploy or restart waits
+ * for all of it before seeing a single number, which is the same stall the
+ * background refresh removes for everyone else.
+ *
+ * Deliberately not awaited: the server must start accepting requests
+ * immediately. A request arriving before this finishes joins the same in-flight
+ * load instead of starting a second one. A failure here is not fatal either —
+ * the snapshot is simply loaded on demand, as it was before — so it is logged
+ * and swallowed rather than allowed to take the process down at boot.
+ */
+void import("./lib/sheet-cache.server")
+  .then(({ loadAllData }) => loadAllData())
+  .catch((error) => console.error("[warm-up] snapshot preload failed:", error));
+
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
