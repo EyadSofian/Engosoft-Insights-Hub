@@ -147,8 +147,6 @@ export interface AgentCoursePerformance {
   conversionRate: number | null;
   decidedConversionRate: number | null;
   sampleStatus: "reliable" | "insufficient";
-  /** The invoices this course's revenue is made of, newest payment first. */
-  invoiceList: AgentCourseInvoice[];
 }
 
 export interface AgentSpecializationPerformance {
@@ -348,8 +346,7 @@ interface MutableDimension {
   won: number;
   lost: number;
   paidRevenue: number;
-  /** Move number → the invoice, so repeated lines collapse into one entry. */
-  invoiceRefs: Map<string, AgentCourseInvoice>;
+  invoiceRefs: Set<string>;
 }
 
 interface MutableAgentProfile {
@@ -498,7 +495,7 @@ function dimensionFor(
       won: 0,
       lost: 0,
       paidRevenue: 0,
-      invoiceRefs: new Map(),
+      invoiceRefs: new Set(),
     };
     map.set(key, row);
   }
@@ -528,6 +525,34 @@ function addLeadToProfile(
   }
 }
 
+interface SaleDimensions {
+  category: string;
+  courseLabel: string;
+  courseKey: string;
+}
+
+/**
+ * Which course row a paid invoice line belongs to.
+ *
+ * Shared by the profile builder and the on-demand invoice lookup so the two
+ * cannot drift: a course whose invoices the lookup could not find would show an
+ * invoice count in the table beside an empty list on click.
+ */
+function saleDimensions(source: {
+  course: string;
+  mainCategory: string;
+  productCategory: string;
+  category: string;
+}): SaleDimensions {
+  const category = cleanCategoryLabel(
+    source.mainCategory || source.productCategory || source.category,
+  );
+  const courseLabel = cleanDimensionLabel(
+    source.course || source.productCategory || source.category,
+  );
+  return { category, courseLabel, courseKey: normalizeDimension(courseLabel) || "uncategorized" };
+}
+
 function addSaleToProfile(
   profiles: Map<string, MutableAgentProfile>,
   source: {
@@ -539,34 +564,56 @@ function addSaleToProfile(
     usdPaid: number;
     movement: string;
     isCreditNote: boolean;
-    paymentDate: string;
-    partner: string;
   },
 ) {
   const profile = profileFor(profiles, source.salesperson);
   if (!profile) return;
-  const category = cleanCategoryLabel(
-    source.mainCategory || source.productCategory || source.category,
-  );
-  const courseLabel = source.course || source.productCategory || source.category;
+  const { category, courseLabel } = saleDimensions(source);
   const course = dimensionFor(profile.courses, courseLabel, category);
   const specialization = dimensionFor(profile.specializations, category, category);
   for (const row of [course, specialization]) {
     row.paidRevenue += source.usdPaid;
-    if (!source.movement || source.isCreditNote) continue;
-    // Several lines of one course can share a move number. They are one
-    // invoice with one total, which is what `invoices` has always counted and
-    // what a manager will look for in Odoo.
-    const seen = row.invoiceRefs.get(source.movement);
-    if (seen) seen.usdPaid += source.usdPaid;
+    if (source.movement && !source.isCreditNote) row.invoiceRefs.add(source.movement);
+  }
+}
+
+/**
+ * The invoices behind one employee's figure for one course.
+ *
+ * Deliberately not part of the profile payload. Shipping it there cost 551 KB
+ * on a 864 KB response — every invoice of every course of all 53 employees, on
+ * every page load, to serve a dialog that shows one course at a time and is
+ * usually never opened. It is read here on click instead.
+ */
+export function courseInvoicesFor(
+  data: FilteredData,
+  agent: string,
+  courseKey: string,
+): AgentCourseInvoice[] {
+  const wanted = normalizePersonName(agent);
+  if (!wanted) return [];
+  // Lines of one course can share a move number. They are one invoice with one
+  // total, which is what the table's invoice count has always treated them as.
+  const byMovement = new Map<string, AgentCourseInvoice>();
+  for (const row of data.accounting) {
+    if (!row.movement || row.isCreditNote) continue;
+    if (normalizePersonName(row.salesperson) !== wanted) continue;
+    if (saleDimensions(row).courseKey !== courseKey) continue;
+    const seen = byMovement.get(row.movement);
+    if (seen) seen.usdPaid += row.usdPaid;
     else
-      row.invoiceRefs.set(source.movement, {
-        movement: source.movement,
-        paymentDate: source.paymentDate,
-        partner: source.partner,
-        usdPaid: source.usdPaid,
+      byMovement.set(row.movement, {
+        movement: row.movement,
+        paymentDate: row.paymentDate,
+        partner: row.partner,
+        usdPaid: row.usdPaid,
       });
   }
+  return [...byMovement.values()].sort(
+    (left, right) =>
+      right.paymentDate.localeCompare(left.paymentDate) ||
+      left.movement.localeCompare(right.movement),
+  );
 }
 
 function finishDimension(
@@ -589,11 +636,6 @@ function finishDimension(
     openLeads: Math.max(0, source.leads - decided),
     paidRevenue: source.paidRevenue,
     invoices: source.invoiceRefs.size,
-    invoiceList: [...source.invoiceRefs.values()].sort(
-      (left, right) =>
-        right.paymentDate.localeCompare(left.paymentDate) ||
-        left.movement.localeCompare(right.movement),
-    ),
     leadShare: totalLeads > 0 ? (source.leads / totalLeads) * 100 : 0,
     salesShare:
       positiveRevenue > 0 && source.paidRevenue > 0
@@ -663,11 +705,7 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
           specializationRevenue,
           lostDataAvailable,
         );
-        const {
-          mainCategory: _mainCategory,
-          invoiceList: _invoiceList,
-          ...specialization
-        } = finished;
+        const { mainCategory: _mainCategory, ...specialization } = finished;
         return specialization;
       })
       .sort(

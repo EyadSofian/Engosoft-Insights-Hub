@@ -27,6 +27,7 @@ import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
+import { Route as ApiAgentCourseInvoicesRouteImport } from './routes/api/agent-course-invoices'
 import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -141,6 +142,11 @@ const ApiAccountingExportRoute = ApiAccountingExportRouteImport.update({
 const ApiAdsRoute = ApiAdsRouteImport.update({
   id: '/api/ads',
   path: '/api/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentCourseInvoicesRoute = ApiAgentCourseInvoicesRouteImport.update({
+  id: '/api/agent-course-invoices',
+  path: '/api/agent-course-invoices',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCampaignRiskRoute = ApiCampaignRiskRouteImport.update({
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -333,6 +340,7 @@ export interface FileRoutesByTo {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -379,6 +387,7 @@ export interface FileRoutesById {
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
+  '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -426,6 +435,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/agent-course-invoices'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -471,6 +481,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/agent-course-invoices'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -516,6 +527,7 @@ export interface FileRouteTypes {
     | '/api/accounting'
     | '/api/accounting-export'
     | '/api/ads'
+    | '/api/agent-course-invoices'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -562,6 +574,7 @@ export interface RootRouteChildren {
   ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
   ApiAdsRoute: typeof ApiAdsRoute
+  ApiAgentCourseInvoicesRoute: typeof ApiAgentCourseInvoicesRoute
   ApiCampaignRiskRoute: typeof ApiCampaignRiskRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -715,6 +728,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ads'
       fullPath: '/api/ads'
       preLoaderRoute: typeof ApiAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-course-invoices': {
+      id: '/api/agent-course-invoices'
+      path: '/api/agent-course-invoices'
+      fullPath: '/api/agent-course-invoices'
+      preLoaderRoute: typeof ApiAgentCourseInvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/campaign-risk': {
@@ -914,6 +934,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAccountingRoute: ApiAccountingRoute,
   ApiAccountingExportRoute: ApiAccountingExportRoute,
   ApiAdsRoute: ApiAdsRoute,
+  ApiAgentCourseInvoicesRoute: ApiAgentCourseInvoicesRoute,
   ApiCampaignRiskRoute: ApiCampaignRiskRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,

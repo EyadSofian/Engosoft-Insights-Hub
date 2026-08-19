@@ -45,6 +45,7 @@ import {
 import type {
   AgentAnalyticsResult as AgentsResponse,
   AgentAnalyticsRow as AgentRow,
+  AgentCourseInvoice,
   AgentCoursePerformance,
   AgentSpecializationPerformance,
   AgentTarget,
@@ -1713,8 +1714,17 @@ function CourseInvoicesDialog({
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const invoices = course.invoiceList;
-  const listed = invoices.reduce((sum, invoice) => sum + invoice.usdPaid, 0);
+  // Fetched on open, not shipped with the page: the full list for every course
+  // of every employee was 551 KB of an 864 KB response, to fill a dialog that
+  // is usually never opened.
+  const { data, isPending, error } = useApi<{
+    invoices: AgentCourseInvoice[];
+    total: number;
+  }>(
+    `/api/agent-course-invoices?agent=${encodeURIComponent(agent)}&course=${encodeURIComponent(course.key)}`,
+  );
+  const invoices = data?.invoices ?? [];
+  const listed = data?.total ?? 0;
 
   return (
     <div
@@ -1752,7 +1762,16 @@ function CourseInvoicesDialog({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-5 sm:p-6">
-          {invoices.length === 0 ? (
+          {isPending ? (
+            <div className="rounded-xl bg-surface-2 p-4 text-xs text-text-muted">
+              {ar ? "بيحمّل الفواتير…" : "Loading invoices…"}
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-danger/20 bg-danger/7 p-4 text-xs text-danger">
+              {ar ? "مش قادر يجيب الفواتير: " : "Could not load the invoices: "}
+              {error.message}
+            </div>
+          ) : invoices.length === 0 ? (
             <div className="rounded-xl bg-surface-2 p-4 text-xs leading-relaxed text-text-muted">
               {course.won > 0
                 ? ar
@@ -1796,14 +1815,18 @@ function CourseInvoicesDialog({
 
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border p-5 text-xs text-text-muted sm:p-6">
           <span>
-            {ar
-              ? `${fmtNum(invoices.length)} فاتورة · المجموع ${fmtUSDFull(listed)}`
-              : `${fmtNum(invoices.length)} invoices · ${fmtUSDFull(listed)} total`}
+            {isPending
+              ? ar
+                ? "…"
+                : "…"
+              : ar
+                ? `${fmtNum(invoices.length)} فاتورة · المجموع ${fmtUSDFull(listed)}`
+                : `${fmtNum(invoices.length)} invoices · ${fmtUSDFull(listed)} total`}
           </span>
           {/* The two can differ: a credit note is excluded from the list but
               still moves the course total, so saying nothing would look like an
               arithmetic error. */}
-          {Math.abs(listed - course.paidRevenue) >= 0.01 && (
+          {!isPending && Math.abs(listed - course.paidRevenue) >= 0.01 && (
             <span>
               {ar
                 ? `إجمالي الكورس ${fmtUSDFull(course.paidRevenue)} — الفرق إشعارات دائن مش متعروضة هنا.`
