@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { negotiateCompression, parseContentLength } from "./lib/response-compression";
 import { startScheduler } from "./lib/scheduler.server";
 
 // Registered once at module load. `startScheduler` is idempotent and returns
@@ -68,12 +69,52 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+/**
+ * Compress the response when the client asked for it and nothing else has.
+ *
+ * Railway's proxy does not: production returns `/api/filters` as 634 KB with no
+ * `content-encoding` even when `gzip, br` is offered, and the HTML document as
+ * 31 KB where gzip gives 5.8 KB.
+ *
+ * Streamed rather than buffered, so an SSR document still arrives progressively
+ * and a large payload never has to sit in memory in full. `Content-Length` is
+ * dropped because the compressed length is not known until the stream ends, and
+ * a wrong one truncates the body.
+ */
+function compressResponse(request: Request, response: Response): Response {
+  const encoding = negotiateCompression({
+    acceptEncoding: request.headers.get("accept-encoding"),
+    status: response.status,
+    method: request.method,
+    contentType: response.headers.get("content-type"),
+    contentEncoding: response.headers.get("content-encoding"),
+    contentLength: parseContentLength(response.headers.get("content-length")),
+    hasBody: response.body !== null,
+  });
+  if (!encoding || !response.body) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("content-encoding", encoding);
+  headers.delete("content-length");
+  // Caches must not hand a gzipped body to a client that never asked for one.
+  const vary = headers.get("vary");
+  if (!vary) headers.set("vary", "accept-encoding");
+  else if (!vary.toLocaleLowerCase("en").includes("accept-encoding"))
+    headers.set("vary", `${vary}, accept-encoding`);
+
+  return new Response(response.body.pipeThrough(new CompressionStream(encoding)), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return compressResponse(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

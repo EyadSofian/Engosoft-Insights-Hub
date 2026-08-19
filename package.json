@@ -27,7 +27,8 @@
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:snapshot-freshness": "node --experimental-strip-types scripts/test-snapshot-freshness.mjs"
+    "test:snapshot-freshness": "node --experimental-strip-types scripts/test-snapshot-freshness.mjs",
+    "test:response-compression": "node --experimental-strip-types scripts/test-response-compression.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
