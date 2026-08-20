@@ -4,7 +4,11 @@ import {
   datasetFreshnessAlerts,
   isHistoricalDataset,
 } from "../src/lib/dataset-freshness.ts";
-import { INSERT_CHUNK_ROWS, POSTGRES_MAX_BIND_PARAMS } from "../src/lib/dashboard-db.server.ts";
+import {
+  INSERT_CHUNK_ROWS,
+  POSTGRES_MAX_BIND_PARAMS,
+  dedupeByStableKey,
+} from "../src/lib/dashboard-db.server.ts";
 
 const HOUR = 3_600_000;
 const NOW = Date.parse("2026-08-19T23:55:00Z");
@@ -95,6 +99,46 @@ const ok = (dataset, hours) => ({ dataset, status: "success", syncedAt: ago(hour
   );
 }
 
+/* --- the duplicate keys PostgreSQL actually rejected ------------------------ */
+{
+  // Recorded on the production database, twice, against this exact INSERT:
+  //   ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time
+  // `stableKey` uses the first identifier a row carries, and for Full Invoiced
+  // Orders that is the order reference — so an order with three lines is three
+  // rows sharing one key. PostgreSQL rejects the whole statement, so the whole
+  // sync fails.
+  const lines = [
+    { "Order ID": "SO-1001", product: "PMP", amount: "100" },
+    { "Order ID": "SO-1001", product: "CFM", amount: "200" },
+    { "Order ID": "SO-1001", product: "BIM", amount: "300" },
+    { "Order ID": "SO-1002", product: "Interior", amount: "400" },
+  ];
+  const { rows, duplicates } = dedupeByStableKey("invoiced", lines);
+  assert.equal(rows.length, 2, "one row per order reference");
+  assert.equal(duplicates, 2);
+  // Last wins — the same result the upsert would reach if the rows arrived in
+  // separate statements, which is what made this look intermittent.
+  assert.equal(rows[0].product, "BIM");
+  assert.equal(rows[1].product, "Interior");
+}
+
+{
+  // Rows carrying no identifier at all are hashed on their content, so genuinely
+  // distinct rows survive and byte-identical ones collapse.
+  const { rows, duplicates } = dedupeByStableKey("crm", [
+    { name: "a", course: "PMP" },
+    { name: "b", course: "CFM" },
+    { name: "a", course: "PMP" },
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(duplicates, 1);
+  // And a clean payload must pass through untouched.
+  const clean = dedupeByStableKey("crm", [{ __odoo_id: "1" }, { __odoo_id: "2" }]);
+  assert.equal(clean.rows.length, 2);
+  assert.equal(clean.duplicates, 0);
+  assert.deepEqual(dedupeByStableKey("crm", []), { rows: [], duplicates: 0 });
+}
+
 /* --- the write that caused the outage -------------------------------------- */
 // Kept beside the detection rule because they are two halves of one incident:
 // this is what made the sync slow enough to be cut off, and the rule above is
@@ -106,16 +150,14 @@ const ok = (dataset, hours) => ({ dataset, status: "success", syncedAt: ago(hour
     INSERT_CHUNK_ROWS * PARAMS_PER_ROW <= POSTGRES_MAX_BIND_PARAMS,
     `${INSERT_CHUNK_ROWS} rows x ${PARAMS_PER_ROW} params exceeds PostgreSQL's ${POSTGRES_MAX_BIND_PARAMS}`,
   );
-  // The old value was 500, which cost 14 round trips inside one transaction for
-  // the 6,650-row dataset that broke. Two is the point of the change.
+  // 500 cost fourteen round trips for the 6,650-row dataset; 1,000 costs seven.
   const INVOICED_ROWS = 6_650;
-  assert.ok(
-    Math.ceil(INVOICED_ROWS / INSERT_CHUNK_ROWS) <= 2,
-    "the dataset that broke must not need more than two inserts",
-  );
-  assert.ok(Math.ceil(INVOICED_ROWS / 500) === 14, "…where the old chunk size needed fourteen");
-  // Headroom for growth: the ceiling must still hold at triple the size.
-  assert.ok(INSERT_CHUNK_ROWS * PARAMS_PER_ROW * 3 <= POSTGRES_MAX_BIND_PARAMS * 3);
+  assert.equal(Math.ceil(INVOICED_ROWS / 500), 14, "what the old size cost");
+  assert.equal(Math.ceil(INVOICED_ROWS / INSERT_CHUNK_ROWS), 7);
+  // Deliberately not maximal. A wider batch is not free: it builds a larger
+  // statement and holds it whole in memory, and 5,000 was tried and dialled
+  // back for exactly that reason.
+  assert.ok(INSERT_CHUNK_ROWS <= 1_000, "batches stay modest on purpose");
 }
 
 console.log("dataset freshness tests passed.");

@@ -42,6 +42,12 @@ export interface DatasetWriteResult {
   receivedRows: number;
   rowCount: number;
   syncedAt: string;
+  /**
+   * Rows that shared a `stable_key` with a later row and were collapsed into
+   * it. Normal for line-level datasets keyed on an order reference; a sudden
+   * change is worth noticing, so it is reported rather than swallowed.
+   */
+  duplicates: number;
 }
 
 const DATASETS = new Set<DashboardDataset>([
@@ -180,6 +186,40 @@ function stableKey(dataset: DashboardDataset, row: DashboardRow): string {
   return `${dataset}:sha256:${createHash("sha256").update(canonicalJson(row)).digest("hex")}`;
 }
 
+/**
+ * Collapse rows that resolve to the same `stable_key`, keeping the last.
+ *
+ * `ON CONFLICT (dataset, stable_key) DO UPDATE` is how a row is upserted, and
+ * PostgreSQL refuses that command outright when one statement proposes the same
+ * key twice:
+ *
+ *   ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time
+ *   HINT: Ensure that no rows proposed for insertion within the same command
+ *         have duplicate constrained values.
+ *
+ * Recorded against this exact INSERT on the production database on 2026-08-18.
+ * It is not a corrupt payload: `stableKey` takes the first identifier a row
+ * carries, and for Full Invoiced Orders that is the order reference — so an
+ * order with several lines is several rows sharing one key, by design.
+ *
+ * The whole statement fails, so the whole transaction fails, so the sync fails.
+ * Whether it fails at all used to depend on chunk size — two duplicates had to
+ * land in the same batch — which made it look intermittent and made a wider
+ * batch strictly more dangerous.
+ *
+ * Last wins, which is what the upsert would have done anyway had the rows
+ * arrived in separate statements. Exported so the rule can be tested without a
+ * database.
+ */
+export function dedupeByStableKey(
+  dataset: DashboardDataset,
+  rows: DashboardRow[],
+): { rows: DashboardRow[]; duplicates: number } {
+  const byKey = new Map<string, DashboardRow>();
+  for (const row of rows) byKey.set(stableKey(dataset, row), row);
+  return { rows: [...byKey.values()], duplicates: rows.length - byKey.size };
+}
+
 function recordDate(row: DashboardRow): string | null {
   const raw = first(row, [
     "Date",
@@ -225,20 +265,21 @@ export const POSTGRES_MAX_BIND_PARAMS = 65_535;
 /**
  * Rows per INSERT.
  *
- * This was 500, which is 3,000 of the 65,535 parameters PostgreSQL allows — so
- * a 6,650-row dataset paid fourteen round trips inside one transaction where
- * two would do. That is not a micro-optimisation: on 2026-08-19 the Full
- * Invoiced Orders sync crossed roughly twenty seconds of server time and every
- * run since was cut off mid-request, leaving the dashboard fourteen hours
- * stale. The runs that still succeeded took eleven seconds; the ones that
- * failed took twenty-nine.
+ * Was 500, briefly 5,000, now 1,000. The jump to 5,000 was a mistake worth
+ * recording: it was meant to cut round trips, but every row added to a batch
+ * raises the chance that two rows sharing a `stable_key` land in the same
+ * statement — and PostgreSQL rejects the whole command when that happens (see
+ * `dedupeByStableKey`). Batching wider made a latent duplicate bug easier to
+ * hit, not harder.
  *
- * Capped well under the parameter ceiling rather than at it, because a single
- * statement also has to be built, sent and parsed — and because the row count
- * is data, not a constant, so the margin has to survive the dataset growing.
+ * With duplicates now collapsed before batching that hazard is gone, so the
+ * size is chosen on cost alone: 1,000 rows is 6,000 of PostgreSQL's 65,535
+ * bind parameters and turns a 6,650-row dataset into seven round trips instead
+ * of fourteen, without building a ten-megabyte statement or holding it whole in
+ * memory the way 5,000 did.
  */
 export const INSERT_CHUNK_ROWS = Math.min(
-  5_000,
+  1_000,
   Math.floor(POSTGRES_MAX_BIND_PARAMS / BIND_PARAMS_PER_ROW),
 );
 
@@ -332,7 +373,7 @@ export async function writeDashboardDataset(
   } = {},
 ): Promise<DatasetWriteResult> {
   await ensureSchema();
-  const rows = inputRows.map(stringRow);
+  const { rows, duplicates } = dedupeByStableKey(dataset, inputRows.map(stringRow));
   const syncedAtRaw = options.syncedAt?.trim();
   const syncedAt =
     syncedAtRaw && Number.isFinite(Date.parse(syncedAtRaw))
@@ -365,7 +406,7 @@ export async function writeDashboardDataset(
       [dataset, rowCount, syncedAt, JSON.stringify(options.metadata ?? {})],
     );
     await client.query("COMMIT");
-    return { dataset, receivedRows: rows.length, rowCount, syncedAt };
+    return { dataset, receivedRows: inputRows.length, rowCount, syncedAt, duplicates };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
