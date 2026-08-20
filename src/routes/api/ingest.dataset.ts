@@ -1,13 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
-// A complete Accounting rebuild currently contains roughly 6.5k invoice lines.
-// Keep the payload below the existing 10 MB request guard, but allow n8n to
-// replace that dataset atomically in one request. Splitting a `replace` across
-// several requests would delete the earlier chunks and leave an incomplete
-// accounting snapshot.
+// A `replace` has to arrive in one request: splitting it across several would
+// delete the earlier chunks and leave an incomplete snapshot. So both limits
+// have to clear the largest dataset whole, with room for it to grow.
 const MAX_ROWS_PER_REQUEST = 15_000;
-const MAX_REQUEST_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Largest request body accepted.
+ *
+ * This was 10 MB, chosen against a comment claiming the payload stayed under
+ * it. It did not: Full Invoiced Orders is roughly 6,500 lines and about 26 MB,
+ * so on 2026-08-20 the limit rejected nine consecutive syncs with 413 in fifty
+ * milliseconds each — the guard meant to stop abuse was stopping the only
+ * caller instead.
+ *
+ * 64 MB is not a measurement of the payload, it is headroom over one: roughly
+ * 2.5x the dataset as it stands, so ordinary growth does not walk back into
+ * this. The row cap above is the limit with a real basis; this one exists to
+ * stop something absurd, and an absurd body is far larger than this.
+ */
+const MAX_REQUEST_BYTES = 64 * 1024 * 1024;
 
 function authorized(request: Request): boolean {
   const expected = process.env.DASHBOARD_INGEST_SECRET?.trim() ?? "";
