@@ -350,7 +350,7 @@ async function fetchOfficialCampaignStatus() {
         },
         body: {
           query:
-            "SELECT customer.id, customer.descriptive_name, campaign.id, campaign.name, campaign.status, campaign.primary_status, campaign.serving_status, campaign.primary_status_reasons, campaign.start_date, campaign.end_date FROM campaign WHERE campaign.status != 'REMOVED'",
+            "SELECT customer.id, customer.descriptive_name, campaign.id, campaign.name, campaign.status, campaign.primary_status, campaign.serving_status, campaign.primary_status_reasons FROM campaign WHERE campaign.status != 'REMOVED'",
         },
       });
       const campaigns = (Array.isArray(response) ? response : []).flatMap((batch) =>
@@ -359,7 +359,14 @@ async function fetchOfficialCampaignStatus() {
       total += campaigns.length;
       for (const result of campaigns) {
         const campaign = result?.campaign || {};
-        if (text(campaign?.status) !== "ENABLED") continue;
+        const configuredStatus = text(campaign?.status);
+        const primaryStatus = text(campaign?.primaryStatus);
+        const servingStatus = text(campaign?.servingStatus);
+        const isServing =
+          configuredStatus === "ENABLED" &&
+          (servingStatus === "SERVING" ||
+            (!servingStatus && !["ENDED", "PAUSED", "REMOVED"].includes(primaryStatus)));
+        if (!isServing) continue;
         active += 1;
         addRow({
           platform: "google",
@@ -367,14 +374,12 @@ async function fetchOfficialCampaignStatus() {
           account: result?.customer?.descriptiveName || customerId,
           campaignId: campaign?.id,
           name: campaign?.name,
-          configuredStatus: campaign?.status,
-          effectiveStatus: campaign?.primaryStatus || campaign?.status,
-          servingStatus: campaign?.servingStatus,
+          configuredStatus,
+          effectiveStatus: primaryStatus || configuredStatus,
+          servingStatus,
           statusReason: Array.isArray(campaign?.primaryStatusReasons)
             ? campaign.primaryStatusReasons.join(", ")
             : "",
-          startTime: campaign?.startDate,
-          stopTime: campaign?.endDate,
         });
       }
     }
