@@ -6,6 +6,7 @@ import {
   BookOpen,
   Check,
   Languages,
+  Leaf,
   MoreHorizontal,
   Moon,
   RefreshCw,
@@ -241,7 +242,7 @@ export function TopBar({ title }: { title?: string }) {
                 setAcquisitionFilter(v === "all" ? undefined : (v as AcquisitionChannel))
               }
               options={[
-                { value: "all", label: t("all_platforms") },
+                { value: "all", label: t("all_channels") },
                 ...ACQUISITION_CHANNELS.map((channel) => ({
                   value: channel,
                   label: ACQUISITION_CHANNEL_LABEL[channel][lang],
@@ -250,6 +251,19 @@ export function TopBar({ title }: { title?: string }) {
             />
           </div>
         </div>
+
+        {filters.channel === "organic" && (
+          <div
+            role="status"
+            className="mb-2 flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-xs leading-relaxed text-text sm:mb-2.5"
+            style={{ background: "var(--success-soft)" }}
+          >
+            <Leaf size={15} className="mt-0.5 shrink-0" style={{ color: "var(--success)" }} />
+            <span>
+              <strong>{ACQUISITION_CHANNEL_LABEL.organic[lang]}:</strong> {t("organic_scope_note")}
+            </span>
+          </div>
+        )}
 
         <DataHealthBar data={data} />
       </header>
@@ -546,7 +560,7 @@ function FilterSheet({
           <div className="grid gap-4">
             <div>
               <span className="block text-xs font-medium text-text-muted mb-2">
-                {t("platform")}
+                {t("acquisition_channel")}
               </span>
               <div className="overflow-x-auto overscroll-x-contain scrollbar-none pb-1">
                 <Segmented
@@ -558,7 +572,7 @@ function FilterSheet({
                   }
                   size="md"
                   options={[
-                    { value: "all", label: t("all_platforms") },
+                    { value: "all", label: t("all_channels") },
                     ...ACQUISITION_CHANNELS.map((channel) => ({
                       value: channel,
                       label: ACQUISITION_CHANNEL_LABEL[channel][lang],

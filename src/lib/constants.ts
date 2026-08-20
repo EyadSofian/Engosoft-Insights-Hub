@@ -9,11 +9,16 @@ export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   google: { ar: "جوجل", en: "Google Ads" },
 };
 
-export const ACQUISITION_CHANNELS: AcquisitionChannel[] = [...PLATFORMS, "organic"];
+/**
+ * Organic deliberately comes first. On narrow screens the acquisition picker
+ * scrolls horizontally, so putting it after four paid platforms made the new
+ * channel effectively undiscoverable.
+ */
+export const ACQUISITION_CHANNELS: AcquisitionChannel[] = ["organic", ...PLATFORMS];
 
 export const ACQUISITION_CHANNEL_LABEL: Record<AcquisitionChannel, { ar: string; en: string }> = {
   ...PLATFORM_LABEL,
-  organic: { ar: "أورجانيك", en: "Organic" },
+  organic: { ar: "أورجانيك · Odoo", en: "Organic · Odoo" },
 };
 
 /** One colour per platform, shared by the switcher, the charts and every badge. */

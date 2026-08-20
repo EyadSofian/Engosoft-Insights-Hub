@@ -88,6 +88,12 @@ export const DICT = {
   // platform
   platform: { ar: "المنصة", en: "Platform" },
   all_platforms: { ar: "كل المنصات", en: "All platforms" },
+  acquisition_channel: { ar: "قناة مصدر العميل", en: "Acquisition channel" },
+  all_channels: { ar: "كل القنوات", en: "All channels" },
+  organic_scope_note: {
+    ar: "يعرض مبيعات وليدز مصادر Odoo غير المدفوعة. الإنفاق الإعلاني صفر لأن أورجانيك ليست منصة إعلانات.",
+    en: "Shows sales and leads from non-paid Odoo sources. Ad spend is zero because Organic is not an ad platform.",
+  },
   not_reported: { ar: "لا تُبلغ عنه المنصة", en: "Not reported by this platform" },
 
   // metrics

@@ -4,6 +4,18 @@ import {
   isOrganicSourceKey,
   PLATFORM_SOURCE_KEYS,
 } from "../src/lib/acquisition-channel.ts";
+import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "../src/lib/constants.ts";
+
+assert.deepEqual(
+  ACQUISITION_CHANNELS,
+  ["organic", "meta", "snapchat", "tiktok", "google"],
+  "Organic must remain the first visible channel after All on narrow screens",
+);
+assert.match(
+  ACQUISITION_CHANNEL_LABEL.organic.ar,
+  /Odoo/,
+  "the Organic label must make its Odoo source explicit",
+);
 
 for (const source of [
   "website",

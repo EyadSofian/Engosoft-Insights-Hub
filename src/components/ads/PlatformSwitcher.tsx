@@ -61,14 +61,14 @@ export function PlatformSwitcher({
     <div
       className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain scrollbar-none pb-1"
       role="tablist"
-      aria-label={t("platform")}
+      aria-label={t("acquisition_channel")}
     >
       <Tab
         active={active === "all"}
         onClick={() => select("all")}
         color="var(--brand)"
         icon={<LayoutGrid size={14} />}
-        title={t("all_platforms")}
+        title={t("all_channels")}
         line={
           anyData
             ? `${fmtUSD(overall.spend)} · ${fmtNum(overall.crmLeads)} ${lang === "ar" ? "عميل" : "leads"}`
