@@ -103,10 +103,9 @@ const ok = (dataset, hours) => ({ dataset, status: "success", syncedAt: ago(hour
 {
   // Recorded on the production database, twice, against this exact INSERT:
   //   ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time
-  // `stableKey` uses the first identifier a row carries, and for Full Invoiced
-  // Orders that is the order reference — so an order with three lines is three
-  // rows sharing one key. PostgreSQL rejects the whole statement, so the whole
-  // sync fails.
+  // An order reference identifies the parent order, not one of its product
+  // lines. The old fix made PostgreSQL accept the statement by deleting two of
+  // the three SO-1001 lines. Every line must survive instead.
   const lines = [
     { "Order ID": "SO-1001", product: "PMP", amount: "100" },
     { "Order ID": "SO-1001", product: "CFM", amount: "200" },
@@ -114,23 +113,24 @@ const ok = (dataset, hours) => ({ dataset, status: "success", syncedAt: ago(hour
     { "Order ID": "SO-1002", product: "Interior", amount: "400" },
   ];
   const { rows, duplicates } = dedupeByStableKey("invoiced", lines);
-  assert.equal(rows.length, 2, "one row per order reference");
-  assert.equal(duplicates, 2);
-  // Last wins — the same result the upsert would reach if the rows arrived in
-  // separate statements, which is what made this look intermittent.
-  assert.equal(rows[0].product, "BIM");
-  assert.equal(rows[1].product, "Interior");
+  assert.equal(rows.length, 4, "every product line survives");
+  assert.equal(duplicates, 0, "a parent order reference is not treated as a row id");
+  assert.deepEqual(
+    rows.map((row) => row.product),
+    ["PMP", "CFM", "BIM", "Interior"],
+  );
 }
 
 {
-  // Rows carrying no identifier at all are hashed on their content, so genuinely
-  // distinct rows survive and byte-identical ones collapse.
+  // Rows carrying no identifier at all are hashed on their content. Even
+  // byte-identical rows are retained: two equal source records can be valid,
+  // and replace mode promises to store exactly the submitted population.
   const { rows, duplicates } = dedupeByStableKey("crm", [
     { name: "a", course: "PMP" },
     { name: "b", course: "CFM" },
     { name: "a", course: "PMP" },
   ]);
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 3);
   assert.equal(duplicates, 1);
   // And a clean payload must pass through untouched.
   const clean = dedupeByStableKey("crm", [{ __odoo_id: "1" }, { __odoo_id: "2" }]);

@@ -44,8 +44,7 @@ async function fetchOfficialCampaignStatus() {
       .replace(/access[_-]?token[=:][^&\s]+/gi, "access_token=<redacted>")
       .replace(/\s+/g, " ")
       .slice(0, 320);
-  const request = (options) =>
-    this.helpers.httpRequest({ ...options, json: true, timeout: 90000 });
+  const request = (options) => this.helpers.httpRequest({ ...options, json: true, timeout: 90000 });
   const oauthForm = async (url, values) => {
     const body = Object.entries(values)
       .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(text(value))}`)
@@ -58,7 +57,11 @@ async function fetchOfficialCampaignStatus() {
       timeout: 90000,
     });
     if (typeof raw === "string") {
-      try { return JSON.parse(raw); } catch { return {}; }
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
     }
     return raw || {};
   };
@@ -68,9 +71,7 @@ async function fetchOfficialCampaignStatus() {
     let first = true;
     for (let page = 0; next && page < 100; page += 1) {
       const response = await request(
-        first
-          ? { method: "GET", url: next, qs, headers }
-          : { method: "GET", url: next, headers },
+        first ? { method: "GET", url: next, qs, headers } : { method: "GET", url: next, headers },
       );
       first = false;
       output.push(...(Array.isArray(response?.data) ? response.data : []));
@@ -130,14 +131,11 @@ async function fetchOfficialCampaignStatus() {
     if (!token) throw new Error("Meta credentials are not configured");
     let discoveredAccounts = [];
     try {
-      discoveredAccounts = await fetchPaged(
-        `https://graph.facebook.com/${version}/me/adaccounts`,
-        {
-          fields: "id,name,account_status,disable_reason,timezone_name",
-          limit: 200,
-          access_token: token,
-        },
-      );
+      discoveredAccounts = await fetchPaged(`https://graph.facebook.com/${version}/me/adaccounts`, {
+        fields: "id,name,account_status,disable_reason,timezone_name",
+        limit: 200,
+        access_token: token,
+      });
     } catch (error) {
       if (!configuredAccounts.length) throw error;
     }
@@ -151,22 +149,21 @@ async function fetchOfficialCampaignStatus() {
       const rawId = text(configured?.id);
       const accountId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
       const [campaigns, adsets, ads] = await Promise.all([
-        fetchPaged(
-          `https://graph.facebook.com/${version}/${accountId}/campaigns`,
-          {
-            fields: "id,name,status,effective_status,start_time,stop_time,updated_time",
-            limit: 500,
-            access_token: token,
-          },
-        ),
-        fetchPaged(
-          `https://graph.facebook.com/${version}/${accountId}/adsets`,
-          { fields: "id,campaign_id,effective_status", limit: 500, access_token: token },
-        ),
-        fetchPaged(
-          `https://graph.facebook.com/${version}/${accountId}/ads`,
-          { fields: "id,campaign_id,effective_status", limit: 500, access_token: token },
-        ),
+        fetchPaged(`https://graph.facebook.com/${version}/${accountId}/campaigns`, {
+          fields: "id,name,status,effective_status,start_time,stop_time,updated_time",
+          limit: 500,
+          access_token: token,
+        }),
+        fetchPaged(`https://graph.facebook.com/${version}/${accountId}/adsets`, {
+          fields: "id,campaign_id,effective_status",
+          limit: 500,
+          access_token: token,
+        }),
+        fetchPaged(`https://graph.facebook.com/${version}/${accountId}/ads`, {
+          fields: "id,campaign_id,effective_status",
+          limit: 500,
+          access_token: token,
+        }),
       ]);
       total += campaigns.length;
       const adsetCounts = new Map();
@@ -188,8 +185,7 @@ async function fetchOfficialCampaignStatus() {
         const start = Date.parse(text(campaign?.start_time));
         const stop = Date.parse(text(campaign?.stop_time));
         const scheduleIsCurrent =
-          (!Number.isFinite(start) || start <= now) &&
-          (!Number.isFinite(stop) || stop > now);
+          (!Number.isFinite(start) || start <= now) && (!Number.isFinite(stop) || stop > now);
         const activeAdsets = adsetCounts.get(campaignId) || 0;
         const activeAds = adCounts.get(campaignId) || 0;
         if (!scheduleIsCurrent || activeAdsets < 1 || activeAds < 1) continue;
@@ -261,7 +257,8 @@ async function fetchOfficialCampaignStatus() {
         name: campaign?.name,
         configuredStatus: campaign?.status,
         effectiveStatus: campaign?.status,
-        servingStatus: delivery.includes("VALID") || delivery.includes("DELIVERING") ? "SERVING" : "LIMITED",
+        servingStatus:
+          delivery.includes("VALID") || delivery.includes("DELIVERING") ? "SERVING" : "LIMITED",
         statusReason: delivery.join(", "),
         startTime: campaign?.start_time,
         stopTime: campaign?.end_time,
@@ -331,15 +328,12 @@ async function fetchOfficialCampaignStatus() {
   try {
     const customers = parseList(config.GOOGLE_CUSTOMER_IDS_JSON).map(text).filter(Boolean);
     if (!customers.length) throw new Error("Google Ads customer is not configured");
-    const tokenResponse = await oauthForm(
-      "https://oauth2.googleapis.com/token",
-      {
-        client_id: text(config.GOOGLE_CLIENT_ID),
-        client_secret: text(config.GOOGLE_CLIENT_SECRET),
-        refresh_token: text(config.GOOGLE_REFRESH_TOKEN),
-        grant_type: "refresh_token",
-      },
-    );
+    const tokenResponse = await oauthForm("https://oauth2.googleapis.com/token", {
+      client_id: text(config.GOOGLE_CLIENT_ID),
+      client_secret: text(config.GOOGLE_CLIENT_SECRET),
+      refresh_token: text(config.GOOGLE_REFRESH_TOKEN),
+      grant_type: "refresh_token",
+    });
     const accessToken = text(tokenResponse?.access_token);
     if (!accessToken) throw new Error("Google OAuth did not return an access token");
     let active = 0;
@@ -359,8 +353,9 @@ async function fetchOfficialCampaignStatus() {
             "SELECT customer.id, customer.descriptive_name, campaign.id, campaign.name, campaign.status, campaign.primary_status, campaign.serving_status, campaign.primary_status_reasons, campaign.start_date, campaign.end_date FROM campaign WHERE campaign.status != 'REMOVED'",
         },
       });
-      const campaigns = (Array.isArray(response) ? response : [])
-        .flatMap((batch) => (Array.isArray(batch?.results) ? batch.results : []));
+      const campaigns = (Array.isArray(response) ? response : []).flatMap((batch) =>
+        Array.isArray(batch?.results) ? batch.results : [],
+      );
       total += campaigns.length;
       for (const result of campaigns) {
         const campaign = result?.campaign || {};
@@ -391,7 +386,17 @@ async function fetchOfficialCampaignStatus() {
   }
 
   if (!rows.length) {
-    return [{ json: { __placeholder: true, __status_checked_at: checkedAt, __request_mode: requestMode, __platform_health_json: JSON.stringify(health), __errors_json: JSON.stringify(errors) } }];
+    return [
+      {
+        json: {
+          __placeholder: true,
+          __status_checked_at: checkedAt,
+          __request_mode: requestMode,
+          __platform_health_json: JSON.stringify(health),
+          __errors_json: JSON.stringify(errors),
+        },
+      },
+    ];
   }
   return rows.map((row, index) => ({
     json: {
@@ -406,8 +411,11 @@ async function packageOfficialResponse() {
   const items = $input.all().map((item) => item.json || {});
   const stateRows = items.filter((row) => row.__row_type === "campaign_state");
   const parse = (key) => {
-    try { return JSON.parse(String(items.find((row) => row[key])?.[key] || "[]")); }
-    catch { return []; }
+    try {
+      return JSON.parse(String(items.find((row) => row[key])?.[key] || "[]"));
+    } catch {
+      return [];
+    }
   };
   const first = items[0] || {};
   const response = {
@@ -449,15 +457,30 @@ async function packageOfficialResponse() {
 
 async function readCachedOfficialResponse() {
   const cached = $getWorkflowStaticData("global").officialCampaignStatusResponse;
-  return [{
-    json: cached && Array.isArray(cached.campaigns)
-      ? { ...cached, requestMode: "webhook" }
-      : { ok: false, source: "n8n_live", definition: "official_status", generatedAt: "", requestMode: "webhook", platformHealth: [], accountsWithErrors: [{ message: "Official status cache is empty. Run refresh once." }], campaigns: [] },
-  }];
+  return [
+    {
+      json:
+        cached && Array.isArray(cached.campaigns)
+          ? { ...cached, requestMode: "webhook" }
+          : {
+              ok: false,
+              source: "n8n_live",
+              definition: "official_status",
+              generatedAt: "",
+              requestMode: "webhook",
+              platformHealth: [],
+              accountsWithErrors: [
+                { message: "Official status cache is empty. Run refresh once." },
+              ],
+              campaigns: [],
+            },
+    },
+  ];
 }
 
 async function prepareGoogleBackup() {
-  return $input.all()
+  return $input
+    .all()
     .filter((item) => item.json?.__row_type === "campaign_state")
     .map((item) => {
       const row = item.json;
@@ -477,91 +500,400 @@ async function prepareGoogleBackup() {
         statusSource: "official_platform_api",
         checkedAt: String(row.__status_checked_at || ""),
       };
-      return { json: {
-        "التاريخ": String(row.__status_checked_at || "").slice(0, 10),
-        "اسم الحساب الإعلاني": String(row.__account_name || ""),
-        "اسم الكامبين": String(row.__campaign_name || ""),
-        "Ad set name": "", "Ad Name": "", "Spend (Cost)": 0, "العملة": "",
-        Impressions: 0, "Link Clicks": 0, "Clicks (all)": 0, "CTR (all)": "", "CTR (link)": "",
-        "Leads (on facebook Leads)": 0, "Leads (Website/Pixel)": 0, "Leads (Total)": 0,
-        "CPL (Cost/Lead)": "", Course: "", __meta_key: String(row.__meta_key || ""),
-        __account_id: String(row.__account_id || ""), __account_name: String(row.__account_name || ""),
-        __account_status: "", __account_currency: "", __campaign_id: String(row.__campaign_id || ""),
-        __adset_id: "", __ad_id: "", __lead_types: JSON.stringify(state),
-        __synced_at: String(row.__status_checked_at || ""),
-      } };
+      return {
+        json: {
+          التاريخ: String(row.__status_checked_at || "").slice(0, 10),
+          "اسم الحساب الإعلاني": String(row.__account_name || ""),
+          "اسم الكامبين": String(row.__campaign_name || ""),
+          "Ad set name": "",
+          "Ad Name": "",
+          "Spend (Cost)": 0,
+          العملة: "",
+          Impressions: 0,
+          "Link Clicks": 0,
+          "Clicks (all)": 0,
+          "CTR (all)": "",
+          "CTR (link)": "",
+          "Leads (on facebook Leads)": 0,
+          "Leads (Website/Pixel)": 0,
+          "Leads (Total)": 0,
+          "CPL (Cost/Lead)": "",
+          Course: "",
+          __meta_key: String(row.__meta_key || ""),
+          __account_id: String(row.__account_id || ""),
+          __account_name: String(row.__account_name || ""),
+          __account_status: "",
+          __account_currency: "",
+          __campaign_id: String(row.__campaign_id || ""),
+          __adset_id: "",
+          __ad_id: "",
+          __lead_types: JSON.stringify(state),
+          __synced_at: String(row.__status_checked_at || ""),
+        },
+      };
     });
 }
 
 const assignment = (id, name, value, type = "string") => ({ id, name, value, type });
 const contextNode = (id, name, requestMode, position) => ({
-  id, name, type: "n8n-nodes-base.set", typeVersion: 3.4, position,
-  parameters: { assignments: { assignments: [assignment(`${id}-mode`, "requestMode", requestMode)] }, options: {} },
+  id,
+  name,
+  type: "n8n-nodes-base.set",
+  typeVersion: 3.4,
+  position,
+  parameters: {
+    assignments: { assignments: [assignment(`${id}-mode`, "requestMode", requestMode)] },
+    options: {},
+  },
 });
 
 const schema = [
-  "التاريخ", "اسم الحساب الإعلاني", "اسم الكامبين", "Ad set name", "Ad Name", "Spend (Cost)", "العملة",
-  "Impressions", "Link Clicks", "Clicks (all)", "Leads (on facebook Leads)", "Leads (Website/Pixel)",
-  "Leads (Total)", "CPL (Cost/Lead)", "Course", "__meta_key", "__account_id", "__account_name",
-  "__account_status", "__account_currency", "__campaign_id", "__adset_id", "__ad_id", "__lead_types", "__synced_at",
-].map((id) => ({ id, displayName: id, required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true, removed: false }));
+  "التاريخ",
+  "اسم الحساب الإعلاني",
+  "اسم الكامبين",
+  "Ad set name",
+  "Ad Name",
+  "Spend (Cost)",
+  "العملة",
+  "Impressions",
+  "Link Clicks",
+  "Clicks (all)",
+  "Leads (on facebook Leads)",
+  "Leads (Website/Pixel)",
+  "Leads (Total)",
+  "CPL (Cost/Lead)",
+  "Course",
+  "__meta_key",
+  "__account_id",
+  "__account_name",
+  "__account_status",
+  "__account_currency",
+  "__campaign_id",
+  "__adset_id",
+  "__ad_id",
+  "__lead_types",
+  "__synced_at",
+].map((id) => ({
+  id,
+  displayName: id,
+  required: false,
+  defaultMatch: false,
+  display: true,
+  type: "string",
+  canBeUsedToMatch: true,
+  removed: false,
+}));
 
 const workflow = {
   name: "Engosoft — All Ads Official Campaign Status [v2]",
   settings: { executionOrder: "v1", timezone: "Africa/Cairo" },
   nodes: [
-    { id: "status-webhook", name: "Dashboard Official Status Webhook", type: "n8n-nodes-base.webhook", typeVersion: 2.1, position: [0, 0], webhookId: "4fbe7508-663a-4eb7-8c3a-42e23a58c124", parameters: { httpMethod: "GET", path: "engosoft-meta-campaign-live-status-v1-4fbe7508", responseMode: "responseNode", options: {} } },
-    { id: "status-refresh-webhook", name: "Force Official Status Refresh", type: "n8n-nodes-base.webhook", typeVersion: 2.1, position: [0, 130], webhookId: "5f7cb370-efb1-4b5f-8d7e-4d6522755ea8", parameters: { httpMethod: "POST", path: "engosoft-meta-campaign-refresh-v1-7d6522755ea8", responseMode: "responseNode", options: {} } },
-    { id: "status-schedule", name: "Refresh Official Status Hourly", type: "n8n-nodes-base.scheduleTrigger", typeVersion: 1.3, position: [0, 270], parameters: { rule: { interval: [{ field: "cronExpression", expression: "15 * * * *" }] } } },
-    { id: "status-manual", name: "Manual Test Run", type: "n8n-nodes-base.manualTrigger", typeVersion: 1, position: [0, 420], parameters: {} },
+    {
+      id: "status-webhook",
+      name: "Dashboard Official Status Webhook",
+      type: "n8n-nodes-base.webhook",
+      typeVersion: 2.1,
+      position: [0, 0],
+      webhookId: "4fbe7508-663a-4eb7-8c3a-42e23a58c124",
+      parameters: {
+        httpMethod: "GET",
+        path: "engosoft-meta-campaign-live-status-v1-4fbe7508",
+        responseMode: "responseNode",
+        options: {},
+      },
+    },
+    {
+      id: "status-refresh-webhook",
+      name: "Force Official Status Refresh",
+      type: "n8n-nodes-base.webhook",
+      typeVersion: 2.1,
+      position: [0, 130],
+      webhookId: "5f7cb370-efb1-4b5f-8d7e-4d6522755ea8",
+      parameters: {
+        httpMethod: "POST",
+        path: "engosoft-meta-campaign-refresh-v1-7d6522755ea8",
+        responseMode: "responseNode",
+        options: {},
+      },
+    },
+    {
+      id: "status-schedule",
+      name: "Refresh Official Status Every 10 Minutes",
+      type: "n8n-nodes-base.scheduleTrigger",
+      typeVersion: 1.3,
+      position: [0, 270],
+      parameters: { rule: { interval: [{ field: "cronExpression", expression: "*/10 * * * *" }] } },
+    },
+    {
+      id: "status-manual",
+      name: "Manual Test Run",
+      type: "n8n-nodes-base.manualTrigger",
+      typeVersion: 1,
+      position: [0, 420],
+      parameters: {},
+    },
     contextNode("status-refresh-context", "Refresh Request", "refresh_webhook", [230, 130]),
     contextNode("status-background-context", "Background Request", "scheduled", [230, 330]),
-    { id: "status-cache-read", name: "Read n8n Official Cache", type: "n8n-nodes-base.code", typeVersion: 2, position: [300, -60], parameters: { jsCode: stripFunction(readCachedOfficialResponse) } },
-    { id: "status-config", name: "Official Status Configuration", type: "n8n-nodes-base.set", typeVersion: 3.4, position: [500, 160], parameters: { assignments: { assignments: [
-      assignment("cfg-meta-token", "META_TOKEN", env.META_TOKEN || "REPLACE_META_TOKEN"),
-      assignment("cfg-meta-accounts", "META_ACCOUNTS_JSON", env.META_ACCOUNTS_JSON || "[]"),
-      assignment("cfg-meta-version", "META_API_VERSION", "v25.0"),
-      assignment("cfg-snap-account", "SNAP_AD_ACCOUNT_ID", env.SNAP_AD_ACCOUNT_ID || ""),
-      assignment("cfg-snap-name", "SNAP_ACCOUNT_NAME", env.SNAP_ACCOUNT_NAME || "Engosoft Snapchat"),
-      assignment("cfg-snap-refresh", "SNAP_REFRESH_TOKEN", env.SNAP_REFRESH_TOKEN || ""),
-      assignment("cfg-snap-client", "SNAP_CLIENT_ID", env.SNAP_CLIENT_ID || ""),
-      assignment("cfg-snap-secret", "SNAP_CLIENT_SECRET", env.SNAP_CLIENT_SECRET || ""),
-      assignment("cfg-tiktok-token", "TIKTOK_ACCESS_TOKEN", env.TIKTOK_ACCESS_TOKEN || ""),
-      assignment("cfg-tiktok-ids", "TIKTOK_ADVERTISER_IDS_JSON", env.TIKTOK_ADVERTISER_IDS_JSON || "[]"),
-      assignment("cfg-google-client", "GOOGLE_CLIENT_ID", env.GOOGLE_ADS_CLIENT_ID || ""),
-      assignment("cfg-google-secret", "GOOGLE_CLIENT_SECRET", env.GOOGLE_ADS_CLIENT_SECRET || ""),
-      assignment("cfg-google-refresh", "GOOGLE_REFRESH_TOKEN", env.GOOGLE_ADS_REFRESH_TOKEN || ""),
-      assignment("cfg-google-dev", "GOOGLE_DEVELOPER_TOKEN", env.GOOGLE_ADS_DEVELOPER_TOKEN || ""),
-      assignment("cfg-google-login", "GOOGLE_LOGIN_CUSTOMER_ID", env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || ""),
-      assignment("cfg-google-customers", "GOOGLE_CUSTOMER_IDS_JSON", env.GOOGLE_ADS_CUSTOMER_IDS_JSON || "[]"),
-      assignment("cfg-sheet-url", "SPREADSHEET_URL", "https://docs.google.com/spreadsheets/d/14kv8Xkv8SeFhF9roekDI0OKmpZBU29YQOlMj03LOKT0/edit?usp=sharing"),
-      assignment("cfg-sheet-name", "SHEET_NAME", "Meta Ads Daily"),
-      assignment("cfg-mode", "requestMode", "={{ $json.requestMode || 'scheduled' }}"),
-    ] }, options: {} } },
-    { id: "status-fetch", name: "Fetch Official Status — All Platforms", type: "n8n-nodes-base.code", typeVersion: 2, position: [790, 160], parameters: { jsCode: stripFunction(fetchOfficialCampaignStatus) }, retryOnFail: true, maxTries: 2, waitBetweenTries: 4000 },
-    { id: "status-package", name: "Cache + Package Official Response", type: "n8n-nodes-base.code", typeVersion: 2, position: [1060, 30], parameters: { jsCode: stripFunction(packageOfficialResponse) } },
-    { id: "status-has-row", name: "Has Official State Row", type: "n8n-nodes-base.if", typeVersion: 2, position: [1060, 300], parameters: { conditions: { options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 }, conditions: [{ id: "status-key-check", leftValue: "={{ $json.__meta_key }}", rightValue: "", operator: { type: "string", operation: "notEmpty", singleValue: true } }], combinator: "and" }, options: {} } },
-    { id: "status-backup-map", name: "Prepare Google Backup Rows", type: "n8n-nodes-base.code", typeVersion: 2, position: [1290, 300], parameters: { jsCode: stripFunction(prepareGoogleBackup) } },
-    { id: "status-sheet", name: "Backup Official Status to Google", type: "n8n-nodes-base.googleSheets", typeVersion: 4.7, position: [1530, 300], retryOnFail: true, maxTries: 3, waitBetweenTries: 5000, credentials: { googleSheetsOAuth2Api: { id: "ZXa2IX134lVjdbGk", name: "Google Sheets account" } }, parameters: { operation: "appendOrUpdate", documentId: { __rl: true, value: "={{ $('Official Status Configuration').first().json.SPREADSHEET_URL }}", mode: "url" }, sheetName: { __rl: true, value: "={{ $('Official Status Configuration').first().json.SHEET_NAME }}", mode: "name" }, columns: { mappingMode: "autoMapInputData", value: {}, matchingColumns: ["__meta_key"], schema, attemptToConvertTypes: false, convertFieldsToString: false }, options: { cellFormat: "RAW", handlingExtraData: "insertInNewColumn", useAppend: true } } },
-    { id: "status-webhook-kind", name: "Is Refresh Webhook", type: "n8n-nodes-base.if", typeVersion: 2, position: [1320, 30], parameters: { conditions: { options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 }, conditions: [{ id: "status-webhook-check", leftValue: "={{ $json.requestMode }}", rightValue: "refresh_webhook", operator: { type: "string", operation: "equals" } }], combinator: "and" }, options: {} } },
-    { id: "status-get-response", name: "Return Official Campaign Status", type: "n8n-nodes-base.respondToWebhook", typeVersion: 1.4, position: [570, -60], parameters: { respondWith: "json", responseBody: "={{ JSON.stringify($json) }}", options: {} } },
-    { id: "status-refresh-response", name: "Return Fresh Official Status", type: "n8n-nodes-base.respondToWebhook", typeVersion: 1.4, position: [1570, 40], parameters: { respondWith: "json", responseBody: "={{ JSON.stringify($json) }}", options: {} } },
-    { id: "status-note", name: "Status rules", type: "n8n-nodes-base.stickyNote", typeVersion: 1, position: [720, -230], parameters: { width: 780, height: 220, content: "## Current status without misleading counts\n- Meta: discover every accessible ad account; require campaign `effective_status=ACTIVE`, a current start/stop schedule, an ACTIVE ad set, and an ACTIVE ad.\n- Snapchat: `status=ACTIVE` plus `delivery_status`.\n- TikTok: `operation_status=ENABLE` plus `secondary_status`.\n- Google Ads: `campaign.status=ENABLED` plus primary/serving status.\n- Spend is context only. It never decides whether a campaign is active.\n- n8n is primary; Google Sheets is backup only." } },
+    {
+      id: "status-cache-read",
+      name: "Read n8n Official Cache",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [300, -60],
+      parameters: { jsCode: stripFunction(readCachedOfficialResponse) },
+    },
+    {
+      id: "status-config",
+      name: "Official Status Configuration",
+      type: "n8n-nodes-base.set",
+      typeVersion: 3.4,
+      position: [500, 160],
+      parameters: {
+        assignments: {
+          assignments: [
+            assignment("cfg-meta-token", "META_TOKEN", env.META_TOKEN || "REPLACE_META_TOKEN"),
+            assignment("cfg-meta-accounts", "META_ACCOUNTS_JSON", env.META_ACCOUNTS_JSON || "[]"),
+            assignment("cfg-meta-version", "META_API_VERSION", "v25.0"),
+            assignment("cfg-snap-account", "SNAP_AD_ACCOUNT_ID", env.SNAP_AD_ACCOUNT_ID || ""),
+            assignment(
+              "cfg-snap-name",
+              "SNAP_ACCOUNT_NAME",
+              env.SNAP_ACCOUNT_NAME || "Engosoft Snapchat",
+            ),
+            assignment("cfg-snap-refresh", "SNAP_REFRESH_TOKEN", env.SNAP_REFRESH_TOKEN || ""),
+            assignment("cfg-snap-client", "SNAP_CLIENT_ID", env.SNAP_CLIENT_ID || ""),
+            assignment("cfg-snap-secret", "SNAP_CLIENT_SECRET", env.SNAP_CLIENT_SECRET || ""),
+            assignment("cfg-tiktok-token", "TIKTOK_ACCESS_TOKEN", env.TIKTOK_ACCESS_TOKEN || ""),
+            assignment(
+              "cfg-tiktok-ids",
+              "TIKTOK_ADVERTISER_IDS_JSON",
+              env.TIKTOK_ADVERTISER_IDS_JSON || "[]",
+            ),
+            assignment("cfg-google-client", "GOOGLE_CLIENT_ID", env.GOOGLE_ADS_CLIENT_ID || ""),
+            assignment(
+              "cfg-google-secret",
+              "GOOGLE_CLIENT_SECRET",
+              env.GOOGLE_ADS_CLIENT_SECRET || "",
+            ),
+            assignment(
+              "cfg-google-refresh",
+              "GOOGLE_REFRESH_TOKEN",
+              env.GOOGLE_ADS_REFRESH_TOKEN || "",
+            ),
+            assignment(
+              "cfg-google-dev",
+              "GOOGLE_DEVELOPER_TOKEN",
+              env.GOOGLE_ADS_DEVELOPER_TOKEN || "",
+            ),
+            assignment(
+              "cfg-google-login",
+              "GOOGLE_LOGIN_CUSTOMER_ID",
+              env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "",
+            ),
+            assignment(
+              "cfg-google-customers",
+              "GOOGLE_CUSTOMER_IDS_JSON",
+              env.GOOGLE_ADS_CUSTOMER_IDS_JSON || "[]",
+            ),
+            assignment(
+              "cfg-sheet-url",
+              "SPREADSHEET_URL",
+              "https://docs.google.com/spreadsheets/d/14kv8Xkv8SeFhF9roekDI0OKmpZBU29YQOlMj03LOKT0/edit?usp=sharing",
+            ),
+            assignment("cfg-sheet-name", "SHEET_NAME", "Meta Ads Daily"),
+            assignment("cfg-mode", "requestMode", "={{ $json.requestMode || 'scheduled' }}"),
+          ],
+        },
+        options: {},
+      },
+    },
+    {
+      id: "status-fetch",
+      name: "Fetch Official Status — All Platforms",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [790, 160],
+      parameters: { jsCode: stripFunction(fetchOfficialCampaignStatus) },
+      retryOnFail: true,
+      maxTries: 2,
+      waitBetweenTries: 4000,
+    },
+    {
+      id: "status-package",
+      name: "Cache + Package Official Response",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [1060, 30],
+      parameters: { jsCode: stripFunction(packageOfficialResponse) },
+    },
+    {
+      id: "status-has-row",
+      name: "Has Official State Row",
+      type: "n8n-nodes-base.if",
+      typeVersion: 2,
+      position: [1060, 300],
+      parameters: {
+        conditions: {
+          options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 },
+          conditions: [
+            {
+              id: "status-key-check",
+              leftValue: "={{ $json.__meta_key }}",
+              rightValue: "",
+              operator: { type: "string", operation: "notEmpty", singleValue: true },
+            },
+          ],
+          combinator: "and",
+        },
+        options: {},
+      },
+    },
+    {
+      id: "status-backup-map",
+      name: "Prepare Google Backup Rows",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [1290, 300],
+      parameters: { jsCode: stripFunction(prepareGoogleBackup) },
+    },
+    {
+      id: "status-sheet",
+      name: "Backup Official Status to Google",
+      type: "n8n-nodes-base.googleSheets",
+      typeVersion: 4.7,
+      position: [1530, 300],
+      retryOnFail: true,
+      maxTries: 3,
+      waitBetweenTries: 5000,
+      credentials: {
+        googleSheetsOAuth2Api: { id: "ZXa2IX134lVjdbGk", name: "Google Sheets account" },
+      },
+      parameters: {
+        operation: "appendOrUpdate",
+        documentId: {
+          __rl: true,
+          value: "={{ $('Official Status Configuration').first().json.SPREADSHEET_URL }}",
+          mode: "url",
+        },
+        sheetName: {
+          __rl: true,
+          value: "={{ $('Official Status Configuration').first().json.SHEET_NAME }}",
+          mode: "name",
+        },
+        columns: {
+          mappingMode: "autoMapInputData",
+          value: {},
+          matchingColumns: ["__meta_key"],
+          schema,
+          attemptToConvertTypes: false,
+          convertFieldsToString: false,
+        },
+        options: { cellFormat: "RAW", handlingExtraData: "insertInNewColumn", useAppend: true },
+      },
+    },
+    {
+      id: "status-webhook-kind",
+      name: "Is Refresh Webhook",
+      type: "n8n-nodes-base.if",
+      typeVersion: 2,
+      position: [1320, 30],
+      parameters: {
+        conditions: {
+          options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 },
+          conditions: [
+            {
+              id: "status-webhook-check",
+              leftValue: "={{ $json.requestMode }}",
+              rightValue: "refresh_webhook",
+              operator: { type: "string", operation: "equals" },
+            },
+          ],
+          combinator: "and",
+        },
+        options: {},
+      },
+    },
+    {
+      id: "status-get-response",
+      name: "Return Official Campaign Status",
+      type: "n8n-nodes-base.respondToWebhook",
+      typeVersion: 1.4,
+      position: [570, -60],
+      parameters: {
+        respondWith: "json",
+        responseBody: "={{ JSON.stringify($json) }}",
+        options: {},
+      },
+    },
+    {
+      id: "status-refresh-response",
+      name: "Return Fresh Official Status",
+      type: "n8n-nodes-base.respondToWebhook",
+      typeVersion: 1.4,
+      position: [1570, 40],
+      parameters: {
+        respondWith: "json",
+        responseBody: "={{ JSON.stringify($json) }}",
+        options: {},
+      },
+    },
+    {
+      id: "status-note",
+      name: "Status rules",
+      type: "n8n-nodes-base.stickyNote",
+      typeVersion: 1,
+      position: [720, -230],
+      parameters: {
+        width: 780,
+        height: 220,
+        content:
+          "## Current status without misleading counts\n- Meta: discover every accessible ad account; require campaign `effective_status=ACTIVE`, a current start/stop schedule, an ACTIVE ad set, and an ACTIVE ad.\n- Snapchat: `status=ACTIVE` plus `delivery_status`.\n- TikTok: `operation_status=ENABLE` plus `secondary_status`.\n- Google Ads: `campaign.status=ENABLED` plus primary/serving status.\n- Spend is context only. It never decides whether a campaign is active.\n- n8n is primary; Google Sheets is backup only.",
+      },
+    },
   ],
   connections: {
-    "Dashboard Official Status Webhook": { main: [[{ node: "Read n8n Official Cache", type: "main", index: 0 }]] },
-    "Read n8n Official Cache": { main: [[{ node: "Return Official Campaign Status", type: "main", index: 0 }]] },
-    "Force Official Status Refresh": { main: [[{ node: "Refresh Request", type: "main", index: 0 }]] },
-    "Refresh Official Status Hourly": { main: [[{ node: "Background Request", type: "main", index: 0 }]] },
+    "Dashboard Official Status Webhook": {
+      main: [[{ node: "Read n8n Official Cache", type: "main", index: 0 }]],
+    },
+    "Read n8n Official Cache": {
+      main: [[{ node: "Return Official Campaign Status", type: "main", index: 0 }]],
+    },
+    "Force Official Status Refresh": {
+      main: [[{ node: "Refresh Request", type: "main", index: 0 }]],
+    },
+    "Refresh Official Status Every 10 Minutes": {
+      main: [[{ node: "Background Request", type: "main", index: 0 }]],
+    },
     "Manual Test Run": { main: [[{ node: "Background Request", type: "main", index: 0 }]] },
-    "Refresh Request": { main: [[{ node: "Official Status Configuration", type: "main", index: 0 }]] },
-    "Background Request": { main: [[{ node: "Official Status Configuration", type: "main", index: 0 }]] },
-    "Official Status Configuration": { main: [[{ node: "Fetch Official Status — All Platforms", type: "main", index: 0 }]] },
-    "Fetch Official Status — All Platforms": { main: [[{ node: "Cache + Package Official Response", type: "main", index: 0 }, { node: "Has Official State Row", type: "main", index: 0 }]] },
-    "Cache + Package Official Response": { main: [[{ node: "Is Refresh Webhook", type: "main", index: 0 }]] },
-    "Is Refresh Webhook": { main: [[{ node: "Return Fresh Official Status", type: "main", index: 0 }], []] },
-    "Has Official State Row": { main: [[{ node: "Prepare Google Backup Rows", type: "main", index: 0 }], []] },
-    "Prepare Google Backup Rows": { main: [[{ node: "Backup Official Status to Google", type: "main", index: 0 }]] },
+    "Refresh Request": {
+      main: [[{ node: "Official Status Configuration", type: "main", index: 0 }]],
+    },
+    "Background Request": {
+      main: [[{ node: "Official Status Configuration", type: "main", index: 0 }]],
+    },
+    "Official Status Configuration": {
+      main: [[{ node: "Fetch Official Status — All Platforms", type: "main", index: 0 }]],
+    },
+    "Fetch Official Status — All Platforms": {
+      main: [
+        [
+          { node: "Cache + Package Official Response", type: "main", index: 0 },
+          { node: "Has Official State Row", type: "main", index: 0 },
+        ],
+      ],
+    },
+    "Cache + Package Official Response": {
+      main: [[{ node: "Is Refresh Webhook", type: "main", index: 0 }]],
+    },
+    "Is Refresh Webhook": {
+      main: [[{ node: "Return Fresh Official Status", type: "main", index: 0 }], []],
+    },
+    "Has Official State Row": {
+      main: [[{ node: "Prepare Google Backup Rows", type: "main", index: 0 }], []],
+    },
+    "Prepare Google Backup Rows": {
+      main: [[{ node: "Backup Official Status to Google", type: "main", index: 0 }]],
+    },
   },
 };
 

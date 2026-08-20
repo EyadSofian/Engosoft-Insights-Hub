@@ -11,6 +11,7 @@ import type { PerfRow } from "@/lib/types";
  * so a campaign that turns risky later still breaks through.
  *
  *   close (X / Esc / backdrop) → nothing stored, back on the next load
+ *   action taken               → hide that campaign for seven days
  *   snooze                     → quiet until local midnight
  *   mute                       → those exact campaigns never alert again
  *
@@ -26,6 +27,8 @@ export interface RiskAlertPrefs {
   snoozeUntil: number;
   /** Campaigns visible when the snooze started — anything new ignores it. */
   snoozedKeys: string[];
+  /** Campaign-specific action memory. Expired entries stop suppressing alerts. */
+  reviewedUntil: Record<string, number>;
   /** Bumped by restore() so an already-closed popup can reopen. Not persisted. */
   restoredAt: number;
 }
@@ -34,6 +37,7 @@ const EMPTY: RiskAlertPrefs = {
   mutedKeys: [],
   snoozeUntil: 0,
   snoozedKeys: [],
+  reviewedUntil: {},
   restoredAt: 0,
 };
 
@@ -46,6 +50,16 @@ const emit = () => {
 const toKeys = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
+const toReviewMap = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > Date.now(),
+    ),
+  );
+};
+
 function readStorage(): RiskAlertPrefs {
   if (typeof window === "undefined") return EMPTY;
   try {
@@ -56,6 +70,7 @@ function readStorage(): RiskAlertPrefs {
       mutedKeys: toKeys(parsed.mutedKeys),
       snoozeUntil: typeof parsed.snoozeUntil === "number" ? parsed.snoozeUntil : 0,
       snoozedKeys: toKeys(parsed.snoozedKeys),
+      reviewedUntil: toReviewMap(parsed.reviewedUntil),
       restoredAt: 0,
     };
   } catch {
@@ -64,18 +79,22 @@ function readStorage(): RiskAlertPrefs {
 }
 
 function commit(next: RiskAlertPrefs) {
-  cache = next;
+  const reviewedUntil = Object.fromEntries(
+    Object.entries(next.reviewedUntil).filter(([, until]) => until > Date.now()),
+  );
+  cache = { ...next, reviewedUntil };
   if (typeof window !== "undefined") {
     try {
-      if (!next.mutedKeys.length && !next.snoozeUntil) {
+      if (!next.mutedKeys.length && !next.snoozeUntil && !Object.keys(reviewedUntil).length) {
         window.localStorage.removeItem(STORAGE_KEY);
       } else {
         window.localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
-            mutedKeys: next.mutedKeys,
-            snoozeUntil: next.snoozeUntil,
-            snoozedKeys: next.snoozedKeys,
+            mutedKeys: cache.mutedKeys,
+            snoozeUntil: cache.snoozeUntil,
+            snoozedKeys: cache.snoozedKeys,
+            reviewedUntil,
           }),
         );
       }
@@ -120,6 +139,20 @@ export const riskAlertPrefs = {
       snoozedKeys: [],
     });
   },
+  /** Record that action was taken; re-check the campaign after seven days. */
+  review(keys: string[], now = Date.now()) {
+    const current = riskAlertPrefs.get();
+    const until = now + 7 * 24 * 60 * 60 * 1000;
+    commit({
+      ...current,
+      reviewedUntil: {
+        ...current.reviewedUntil,
+        ...Object.fromEntries(keys.map((key) => [key, until])),
+      },
+      snoozeUntil: 0,
+      snoozedKeys: [],
+    });
+  },
   /** Undo every mute and snooze, and reopen the alert. */
   restore() {
     commit({ ...EMPTY, restoredAt: Date.now() });
@@ -136,10 +169,13 @@ if (typeof window !== "undefined") {
 }
 
 /** At-risk campaigns the user has not muted. */
-export function pendingRiskRows(rows: PerfRow[], prefs: RiskAlertPrefs): PerfRow[] {
-  if (!prefs.mutedKeys.length) return rows;
+export function pendingRiskRows(
+  rows: PerfRow[],
+  prefs: RiskAlertPrefs,
+  now = Date.now(),
+): PerfRow[] {
   const muted = new Set(prefs.mutedKeys);
-  return rows.filter((row) => !muted.has(row.key));
+  return rows.filter((row) => !muted.has(row.key) && (prefs.reviewedUntil[row.key] ?? 0) <= now);
 }
 
 /** Muted campaigns that are still burning money right now. */
@@ -147,6 +183,16 @@ export function mutedRiskCount(rows: PerfRow[], prefs: RiskAlertPrefs): number {
   if (!prefs.mutedKeys.length) return 0;
   const muted = new Set(prefs.mutedKeys);
   return rows.reduce((total, row) => total + (muted.has(row.key) ? 1 : 0), 0);
+}
+
+/** Campaigns hidden because they were muted or an action was recently recorded. */
+export function suppressedRiskCount(
+  rows: PerfRow[],
+  prefs: RiskAlertPrefs,
+  now = Date.now(),
+): number {
+  const pending = new Set(pendingRiskRows(rows, prefs, now).map((row) => row.key));
+  return rows.reduce((total, row) => total + (pending.has(row.key) ? 0 : 1), 0);
 }
 
 export function shouldShowRiskAlert(

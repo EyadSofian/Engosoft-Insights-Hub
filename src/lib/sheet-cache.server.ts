@@ -35,6 +35,7 @@ import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-fresh
 import {
   databaseConfigured,
   readDashboardDataset,
+  readDashboardDatasets,
   writeDashboardDataset,
   type DashboardDataset,
   type DatasetSnapshot,
@@ -59,6 +60,10 @@ const DEFAULT_SHEET_ID = "14kv8Xkv8SeFhF9roekDI0OKmpZBU29YQOlMj03LOKT0";
 // operators to run n8n again. Five minutes keeps the shared sheet/Odoo load
 // bounded while allowing scheduled syncs to appear without manual intervention.
 const TTL_MS = 5 * 60 * 1000;
+// Odoo CRM/Lost is a full-history export followed by two full PostgreSQL
+// replaces. It is an upstream sync, not a page read, and does not belong on the
+// five-minute in-memory snapshot cadence.
+const DIRECT_ODOO_REFRESH_MS = 30 * 60 * 1000;
 
 const TAB = {
   meta: "Meta Ads Daily",
@@ -156,6 +161,7 @@ export interface Snapshot {
 let cache: Snapshot | null = null;
 let inflight: Promise<Snapshot> | null = null;
 let inflightStartedAt = 0;
+let cacheRevision = 0;
 
 /**
  * How long a snapshot may keep being served past its TTL while the refresh runs
@@ -177,9 +183,14 @@ const MAX_STALE_MS = 30 * 60 * 1000;
  */
 const REFRESH_STUCK_MS = 2 * 60 * 1000;
 
-/** Make newly-ingested database batches visible on the next request. */
+/**
+ * Make newly-ingested batches visible without turning the next visitor into a
+ * cold-start victim. A warm snapshot is marked stale and refreshed behind the
+ * request; only a genuinely cold process has to wait.
+ */
 export function invalidateDataCache(): void {
-  cache = null;
+  cacheRevision += 1;
+  if (cache) cache = { ...cache, lastAttemptAt: Date.now() - TTL_MS };
 }
 /**
  * Last successful raw rows per tab. A tab that fails or comes back empty is
@@ -821,15 +832,16 @@ export async function loadAllData(force = false): Promise<Snapshot> {
     // it surfaces as an unhandled rejection. A failed background refresh leaves
     // the previous snapshot standing, exactly as a failed foreground one does,
     // and still reports itself through `fetchErrors`.
-    void refreshSnapshot().catch(() => {});
+    void refreshSnapshot(false).catch(() => {});
     return cache;
   }
   if (action === "join-refresh" && inflight) return inflight;
-  return refreshSnapshot();
+  return refreshSnapshot(force);
 }
 
-async function refreshSnapshot(): Promise<Snapshot> {
+async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot> {
   const sheetId = process.env.SHEET_ID || DEFAULT_SHEET_ID;
+  const revisionAtStart = cacheRevision;
 
   inflightStartedAt = Date.now();
   inflight = (async () => {
@@ -860,6 +872,40 @@ async function refreshSnapshot(): Promise<Snapshot> {
     // Read durable sources first. Once a dataset has landed in PostgreSQL its
     // Google tab is no longer fetched at all; Sheets remains a migration-only
     // bootstrap for installations that have not run the new n8n path yet.
+    const storedDatasets = [
+      "meta_ads",
+      "snap_ads",
+      "accounting",
+      "accounting_legacy",
+      "ads_legacy",
+      "crm",
+      "lost",
+      "invoiced",
+      "website_sales",
+    ] as const;
+    let storedSnapshots: Array<DatasetSnapshot | null>;
+    try {
+      storedSnapshots = await readDashboardDatasets(storedDatasets);
+      for (const snapshot of storedSnapshots) {
+        if (!snapshot) continue;
+        storedStates.push({
+          dataset: snapshot.dataset,
+          status: snapshot.status,
+          syncedAt: snapshot.syncedAt,
+          error: snapshot.error,
+        });
+      }
+    } catch {
+      // Preserve the old per-dataset isolation as a recovery path. The common
+      // healthy path is two queries total; a partial database fault can still
+      // recover whichever datasets remain readable.
+      storedSnapshots = await Promise.all(storedDatasets.map(readStored));
+    }
+    const storedByDataset = new Map(
+      storedSnapshots
+        .filter((snapshot): snapshot is DatasetSnapshot => snapshot !== null)
+        .map((snapshot) => [snapshot.dataset, snapshot]),
+    );
     const [
       metaStored,
       snapStored,
@@ -870,17 +916,7 @@ async function refreshSnapshot(): Promise<Snapshot> {
       lostStored,
       invoicedStored,
       websiteSalesStored,
-    ] = await Promise.all([
-      readStored("meta_ads"),
-      readStored("snap_ads"),
-      readStored("accounting"),
-      readStored("accounting_legacy"),
-      readStored("ads_legacy"),
-      readStored("crm"),
-      readStored("lost"),
-      readStored("invoiced"),
-      readStored("website_sales"),
-    ]);
+    ] = storedDatasets.map((dataset) => storedByDataset.get(dataset) ?? null);
 
     /**
      * A tab is only allowed to reach the parser as empty when it has *never*
@@ -972,7 +1008,24 @@ async function refreshSnapshot(): Promise<Snapshot> {
         : Promise.resolve({
             error: "Odoo CRM is not configured; using Google Sheets fallback.",
           });
-    const directCrmPromise = loadDirectCrmCandidate();
+    const storedIsFresh = (snapshot: DatasetSnapshot | null, maxAgeMs: number): boolean => {
+      const syncedAt = Date.parse(snapshot?.syncedAt ?? "");
+      return (
+        !!snapshot?.rows.length &&
+        snapshot.status === "success" &&
+        Number.isFinite(syncedAt) &&
+        Date.now() - syncedAt < maxAgeMs
+      );
+    };
+    const directCrmAttempted =
+      odooConfigured() &&
+      (refreshRemoteSources ||
+        !storedIsFresh(crmStored, DIRECT_ODOO_REFRESH_MS) ||
+        !storedIsFresh(lostStored, DIRECT_ODOO_REFRESH_MS));
+    const directCrmPromise: Promise<{
+      value?: Awaited<ReturnType<typeof loadDirectCrm>>;
+      error?: string;
+    }> = directCrmAttempted ? loadDirectCrmCandidate() : Promise.resolve({ error: "" });
 
     // Accounting follows the same fail-closed contract as CRM: start the Odoo
     // read while Google is loading, cap its wall time, and never turn an Odoo
@@ -1048,7 +1101,7 @@ async function refreshSnapshot(): Promise<Snapshot> {
     const crmFallbackRaw = crmStored?.rows.length ? crmStored.rows : crmSheetRaw;
     const invRaw = invoicedStored?.rows.length ? invoicedStored.rows : invoicedSheetRaw;
     const safeTikTok = () =>
-      fetchTikTokAds().catch((error: unknown) => ({
+      fetchTikTokAds(refreshRemoteSources).catch((error: unknown) => ({
         configured: Boolean(
           process.env.TIKTOK_ACCESS_TOKEN?.trim() && process.env.TIKTOK_ADVERTISER_IDS?.trim(),
         ),
@@ -1057,7 +1110,7 @@ async function refreshSnapshot(): Promise<Snapshot> {
         errors: [error instanceof Error ? error.message : String(error)],
       }));
     const safeGoogle = () =>
-      fetchGoogleAds().catch((error: unknown) => ({
+      fetchGoogleAds(refreshRemoteSources).catch((error: unknown) => ({
         configured: Boolean(
           process.env.GOOGLE_ADS_CLIENT_ID?.trim() &&
           process.env.GOOGLE_ADS_CLIENT_SECRET?.trim() &&
@@ -2704,6 +2757,15 @@ async function refreshSnapshot(): Promise<Snapshot> {
       };
       return cache;
     }
+    // An ingest committed after this rebuild began. Publishing `next` would
+    // stamp a pre-ingest read as fresh for another five minutes. Keep the
+    // snapshot stale so the next request starts one clean rebuild instead.
+    if (cacheRevision !== revisionAtStart) {
+      // On a cold process there is no previous snapshot to retain. The rebuild
+      // is still usable, but it must not masquerade as including the ingest.
+      cache = { ...(previous ?? next), lastAttemptAt: Date.now() - TTL_MS };
+      return cache;
+    }
     cache = next;
     return cache;
   } catch (e) {
@@ -2715,7 +2777,7 @@ async function refreshSnapshot(): Promise<Snapshot> {
 }
 
 export function invalidateCache() {
-  cache = null;
+  invalidateDataCache();
 }
 
 export { parseDate, daysBetween, SOURCES_WITHOUT_SPEND };

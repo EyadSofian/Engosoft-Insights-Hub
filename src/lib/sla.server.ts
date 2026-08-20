@@ -2,7 +2,7 @@
 // PostgreSQL database. n8n pulls directly from Yeastar and posts raw call rows
 // through /api/ingest/dataset; no Google Sheet or Supabase read is involved.
 
-import { readDashboardDataset } from "./dashboard-db.server";
+import { readDashboardDatasets } from "./dashboard-db.server";
 import { readSalesReport, type SalesReportRow } from "./sales-report.ts";
 
 export interface SlaRepMonthly {
@@ -51,7 +51,7 @@ export interface SlaSnapshot {
   source: string;
 }
 
-interface MutableMonth extends SlaRepMonthly {}
+type MutableMonth = SlaRepMonthly;
 
 const num = (value: unknown): number => {
   const parsed = Number(value);
@@ -91,10 +91,10 @@ let dataCache: { value: SlaSnapshot; expiresAt: number } | null = null;
 let inFlight: Promise<SlaSnapshot> | null = null;
 
 async function refresh(): Promise<SlaSnapshot> {
-  const [calls, extensions, sales] = await Promise.all([
-    readDashboardDataset("sla_calls"),
-    readDashboardDataset("pbx_extensions"),
-    readDashboardDataset("sales_summary"),
+  const [calls, extensions, sales] = await readDashboardDatasets([
+    "sla_calls",
+    "pbx_extensions",
+    "sales_summary",
   ]);
   if (!calls.configured || !extensions.configured) {
     throw new Error("Railway PostgreSQL is not configured for Yeastar calls.");
@@ -102,10 +102,13 @@ async function refresh(): Promise<SlaSnapshot> {
 
   const extensionMap = new Map(
     extensions.rows
-      .map((row) => [
-        text(row.extension),
-        { userId: num(row.user_id), userName: text(row.user_name) },
-      ] as const)
+      .map(
+        (row) =>
+          [
+            text(row.extension),
+            { userId: num(row.user_id), userName: text(row.user_name) },
+          ] as const,
+      )
       .filter(([extension, person]) => extension && person.userName),
   );
   // Keep the existing `month` field name for the API contract, but aggregate
@@ -136,8 +139,7 @@ async function refresh(): Promise<SlaSnapshot> {
   const repMonthly = [...daily.values()]
     .map((row) => ({
       ...row,
-      answer_pct:
-        row.outbound_calls > 0 ? (row.answered_calls / row.outbound_calls) * 100 : null,
+      answer_pct: row.outbound_calls > 0 ? (row.answered_calls / row.outbound_calls) * 100 : null,
     }))
     .sort((a, b) => a.month.localeCompare(b.month) || a.user_name.localeCompare(b.user_name));
   const fetchedAt =

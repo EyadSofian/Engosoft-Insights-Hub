@@ -28,6 +28,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:snapshot-freshness": "node --experimental-strip-types scripts/test-snapshot-freshness.mjs",
+    "test:dashboard-db": "node --experimental-strip-types scripts/test-dashboard-db.mjs",
+    "test:campaign-risk-prefs": "node --experimental-strip-types scripts/test-campaign-risk-prefs.mjs",
+    "test:campaign-status-policy": "node --experimental-strip-types scripts/test-campaign-status-policy.mjs",
+    "test:limited-json": "node --experimental-strip-types scripts/test-limited-json.mjs",
     "test:response-compression": "node --experimental-strip-types scripts/test-response-compression.mjs",
     "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs"
   },

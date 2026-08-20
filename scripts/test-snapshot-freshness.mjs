@@ -73,10 +73,12 @@ const at = (cacheAgeMs, over = {}) =>
 {
   // Pressing it must never hand back the cache, however fresh.
   assert.equal(at(0, { force: true }), "refresh-and-wait");
-  // Nor a rebuild already in flight: that one was requested before the button
-  // was pressed, so it returns exactly the stale data the user was escaping.
+  // A healthy rebuild already reads the newest committed snapshot. Joining it
+  // avoids doubling every PostgreSQL/Odoo/API read when Refresh is clicked.
+  assert.equal(at(0, { force: true, refreshRunning: true, refreshAgeMs: 1_000 }), "join-refresh");
+  // A genuinely stuck rebuild is replaced.
   assert.equal(
-    at(0, { force: true, refreshRunning: true, refreshAgeMs: 1_000 }),
+    at(0, { force: true, refreshRunning: true, refreshAgeMs: 2 * MIN + 1 }),
     "refresh-and-wait",
   );
 }

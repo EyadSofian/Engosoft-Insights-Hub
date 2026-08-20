@@ -1,27 +1,28 @@
 # Engosoft Insights Hub
 
 Bilingual (Arabic RTL / English) marketing & sales intelligence dashboard for Engosoft.
-It reads a published Google Sheet plus TikTok's Marketing API, joins Meta, Snapchat and
-TikTok ad spend to CRM leads and invoiced revenue, and reports full-funnel performance
-with an AI assistant on top.
+It reads durable PostgreSQL snapshots written by authenticated n8n jobs, with the
+published Google Sheet retained as a migration/recovery source. It joins Meta,
+Snapchat, TikTok and Google ad spend to CRM leads and invoiced revenue, and reports
+full-funnel performance with an AI assistant on top.
 
 ## Stack
 
-| Layer      | Choice                                                                     |
-| ---------- | -------------------------------------------------------------------------- |
-| Framework  | TanStack Start (React 19, SSR)                                             |
-| Build      | Vite 8, Nitro (`node-server` preset)                                       |
-| Styling    | Tailwind CSS v4, custom token layer                                        |
-| Charts     | Recharts                                                                   |
-| Data       | Google Sheets CSV (gviz), parsed with papaparse, cached in memory          |
+| Layer       | Choice                                                                              |
+| ----------- | ----------------------------------------------------------------------------------- |
+| Framework   | TanStack Start (React 19, SSR)                                                      |
+| Build       | Vite 8, Nitro (`node-server` preset)                                                |
+| Styling     | Tailwind CSS v4, custom token layer                                                 |
+| Charts      | Recharts                                                                            |
+| Data        | PostgreSQL JSONB snapshots via authenticated n8n ingest; Google Sheets fallback     |
 | Data (live) | Odoo 17 JSON-RPC, direct — guarded Accounting and authoritative CRM/Lost candidates |
-| Scheduling | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency |
-| AI         | OpenAI (isolated in the chat route, swappable)                             |
+| Scheduling  | in-process timer + a small cron matcher (`src/lib/cron.ts`), no dependency          |
+| AI          | OpenAI (isolated in the chat route, swappable)                                      |
 
-No database. CRM and Lost prefer Odoo directly, while Accounting accepts a direct
-invoice extract only after it reconciles to the approved paid-invoice sheet. Healthy
-sheet fallbacks remain authoritative during an Odoo outage and are not shown as
-missing sources. The dashboard exposes one Accounting report plus a dedicated
+PostgreSQL is the durable last-good store. Normal page requests bulk-read its datasets;
+they do not run a complete Odoo/ads rebuild. CRM and Lost can refresh from Odoo when
+their stored snapshot is old, while healthy stored/Sheet fallbacks continue serving
+during an upstream outage. The dashboard exposes one Accounting report plus a dedicated
 Marketing Courses view; legacy Products and Full Invoiced routes redirect to Accounting.
 
 ## Running locally
@@ -42,34 +43,38 @@ npm run start        # serves .output/server/index.mjs on $PORT
 
 Copy `.env.example` to `.env`:
 
-| Variable                    | Required | Purpose                                                                                |
-| --------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| `SHEET_ID`                  | No       | Google Sheet id. Falls back to the Engosoft sheet.                                     |
-| `ODOO_LOGIN`                | Live data | Odoo user the API key belongs to. Without it Products is unavailable and CRM/Lost use the sheet fallback. |
-| `ODOO_API_KEY`              | Live data | Odoo API key, used in place of the password. Never logged or returned in a response.   |
-| `ODOO_URL` / `ODOO_DB`      | No       | Default to `https://engosoft.com` and `EngoSoft`.                                      |
-| `ODOO_COMPANY_IDS`          | No       | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                             |
-| `ODOO_START_DATE`           | No       | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                |
-| `OPENAI_API_KEY`            | No       | Enables free-form AI answers. Without it the built-in exact-figure answers still work. |
-| `TIKTOK_APP_ID`             | For TikTok | Developer app ID used to resolve authorised account names.                          |
-| `TIKTOK_APP_SECRET`         | For TikTok | Developer app secret. Server-only; never returned or logged.                        |
-| `TIKTOK_ACCESS_TOKEN`       | For TikTok | Long-term Marketing API access token.                                               |
-| `TIKTOK_ADVERTISER_IDS`     | For TikTok | Comma-separated advertiser account IDs.                                             |
-| `TIKTOK_START_DATE`         | No       | Historical start date; defaults to Jan 1 of the current year.                         |
-| `GOOGLE_ADS_CLIENT_ID`      | For Google Ads | OAuth desktop/web client ID. Server-only.                                        |
-| `GOOGLE_ADS_CLIENT_SECRET`  | For Google Ads | OAuth client secret. Server-only; never returned or logged.                      |
-| `GOOGLE_ADS_REFRESH_TOKEN`  | For Google Ads | OAuth refresh token authorised for the Google Ads scope.                        |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | For Google Ads | Developer token from the linked manager account's API Center.                  |
-| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | For Google Ads | Manager account ID used in the `login-customer-id` header.                    |
-| `GOOGLE_ADS_CUSTOMER_IDS`   | For Google Ads | Comma-separated client account IDs to report.                                      |
-| `GOOGLE_ADS_START_DATE`     | No       | Historical start date; defaults to Jan 1 of the current year.                         |
-| `GOOGLE_ADS_END_DATE`       | No       | Optional fixed report end date; defaults to today.                                    |
-| `TELEGRAM_BOT_TOKEN`        | No       | Enables the daily report. Never logged or returned in a response.                      |
-| `TELEGRAM_CHAT_ID`          | No       | Optional fallback recipient, always included alongside `/start` subscribers.           |
-| `TELEGRAM_SUBSCRIBERS_FILE` | No       | Where the subscriber list is stored. Point at a mounted volume on Railway.             |
-| `REPORT_CRON`               | No       | Cron expression in Africa/Cairo. Default `0 9 * * *`.                                  |
-| `REPORT_LANG`               | No       | `ar` (default) or `en`.                                                                |
-| `PORT`                      | No       | Set by Railway automatically.                                                          |
+| Variable                       | Required       | Purpose                                                                                                   |
+| ------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------- |
+| `SHEET_ID`                     | No             | Google Sheet id. Falls back to the Engosoft sheet.                                                        |
+| `DATABASE_URL`                 | Production     | PostgreSQL connection injected into the Railway app service.                                              |
+| `DASHBOARD_INGEST_SECRET`      | Production     | Shared bearer secret for n8n `POST /api/ingest/dataset`.                                                  |
+| `ODOO_LOGIN`                   | Live data      | Odoo user the API key belongs to. Without it Products is unavailable and CRM/Lost use the sheet fallback. |
+| `ODOO_API_KEY`                 | Live data      | Odoo API key, used in place of the password. Never logged or returned in a response.                      |
+| `ODOO_URL` / `ODOO_DB`         | No             | Default to `https://engosoft.com` and `EngoSoft`.                                                         |
+| `ODOO_COMPANY_IDS`             | No             | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                                                |
+| `ODOO_START_DATE`              | No             | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                                   |
+| `OPENAI_API_KEY`               | No             | Enables free-form AI answers. Without it the built-in exact-figure answers still work.                    |
+| `TIKTOK_APP_ID`                | For TikTok     | Developer app ID used to resolve authorised account names.                                                |
+| `TIKTOK_APP_SECRET`            | For TikTok     | Developer app secret. Server-only; never returned or logged.                                              |
+| `TIKTOK_ACCESS_TOKEN`          | For TikTok     | Long-term Marketing API access token.                                                                     |
+| `TIKTOK_ADVERTISER_IDS`        | For TikTok     | Comma-separated advertiser account IDs.                                                                   |
+| `TIKTOK_START_DATE`            | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
+| `GOOGLE_ADS_CLIENT_ID`         | For Google Ads | OAuth desktop/web client ID. Server-only.                                                                 |
+| `GOOGLE_ADS_CLIENT_SECRET`     | For Google Ads | OAuth client secret. Server-only; never returned or logged.                                               |
+| `GOOGLE_ADS_REFRESH_TOKEN`     | For Google Ads | OAuth refresh token authorised for the Google Ads scope.                                                  |
+| `GOOGLE_ADS_DEVELOPER_TOKEN`   | For Google Ads | Developer token from the linked manager account's API Center.                                             |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | For Google Ads | Manager account ID used in the `login-customer-id` header.                                                |
+| `GOOGLE_ADS_CUSTOMER_IDS`      | For Google Ads | Comma-separated client account IDs to report.                                                             |
+| `GOOGLE_ADS_START_DATE`        | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
+| `GOOGLE_ADS_END_DATE`          | No             | Optional fixed report end date; defaults to today.                                                        |
+| `META_LIVE_STATUS_URL`         | No             | Fast n8n official-campaign-status cache endpoint.                                                         |
+| `META_LIVE_STATUS_REFRESH_URL` | No             | n8n refresh endpoint used only when the shared status snapshot is old.                                    |
+| `TELEGRAM_BOT_TOKEN`           | No             | Enables the daily report. Never logged or returned in a response.                                         |
+| `TELEGRAM_CHAT_ID`             | No             | Optional fallback recipient, always included alongside `/start` subscribers.                              |
+| `TELEGRAM_SUBSCRIBERS_FILE`    | No             | Where the subscriber list is stored. Point at a mounted volume on Railway.                                |
+| `REPORT_CRON`                  | No             | Cron expression in Africa/Cairo. Default `0 9 * * *`.                                                     |
+| `REPORT_LANG`                  | No             | `ar` (default) or `en`.                                                                                   |
+| `PORT`                         | No             | Set by Railway automatically.                                                                             |
 
 The sheet must be shared as **anyone with the link can view**. The app only ever reads it.
 
@@ -90,9 +95,12 @@ are fetched in 30-day chunks and include deleted ads, then joined to `/ad/get/` 
 hierarchy metadata remains available. The optional `TikTok Ads Daily` sheet stays as a
 fallback when API credentials are not configured.
 
-Data is fetched on first request, cached in memory for five minutes, and refreshed via
-`POST /api/refresh`. If a fetch fails, the previous snapshot keeps serving rather than
-blanking the dashboard.
+Data is loaded on first request and cached in memory for five minutes. An expired warm
+snapshot is served immediately while one background rebuild runs; `/api/refresh` waits
+for a forced refresh but coalesces concurrent clicks and applies a short cooldown.
+Identical PostgreSQL replacement payloads update their sync state without deleting and
+rewriting every row. If any source fails or comes back empty, the previous good snapshot
+keeps serving rather than blanking the dashboard.
 
 ## Things that are easy to get wrong here
 
@@ -206,6 +214,12 @@ the modal course of its own CRM leads, and to nothing when it has none.
 course spend resolves through the campaign name, no campaign lands under two courses, and
 no campaign's name contradicts the course it was filed under.
 
+**18. A historical Active row is not a currently active campaign.** Risk alerts require
+a recent official platform check, a current schedule, and actual delivery eligibility.
+Meta additionally needs a live ad set and ad; Google/Snapchat must be serving; TikTok's
+effective status must remain enabled. Old Google Sheet recovery rows are never allowed to
+resurrect a campaign that the team already paused or ended.
+
 ## Metric definitions
 
 Every ratio goes through `div()`, which returns `null` when the denominator is zero.
@@ -230,27 +244,30 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 `account`, `campaign`, `adset`, `ad`, `source`, `course`, `mainCategory`, `salesTeam`,
 `salesperson`, `range`, `includeNonLead`, `cpaBasis`).
 
-| Endpoint                                       | Returns                                                                                  |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `GET /api/overview`                            | KPI totals, deltas, funnel, trend, lead origin, spotlights, data health                  |
-| `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains                                             |
+| Endpoint                                       | Returns                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/overview`                            | KPI totals, deltas, funnel, trend, lead origin, spotlights, data health                                                                                      |
+| `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains                                                                                                                 |
 | `GET /api/ads[?grain=campaign\|adset\|ad]`     | Per-platform metrics, platform coverage, daily spend and trend. With `grain`, one level of the performance table; without it, the full ad + ad-set breakdown |
-| `GET /api/courses`                             | Course leaderboard, inferred spend, optional `?detail=` drilldown                        |
-| `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                         |
-| `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                         |
-| `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate              |
-| `GET /api/accounting`                          | Paid accounting lines, distinct invoices, revenue groups, and detail rows                |
-| `GET /api/full-invoiced`                       | Legacy compatibility endpoint; not a revenue source                                      |
-| `GET /api/sales`                               | Legacy alias backed by Accounting                                                        |
-| `GET /api/yoy`                                 | Year-over-year, or an honest empty state                                                 |
-| `GET /api/filters`                             | Distinct filter values, coverage, sync status, data health                               |
-| `POST /api/refresh`                            | Drops the cache and re-pulls the sheet; returns row counts so a no-op refresh is visible |
-| `POST /api/chat`                               | AI assistant                                                                             |
-| `GET /api/telegram/preview`                    | The exact report text, without sending                                                   |
-| `POST /api/telegram/send-daily`                | Broadcasts to every subscriber (`?days=7` for weekly)                                    |
-| `POST /api/telegram/webhook`                   | Handles `/start`, `/stop`, `/report`, `/week`, `/status`                                 |
-| `GET /api/telegram/setup`                      | Whether the webhook is registered, subscriber count, schedule state                      |
-| `POST /api/telegram/setup`                     | Points Telegram at this deployment. Required once before the bot works                   |
+| `GET /api/courses`                             | Course leaderboard, inferred spend, optional `?detail=` drilldown                                                                                            |
+| `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                                                                                             |
+| `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                                                                                             |
+| `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate                                                                                  |
+| `GET /api/accounting`                          | Paid accounting lines, distinct invoices, revenue groups, and detail rows                                                                                    |
+| `GET /api/full-invoiced`                       | Legacy compatibility endpoint; not a revenue source                                                                                                          |
+| `GET /api/sales`                               | Legacy alias backed by Accounting                                                                                                                            |
+| `GET /api/yoy`                                 | Year-over-year, or an honest empty state                                                                                                                     |
+| `GET /api/filters`                             | Distinct filter values, coverage, sync status, data health                                                                                                   |
+| `POST /api/refresh`                            | Coalesces a forced remote refresh and returns source counts/errors                                                                                           |
+| `POST /api/ingest/dataset`                     | Authenticated n8n upsert/replace into the durable dataset store                                                                                              |
+| `GET /api/health`                              | Constant-cost Railway liveness check; never downloads reporting rows                                                                                         |
+| `GET /api/health?details=1`                    | Sync-state diagnostics and row counts from the small metadata table                                                                                          |
+| `POST /api/chat`                               | AI assistant                                                                                                                                                 |
+| `GET /api/telegram/preview`                    | The exact report text, without sending                                                                                                                       |
+| `POST /api/telegram/send-daily`                | Broadcasts to every subscriber (`?days=7` for weekly)                                                                                                        |
+| `POST /api/telegram/webhook`                   | Handles `/start`, `/stop`, `/report`, `/week`, `/status`                                                                                                     |
+| `GET /api/telegram/setup`                      | Whether the webhook is registered, subscriber count, schedule state                                                                                          |
+| `POST /api/telegram/setup`                     | Points Telegram at this deployment. Required once before the bot works                                                                                       |
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 

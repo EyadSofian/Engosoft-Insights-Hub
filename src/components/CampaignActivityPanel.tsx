@@ -19,18 +19,24 @@ import type {
 } from "@/lib/types";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
 import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
-import { mutedRiskCount, riskAlertPrefs, useRiskAlertPrefs } from "@/lib/campaign-risk-prefs";
+import {
+  pendingRiskRows,
+  riskAlertPrefs,
+  suppressedRiskCount,
+  useRiskAlertPrefs,
+} from "@/lib/campaign-risk-prefs";
 import { Card, EmptyState, Notice, Pill, SectionTitle } from "./ui-bits";
 
 export function CampaignActivityPanel({ activity }: { activity: CampaignActivity }) {
   const { lang } = useI18n();
   const prefs = useRiskAlertPrefs();
-  // The only way back once the popup has been silenced for good.
-  const muted = mutedRiskCount(activity.atRisk, prefs);
+  const pendingAtRisk = pendingRiskRows(activity.atRisk, prefs);
+  // The only way back once a review or mute has been recorded.
+  const suppressed = suppressedRiskCount(activity.atRisk, prefs);
   // Both badges read the server's own verdict. Recomputing them here let the
   // list disagree with the count in the notice right above it.
   const zeroKeys = new Set(activity.zeroResult.map((row) => row.key));
-  const atRiskKeys = new Set(activity.atRisk.map((row) => row.key));
+  const atRiskKeys = new Set(pendingAtRisk.map((row) => row.key));
   const lifetime = activity.lifetime ?? {};
   const period = activity.period ?? {};
   const delivery = activity.delivery ?? {};
@@ -134,20 +140,30 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
         />
       ) : (
         <div className="space-y-4">
-          {activity.atRisk.length > 0 && (
+          {(pendingAtRisk.length > 0 || suppressed > 0) && (
             <Notice
-              tone="warning"
+              tone={pendingAtRisk.length > 0 ? "warning" : "info"}
               title={
                 lang === "ar"
-                  ? `${fmtNum(activity.atRisk.length)} حملة تحتاج مراجعة`
-                  : `${fmtNum(activity.atRisk.length)} campaigns need review`
+                  ? pendingAtRisk.length > 0
+                    ? `${fmtNum(pendingAtRisk.length)} حملة تحتاج مراجعة`
+                    : "تم التعامل مع كل حملات المراجعة الحالية"
+                  : pendingAtRisk.length > 0
+                    ? `${fmtNum(pendingAtRisk.length)} campaigns need review`
+                    : "All current review campaigns have been handled"
               }
-              icon={<AlertTriangle size={16} />}
+              icon={
+                pendingAtRisk.length > 0 ? <AlertTriangle size={16} /> : <CircleCheck size={16} />
+              }
             >
-              {lang === "ar"
-                ? `دي قائمة المراجعة فقط، مش كل الحملات الجاهزة. الحملات دي مفعّلة وجدولها مفتوح وجواها إعلان شغّال، وصرفت في الفترة المختارة، ولسه مفيش Won أو فاتورة مدفوعة أو أمر بيع مفوتر بالكامل في تاريخها.`
-                : "This is only the review list. These campaigns are enabled, currently scheduled, contain a live ad, spent in the selected period, and still have no Won, paid invoice, or fully invoiced sales order in their history."}
-              {muted > 0 && (
+              {pendingAtRisk.length > 0
+                ? lang === "ar"
+                  ? "دي قائمة المراجعة المتبقية فقط. الحملات دي مفعّلة وصرفت في الفترة المختارة ولسه مفيش بيع مسجل في تاريخها."
+                  : "This is the remaining review list. These campaigns are active, spent in the selected period, and still have no recorded sale in their history."
+                : lang === "ar"
+                  ? "الإجراءات المسجلة مخفية من التنبيه. الحملة ترجع تلقائيًا بعد 7 أيام لو ظلت Active بلا بيع."
+                  : "Recorded actions are hidden from the alert. A campaign returns after 7 days if it remains active with no sale."}
+              {suppressed > 0 && (
                 <button
                   type="button"
                   onClick={() => riskAlertPrefs.restore()}
@@ -155,8 +171,8 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                 >
                   <BellRing size={13} aria-hidden="true" />
                   {lang === "ar"
-                    ? `إظهار تنبيه ${fmtNum(muted)} حملة مكتومة`
-                    : `Unmute ${fmtNum(muted)} silenced ${muted === 1 ? "campaign" : "campaigns"}`}
+                    ? `إعادة ${fmtNum(suppressed)} حملة لقائمة المراجعة`
+                    : `Restore ${fmtNum(suppressed)} handled ${suppressed === 1 ? "campaign" : "campaigns"}`}
                 </button>
               )}
             </Notice>

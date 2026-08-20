@@ -104,8 +104,13 @@ export const Route = createFileRoute("/api/ingest/dataset")({
         }
         let payload: unknown;
         try {
-          payload = await request.json();
-        } catch {
+          const { readLimitedJson } = await import("@/lib/limited-json.server");
+          payload = await readLimitedJson(request, MAX_REQUEST_BYTES);
+        } catch (error) {
+          const { RequestBodyTooLargeError } = await import("@/lib/limited-json.server");
+          if (error instanceof RequestBodyTooLargeError) {
+            return Response.json({ ok: false, error: "Request is too large." }, { status: 413 });
+          }
           return Response.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
         }
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) {

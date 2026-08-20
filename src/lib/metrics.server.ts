@@ -19,6 +19,7 @@ import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
+import { isOperationalStateCurrent } from "./campaign-status-policy";
 import type {
   AdRow,
   AccountingRow,
@@ -674,7 +675,8 @@ export function computeTotals(data: FilteredData): Totals {
   const leadsFromCampaign =
     crm.filter((c) => c.fromCampaign).length +
     allArchived.filter((l) => !!l.campaignName || !!l.campaignId).length;
-  const won = crm.filter((c) => c.isWon).length + allArchived.filter(archivedWinCounter(data)).length;
+  const won =
+    crm.filter((c) => c.isWon).length + allArchived.filter(archivedWinCounter(data)).length;
   const lostInCrm = 0;
   const lost = archived.length;
   // Close time stays on CRM rows: archived rows carry no closing date, and
@@ -1256,22 +1258,12 @@ export async function computeRecentCampaignActivity(
   const fallbackStates = history.snapshot.campaignStates;
   const usingDirectState = !!(live || googleDirect.health.ok);
   const statePool = usingDirectState ? directStates : fallbackStates;
-  const scheduleTime = (value: string, endOfDay: boolean): number => {
-    if (!value) return Number.NaN;
-    const candidate = /^\d{4}-\d{2}-\d{2}$/.test(value)
-      ? `${value}T${endOfDay ? "23:59:59" : "00:00:00"}Z`
-      : value;
-    return Date.parse(candidate);
-  };
   const now = Date.now();
-  const scheduledStates = statePool.filter((state) => {
-    const start = scheduleTime(state.startTime, false);
-    const stop = scheduleTime(state.stopTime, true);
-    if (Number.isFinite(start) && start > now) return false;
-    if (Number.isFinite(stop) && stop < now) return false;
-    return true;
-  });
-  const officialStates = scheduledStates.filter(acceptsState);
+  // A stale recovery row used to resurrect campaigns long after the team had
+  // closed them. Require a recent platform check and actual delivery eligibility
+  // before a campaign can enter any Active count or risk alert.
+  const currentStates = statePool.filter((state) => isOperationalStateCurrent(state, now));
+  const officialStates = currentStates.filter(acceptsState);
   const rawPlatformHealth = (() => {
     const collectorHealth = (live?.platformHealth ?? []).filter(
       (entry) => entry.platform !== "google",
@@ -1282,13 +1274,13 @@ export async function computeRecentCampaignActivity(
     ? rawPlatformHealth.map((entry) => ({
         ...entry,
         active: entry.ok
-          ? scheduledStates.filter((state) => state.platform === entry.platform).length
+          ? currentStates.filter((state) => state.platform === entry.platform).length
           : 0,
       }))
     : PLATFORMS.map((platform) => ({
         platform,
-        ok: fallbackStates.some((state) => state.platform === platform),
-        active: scheduledStates.filter((state) => state.platform === platform).length,
+        ok: currentStates.some((state) => state.platform === platform),
+        active: currentStates.filter((state) => state.platform === platform).length,
         total: fallbackStates.filter((state) => state.platform === platform).length,
         message: "",
         checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",

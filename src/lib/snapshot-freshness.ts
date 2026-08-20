@@ -65,10 +65,14 @@ export function decideSnapshotRead(
   state: SnapshotFreshness,
   limits: SnapshotLimits,
 ): SnapshotAction {
-  // Forced reloads never read the cache and never join a rebuild already in
-  // flight: that one was requested before the button was pressed, so returning
-  // it hands back exactly the stale data the user was trying to escape.
-  if (state.force) return "refresh-and-wait";
+  if (state.force) {
+    // A healthy rebuild already reads the newest committed database snapshot.
+    // Starting another full read beside it doubles PostgreSQL/Odoo/API work and
+    // can make both slower. Only replace a rebuild that is old enough to be
+    // treated as stuck.
+    const healthyRefresh = state.refreshRunning && state.refreshAgeMs <= limits.stuckRefreshMs;
+    return healthyRefresh ? "join-refresh" : "refresh-and-wait";
+  }
 
   if (state.hasCache) {
     if (state.cacheAgeMs < limits.ttlMs) return "serve-cached";

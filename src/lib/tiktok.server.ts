@@ -14,6 +14,7 @@ const MAX_PAGES = 100;
 // other TikTok call made by the same process.
 const MIN_REQUEST_GAP_MS = 150;
 const MAX_RATE_LIMIT_RETRIES = 5;
+const REPORT_CACHE_MS = 30 * 60 * 1000;
 
 let requestSchedule: Promise<void> = Promise.resolve();
 let nextRequestAt = 0;
@@ -86,6 +87,9 @@ export interface TikTokFetchResult {
   syncedAt: string;
   errors: string[];
 }
+
+let reportCache: { value: TikTokFetchResult; expiresAt: number } | null = null;
+let reportInflight: Promise<TikTokFetchResult> | null = null;
 
 function iso(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -329,7 +333,7 @@ async function adIndex(cfg: TikTokConfig, advertiserId: string): Promise<Map<str
   return out;
 }
 
-export async function fetchTikTokAds(): Promise<TikTokFetchResult> {
+async function fetchTikTokAdsUncached(): Promise<TikTokFetchResult> {
   const cfg = config();
   if (!cfg) return { configured: false, rows: [], syncedAt: "", errors: [] };
 
@@ -404,4 +408,24 @@ export async function fetchTikTokAds(): Promise<TikTokFetchResult> {
   }
 
   return { configured: true, rows, syncedAt, errors };
+}
+
+/** Share one year-to-date report across dashboard snapshot rebuilds. */
+export async function fetchTikTokAds(force = false): Promise<TikTokFetchResult> {
+  if (!force && reportCache && reportCache.expiresAt > Date.now()) return reportCache.value;
+  if (reportInflight) return reportInflight;
+  reportInflight = fetchTikTokAdsUncached()
+    .then((value) => {
+      if (value.configured && value.errors.length === 0 && value.rows.length > 0) {
+        reportCache = { value, expiresAt: Date.now() + REPORT_CACHE_MS };
+        return value;
+      }
+      return reportCache
+        ? { ...reportCache.value, errors: value.errors, syncedAt: reportCache.value.syncedAt }
+        : value;
+    })
+    .finally(() => {
+      reportInflight = null;
+    });
+  return reportInflight;
 }

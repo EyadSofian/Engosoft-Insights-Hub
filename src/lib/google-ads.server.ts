@@ -9,6 +9,8 @@ const API = `https://googleads.googleapis.com/${API_VERSION}`;
 const OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REQUEST_TIMEOUT_MS = 90_000;
 const MAX_RETRIES = 3;
+const REPORT_CACHE_MS = 30 * 60 * 1000;
+const STATUS_CACHE_MS = 2 * 60 * 1000;
 
 interface GoogleAdsConfig {
   clientId: string;
@@ -120,6 +122,10 @@ export interface GoogleAdsCampaignStatusResult {
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
 let accessTokenInflight: Promise<string> | null = null;
+let reportCache: { value: GoogleAdsFetchResult; expiresAt: number } | null = null;
+let reportInflight: Promise<GoogleAdsFetchResult> | null = null;
+let statusCache: { value: GoogleAdsCampaignStatusResult; expiresAt: number } | null = null;
+let statusInflight: Promise<GoogleAdsCampaignStatusResult> | null = null;
 
 function iso(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -408,10 +414,11 @@ async function searchCustomer(
 }
 
 /**
- * Reads Google's own campaign switch directly from Google Ads. Spend is not
- * consulted here: ENABLED is Active, while PAUSED stays out of the active list.
+ * Reads Google's own campaign switch and delivery fields directly from Google
+ * Ads. The shared operational policy later excludes enabled-but-ended or
+ * non-serving campaigns; spend never decides status.
  */
-export async function fetchGoogleAdsCampaignStatus(): Promise<GoogleAdsCampaignStatusResult> {
+async function fetchGoogleAdsCampaignStatusUncached(): Promise<GoogleAdsCampaignStatusResult> {
   const cfg = config();
   const checkedAt = new Date().toISOString();
   if (!cfg) {
@@ -493,7 +500,32 @@ export async function fetchGoogleAdsCampaignStatus(): Promise<GoogleAdsCampaignS
   };
 }
 
-export async function fetchGoogleAds(): Promise<GoogleAdsFetchResult> {
+export async function fetchGoogleAdsCampaignStatus(
+  force = false,
+): Promise<GoogleAdsCampaignStatusResult> {
+  if (!force && statusCache && statusCache.expiresAt > Date.now()) return statusCache.value;
+  if (statusInflight) return statusInflight;
+  statusInflight = fetchGoogleAdsCampaignStatusUncached()
+    .then((value) => {
+      // A failed status read must not evict the last known-good platform switch.
+      if (value.configured && value.health.ok) {
+        statusCache = { value, expiresAt: Date.now() + STATUS_CACHE_MS };
+      } else if (statusCache) {
+        return {
+          ...statusCache.value,
+          errors: value.errors,
+          health: { ...statusCache.value.health, ok: false, message: value.errors.join(" | ") },
+        };
+      }
+      return value;
+    })
+    .finally(() => {
+      statusInflight = null;
+    });
+  return statusInflight;
+}
+
+async function fetchGoogleAdsUncached(): Promise<GoogleAdsFetchResult> {
   const cfg = config();
   if (!cfg) return { configured: false, rows: [], syncedAt: "", errors: [] };
 
@@ -542,4 +574,30 @@ export async function fetchGoogleAds(): Promise<GoogleAdsFetchResult> {
   }
 
   return { configured: true, rows, syncedAt, errors };
+}
+
+/**
+ * The report covers the year to date. Re-running it for every five-minute
+ * dashboard snapshot spends quota and Railway CPU without creating fresher
+ * daily facts, so one process shares a 30-minute last-good result.
+ */
+export async function fetchGoogleAds(force = false): Promise<GoogleAdsFetchResult> {
+  if (!force && reportCache && reportCache.expiresAt > Date.now()) return reportCache.value;
+  if (reportInflight) return reportInflight;
+  reportInflight = fetchGoogleAdsUncached()
+    .then((value) => {
+      if (value.configured && value.errors.length === 0 && value.rows.length > 0) {
+        reportCache = { value, expiresAt: Date.now() + REPORT_CACHE_MS };
+        return value;
+      }
+      // Preserve complete facts across a transient customer/API failure while
+      // still surfacing the current error in data health.
+      return reportCache
+        ? { ...reportCache.value, errors: value.errors, syncedAt: reportCache.value.syncedAt }
+        : value;
+    })
+    .finally(() => {
+      reportInflight = null;
+    });
+  return reportInflight;
 }

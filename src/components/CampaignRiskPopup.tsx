@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BadgeDollarSign,
   BellOff,
+  CircleCheck,
   Clock,
   ReceiptText,
   ShoppingCart,
@@ -47,7 +48,9 @@ export function CampaignRiskPopup() {
       if (!response.ok) throw new Error(`Campaign risk request failed: ${response.status}`);
       return response.json();
     },
-    staleTime: 5 * 60_000,
+    // Campaigns are routinely paused while the dashboard is open. Refetch on
+    // the next focus after one minute so a closed campaign cannot keep nagging.
+    staleTime: 60_000,
     retry: 1,
     enabled: eligiblePath,
   });
@@ -71,6 +74,7 @@ export function CampaignRiskPopup() {
   const keys = useMemo(() => rows.map((row) => row.key), [rows]);
   const snooze = useCallback(() => riskAlertPrefs.snooze(keys), [keys]);
   const mute = useCallback(() => riskAlertPrefs.mute(keys), [keys]);
+  const reviewAll = useCallback(() => riskAlertPrefs.review(keys), [keys]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,7 +142,7 @@ export function CampaignRiskPopup() {
                 : `${fmtNum(rows.length)} to review out of ${fmtNum(totalActive)} Active campaigns`}
             </div>
             <Pill tone="neutral">
-              {lang === "ar" ? "الـStatus من المنصة مباشرة" : "Status comes directly from platform"}
+              {lang === "ar" ? "آخر حالة مؤكدة من المنصة" : "Last verified platform status"}
             </Pill>
           </div>
 
@@ -148,6 +152,7 @@ export function CampaignRiskPopup() {
                 key={`${row.platforms.join("-")}:${row.key}`}
                 row={row}
                 lifetime={data.activity.lifetime?.[row.key]}
+                onReviewed={() => riskAlertPrefs.review([row.key])}
               />
             ))}
           </div>
@@ -175,10 +180,13 @@ export function CampaignRiskPopup() {
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={dismiss}
+                  onClick={reviewAll}
                   className="min-h-11 cursor-pointer rounded-xl border border-border px-4 text-sm font-semibold text-text transition-colors hover:bg-surface-2"
                 >
-                  {lang === "ar" ? "إغلاق بعد المراجعة" : "Close after review"}
+                  <span className="inline-flex items-center gap-1.5">
+                    <CircleCheck size={15} aria-hidden="true" />
+                    {lang === "ar" ? "تم اتخاذ إجراء للكل" : "Action taken on all"}
+                  </span>
                 </button>
                 <a
                   href="/campaigns"
@@ -191,8 +199,8 @@ export function CampaignRiskPopup() {
             </div>
             <p className="mt-2.5 text-[11px] leading-relaxed text-text-subtle">
               {lang === "ar"
-                ? "«لا تظهر مجددًا» تكتم الحملات المعروضة هنا فقط — أي حملة جديدة تدخل الخطر هتنبّهك، وتقدر ترجّع المكتومة من بطاقة «الحملات التي تعمل الآن» في النظرة العامة."
-                : "“Don't show again” silences only the campaigns listed here — a newly at-risk campaign still alerts you, and you can unmute from the “Campaigns running now” card on the overview."}
+                ? "«تم اتخاذ إجراء» يخفي الحملة من قائمة المراجعة 7 أيام ثم يفحصها من جديد لو ظلت Active بلا بيع. «لا تظهر مجددًا» يكتمها نهائيًا على هذا المتصفح."
+                : "“Action taken” removes a campaign from review for 7 days, then checks it again if it is still active with no sale. “Don't show again” permanently silences it in this browser."}
             </p>
           </div>
         </div>
@@ -202,7 +210,15 @@ export function CampaignRiskPopup() {
   );
 }
 
-function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime }) {
+function RiskCard({
+  row,
+  lifetime,
+  onReviewed,
+}: {
+  row: PerfRow;
+  lifetime?: CampaignLifetime;
+  onReviewed: () => void;
+}) {
   const { lang } = useI18n();
   return (
     <article className="rounded-2xl border border-danger/25 bg-danger-soft/40 p-4">
@@ -255,6 +271,14 @@ function RiskCard({ row, lifetime }: { row: PerfRow; lifetime?: CampaignLifetime
             : `Spending since ${lifetime.firstSpendDate} with no recorded sale`}
         </p>
       )}
+      <button
+        type="button"
+        onClick={onReviewed}
+        className="mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-success/30 bg-success-soft px-3 text-xs font-semibold text-success transition-[filter] hover:brightness-95"
+      >
+        <CircleCheck size={15} aria-hidden="true" />
+        {lang === "ar" ? "تم اتخاذ إجراء" : "Action taken"}
+      </button>
     </article>
   );
 }
