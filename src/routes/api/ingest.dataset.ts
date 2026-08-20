@@ -7,6 +7,7 @@ import { timingSafeEqual } from "node:crypto";
 // several requests would delete the earlier chunks and leave an incomplete
 // accounting snapshot.
 const MAX_ROWS_PER_REQUEST = 15_000;
+const MAX_REQUEST_BYTES = 10 * 1024 * 1024;
 
 function authorized(request: Request): boolean {
   const expected = process.env.DASHBOARD_INGEST_SECRET?.trim() ?? "";
@@ -43,7 +44,10 @@ export const Route = createFileRoute("/api/ingest/dataset")({
         // Workers only need the small PBX directory to attach an extension to
         // an Odoo user. Large reporting datasets are deliberately write-only.
         if (dataset !== "pbx_extensions") {
-          return Response.json({ ok: false, error: "Dataset is not readable here." }, { status: 403 });
+          return Response.json(
+            { ok: false, error: "Dataset is not readable here." },
+            { status: 403 },
+          );
         }
         try {
           const snapshot = await readDashboardDataset(dataset);
@@ -77,8 +81,12 @@ export const Route = createFileRoute("/api/ingest/dataset")({
             { status: 401, headers: { "cache-control": "no-store" } },
           );
         }
-        const length = Number(request.headers.get("content-length") ?? 0);
-        if (length > 10 * 1024 * 1024) {
+        // `Number(null)` is 0, not NaN, so reading the header without checking
+        // for its absence let every chunked upload — which is exactly how a
+        // large body arrives — walk past this guard and be buffered whole.
+        const declared = request.headers.get("content-length");
+        const length = declared === null ? null : Number(declared);
+        if (length !== null && Number.isFinite(length) && length > MAX_REQUEST_BYTES) {
           return Response.json({ ok: false, error: "Request is too large." }, { status: 413 });
         }
         let payload: unknown;
@@ -129,7 +137,16 @@ export const Route = createFileRoute("/api/ingest/dataset")({
             { ok: true, ...result },
             { headers: { "cache-control": "no-store" } },
           );
-        } catch {
+        } catch (cause) {
+          // Without this the failure is invisible. `dashboard_sync_state` only
+          // ever recorded successes, so a dataset failing every half hour sat
+          // there reading `success` with a fourteen-hour-old timestamp, and
+          // the dashboard reported it as simply "last updated 12:05" — no
+          // warning, nothing to notice. Twenty-six consecutive failures went
+          // unseen that way.
+          const message = cause instanceof Error ? cause.message : "Dataset write failed.";
+          const { markDashboardDatasetFailed } = await import("@/lib/dashboard-db.server");
+          await markDashboardDatasetFailed(body.dataset, message).catch(() => undefined);
           return Response.json(
             { ok: false, error: "Dataset write failed." },
             { status: 500, headers: { "cache-control": "no-store" } },

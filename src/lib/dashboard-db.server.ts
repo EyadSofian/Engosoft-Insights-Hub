@@ -211,6 +211,37 @@ function sourceUpdatedAt(row: DashboardRow): string | null {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
+/**
+ * Columns bound per row by `upsertChunk`. Changing the INSERT changes this.
+ */
+const BIND_PARAMS_PER_ROW = 6;
+
+/**
+ * PostgreSQL's hard ceiling on bind parameters in one statement.
+ * Exceeding it fails the whole sync with `bind message has N parameter formats`.
+ */
+export const POSTGRES_MAX_BIND_PARAMS = 65_535;
+
+/**
+ * Rows per INSERT.
+ *
+ * This was 500, which is 3,000 of the 65,535 parameters PostgreSQL allows — so
+ * a 6,650-row dataset paid fourteen round trips inside one transaction where
+ * two would do. That is not a micro-optimisation: on 2026-08-19 the Full
+ * Invoiced Orders sync crossed roughly twenty seconds of server time and every
+ * run since was cut off mid-request, leaving the dashboard fourteen hours
+ * stale. The runs that still succeeded took eleven seconds; the ones that
+ * failed took twenty-nine.
+ *
+ * Capped well under the parameter ceiling rather than at it, because a single
+ * statement also has to be built, sent and parsed — and because the row count
+ * is data, not a constant, so the margin has to survive the dataset growing.
+ */
+export const INSERT_CHUNK_ROWS = Math.min(
+  5_000,
+  Math.floor(POSTGRES_MAX_BIND_PARAMS / BIND_PARAMS_PER_ROW),
+);
+
 async function upsertChunk(
   client: PoolClient,
   dataset: DashboardDataset,
@@ -313,8 +344,8 @@ export async function writeDashboardDataset(
     if (options.mode === "replace") {
       await client.query(`DELETE FROM dashboard_rows WHERE dataset = $1`, [dataset]);
     }
-    for (let index = 0; index < rows.length; index += 500) {
-      await upsertChunk(client, dataset, rows.slice(index, index + 500), syncedAt);
+    for (let index = 0; index < rows.length; index += INSERT_CHUNK_ROWS) {
+      await upsertChunk(client, dataset, rows.slice(index, index + INSERT_CHUNK_ROWS), syncedAt);
     }
     const countResult = await client.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM dashboard_rows WHERE dataset = $1`,

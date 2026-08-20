@@ -31,6 +31,7 @@ import {
 } from "./course-taxonomy";
 import { isArchivedWonStage } from "./archived-won";
 import { decideSnapshotRead } from "./snapshot-freshness";
+import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-freshness";
 import {
   databaseConfigured,
   readDashboardDataset,
@@ -838,9 +839,19 @@ async function refreshSnapshot(): Promise<Snapshot> {
     // pull and bypass Google's CDN cache together.
     const bust = Date.now();
 
+    // Every stored dataset that was read, so their sync ages can be judged
+    // together once all reads have landed.
+    const storedStates: StoredDatasetState[] = [];
     const readStored = async (dataset: DashboardDataset): Promise<DatasetSnapshot | null> => {
       try {
-        return await readDashboardDataset(dataset);
+        const snapshot = await readDashboardDataset(dataset);
+        storedStates.push({
+          dataset,
+          status: snapshot.status,
+          syncedAt: snapshot.syncedAt,
+          error: snapshot.error,
+        });
+        return snapshot;
       } catch {
         fetchErrors.push(`PostgreSQL ${dataset}: last-good read failed.`);
         return null;
@@ -2391,6 +2402,13 @@ async function refreshSnapshot(): Promise<Snapshot> {
       const d = Date.parse(v.replace(" ", "T") + "Z");
       return isFinite(d) ? new Date(d).toISOString() : "";
     };
+
+    // A source that stopped syncing has to say so. Reporting only its age left
+    // a dataset that had failed twenty-six times in a row looking identical to
+    // one that had simply not been touched since lunchtime.
+    for (const alert of datasetFreshnessAlerts(storedStates, Date.now())) {
+      fetchErrors.push(alert.message);
+    }
 
     const tabSyncs: SourceFreshness[] = [
       {
