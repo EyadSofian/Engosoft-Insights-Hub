@@ -8,6 +8,7 @@ import {
   GraduationCap,
   History,
   Info,
+  Leaf,
   ReceiptText,
   Search,
   ShoppingCart,
@@ -27,6 +28,7 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
+import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -40,6 +42,7 @@ interface CourseCampaign {
   name: string;
   platforms: Platform[];
   accounts: string[];
+  sources: string[];
   objective: CampaignObjective;
   spend: number;
   latestSpend: number;
@@ -96,6 +99,8 @@ interface CoursesResponse {
 
 function Courses() {
   const { lang } = useI18n();
+  const filters = useFilters();
+  const organicScope = filters.channel === "organic";
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
   const { data, isLoading, error, refetch } = useApi<CoursesResponse>("/api/courses");
@@ -267,9 +272,13 @@ function Courses() {
       <PageHeader
         title={lang === "ar" ? "الدورات" : "Courses"}
         subtitle={
-          lang === "ar"
-            ? "كل دورة في صف واحد، وتحتها الحملات الشغالة والقديمة ومقارنة شهر بشهر."
-            : "One row per course, with current campaigns, campaign history and month-to-month comparison."
+          organicScope
+            ? lang === "ar"
+              ? "كل دورة من مصادر Odoo غير المدفوعة، وتحتها حملات الأورجانيك المسجلة ومقارنتها شهرًا بشهر."
+              : "Each course from non-paid Odoo sources, with its recorded Organic campaigns and month-to-month comparison."
+            : lang === "ar"
+              ? "كل دورة في صف واحد، وتحتها الحملات الشغالة والقديمة ومقارنة شهر بشهر."
+              : "One row per course, with current campaigns, campaign history and month-to-month comparison."
         }
       />
 
@@ -321,9 +330,13 @@ function Courses() {
           </div>
 
           <Notice icon={<Info size={17} />}>
-            {lang === "ar"
-              ? "مصروف الدورة بيتربط من اسم الإعلان أولًا، ثم اسم مجموعة الإعلانات، ثم اسم الحملة، ولو الاسم مش واضح بنرجع للدورة الغالبة في ليدز الحملة. كل كارت تحت بيقولك مصدر الربط. الليدز من CRM، وأوامر البيع من Full Invoiced Orders، والفواتير والإيراد من الفواتير المدفوعة."
-              : "Course spend is attributed from the ad name first, then ad-set name, campaign name, and finally the campaign's dominant CRM course. Every campaign card shows its attribution source. Leads come from CRM, sales orders from Full Invoiced Orders, and invoices/revenue from Paid Invoices."}
+            {organicScope
+              ? lang === "ar"
+                ? "فلتر أورجانيك شغال على مصادر Odoo غير المدفوعة فقط. كل صف يمثل دورة، ولما تضغط عليها هتظهر أسماء حملات الأورجانيك المسجلة في Odoo ومصادرها وليدزها ومبيعاتها. الإنفاق يظل صفر لأنه مش إعلان مدفوع."
+                : "Organic is scoped to non-paid Odoo sources only. Each row is a course; select it to see its recorded Organic campaign names, sources, leads and sales. Spend stays zero because this is not paid advertising."
+              : lang === "ar"
+                ? "مصروف الدورة بيتربط من اسم الإعلان أولًا، ثم اسم مجموعة الإعلانات، ثم اسم الحملة، ولو الاسم مش واضح بنرجع للدورة الغالبة في ليدز الحملة. كل كارت تحت بيقولك مصدر الربط. الليدز من CRM، وأوامر البيع من Full Invoiced Orders، والفواتير والإيراد من الفواتير المدفوعة."
+                : "Course spend is attributed from the ad name first, then ad-set name, campaign name, and finally the campaign's dominant CRM course. Every campaign card shows its attribution source. Leads come from CRM, sales orders from Full Invoiced Orders, and invoices/revenue from Paid Invoices."}
           </Notice>
 
           <div className="md:hidden">
@@ -450,6 +463,7 @@ function Courses() {
               drill={detailQuery.data?.drill ?? null}
               loading={detailQuery.isLoading}
               error={detailQuery.error as Error | null}
+              organicScope={organicScope}
             />
           )}
         </>
@@ -463,11 +477,13 @@ function CourseDetailPanel({
   drill,
   loading,
   error,
+  organicScope,
 }: {
   course: CourseAgg;
   drill: CourseDrill | null;
   loading: boolean;
   error: Error | null;
+  organicScope: boolean;
 }) {
   const { lang } = useI18n();
   const months = drill?.monthly ?? [];
@@ -526,9 +542,13 @@ function CourseDetailPanel({
               </p>
               <h2 className="mt-0.5 truncate text-xl font-semibold text-text">{course.name}</h2>
               <p className="mt-1 text-xs text-text-muted">
-                {lang === "ar"
-                  ? `${drill.activeCampaigns.length} حملة جاهزة للتشغيل حاليًا، و${drill.previousCampaignCount} حملة سابقة في الفترة.`
-                  : `${drill.activeCampaigns.length} campaigns are eligible to run now, with ${drill.previousCampaignCount} previous campaigns in the period.`}
+                {organicScope
+                  ? lang === "ar"
+                    ? `${drill.previousCampaignCount} حملة أورجانيك مسجلة على Odoo للدورة في الفترة.`
+                    : `${drill.previousCampaignCount} Organic campaigns are recorded in Odoo for this course in the period.`
+                  : lang === "ar"
+                    ? `${drill.activeCampaigns.length} حملة جاهزة للتشغيل حاليًا، و${drill.previousCampaignCount} حملة سابقة في الفترة.`
+                    : `${drill.activeCampaigns.length} campaigns are eligible to run now, with ${drill.previousCampaignCount} previous campaigns in the period.`}
               </p>
             </div>
           </div>
@@ -551,89 +571,118 @@ function CourseDetailPanel({
           </div>
         </div>
 
-        <div className="p-4 sm:p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Target size={16} className="text-brand" />
-            <h3 className="text-sm font-semibold text-text">
-              {lang === "ar"
-                ? "فلوس الإعلانات اتربطت بالدورة منين؟"
-                : "Where did the course spend attribution come from?"}
-            </h3>
-          </div>
-          {sourceRows.length ? (
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              {sourceRows.map(([source, spend]) => (
-                <div key={source} className="rounded-xl border border-border bg-surface-2/60 p-3">
-                  <div className="text-[11px] text-text-muted">{sourceLabel(source, lang)}</div>
-                  <div className="num mt-1 text-base font-semibold text-text">{fmtUSD(spend)}</div>
-                </div>
-              ))}
+        {!organicScope && (
+          <div className="p-4 sm:p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Target size={16} className="text-brand" />
+              <h3 className="text-sm font-semibold text-text">
+                {lang === "ar"
+                  ? "فلوس الإعلانات اتربطت بالدورة منين؟"
+                  : "Where did the course spend attribution come from?"}
+              </h3>
             </div>
-          ) : (
-            <p className="text-sm text-text-muted">
-              {lang === "ar"
-                ? "مفيش إنفاق مربوط بالدورة في الفترة المختارة."
-                : "No attributed spend in the selected period."}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <SectionHeading
-          icon={<Activity size={18} />}
-          title={lang === "ar" ? "الحملات الجاهزة للتشغيل دلوقتي" : "Campaigns eligible to run now"}
-          hint={
-            lang === "ar"
-              ? "الحملة لازم تكون مفعّلة، جدولها مفتوح، وجواها إعلان شغّال. الصرف ظاهر للمعلومة فقط ومش هو اللي بيقرر الحالة."
-              : "A campaign must be enabled, currently scheduled, and contain a live ad. Spend is context only and never decides status."
-          }
-          count={drill.activeCampaigns.length}
-        />
-        {drill.activeCampaigns.length ? (
-          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-            {drill.activeCampaigns.map((campaign) => (
-              <CampaignCard key={campaign.key} campaign={campaign} active />
-            ))}
-          </div>
-        ) : (
-          <div className="card">
-            <EmptyState
-              label={
-                lang === "ar"
-                  ? "مفيش حملة للدورة جاهزة للتشغيل حاليًا"
-                  : "No course campaign is currently eligible to run"
-              }
-              compact
-            />
+            {sourceRows.length ? (
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                {sourceRows.map(([source, spend]) => (
+                  <div key={source} className="rounded-xl border border-border bg-surface-2/60 p-3">
+                    <div className="text-[11px] text-text-muted">{sourceLabel(source, lang)}</div>
+                    <div className="num mt-1 text-base font-semibold text-text">
+                      {fmtUSD(spend)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted">
+                {lang === "ar"
+                  ? "مفيش إنفاق مربوط بالدورة في الفترة المختارة."
+                  : "No attributed spend in the selected period."}
+              </p>
+            )}
           </div>
         )}
       </div>
 
+      {!organicScope && (
+        <div>
+          <SectionHeading
+            icon={<Activity size={18} />}
+            title={
+              lang === "ar" ? "الحملات الجاهزة للتشغيل دلوقتي" : "Campaigns eligible to run now"
+            }
+            hint={
+              lang === "ar"
+                ? "الحملة لازم تكون مفعّلة، جدولها مفتوح، وجواها إعلان شغّال. الصرف ظاهر للمعلومة فقط ومش هو اللي بيقرر الحالة."
+                : "A campaign must be enabled, currently scheduled, and contain a live ad. Spend is context only and never decides status."
+            }
+            count={drill.activeCampaigns.length}
+          />
+          {drill.activeCampaigns.length ? (
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {drill.activeCampaigns.map((campaign) => (
+                <CampaignCard key={campaign.key} campaign={campaign} active />
+              ))}
+            </div>
+          ) : (
+            <div className="card">
+              <EmptyState
+                label={
+                  lang === "ar"
+                    ? "مفيش حملة للدورة جاهزة للتشغيل حاليًا"
+                    : "No course campaign is currently eligible to run"
+                }
+                compact
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <div>
         <SectionHeading
-          icon={<History size={18} />}
-          title={lang === "ar" ? "الحملات السابقة للدورة" : "Previous course campaigns"}
+          icon={organicScope ? <Leaf size={18} /> : <History size={18} />}
+          title={
+            organicScope
+              ? lang === "ar"
+                ? "حملات الأورجانيك المسجلة للدورة"
+                : "Recorded Organic campaigns for the course"
+              : lang === "ar"
+                ? "الحملات السابقة للدورة"
+                : "Previous course campaigns"
+          }
           hint={
-            lang === "ar"
-              ? "حملات ظهرت وصرفت في الفترة المختارة، لكنها مش جاهزة للتشغيل حاليًا."
-              : "Campaigns with spend in the selected period that aren't eligible to run now."
+            organicScope
+              ? lang === "ar"
+                ? "الأسماء والمصادر جاية من Campaign وSource في Odoo؛ لا يتم خلطها بحملات منصات الإعلانات الشغالة."
+                : "Names and sources come from Odoo Campaign and Source; active paid-media campaigns are kept out of this list."
+              : lang === "ar"
+                ? "حملات ظهرت وصرفت في الفترة المختارة، لكنها مش جاهزة للتشغيل حاليًا."
+                : "Campaigns with spend in the selected period that aren't eligible to run now."
           }
           count={drill.previousCampaignCount}
         />
         {drill.previousCampaigns.length ? (
           <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {drill.previousCampaigns.map((campaign) => (
-              <CampaignCard key={campaign.key} campaign={campaign} active={false} />
+              <CampaignCard
+                key={campaign.key}
+                campaign={campaign}
+                active={false}
+                organic={organicScope}
+              />
             ))}
           </div>
         ) : (
           <div className="card">
             <EmptyState
               label={
-                lang === "ar"
-                  ? "مفيش حملات سابقة في الفترة"
-                  : "No previous campaigns in this period"
+                organicScope
+                  ? lang === "ar"
+                    ? "مفيش أسماء حملات أورجانيك مسجلة للدورة في الفترة"
+                    : "No Organic campaign names are recorded for this course in the period"
+                  : lang === "ar"
+                    ? "مفيش حملات سابقة في الفترة"
+                    : "No previous campaigns in this period"
               }
               compact
             />
@@ -758,7 +807,15 @@ function CourseDetailPanel({
   );
 }
 
-function CampaignCard({ campaign, active }: { campaign: CourseCampaign; active: boolean }) {
+function CampaignCard({
+  campaign,
+  active,
+  organic = false,
+}: {
+  campaign: CourseCampaign;
+  active: boolean;
+  organic?: boolean;
+}) {
   const { lang } = useI18n();
   const sourceText = campaign.attributionSources
     .map((source) => sourceLabel(source, lang))
@@ -768,22 +825,32 @@ function CampaignCard({ campaign, active }: { campaign: CourseCampaign; active: 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap gap-1.5">
-            {campaign.platforms.map((platform) => (
+            {organic ? (
               <span
-                key={platform}
                 className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                style={{
-                  background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
-                  color: PLATFORM_COLOR[platform],
-                }}
+                style={{ background: "var(--success-soft)", color: "var(--success)" }}
               >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: PLATFORM_COLOR[platform] }}
-                />
-                {PLATFORM_LABEL[platform][lang]}
+                <Leaf size={11} />
+                {lang === "ar" ? "أورجانيك · Odoo" : "Organic · Odoo"}
               </span>
-            ))}
+            ) : (
+              campaign.platforms.map((platform) => (
+                <span
+                  key={platform}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
+                    color: PLATFORM_COLOR[platform],
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: PLATFORM_COLOR[platform] }}
+                  />
+                  {PLATFORM_LABEL[platform][lang]}
+                </span>
+              ))
+            )}
           </div>
           <h4
             className="line-clamp-2 text-sm font-semibold leading-5 text-text"
@@ -792,36 +859,67 @@ function CampaignCard({ campaign, active }: { campaign: CourseCampaign; active: 
             {campaign.name}
           </h4>
         </div>
-        <Pill tone={active ? "success" : "neutral"}>
-          {active ? (lang === "ar" ? "شغالة" : "Active") : lang === "ar" ? "سابقة" : "Previous"}
+        <Pill tone={active || organic ? "success" : "neutral"}>
+          {organic
+            ? lang === "ar"
+              ? "من Odoo"
+              : "From Odoo"
+            : active
+              ? lang === "ar"
+                ? "شغالة"
+                : "Active"
+              : lang === "ar"
+                ? "سابقة"
+                : "Previous"}
         </Pill>
       </div>
 
       <div className="mt-3 flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-xs text-text-muted">
-        <Target size={14} className="shrink-0 text-brand" />
-        <span>{lang === "ar" ? "هدفها:" : "Objective:"}</span>
-        <strong className="font-semibold text-text">
-          {objectiveLabel(campaign.objective, lang)}
-        </strong>
+        {organic ? (
+          <>
+            <Leaf size={14} className="shrink-0" style={{ color: "var(--success)" }} />
+            <span>{lang === "ar" ? "مصادر Odoo:" : "Odoo sources:"}</span>
+            <strong
+              className="truncate font-semibold text-text"
+              title={campaign.sources.join("، ")}
+            >
+              {campaign.sources.join("، ") || "—"}
+            </strong>
+          </>
+        ) : (
+          <>
+            <Target size={14} className="shrink-0 text-brand" />
+            <span>{lang === "ar" ? "هدفها:" : "Objective:"}</span>
+            <strong className="font-semibold text-text">
+              {objectiveLabel(campaign.objective, lang)}
+            </strong>
+          </>
+        )}
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-        <MobileMetric
-          label={
-            active
-              ? lang === "ar"
-                ? "صرف آخر 24 ساعة (للمعلومة)"
-                : "Last 24h spend (context)"
-              : lang === "ar"
-                ? "آخر يوم صرف"
-                : "Last spend day"
-          }
-          value={active ? fmtUSD(campaign.statusSpend24h) : fmtDate(campaign.spendDateMax, lang)}
-        />
-        <MobileMetric
-          label={lang === "ar" ? "إنفاق الفترة" : "Period spend"}
-          value={fmtUSD(campaign.spend)}
-        />
+        {!organic && (
+          <>
+            <MobileMetric
+              label={
+                active
+                  ? lang === "ar"
+                    ? "صرف آخر 24 ساعة (للمعلومة)"
+                    : "Last 24h spend (context)"
+                  : lang === "ar"
+                    ? "آخر يوم صرف"
+                    : "Last spend day"
+              }
+              value={
+                active ? fmtUSD(campaign.statusSpend24h) : fmtDate(campaign.spendDateMax, lang)
+              }
+            />
+            <MobileMetric
+              label={lang === "ar" ? "إنفاق الفترة" : "Period spend"}
+              value={fmtUSD(campaign.spend)}
+            />
+          </>
+        )}
         <MobileMetric
           label={lang === "ar" ? "ليدز CRM في الفترة" : "Period CRM leads"}
           value={fmtNum(campaign.crmLeads)}
@@ -836,33 +934,44 @@ function CampaignCard({ campaign, active }: { campaign: CourseCampaign; active: 
           label={lang === "ar" ? "المحصل" : "Revenue"}
           value={fmtUSD(campaign.revenue)}
         />
-        <MobileMetric label="ROAS" value={fmtRoas(campaign.roas)} />
+        {!organic && <MobileMetric label="ROAS" value={fmtRoas(campaign.roas)} />}
       </dl>
 
       <div className="mt-auto border-t border-border pt-3 text-[11px] leading-5 text-text-muted">
-        {campaign.accounts.length > 0 && (
-          <div className="truncate" title={campaign.accounts.join("، ")}>
-            {lang === "ar" ? "الحساب: " : "Account: "}
-            <span className="font-medium text-text">{campaign.accounts.join("، ")}</span>
-          </div>
-        )}
-        <div>
-          {lang === "ar" ? "ربط الدورة: " : "Course match: "}
-          <span className="font-medium text-text">{sourceText || "—"}</span>
-          {campaign.attributionConfidence < 0.999 && (
-            <span>
-              {" "}
-              · {lang === "ar" ? "ثقة" : "confidence"}{" "}
-              {fmtPct(campaign.attributionConfidence * 100, 0)}
+        {organic ? (
+          <div>
+            {lang === "ar" ? "نوع التجميع: " : "Grouping basis: "}
+            <span className="font-medium text-text">
+              {lang === "ar" ? "اسم Campaign داخل Odoo" : "Campaign name in Odoo"}
             </span>
-          )}
-        </div>
-        <div>
-          {lang === "ar" ? "فترة الإنفاق: " : "Spend window: "}
-          <span className="num">
-            {fmtDate(campaign.spendDateMin, lang)} — {fmtDate(campaign.spendDateMax, lang)}
-          </span>
-        </div>
+          </div>
+        ) : (
+          <>
+            {campaign.accounts.length > 0 && (
+              <div className="truncate" title={campaign.accounts.join("، ")}>
+                {lang === "ar" ? "الحساب: " : "Account: "}
+                <span className="font-medium text-text">{campaign.accounts.join("، ")}</span>
+              </div>
+            )}
+            <div>
+              {lang === "ar" ? "ربط الدورة: " : "Course match: "}
+              <span className="font-medium text-text">{sourceText || "—"}</span>
+              {campaign.attributionConfidence < 0.999 && (
+                <span>
+                  {" "}
+                  · {lang === "ar" ? "ثقة" : "confidence"}{" "}
+                  {fmtPct(campaign.attributionConfidence * 100, 0)}
+                </span>
+              )}
+            </div>
+            <div>
+              {lang === "ar" ? "فترة الإنفاق: " : "Spend window: "}
+              <span className="num">
+                {fmtDate(campaign.spendDateMin, lang)} — {fmtDate(campaign.spendDateMax, lang)}
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </article>
   );

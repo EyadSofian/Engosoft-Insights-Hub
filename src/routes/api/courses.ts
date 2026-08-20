@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/courses")({
         const { normalizeName } = await import("@/lib/sheet-cache.server");
 
         const filters = await parseFilters(request);
+        const organicScope = filters.channel === "organic";
         const data = await getFiltered(filters);
         const prevRange = previousPeriod(filters.from, filters.to);
         // No prior-period revenue delta when that window predates the data.
@@ -71,6 +72,7 @@ export const Route = createFileRoute("/api/courses")({
             name: string;
             platforms: Set<import("@/lib/types").Platform>;
             accounts: Set<string>;
+            sources: Set<string>;
             objective: import("@/lib/types").CampaignObjective;
             spend: number;
             latestSpend: number;
@@ -102,6 +104,7 @@ export const Route = createFileRoute("/api/courses")({
                 name: name || "—",
                 platforms: new Set(),
                 accounts: new Set(),
+                sources: new Set(),
                 objective: "unknown",
                 spend: 0,
                 latestSpend: 0,
@@ -189,26 +192,32 @@ export const Route = createFileRoute("/api/courses")({
           // Course status follows the platform's official Active snapshot. It
           // deliberately does not infer Active from spend. A campaign can be
           // officially Active and spend zero in the selected period.
-          for (const state of data.snapshot.campaignStates) {
-            if (state.deliveryState !== "active") continue;
-            const meta = data.snapshot.campaigns.get(state.campaignKey);
-            const namedCourse = isCourse(meta?.course ?? "");
-            if (!namedCourse && !dominatedByCourse(state.campaignKey)) continue;
-            const campaign = atCampaign(state.campaignKey, state.name);
-            campaign.platforms.add(state.platform);
-            if (state.account) campaign.accounts.add(state.account);
-            if (meta && meta.objective !== "unknown") campaign.objective = meta.objective;
-            // Without this an Active campaign with no spend in the window
-            // rendered "Course match: —", which reads as an unattributed row
-            // rather than one that simply did not spend this month.
-            const source = namedCourse
-              ? meta?.courseSource || "campaign_name"
-              : campaignCourseSource.get(state.campaignKey);
-            if (source) campaign.attributionSources.add(source);
-            campaign.officialActive = true;
-            campaign.statusSpend24h = state.spend24h;
-            campaign.statusCheckedAt = state.checkedAt;
-            campaign.statusSource = state.source;
+          if (!organicScope) {
+            for (const state of data.snapshot.campaignStates) {
+              if (state.deliveryState !== "active") continue;
+              if (filters.platform && state.platform !== filters.platform) continue;
+              if (filters.account && state.account !== filters.account) continue;
+              if (filters.campaignKey && state.campaignKey !== filters.campaignKey) continue;
+              if (filters.campaign && state.name !== filters.campaign) continue;
+              const meta = data.snapshot.campaigns.get(state.campaignKey);
+              const namedCourse = isCourse(meta?.course ?? "");
+              if (!namedCourse && !dominatedByCourse(state.campaignKey)) continue;
+              const campaign = atCampaign(state.campaignKey, state.name);
+              campaign.platforms.add(state.platform);
+              if (state.account) campaign.accounts.add(state.account);
+              if (meta && meta.objective !== "unknown") campaign.objective = meta.objective;
+              // Without this an Active campaign with no spend in the window
+              // rendered "Course match: —", which reads as an unattributed row
+              // rather than one that simply did not spend this month.
+              const source = namedCourse
+                ? meta?.courseSource || "campaign_name"
+                : campaignCourseSource.get(state.campaignKey);
+              if (source) campaign.attributionSources.add(source);
+              campaign.officialActive = true;
+              campaign.statusSpend24h = state.spend24h;
+              campaign.statusCheckedAt = state.checkedAt;
+              campaign.statusSource = state.source;
+            }
           }
 
           for (const ad of data.ads) {
@@ -261,6 +270,7 @@ export const Route = createFileRoute("/api/courses")({
             }
             if (!row.fromCampaign) continue;
             const campaign = atCampaign(row.campaignKey, row.campaignName);
+            if (row.source) campaign.sources.add(row.source);
             campaign.crmLeads++;
             if (row.isWon) campaign.won++;
           }
@@ -278,6 +288,7 @@ export const Route = createFileRoute("/api/courses")({
             }
             if (!row.campaignKey && !row.campaignName) continue;
             const campaign = atCampaign(row.campaignKey, row.campaignName);
+            if (row.source) campaign.sources.add(row.source);
             campaign.crmLeads++;
             campaign.lost++;
           }
@@ -292,6 +303,7 @@ export const Route = createFileRoute("/api/courses")({
             }
             if (!row.campaignKey && !row.campaignName) continue;
             const campaign = atCampaign(row.campaignKey, row.campaignName);
+            if (row.source) campaign.sources.add(row.source);
             campaign.revenue += row.usdPaid;
             if (row.movement && !row.isCreditNote) campaign.invoiceRefs.add(row.movement);
           }
@@ -301,16 +313,28 @@ export const Route = createFileRoute("/api/courses")({
             if (row.revenueDate && row.orderRef)
               atMonth(row.revenueDate.slice(0, 7)).salesOrderRefs.add(row.orderRef);
             if ((!row.campaignKey && !row.campaignName) || !row.orderRef) continue;
-            atCampaign(row.campaignKey, row.campaignName).salesOrderRefs.add(row.orderRef);
+            const campaign = atCampaign(row.campaignKey, row.campaignName);
+            if (row.source) campaign.sources.add(row.source);
+            campaign.salesOrderRefs.add(row.orderRef);
           }
 
           const campaignRows = [...campaignMap.values()]
-            .filter((row) => row.spend > 0 || row.officialActive)
+            .filter((row) =>
+              organicScope
+                ? row.crmLeads > 0 ||
+                  row.won > 0 ||
+                  row.lost > 0 ||
+                  row.revenue !== 0 ||
+                  row.invoiceRefs.size > 0 ||
+                  row.salesOrderRefs.size > 0
+                : row.spend > 0 || row.officialActive,
+            )
             .map((row) => ({
               key: row.key,
               name: row.name,
               platforms: [...row.platforms],
               accounts: [...row.accounts],
+              sources: [...row.sources].sort(),
               objective: row.objective,
               spend: row.spend,
               latestSpend: row.latestSpend,
@@ -341,7 +365,11 @@ export const Route = createFileRoute("/api/courses")({
               .sort((a, b) => b.statusSpend24h - a.statusSpend24h || b.spend - a.spend),
             previousCampaigns: campaignRows
               .filter((row) => !row.officialActive)
-              .sort((a, b) => b.spendDateMax.localeCompare(a.spendDateMax) || b.spend - a.spend),
+              .sort((a, b) =>
+                organicScope
+                  ? b.revenue - a.revenue || b.crmLeads - a.crmLeads
+                  : b.spendDateMax.localeCompare(a.spendDateMax) || b.spend - a.spend,
+              ),
             previousCampaignCount: campaignRows.filter((row) => !row.officialActive).length,
             attribution: {
               spendBySource,
