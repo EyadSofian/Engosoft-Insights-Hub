@@ -149,7 +149,7 @@ function Organic() {
   const { data, isLoading, error, refetch } = useApi<OrganicResponse>("/api/organic");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  const lostAvailable = data?.health.lostAuthority === "odoo-direct";
+  const lostAvailable = data?.health.lostAuthority !== "unavailable";
 
   const sourceColumns: Col<OrganicBreakdown>[] = [
     {
