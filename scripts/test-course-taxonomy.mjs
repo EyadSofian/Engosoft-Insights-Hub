@@ -78,19 +78,22 @@ for (const name of [
 ])
   assert.equal(courseFromMarketingName(name), "", name);
 
-/* --- an authoritative column is never overwritten by product text ---------- */
-// Each of these moved real money on the live workbook. `canonicalCourse` joined
-// the course column, the product and the product category into one string and
-// returned whichever rule sat earliest in the array — so 100% of Maint revenue
-// was reported as CMRP and 100% of Marketing revenue as Tech.
+/* --- authoritative columns and deliberate business aliases ----------------- */
+// Maintenance is sold inside CMRP. The authoritative `Maint` label, its product
+// wording and its category must therefore resolve to the same bucket as CMRP so
+// paid revenue and campaign spend cannot split into two dashboard rows.
 assert.equal(
   canonicalCourseValue(
     "Maint",
     "[897] Individual Preparation CMRP",
     "revenue / engineering / maintenance",
   ),
-  "Maint",
+  "CMRP",
 );
+assert.equal(courseFromMarketingName("maintenance-ksa-20/8/26"), "CMRP");
+assert.equal(courseFromMarketingName("maint-web-20/8/26"), "CMRP");
+
+// Other authoritative courses remain protected from unrelated product text.
 assert.equal(
   canonicalCourseValue(
     "Marketing",
@@ -119,7 +122,7 @@ assert.equal(
 // A blank course column still resolves from the category, which is what the
 // Courses tab is for.
 assert.equal(canonicalCourseValue("", "", "revenue / engineering / safety"), "Safety");
-assert.equal(canonicalCourseValue("", "", "revenue / engineering / maintenance"), "Maint");
+assert.equal(canonicalCourseValue("", "", "revenue / engineering / maintenance"), "CMRP");
 assert.equal(canonicalCourseValue("", "Interior Design - AutoCAD & 3ds Max", ""), "Interior");
 
 // ...but an unrecognised product name is not a course. Discount lines used to
@@ -140,23 +143,17 @@ assert.equal(canonicalCourseValue("Technical / Safety"), "Safety");
 assert.equal(canonicalCourseValue("FMP"), "CFM");
 // Already-canonical values resolve to themselves, including the ones the old
 // twelve rules could not produce at all.
-for (const code of [
-  "Auto",
-  "Safety",
-  "Maint",
-  "Steel",
-  "Website",
-  "Private",
-  "Certificate",
-  "Other",
-])
+for (const code of ["Auto", "Safety", "Steel", "Website", "Private", "Certificate", "Other"])
   assert.equal(canonicalCourseValue(code), code);
+for (const maintenanceLabel of ["Maint", "Maintenance", "revenue / engineering / maintenance"])
+  assert.equal(canonicalCourseValue(maintenanceLabel), "CMRP");
 
 /* --- main category comes from the same table ------------------------------- */
 assert.equal(mainCategoryForCourse("PMP"), "Professional Certificate");
 assert.equal(mainCategoryForCourse("Safety"), "Professional Certificate");
 assert.equal(mainCategoryForCourse("Interior"), "Interior & Decor");
-assert.equal(mainCategoryForCourse("Maint"), "Engineering");
+assert.equal(mainCategoryForCourse("Maint"), "Professional Certificate");
+assert.equal(mainCategoryForCourse("CMRP"), "Professional Certificate");
 assert.equal(mainCategoryForCourse("nonsense"), "");
 
 /* --- the ads course column is a formula, and formulas break ---------------- */
@@ -165,7 +162,7 @@ assert.equal(mainCategoryForCourse("nonsense"), "");
 assert.equal(isKnownCourse("#REF!"), false);
 assert.equal(isKnownCourse("#N/A"), false);
 assert.equal(isKnownCourse(""), false);
-for (const code of ["Auto", "Web", "PMP", "Interior", "Safety"])
+for (const code of ["Auto", "Web", "PMP", "Interior", "Safety", "Maint"])
   assert.equal(isKnownCourse(code), true);
 // Odoo category spellings count as known, so a hint written as a category works.
 assert.equal(isKnownCourse("Facility Management"), true);

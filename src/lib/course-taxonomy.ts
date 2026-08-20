@@ -29,9 +29,10 @@
 // must not be mixed. A column value is looked up exactly against the workbook's
 // `Courses` tab; a campaign name is tokenised. The old `canonicalCourse` joined
 // an authoritative course column with free product text into one string and
-// returned whichever rule sat earliest in the array — which silently moved every
-// Maint invoice into CMRP ("Individual Preparation CMRP") and every Marketing
-// invoice into Tech ("Technology - Digital Marketing").
+// returned whichever rule sat earliest in the array. Context still must not
+// overwrite an authoritative course column. `Maint` is the one explicit
+// business alias: Engosoft sells Maintenance inside CMRP, so both labels
+// intentionally canonicalise to the same CMRP bucket.
 
 /** Trim, lower-case and collapse whitespace and dash variants for comparison. */
 export function normalizeCourseKey(value: unknown): string {
@@ -60,7 +61,6 @@ export const COURSE_CODES = [
   "English",
   "Infra",
   "Interior",
-  "Maint",
   "Marketing",
   "Mech",
   "Other",
@@ -120,7 +120,7 @@ const CATEGORY_TO_COURSE: Record<string, string> = {
   "revenue / engineering / automotive": "Auto",
   "revenue / engineering / civil / infrastructure": "Infra",
   "revenue / engineering / civil / structure": "Struc",
-  "revenue / engineering / maintenance": "Maint",
+  "revenue / engineering / maintenance": "CMRP",
   "revenue / engineering / safety": "Safety",
   "revenue / non-engineering / english": "English",
   "revenue / non-engineering / interior": "Interior",
@@ -133,6 +133,11 @@ for (const [category, course] of Object.entries(CATEGORY_TO_COURSE))
   VALUE_ALIASES.set(category, course);
 // A row that already carries the canonical code resolves to itself.
 for (const code of COURSE_CODES) VALUE_ALIASES.set(normalizeCourseKey(code), code);
+// The workbook still emits this historical label, but the business reports the
+// product under CMRP. Keep the alias at ingestion so spend, CRM and revenue use
+// one key everywhere rather than being stitched together only in the UI.
+VALUE_ALIASES.set("maint", "CMRP");
+VALUE_ALIASES.set("maintenance", "CMRP");
 
 /**
  * Bucket for paid lines that genuinely belong to no course — discounts,
@@ -166,7 +171,6 @@ const COURSE_MAIN_CATEGORY: Record<string, string> = {
   English: "Non-Engineering",
   Infra: "Engineering",
   Interior: "Interior & Decor",
-  Maint: "Engineering",
   Marketing: "Non-Engineering",
   Mech: "Engineering",
   Other: "Non-Engineering",
@@ -181,7 +185,10 @@ const COURSE_MAIN_CATEGORY: Record<string, string> = {
   civil: "Engineering",
 };
 
-export const mainCategoryForCourse = (course: string): string => COURSE_MAIN_CATEGORY[course] ?? "";
+export const mainCategoryForCourse = (course: string): string => {
+  const canonical = VALUE_ALIASES.get(normalizeCourseKey(course)) ?? course;
+  return COURSE_MAIN_CATEGORY[canonical] ?? "";
+};
 
 /**
  * Leading tokens used by the marketing naming convention, verified against every
@@ -219,8 +226,8 @@ const NAME_TOKENS: Record<string, string> = {
   tech: "Tech",
   technology: "Tech",
   safety: "Safety",
-  maint: "Maint",
-  maintenance: "Maint",
+  maint: "CMRP",
+  maintenance: "CMRP",
   marketing: "Marketing",
   english: "English",
 };
@@ -297,8 +304,9 @@ export function courseFromMarketingName(name: unknown): string {
  * `courseValue` is the authoritative column (`Course`, `Course Name`,
  * `Course Categories`); `context` is supporting text such as the product name
  * and product category. They are resolved **in order and independently** — an
- * authoritative value is never concatenated with free product text, which is
- * what let "Individual Preparation CMRP" overwrite an explicit `Maint`.
+ * authoritative value is never concatenated with free product text. Explicit
+ * business aliases are resolved before context: `Maint` becomes `CMRP` because
+ * they are the same sold course, while unrelated product words cannot move it.
  *
  * An unrecognised course value keeps its own name, so a new course appears as
  * itself instead of hiding inside a neighbouring one. Unrecognised *context*

@@ -195,8 +195,10 @@ the campaign name, so a creative called `auto profile` moved an entire PMP campa
 Automotive — spend followed the guessed name while leads and revenue followed the row's
 own course, and the courses page showed PMP campaigns filed under Auto with 0 leads and
 $0 revenue. And `canonicalCourse` joined the course column with the product name into one
-string, then returned whichever regex sat earliest in the array, which reported 100% of
-Maint revenue as CMRP and 100% of Marketing revenue as Tech.
+string, then returned whichever regex sat earliest in the array, which could overwrite
+authoritative course values. Resolution is now ordered. `Maint`/`Maintenance` is one
+deliberate business alias of `CMRP`, so its collected revenue, CRM outcomes and CMRP ad
+spend share one bucket; unrelated pairs such as Marketing and Tech remain separate.
 
 A bare `auto` is therefore no longer a course token — `Auto` needs `automotive`,
 `automobile` or `سيارات`. Nothing is lost: all 174 named campaigns spell it in full.
