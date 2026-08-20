@@ -19,6 +19,7 @@ import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
+import { Route as OrganicRouteImport } from './routes/organic'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as TeamsRouteImport } from './routes/teams'
@@ -38,6 +39,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
+import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
@@ -102,6 +104,11 @@ const LostRoute = LostRouteImport.update({
 const MediaBuyersRoute = MediaBuyersRouteImport.update({
   id: '/media-buyers',
   path: '/media-buyers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganicRoute = OrganicRouteImport.update({
+  id: '/organic',
+  path: '/organic',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsRoute = ProductsRouteImport.update({
@@ -199,6 +206,11 @@ const ApiMediaBuyersRoute = ApiMediaBuyersRouteImport.update({
   path: '/api/media-buyers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrganicRoute = ApiOrganicRouteImport.update({
+  id: '/api/organic',
+  path: '/api/organic',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOverviewRoute = ApiOverviewRouteImport.update({
   id: '/api/overview',
   path: '/api/overview',
@@ -286,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
+  '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
@@ -305,6 +318,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
+  '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
@@ -332,6 +346,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
+  '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
@@ -351,6 +366,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
+  '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
@@ -379,6 +395,7 @@ export interface FileRoutesById {
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
+  '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
@@ -398,6 +415,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
+  '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
@@ -427,6 +445,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/lost'
     | '/media-buyers'
+    | '/organic'
     | '/products'
     | '/sales'
     | '/teams'
@@ -446,6 +465,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
+    | '/api/organic'
     | '/api/overview'
     | '/api/products'
     | '/api/profitability'
@@ -473,6 +493,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/lost'
     | '/media-buyers'
+    | '/organic'
     | '/products'
     | '/sales'
     | '/teams'
@@ -492,6 +513,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
+    | '/api/organic'
     | '/api/overview'
     | '/api/products'
     | '/api/profitability'
@@ -519,6 +541,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/lost'
     | '/media-buyers'
+    | '/organic'
     | '/products'
     | '/sales'
     | '/teams'
@@ -538,6 +561,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
+    | '/api/organic'
     | '/api/overview'
     | '/api/products'
     | '/api/profitability'
@@ -566,6 +590,7 @@ export interface RootRouteChildren {
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
+  OrganicRoute: typeof OrganicRoute
   ProductsRoute: typeof ProductsRoute
   SalesRoute: typeof SalesRoute
   TeamsRoute: typeof TeamsRoute
@@ -585,6 +610,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
+  ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
@@ -672,6 +698,13 @@ declare module '@tanstack/react-router' {
       path: '/media-buyers'
       fullPath: '/media-buyers'
       preLoaderRoute: typeof MediaBuyersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organic': {
+      id: '/organic'
+      path: '/organic'
+      fullPath: '/organic'
+      preLoaderRoute: typeof OrganicRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -807,6 +840,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaBuyersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organic': {
+      id: '/api/organic'
+      path: '/api/organic'
+      fullPath: '/api/organic'
+      preLoaderRoute: typeof ApiOrganicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/overview': {
       id: '/api/overview'
       path: '/api/overview'
@@ -926,6 +966,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   MediaBuyersRoute: MediaBuyersRoute,
+  OrganicRoute: OrganicRoute,
   ProductsRoute: ProductsRoute,
   SalesRoute: SalesRoute,
   TeamsRoute: TeamsRoute,
@@ -945,6 +986,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
+  ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
