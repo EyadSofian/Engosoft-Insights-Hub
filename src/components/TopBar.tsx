@@ -17,13 +17,14 @@ import { fmtDateTime, useI18n } from "@/lib/i18n";
 import {
   activeDimensionCount,
   filterStore,
-  setPlatformFilter,
+  setAcquisitionFilter,
   useFilters,
 } from "@/lib/filter-store";
 import { approvedReportingEnd } from "@/lib/reporting-window";
 import { useModalGuard } from "@/lib/ui-store";
-import type { CampaignObjective, DataHealth, Platform } from "@/lib/types";
-import { PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
+import type { AcquisitionChannel, CampaignObjective, DataHealth, Platform } from "@/lib/types";
+import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "@/lib/constants";
+import { acquisitionChannel } from "@/lib/acquisition-channel";
 import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -235,11 +236,16 @@ export function TopBar({ title }: { title?: string }) {
           </div>
           <div className="hscroll bleed-x [--bleed:0.875rem] min-w-0 sm:[--bleed:0px]">
             <Segmented
-              value={filters.platform ?? "all"}
-              onChange={(v) => setPlatformFilter(v === "all" ? undefined : (v as Platform))}
+              value={acquisitionChannel(filters) ?? "all"}
+              onChange={(v) =>
+                setAcquisitionFilter(v === "all" ? undefined : (v as AcquisitionChannel))
+              }
               options={[
                 { value: "all", label: t("all_platforms") },
-                ...PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABEL[p][lang] })),
+                ...ACQUISITION_CHANNELS.map((channel) => ({
+                  value: channel,
+                  label: ACQUISITION_CHANNEL_LABEL[channel][lang],
+                })),
               ]}
             />
           </div>
@@ -544,16 +550,18 @@ function FilterSheet({
               </span>
               <div className="overflow-x-auto overscroll-x-contain scrollbar-none pb-1">
                 <Segmented
-                  value={filters.platform ?? "all"}
+                  value={acquisitionChannel(filters) ?? "all"}
                   onChange={(value) =>
-                    setPlatformFilter(value === "all" ? undefined : (value as Platform))
+                    setAcquisitionFilter(
+                      value === "all" ? undefined : (value as AcquisitionChannel),
+                    )
                   }
                   size="md"
                   options={[
                     { value: "all", label: t("all_platforms") },
-                    ...PLATFORMS.map((platform) => ({
-                      value: platform,
-                      label: PLATFORM_LABEL[platform][lang],
+                    ...ACQUISITION_CHANNELS.map((channel) => ({
+                      value: channel,
+                      label: ACQUISITION_CHANNEL_LABEL[channel][lang],
                     })),
                   ]}
                 />

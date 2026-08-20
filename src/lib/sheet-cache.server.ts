@@ -32,6 +32,7 @@ import {
 import { isArchivedWonStage } from "./archived-won";
 import { decideSnapshotRead } from "./snapshot-freshness";
 import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-freshness";
+import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import {
   databaseConfigured,
   readDashboardDataset,
@@ -357,18 +358,6 @@ export function normalizeSource(s: string): string {
   if (k === "whatsapp") return "whatsapp broadcast";
   return k;
 }
-
-/**
- * Which normalized CRM `source` values identify each ad platform. Lives here
- * rather than in the compute layer because both the platform filter and the
- * "this platform has no spend tab" health check need the same mapping.
- */
-export const PLATFORM_SOURCE_KEYS: Record<Platform, string[]> = {
-  meta: ["facebook", "instagram"],
-  snapchat: ["snapchat"],
-  tiktok: ["tiktok"],
-  google: ["google", "google ads", "adwords", "youtube"],
-};
 
 /**
  * Stages that must never enter the reportable lead population, whichever tab

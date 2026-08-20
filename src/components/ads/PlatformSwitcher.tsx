@@ -1,11 +1,16 @@
 import { LayoutGrid, TriangleAlert } from "lucide-react";
 import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
-import { setPlatformFilter, useFilters } from "@/lib/filter-store";
-import { PLATFORM_COLOR, PLATFORM_LABEL, PLATFORMS } from "@/lib/constants";
-import type { Maybe, Platform } from "@/lib/types";
+import { setAcquisitionFilter, useFilters } from "@/lib/filter-store";
+import {
+  ACQUISITION_CHANNEL_COLOR,
+  ACQUISITION_CHANNEL_LABEL,
+  ACQUISITION_CHANNELS,
+} from "@/lib/constants";
+import { acquisitionChannel } from "@/lib/acquisition-channel";
+import type { AcquisitionChannel, Maybe } from "@/lib/types";
 
 export interface PlatformCoverage {
-  platform: Platform;
+  platform: AcquisitionChannel;
   adRows: number;
   /** False means this platform has no spend tab, so its cost is unknown. */
   spendAvailable: boolean;
@@ -24,7 +29,7 @@ export interface PlatformCoverage {
 }
 
 /**
- * Platform selection, wired to the global `platform` filter so the whole page —
+ * Acquisition selection, wired to the global filters so the whole page —
  * cards, charts and every drill-down level — re-scopes together.
  *
  * Each tab carries its own availability line. That is the point: TikTok has to
@@ -37,19 +42,19 @@ export function PlatformSwitcher({
 }: {
   coverage: PlatformCoverage[];
   /** Unscoped totals. Not a sum of the rows — leads with no ad platform count here too. */
-  overall: { spend: number; crmLeads: number };
+  overall: { spend: number; crmLeads: number; revenue?: number };
 }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
-  const active = filters.platform ?? "all";
+  const active = acquisitionChannel(filters) ?? "all";
 
   const byKey = new Map(coverage.map((c) => [c.platform, c]));
-  const anyData = overall.spend > 0 || overall.crmLeads > 0;
+  const anyData = overall.spend > 0 || overall.crmLeads > 0 || (overall.revenue ?? 0) > 0;
 
-  const select = (value: Platform | "all") => {
+  const select = (value: AcquisitionChannel | "all") => {
     // A campaign belongs to exactly one platform, so a drill-down cannot
     // survive a platform change — clear it rather than show an empty table.
-    setPlatformFilter(value === "all" ? undefined : value);
+    setAcquisitionFilter(value === "all" ? undefined : value);
   };
 
   return (
@@ -72,28 +77,30 @@ export function PlatformSwitcher({
               : "No data in this period"
         }
       />
-      {PLATFORMS.map((p) => {
+      {ACQUISITION_CHANNELS.map((p) => {
         const c = byKey.get(p);
         const leads = c?.crmLeads ?? 0;
-        const hasAnything = !!c && (c.adRows > 0 || leads > 0);
+        const hasAnything = !!c && (c.adRows > 0 || leads > 0 || c.revenue > 0);
         return (
           <Tab
             key={p}
             active={active === p}
             onClick={() => select(p)}
-            color={PLATFORM_COLOR[p]}
-            title={PLATFORM_LABEL[p][lang]}
+            color={ACQUISITION_CHANNEL_COLOR[p]}
+            title={ACQUISITION_CHANNEL_LABEL[p][lang]}
             warn={!!c && !c.spendAvailable && leads > 0}
             line={
               !hasAnything
                 ? lang === "ar"
                   ? "مفيش بيانات في الفترة دي"
                   : "No data in this period"
-                : c!.spendAvailable
-                  ? `${fmtUSD(c!.spend)} · ${fmtNum(leads)} ${lang === "ar" ? "عميل" : "leads"}`
-                  : lang === "ar"
-                    ? `${fmtNum(leads)} عميل · الإنفاق غير متاح`
-                    : `${fmtNum(leads)} leads · spend not available`
+                : p === "organic"
+                  ? `${fmtUSD(c!.revenue)} · ${fmtNum(leads)} ${lang === "ar" ? "عميل" : "leads"}`
+                  : c!.spendAvailable
+                    ? `${fmtUSD(c!.spend)} · ${fmtNum(leads)} ${lang === "ar" ? "عميل" : "leads"}`
+                    : lang === "ar"
+                      ? `${fmtNum(leads)} عميل · الإنفاق غير متاح`
+                      : `${fmtNum(leads)} leads · spend not available`
             }
           />
         );

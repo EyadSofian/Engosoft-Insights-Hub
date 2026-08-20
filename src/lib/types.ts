@@ -2,6 +2,9 @@
 
 export type Platform = "meta" | "snapchat" | "tiktok" | "google";
 
+/** A top-level acquisition filter. Organic has no ad-platform fact rows. */
+export type AcquisitionChannel = Platform | "organic";
+
 /** Why an ad account spends. Traffic/unknown accounts poison efficiency metrics. */
 export type CampaignObjective = "leads" | "website_conversion" | "traffic" | "unknown";
 
@@ -26,6 +29,8 @@ export interface GlobalFilters {
   /** Accounting invoice company. Other facts are left untouched when they lack this dimension. */
   company?: string;
   platform?: Platform;
+  /** Source-based, non-paid acquisition channel from Odoo. */
+  channel?: "organic";
   account?: string;
   campaign?: string;
   /** Stable internal campaign key used by table drill-down. */

@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/ads")({
         const { getFiltered, computeTotals, computePerf, dailyTrend, div, UNKNOWN_ADSET_KEY } =
           await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
-        const { PLATFORMS } = await import("@/lib/constants");
+        const { ACQUISITION_CHANNELS, PLATFORMS } = await import("@/lib/constants");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -86,20 +86,27 @@ export const Route = createFileRoute("/api/ads")({
         // Meta would make the tab it came from report Meta's numbers. It also
         // cannot be a sum of the three platform rows: leads from UChat, WhatsApp
         // and referrals belong to no ad platform and would silently vanish.
-        const overall = filters.platform
-          ? computeTotals(await getFiltered({ ...filters, platform: undefined }))
-          : totals;
+        const overall =
+          filters.platform || filters.channel
+            ? computeTotals(
+                await getFiltered({ ...filters, platform: undefined, channel: undefined }),
+              )
+            : totals;
 
         const coverage = await Promise.all(
-          PLATFORMS.map(async (platform) => {
-            const scoped = await getFiltered({ ...filters, platform });
+          ACQUISITION_CHANNELS.map(async (platform) => {
+            const scoped = await getFiltered({
+              ...filters,
+              platform: platform === "organic" ? undefined : platform,
+              channel: platform === "organic" ? "organic" : undefined,
+            });
             const totals = computeTotals(scoped);
             const adRows = scoped.ads.length;
             return {
               platform,
               adRows,
-              /** False means: no spend tab for this platform, so cost is unknown. */
-              spendAvailable: adRows > 0,
+              /** Organic deliberately carries no paid-platform spend. */
+              spendAvailable: platform === "organic" || adRows > 0,
               spend: totals.spend,
               impressions: totals.impressions,
               clicksAll: totals.clicksAll,

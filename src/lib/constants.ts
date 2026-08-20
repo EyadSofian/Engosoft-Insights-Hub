@@ -1,4 +1,4 @@
-import type { Platform } from "./types";
+import type { AcquisitionChannel, Platform } from "./types";
 
 export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok", "google"];
 
@@ -9,12 +9,24 @@ export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   google: { ar: "جوجل", en: "Google Ads" },
 };
 
+export const ACQUISITION_CHANNELS: AcquisitionChannel[] = [...PLATFORMS, "organic"];
+
+export const ACQUISITION_CHANNEL_LABEL: Record<AcquisitionChannel, { ar: string; en: string }> = {
+  ...PLATFORM_LABEL,
+  organic: { ar: "أورجانيك", en: "Organic" },
+};
+
 /** One colour per platform, shared by the switcher, the charts and every badge. */
 export const PLATFORM_COLOR: Record<Platform, string> = {
   meta: "var(--chart-1)",
   snapchat: "var(--chart-2)",
   tiktok: "var(--chart-4)",
   google: "var(--chart-3)",
+};
+
+export const ACQUISITION_CHANNEL_COLOR: Record<AcquisitionChannel, string> = {
+  ...PLATFORM_COLOR,
+  organic: "var(--success)",
 };
 
 /** Metrics a platform genuinely does not report, so the UI can say so. */

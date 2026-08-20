@@ -41,8 +41,9 @@ import { PlatformSwitcher, type PlatformCoverage } from "@/components/ads/Platfo
 import { PerfExplorer, type Grain } from "@/components/ads/PerfExplorer";
 import { ratioCell } from "@/components/ads/cells";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
-import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
-import type { DataHealth, Maybe, PerfRow, Platform, Totals } from "@/lib/types";
+import { ACQUISITION_CHANNEL_LABEL, PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
+import { acquisitionChannel } from "@/lib/acquisition-channel";
+import type { AcquisitionChannel, DataHealth, Maybe, PerfRow, Platform, Totals } from "@/lib/types";
 
 export const Route = createFileRoute("/ads")({ component: Ads });
 
@@ -94,7 +95,7 @@ function Ads() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  const selected = filters.platform;
+  const selected = acquisitionChannel(filters);
   const coverage = data?.platformCoverage ?? [];
   const selectedCoverage = selected ? coverage.find((c) => c.platform === selected) : undefined;
 
@@ -107,8 +108,8 @@ function Ads() {
 
   const spendNote = noSpendTab
     ? lang === "ar"
-      ? `${PLATFORM_LABEL[selected!][lang]} مالهاش تبويب إنفاق في المصدر الحالي، فالإنفاق وكل المؤشرات المبنية عليه غير متاحة.`
-      : `${PLATFORM_LABEL[selected!][lang]} has no spend tab in the current source, so spend and every metric built on it are unavailable.`
+      ? `${ACQUISITION_CHANNEL_LABEL[selected!][lang]} مالهاش تبويب إنفاق في المصدر الحالي، فالإنفاق وكل المؤشرات المبنية عليه غير متاحة.`
+      : `${ACQUISITION_CHANNEL_LABEL[selected!][lang]} has no spend tab in the current source, so spend and every metric built on it are unavailable.`
     : undefined;
 
   const unavailableReason = noSpendTab
@@ -120,7 +121,10 @@ function Ads() {
       : undefined;
 
   const nothingAtAll =
-    !!selectedCoverage && selectedCoverage.adRows === 0 && selectedCoverage.crmLeads === 0;
+    !!selectedCoverage &&
+    selectedCoverage.adRows === 0 &&
+    selectedCoverage.crmLeads === 0 &&
+    selectedCoverage.revenue === 0;
 
   return (
     <div className="space-y-5">
@@ -156,7 +160,11 @@ function Ads() {
             // Falls back to the scoped totals if an older payload is still
             // cached, so a mid-deploy client degrades instead of blanking.
             overall={
-              data.platformCoverageAll ?? { spend: totals.spend, crmLeads: totals.totalLeads }
+              data.platformCoverageAll ?? {
+                spend: totals.spend,
+                crmLeads: totals.totalLeads,
+                revenue: totals.revenue,
+              }
             }
           />
 
@@ -172,8 +180,8 @@ function Ads() {
               <EmptyState
                 label={
                   lang === "ar"
-                    ? `مفيش أي بيانات لـ${PLATFORM_LABEL[selected!][lang]} في الفترة دي`
-                    : `No ${PLATFORM_LABEL[selected!].en} data in this period`
+                    ? `مفيش أي بيانات لـ${ACQUISITION_CHANNEL_LABEL[selected!][lang]} في الفترة دي`
+                    : `No ${ACQUISITION_CHANNEL_LABEL[selected!].en} data in this period`
                 }
                 hint={
                   lang === "ar"
@@ -552,7 +560,7 @@ function PlatformState({
   allCoverage,
   health,
 }: {
-  selected?: Platform;
+  selected?: AcquisitionChannel;
   coverage?: PlatformCoverage;
   allCoverage: PlatformCoverage[];
   health: DataHealth;
@@ -570,12 +578,16 @@ function PlatformState({
       >
         {lang === "ar"
           ? `${noSpend
-              .map((c) => `${PLATFORM_LABEL[c.platform].ar} (${fmtNum(c.crmLeads)} عميل)`)
+              .map(
+                (c) => `${ACQUISITION_CHANNEL_LABEL[c.platform].ar} (${fmtNum(c.crmLeads)} عميل)`,
+              )
               .join(
                 "، ",
               )} بتجيب عملاء لكن مفيش لها تبويب إنفاق في الملف. يعني تكلفة العميل وتكلفة الصفقة بيظهروا أرخص من الحقيقة، والعائد أعلى من الحقيقة. الأرقام بتتظبط أول ما يتعمل التبويب.`
           : `${noSpend
-              .map((c) => `${PLATFORM_LABEL[c.platform].en} (${fmtNum(c.crmLeads)} leads)`)
+              .map(
+                (c) => `${ACQUISITION_CHANNEL_LABEL[c.platform].en} (${fmtNum(c.crmLeads)} leads)`,
+              )
               .join(
                 ", ",
               )} produce leads but have no spend tab in the workbook, so CPL and CPA read cheaper than reality and ROAS reads higher. The figures correct themselves the moment the tab exists.`}
@@ -585,14 +597,32 @@ function PlatformState({
 
   if (!coverage) return null;
 
+  if (selected === "organic") {
+    return (
+      <Notice
+        tone="info"
+        title={
+          lang === "ar"
+            ? "أورجانيك: مبيعات من مصادر Odoo غير المدفوعة"
+            : "Organic: sales from non-paid Odoo sources"
+        }
+        icon={<Info size={16} />}
+      >
+        {lang === "ar"
+          ? `التقرير ده بيجمع مصادر Odoo غير المدفوعة زي الموقع وUChat وواتساب والترشيحات والمكالمات والـwebinars. فيه ${fmtNum(coverage.crmLeads)} عميل، ${fmtNum(coverage.won)} صفقة رابحة، وتحصيل ${fmtUSD(coverage.revenue)}. الإنفاق الإعلاني صفر لأن الصفوف دي مش من منصات الإعلانات.`
+          : `This view groups non-paid Odoo sources such as Website, UChat, WhatsApp, recommendations, phone calls and webinars. It contains ${fmtNum(coverage.crmLeads)} leads, ${fmtNum(coverage.won)} won deals and ${fmtUSD(coverage.revenue)} collected. Paid-media spend is zero because these rows do not come from ad platforms.`}
+      </Notice>
+    );
+  }
+
   if (!coverage.spendAvailable) {
     return (
       <Notice
         tone="warning"
         title={
           lang === "ar"
-            ? `${PLATFORM_LABEL[selected].ar}: بيانات الإنفاق والحملات غير متاحة في المصدر الحالي`
-            : `${PLATFORM_LABEL[selected].en}: spend and campaign data are not available in the current source`
+            ? `${ACQUISITION_CHANNEL_LABEL[selected].ar}: بيانات الإنفاق والحملات غير متاحة في المصدر الحالي`
+            : `${ACQUISITION_CHANNEL_LABEL[selected].en}: spend and campaign data are not available in the current source`
         }
         icon={<Info size={16} />}
       >
@@ -616,8 +646,8 @@ function PlatformState({
       tone="info"
       title={
         lang === "ar"
-          ? `${PLATFORM_LABEL[selected].ar}: مؤشرات مش موجودة في التصدير`
-          : `${PLATFORM_LABEL[selected].en}: metrics absent from the export`
+          ? `${ACQUISITION_CHANNEL_LABEL[selected].ar}: مؤشرات مش موجودة في التصدير`
+          : `${ACQUISITION_CHANNEL_LABEL[selected].en}: metrics absent from the export`
       }
       icon={<Info size={16} />}
     >

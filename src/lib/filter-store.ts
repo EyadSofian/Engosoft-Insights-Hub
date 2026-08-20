@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { DatePreset, GlobalFilters, Platform } from "./types";
+import type { AcquisitionChannel, DatePreset, GlobalFilters, Platform } from "./types";
 import { DEFAULT_FX_RATES } from "./fx-rates";
 
 type Listener = () => void;
@@ -9,6 +9,7 @@ const DIMENSIONS = [
   "dateBasis",
   "company",
   "platform",
+  "channel",
   "account",
   "campaign",
   "adset",
@@ -190,8 +191,14 @@ export function activeDimensionCount(f: GlobalFilters): number {
  * canonical reset path.
  */
 export function setPlatformFilter(platform?: Platform) {
+  setAcquisitionFilter(platform);
+}
+
+/** Selects either one paid platform or the source-based Organic channel. */
+export function setAcquisitionFilter(channel?: AcquisitionChannel) {
   filterStore.set({
-    platform,
+    platform: channel && channel !== "organic" ? channel : undefined,
+    channel: channel === "organic" ? "organic" : undefined,
     account: undefined,
     campaign: undefined,
     campaignKey: undefined,

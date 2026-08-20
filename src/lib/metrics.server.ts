@@ -9,9 +9,9 @@ import {
   knownCourseFromText,
   normalizeName,
   normalizeSource,
-  PLATFORM_SOURCE_KEYS,
   type Snapshot,
 } from "./sheet-cache.server";
+import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
@@ -352,6 +352,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     from,
     to,
     platform,
+    channel,
     account,
     campaign,
     campaignKey: campaignKeyFilter,
@@ -374,6 +375,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   const sourceKey = source ? normalizeSource(source) : "";
   const attributionScoped = !!(
     platform ||
+    channel ||
     account ||
     campaign ||
     campaignKeyFilter ||
@@ -416,12 +418,14 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     for (const a of all.ads) if (a.platform === platform) platformCampaigns.add(a.campaignKey);
   }
   const matchesPlatform = (campaignKey: string, srcKey: string): boolean => {
+    if (channel === "organic") return isOrganicSourceKey(srcKey);
     if (!platform) return true;
     if (campaignKey && platformCampaigns.has(campaignKey)) return true;
     return PLATFORM_SOURCES[platform].includes(srcKey);
   };
 
   const ads = all.ads.filter((r) => {
+    if (channel === "organic") return false;
     if (!inRange(r.date, from, to)) return false;
     if (platform && r.platform !== platform) return false;
     if (account && r.account !== account) return false;
@@ -1146,6 +1150,10 @@ export async function computeRecentCampaignActivity(
     atRisk: [],
     lifetime: {},
   };
+  // Organic is an Odoo source classification, not an ad platform. Do not call
+  // Meta/Google status APIs for this view: there is no delivery state to show,
+  // and doing so would add latency and paid API work to an unrelated filter.
+  if (filters.channel === "organic") return empty;
   const history = await getFiltered({ ...filters, from: undefined, to: undefined, range: "all" });
   const lifetimeRows = new Map(computePerf(history, "campaign").map((row) => [row.key, row]));
   const eligibleCampaignKeys = new Set([

@@ -26,6 +26,7 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
       platform === "google"
         ? (platform as Platform)
         : undefined,
+    channel: p.get("channel") === "organic" ? "organic" : undefined,
     account: p.get("account") || undefined,
     campaign: p.get("campaign") || undefined,
     campaignKey: p.get("campaignKey") || undefined,

@@ -1,7 +1,8 @@
 import { X, Filter } from "lucide-react";
 import { fmtDate, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
-import { PLATFORM_LABEL } from "@/lib/constants";
+import { ACQUISITION_CHANNEL_LABEL } from "@/lib/constants";
+import { acquisitionChannel } from "@/lib/acquisition-channel";
 import type { GlobalFilters } from "@/lib/types";
 
 /**
@@ -34,13 +35,15 @@ export function FilterSummary({ className = "" }: { className?: string }) {
       value: filters.company,
     });
 
-  if (filters.platform) {
+  const selectedChannel = acquisitionChannel(filters);
+  if (selectedChannel) {
     chips.push({
-      key: "platform",
-      label: t("platform"),
-      value: PLATFORM_LABEL[filters.platform][lang],
+      key: filters.channel ? "channel" : "platform",
+      label: lang === "ar" ? "قناة الاكتساب" : "Acquisition channel",
+      value: ACQUISITION_CHANNEL_LABEL[selectedChannel][lang],
       clears: {
         platform: undefined,
+        channel: undefined,
         campaign: undefined,
         campaignKey: undefined,
         adset: undefined,

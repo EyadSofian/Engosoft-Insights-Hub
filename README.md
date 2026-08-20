@@ -140,6 +140,13 @@ feed. TikTok is priced when its API credentials are configured. Blended CPL
 (`spend ÷ all CRM leads`) can therefore read cheaper than paid CPL. Both are exposed:
 `cpl`, `platformCpl`, and `attributedCpl`.
 
+The top-level **Organic** channel is source-based, not an ad-platform tab. Live Odoo
+does not currently use a literal `utm.source = Organic`; it records the concrete source
+such as Website, UChat, WhatsApp, recommendation, phone, webinar or landing page. The
+Organic filter includes every non-empty source except explicit paid-platform aliases and
+generic paid markers (`ads`, `paid`, `cpc`, `ppc`, `sem`). It deliberately returns no ad
+facts, so paid-media spend is zero and platform delivery APIs are not called for that view.
+
 **8. Traffic and unnamed ad accounts are excluded from efficiency denominators.**
 `Engo soft website` runs traffic campaigns and `114732099069544` has no name and zero
 leads. Their spend is reported separately as "Non-lead spend" with a toggle to include
@@ -242,7 +249,7 @@ Every ratio goes through `div()`, which returns `null` when the denominator is z
 
 ## API
 
-All endpoints accept the global filters as query params (`from`, `to`, `platform`,
+All endpoints accept the global filters as query params (`from`, `to`, `platform`, `channel`,
 `account`, `campaign`, `adset`, `ad`, `source`, `course`, `mainCategory`, `salesTeam`,
 `salesperson`, `range`, `includeNonLead`, `cpaBasis`).
 

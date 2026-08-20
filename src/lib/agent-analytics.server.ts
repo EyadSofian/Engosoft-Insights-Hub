@@ -15,6 +15,7 @@ import {
 import { targetMonths, targetsByPerson, windowTarget, type TargetSource } from "./sales-targets.ts";
 import { loadTargetSource } from "./sales-targets.server";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
+import { isOrganicSourceKey } from "./acquisition-channel";
 
 export interface AgentAnalyticsRow {
   key: string;
@@ -900,6 +901,7 @@ function mergeOperationalClosures(
     mainCategory: string;
     salesperson: string;
   }) => {
+    if (filters.channel === "organic" && !isOrganicSourceKey(row.sourceKey)) return false;
     if (filters.platform && !platformCampaigns?.has(row.campaignKey)) return false;
     if (filters.campaign && row.campaignName !== filters.campaign) return false;
     if (filters.campaignKey && row.campaignKey !== filters.campaignKey) return false;
