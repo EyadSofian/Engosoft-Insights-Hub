@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
+import { hasReportableLost } from "@/lib/lost-authority";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import {
   Card,
@@ -158,7 +159,7 @@ function Campaigns() {
               unknownAdsetKey={data.unknownAdsetKey}
               csvPrefix="engosoft"
               activeCampaignStates={Object.values(data.activity.delivery)}
-              lostAvailable={data.health.lostAuthority === "odoo-direct"}
+              lostAvailable={hasReportableLost(data.health.lostAuthority)}
               spendAvailable={spend > 0}
               spendNote={
                 spend <= 0

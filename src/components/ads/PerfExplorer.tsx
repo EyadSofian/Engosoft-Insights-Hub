@@ -580,8 +580,8 @@ export function PerfExplorer({
           style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
         >
           {lang === "ar"
-            ? "بيانات Lost المباشرة مش متاحة حاليًا؛ علشان مانضللكش، الحملات الناضجة مش هتظهر «ناجحة» لحد ما المصدر يرجع."
-            : "Direct Lost data is unavailable. To avoid a misleading result, mature campaigns will not be marked Successful until the source recovers."}
+            ? "بيانات Archived Lost مش متاحة لا من Odoo ولا من النسخة الآمنة؛ علشان مانضللكش، الحملات الناضجة مش هتظهر «ناجحة» لحد ما المصدر يرجع."
+            : "Archived Lost is unavailable from both Odoo and the safe snapshot. To avoid a misleading result, mature campaigns will not be marked Successful until the source recovers."}
         </p>
       )}
       {decisionMode && activePlatformCount > evaluatedLiveCount && (

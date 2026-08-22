@@ -16,6 +16,7 @@ import {
 } from "@/components/ui-bits";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
+import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
 
 export const Route = createFileRoute("/lost")({ component: Lost });
 
@@ -144,11 +145,18 @@ function Lost() {
         </>
       ) : (
         <>
-          {data.health.lostAuthority !== "odoo-direct" && (
+          {!hasReportableLost(data.health.lostAuthority) && (
             <Notice tone="danger" title={t("data_notes")} icon={<Info size={16} />}>
               {lang === "ar"
-                ? "تعذّر قراءة أرشيف Odoo المباشر، لذلك أوقفنا أرقام Lost بدل ما نعرض نسخة قديمة بتاريخ غلط. جرّب تحديث الصفحة أو راجع اتصال Odoo."
-                : "Direct Odoo archive is unavailable, so Lost figures are stopped instead of showing a legacy file under the wrong date. Refresh or check the Odoo connection."}
+                ? "بيانات Archived Lost غير متاحة لا من Odoo ولا من آخر نسخة آمنة في PostgreSQL، لذلك أوقفنا أرقام Lost بدل ما نعرض صفر مضلل."
+                : "Archived Lost is unavailable from both Odoo and the safe PostgreSQL snapshot, so Lost figures are stopped instead of showing a misleading zero."}
+            </Notice>
+          )}
+          {usesStoredLost(data.health.lostAuthority) && (
+            <Notice tone="warning" title={t("data_notes")} icon={<Info size={16} />}>
+              {lang === "ar"
+                ? "أرقام Lost المعروضة جاية من آخر نسخة ناجحة من Odoo Archived Lost محفوظة في PostgreSQL؛ المصدر المباشر متعذر مؤقتًا، لكن البيانات مش مفقودة ومش محسوبة صفر."
+                : "Lost figures come from the last successful Odoo Archived Lost snapshot stored in PostgreSQL. The direct source is temporarily unavailable, but the data is present and is not treated as zero."}
             </Notice>
           )}
 

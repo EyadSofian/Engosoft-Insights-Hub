@@ -28,6 +28,7 @@ import {
 } from "@/components/ui-bits";
 import { setAcquisitionFilter, useFilters } from "@/lib/filter-store";
 import { fmtCompact, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { hasReportableLost } from "@/lib/lost-authority";
 import type { CourseAgg, DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
@@ -149,7 +150,7 @@ function Organic() {
   const { data, isLoading, error, refetch } = useApi<OrganicResponse>("/api/organic");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  const lostAvailable = data?.health.lostAuthority !== "unavailable";
+  const lostAvailable = data ? hasReportableLost(data.health.lostAuthority) : false;
 
   const sourceColumns: Col<OrganicBreakdown>[] = [
     {

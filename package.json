@@ -34,7 +34,8 @@
     "test:campaign-status-policy": "node --experimental-strip-types scripts/test-campaign-status-policy.mjs",
     "test:limited-json": "node --experimental-strip-types scripts/test-limited-json.mjs",
     "test:response-compression": "node --experimental-strip-types scripts/test-response-compression.mjs",
-    "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs"
+    "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs",
+    "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -245,8 +245,8 @@ export function ownerCampaignVerdict(
 
   if (!lostAvailable) {
     watches.push({
-      ar: "بيانات Lost المباشرة مش متاحة دلوقتي؛ مش هنعتبر الصفر نتيجة مؤكدة.",
-      en: "Direct Lost data is unavailable, so zero cannot be treated as confirmed.",
+      ar: "بيانات Archived Lost مش متاحة لا من Odoo ولا من النسخة الآمنة؛ مش هنعتبر الصفر نتيجة مؤكدة.",
+      en: "Archived Lost is unavailable from both Odoo and the safe snapshot, so zero cannot be treated as confirmed.",
     });
   } else if (row.lostRate !== null) {
     if (row.lostRate > MAX_LOST) {
