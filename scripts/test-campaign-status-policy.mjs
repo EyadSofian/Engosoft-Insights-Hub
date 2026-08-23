@@ -83,5 +83,22 @@ assert.equal(
   "Snapchat must be delivering, not merely configured Active",
 );
 
+const tiktok = {
+  ...base,
+  platform: "tiktok",
+  configuredStatus: "ENABLE",
+  effectiveStatus: "CAMPAIGN_STATUS_ENABLE",
+  servingStatus: "SERVING",
+  // The current TikTok collector reports campaign status directly and does not
+  // populate Meta-style child counts. That must not hide five live campaigns.
+  activeAdsets: 0,
+  activeAds: 0,
+};
+assert.equal(
+  isOperationalStateCurrent(tiktok, NOW),
+  true,
+  "TikTok ENABLE + CAMPAIGN_STATUS_ENABLE is operational even without child counters",
+);
+
 assert.equal(OPERATIONAL_STATE_MAX_AGE_MS, 20 * 60 * 1000);
 process.stdout.write("campaign status policy tests passed\n");

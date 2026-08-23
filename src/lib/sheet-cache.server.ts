@@ -33,6 +33,8 @@ import { isArchivedWonStage } from "./archived-won";
 import { decideSnapshotRead } from "./snapshot-freshness";
 import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-freshness";
 import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
+import { isWebsiteCampaignName, isWebsiteConversionCampaignName } from "./campaign-purpose";
+export { isWebsiteCampaignName, isWebsiteConversionCampaignName } from "./campaign-purpose";
 import {
   databaseConfigured,
   readDashboardDataset,
@@ -660,29 +662,6 @@ function classifyAccount(name: string): CampaignObjective {
   if (/^\d+$/.test(n)) return "unknown";
   if (/website|web\s*site/i.test(n)) return "traffic";
   return "leads";
-}
-
-const campaignNameTokens = (name: string): string[] =>
-  normalizeName(name)
-    .split(/[^a-z0-9]+/i)
-    .filter(Boolean);
-
-/** Engosoft routes any campaign explicitly tagged `web` or `con` to Website. */
-export function isWebsiteCampaignName(name: string): boolean {
-  const tokens = campaignNameTokens(name);
-  return tokens.includes("web") || tokens.includes("con");
-}
-
-/**
- * `con`/`web-con` identifies conversion campaigns. A `web`-only name still
- * appears on the Website page, but keeps its original lead/traffic objective so
- * the dashboard does not relabel a lead campaign as a purchase campaign.
- */
-export function isWebsiteConversionCampaignName(name: string): boolean {
-  const tokens = campaignNameTokens(name);
-  return (
-    tokens.includes("con") || /(^|\s)website\s*conversion(?:s)?(\s|$)/i.test(normalizeName(name))
-  );
 }
 
 function classifyCampaign(name: string, account: string): CampaignObjective {

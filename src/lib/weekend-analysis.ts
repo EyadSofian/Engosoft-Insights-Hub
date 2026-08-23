@@ -120,8 +120,18 @@ export function weekendBudgetDecision(
   const cplChange = ratioDelta(weekend.cpl, comparison.cpl) ?? 0;
   const salesChange = pointDelta(weekend.salesRate, comparison.salesRate) ?? 0;
   const lostChange = pointDelta(weekend.lostRate, comparison.lostRate) ?? 0;
+  // A weak weekday baseline cannot earn full weekend budget by itself. These
+  // absolute guards keep "equally poor" from being presented as healthy.
+  const clearsQualityFloor = weekend.salesRate >= 2 && weekend.lostRate <= 40;
 
-  if (cplChange <= 10 && salesChange >= -2 && lostChange <= 3) return "full";
-  if (cplChange > 25 || salesChange < -4 || lostChange > 6) return "reduce";
+  if (cplChange <= 10 && salesChange >= -2 && lostChange <= 3 && clearsQualityFloor) return "full";
+  if (
+    cplChange > 25 ||
+    salesChange < -4 ||
+    lostChange > 6 ||
+    weekend.salesRate < 0.5 ||
+    weekend.lostRate > 55
+  )
+    return "reduce";
   return "reallocate";
 }

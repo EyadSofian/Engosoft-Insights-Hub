@@ -512,8 +512,8 @@ function PlatformDecisionCard({
 
   let recommendation =
     lang === "ar"
-      ? "لا يوجد حجم عينة كافٍ لتغيير الميزانية."
-      : "The sample is too small for a budget change.";
+      ? "بيانات الصرف أو Lost أو حجم العينة لا تكفي لتغيير الميزانية."
+      : "Spend, Lost data or sample size is insufficient for a budget change.";
   if (row.decision === "full")
     recommendation =
       lang === "ar" ? "استمر مع مراقبة CPL أسبوعيًا." : "Continue and monitor CPL weekly.";
@@ -809,6 +809,11 @@ function Methodology({ data, lang }: { data: WeekendResponse; lang: "ar" | "en" 
             {lang === "ar"
               ? "الليد يُنسب ليوم إنشائه في Odoo حتى لو أُغلق لاحقًا. Lost مأخوذ من Archived Lost المعتمد لنفس دفعة الإنشاء، ونسبة المبيعات هي Won ÷ إجمالي الليدز؛ لا يتم اختراع ربط محاسبي غير موجود بين الليد والفاتورة. متوسط الصرف اليومي يشمل أيام الصرف الصفري داخل العينة."
               : "A lead is attributed to its Odoo creation day even if it closes later. Lost comes from the authoritative Archived Lost cohort, while sales rate is Won ÷ total leads; no unsupported lead-to-invoice link is invented. Average daily spend includes zero-spend days in the sample."}
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-subtle">
+            {lang === "ar"
+              ? "قاعدة Full: CPL لا يسوء بأكثر من 10%، المبيعات لا تنخفض بأكثر من نقطتين، وLost لا ترتفع بأكثر من 3 نقاط مقابل باقي الأسبوع؛ مع حد جودة مطلق لا يقل عن 2% مبيعات ولا يزيد عن 40% Lost."
+              : "Full-budget rule: CPL worsens by no more than 10%, sales fall by no more than 2pp, and Lost rises by no more than 3pp versus the baseline; absolute quality must also reach 2% sales with Lost no higher than 40%."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Pill tone={lostAvailable ? "success" : "danger"}>

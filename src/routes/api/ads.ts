@@ -10,9 +10,70 @@ export const Route = createFileRoute("/api/ads")({
           await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { ACQUISITION_CHANNELS, PLATFORMS } = await import("@/lib/constants");
+        const { paidCampaignPurpose } = await import("@/lib/campaign-purpose");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+
+        type Purpose = "website" | "webinar";
+        interface PurposeCampaign {
+          key: string;
+          campaign: string;
+          platform: Platform;
+          spend: number;
+          platformResults: number;
+          reportsResults: boolean;
+          dates: Set<string>;
+        }
+        const purposeCampaigns = new Map<string, PurposeCampaign>();
+        for (const ad of data.ads) {
+          const purpose = paidCampaignPurpose(ad.campaign);
+          if (purpose === "other") continue;
+          const key = `${purpose}:${ad.platform}:${ad.campaignKey || ad.campaign}`;
+          const campaign = purposeCampaigns.get(key) ?? {
+            key,
+            campaign: ad.campaign,
+            platform: ad.platform,
+            spend: 0,
+            platformResults: 0,
+            reportsResults: false,
+            dates: new Set<string>(),
+          };
+          campaign.spend += ad.spend;
+          if (ad.platformLeads !== null) {
+            campaign.reportsResults = true;
+            campaign.platformResults += ad.platformLeads;
+          }
+          if (ad.date) campaign.dates.add(ad.date);
+          purposeCampaigns.set(key, campaign);
+        }
+        const spendSections = (["website", "webinar"] as const).map((purpose) => {
+          const rows = [...purposeCampaigns.values()]
+            .filter((row) => row.key.startsWith(`${purpose}:`) && row.spend > 0)
+            .sort((a, b) => b.spend - a.spend);
+          const dates = new Set(rows.flatMap((row) => [...row.dates]));
+          const spend = rows.reduce((sum, row) => sum + row.spend, 0);
+          const reportsResults = rows.some((row) => row.reportsResults);
+          return {
+            purpose: purpose as Purpose,
+            spend,
+            campaigns: rows.length,
+            spendDays: dates.size,
+            averageDailySpend: dates.size ? spend / dates.size : null,
+            platformResults: reportsResults
+              ? rows.reduce((sum, row) => sum + row.platformResults, 0)
+              : null,
+            rows: rows.slice(0, 6).map((row) => ({
+              key: row.key,
+              campaign: row.campaign,
+              platform: row.platform,
+              spend: row.spend,
+              spendDays: row.dates.size,
+              averageDailySpend: row.dates.size ? row.spend / row.dates.size : null,
+              platformResults: row.reportsResults ? row.platformResults : null,
+            })),
+          };
+        });
 
         // Optional. Without it the response keeps its original shape, which is
         // what the production validator reads. With it the page asks for one
@@ -160,6 +221,7 @@ export const Route = createFileRoute("/api/ads")({
           byDay: [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
           // Spend, revenue, leads and won on one shared day axis.
           trend: dailyTrend(data),
+          spendSections,
           // One grain at a time when asked for; otherwise the original complete
           // aggregate, so existing consumers and the validator are unaffected.
           ...(grain

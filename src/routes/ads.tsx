@@ -1,14 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   BadgeDollarSign,
   BarChart3,
   ChevronDown,
   CircleDollarSign,
+  Globe2,
   Handshake,
   Info,
   MousePointerClick,
   Percent,
+  Presentation,
   ScatterChart as ScatterIcon,
   TrendingUp,
   UserMinus,
@@ -79,11 +81,30 @@ interface Resp {
   };
   byDay: ({ date: string; impressions: number; clicks: number } & Record<Platform, number>)[];
   trend: { date: string; spend: number; revenue: number; leads: number; won: number }[];
+  spendSections: CampaignSpendSection[];
   grain: Grain;
   rows: PerfRow[];
   unknownAdsetKey: string;
   accounts: { name: string; objective: string; spend: number; platformLeads: number | null }[];
   health: DataHealth;
+}
+
+interface CampaignSpendSection {
+  purpose: "website" | "webinar";
+  spend: number;
+  campaigns: number;
+  spendDays: number;
+  averageDailySpend: number | null;
+  platformResults: number | null;
+  rows: {
+    key: string;
+    campaign: string;
+    platform: Platform;
+    spend: number;
+    spendDays: number;
+    averageDailySpend: number | null;
+    platformResults: number | null;
+  }[];
 }
 
 function Ads() {
@@ -370,6 +391,8 @@ function Ads() {
                 </div>
               )}
 
+              <CampaignPurposeSpend sections={data.spendSections ?? []} />
+
               {/* --- charts ------------------------------------------------ */}
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="lg:col-span-2">
@@ -543,6 +566,130 @@ function SpendSplit({ totals }: { totals: Totals }) {
     totals.spendGoogle > 0 ? `${PLATFORM_LABEL.google[lang]} ${fmtUSD(totals.spendGoogle)}` : "",
   ].filter(Boolean);
   return <>{parts.join(" · ")}</>;
+}
+
+function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }) {
+  const { lang } = useI18n();
+  if (!sections.some((section) => section.spend > 0)) return null;
+
+  return (
+    <section>
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? "تصنيف مباشر من اسم الحملة؛ الويبنار لا يدخل ضمن حملات الموقع."
+            : "Classified directly from campaign names; webinar spend never enters Website."
+        }
+      >
+        {lang === "ar" ? "الصرف حسب غرض الحملة" : "Spend by campaign purpose"}
+      </SectionTitle>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {sections.map((section) => {
+          const website = section.purpose === "website";
+          const color = website ? "var(--brand)" : "var(--warning)";
+          const soft = website ? "var(--brand-soft)" : "var(--warning-soft)";
+          const Icon = website ? Globe2 : Presentation;
+          return (
+            <Card
+              key={section.purpose}
+              className="overflow-hidden"
+              style={{
+                background: `linear-gradient(145deg, ${soft}, var(--surface) 55%)`,
+                borderColor: `color-mix(in oklab, ${color} 25%, var(--border))`,
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                    style={{ background: soft, color }}
+                  >
+                    <Icon size={19} />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-text">
+                      {website
+                        ? lang === "ar"
+                          ? "حملات الموقع · web / web con / con"
+                          : "Website · web / web con / con"
+                        : lang === "ar"
+                          ? "حملات الويبنار"
+                          : "Webinar campaigns"}
+                    </h3>
+                    <p className="mt-0.5 text-[10.5px] text-text-muted">
+                      {website
+                        ? lang === "ar"
+                          ? "صرف زيارات وتحويلات الموقع"
+                          : "Website traffic and conversion spend"
+                        : lang === "ar"
+                          ? "سيكشن مستقل عن الموقع"
+                          : "Reported separately from Website"}
+                    </p>
+                  </div>
+                </div>
+                {website && (
+                  <Link
+                    to="/website"
+                    className="shrink-0 text-[11px] font-semibold text-brand hover:underline"
+                  >
+                    {lang === "ar" ? "تفاصيل الموقع" : "Website detail"}
+                  </Link>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <PurposeFact
+                  label={lang === "ar" ? "إجمالي الصرف" : "Total spend"}
+                  value={fmtUSDFull(section.spend)}
+                />
+                <PurposeFact
+                  label={lang === "ar" ? "حملات صرفت" : "Spending campaigns"}
+                  value={fmtNum(section.campaigns)}
+                />
+                <PurposeFact
+                  label={lang === "ar" ? "نتائج المنصة" : "Platform results"}
+                  value={fmtNum(section.platformResults)}
+                />
+              </div>
+
+              <div className="mt-4 space-y-2 border-t border-border/70 pt-3">
+                {section.rows.slice(0, 4).map((row) => (
+                  <div key={row.key} className="flex items-center justify-between gap-3 text-xs">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: PLATFORM_COLOR[row.platform] }}
+                      />
+                      <span className="truncate text-text" dir="auto" title={row.campaign}>
+                        {row.campaign}
+                      </span>
+                    </div>
+                    <span className="num shrink-0 font-semibold text-text">
+                      {fmtUSD(row.spend)}
+                    </span>
+                  </div>
+                ))}
+                {!section.rows.length && (
+                  <p className="py-2 text-center text-xs text-text-muted">
+                    {lang === "ar" ? "لا يوجد صرف في الفترة" : "No spend in this period"}
+                  </p>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PurposeFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface/75 p-2.5">
+      <div className="text-[9.5px] leading-tight text-text-muted">{label}</div>
+      <div className="num mt-1 text-sm font-semibold text-text">{value}</div>
+    </div>
+  );
 }
 
 /* --- per-platform state ---------------------------------------------------- */

@@ -43,6 +43,14 @@ assert.equal(
   }),
   "reduce",
 );
+const weakQualityBaseline = { ...baseline, cpl: 10, salesRate: 1, lostRate: 46 };
+assert.equal(
+  weekendBudgetDecision({ ...weakQualityBaseline, cpl: 6, salesRate: 1.5, lostRate: 45 }, weakQualityBaseline, {
+    lostAvailable: true,
+    hasSpendData: true,
+  }),
+  "reallocate",
+);
 assert.equal(
   weekendBudgetDecision({ ...baseline, leads: 12 }, baseline, {
     lostAvailable: true,
