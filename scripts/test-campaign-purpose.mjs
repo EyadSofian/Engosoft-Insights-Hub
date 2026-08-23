@@ -6,7 +6,13 @@ import {
   paidCampaignPurpose,
 } from "../src/lib/campaign-purpose.ts";
 
-for (const name of ["web-signup-1/7", "web-con-all-1/7/26-sa", "web-con", "con-web-shop"])
+for (const name of [
+  "web-signup-1/7",
+  "web-con-all-1/7/26-sa",
+  "web-con",
+  "con-web-shop",
+  "Traffic-all-web-20/7/26",
+])
   assert.equal(isWebsiteCampaignName(name), true, name);
 
 assert.equal(isWebsiteConversionCampaignName("web-con-all-1/7/26-sa"), true);

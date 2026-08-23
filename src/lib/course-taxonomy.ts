@@ -1,3 +1,5 @@
+import { paidCampaignPurpose } from "./campaign-purpose.ts";
+
 // Pure, isomorphic course taxonomy: how a raw column value or a marketing name
 // becomes one of the course codes the business actually reports on.
 //
@@ -16,14 +18,13 @@
 //
 // **2. The course is the LEADING token of a campaign name, not any token.**
 // `BIm - CBO - Arch - 17/7/26` is a BIM campaign whose creative angle is
-// architecture; `pmp-1/4/26-sayed-web` is a PMP campaign running to the website.
-// Searching the whole string made the first ambiguous (two rules matched, so the
-// old code gave up and returned nothing) and would make the second a Web
-// campaign. Everything after the leading token is geography, owner, team, funnel
-// stage or creative variant — never the course. Anchoring on the first
-// non-noise token resolves 161 of the 174 campaigns exactly; the other 13 name
-// no course at all (`Leads -hiring - sales`, `FB-Engagement-…`) and correctly
-// fall through to the CRM modal-course fallback.
+// architecture. Normal course names therefore still use their leading token.
+// Website is the deliberate exception: Engosoft defines any campaign explicitly
+// tagged `web` or `con` as part of the Website reporting bucket, wherever that
+// tag appears. Everything else after the leading token remains geography,
+// owner, team, funnel stage or creative variant. Names with no course at all
+// (`Leads -hiring - sales`, `FB-Engagement-…`) correctly fall through to the CRM
+// modal-course fallback.
 //
 // Column values and marketing names are resolved by *different* mechanisms and
 // must not be mixed. A column value is looked up exactly against the workbook's
@@ -45,9 +46,8 @@ export function normalizeCourseKey(value: unknown): string {
 
 /**
  * Every course code the business reports on, taken from the workbook's `Courses`
- * tab. `Web` is the ads-side code for website conversion/signup campaigns and is
- * kept distinct from the revenue-side `Website` product category, because no
- * source in the workbook asserts they are the same bucket.
+ * tab. Engosoft treats the ads-side `Web` label and the revenue-side `Website`
+ * label as one Website bucket, so the canonical reporting code is `Web`.
  */
 export const COURSE_CODES = [
   "Arch",
@@ -71,7 +71,6 @@ export const COURSE_CODES = [
   "Struc",
   "Tech",
   "Web",
-  "Website",
 ] as const;
 
 /**
@@ -111,7 +110,7 @@ const CATEGORY_TO_COURSE: Record<string, string> = {
   pmp: "PMP",
   "revenue / miscellaneous / certificate": "Certificate",
   "revenue / miscellaneous / private": "Private",
-  "revenue / miscellaneous / website": "Website",
+  "revenue / miscellaneous / website": "Web",
   "revenue / engineering / architecture": "Arch",
   "revenue / engineering / bim": "BIM",
   "revenue / engineering / electrical": "Elec",
@@ -133,6 +132,9 @@ for (const [category, course] of Object.entries(CATEGORY_TO_COURSE))
   VALUE_ALIASES.set(category, course);
 // A row that already carries the canonical code resolves to itself.
 for (const code of COURSE_CODES) VALUE_ALIASES.set(normalizeCourseKey(code), code);
+// Odoo/accounting writes `Website`, while paid campaigns write `Web`. They are
+// the same business bucket and must reconcile to one row on the Courses page.
+VALUE_ALIASES.set("website", "Web");
 // The workbook still emits this historical label, but the business reports the
 // product under CMRP. Keep the alias at ingestion so spend, CRM and revenue use
 // one key everywhere rather than being stitched together only in the UI.
@@ -181,7 +183,6 @@ const COURSE_MAIN_CATEGORY: Record<string, string> = {
   Struc: "Engineering",
   Tech: "Non-Engineering",
   Web: "Non-Engineering",
-  Website: "Non-Engineering",
   civil: "Engineering",
 };
 
@@ -291,7 +292,12 @@ const isProductLine = (value: string): boolean =>
  * must stay unresolved rather than become one.
  */
 export function courseFromMarketingName(name: unknown): string {
-  for (const token of tokenize(String(name ?? ""))) {
+  const raw = String(name ?? "");
+  // The Website page uses the explicit Engosoft naming rule `web` / `con`
+  // anywhere in a campaign name. Apply the same rule here so `Traffic-all-web`
+  // cannot disappear from the Courses Website total, and keep webinar separate.
+  if (paidCampaignPurpose(raw) === "website") return "Web";
+  for (const token of tokenize(raw)) {
     if (isNumeric(token) || LEADING_NOISE.has(token)) continue;
     return NAME_TOKENS[token] ?? "";
   }

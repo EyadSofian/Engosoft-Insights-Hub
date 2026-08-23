@@ -25,7 +25,7 @@ import {
 } from "@/components/ui-bits";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import { buildQuery, filterStore, useFilters } from "@/lib/filter-store";
-import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { Maybe, Platform } from "@/lib/types";
 import type { WeekendDayKey, WeekendDecision } from "@/lib/weekend-analysis";
 
@@ -248,7 +248,11 @@ function WeekendPerformance() {
             <KpiCard
               label={lang === "ar" ? "متوسط الصرف اليومي" : "Average daily spend"}
               value={fmtUSD(data.portfolio.weekend.avgDailySpend)}
-              sub={lang === "ar" ? "عبر 24 يوم ويك إند" : "Across 24 weekend days"}
+              sub={
+                lang === "ar"
+                  ? `عبر ${fmtNum(data.window.weekendDays)} يوم: الخميس والجمعة والسبت فقط`
+                  : `Across ${fmtNum(data.window.weekendDays)} Thursday–Saturday days only`
+              }
               icon={<CircleDollarSign size={18} />}
               index={0}
             />
@@ -451,8 +455,20 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
         <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Pill tone={copy.tone}>{lang === "ar" ? "قرار الويك إند" : "Weekend decision"}</Pill>
-            <span className="num text-[11px] text-text-muted">
-              {fmtDate(data.window.from, lang)} — {fmtDate(data.window.to, lang)}
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 rounded-lg border border-border bg-surface/75 px-2.5 py-1 text-[11px] text-text-muted">
+              <span>
+                {lang === "ar"
+                  ? "نافذة التحليل الكاملة، وتشمل أيام المقارنة:"
+                  : "Full analysis window, including baseline days:"}
+              </span>
+              <bdi dir="ltr" className="num font-semibold text-text">
+                {data.window.from} → {data.window.to}
+              </bdi>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
+              {lang === "ar"
+                ? `المحسوب كويك إند: الخميس + الجمعة + السبت فقط · ${fmtNum(data.window.weekendDays)} يوم`
+                : `Weekend sample: Thursday + Friday + Saturday only · ${fmtNum(data.window.weekendDays)} days`}
             </span>
           </div>
           <h2 className="text-xl font-semibold text-text sm:text-2xl">{copy.label}</h2>
@@ -468,9 +484,18 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
           )}
         </div>
         <div className="grid grid-cols-3 gap-2 lg:min-w-[310px]">
-          <SignalStat value="8" label={lang === "ar" ? "أسابيع" : "weeks"} />
-          <SignalStat value="24" label={lang === "ar" ? "يوم ويك إند" : "weekend days"} />
-          <SignalStat value="32" label={lang === "ar" ? "يوم مقارنة" : "baseline days"} />
+          <SignalStat
+            value={fmtNum(data.window.weeks)}
+            label={lang === "ar" ? "أسابيع مكتملة" : "complete weeks"}
+          />
+          <SignalStat
+            value={fmtNum(data.window.weekendDays)}
+            label={lang === "ar" ? "خميس + جمعة + سبت" : "Thu + Fri + Sat"}
+          />
+          <SignalStat
+            value={fmtNum(data.window.comparisonDays)}
+            label={lang === "ar" ? "أحد إلى أربعاء للمقارنة" : "Sun–Wed baseline"}
+          />
         </div>
       </div>
     </Card>

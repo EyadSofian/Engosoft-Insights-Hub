@@ -312,9 +312,8 @@ export type CourseAttributionSource = "source_mapping" | "campaign_name" | "crm_
  * courses, which let a creative called `auto profile` move an entire PMP
  * campaign's spend into Automotive. Reversing the order fixed that case and left
  * the mechanism intact: with ad-set and ad names kept as a fallback for
- * campaigns that name no course, `Traffic-all-web-20/7/26` — a Traffic campaign
- * on the `Engo soft website` account — still charged $172 to Interior and $31 to
- * CFM, because its ad sets are named `interior` and `cfm`.
+ * campaigns that name no course, awareness rows could still be charged to
+ * Interior and CFM merely because their ad sets used those topic names.
  *
  * That is not a mis-parse, it is the whole idea being wrong. Awareness campaigns
  * are segmented by topic, so their ad sets carry course words while the campaign
@@ -328,13 +327,21 @@ export type CourseAttributionSource = "source_mapping" | "campaign_name" | "crm_
  * So a campaign whose name declares nothing now falls through to the modal
  * course of its own CRM leads, which is evidence rather than a guess, and to
  * nothing at all when it has no leads either.
+ *
+ * Website is the explicit business exception handled by
+ * `courseFromMarketingName`: a `web` / `con` tag anywhere in the campaign maps
+ * to the shared Web bucket, matching the Website page exactly. Webinar keeps
+ * its own purpose and therefore never enters that bucket.
  */
 export function attributedAdCourse(
   row: AdRow,
   snapshot: Snapshot,
 ): { course: string; source: CourseAttributionSource; confidence: number } {
-  if (row.courseHint) return { course: row.courseHint, source: "source_mapping", confidence: 1 };
+  // Website is a campaign-purpose rule, so it must win over an old sheet hint
+  // such as CFM on `cfm-con-web`. Otherwise Courses and Website diverge again.
   const campaignCourse = knownCourseFromText(row.campaign);
+  if (campaignCourse === "Web") return { course: "Web", source: "campaign_name", confidence: 1 };
+  if (row.courseHint) return { course: row.courseHint, source: "source_mapping", confidence: 1 };
   if (campaignCourse) return { course: campaignCourse, source: "campaign_name", confidence: 1 };
   const meta = snapshot.campaigns.get(row.campaignKey);
   return {

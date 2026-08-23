@@ -58,10 +58,13 @@ for (const name of [
 assert.equal(courseFromMarketingName("BIm - CBO - Arch - 17/7/26"), "BIM");
 assert.equal(courseFromMarketingName("BIm - CBO - Struc - 17/7/26"), "BIM");
 assert.equal(courseFromMarketingName("Bim - MEP - 16/7/26 - CBO"), "BIM");
-// `web` is a real course token, and also the commonest trailing modifier.
+// Website is a reporting-purpose bucket: Engosoft's explicit `web` / `con`
+// campaign tag wins wherever it appears, so Courses reconciles to Website.
 assert.equal(courseFromMarketingName("web-con-all-1/7/26-sa"), "Web");
-assert.equal(courseFromMarketingName("pmp-1/4/26-sayed-web"), "PMP");
-assert.equal(courseFromMarketingName("cfm-con-web-4/6/26"), "CFM");
+assert.equal(courseFromMarketingName("pmp-1/4/26-sayed-web"), "Web");
+assert.equal(courseFromMarketingName("cfm-con-web-4/6/26"), "Web");
+assert.equal(courseFromMarketingName("Traffic-all-web-20/7/26"), "Web");
+assert.equal(courseFromMarketingName("CMRP-WEBINAR-20/8/26-lp"), "CMRP");
 
 /* --- names that declare no course stay unresolved -------------------------- */
 // They must fall through to the CRM modal-course fallback rather than being
@@ -91,7 +94,9 @@ assert.equal(
   "CMRP",
 );
 assert.equal(courseFromMarketingName("maintenance-ksa-20/8/26"), "CMRP");
-assert.equal(courseFromMarketingName("maint-web-20/8/26"), "CMRP");
+// An explicit Website tag wins for campaign reporting, even when the promoted
+// course token is also present; revenue still follows its authoritative course.
+assert.equal(courseFromMarketingName("maint-web-20/8/26"), "Web");
 
 // Other authoritative courses remain protected from unrelated product text.
 assert.equal(
@@ -143,8 +148,10 @@ assert.equal(canonicalCourseValue("Technical / Safety"), "Safety");
 assert.equal(canonicalCourseValue("FMP"), "CFM");
 // Already-canonical values resolve to themselves, including the ones the old
 // twelve rules could not produce at all.
-for (const code of ["Auto", "Safety", "Steel", "Website", "Private", "Certificate", "Other"])
+for (const code of ["Auto", "Safety", "Steel", "Private", "Certificate", "Other"])
   assert.equal(canonicalCourseValue(code), code);
+assert.equal(canonicalCourseValue("Website"), "Web");
+assert.equal(canonicalCourseValue("revenue / miscellaneous / website"), "Web");
 for (const maintenanceLabel of ["Maint", "Maintenance", "revenue / engineering / maintenance"])
   assert.equal(canonicalCourseValue(maintenanceLabel), "CMRP");
 
@@ -154,6 +161,7 @@ assert.equal(mainCategoryForCourse("Safety"), "Professional Certificate");
 assert.equal(mainCategoryForCourse("Interior"), "Interior & Decor");
 assert.equal(mainCategoryForCourse("Maint"), "Professional Certificate");
 assert.equal(mainCategoryForCourse("CMRP"), "Professional Certificate");
+assert.equal(mainCategoryForCourse("Website"), "Non-Engineering");
 assert.equal(mainCategoryForCourse("nonsense"), "");
 
 /* --- the ads course column is a formula, and formulas break ---------------- */
@@ -185,13 +193,11 @@ assert.equal(canonicalCourseValue("Freelance Masterclass"), "Freelance Mastercla
 
 /* --- awareness campaigns are segmented by topic, and sell nothing ---------- */
 // Their ad sets carry course words while the campaign does not. Reading a course
-// off an ad set charged $172 of `Traffic-all-web-20/7/26` (a Traffic campaign on
-// the `Engo soft website` account, ad sets `interior` and `cfm`) to Interior and
-// CFM. `attributedAdCourse` no longer consults ad-set or ad names at all; these
-// names must therefore keep declaring no course, so that when a campaign name is
-// checked directly the answer is honestly empty.
+// off an ad set used to charge awareness spend to Interior and CFM merely because
+// those topic names appeared underneath the campaign. `attributedAdCourse` no
+// longer consults ad-set or ad names; names without an explicit Website tag or a
+// leading course must therefore remain unresolved.
 for (const name of [
-  "Traffic-all-web-20/7/26",
   "IG-traffic-11/1/26-SAYED",
   "FB-Engagement-7/1/26-SAYED",
   "IG-Engagement-11/1/26-SAYED",
