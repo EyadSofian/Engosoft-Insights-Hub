@@ -2123,6 +2123,15 @@ export function AccountingProfitabilityView() {
   }
 
   const p = data.snapshot;
+  const companyNames = p.companies.map((company) => company.name).join("، ");
+  const companyScope =
+    p.companies.length === 1
+      ? lang === "ar"
+        ? `لشركة ${companyNames}`
+        : `for ${companyNames}`
+      : lang === "ar"
+        ? `لكل الشركات المتاحة في Odoo (${p.companies.length}): ${companyNames}`
+        : `for every Odoo-accessible company (${p.companies.length}): ${companyNames}`;
   return (
     <div className="space-y-4">
       <Notice
@@ -2131,8 +2140,8 @@ export function AccountingProfitabilityView() {
         icon={<Calculator size={16} />}
       >
         {lang === "ar"
-          ? `تقرير Profit and Loss مباشر من Odoo 17 للشركات 2 و3 و4، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. الربح = الدخل − المصروفات.`
-          : `Direct Odoo 17 Profit and Loss for companies 2, 3 and 4, posted entries only, ${p.from} → ${p.to}. Profit = income − expenses.`}
+          ? `تقرير Profit and Loss مباشر من Odoo 17 ${companyScope}، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. الربح = الدخل − المصروفات.`
+          : `Direct Odoo 17 Profit and Loss ${companyScope}, posted entries only, ${p.from} → ${p.to}. Profit = income − expenses.`}
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard

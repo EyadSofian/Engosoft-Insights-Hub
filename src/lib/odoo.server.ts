@@ -19,6 +19,14 @@ export interface OdooConfig {
   startDate: string;
 }
 
+export interface OdooAccessibleCompany {
+  id: number;
+  name: string;
+  active: boolean;
+  currencyId: number;
+  currency: string;
+}
+
 /** Odoo many2one fields arrive as `[id, display_name]`, or `false` when unset. */
 export type M2O = [number, string] | false;
 
@@ -59,6 +67,11 @@ export class OdooError extends Error {
 }
 
 let uidCache: { uid: number; login: string; db: string } | null = null;
+let accessibleCompaniesCache: {
+  uid: number;
+  value: OdooAccessibleCompany[];
+  expiresAt: number;
+} | null = null;
 
 async function rpc(
   service: string,
@@ -234,6 +247,54 @@ export async function readGroup(
     lazy: false,
     context: companyContext(context),
   });
+}
+
+/**
+ * Companies the authenticated Odoo user can actually switch to.
+ *
+ * Most dashboard datasets intentionally stay on ODOO_COMPANY_IDS. Reports
+ * such as Profit and Loss are different: their company selector should mirror
+ * Odoo itself, so discover the user's `company_ids` without widening the
+ * global context used by accounting, CRM, products, or campaign attribution.
+ */
+export async function odooAccessibleCompanies(): Promise<OdooAccessibleCompany[]> {
+  const userId = await uid();
+  if (accessibleCompaniesCache?.uid === userId && accessibleCompaniesCache.expiresAt > Date.now()) {
+    return accessibleCompaniesCache.value;
+  }
+
+  const users = await odooCall<{ id: number; company_ids?: number[] }[]>(
+    "res.users",
+    "read",
+    [[userId], ["company_ids"]],
+    // Do not call companyContext() here: its configured 2/3/4 scope also
+    // trims this relational field, which would hide the very companies this
+    // discovery call exists to find.
+    { context: { active_test: false } },
+  );
+  const companyIds = [...new Set(users[0]?.company_ids ?? [])]
+    .map(Number)
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (!companyIds.length) {
+    throw new OdooError("The Odoo API user has no accessible companies.", "access");
+  }
+
+  const companies = await odooCall<
+    { id: number; name?: string; active?: boolean; currency_id?: M2O }[]
+  >("res.company", "search_read", [[["id", "in", companyIds]]], {
+    fields: ["id", "name", "active", "currency_id"],
+    order: "id",
+    context: companyContext({ allowed_company_ids: companyIds, active_test: false }),
+  });
+  const value = companies.map((company) => ({
+    id: Number(company.id),
+    name: String(company.name || company.id),
+    active: company.active !== false,
+    currencyId: m2oId(company.currency_id),
+    currency: m2oName(company.currency_id),
+  }));
+  accessibleCompaniesCache = { uid: userId, value, expiresAt: Date.now() + 30 * 60 * 1000 };
+  return value;
 }
 
 /* --- small shared helpers ------------------------------------------------ */

@@ -1,7 +1,7 @@
 import {
   companyContext,
+  odooAccessibleCompanies,
   odooCallWithPolicy,
-  odooConfig,
   odooConfigured,
 } from "./odoo.server";
 
@@ -89,11 +89,13 @@ async function fetchProfitability(
   company?: string,
 ): Promise<ProfitabilitySnapshot> {
   if (!odooConfigured()) throw new Error("Odoo credentials are not configured.");
-  const cfg = odooConfig();
+  const accessibleCompanies = await odooAccessibleCompanies();
+  const accessibleCompanyIds = accessibleCompanies.map((company) => company.id);
   const baseContext = companyContext({
     lang: "en_US",
     tz: "Africa/Cairo",
     report_id: REPORT_ID,
+    allowed_company_ids: accessibleCompanyIds,
   });
 
   const initialOptions = await odooCallWithPolicy<OdooReportOptions>(
@@ -104,7 +106,7 @@ async function fetchProfitability(
     { attempts: 1, timeoutMs: 45_000 },
   );
   const availableCompanies =
-    initialOptions.companies ?? cfg.companyIds.map((id) => ({ id, name: String(id) }));
+    initialOptions.companies ?? accessibleCompanies.map(({ id, name }) => ({ id, name }));
   const selectedCompanies = company
     ? availableCompanies.filter((item) => clean(item.name) === clean(company))
     : availableCompanies;
@@ -183,9 +185,10 @@ async function fetchProfitability(
     currency: "LE",
     reportId: REPORT_ID,
     postedOnly: true,
-    companies: selectedCompanies.map(
-      (company) => ({ id: Number(company.id), name: String(company.name) }),
-    ),
+    companies: selectedCompanies.map((company) => ({
+      id: Number(company.id),
+      name: String(company.name),
+    })),
     netProfit: findLine(lines, "Net Profit"),
     income: findLine(lines, "Income"),
     grossProfit: findLine(lines, "Gross Profit"),
@@ -222,7 +225,7 @@ export async function getProfitability(
   to: string,
   company?: string,
 ): Promise<ProfitabilityResult> {
-  const key = `${from}|${to}|${company || odooConfig().companyIds.join(",")}`;
+  const key = `${from}|${to}|${company || "all-accessible-odoo-companies"}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return { status: "ready", snapshot: cached.value };
 
