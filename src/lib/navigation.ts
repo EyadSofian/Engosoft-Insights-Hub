@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarClock,
   CalendarRange,
   GraduationCap,
   Globe2,
@@ -57,6 +58,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     defaultTo: "/campaigns",
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
+      { to: "/weekend", key: "weekend", icon: CalendarClock },
       { to: "/organic", key: "organic", icon: Leaf },
       { to: "/courses", key: "courses", icon: GraduationCap },
       { to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch },

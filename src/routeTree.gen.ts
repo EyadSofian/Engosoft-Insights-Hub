@@ -24,6 +24,7 @@ import { Route as ProductsRouteImport } from './routes/products'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as WebsiteRouteImport } from './routes/website'
+import { Route as WeekendRouteImport } from './routes/weekend'
 import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
@@ -48,6 +49,7 @@ import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
+import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
@@ -129,6 +131,11 @@ const TeamsRoute = TeamsRouteImport.update({
 const WebsiteRoute = WebsiteRouteImport.update({
   id: '/website',
   path: '/website',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WeekendRoute = WeekendRouteImport.update({
+  id: '/weekend',
+  path: '/weekend',
   getParentRoute: () => rootRouteImport,
 } as any)
 const YoyRoute = YoyRouteImport.update({
@@ -251,6 +258,11 @@ const ApiWebsiteRoute = ApiWebsiteRouteImport.update({
   path: '/api/website',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWeekendRoute = ApiWeekendRouteImport.update({
+  id: '/api/weekend',
+  path: '/api/weekend',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiYoyRoute = ApiYoyRouteImport.update({
   id: '/api/yoy',
   path: '/api/yoy',
@@ -303,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
+  '/weekend': typeof WeekendRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
@@ -327,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
+  '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -351,6 +365,7 @@ export interface FileRoutesByTo {
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
+  '/weekend': typeof WeekendRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
@@ -375,6 +390,7 @@ export interface FileRoutesByTo {
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
+  '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -400,6 +416,7 @@ export interface FileRoutesById {
   '/sales': typeof SalesRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
+  '/weekend': typeof WeekendRoute
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
@@ -424,6 +441,7 @@ export interface FileRoutesById {
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/website': typeof ApiWebsiteRoute
+  '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -450,6 +468,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/teams'
     | '/website'
+    | '/weekend'
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
@@ -474,6 +493,7 @@ export interface FileRouteTypes {
     | '/api/targets'
     | '/api/teams'
     | '/api/website'
+    | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
     | '/api/ingest/dataset'
@@ -498,6 +518,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/teams'
     | '/website'
+    | '/weekend'
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
@@ -522,6 +543,7 @@ export interface FileRouteTypes {
     | '/api/targets'
     | '/api/teams'
     | '/api/website'
+    | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
     | '/api/ingest/dataset'
@@ -546,6 +568,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/teams'
     | '/website'
+    | '/weekend'
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
@@ -570,6 +593,7 @@ export interface FileRouteTypes {
     | '/api/targets'
     | '/api/teams'
     | '/api/website'
+    | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
     | '/api/ingest/dataset'
@@ -595,6 +619,7 @@ export interface RootRouteChildren {
   SalesRoute: typeof SalesRoute
   TeamsRoute: typeof TeamsRoute
   WebsiteRoute: typeof WebsiteRoute
+  WeekendRoute: typeof WeekendRoute
   YoyRoute: typeof YoyRoute
   ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
@@ -619,6 +644,7 @@ export interface RootRouteChildren {
   ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
+  ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
@@ -733,6 +759,13 @@ declare module '@tanstack/react-router' {
       path: '/website'
       fullPath: '/website'
       preLoaderRoute: typeof WebsiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/weekend': {
+      id: '/weekend'
+      path: '/weekend'
+      fullPath: '/weekend'
+      preLoaderRoute: typeof WeekendRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/yoy': {
@@ -903,6 +936,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebsiteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/weekend': {
+      id: '/api/weekend'
+      path: '/api/weekend'
+      fullPath: '/api/weekend'
+      preLoaderRoute: typeof ApiWeekendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/yoy': {
       id: '/api/yoy'
       path: '/api/yoy'
@@ -971,6 +1011,7 @@ const rootRouteChildren: RootRouteChildren = {
   SalesRoute: SalesRoute,
   TeamsRoute: TeamsRoute,
   WebsiteRoute: WebsiteRoute,
+  WeekendRoute: WeekendRoute,
   YoyRoute: YoyRoute,
   ApiAccountingRoute: ApiAccountingRoute,
   ApiAccountingExportRoute: ApiAccountingExportRoute,
@@ -995,6 +1036,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,
+  ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,

@@ -35,7 +35,8 @@
     "test:limited-json": "node --experimental-strip-types scripts/test-limited-json.mjs",
     "test:response-compression": "node --experimental-strip-types scripts/test-response-compression.mjs",
     "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs",
-    "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs"
+    "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs",
+    "test:weekend-analysis": "node --experimental-strip-types scripts/test-weekend-analysis.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
