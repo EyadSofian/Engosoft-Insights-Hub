@@ -34,8 +34,26 @@ export const Route = createFileRoute("/api/overview")({
         // entirely when that window predates the data — see isPreviousComparable.
         const prevRange = previousPeriod(filters.from, filters.to);
         const prevComparable = await isPreviousComparable(prevRange);
-        const prevData = prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
+        const prevData =
+          prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
         const deltas = prevData ? computeDeltas(totals, computeTotals(prevData)) : {};
+        const courses = computeCourses(data, prevData ?? undefined);
+        const soldCourses = courses
+          .filter((course) => course.course !== "Unattributed" && course.revenue > 0)
+          .sort((a, b) => b.revenue - a.revenue);
+        const classifiedCourseRevenue = soldCourses.reduce(
+          (sum, course) => sum + course.revenue,
+          0,
+        );
+        const courseSales = soldCourses.map((course) => ({
+          course: course.course,
+          mainCategory: course.mainCategory,
+          revenue: course.revenue,
+          contribution:
+            classifiedCourseRevenue > 0 ? (course.revenue / classifiedCourseRevenue) * 100 : 0,
+          paidInvoices: course.invoices,
+          averageSalePrice: course.avgOrder,
+        }));
 
         const spending = campaigns.filter((c) => c.spend >= 50);
         const health = data.snapshot.health;
@@ -55,7 +73,8 @@ export const Route = createFileRoute("/api/overview")({
           topLeaks: topLeaks(campaigns, 5),
           topByROAS: [...spending].sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0)).slice(0, 6),
           topSpend: [...campaigns].sort((a, b) => b.spend - a.spend).slice(0, 6),
-          topCourses: computeCourses(data, prevData ?? undefined).slice(0, 6),
+          topCourses: courses.slice(0, 6),
+          courseSales,
           accounts: data.snapshot.accounts,
           summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,

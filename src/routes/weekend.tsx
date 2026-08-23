@@ -104,7 +104,6 @@ interface WeekendResponse {
 }
 
 const DAY_LABEL: Record<WeekendDayKey, { ar: string; en: string }> = {
-  thursday: { ar: "الخميس", en: "Thursday" },
   friday: { ar: "الجمعة", en: "Friday" },
   saturday: { ar: "السبت", en: "Saturday" },
 };
@@ -233,8 +232,8 @@ function WeekendPerformance() {
         title={lang === "ar" ? "أداء الحملات خلال الويك إند" : "Weekend campaign performance"}
         subtitle={
           lang === "ar"
-            ? "تحليل آخر 8 أسابيع مكتملة للخميس والجمعة والسبت، مقارنةً بالأحد إلى الأربعاء لكل منصة."
-            : "The last 8 complete weeks across Thursday, Friday and Saturday, benchmarked against Sunday–Wednesday per platform."
+            ? "تحليل آخر 8 أسابيع مكتملة: الويك إند الجمعة والسبت مقابل أيام العمل من الأحد إلى الخميس، لكل منصة."
+            : "The last 8 complete weeks: Friday–Saturday weekend versus Sunday–Thursday workdays, per platform."
         }
       />
 
@@ -250,8 +249,8 @@ function WeekendPerformance() {
               value={fmtUSD(data.portfolio.weekend.avgDailySpend)}
               sub={
                 lang === "ar"
-                  ? `عبر ${fmtNum(data.window.weekendDays)} يوم: الخميس والجمعة والسبت فقط`
-                  : `Across ${fmtNum(data.window.weekendDays)} Thursday–Saturday days only`
+                  ? `عبر ${fmtNum(data.window.weekendDays)} يوم: الجمعة والسبت فقط`
+                  : `Across ${fmtNum(data.window.weekendDays)} Friday–Saturday days only`
               }
               icon={<CircleDollarSign size={18} />}
               index={0}
@@ -268,7 +267,7 @@ function WeekendPerformance() {
               value={fmtUSDFull(data.portfolio.weekend.cpl)}
               delta={data.portfolio.cplDelta ?? undefined}
               deltaInvert
-              sub={lang === "ar" ? "مقابل الأحد–الأربعاء" : "vs Sunday–Wednesday"}
+              sub={lang === "ar" ? "مقابل أيام العمل: الأحد–الخميس" : "vs Sunday–Thursday workdays"}
               icon={<Gauge size={18} />}
               index={2}
             />
@@ -288,12 +287,14 @@ function WeekendPerformance() {
             />
           </div>
 
+          <PeriodComparison data={data} lang={lang} />
+
           <section>
             <SectionTitle
               hint={
                 lang === "ar"
-                  ? "كل منصة مقارنة بأدائها هي نفسها من الأحد إلى الأربعاء خلال نفس الفترة."
-                  : "Each platform is benchmarked against its own Sunday–Wednesday performance in the same period."
+                  ? "كل منصة مقارنة بأدائها هي نفسها في أيام العمل من الأحد إلى الخميس خلال نفس الفترة."
+                  : "Each platform is benchmarked against its own Sunday–Thursday workday performance in the same period."
               }
             >
               {lang === "ar" ? "قرار الميزانية لكل منصة" : "Budget decision by platform"}
@@ -467,8 +468,8 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
             </span>
             <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
               {lang === "ar"
-                ? `المحسوب كويك إند: الخميس + الجمعة + السبت فقط · ${fmtNum(data.window.weekendDays)} يوم`
-                : `Weekend sample: Thursday + Friday + Saturday only · ${fmtNum(data.window.weekendDays)} days`}
+                ? `المحسوب كويك إند: الجمعة + السبت فقط · ${fmtNum(data.window.weekendDays)} يوم`
+                : `Weekend sample: Friday + Saturday only · ${fmtNum(data.window.weekendDays)} days`}
             </span>
           </div>
           <h2 className="text-xl font-semibold text-text sm:text-2xl">{copy.label}</h2>
@@ -490,11 +491,11 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
           />
           <SignalStat
             value={fmtNum(data.window.weekendDays)}
-            label={lang === "ar" ? "خميس + جمعة + سبت" : "Thu + Fri + Sat"}
+            label={lang === "ar" ? "جمعة + سبت" : "Fri + Sat"}
           />
           <SignalStat
             value={fmtNum(data.window.comparisonDays)}
-            label={lang === "ar" ? "أحد إلى أربعاء للمقارنة" : "Sun–Wed baseline"}
+            label={lang === "ar" ? "أحد إلى خميس: أيام العمل" : "Sun–Thu workdays"}
           />
         </div>
       </div>
@@ -508,6 +509,99 @@ function SignalStat({ value, label }: { value: string; label: string }) {
       <div className="num text-xl font-semibold text-text">{value}</div>
       <div className="mt-1 text-[10px] leading-tight text-text-muted">{label}</div>
     </div>
+  );
+}
+
+function PeriodComparison({ data, lang }: { data: WeekendResponse; lang: "ar" | "en" }) {
+  return (
+    <section>
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? "نفس مصادر الصرف وOdoo وLost، لكن كل مجموعة أيام مجمعة لوحدها."
+            : "The same spend, Odoo and Lost sources, with each day group aggregated separately."
+        }
+      >
+        {lang === "ar" ? "الويك إند مقابل أيام العمل" : "Weekend versus workdays"}
+      </SectionTitle>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PeriodCard
+          title={lang === "ar" ? "الويك إند" : "Weekend"}
+          daysLabel={lang === "ar" ? "الجمعة + السبت" : "Friday + Saturday"}
+          metrics={data.portfolio.weekend}
+          tone="weekend"
+          lang={lang}
+        />
+        <PeriodCard
+          title={lang === "ar" ? "أيام العمل" : "Workdays"}
+          daysLabel={lang === "ar" ? "الأحد إلى الخميس" : "Sunday through Thursday"}
+          metrics={data.portfolio.comparison}
+          tone="workday"
+          lang={lang}
+        />
+      </div>
+    </section>
+  );
+}
+
+function PeriodCard({
+  title,
+  daysLabel,
+  metrics,
+  tone,
+  lang,
+}: {
+  title: string;
+  daysLabel: string;
+  metrics: WeekendMetrics;
+  tone: "weekend" | "workday";
+  lang: "ar" | "en";
+}) {
+  const color = tone === "weekend" ? "var(--warning)" : "var(--brand)";
+  const soft = tone === "weekend" ? "var(--warning-soft)" : "var(--brand-soft)";
+  return (
+    <Card
+      className="overflow-hidden"
+      style={{
+        background: `linear-gradient(140deg, ${soft}, var(--surface) 54%)`,
+        borderColor: `color-mix(in oklab, ${color} 28%, var(--border))`,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-text">{title}</h3>
+          <p className="mt-0.5 text-[11px] font-medium" style={{ color }}>
+            {daysLabel}
+          </p>
+        </div>
+        <span
+          className="num rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          style={{ background: soft, color }}
+        >
+          {fmtNum(metrics.calendarDays)} {lang === "ar" ? "يوم" : "days"}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
+        <Fact
+          label={lang === "ar" ? "إجمالي الصرف" : "Total spend"}
+          value={fmtUSD(metrics.spend)}
+        />
+        <Fact
+          label={lang === "ar" ? "متوسط الصرف/يوم" : "Avg spend/day"}
+          value={fmtUSD(metrics.avgDailySpend)}
+        />
+        <Fact label={lang === "ar" ? "عدد الليدز" : "Leads"} value={fmtNum(metrics.leads)} />
+        <Fact label="CPL" value={fmtUSDFull(metrics.cpl)} />
+        <Fact
+          label={lang === "ar" ? "Lost" : "Lost"}
+          value={`${fmtNum(metrics.lost)} · ${fmtPct(metrics.lostRate, 1)}`}
+        />
+        <Fact
+          label={lang === "ar" ? "تقفيل Won" : "Won closes"}
+          value={`${fmtNum(metrics.won)} · ${fmtPct(metrics.salesRate, 1)}`}
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -595,12 +689,12 @@ function PlatformDecisionCard({
         <Fact label="Lost" value={fmtPct(row.weekend.lostRate, 1)} />
         <Fact
           label={lang === "ar" ? "تغطية الصرف" : "Spend coverage"}
-          value={`${fmtNum(row.weekend.reportedDays)}/24`}
+          value={`${fmtNum(row.weekend.reportedDays)}/${fmtNum(row.weekend.calendarDays)}`}
         />
       </div>
       <div className="mt-5 border-t border-border pt-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-text-subtle">
-          {lang === "ar" ? "مقابل باقي الأسبوع" : "vs rest of week"}
+          {lang === "ar" ? "مقابل 5 أيام العمل" : "vs five workdays"}
         </p>
         <p className="num mt-1.5 text-xs text-text-muted">{evidence.join(" · ") || "—"}</p>
       </div>
@@ -679,6 +773,22 @@ function PlatformComparison({ data, lang }: { data: WeekendResponse; lang: "ar" 
       sortValue: (row) => row.weekend.salesRate ?? -Infinity,
     },
     {
+      key: "baseAvgSpend",
+      header: lang === "ar" ? "صرف/يوم" : "Spend/day",
+      group: "baseline",
+      align: "right",
+      render: (row) => fmtUSD(row.hasSpendData ? row.comparison.avgDailySpend : null),
+      sortValue: (row) => row.comparison.avgDailySpend,
+    },
+    {
+      key: "baseLeads",
+      header: lang === "ar" ? "الليدز" : "Leads",
+      group: "baseline",
+      align: "right",
+      render: (row) => fmtNum(row.comparison.leads),
+      sortValue: (row) => row.comparison.leads,
+    },
+    {
       key: "baseCpl",
       header: "CPL",
       group: "baseline",
@@ -738,8 +848,8 @@ function PlatformComparison({ data, lang }: { data: WeekendResponse; lang: "ar" 
       <SectionTitle
         hint={
           lang === "ar"
-            ? "المقارنة المرجعية هي متوسط الأحد إلى الأربعاء لنفس المنصة ونفس الأسابيع."
-            : "The baseline is the same platform's Sunday–Wednesday performance in the same weeks."
+            ? "المقارنة المرجعية هي أداء أيام العمل من الأحد إلى الخميس لنفس المنصة ونفس الأسابيع."
+            : "The baseline is the same platform's Sunday–Thursday workday performance in the same weeks."
         }
       >
         {lang === "ar" ? "المقارنة الكاملة بين المنصات" : "Full platform comparison"}
@@ -750,8 +860,8 @@ function PlatformComparison({ data, lang }: { data: WeekendResponse; lang: "ar" 
         pageSize={10}
         initialSort={{ key: "cpl", dir: 1 }}
         groupLabels={{
-          weekend: lang === "ar" ? "الخميس–السبت" : "Thursday–Saturday",
-          baseline: lang === "ar" ? "الأحد–الأربعاء" : "Sunday–Wednesday",
+          weekend: lang === "ar" ? "الويك إند: الجمعة–السبت" : "Weekend: Friday–Saturday",
+          baseline: lang === "ar" ? "أيام العمل: الأحد–الخميس" : "Workdays: Sunday–Thursday",
           change: lang === "ar" ? "الفارق" : "Change",
         }}
         columnChooser
@@ -763,6 +873,8 @@ function PlatformComparison({ data, lang }: { data: WeekendResponse; lang: "ar" 
           weekend_cpl: row.weekend.cpl ?? "",
           weekend_lost_rate: row.weekend.lostRate ?? "",
           weekend_sales_rate: row.weekend.salesRate ?? "",
+          workday_avg_daily_spend: row.comparison.avgDailySpend,
+          workday_leads: row.comparison.leads,
           baseline_cpl: row.comparison.cpl ?? "",
           cpl_change_pct: row.cplDelta ?? "",
           decision: row.decision,
@@ -783,7 +895,7 @@ function DayBreakdown({ rows, lang }: { rows: WeekendDayRow[]; lang: "ar" | "en"
           lang === "ar" ? "متوسط كل يوم عبر 8 تكرارات" : "Each day's average across 8 occurrences"
         }
       >
-        {lang === "ar" ? "الخميس أم الجمعة أم السبت؟" : "Thursday, Friday or Saturday?"}
+        {lang === "ar" ? "الجمعة أم السبت؟" : "Friday or Saturday?"}
       </SectionTitle>
       <div className="space-y-2.5">
         {bestRows.map((row, index) => (

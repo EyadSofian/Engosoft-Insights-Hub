@@ -3,7 +3,10 @@ import { useState } from "react";
 import {
   AlertTriangle,
   Award,
+  BookOpenCheck,
+  CalendarDays,
   ChevronDown,
+  CircleDollarSign,
   DollarSign,
   Info,
   Percent,
@@ -31,7 +34,7 @@ import {
 } from "@/components/ui-bits";
 import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bits";
 import { TelegramPanel } from "@/components/TelegramPanel";
-import { HBarChart, SpendRevenueChart } from "@/components/charts";
+import { HBarChart, MultiLineChart } from "@/components/charts";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
 import type {
   CampaignActivity,
@@ -64,6 +67,7 @@ interface OverviewResp {
   prevRange: { from: string; to: string } | null;
   prevComparable: boolean;
   trend: { date: string; spend: number; revenue: number; leads: number; won: number }[];
+  courseSales: CourseSaleContribution[];
   funnel: FunnelStep[];
   origin: { cohorts: OriginCohort[]; otherBySource: Grouped[] };
   best: PerfRow | null;
@@ -81,6 +85,22 @@ interface OverviewResp {
   staleTabs: string[];
 }
 
+interface CourseSaleContribution {
+  course: string;
+  mainCategory: string;
+  revenue: number;
+  contribution: number;
+  paidInvoices: number;
+  averageSalePrice: number | null;
+}
+
+type TrendGrain = "day" | "week";
+
+interface MoneyPoint extends Record<string, string | number> {
+  date: string;
+  value: number;
+}
+
 const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
   impressions: { ar: "مرات الظهور", en: "Impressions" },
   clicks: { ar: "النقرات", en: "Clicks" },
@@ -89,10 +109,33 @@ const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
   won: { ar: "صفقات مغلقة", en: "Won" },
 };
 
+function sundayWeekStart(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
+}
+
+function moneyTrend(
+  rows: OverviewResp["trend"],
+  grain: TrendGrain,
+  metric: "spend" | "revenue",
+): MoneyPoint[] {
+  const grouped = new Map<string, number>();
+  for (const row of rows) {
+    const date = grain === "week" ? sundayWeekStart(row.date) : row.date;
+    grouped.set(date, (grouped.get(date) ?? 0) + row[metric]);
+  }
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, value]) => ({ date, value }));
+}
+
 function Overview() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
+  const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
+  const [revenueGrain, setRevenueGrain] = useState<TrendGrain>("week");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -107,6 +150,8 @@ function Overview() {
   }
 
   const { totals: T, deltas, health } = data;
+  const spendTrend = moneyTrend(data.trend, spendGrain, "spend");
+  const revenueTrend = moneyTrend(data.trend, revenueGrain, "revenue");
   const mobileAlertCount = [
     data.fetchErrors.length > 0,
     data.staleTabs?.length > 0,
@@ -153,13 +198,17 @@ function Overview() {
           <div className="max-h-[52dvh] space-y-2 overflow-y-auto border-t border-border p-2.5 text-[11.5px] leading-relaxed">
             {data.fetchErrors.length > 0 && (
               <div className="rounded-lg bg-danger-soft p-2.5 text-danger">
-                <strong className="block">{lang === "ar" ? "مصادر تعذّر تحميلها" : "Sources failed to load"}</strong>
+                <strong className="block">
+                  {lang === "ar" ? "مصادر تعذّر تحميلها" : "Sources failed to load"}
+                </strong>
                 <span>{data.fetchErrors.join(" · ")}</span>
               </div>
             )}
             {data.staleTabs?.length > 0 && (
               <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
-                <strong className="block">{lang === "ar" ? "معروض من آخر نسخة سليمة" : "Using the last good copy"}</strong>
+                <strong className="block">
+                  {lang === "ar" ? "معروض من آخر نسخة سليمة" : "Using the last good copy"}
+                </strong>
                 <span>{data.staleTabs.join(" · ")}</span>
               </div>
             )}
@@ -177,9 +226,7 @@ function Overview() {
               <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
                 <strong className="block">{t("excluded_stages")}</strong>
                 <span>
-                  {health.excludedStages
-                    .map((s) => `${s.stage}: ${fmtNum(s.rows)}`)
-                    .join(" · ")}
+                  {health.excludedStages.map((s) => `${s.stage}: ${fmtNum(s.rows)}`).join(" · ")}
                 </span>
               </div>
             )}
@@ -200,68 +247,64 @@ function Overview() {
       )}
 
       <div className="hidden space-y-3 sm:block">
-      {data.fetchErrors.length > 0 && (
-        <Notice
-          tone="danger"
-          title={lang === "ar" ? "تعذّر تحميل بعض التبويبات" : "Some tabs failed to load"}
-          icon={<AlertTriangle size={16} />}
-        >
-          {lang === "ar"
-            ? `الأرقام أدناه لا تشمل هذه المصادر: ${data.fetchErrors.join(" · ")}`
-            : `The numbers below exclude these sources: ${data.fetchErrors.join(" · ")}`}
-        </Notice>
-      )}
+        {data.fetchErrors.length > 0 && (
+          <Notice
+            tone="danger"
+            title={lang === "ar" ? "تعذّر تحميل بعض التبويبات" : "Some tabs failed to load"}
+            icon={<AlertTriangle size={16} />}
+          >
+            {lang === "ar"
+              ? `الأرقام أدناه لا تشمل هذه المصادر: ${data.fetchErrors.join(" · ")}`
+              : `The numbers below exclude these sources: ${data.fetchErrors.join(" · ")}`}
+          </Notice>
+        )}
 
-      {data.staleTabs?.length > 0 && (
-        <Notice
-          tone="warning"
-          title={lang === "ar" ? "تبويبات معروضة من آخر نسخة سليمة" : "Tabs served from the last good copy"}
-          icon={<AlertTriangle size={16} />}
-        >
-          {lang === "ar"
-            ? `تعذّر سحب نسخة حديثة من: ${data.staleTabs.join(" · ")}. تُعرض آخر نسخة ناجحة بدلاً من أصفار، وقد لا تشمل أحدث الصفوف.`
-            : `A fresh pull failed for: ${data.staleTabs.join(" · ")}. The last successful copy is shown instead of zeros, so the newest rows may be missing.`}
-        </Notice>
-      )}
+        {data.staleTabs?.length > 0 && (
+          <Notice
+            tone="warning"
+            title={
+              lang === "ar"
+                ? "تبويبات معروضة من آخر نسخة سليمة"
+                : "Tabs served from the last good copy"
+            }
+            icon={<AlertTriangle size={16} />}
+          >
+            {lang === "ar"
+              ? `تعذّر سحب نسخة حديثة من: ${data.staleTabs.join(" · ")}. تُعرض آخر نسخة ناجحة بدلاً من أصفار، وقد لا تشمل أحدث الصفوف.`
+              : `A fresh pull failed for: ${data.staleTabs.join(" · ")}. The last successful copy is shown instead of zeros, so the newest rows may be missing.`}
+          </Notice>
+        )}
 
-      {/* Spend that exists in reality but not in the workbook makes every
+        {/* Spend that exists in reality but not in the workbook makes every
           efficiency ratio look better than it is. That has to be stated on the
           page, not buried in a health tab. */}
-      {health.platformsWithoutSpendTab?.length > 0 && (
-        <Notice
-          tone="danger"
-          title={t("missing_spend_tab")}
-          icon={<AlertTriangle size={16} />}
-        >
-          {health.platformsWithoutSpendTab
-            .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
-            .join(" · ")}
-          {" — "}
-          {t("missing_spend_tab_note")}
-        </Notice>
-      )}
+        {health.platformsWithoutSpendTab?.length > 0 && (
+          <Notice tone="danger" title={t("missing_spend_tab")} icon={<AlertTriangle size={16} />}>
+            {health.platformsWithoutSpendTab
+              .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
+              .join(" · ")}
+            {" — "}
+            {t("missing_spend_tab_note")}
+          </Notice>
+        )}
 
-      {health.excludedStages?.length > 0 && (
-        <Notice
-          tone="warning"
-          title={t("excluded_stages")}
-          icon={<AlertTriangle size={16} />}
-        >
-          {health.excludedStages
-            .map((s) => `${s.stage}: ${fmtNum(s.rows)} ${lang === "ar" ? "صف" : "rows"}`)
-            .join(" · ")}
-          {" — "}
-          {t("excluded_stages_note")}
-        </Notice>
-      )}
+        {health.excludedStages?.length > 0 && (
+          <Notice tone="warning" title={t("excluded_stages")} icon={<AlertTriangle size={16} />}>
+            {health.excludedStages
+              .map((s) => `${s.stage}: ${fmtNum(s.rows)} ${lang === "ar" ? "صف" : "rows"}`)
+              .join(" · ")}
+            {" — "}
+            {t("excluded_stages_note")}
+          </Notice>
+        )}
 
-      {T.lostArchived > 0 && (
-        <Notice tone="info" icon={<Info size={16} />}>
-          {lang === "ar"
-            ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز وفي الصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
-            : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
-        </Notice>
-      )}
+        {T.lostArchived > 0 && (
+          <Notice tone="info" icon={<Info size={16} />}>
+            {lang === "ar"
+              ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز وفي الصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
+              : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
+          </Notice>
+        )}
       </div>
 
       <details className="group card overflow-hidden sm:hidden">
@@ -269,10 +312,7 @@ function Overview() {
           <span className="text-[13px] font-semibold text-text">{t("exec_summary")}</span>
           <span className="flex items-center gap-2 text-[10.5px] text-text-muted">
             {lang === "ar" ? "اضغط للقراءة" : "Tap to read"}
-            <ChevronDown
-              size={16}
-              className="transition-transform group-open:rotate-180"
-            />
+            <ChevronDown size={16} className="transition-transform group-open:rotate-180" />
           </span>
         </summary>
         <div className="max-h-[58dvh] overflow-y-auto border-t border-border px-3.5 py-3">
@@ -297,11 +337,16 @@ function Overview() {
           delta={deltas.totalLeads}
           icon={<Users size={15} />}
           subWrap
-          sub={
-            `${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "Lost" : "Lost"} ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
-          }
+          sub={`${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "Lost" : "Lost"} ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`}
         />
-        <KpiCard index={1} label={t("won")} value={fmtNum(T.won)} delta={deltas.won} icon={<Award size={15} />} sub={fmtPct(T.conversionRate, 1)} />
+        <KpiCard
+          index={1}
+          label={t("won")}
+          value={fmtNum(T.won)}
+          delta={deltas.won}
+          icon={<Award size={15} />}
+          sub={fmtPct(T.conversionRate, 1)}
+        />
         <KpiCard
           index={2}
           label={t("lost_count")}
@@ -311,15 +356,34 @@ function Overview() {
           icon={<TrendingDown size={15} />}
           sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
         />
-        <KpiCard index={3} label={t("conversion_rate")} value={fmtPct(T.conversionRate, 2)} delta={deltas.conversionRate} icon={<Percent size={15} />} sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`} />
+        <KpiCard
+          index={3}
+          label={t("conversion_rate")}
+          value={fmtPct(T.conversionRate, 2)}
+          delta={deltas.conversionRate}
+          icon={<Percent size={15} />}
+          sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`}
+        />
 
-        <KpiCard index={4} label={t("lost_rate")} value={fmtPct(T.lostRate, 2)} delta={deltas.lostRate} deltaInvert icon={<Percent size={15} />} sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`} />
+        <KpiCard
+          index={4}
+          label={t("lost_rate")}
+          value={fmtPct(T.lostRate, 2)}
+          delta={deltas.lostRate}
+          deltaInvert
+          icon={<Percent size={15} />}
+          sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`}
+        />
         <KpiCard
           index={5}
           label={t("avg_close_time")}
           value={T.avgCloseDays === null ? "—" : T.avgCloseDays.toFixed(1)}
           icon={<Timer size={15} />}
-          sub={T.closeSample ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}` : undefined}
+          sub={
+            T.closeSample
+              ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}`
+              : undefined
+          }
         />
         <KpiCard
           index={6}
@@ -328,16 +392,18 @@ function Overview() {
           delta={deltas.spend}
           deltaInvert
           icon={<DollarSign size={15} />}
-          sub={
-            [
-              `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
-              `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
-              T.spendTikTok > 0 ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}` : "",
-              T.spendGoogle > 0 ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}` : "",
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          }
+          sub={[
+            `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
+            `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
+            T.spendTikTok > 0
+              ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
+              : "",
+            T.spendGoogle > 0
+              ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         />
         <Link
           to="/campaigns"
@@ -370,9 +436,44 @@ function Overview() {
           />
         </Link>
 
-        <KpiCard index={8} label={t("roas")} value={fmtRoas(T.roas)} delta={deltas.roas} icon={<Target size={15} />} sub={lang === "ar" ? `الإيراد المحصّل من Accounting ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}` : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`} />
-        <KpiCard index={9} label={t("acos")} value={fmtPct(T.acos, 1)} delta={deltas.acos} deltaInvert icon={<Percent size={15} />} sub={lang === "ar" ? "الإنفاق ÷ الإيراد المحصّل من Accounting" : "Spend ÷ collected Accounting revenue"} />
-        <KpiCard index={10} label={t("cpl")} value={fmtUSDFull(T.cpl)} delta={deltas.cpl} deltaInvert icon={<DollarSign size={15} />} sub={lang === "ar" ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية` : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`} />
+        <KpiCard
+          index={8}
+          label={t("roas")}
+          value={fmtRoas(T.roas)}
+          delta={deltas.roas}
+          icon={<Target size={15} />}
+          sub={
+            lang === "ar"
+              ? `الإيراد المحصّل من Accounting ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`
+              : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`
+          }
+        />
+        <KpiCard
+          index={9}
+          label={t("acos")}
+          value={fmtPct(T.acos, 1)}
+          delta={deltas.acos}
+          deltaInvert
+          icon={<Percent size={15} />}
+          sub={
+            lang === "ar"
+              ? "الإنفاق ÷ الإيراد المحصّل من Accounting"
+              : "Spend ÷ collected Accounting revenue"
+          }
+        />
+        <KpiCard
+          index={10}
+          label={t("cpl")}
+          value={fmtUSDFull(T.cpl)}
+          delta={deltas.cpl}
+          deltaInvert
+          icon={<DollarSign size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية`
+              : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`
+          }
+        />
         <CpaCard totals={T} />
       </div>
 
@@ -392,14 +493,62 @@ function Overview() {
         </Notice>
       )}
 
+      <section>
+        <SectionTitle
+          hint={
+            lang === "ar"
+              ? "الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع. كل شارت له اختيار يومي أو أسبوعي مستقل."
+              : "Spend follows ad date and collection follows Payment Date. Each chart has its own daily or weekly grain."
+          }
+        >
+          {lang === "ar" ? "حركة الصرف والتحصيل" : "Spend and collection movement"}
+        </SectionTitle>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <MoneyTrendCard
+            title={lang === "ar" ? "معدل الصرف" : "Spend trend"}
+            note={lang === "ar" ? "إجمالي إنفاق المنصات" : "Total platform spend"}
+            points={spendTrend}
+            grain={spendGrain}
+            onGrainChange={setSpendGrain}
+            color="var(--chart-1)"
+            icon={<CircleDollarSign size={17} />}
+            lang={lang}
+          />
+          <MoneyTrendCard
+            title={lang === "ar" ? "معدل التحصيل" : "Collection trend"}
+            note={
+              lang === "ar"
+                ? "التحصيل الفعلي حسب Payment Date"
+                : "Actual collection by Payment Date"
+            }
+            points={revenueTrend}
+            grain={revenueGrain}
+            onGrainChange={setRevenueGrain}
+            color="var(--chart-2)"
+            icon={<TrendingUp size={17} />}
+            lang={lang}
+          />
+        </div>
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <SectionTitle hint={lang === "ar" ? "الإنفاق بتاريخ الإعلان، الإيراد بتاريخ الدفع" : "Spend by ad date, revenue by Payment Date"}>
-            {t("spend_vs_revenue")}
+          <SectionTitle
+            hint={
+              lang === "ar"
+                ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف. متوسط سعر البيع = التحصيل ÷ الفواتير المدفوعة."
+                : "Contribution = course revenue ÷ classified course revenue. Average sale price = collection ÷ paid invoices."
+            }
+          >
+            <span className="inline-flex items-center gap-2">
+              <BookOpenCheck size={17} className="text-brand" />
+              {lang === "ar"
+                ? "مساهمة الدورات ومتوسط سعر البيع"
+                : "Course contribution and average sale price"}
+            </span>
           </SectionTitle>
-          <SpendRevenueChart data={data.trend} />
+          <CourseContributionChart rows={data.courseSales} lang={lang} />
         </Card>
-
         <Card>
           <SectionTitle>{t("funnel")}</SectionTitle>
           <FunnelBars
@@ -460,7 +609,9 @@ function Overview() {
               {lang === "ar" ? "توزيع العملاء بلا حملة حسب المصدر" : "Non-campaign leads by source"}
             </div>
             <HBarChart
-              data={data.origin.otherBySource.slice(0, 8).map((g) => ({ label: g.label, value: g.count }))}
+              data={data.origin.otherBySource
+                .slice(0, 8)
+                .map((g) => ({ label: g.label, value: g.count }))}
               format={fmtNum}
               name={t("leads")}
               color="var(--chart-3)"
@@ -471,11 +622,24 @@ function Overview() {
       </Card>
 
       <Card>
-        <SectionTitle hint={lang === "ar" ? "حملات أنفقت ولم تُعد ما يساوي إنفاقها" : "Campaigns that spent more than they returned"}>
+        <SectionTitle
+          hint={
+            lang === "ar"
+              ? "حملات أنفقت ولم تُعد ما يساوي إنفاقها"
+              : "Campaigns that spent more than they returned"
+          }
+        >
           {t("where_budget_goes")}
         </SectionTitle>
         {data.topLeaks.length === 0 ? (
-          <EmptyState label={lang === "ar" ? "لا توجد حملات خاسرة في هذه الفترة" : "No loss-making campaigns in this period"} compact />
+          <EmptyState
+            label={
+              lang === "ar"
+                ? "لا توجد حملات خاسرة في هذه الفترة"
+                : "No loss-making campaigns in this period"
+            }
+            compact
+          />
         ) : (
           <div className="table-wrap scroll-hint-x">
             <table className="w-full text-sm min-w-[520px]">
@@ -541,14 +705,24 @@ function Overview() {
                       </span>
                       {a.objective !== "leads" && (
                         <Pill tone="warning">
-                          {a.objective === "traffic" ? (lang === "ar" ? "زيارات" : "traffic") : lang === "ar" ? "غير معروف" : "unknown"}
+                          {a.objective === "traffic"
+                            ? lang === "ar"
+                              ? "زيارات"
+                              : "traffic"
+                            : lang === "ar"
+                              ? "غير معروف"
+                              : "unknown"}
                         </Pill>
                       )}
                     </span>
                   </td>
                   <td className="py-2.5 text-end num">{fmtUSDFull(a.spend)}</td>
                   <td className="py-2.5 text-end num">
-                    {a.platformLeads === null ? <span className="text-text-subtle">—</span> : fmtNum(a.platformLeads)}
+                    {a.platformLeads === null ? (
+                      <span className="text-text-subtle">—</span>
+                    ) : (
+                      fmtNum(a.platformLeads)
+                    )}
                   </td>
                 </tr>
               ))}
@@ -562,26 +736,207 @@ function Overview() {
   );
 }
 
-function CpaCard({ totals }: { totals: Totals }) {
-  const { t, lang } = useI18n();
-
+function MoneyTrendCard({
+  title,
+  note,
+  points,
+  grain,
+  onGrainChange,
+  color,
+  icon,
+  lang,
+}: {
+  title: string;
+  note: string;
+  points: MoneyPoint[];
+  grain: TrendGrain;
+  onGrainChange: (grain: TrendGrain) => void;
+  color: string;
+  icon: React.ReactNode;
+  lang: "ar" | "en";
+}) {
+  const average = points.length
+    ? points.reduce((sum, point) => sum + point.value, 0) / points.length
+    : null;
   return (
-    <div className="card stagger p-4 sm:p-5 relative overflow-hidden" style={{ "--i": 11 } as React.CSSProperties}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted truncate">{t("cpa")}</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted whitespace-nowrap">{t("cpa_won")}</span>
+    <Card className="overflow-hidden">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span
+            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+            style={{ color, background: `color-mix(in oklab, ${color} 13%, var(--surface))` }}
+          >
+            {icon}
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-text">{title}</h3>
+            <p className="mt-0.5 text-[10.5px] text-text-muted">{note}</p>
+          </div>
+        </div>
+        <GrainToggle value={grain} onChange={onGrainChange} lang={lang} />
       </div>
-      <div className="num mt-2 font-semibold leading-none text-[22px] sm:text-[27px] text-text">
-        {fmtUSDFull(totals.cpa)}
+      <div className="mb-1 flex items-baseline justify-between gap-3 rounded-xl bg-surface-2/70 px-3 py-2">
+        <span className="text-[10.5px] text-text-muted">
+          {lang === "ar" ? `متوسط ${grain === "day" ? "يومي" : "أسبوعي"}` : `Average per ${grain}`}
+        </span>
+        <strong className="num text-sm text-text">{fmtUSD(average)}</strong>
       </div>
-      <div className="mt-2 text-[11px] text-text-muted leading-snug">
-        {lang === "ar" ? `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} صفقة Won` : `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} won deals`}
+      <MultiLineChart
+        data={points}
+        series={[{ key: "value", name: title, color }]}
+        height={270}
+        format={fmtUSD}
+      />
+    </Card>
+  );
+}
+
+function GrainToggle({
+  value,
+  onChange,
+  lang,
+}: {
+  value: TrendGrain;
+  onChange: (grain: TrendGrain) => void;
+  lang: "ar" | "en";
+}) {
+  return (
+    <div
+      className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5"
+      role="group"
+      aria-label={lang === "ar" ? "تجميع الشارت" : "Chart grain"}
+    >
+      {(["day", "week"] as const).map((grain) => (
+        <button
+          key={grain}
+          type="button"
+          onClick={() => onChange(grain)}
+          className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+            value === grain ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"
+          }`}
+          aria-pressed={value === grain}
+        >
+          <CalendarDays size={12} />
+          {grain === "day"
+            ? lang === "ar"
+              ? "يومي"
+              : "Daily"
+            : lang === "ar"
+              ? "أسبوعي"
+              : "Weekly"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CourseContributionChart({
+  rows,
+  lang,
+}: {
+  rows: CourseSaleContribution[];
+  lang: "ar" | "en";
+}) {
+  if (!rows.length)
+    return (
+      <EmptyState
+        label={lang === "ar" ? "لا توجد مبيعات دورات في الفترة" : "No course sales in this period"}
+        compact
+      />
+    );
+  return (
+    <div>
+      <div className="mb-2 grid grid-cols-[minmax(72px,0.8fr)_minmax(108px,1.5fr)_minmax(70px,0.7fr)] gap-2 px-2 text-[9.5px] font-semibold uppercase tracking-wide text-text-subtle sm:grid-cols-[minmax(100px,0.8fr)_minmax(160px,2fr)_minmax(88px,0.7fr)] sm:gap-3">
+        <span>{lang === "ar" ? "الدورة" : "Course"}</span>
+        <span>{lang === "ar" ? "المساهمة في المبيعات" : "Sales contribution"}</span>
+        <span className="text-end">{lang === "ar" ? "متوسط البيع" : "Average sale"}</span>
+      </div>
+      <div className="max-h-[390px] space-y-1.5 overflow-y-auto pe-1">
+        {rows.map((row, index) => (
+          <div
+            key={row.course}
+            className="grid grid-cols-[minmax(72px,0.8fr)_minmax(108px,1.5fr)_minmax(70px,0.7fr)] items-center gap-2 rounded-xl border border-border bg-surface-2/45 px-2.5 py-2.5 sm:grid-cols-[minmax(100px,0.8fr)_minmax(160px,2fr)_minmax(88px,0.7fr)] sm:gap-3"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="num text-[9px] text-text-subtle">#{index + 1}</span>
+                <span className="truncate text-xs font-semibold text-text" title={row.course}>
+                  {row.course}
+                </span>
+              </div>
+              <div className="mt-0.5 truncate text-[9.5px] text-text-muted">
+                {fmtNum(row.paidInvoices)} {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
+                <span className="num font-semibold text-brand">{fmtPct(row.contribution, 1)}</span>
+                <span className="num text-text-muted">{fmtUSD(row.revenue)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-border/70">
+                <div
+                  className="h-full rounded-full bg-brand transition-[width] duration-500"
+                  style={{ width: `${Math.min(100, Math.max(1.5, row.contribution))}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-end">
+              <div className="num text-xs font-semibold text-text">
+                {fmtUSDFull(row.averageSalePrice)}
+              </div>
+              <div className="mt-0.5 text-[9px] text-text-muted">
+                {lang === "ar" ? "لكل فاتورة" : "per invoice"}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Link to="/courses" className="text-[11px] font-semibold text-brand hover:underline">
+          {lang === "ar" ? "فتح تقرير الدورات الكامل ←" : "Open full courses report →"}
+        </Link>
       </div>
     </div>
   );
 }
 
-function Spotlight({ tone, title, row }: { tone: "success" | "danger"; title: string; row: PerfRow | null }) {
+function CpaCard({ totals }: { totals: Totals }) {
+  const { t, lang } = useI18n();
+
+  return (
+    <div
+      className="card stagger p-4 sm:p-5 relative overflow-hidden"
+      style={{ "--i": 11 } as React.CSSProperties}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted truncate">
+          {t("cpa")}
+        </span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-text-muted whitespace-nowrap">
+          {t("cpa_won")}
+        </span>
+      </div>
+      <div className="num mt-2 font-semibold leading-none text-[22px] sm:text-[27px] text-text">
+        {fmtUSDFull(totals.cpa)}
+      </div>
+      <div className="mt-2 text-[11px] text-text-muted leading-snug">
+        {lang === "ar"
+          ? `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} صفقة Won`
+          : `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} won deals`}
+      </div>
+    </div>
+  );
+}
+
+function Spotlight({
+  tone,
+  title,
+  row,
+}: {
+  tone: "success" | "danger";
+  title: string;
+  row: PerfRow | null;
+}) {
   const { t, lang } = useI18n();
   if (!row) {
     return (
@@ -629,7 +984,8 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const pct = (n: number) => fmtPct(n * 100, 1);
-  const adBearing = health.adsetExact + health.adsetDerived + health.adsetAmbiguous + health.adsetUnknown;
+  const adBearing =
+    health.adsetExact + health.adsetDerived + health.adsetAmbiguous + health.adsetUnknown;
 
   const items: { label: string; value: string; warn?: boolean }[] = [
     {
@@ -643,13 +999,13 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
             ? lang === "ar"
               ? "آخر نسخة سليمة من Odoo في PostgreSQL"
               : "Odoo last-good in PostgreSQL"
-          : health.crmAuthority === "google-sheet"
-            ? lang === "ar"
-              ? "Google Sheets — نفس مصدر Power BI"
-              : "Google Sheets — Power BI canonical source"
-          : lang === "ar"
-            ? "نسخة Google Sheets الاحتياطية"
-            : "Google Sheets fallback",
+            : health.crmAuthority === "google-sheet"
+              ? lang === "ar"
+                ? "Google Sheets — نفس مصدر Power BI"
+                : "Google Sheets — Power BI canonical source"
+              : lang === "ar"
+                ? "نسخة Google Sheets الاحتياطية"
+                : "Google Sheets fallback",
       warn: health.crmAuthority === "google-sheet-fallback",
     },
     {
@@ -658,22 +1014,28 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
       warn: health.adsetResolutionRate < 0.9,
     },
     {
-      label: lang === "ar" ? "منها تقديرية (اسم إعلان مكرر)" : "of which ambiguous (duplicate ad name)",
+      label:
+        lang === "ar" ? "منها تقديرية (اسم إعلان مكرر)" : "of which ambiguous (duplicate ad name)",
       value: fmtNum(health.adsetAmbiguous),
       warn: health.adsetAmbiguous > 0,
     },
-    { label: t("match_rate"), value: pct(health.campaignMatchRate), warn: health.campaignMatchRate < 0.8 },
+    {
+      label: t("match_rate"),
+      value: pct(health.campaignMatchRate),
+      warn: health.campaignMatchRate < 0.8,
+    },
     {
       label: t("revenue_coverage"),
       value: `${pct(health.revenueCampaignCoverage)} ${lang === "ar" ? "من الصفوف" : "of rows"} · ${pct(health.revenueCampaignShare)} ${lang === "ar" ? "من الإيراد" : "of revenue"}`,
       warn: health.revenueCampaignShare < 0.6,
     },
-    { label: lang === "ar" ? "تغطية اسم الإعلان في النظام" : "CRM ad-name coverage", value: pct(health.crmAdCoverage), warn: health.crmAdCoverage < 0.8 },
     {
-      label:
-        lang === "ar"
-          ? "تغطية اسم الإعلان في الحسابات"
-          : "Accounting ad-name coverage",
+      label: lang === "ar" ? "تغطية اسم الإعلان في النظام" : "CRM ad-name coverage",
+      value: pct(health.crmAdCoverage),
+      warn: health.crmAdCoverage < 0.8,
+    },
+    {
+      label: lang === "ar" ? "تغطية اسم الإعلان في الحسابات" : "Accounting ad-name coverage",
       value: pct(health.accountingAdCoverage),
       warn: health.accountingAdCoverage < 0.8,
     },
@@ -682,12 +1044,14 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
       value: `${fmtNum(health.closeSample)} ${lang === "ar" ? "صفقة" : "leads"} (${pct(health.closeCoverage)})`,
       warn: true,
     },
-    { label: t("no_spend_source"), value: fmtNum(health.leadsWithoutSpendSource), warn: health.leadsWithoutSpendSource > 0 },
+    {
+      label: t("no_spend_source"),
+      value: fmtNum(health.leadsWithoutSpendSource),
+      warn: health.leadsWithoutSpendSource > 0,
+    },
     {
       label:
-        lang === "ar"
-          ? "بنود خصم سالبة داخل الفواتير"
-          : "Negative discount lines inside invoices",
+        lang === "ar" ? "بنود خصم سالبة داخل الفواتير" : "Negative discount lines inside invoices",
       value: `${fmtNum(health.negativeRevenueRows)} · ${fmtUSDFull(health.negativeRevenue)}`,
     },
   ];
@@ -709,9 +1073,15 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
 
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
         {items.slice(0, open ? items.length : 4).map((it) => (
-          <div key={it.label} className="flex items-baseline justify-between gap-3 py-1 border-b border-border/60">
+          <div
+            key={it.label}
+            className="flex items-baseline justify-between gap-3 py-1 border-b border-border/60"
+          >
             <span className="text-text-muted min-w-0">{it.label}</span>
-            <span className="num font-medium shrink-0" style={it.warn ? { color: "var(--warning)" } : { color: "var(--text)" }}>
+            <span
+              className="num font-medium shrink-0"
+              style={it.warn ? { color: "var(--warning)" } : { color: "var(--text)" }}
+            >
               {it.value}
             </span>
           </div>
@@ -727,7 +1097,10 @@ function DataHealthPanel({ health }: { health: DataHealth }) {
             {t("no_spend_source_note")}
             {health.unpricedSources.length > 0 && (
               <span className="block mt-1.5 num text-[11px]">
-                {health.unpricedSources.slice(0, 6).map((s) => `${s.label} ${fmtNum(s.count)}`).join(" · ")}
+                {health.unpricedSources
+                  .slice(0, 6)
+                  .map((s) => `${s.label} ${fmtNum(s.count)}`)
+                  .join(" · ")}
               </span>
             )}
           </Notice>

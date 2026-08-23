@@ -19,6 +19,7 @@ export const Route = createFileRoute("/api/weekend")({
         const {
           completedWeekendWindow,
           isWeekendDate,
+          isWorkdayDate,
           pointDelta,
           ratioDelta,
           shiftIsoDate,
@@ -163,11 +164,7 @@ export const Route = createFileRoute("/api/weekend")({
         const rows = platformData.map(({ platform, data }) => {
           const facts = factsFor(data);
           const weekend = aggregate(facts, isWeekendDate, window.weekendDays);
-          const comparison = aggregate(
-            facts,
-            (date) => utcWeekday(date) >= 0 && utcWeekday(date) <= 3,
-            window.comparisonDays,
-          );
+          const comparison = aggregate(facts, isWorkdayDate, window.comparisonDays);
           const hasSpendData = data.ads.length > 0;
           const decision = weekendBudgetDecision(weekend, comparison, {
             lostAvailable,
@@ -236,11 +233,10 @@ export const Route = createFileRoute("/api/weekend")({
         const dayRows = platformData.flatMap(({ platform, data }) => {
           const facts = factsFor(data);
           const dayKeys = {
-            4: "thursday",
             5: "friday",
             6: "saturday",
           } as const;
-          return ([4, 5, 6] as const).map((weekday) => ({
+          return ([5, 6] as const).map((weekday) => ({
             platform,
             day: dayKeys[weekday],
             ...aggregate(facts, (date) => utcWeekday(date) === weekday, window.weeks),
@@ -257,7 +253,7 @@ export const Route = createFileRoute("/api/weekend")({
             const metrics = aggregate(
               facts,
               (date) => isWeekendDate(date) && weekStart(date) === start,
-              3,
+              2,
             );
             point[`${platform}Cpl`] = metrics.cpl;
             point[`${platform}Leads`] = metrics.leads;
@@ -312,8 +308,8 @@ export const Route = createFileRoute("/api/weekend")({
             insufficientPlatforms,
           },
           methodology: {
-            weekendDays: ["thursday", "friday", "saturday"],
-            comparisonDays: ["sunday", "monday", "tuesday", "wednesday"],
+            weekendDays: ["friday", "saturday"],
+            comparisonDays: ["sunday", "monday", "tuesday", "wednesday", "thursday"],
             leadDateBasis: "odoo_creation_date",
             lostSource: platformData[0]?.data.snapshot.health.lostAuthority ?? "unavailable",
             salesDefinition: "won_leads_divided_by_total_leads",

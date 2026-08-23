@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   completedWeekendWindow,
   isWeekendDate,
+  isWorkdayDate,
   weekendBudgetDecision,
   weekendDayKey,
   weekStart,
@@ -11,13 +12,15 @@ assert.deepEqual(completedWeekendWindow("2026-08-23"), {
   from: "2026-06-28",
   to: "2026-08-22",
   weeks: 8,
-  weekendDays: 24,
-  comparisonDays: 32,
+  weekendDays: 16,
+  comparisonDays: 40,
 });
-assert.equal(weekendDayKey("2026-08-20"), "thursday");
+assert.equal(weekendDayKey("2026-08-20"), null);
 assert.equal(weekendDayKey("2026-08-21"), "friday");
 assert.equal(weekendDayKey("2026-08-22"), "saturday");
 assert.equal(isWeekendDate("2026-08-19"), false);
+assert.equal(isWorkdayDate("2026-08-20"), true);
+assert.equal(isWorkdayDate("2026-08-21"), false);
 assert.equal(weekStart("2026-08-22"), "2026-08-16");
 
 const baseline = {
@@ -45,10 +48,14 @@ assert.equal(
 );
 const weakQualityBaseline = { ...baseline, cpl: 10, salesRate: 1, lostRate: 46 };
 assert.equal(
-  weekendBudgetDecision({ ...weakQualityBaseline, cpl: 6, salesRate: 1.5, lostRate: 45 }, weakQualityBaseline, {
-    lostAvailable: true,
-    hasSpendData: true,
-  }),
+  weekendBudgetDecision(
+    { ...weakQualityBaseline, cpl: 6, salesRate: 1.5, lostRate: 45 },
+    weakQualityBaseline,
+    {
+      lostAvailable: true,
+      hasSpendData: true,
+    },
+  ),
   "reallocate",
 );
 assert.equal(

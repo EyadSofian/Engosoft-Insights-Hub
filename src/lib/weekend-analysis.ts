@@ -1,6 +1,7 @@
-export const WEEKEND_WEEKDAYS = [4, 5, 6] as const;
+export const WEEKEND_WEEKDAYS = [5, 6] as const;
+export const WORKDAY_WEEKDAYS = [0, 1, 2, 3, 4] as const;
 
-export type WeekendDayKey = "thursday" | "friday" | "saturday";
+export type WeekendDayKey = "friday" | "saturday";
 export type WeekendDecision = "full" | "reallocate" | "reduce" | "insufficient";
 
 export interface WeekendOutcomeMetrics {
@@ -14,7 +15,6 @@ export interface WeekendOutcomeMetrics {
 }
 
 const DAY_KEY: Record<(typeof WEEKEND_WEEKDAYS)[number], WeekendDayKey> = {
-  4: "thursday",
   5: "friday",
   6: "saturday",
 };
@@ -57,8 +57,8 @@ export function completedWeekendWindow(
     from,
     to,
     weeks,
-    weekendDays: weeks * 3,
-    comparisonDays: weeks * 4,
+    weekendDays: weeks * 2,
+    comparisonDays: weeks * 5,
   };
 }
 
@@ -68,11 +68,16 @@ export function utcWeekday(value: string): number {
 
 export function weekendDayKey(value: string): WeekendDayKey | null {
   const day = utcWeekday(value);
-  return day === 4 || day === 5 || day === 6 ? DAY_KEY[day] : null;
+  return day === 5 || day === 6 ? DAY_KEY[day] : null;
 }
 
 export function isWeekendDate(value: string): boolean {
   return weekendDayKey(value) !== null;
+}
+
+export function isWorkdayDate(value: string): boolean {
+  const day = utcWeekday(value);
+  return day >= 0 && day <= 4;
 }
 
 export function weekStart(value: string): string {
@@ -93,7 +98,7 @@ export function pointDelta(current: number | null, baseline: number | null): num
 
 /**
  * An explainable budget rule, not an opaque score. Weekend performance must
- * earn full budget by matching its own platform's Sunday-Wednesday baseline.
+ * earn full budget by matching its own platform's Sunday-Thursday baseline.
  */
 export function weekendBudgetDecision(
   weekend: WeekendOutcomeMetrics,
