@@ -91,11 +91,12 @@ export async function buildCurrentCourseLeadAlertReport(filters: GlobalFilters =
     ? `تم إيقاف الإنذارات لأن آخر يوم مشترك مكتمل هو ${anchorDate || "غير متاح"}، أقدم من آخر يوم مكتمل بـ${freshnessAgeDays} يوم.`
     : "الإنذارات مبنية على آخر يوم مكتمل في الإعلانات وCRM.";
   const facts: CourseDailyFact[] = [];
+  const nonCourseBuckets = new Set(["other", "uncategorized", "unattributed"]);
   const validCourse = (course: string) =>
     course &&
     /[\p{L}\p{N}]/u.test(course) &&
     course !== UNATTRIBUTED_COURSE &&
-    course.toLowerCase() !== "unattributed";
+    !nonCourseBuckets.has(course.trim().toLocaleLowerCase("en"));
 
   for (const row of data.ads) {
     if (!row.date) continue;
