@@ -167,7 +167,7 @@ export function KpiCard({
 }) {
   return (
     <div
-      className="card stagger min-h-[96px] p-3 min-[420px]:p-3.5 sm:min-h-0 sm:p-5 relative overflow-hidden"
+      className="card stagger relative min-h-[128px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[144px] sm:p-5"
       style={
         {
           "--i": index,
@@ -180,33 +180,40 @@ export function KpiCard({
         } as React.CSSProperties
       }
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex min-w-0 items-center gap-1">
-          <span className="min-h-7 text-[10.5px] sm:min-h-0 sm:text-[11px] font-medium uppercase tracking-wide text-text-muted leading-snug line-clamp-2 sm:block sm:truncate">
+      <div className="flex min-h-8 items-start justify-between gap-3">
+        <span className="inline-flex min-w-0 items-start gap-1.5">
+          <span className="line-clamp-2 text-[11px] font-semibold leading-[1.45] text-text-muted sm:text-xs">
             {label}
           </span>
           {info}
         </span>
         {icon && (
-          <span className="text-text-subtle shrink-0" style={hero ? { color: "var(--accent-ink)" } : undefined}>
+          <span
+            className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-text-subtle"
+            style={
+              hero
+                ? { color: "var(--accent-ink)", background: "color-mix(in oklab, var(--accent) 12%, transparent)" }
+                : undefined
+            }
+          >
             {icon}
           </span>
         )}
       </div>
 
       <div
-        className="num mt-1.5 sm:mt-2 font-semibold leading-none text-[15px] min-[360px]:text-[17px] min-[420px]:text-[19px] sm:text-[27px]"
+        className="num mt-2.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] font-semibold leading-none tracking-[-0.025em] sm:mt-3"
         style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
       >
         {value}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 min-h-[18px] flex-wrap">
+      <div className="mt-3 flex min-h-[32px] items-start gap-2">
         <DeltaBadge value={delta} invert={deltaInvert} />
         {sub != null && (
           <span
-            className={`text-[10.5px] sm:text-[11px] text-text-muted ${
-              subWrap ? "leading-relaxed" : "line-clamp-2 sm:block sm:truncate"
+            className={`min-w-0 text-[10.5px] leading-[1.55] text-text-muted sm:text-[11px] ${
+              subWrap ? "leading-relaxed" : "line-clamp-2"
             }`}
           >
             {sub}

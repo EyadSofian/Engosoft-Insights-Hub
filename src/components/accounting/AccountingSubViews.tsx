@@ -271,7 +271,7 @@ export function AccountingAgentsView() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
           ? `التحصيل والفواتير من حسابات Odoo حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. الليدز والإغلاقات من Odoo، والمكالمات من Yeastar بعد تخزينها في PostgreSQL على Railway.`
@@ -324,7 +324,7 @@ export function AccountingAgentsView() {
         // report is re-read rather than left showing the previous numbers.
         onSaved={() => refetch()}
       />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 xl:gap-4">
         <KpiCard
           index={0}
           label={lang === "ar" ? "الموظفون النشطون" : "Active employees"}
@@ -339,7 +339,7 @@ export function AccountingAgentsView() {
         <KpiCard
           index={1}
           label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
-          value={fmtUSDExact(data.summary.paidRevenue)}
+          value={fmtUSDFull(data.summary.paidRevenue)}
           sub={invoiceCount(data.summary.invoices, lang)}
           icon={<ReceiptText size={18} />}
           hero
