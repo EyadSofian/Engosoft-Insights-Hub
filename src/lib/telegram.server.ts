@@ -2,9 +2,17 @@
 //
 // The bot token is read from the environment and never logged, echoed in a
 // response body, or included in an error message.
-import { getFiltered, computeTotals, computePerf, bestCampaign, moneyLeak, div } from "./metrics.server";
+import {
+  getFiltered,
+  computeTotals,
+  computePerf,
+  bestCampaign,
+  moneyLeak,
+  div,
+} from "./metrics.server";
 import { loadAllData } from "./sheet-cache.server";
 import { dashboardUrl } from "./constants";
+import type { CourseLeadAlertReport, CourseLeadSignal } from "./course-lead-alerts";
 import type { Maybe, PerfRow, Totals } from "./types";
 
 const API = "https://api.telegram.org";
@@ -30,7 +38,8 @@ const EM = "—";
 const money = (n: Maybe, digits = 0) =>
   n === null || !isFinite(n)
     ? EM
-    : "$" + n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    : "$" +
+      n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const int = (n: Maybe) => (n === null || !isFinite(n) ? EM : Math.round(n).toLocaleString("en-US"));
 const pct = (n: Maybe, d = 1) => (n === null || !isFinite(n) ? EM : n.toFixed(d) + "%");
 const times = (n: Maybe) => (n === null || !isFinite(n) ? EM : n.toFixed(2) + "×");
@@ -146,7 +155,9 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   L.push("");
 
   L.push(`📈 *${esc("مؤشرات الكفاءة")}*`);
-  L.push(esc(`CPL = الإنفاق ÷ Leads المنصات: ${money(t.cpl, 2)}  ${change(t.cpl ?? 0, p.cpl ?? 0)}`));
+  L.push(
+    esc(`CPL = الإنفاق ÷ Leads المنصات: ${money(t.cpl, 2)}  ${change(t.cpl ?? 0, p.cpl ?? 0)}`),
+  );
   L.push(esc(`CPA = الإنفاق ÷ Won: ${money(t.cpa, 2)}`));
   L.push(esc(`العائد على الإنفاق: ${times(t.roas)} · نسبة الإنفاق للإيراد: ${pct(t.acos)}`));
   L.push("");
@@ -182,7 +193,9 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
     if (Math.abs(g) >= 15) {
       // Naming the top spender as the *cause* of a CPL move is a claim the data
       // does not support, so it is reported as context, not as an explanation.
-      const topSpender = [...cur.rows].filter((r) => r.spend > 0).sort((a, b) => b.spend - a.spend)[0];
+      const topSpender = [...cur.rows]
+        .filter((r) => r.spend > 0)
+        .sort((a, b) => b.spend - a.spend)[0];
       notes.push(
         `تكلفة العميل ${g > 0 ? "ارتفعت" : "انخفضت"} بنسبة ${Math.abs(g).toFixed(0)}% مقارنة بالفترة السابقة${topSpender ? `، وأعلى حملة إنفاقاً في الفترة هي ${topSpender.name}` : ""}.`,
       );
@@ -212,13 +225,67 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   return L.join("\n");
 }
 
+function alertReason(row: CourseLeadSignal): string {
+  const reasons: string[] = [];
+  if (row.issues.includes("lead_drop"))
+    reasons.push(`الليدز ${int(row.current.leads)} بدل ${row.baseline.leadsPerDay.toFixed(1)}`);
+  if (row.issues.includes("cpl_spike"))
+    reasons.push(`CPL ${money(row.current.cpl, 2)} بدل ${money(row.baseline.cpl, 2)}`);
+  if (row.issues.includes("spend_without_leads"))
+    reasons.push(`صرف ${money(row.current.spend, 2)} بدون ليدز`);
+  return reasons.join(" · ");
+}
+
+export async function buildCourseAlertMessage(
+  report?: CourseLeadAlertReport,
+): Promise<{ report: CourseLeadAlertReport; text: string }> {
+  const current =
+    report ??
+    (await (await import("./course-lead-alerts.server")).buildCurrentCourseLeadAlertReport());
+  const alerts = current.rows.filter((row) => row.status !== "stable");
+  const lines: string[] = [
+    `🚨 *${esc("تنبيه تغيّر أداء الدورات")}*`,
+    esc(`يوم ${current.anchorDate} · مقارنة بنفس يوم الأسبوع خلال ${current.baselineWeeks} أسابيع`),
+    "",
+  ];
+
+  if (!current.freshness.ok) {
+    lines.push(`⚠️ ${esc(current.freshness.message)}`);
+  } else if (!alerts.length) {
+    lines.push(`✅ ${esc("لا توجد تغيّرات جوهرية تحتاج مراجعة.")}`);
+  } else {
+    for (const row of alerts.slice(0, 10)) {
+      const marker = row.status === "critical" ? "🔴" : "🟠";
+      lines.push(`${marker} *${esc(row.course)}*`);
+      lines.push(esc(alertReason(row)));
+    }
+    if (alerts.length > 10) lines.push(esc(`+ ${alerts.length - 10} دورات أخرى داخل الداشبورد`));
+  }
+
+  const url = dashboardUrl();
+  if (url) {
+    lines.push("");
+    lines.push(
+      `[${esc("افتح مراقبة الدورات")}](${url.replace(/\/$/, "")}/courses#daily-lead-monitor)`,
+    );
+  }
+  return { report: current, text: lines.join("\n") };
+}
+
 /* --- transport -------------------------------------------------------------- */
 
-export async function sendMessage(text: string, to?: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendMessage(
+  text: string,
+  to?: string,
+): Promise<{ ok: boolean; error?: string }> {
   const token = botToken();
   const target = to || chatId();
   if (!token) return { ok: false, error: "TELEGRAM_BOT_TOKEN is not set" };
-  if (!target) return { ok: false, error: "no recipient: nobody has sent /start and TELEGRAM_CHAT_ID is not set" };
+  if (!target)
+    return {
+      ok: false,
+      error: "no recipient: nobody has sent /start and TELEGRAM_CHAT_ID is not set",
+    };
 
   try {
     const res = await fetch(`${API}/bot${token}/sendMessage`, {
@@ -264,7 +331,8 @@ export async function sendDaily(
   days = 1,
   opts: { once?: boolean } = {},
 ): Promise<BroadcastResult & { skipped?: boolean }> {
-  const { recipients, unsubscribe, claimReportDay, reportDay } = await import("./subscribers.server");
+  const { recipients, unsubscribe, claimReportDay, reportDay } =
+    await import("./subscribers.server");
 
   // `once` is used by the scheduled trigger so that an external scheduler can
   // safely cover for a sleeping container without producing two reports.
@@ -278,7 +346,15 @@ export async function sendDaily(
   const text = await buildReport({ days });
   const chats = await recipients();
 
-  if (!botToken()) return { ok: false, error: "TELEGRAM_BOT_TOKEN is not set", text, sent: 0, failed: 0, removed: [] };
+  if (!botToken())
+    return {
+      ok: false,
+      error: "TELEGRAM_BOT_TOKEN is not set",
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+    };
   if (!chats.length) {
     return {
       ok: false,
@@ -318,5 +394,91 @@ export async function sendDaily(
     sent,
     failed,
     removed,
+  };
+}
+
+export async function sendCourseAlerts(
+  opts: { once?: boolean } = {},
+): Promise<
+  BroadcastResult & { skipped?: boolean; noAlerts?: boolean; report: CourseLeadAlertReport }
+> {
+  const { recipients, unsubscribe, claimCourseAlertDay } = await import("./subscribers.server");
+  const { report, text } = await buildCourseAlertMessage();
+  const alerts = report.rows.filter((row) => row.status !== "stable");
+
+  if (!report.freshness.ok || alerts.length === 0) {
+    return {
+      ok: true,
+      skipped: true,
+      noAlerts: alerts.length === 0,
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+      report,
+    };
+  }
+  if (!botToken()) {
+    return {
+      ok: false,
+      error: "TELEGRAM_BOT_TOKEN is not set",
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+      report,
+    };
+  }
+  const chats = await recipients();
+  if (!chats.length) {
+    return {
+      ok: false,
+      error: "no subscribers yet — send /start to the bot, or set TELEGRAM_CHAT_ID",
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+      report,
+    };
+  }
+  if (opts.once && !(await claimCourseAlertDay(report.anchorDate))) {
+    return {
+      ok: true,
+      skipped: true,
+      text,
+      sent: 0,
+      failed: 0,
+      removed: [],
+      report,
+    };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const removed: string[] = [];
+  const errors: string[] = [];
+  for (const chat of chats) {
+    const result = await sendMessage(text, chat);
+    if (result.ok) {
+      sent++;
+      continue;
+    }
+    failed++;
+    const reason = result.error ?? "";
+    if (/blocked|chat not found|deactivated|kicked|user is deactivated/i.test(reason)) {
+      await unsubscribe(chat);
+      removed.push(chat);
+    } else {
+      errors.push(reason);
+    }
+  }
+  return {
+    ok: sent > 0,
+    error: sent > 0 ? undefined : errors[0] || "delivery failed for every subscriber",
+    text,
+    sent,
+    failed,
+    removed,
+    report,
   };
 }

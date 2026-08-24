@@ -4,7 +4,9 @@ import {
   Activity,
   BadgeDollarSign,
   BarChart3,
+  BellRing,
   CalendarDays,
+  CircleDollarSign,
   GraduationCap,
   History,
   Info,
@@ -13,6 +15,8 @@ import {
   Search,
   ShoppingCart,
   Target,
+  TrendingDown,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
@@ -28,6 +32,7 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
+import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
 import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
@@ -104,6 +109,7 @@ function Courses() {
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
   const { data, isLoading, error, refetch } = useApi<CoursesResponse>("/api/courses");
+  const leadAlerts = useApi<CourseLeadAlertReport>("/api/course-lead-alerts");
 
   const courses = useMemo(() => data?.courses ?? [], [data?.courses]);
   const selectedCourse = courses.find((course) => course.key === selectedKey) ?? courses[0] ?? null;
@@ -283,6 +289,18 @@ function Courses() {
       />
 
       <FilterSummary />
+
+      {leadAlerts.isLoading || !leadAlerts.data ? (
+        <Skeleton className="h-[250px]" />
+      ) : leadAlerts.error ? (
+        <Notice tone="danger" icon={<TriangleAlert size={17} />}>
+          {lang === "ar"
+            ? `تعذّر تحميل مراقبة الليدز اليومية: ${(leadAlerts.error as Error).message}`
+            : `Daily lead monitor failed: ${(leadAlerts.error as Error).message}`}
+        </Notice>
+      ) : (
+        <CourseLeadMonitor report={leadAlerts.data} />
+      )}
 
       {isLoading || !data ? (
         <>
@@ -468,6 +486,341 @@ function Courses() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
+  const { lang } = useI18n();
+  const [showAlertsOnly, setShowAlertsOnly] = useState(false);
+  const rows = showAlertsOnly ? report.rows.filter((row) => row.status !== "stable") : report.rows;
+  const hasAlerts = report.summary.alertCount > 0;
+
+  return (
+    <section
+      id="daily-lead-monitor"
+      className="card scroll-mt-28 overflow-hidden"
+      style={{
+        borderColor: hasAlerts
+          ? report.summary.criticalCount
+            ? "color-mix(in oklab, var(--danger) 42%, var(--border))"
+            : "color-mix(in oklab, var(--warning) 42%, var(--border))"
+          : undefined,
+      }}
+    >
+      <div className="border-b border-border p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl"
+              style={{
+                background: hasAlerts ? "var(--warning-soft)" : "var(--success-soft)",
+                color: hasAlerts ? "var(--warning)" : "var(--success)",
+              }}
+            >
+              <BellRing size={20} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold text-text sm:text-lg">
+                  {lang === "ar" ? "مراقبة الليدز اليومية لكل دورة" : "Daily leads by course"}
+                </h2>
+                <Pill
+                  tone={
+                    !report.freshness.ok
+                      ? "neutral"
+                      : report.summary.criticalCount
+                        ? "danger"
+                        : report.summary.warningCount
+                          ? "warning"
+                          : "success"
+                  }
+                >
+                  {!report.freshness.ok
+                    ? lang === "ar"
+                      ? "المراقبة متوقفة"
+                      : "Monitoring paused"
+                    : hasAlerts
+                      ? lang === "ar"
+                        ? `${fmtNum(report.summary.alertCount)} إنذار`
+                        : `${fmtNum(report.summary.alertCount)} alerts`
+                      : lang === "ar"
+                        ? "الوضع طبيعي"
+                        : "Normal"}
+                </Pill>
+              </div>
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-text-muted">
+                {lang === "ar"
+                  ? `آخر يوم مكتمل ${fmtDate(report.anchorDate, lang)}، مقارنة بمتوسط نفس يوم الأسبوع خلال ${report.baselineWeeks} أسابيع. الإيميل وتنبيه تيليجرام يخرجان فقط عند وجود تغيّر حقيقي.`
+                  : `Latest complete day ${fmtDate(report.anchorDate, lang)}, compared with the same weekday over ${report.baselineWeeks} weeks. Email and Telegram are sent only for material changes.`}
+              </p>
+            </div>
+          </div>
+          <div
+            className="inline-flex w-fit rounded-lg border border-border bg-surface-2 p-0.5"
+            role="group"
+            aria-label={lang === "ar" ? "عرض مراقبة الليدز" : "Lead monitor view"}
+          >
+            <button
+              type="button"
+              onClick={() => setShowAlertsOnly(false)}
+              aria-pressed={!showAlertsOnly}
+              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+                !showAlertsOnly ? "bg-surface text-brand shadow-sm" : "text-text-muted"
+              }`}
+            >
+              {lang === "ar" ? "كل الدورات" : "All courses"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAlertsOnly(true)}
+              aria-pressed={showAlertsOnly}
+              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+                showAlertsOnly ? "bg-surface text-brand shadow-sm" : "text-text-muted"
+              }`}
+            >
+              {lang === "ar" ? "الإنذارات فقط" : "Alerts only"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <MonitorStat
+            icon={<TriangleAlert size={15} />}
+            label={lang === "ar" ? "دورات محتاجة مراجعة" : "Courses to review"}
+            value={report.summary.alertCount}
+            tone={hasAlerts ? "danger" : "success"}
+          />
+          <MonitorStat
+            icon={<TrendingDown size={15} />}
+            label={lang === "ar" ? "هبوط في الليدز" : "Lead drops"}
+            value={report.summary.leadDropCount}
+            tone={report.summary.leadDropCount ? "warning" : "neutral"}
+          />
+          <MonitorStat
+            icon={<CircleDollarSign size={15} />}
+            label={lang === "ar" ? "ارتفاع في CPL" : "CPL spikes"}
+            value={report.summary.cplSpikeCount}
+            tone={report.summary.cplSpikeCount ? "warning" : "neutral"}
+          />
+          <MonitorStat
+            icon={<BellRing size={15} />}
+            label={lang === "ar" ? "صرف بدون ليدز" : "Spend without leads"}
+            value={report.summary.spendWithoutLeadsCount}
+            tone={report.summary.spendWithoutLeadsCount ? "danger" : "neutral"}
+          />
+        </div>
+      </div>
+
+      {!report.freshness.ok && (
+        <div className="border-b border-border bg-warning-soft px-4 py-3 text-xs leading-5 text-warning sm:px-5">
+          {lang === "ar"
+            ? report.freshness.message
+            : `Alerts are paused because the latest common complete day is ${report.freshness.ageDays} days old.`}
+        </div>
+      )}
+
+      {rows.length ? (
+        <>
+          <div className="space-y-2 p-3 md:hidden">
+            {rows.map((row) => (
+              <CourseLeadMobileCard key={row.key} row={row} paused={!report.freshness.ok} />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[980px] text-start text-xs">
+              <thead className="bg-surface-2/75 text-[10.5px] font-semibold text-text-muted">
+                <tr>
+                  <th className="px-4 py-3 text-start">{lang === "ar" ? "الدورة" : "Course"}</th>
+                  <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "ليدز اليوم" : "Day leads"}
+                  </th>
+                  <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "المتوقع" : "Expected"}
+                  </th>
+                  <th className="px-3 py-3 text-center">{lang === "ar" ? "التغيّر" : "Change"}</th>
+                  <th className="px-3 py-3 text-center">CPL</th>
+                  <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
+                  </th>
+                  <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "آخر 14 يوم" : "Last 14 days"}
+                  </th>
+                  <th className="px-4 py-3 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((row) => (
+                  <tr key={row.key} className="hover:bg-surface-2/35">
+                    <td className="px-4 py-3 font-semibold text-text">{row.course}</td>
+                    <td className="num px-3 py-3 text-center font-semibold text-text">
+                      {fmtNum(row.current.leads)}
+                    </td>
+                    <td className="num px-3 py-3 text-center text-text-muted">
+                      {row.baseline.leadsPerDay.toFixed(1)}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <DeltaBadge value={row.leadDeltaPct ?? undefined} />
+                    </td>
+                    <td className="num px-3 py-3 text-center font-medium text-text">
+                      {fmtUSD(row.current.cpl)}
+                    </td>
+                    <td className="num px-3 py-3 text-center text-text-muted">
+                      {fmtUSD(row.baseline.cpl)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <MiniLeadTrend row={row} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <CourseSignalStatus row={row} paused={!report.freshness.ok} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="p-5">
+          <EmptyState
+            compact
+            label={
+              showAlertsOnly
+                ? lang === "ar"
+                  ? "لا توجد إنذارات حالية"
+                  : "No current alerts"
+                : lang === "ar"
+                  ? "لا توجد بيانات دورات في نافذة المتابعة"
+                  : "No course data in the monitoring window"
+            }
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MonitorStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  tone: "neutral" | "success" | "warning" | "danger";
+}) {
+  const colors = {
+    neutral: { background: "var(--surface-2)", color: "var(--text-muted)" },
+    success: { background: "var(--success-soft)", color: "var(--success)" },
+    warning: { background: "var(--warning-soft)", color: "var(--warning)" },
+    danger: { background: "var(--danger-soft)", color: "var(--danger)" },
+  }[tone];
+  return (
+    <div className="rounded-xl border border-border px-3 py-2.5" style={colors}>
+      <div className="flex items-center justify-between gap-2 text-[10.5px] font-medium">
+        <span>{label}</span>
+        {icon}
+      </div>
+      <div className="num mt-1 text-lg font-semibold">{fmtNum(value)}</div>
+    </div>
+  );
+}
+
+function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: boolean }) {
+  const { lang } = useI18n();
+  return (
+    <article className="rounded-xl border border-border bg-surface-2/35 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text">{row.course}</h3>
+          <p className="mt-0.5 text-[10.5px] text-text-muted">
+            {lang === "ar" ? "مقارنة بنفس يوم الأسبوع" : "Compared with the same weekday"}
+          </p>
+        </div>
+        <CourseSignalStatus row={row} paused={paused} />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <MobileMetric
+          label={lang === "ar" ? "ليدز اليوم / المتوقع" : "Day / expected leads"}
+          value={`${fmtNum(row.current.leads)} / ${row.baseline.leadsPerDay.toFixed(1)}`}
+        />
+        <div>
+          <dt className="text-[11px] text-text-muted">{lang === "ar" ? "التغيّر" : "Change"}</dt>
+          <dd className="mt-0.5">
+            <DeltaBadge value={row.leadDeltaPct ?? undefined} />
+          </dd>
+        </div>
+        <MobileMetric label="CPL" value={fmtUSD(row.current.cpl)} />
+        <MobileMetric
+          label={lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
+          value={fmtUSD(row.baseline.cpl)}
+        />
+      </div>
+      <div className="mt-3">
+        <MiniLeadTrend row={row} />
+      </div>
+    </article>
+  );
+}
+
+function MiniLeadTrend({ row }: { row: CourseLeadSignal }) {
+  const { lang } = useI18n();
+  const points = row.trend.slice(-14);
+  const peak = Math.max(1, ...points.map((point) => point.leads));
+  return (
+    <div
+      className="flex h-8 min-w-[126px] items-end gap-0.5"
+      role="img"
+      aria-label={
+        lang === "ar" ? `ليدز ${row.course} آخر 14 يوم` : `${row.course} leads, last 14 days`
+      }
+    >
+      {points.map((point, index) => (
+        <span
+          key={point.date}
+          className="min-w-1 flex-1 rounded-t-sm"
+          title={`${point.date}: ${point.leads}`}
+          style={{
+            height: `${Math.max(point.leads > 0 ? 12 : 4, (point.leads / peak) * 100)}%`,
+            background:
+              index === points.length - 1
+                ? row.status === "critical"
+                  ? "var(--danger)"
+                  : row.status === "warning"
+                    ? "var(--warning)"
+                    : "var(--brand)"
+                : "color-mix(in oklab, var(--brand) 38%, var(--border))",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CourseSignalStatus({ row, paused = false }: { row: CourseLeadSignal; paused?: boolean }) {
+  const { lang } = useI18n();
+  if (paused) {
+    return (
+      <Pill tone="neutral">{lang === "ar" ? "متوقفة لحين التحديث" : "Awaiting fresh data"}</Pill>
+    );
+  }
+  if (row.status === "stable") {
+    return <Pill tone="success">{lang === "ar" ? "طبيعي" : "Stable"}</Pill>;
+  }
+  const labels = row.issues.map((issue) => {
+    if (issue === "lead_drop") return lang === "ar" ? "ليدز أقل" : "Lead drop";
+    if (issue === "cpl_spike") return lang === "ar" ? "CPL أعلى" : "CPL spike";
+    return lang === "ar" ? "صرف بلا ليدز" : "Spend, no leads";
+  });
+  return (
+    <div className="flex max-w-[190px] flex-wrap gap-1">
+      {labels.map((label) => (
+        <Pill key={label} tone={row.status === "critical" ? "danger" : "warning"}>
+          {label}
+        </Pill>
+      ))}
     </div>
   );
 }

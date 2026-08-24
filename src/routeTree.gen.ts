@@ -33,6 +33,7 @@ import { Route as ApiAgentCourseInvoicesRouteImport } from './routes/api/agent-c
 import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiCourseLeadAlertsRouteImport } from './routes/api/course-lead-alerts'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
 import { Route as ApiEmployeeCallDetailRouteImport } from './routes/api/employee-call-detail'
 import { Route as ApiEmployeeCallRecordingRouteImport } from './routes/api/employee-call-recording'
@@ -57,6 +58,7 @@ import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
+import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/telegram.send-course-alerts'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
 import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
@@ -181,6 +183,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCourseLeadAlertsRoute = ApiCourseLeadAlertsRouteImport.update({
+  id: '/api/course-lead-alerts',
+  path: '/api/course-lead-alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCoursesRoute = ApiCoursesRouteImport.update({
   id: '/api/courses',
   path: '/api/courses',
@@ -302,6 +309,12 @@ const ApiTelegramPreviewRoute = ApiTelegramPreviewRouteImport.update({
   path: '/api/telegram/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelegramSendCourseAlertsRoute =
+  ApiTelegramSendCourseAlertsRouteImport.update({
+    id: '/api/telegram/send-course-alerts',
+    path: '/api/telegram/send-course-alerts',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiTelegramSendDailyRoute = ApiTelegramSendDailyRouteImport.update({
   id: '/api/telegram/send-daily',
   path: '/api/telegram/send-daily',
@@ -343,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
@@ -367,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
@@ -396,6 +411,7 @@ export interface FileRoutesByTo {
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
@@ -420,6 +436,7 @@ export interface FileRoutesByTo {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
@@ -450,6 +467,7 @@ export interface FileRoutesById {
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
@@ -474,6 +492,7 @@ export interface FileRoutesById {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
+  '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
@@ -505,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
+    | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
@@ -529,6 +549,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
+    | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
@@ -558,6 +579,7 @@ export interface FileRouteTypes {
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
+    | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
@@ -582,6 +604,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
+    | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
@@ -611,6 +634,7 @@ export interface FileRouteTypes {
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
+    | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
@@ -635,6 +659,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
+    | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
@@ -665,6 +690,7 @@ export interface RootRouteChildren {
   ApiCampaignRiskRoute: typeof ApiCampaignRiskRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiCourseLeadAlertsRoute: typeof ApiCourseLeadAlertsRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
   ApiEmployeeCallDetailRoute: typeof ApiEmployeeCallDetailRoute
   ApiEmployeeCallRecordingRoute: typeof ApiEmployeeCallRecordingRoute
@@ -689,6 +715,7 @@ export interface RootRouteChildren {
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
+  ApiTelegramSendCourseAlertsRoute: typeof ApiTelegramSendCourseAlertsRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
   ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
@@ -864,6 +891,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/course-lead-alerts': {
+      id: '/api/course-lead-alerts'
+      path: '/api/course-lead-alerts'
+      fullPath: '/api/course-lead-alerts'
+      preLoaderRoute: typeof ApiCourseLeadAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/courses': {
       id: '/api/courses'
       path: '/api/courses'
@@ -1032,6 +1066,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/telegram/send-course-alerts': {
+      id: '/api/telegram/send-course-alerts'
+      path: '/api/telegram/send-course-alerts'
+      fullPath: '/api/telegram/send-course-alerts'
+      preLoaderRoute: typeof ApiTelegramSendCourseAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram/send-daily': {
       id: '/api/telegram/send-daily'
       path: '/api/telegram/send-daily'
@@ -1081,6 +1122,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCampaignRiskRoute: ApiCampaignRiskRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiCourseLeadAlertsRoute: ApiCourseLeadAlertsRoute,
   ApiCoursesRoute: ApiCoursesRoute,
   ApiEmployeeCallDetailRoute: ApiEmployeeCallDetailRoute,
   ApiEmployeeCallRecordingRoute: ApiEmployeeCallRecordingRoute,
@@ -1105,6 +1147,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
+  ApiTelegramSendCourseAlertsRoute: ApiTelegramSendCourseAlertsRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
   ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,

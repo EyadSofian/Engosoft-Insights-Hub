@@ -17,6 +17,8 @@ interface Stored {
   chats: Record<string, { since: string; name?: string }>;
   /** Cairo date (YYYY-MM-DD) the daily report was last delivered for. */
   lastSentDay?: string;
+  /** Source date whose course-performance alert was last delivered. */
+  lastCourseAlertDay?: string;
 }
 
 let loaded: Stored | null = null;
@@ -53,7 +55,10 @@ async function persist(): Promise<void> {
       await writeFile(tmp, snapshot, "utf8");
       await rename(tmp, path);
     } catch (e) {
-      console.error("[telegram] could not persist subscribers:", e instanceof Error ? e.message : e);
+      console.error(
+        "[telegram] could not persist subscribers:",
+        e instanceof Error ? e.message : e,
+      );
     }
   });
   return writing;
@@ -134,6 +139,20 @@ export async function claimReportDay(day: string): Promise<boolean> {
 export async function lastSentDay(): Promise<string | undefined> {
   const store = await load();
   return store.lastSentDay;
+}
+
+/** Separate idempotency guard for the course alert, so it cannot block the daily report. */
+export async function claimCourseAlertDay(day: string): Promise<boolean> {
+  const store = await load();
+  if (store.lastCourseAlertDay === day) return false;
+  store.lastCourseAlertDay = day;
+  await persist();
+  return true;
+}
+
+export async function lastCourseAlertDay(): Promise<string | undefined> {
+  const store = await load();
+  return store.lastCourseAlertDay;
 }
 
 /** Test seam — drops the in-memory copy so the next read hits disk. */
