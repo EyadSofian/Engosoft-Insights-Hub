@@ -259,7 +259,7 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `GET /api/campaigns?grain=campaign\|adset\|ad` | The performance table at one of three grains                                                                                                                 |
 | `GET /api/ads[?grain=campaign\|adset\|ad]`     | Per-platform metrics, platform coverage, daily spend and trend. With `grain`, one level of the performance table; without it, the full ad + ad-set breakdown |
 | `GET /api/courses`                             | Course leaderboard, inferred spend, optional `?detail=` drilldown                                                                                            |
-| `GET /api/course-lead-alerts`                  | Latest complete-day leads/CPL per course, same-weekday 8-week baseline, 28-day trend and material-change alerts                                              |
+| `GET /api/course-lead-alerts`                  | Latest complete-day leads/CPL for currently spending courses, same-weekday campaign-spend baseline, 28-day trend and material-change alerts                  |
 | `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                                                                                             |
 | `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                                                                                             |
 | `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate                                                                                  |
@@ -282,13 +282,17 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 
-The Courses page operational monitor compares the latest complete day with the same
-weekday across the prior eight weeks. It alerts only for a material lead drop, a CPL
-increase of at least 30% with enough volume, or at least $20 spend with zero leads. If
-the shared Ads/CRM date is more than two days old, alerts are paused rather than sending
-false alarms. `scripts/build-course-lead-alert-workflow.mjs` produces the active n8n
-workflow that checks this endpoint at 10:00 `Africa/Cairo`, emails management through the
-native SMTP node and triggers the existing Telegram subscriber notification.
+The Courses page operational monitor defaults to courses with real campaign spend on
+the latest complete day. Its same-weekday baseline uses only prior observations that
+also had course-attributed spend, so weeks before a campaign launched do not dilute the
+expected leads or CPL. At least three comparable days are required before an alert can
+fire. Historical/no-current-spend rows remain available in the explicit all-courses
+view, but never generate alerts. The material rules are a lead drop, a CPL increase of
+at least 30% with enough volume, or at least $20 spend with zero leads. If the shared
+Ads/CRM date is more than two days old, alerts are paused rather than sending false
+alarms. `scripts/build-course-lead-alert-workflow.mjs` produces the active n8n workflow
+that checks this endpoint at 10:00 `Africa/Cairo`, emails management through the native
+SMTP node and triggers the existing Telegram subscriber notification.
 
 ## Telegram report
 

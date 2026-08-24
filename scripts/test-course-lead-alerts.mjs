@@ -14,21 +14,30 @@ for (const date of baselineDates) {
   facts.push({ date, course: "CFM", leads: 4, spend: 24 });
   facts.push({ date, course: "Small", leads: 1, spend: 0 });
   facts.push({ date, course: "Stable", leads: 6, spend: 30 });
+  facts.push({ date, course: "Ended", leads: 8, spend: 40 });
+}
+for (const date of baselineDates.slice(0, 2)) {
+  facts.push({ date, course: "New", leads: 10, spend: 50 });
 }
 facts.push({ date: anchorDate, course: "PMP", leads: 4, spend: 60 });
 facts.push({ date: anchorDate, course: "CFM", leads: 0, spend: 30 });
 facts.push({ date: anchorDate, course: "Small", leads: 0, spend: 0 });
 facts.push({ date: anchorDate, course: "Stable", leads: 6, spend: 30 });
+facts.push({ date: anchorDate, course: "Ended", leads: 0, spend: 0 });
+facts.push({ date: anchorDate, course: "New", leads: 1, spend: 60 });
 
 const report = analyzeCourseLeadFacts(facts, { anchorDate, generatedAt: "2026-08-23T08:00:00Z" });
 const pmp = report.rows.find((row) => row.course === "PMP");
 const cfm = report.rows.find((row) => row.course === "CFM");
 const small = report.rows.find((row) => row.course === "Small");
 const stable = report.rows.find((row) => row.course === "Stable");
+const ended = report.rows.find((row) => row.course === "Ended");
+const newCourse = report.rows.find((row) => row.course === "New");
 
 assert.ok(pmp);
 assert.equal(pmp.current.leads, 4);
 assert.equal(pmp.baseline.leadsPerDay, 10);
+assert.equal(pmp.baseline.activeDays, 8);
 assert.equal(pmp.leadDeltaPct, -60);
 assert.equal(pmp.current.cpl, 15);
 assert.equal(pmp.baseline.cpl, 5);
@@ -44,7 +53,16 @@ assert.equal(small.status, "stable", "small baselines must not create noisy aler
 assert.ok(stable);
 assert.equal(stable.status, "stable");
 assert.equal(stable.trend.length, 28);
+assert.ok(ended);
+assert.equal(ended.hasCurrentCampaignSpend, false);
+assert.equal(ended.status, "stable", "ended campaigns must not raise current alerts");
+assert.ok(newCourse);
+assert.equal(newCourse.hasCurrentCampaignSpend, true);
+assert.equal(newCourse.baseline.activeDays, 2);
+assert.equal(newCourse.status, "stable", "fewer than three comparable campaign days is noisy");
 
+assert.equal(report.summary.courseCount, 4);
+assert.equal(report.summary.referenceCourseCount, 6);
 assert.equal(report.summary.alertCount, 2);
 assert.equal(report.summary.leadDropCount, 2);
 assert.equal(report.summary.cplSpikeCount, 1);

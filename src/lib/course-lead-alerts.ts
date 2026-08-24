@@ -18,6 +18,8 @@ export interface CourseLeadTrendPoint {
 export interface CourseLeadSignal {
   key: string;
   course: string;
+  /** Actual paid delivery on the latest complete reporting day. */
+  hasCurrentCampaignSpend: boolean;
   status: CourseLeadSignalStatus;
   issues: CourseLeadAlertKind[];
   current: CourseLeadTrendPoint;
@@ -26,6 +28,8 @@ export interface CourseLeadSignal {
     spendPerDay: number;
     cpl: number | null;
     totalLeads: number;
+    /** Same-weekday observations where this course actually had paid delivery. */
+    activeDays: number;
   };
   leadDeltaPct: number | null;
   cplDeltaPct: number | null;
@@ -43,7 +47,10 @@ export interface CourseLeadAlertReport {
     message: string;
   };
   summary: {
+    /** Courses with paid delivery on the latest complete day. */
     courseCount: number;
+    /** Historical/reference rows retained behind the "all courses" filter. */
+    referenceCourseCount: number;
     alertCount: number;
     criticalCount: number;
     warningCount: number;
@@ -132,18 +139,24 @@ export function analyzeCourseLeadFacts(
     const baselineRaw = baselineDates.map(
       (date) => course.days.get(date) ?? { leads: 0, spend: 0 },
     );
-    const baselineLeads = baselineRaw.reduce((sum, day) => sum + day.leads, 0);
-    const baselineSpend = baselineRaw.reduce((sum, day) => sum + day.spend, 0);
-    const baselineLeadsPerDay = baselineLeads / baselineWeeks;
-    const baselineSpendPerDay = baselineSpend / baselineWeeks;
+    // A quiet week with no campaign is not evidence of expected performance.
+    // Compare only with matching weekdays on which the course actually spent.
+    const activeBaseline = baselineRaw.filter((day) => day.spend > 0);
+    const activeBaselineDays = activeBaseline.length;
+    const baselineLeads = activeBaseline.reduce((sum, day) => sum + day.leads, 0);
+    const baselineSpend = activeBaseline.reduce((sum, day) => sum + day.spend, 0);
+    const baselineLeadsPerDay = activeBaselineDays ? baselineLeads / activeBaselineDays : 0;
+    const baselineSpendPerDay = activeBaselineDays ? baselineSpend / activeBaselineDays : 0;
     const currentCpl = currentRaw.leads > 0 ? currentRaw.spend / currentRaw.leads : null;
     const baselineCpl = baselineLeads > 0 ? baselineSpend / baselineLeads : null;
     const leadDeltaPct = pctChange(currentRaw.leads, baselineLeadsPerDay);
     const cplDeltaPct =
       currentCpl !== null && baselineCpl !== null ? pctChange(currentCpl, baselineCpl) : null;
     const issues: CourseLeadAlertKind[] = [];
+    const hasCurrentCampaignSpend = currentRaw.spend > 0;
+    const hasComparableCampaignHistory = activeBaselineDays >= 3;
 
-    if (!options.suppressAlerts) {
+    if (!options.suppressAlerts && hasCurrentCampaignSpend && hasComparableCampaignHistory) {
       if (currentRaw.leads === 0 && currentRaw.spend >= 20 && baselineLeadsPerDay >= 1) {
         issues.push("spend_without_leads");
       }
@@ -200,6 +213,7 @@ export function analyzeCourseLeadFacts(
     rows.push({
       key,
       course: course.name,
+      hasCurrentCampaignSpend,
       status,
       issues,
       current: {
@@ -213,6 +227,7 @@ export function analyzeCourseLeadFacts(
         spendPerDay: baselineSpendPerDay,
         cpl: baselineCpl,
         totalLeads: baselineLeads,
+        activeDays: activeBaselineDays,
       },
       leadDeltaPct,
       cplDeltaPct,
@@ -223,6 +238,7 @@ export function analyzeCourseLeadFacts(
   rows.sort(
     (a, b) =>
       severityRank(b.status) - severityRank(a.status) ||
+      Number(b.hasCurrentCampaignSpend) - Number(a.hasCurrentCampaignSpend) ||
       (a.leadDeltaPct ?? 0) - (b.leadDeltaPct ?? 0) ||
       b.current.spend - a.current.spend ||
       a.course.localeCompare(b.course),
@@ -240,7 +256,8 @@ export function analyzeCourseLeadFacts(
       message: options.freshnessMessage ?? "",
     },
     summary: {
-      courseCount: rows.length,
+      courseCount: rows.filter((row) => row.hasCurrentCampaignSpend).length,
+      referenceCourseCount: rows.length,
       alertCount: rows.filter((row) => row.status !== "stable").length,
       criticalCount: rows.filter((row) => row.status === "critical").length,
       warningCount: rows.filter((row) => row.status === "warning").length,

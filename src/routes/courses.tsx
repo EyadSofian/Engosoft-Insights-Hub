@@ -492,8 +492,13 @@ function Courses() {
 
 function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
   const { lang } = useI18n();
-  const [showAlertsOnly, setShowAlertsOnly] = useState(false);
-  const rows = showAlertsOnly ? report.rows.filter((row) => row.status !== "stable") : report.rows;
+  const [view, setView] = useState<"campaigns" | "alerts" | "all">("campaigns");
+  const rows =
+    view === "alerts"
+      ? report.rows.filter((row) => row.status !== "stable")
+      : view === "campaigns"
+        ? report.rows.filter((row) => row.hasCurrentCampaignSpend)
+        : report.rows;
   const hasAlerts = report.summary.alertCount > 0;
 
   return (
@@ -548,11 +553,16 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                         ? "الوضع طبيعي"
                         : "Normal"}
                 </Pill>
+                <Pill tone="neutral">
+                  {lang === "ar"
+                    ? `${fmtNum(report.summary.courseCount)} دورة بصرف فعلي`
+                    : `${fmtNum(report.summary.courseCount)} spending courses`}
+                </Pill>
               </div>
               <p className="mt-1 max-w-3xl text-xs leading-5 text-text-muted">
                 {lang === "ar"
-                  ? `آخر يوم مكتمل ${fmtDate(report.anchorDate, lang)}، مقارنة بمتوسط نفس يوم الأسبوع خلال ${report.baselineWeeks} أسابيع. الإيميل وتنبيه تيليجرام يخرجان فقط عند وجود تغيّر حقيقي.`
-                  : `Latest complete day ${fmtDate(report.anchorDate, lang)}, compared with the same weekday over ${report.baselineWeeks} weeks. Email and Telegram are sent only for material changes.`}
+                  ? `آخر يوم مكتمل ${fmtDate(report.anchorDate, lang)}. نعرض افتراضيًا الدورات التي ظهر لها صرف حملات في هذا اليوم، ونقارن فقط بنفس يوم الأسبوع من الأسابيع التي كان فيها صرف فعلي خلال آخر ${report.baselineWeeks} أسابيع. يلزم 3 أيام مقارنة على الأقل لإصدار إنذار.`
+                  : `Latest complete day ${fmtDate(report.anchorDate, lang)}. The default view contains courses with campaign spend on that day and compares only matching weekdays that also had spend within the last ${report.baselineWeeks} weeks. At least 3 comparison days are required for an alert.`}
               </p>
             </div>
           </div>
@@ -563,23 +573,33 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
           >
             <button
               type="button"
-              onClick={() => setShowAlertsOnly(false)}
-              aria-pressed={!showAlertsOnly}
+              onClick={() => setView("campaigns")}
+              aria-pressed={view === "campaigns"}
               className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
-                !showAlertsOnly ? "bg-surface text-brand shadow-sm" : "text-text-muted"
+                view === "campaigns" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
               }`}
             >
-              {lang === "ar" ? "كل الدورات" : "All courses"}
+              {lang === "ar" ? "عليها صرف حملات" : "Campaign spend"}
             </button>
             <button
               type="button"
-              onClick={() => setShowAlertsOnly(true)}
-              aria-pressed={showAlertsOnly}
+              onClick={() => setView("alerts")}
+              aria-pressed={view === "alerts"}
               className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
-                showAlertsOnly ? "bg-surface text-brand shadow-sm" : "text-text-muted"
+                view === "alerts" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
               }`}
             >
               {lang === "ar" ? "الإنذارات فقط" : "Alerts only"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("all")}
+              aria-pressed={view === "all"}
+              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+                view === "all" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
+              }`}
+            >
+              {lang === "ar" ? "كل الدورات" : "All courses"}
             </button>
           </div>
         </div>
@@ -624,14 +644,22 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
         <>
           <div className="space-y-2 p-3 md:hidden">
             {rows.map((row) => (
-              <CourseLeadMobileCard key={row.key} row={row} paused={!report.freshness.ok} />
+              <CourseLeadMobileCard
+                key={row.key}
+                row={row}
+                baselineWeeks={report.baselineWeeks}
+                paused={!report.freshness.ok}
+              />
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[980px] text-start text-xs">
+            <table className="w-full min-w-[1120px] text-start text-xs">
               <thead className="bg-surface-2/75 text-[10.5px] font-semibold text-text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start">{lang === "ar" ? "الدورة" : "Course"}</th>
+                  <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "صرف اليوم" : "Day spend"}
+                  </th>
                   <th className="px-3 py-3 text-center">
                     {lang === "ar" ? "ليدز اليوم" : "Day leads"}
                   </th>
@@ -644,6 +672,9 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                     {lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
                   </th>
                   <th className="px-3 py-3 text-center">
+                    {lang === "ar" ? "أيام المقارنة" : "Comparison days"}
+                  </th>
+                  <th className="px-3 py-3 text-center">
                     {lang === "ar" ? "آخر 14 يوم" : "Last 14 days"}
                   </th>
                   <th className="px-4 py-3 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
@@ -653,6 +684,9 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                 {rows.map((row) => (
                   <tr key={row.key} className="hover:bg-surface-2/35">
                     <td className="px-4 py-3 font-semibold text-text">{row.course}</td>
+                    <td className="num px-3 py-3 text-center font-medium text-text">
+                      {fmtUSD(row.current.spend)}
+                    </td>
                     <td className="num px-3 py-3 text-center font-semibold text-text">
                       {fmtNum(row.current.leads)}
                     </td>
@@ -667,6 +701,9 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                     </td>
                     <td className="num px-3 py-3 text-center text-text-muted">
                       {fmtUSD(row.baseline.cpl)}
+                    </td>
+                    <td className="num px-3 py-3 text-center text-text-muted">
+                      {fmtNum(row.baseline.activeDays)} / {fmtNum(report.baselineWeeks)}
                     </td>
                     <td className="px-3 py-3">
                       <MiniLeadTrend row={row} />
@@ -685,13 +722,17 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
           <EmptyState
             compact
             label={
-              showAlertsOnly
+              view === "alerts"
                 ? lang === "ar"
                   ? "لا توجد إنذارات حالية"
                   : "No current alerts"
-                : lang === "ar"
-                  ? "لا توجد بيانات دورات في نافذة المتابعة"
-                  : "No course data in the monitoring window"
+                : view === "campaigns"
+                  ? lang === "ar"
+                    ? "لا توجد دورات عليها صرف حملات في آخر يوم مكتمل"
+                    : "No courses had campaign spend on the latest complete day"
+                  : lang === "ar"
+                    ? "لا توجد بيانات دورات في نافذة المتابعة"
+                    : "No course data in the monitoring window"
             }
           />
         </div>
@@ -728,7 +769,15 @@ function MonitorStat({
   );
 }
 
-function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: boolean }) {
+function CourseLeadMobileCard({
+  row,
+  baselineWeeks,
+  paused,
+}: {
+  row: CourseLeadSignal;
+  baselineWeeks: number;
+  paused: boolean;
+}) {
   const { lang } = useI18n();
   return (
     <article className="rounded-xl border border-border bg-surface-2/35 p-3">
@@ -743,6 +792,10 @@ function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: 
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <MobileMetric
+          label={lang === "ar" ? "صرف الحملات اليوم" : "Campaign spend today"}
+          value={fmtUSD(row.current.spend)}
+        />
+        <MobileMetric
           label={lang === "ar" ? "ليدز اليوم / المتوقع" : "Day / expected leads"}
           value={`${fmtNum(row.current.leads)} / ${row.baseline.leadsPerDay.toFixed(1)}`}
         />
@@ -756,6 +809,10 @@ function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: 
         <MobileMetric
           label={lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
           value={fmtUSD(row.baseline.cpl)}
+        />
+        <MobileMetric
+          label={lang === "ar" ? "أيام المقارنة" : "Comparison days"}
+          value={`${fmtNum(row.baseline.activeDays)} / ${fmtNum(baselineWeeks)}`}
         />
       </div>
       <div className="mt-3">
@@ -805,6 +862,12 @@ function CourseSignalStatus({ row, paused = false }: { row: CourseLeadSignal; pa
     return (
       <Pill tone="neutral">{lang === "ar" ? "متوقفة لحين التحديث" : "Awaiting fresh data"}</Pill>
     );
+  }
+  if (!row.hasCurrentCampaignSpend) {
+    return <Pill tone="neutral">{lang === "ar" ? "لا يوجد صرف حالي" : "No current spend"}</Pill>;
+  }
+  if (row.baseline.activeDays < 3) {
+    return <Pill tone="neutral">{lang === "ar" ? "عينة غير كافية" : "Limited history"}</Pill>;
   }
   if (row.status === "stable") {
     return <Pill tone="success">{lang === "ar" ? "طبيعي" : "Stable"}</Pill>;
