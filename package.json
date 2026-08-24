@@ -16,6 +16,7 @@
     "test:accounting-authority": "node --experimental-strip-types scripts/test-accounting-authority.mjs",
     "test:legacy-datasets": "node --experimental-strip-types scripts/test-legacy-datasets.mjs",
     "test:fx-rates": "node --experimental-strip-types scripts/test-fx-rates.mjs",
+    "test:display-currency": "node --experimental-strip-types scripts/test-display-currency.mjs",
     "test:sales-targets": "node --experimental-strip-types scripts/test-sales-targets.mjs",
     "test:course-insight": "node --experimental-strip-types scripts/test-course-insight.mjs",
     "test:archived-won": "node --experimental-strip-types scripts/test-archived-won.mjs",

@@ -36,6 +36,12 @@ import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bit
 import { TelegramPanel } from "@/components/TelegramPanel";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
+import {
+  formatDisplayMoney,
+  usdToDisplayCurrency,
+  type DisplayCurrency,
+} from "@/lib/display-currency";
+import { fxRatesFromFilters } from "@/lib/fx-rates";
 import type {
   CampaignActivity,
   DataHealth,
@@ -136,6 +142,7 @@ function Overview() {
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
   const [revenueGrain, setRevenueGrain] = useState<TrendGrain>("week");
+  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -152,6 +159,12 @@ function Overview() {
   const { totals: T, deltas, health } = data;
   const spendTrend = moneyTrend(data.trend, spendGrain, "spend");
   const revenueTrend = moneyTrend(data.trend, revenueGrain, "revenue");
+  const sarRate = fxRatesFromFilters(filters).SAR;
+  const displayPoints = (points: MoneyPoint[]) =>
+    points.map((point) => ({
+      ...point,
+      value: usdToDisplayCurrency(point.value, displayCurrency, sarRate) ?? 0,
+    }));
   const mobileAlertCount = [
     data.fetchErrors.length > 0,
     data.staleTabs?.length > 0,
@@ -495,10 +508,18 @@ function Overview() {
 
       <section>
         <SectionTitle
+          action={
+            <DisplayCurrencyToggle
+              value={displayCurrency}
+              onChange={setDisplayCurrency}
+              sarRate={sarRate}
+              lang={lang}
+            />
+          }
           hint={
             lang === "ar"
-              ? "الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع. كل شارت له اختيار يومي أو أسبوعي مستقل."
-              : "Spend follows ad date and collection follows Payment Date. Each chart has its own daily or weekly grain."
+              ? `الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع. كل شارت له اختيار يومي أو أسبوعي مستقل. عملة العرض: ${displayCurrency === "SAR" ? "الريال السعودي" : "الدولار"}.`
+              : `Spend follows ad date and collection follows Payment Date. Each chart has its own daily or weekly grain. Display currency: ${displayCurrency}.`
           }
         >
           {lang === "ar" ? "حركة الصرف والتحصيل" : "Spend and collection movement"}
@@ -507,11 +528,12 @@ function Overview() {
           <MoneyTrendCard
             title={lang === "ar" ? "معدل الصرف" : "Spend trend"}
             note={lang === "ar" ? "إجمالي إنفاق المنصات" : "Total platform spend"}
-            points={spendTrend}
+            points={displayPoints(spendTrend)}
             grain={spendGrain}
             onGrainChange={setSpendGrain}
             color="var(--chart-1)"
             icon={<CircleDollarSign size={17} />}
+            currency={displayCurrency}
             lang={lang}
           />
           <MoneyTrendCard
@@ -521,11 +543,12 @@ function Overview() {
                 ? "التحصيل الفعلي حسب Payment Date"
                 : "Actual collection by Payment Date"
             }
-            points={revenueTrend}
+            points={displayPoints(revenueTrend)}
             grain={revenueGrain}
             onGrainChange={setRevenueGrain}
             color="var(--chart-2)"
             icon={<TrendingUp size={17} />}
+            currency={displayCurrency}
             lang={lang}
           />
         </div>
@@ -534,6 +557,14 @@ function Overview() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <SectionTitle
+            action={
+              <DisplayCurrencyToggle
+                value={displayCurrency}
+                onChange={setDisplayCurrency}
+                sarRate={sarRate}
+                lang={lang}
+              />
+            }
             hint={
               lang === "ar"
                 ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف. متوسط سعر البيع = التحصيل ÷ الفواتير المدفوعة."
@@ -547,7 +578,12 @@ function Overview() {
                 : "Course contribution and average sale price"}
             </span>
           </SectionTitle>
-          <CourseContributionChart rows={data.courseSales} lang={lang} />
+          <CourseContributionChart
+            rows={data.courseSales}
+            currency={displayCurrency}
+            sarRate={sarRate}
+            lang={lang}
+          />
         </Card>
         <Card>
           <SectionTitle>{t("funnel")}</SectionTitle>
@@ -744,6 +780,7 @@ function MoneyTrendCard({
   onGrainChange,
   color,
   icon,
+  currency,
   lang,
 }: {
   title: string;
@@ -753,6 +790,7 @@ function MoneyTrendCard({
   onGrainChange: (grain: TrendGrain) => void;
   color: string;
   icon: React.ReactNode;
+  currency: DisplayCurrency;
   lang: "ar" | "en";
 }) {
   const average = points.length
@@ -779,13 +817,15 @@ function MoneyTrendCard({
         <span className="text-[10.5px] text-text-muted">
           {lang === "ar" ? `متوسط ${grain === "day" ? "يومي" : "أسبوعي"}` : `Average per ${grain}`}
         </span>
-        <strong className="num text-sm text-text">{fmtUSD(average)}</strong>
+        <strong className="num text-sm text-text">
+          {formatDisplayMoney(average, currency, lang)}
+        </strong>
       </div>
       <MultiLineChart
         data={points}
         series={[{ key: "value", name: title, color }]}
         height={270}
-        format={fmtUSD}
+        format={(value) => formatDisplayMoney(value, currency, lang)}
       />
     </Card>
   );
@@ -830,11 +870,56 @@ function GrainToggle({
   );
 }
 
+function DisplayCurrencyToggle({
+  value,
+  onChange,
+  sarRate,
+  lang,
+}: {
+  value: DisplayCurrency;
+  onChange: (currency: DisplayCurrency) => void;
+  sarRate: number;
+  lang: "ar" | "en";
+}) {
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div
+        className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5"
+        role="group"
+        aria-label={lang === "ar" ? "عملة عرض الأرقام" : "Display currency"}
+      >
+        {(["USD", "SAR"] as const).map((currency) => (
+          <button
+            key={currency}
+            type="button"
+            onClick={() => onChange(currency)}
+            className={`min-h-7 cursor-pointer rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+              value === currency
+                ? "bg-surface text-brand shadow-sm"
+                : "text-text-muted hover:text-text"
+            }`}
+            aria-pressed={value === currency}
+          >
+            {currency === "USD" ? "$ USD" : lang === "ar" ? "ر.س SAR" : "SAR"}
+          </button>
+        ))}
+      </div>
+      <span className="num whitespace-nowrap text-[9px] text-text-subtle">
+        1 USD = {sarRate.toLocaleString("en-US", { maximumFractionDigits: 4 })} SAR
+      </span>
+    </div>
+  );
+}
+
 function CourseContributionChart({
   rows,
+  currency,
+  sarRate,
   lang,
 }: {
   rows: CourseSaleContribution[];
+  currency: DisplayCurrency;
+  sarRate: number;
   lang: "ar" | "en";
 }) {
   if (!rows.length)
@@ -849,7 +934,9 @@ function CourseContributionChart({
       <div className="mb-2 grid grid-cols-[minmax(72px,0.8fr)_minmax(108px,1.5fr)_minmax(70px,0.7fr)] gap-2 px-2 text-[9.5px] font-semibold uppercase tracking-wide text-text-subtle sm:grid-cols-[minmax(100px,0.8fr)_minmax(160px,2fr)_minmax(88px,0.7fr)] sm:gap-3">
         <span>{lang === "ar" ? "الدورة" : "Course"}</span>
         <span>{lang === "ar" ? "المساهمة في المبيعات" : "Sales contribution"}</span>
-        <span className="text-end">{lang === "ar" ? "متوسط البيع" : "Average sale"}</span>
+        <span className="text-end">
+          {lang === "ar" ? "متوسط البيع" : "Average sale"} ({currency})
+        </span>
       </div>
       <div className="max-h-[390px] space-y-1.5 overflow-y-auto pe-1">
         {rows.map((row, index) => (
@@ -871,7 +958,13 @@ function CourseContributionChart({
             <div className="min-w-0">
               <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
                 <span className="num font-semibold text-brand">{fmtPct(row.contribution, 1)}</span>
-                <span className="num text-text-muted">{fmtUSD(row.revenue)}</span>
+                <span className="num text-text-muted">
+                  {formatDisplayMoney(
+                    usdToDisplayCurrency(row.revenue, currency, sarRate),
+                    currency,
+                    lang,
+                  )}
+                </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-border/70">
                 <div
@@ -882,7 +975,12 @@ function CourseContributionChart({
             </div>
             <div className="text-end">
               <div className="num text-xs font-semibold text-text">
-                {fmtUSDFull(row.averageSalePrice)}
+                {formatDisplayMoney(
+                  usdToDisplayCurrency(row.averageSalePrice, currency, sarRate),
+                  currency,
+                  lang,
+                  true,
+                )}
               </div>
               <div className="mt-0.5 text-[9px] text-text-muted">
                 {lang === "ar" ? "لكل فاتورة" : "per invoice"}
