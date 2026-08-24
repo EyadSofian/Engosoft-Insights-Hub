@@ -1036,12 +1036,14 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
 
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
 
-function phoneVariants(value: string): string[] {
+function phoneKey(value: string): string {
   const digits = value
     .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
     .replace(/\D/g, "");
-  if (digits.length < 7) return [];
-  return [...new Set([digits, digits.length >= 10 ? digits.slice(-10) : "", digits.length >= 9 ? digits.slice(-9) : ""].filter(Boolean))];
+  // Yeastar may hold +9665..., Odoo may hold 05..., and Egyptian records can
+  // similarly carry a country prefix. The subscriber's final nine digits are
+  // stable across those formats. Short extensions are never considered.
+  return digits.length >= 9 ? digits.slice(-9) : "";
 }
 
 function mergeLeadCallCoverage(
@@ -1051,11 +1053,11 @@ function mergeLeadCallCoverage(
 ) {
   const callsByPhone = new Map<string, CallsHubLeadCallAggregate[]>();
   for (const call of calls) {
-    for (const variant of phoneVariants(call.phone)) {
-      const rows = callsByPhone.get(variant) ?? [];
-      rows.push(call);
-      callsByPhone.set(variant, rows);
-    }
+    const key = phoneKey(call.phone);
+    if (!key) continue;
+    const rows = callsByPhone.get(key) ?? [];
+    rows.push(call);
+    callsByPhone.set(key, rows);
   }
   for (const row of map.values()) {
     row.distributedLeads = 0;
@@ -1080,12 +1082,10 @@ function mergeLeadCallCoverage(
     const row = map.get(key) ?? blank(key, lead.salesperson);
     row.distributedLeads += 1;
     const matches = new Map<string, CallsHubLeadCallAggregate>();
-    for (const number of [lead.phone, lead.mobile]) {
-      for (const variant of phoneVariants(number)) {
-        for (const call of callsByPhone.get(variant) ?? []) {
-          matches.set(`${call.phone}|${call.agentExtension}|${call.agentName}`, call);
-        }
-        if (matches.size) break;
+    const leadPhoneKeys = new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean));
+    for (const phone of leadPhoneKeys) {
+      for (const call of callsByPhone.get(phone) ?? []) {
+        matches.set(`${call.phone}|${call.agentExtension}|${call.agentName}`, call);
       }
     }
     if (!matches.size) {
