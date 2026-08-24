@@ -28,6 +28,7 @@ export const Route = createFileRoute("/api/employee-calls")({
               page,
               pageSize,
               playableFirst: true,
+              reviewFirst: true,
             }),
           );
         } catch (error) {

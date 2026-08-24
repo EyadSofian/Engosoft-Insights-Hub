@@ -70,6 +70,9 @@ export interface AgentAnalyticsRow {
   qualityNeedsReview: number | null;
   chatConversations: number | null;
   chatResolved: number | null;
+  chatUnreadConversations: number | null;
+  chatUnreadMessages: number | null;
+  chatAwaitingReply: number | null;
   chatAverageFirstResponseSeconds: number | null;
   chatAverageResolutionSeconds: number | null;
   chatAverageReplySeconds: number | null;
@@ -97,6 +100,23 @@ export interface AgentAnalyticsRow {
   courseProfile: AgentCourseProfile;
   /** Published quota for this window, or `null` when none is published. */
   target: AgentTarget | null;
+  performanceScore: AgentPerformanceScore;
+}
+
+export interface AgentPerformanceScore {
+  overall: number | null;
+  callQuality: number | null;
+  salesExecution: number | null;
+  chatFollowUp: number | null;
+  weights: { callQuality: 40; salesExecution: 40; chatFollowUp: 20 };
+  evidence: {
+    analyzedCalls: number;
+    leadCoverageRate: number | null;
+    leadConversionRate: number | null;
+    chatConversations: number;
+    chatAwaitingReply: number;
+    chatUnreadConversations: number;
+  };
 }
 
 export interface AgentTarget {
@@ -286,6 +306,9 @@ export interface AgentAnalyticsResult {
     leadCallCoverageRate: number | null;
     chatConversations: number | null;
     chatResolved: number | null;
+    chatUnreadConversations: number | null;
+    chatUnreadMessages: number | null;
+    chatAwaitingReply: number | null;
     chatAverageFirstResponseSeconds: number | null;
   };
   targets: TargetCoverage;
@@ -322,6 +345,7 @@ export interface AgentAnalyticsResult {
     fetchedAt: string;
     error?: string;
     metricsAvailable: boolean;
+    unassignedConversations: number | null;
   };
 }
 
@@ -526,6 +550,9 @@ const blank = (key: string, name: string): MutableAgent => ({
   qualityNeedsReview: null,
   chatConversations: null,
   chatResolved: null,
+  chatUnreadConversations: null,
+  chatUnreadMessages: null,
+  chatAwaitingReply: null,
   chatAverageFirstResponseSeconds: null,
   chatAverageResolutionSeconds: null,
   chatAverageReplySeconds: null,
@@ -543,6 +570,21 @@ const blank = (key: string, name: string): MutableAgent => ({
   slaMonths: 0,
   courseProfile: blankCourseProfile(),
   target: null,
+  performanceScore: {
+    overall: null,
+    callQuality: null,
+    salesExecution: null,
+    chatFollowUp: null,
+    weights: { callQuality: 40, salesExecution: 40, chatFollowUp: 20 },
+    evidence: {
+      analyzedCalls: 0,
+      leadCoverageRate: null,
+      leadConversionRate: null,
+      chatConversations: 0,
+      chatAwaitingReply: 0,
+      chatUnreadConversations: 0,
+    },
+  },
   firstCallWeighted: 0,
   firstCallWeight: 0,
   invoiceRefs: new Set(),
@@ -1026,12 +1068,74 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
     const row = matched?.[1] ?? blank(key, source.name);
     row.chatConversations = source.conversations;
     row.chatResolved = source.resolved;
+    row.chatUnreadConversations = source.unreadConversations;
+    row.chatUnreadMessages = source.unreadMessages;
+    row.chatAwaitingReply = source.awaitingReply;
     row.chatAverageFirstResponseSeconds = source.averageFirstResponseSeconds;
     row.chatAverageResolutionSeconds = source.averageResolutionSeconds;
     row.chatAverageReplySeconds = source.averageReplySeconds;
     row.chatwootMatched = true;
     map.set(key, row);
   }
+}
+
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
+
+/**
+ * A transparent, non-LLM employee score. Every component is a visible number
+ * on the same profile: call audits, assigned-lead execution, and unanswered
+ * Chatwoot work. Missing sources are excluded and the remaining weights are
+ * normalized instead of silently becoming zero.
+ */
+function employeePerformanceScore(row: AgentAnalyticsRow): AgentPerformanceScore {
+  const callQuality =
+    row.averageQualityScore !== null && (row.analyzedCalls ?? 0) > 0
+      ? clampPercent(row.averageQualityScore)
+      : null;
+  const salesParts: Array<{ value: number; weight: number }> = [];
+  if (row.leadCallCoverageRate !== null)
+    salesParts.push({ value: clampPercent(row.leadCallCoverageRate), weight: 60 });
+  if (row.conversionRate !== null)
+    salesParts.push({ value: clampPercent(row.conversionRate), weight: 40 });
+  const salesWeight = salesParts.reduce((sum, part) => sum + part.weight, 0);
+  const salesExecution = salesWeight
+    ? salesParts.reduce((sum, part) => sum + part.value * part.weight, 0) / salesWeight
+    : null;
+
+  const conversations = Math.max(0, row.chatConversations ?? 0);
+  const awaiting = Math.max(0, row.chatAwaitingReply ?? 0);
+  const unread = Math.max(0, row.chatUnreadConversations ?? 0);
+  const chatFollowUp = row.chatConversations === null || conversations === 0
+    ? null
+    : clampPercent(
+        70 * (1 - Math.min(1, awaiting / conversations)) +
+        30 * (1 - Math.min(1, unread / conversations)),
+      );
+
+  const components = [
+    { value: callQuality, weight: 40 },
+    { value: salesExecution, weight: 40 },
+    { value: chatFollowUp, weight: 20 },
+  ].filter((part): part is { value: number; weight: number } => part.value !== null);
+  const availableWeight = components.reduce((sum, part) => sum + part.weight, 0);
+  const overall = availableWeight
+    ? components.reduce((sum, part) => sum + part.value * part.weight, 0) / availableWeight
+    : null;
+  return {
+    overall,
+    callQuality,
+    salesExecution,
+    chatFollowUp,
+    weights: { callQuality: 40, salesExecution: 40, chatFollowUp: 20 },
+    evidence: {
+      analyzedCalls: Math.max(0, row.analyzedCalls ?? 0),
+      leadCoverageRate: row.leadCallCoverageRate,
+      leadConversionRate: row.conversionRate,
+      chatConversations: conversations,
+      chatAwaitingReply: awaiting,
+      chatUnreadConversations: unread,
+    },
+  };
 }
 
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -1363,6 +1467,7 @@ export async function buildAgentAnalytics(
     source: "Chatwoot · Agent reports",
     fetchedAt: "",
     metricsAvailable: false,
+    unassignedConversations: null,
   };
   const fallbackRange = cairoDateParts();
   const integrationFrom = filters.from || fallbackRange.monthStart;
@@ -1453,6 +1558,7 @@ export async function buildAgentAnalytics(
       source: chatSnapshot.source,
       fetchedAt: chatSnapshot.fetchedAt,
       metricsAvailable: chatSnapshot.agents.some((row) => row.conversations > 0),
+      unassignedConversations: chatSnapshot.unassignedConversations,
     };
   } catch (error) {
     chatwootStatus.error = error instanceof Error ? error.message : String(error);
@@ -1550,6 +1656,8 @@ export async function buildAgentAnalytics(
     )
     .sort((a, b) => b.paidRevenue - a.paidRevenue || b.cleanLeads - a.cleanLeads);
 
+  for (const row of agents) row.performanceScore = employeePerformanceScore(row);
+
   const summary = agents.reduce(
     (acc, row) => {
       acc.paidRevenue += row.paidRevenue;
@@ -1587,6 +1695,13 @@ export async function buildAgentAnalytics(
         acc.chatConversations = (acc.chatConversations ?? 0) + row.chatConversations;
       if (row.chatResolved !== null)
         acc.chatResolved = (acc.chatResolved ?? 0) + row.chatResolved;
+      if (row.chatUnreadConversations !== null)
+        acc.chatUnreadConversations =
+          (acc.chatUnreadConversations ?? 0) + row.chatUnreadConversations;
+      if (row.chatUnreadMessages !== null)
+        acc.chatUnreadMessages = (acc.chatUnreadMessages ?? 0) + row.chatUnreadMessages;
+      if (row.chatAwaitingReply !== null)
+        acc.chatAwaitingReply = (acc.chatAwaitingReply ?? 0) + row.chatAwaitingReply;
       return acc;
     },
     {
@@ -1624,6 +1739,9 @@ export async function buildAgentAnalytics(
       leadCallCoverageRate: null as number | null,
       chatConversations: chatwootStatus.ok ? 0 : (null as number | null),
       chatResolved: chatwootStatus.ok ? 0 : (null as number | null),
+      chatUnreadConversations: chatwootStatus.ok ? 0 : (null as number | null),
+      chatUnreadMessages: chatwootStatus.ok ? 0 : (null as number | null),
+      chatAwaitingReply: chatwootStatus.ok ? 0 : (null as number | null),
       chatAverageFirstResponseSeconds: null as number | null,
     },
   );

@@ -414,7 +414,7 @@ export function AccountingAgentsView() {
                 : "Quality data unavailable"
               : lang === "ar"
                 ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
-                : `${fmtNum(data.summary.analyzedCalls)} analyzed samples · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`
+                : `${fmtNum(data.summary.analyzedCalls)} analyzed calls · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`
           }
           icon={<CircleGauge size={18} />}
         />
@@ -442,13 +442,16 @@ export function AccountingAgentsView() {
         >
           {lang === "ar" ? "الليدز والمكالمات والشات" : "Lead distribution, calls, and chats"}
         </SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
           <MiniMetric label={lang === "ar" ? "تم الاتصال بها" : "Leads called"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "لم يتم الاتصال بها" : "Never called"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "نسبة الاتصال" : "Coverage rate"} value={fmtPct(data.summary.leadCallCoverageRate, 1)} />
           <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
+          <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
+          <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={data.summary.chatUnreadConversations === null ? "—" : fmtNum(data.summary.chatUnreadConversations)} />
+          <MiniMetric label={lang === "ar" ? "محادثات بلا موظف" : "Unassigned conversations"} value={data.chatwoot.unassignedConversations === null ? "—" : fmtNum(data.chatwoot.unassignedConversations)} />
           <MiniMetric label={lang === "ar" ? "أول رد" : "First response"} value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)} />
         </div>
         <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
@@ -849,8 +852,8 @@ function AgentCards({
                 row.analyzedCalls === null
                   ? undefined
                   : lang === "ar"
-                    ? `${fmtNum(row.analyzedCalls)} عينة محللة`
-                    : `${fmtNum(row.analyzedCalls)} analyzed samples`
+                    ? `${fmtNum(row.analyzedCalls)} مكالمة محللة`
+                    : `${fmtNum(row.analyzedCalls)} analyzed calls`
               }
             />
           </div>
@@ -1049,13 +1052,13 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                   <div className="mt-0.5 text-[10px] text-text-muted">
                     {row.analyzedCalls === null
                       ? "—"
-                      : `${fmtNum(row.analyzedCalls)} ${lang === "ar" ? "عينة" : "samples"}`}
+                      : `${fmtNum(row.analyzedCalls)} ${lang === "ar" ? "مكالمة محللة" : "analyzed calls"}`}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
                   <div className="mt-0.5 text-[10px] text-text-muted">
-                    {row.chatResolved === null ? "—" : `${fmtNum(row.chatResolved)} ${lang === "ar" ? "مغلقة" : "resolved"}`}
+                    {row.chatAwaitingReply === null ? "—" : `${fmtNum(row.chatAwaitingReply)} ${lang === "ar" ? "تنتظر ردًا" : "awaiting reply"}`} · {row.chatUnreadConversations === null ? "—" : `${fmtNum(row.chatUnreadConversations)} ${lang === "ar" ? "غير مقروءة" : "unread"}`}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end">
@@ -1213,6 +1216,34 @@ function AgentPerformanceSheet({
             />
           </div>
 
+          <section className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-brand">{lang === "ar" ? "تقييم الموظف" : "Employee score"}</div>
+                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "درجة واحدة من 3 جوانب" : "One score from 3 performance areas"}</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "جودة المكالمات 40% + متابعة الليدز والمبيعات 40% + متابعة محادثات العملاء 20%. كل رقم تحته الدليل المستخدم." : "Call quality 40% + lead and sales execution 40% + customer chat follow-up 20%. Every component shows its evidence."}</p>
+              </div>
+              <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
+                <div className="num text-3xl font-bold text-brand">{fmtQuality(row.performanceScore.overall)}</div>
+                <small className="text-[10px] text-text-muted">{lang === "ar" ? "التقييم الشامل" : "Overall score"}</small>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-surface p-3.5">
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "جودة المكالمات · 40%" : "Call quality · 40%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.analyzedCalls)} مكالمة مكتملة التحليل` : `${fmtNum(row.performanceScore.evidence.analyzedCalls)} completed call analyses`}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-3.5">
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "الليدز والمبيعات · 40%" : "Leads and sales · 40%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `تم الاتصال بـ ${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} من الليدز · نسبة البيع ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)}` : `${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} lead coverage · ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} conversion`}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-3.5">
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "متابعة المحادثات · 20%" : "Chat follow-up · 20%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.chatConversations)} محادثة · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} عميل ينتظر ردًا · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} غير مقروءة` : `${fmtNum(row.performanceScore.evidence.chatConversations)} conversations · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} awaiting reply · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} unread`}</p>
+              </div>
+            </div>
+          </section>
+
           <section className="space-y-3">
             <div>
               <div className="text-xs font-semibold text-brand">
@@ -1220,8 +1251,8 @@ function AgentPerformanceSheet({
               </div>
               <h3 className="mt-0.5 text-lg font-bold text-text">
                 {lang === "ar"
-                  ? "المكالمات والساعات وعينات الجودة"
-                  : "Calls, hours, and quality samples"}
+                  ? "المكالمات ووقت الحديث والجودة"
+                  : "Calls, talk time, and quality"}
               </h3>
               <p className="mt-1 text-[11px] text-text-muted">
                 {lang === "ar"
@@ -1243,11 +1274,11 @@ function AgentPerformanceSheet({
                 icon={<PhoneCall size={17} />}
               />
               <ProfileMetric
-                label={lang === "ar" ? "ساعات المكالمات" : "Call hours"}
+                label={lang === "ar" ? "الوقت من الاتصال إلى الإغلاق" : "Dial-to-hangup time"}
                 value={formatCallHours(row.totalCallSeconds, lang)}
                 sub={
                   lang === "ar"
-                    ? `${formatCallHours(row.talkSeconds, lang)} وقت كلام فعلي`
+                    ? `${formatCallHours(row.talkSeconds, lang)} حديث فعلي مع العملاء`
                     : `${formatCallHours(row.talkSeconds, lang)} actual talk time`
                 }
                 icon={<Clock3 size={17} />}
@@ -1267,7 +1298,7 @@ function AgentPerformanceSheet({
                       ? "التقييم غير متاح"
                       : "Quality unavailable"
                     : lang === "ar"
-                      ? `${fmtNum(row.analyzedCalls)} عينة محللة · ${fmtNum(row.qualityNeedsReview ?? 0)} للمراجعة`
+                      ? `${fmtNum(row.analyzedCalls)} مكالمة محللة · ${fmtNum(row.qualityNeedsReview ?? 0)} تحتاج مراجعة`
                       : `${fmtNum(row.analyzedCalls)} analyzed · ${fmtNum(row.qualityNeedsReview ?? 0)} to review`
                 }
                 icon={<CircleGauge size={17} />}
@@ -1278,7 +1309,7 @@ function AgentPerformanceSheet({
                 <b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز المتوزعة" : "Assigned lead coverage"}</b>
                 <Pill tone={row.leadCallCoverageRate === null ? "neutral" : row.leadCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadCallCoverageRate, 1)}</Pill>
               </div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "متوزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "تم الاتصال" : "Called"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "بدون اتصال" : "Never called"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
@@ -1291,13 +1322,15 @@ function AgentPerformanceSheet({
                 <b className="text-sm text-text">{lang === "ar" ? "أداء محادثات Chatwoot" : "Chatwoot conversation performance"}</b>
                 <Pill tone={row.chatConversations === null ? "neutral" : "success"}>{row.chatConversations === null ? (lang === "ar" ? "غير مطابق" : "Not matched") : "Connected"}</Pill>
               </div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "المحادثات" : "Conversations"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
-                <MiniMetric label={lang === "ar" ? "المغلقة" : "Resolved"} value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)} />
+                <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
+                <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={row.chatUnreadConversations === null ? "—" : fmtNum(row.chatUnreadConversations)} />
+                <MiniMetric label={lang === "ar" ? "رسائل غير مقروءة" : "Unread messages"} value={row.chatUnreadMessages === null ? "—" : fmtNum(row.chatUnreadMessages)} />
                 <MiniMetric label={lang === "ar" ? "متوسط أول رد" : "Avg. first response"} value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)} />
                 <MiniMetric label={lang === "ar" ? "متوسط الرد" : "Avg. reply"} value={formatCallDuration(row.chatAverageReplySeconds, lang)} />
-                <MiniMetric label={lang === "ar" ? "متوسط الإغلاق" : "Avg. resolution"} value={formatCallDuration(row.chatAverageResolutionSeconds, lang)} />
               </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "حالة Open أو Snoozed أو Resolved لا تخصم وحدها. الذي يهم: هل آخر رسالة من العميل وما زال ينتظر رد الموظف، وهل توجد رسائل غير مقروءة." : "Open, Snoozed, or Resolved does not affect the score by itself. What matters is whether the customer's message is still awaiting an agent reply and whether messages are unread."}</p>
             </div>
             <EmployeeCallsPanel row={row} />
           </section>
@@ -1337,7 +1370,7 @@ function AgentPerformanceSheet({
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {/* Each card carries money *and* cohort, because the row is read
                   left to right as one comparison. Showing revenue on two cards
                   and a bare percentage on the others is what let a $0 course sit
@@ -1682,6 +1715,7 @@ type CallDetailResponse = {
     text: string;
     confidence?: number;
     language?: string;
+    suspect_terms?: string[];
   }>;
   selection?: {
     selected?: boolean;
@@ -1699,8 +1733,8 @@ function EmployeeCallsPanel({ row }: { row: AgentRow }) {
     return (
       <Notice tone="warning" title={lang === "ar" ? "امتداد الموظف غير مطابق" : "Employee extension not matched"}>
         {lang === "ar"
-          ? "اسم الموظف موجود في Odoo لكن مش مطابق لاسم أي Extension نشط في Calls Hub. بعد توحيد الاسم هتظهر سجلاته وعيناته هنا تلقائيًا."
-          : "The employee exists in Odoo but does not match an active Calls Hub extension. Once the names are aligned, records and samples will appear automatically."}
+          ? "اسم الموظف موجود في Odoo لكن مش مطابق لاسم أي Extension نشط في Calls Hub. بعد توحيد الاسم هتظهر سجلاته وتحليلات مكالماته هنا تلقائيًا."
+          : "The employee exists in Odoo but does not match an active Calls Hub extension. Once the names are aligned, records and call analyses will appear automatically."}
       </Notice>
     );
   }
@@ -1729,17 +1763,23 @@ function EmployeeCallsList({
   const { data, isLoading, error, refetch } = useApi<CallsHubEmployeeCalls>(
     `/api/employee-calls?extension=${encodeURIComponent(row.callExtension || "")}&page_size=20`,
   );
+  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < 70) ?? [];
+  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= 70) ?? [];
+  const callGroups = [
+    { key: "review", label: lang === "ar" ? "مكالمات تحتاج مراجعة" : "Calls needing review", calls: reviewCalls, warning: true },
+    { key: "remaining", label: lang === "ar" ? "باقي المكالمات" : "Remaining calls", calls: remainingCalls, warning: false },
+  ].filter((group) => group.calls.length > 0);
   return (
     <Card padded={false}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
         <div>
           <SectionTitle className="mb-0">
-            {lang === "ar" ? "سجلات المكالمات وعينات التقييم" : "Call records and quality samples"}
+            {lang === "ar" ? "كل مكالمات الموظف وتقييمها" : "All employee calls and scores"}
           </SectionTitle>
           <p className="mt-1 text-[11px] text-text-muted">
             {lang === "ar"
-              ? "اضغط على أي مكالمة لعرض التسجيل، النص المصحح، ومعايير الخصم بالأدلة. التسجيلات القابلة للتشغيل والعينات المحللة تظهر أولًا."
-              : "Open any call to review its recording, corrected transcript, and evidence-backed deductions. Playable and analyzed samples appear first."}
+              ? "المكالمات الأقل من 70 تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله."
+              : "Calls below 70 appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction."}
           </p>
         </div>
         {data && (
@@ -1757,34 +1797,42 @@ function EmployeeCallsList({
           {lang === "ar" ? "لا توجد مكالمات لهذا الموظف في الفترة المختارة." : "No calls for this employee in the selected period."}
         </div>
       ) : (
-        <div className="divide-y divide-border">
-          {data.calls.map((call) => {
-            const open = selectedCallId === call.id;
-            return (
-              <article key={call.id} className="bg-surface transition-colors hover:bg-surface-2/55">
-                <button
-                  type="button"
-                  onClick={() => onSelect(open ? null : call.id)}
-                  className="grid w-full gap-3 p-4 text-start sm:grid-cols-[minmax(180px,1.3fr)_minmax(140px,1fr)_110px_100px_28px] sm:items-center"
-                >
-                  <span className="min-w-0">
-                    <b className="block truncate text-sm text-text">{call.customerNumber || "—"}</b>
-                    <small className="mt-0.5 block text-[11px] text-text-muted">
-                      {formatCallDate(call.startedAt, lang)} · {call.callType === "inbound" ? (lang === "ar" ? "واردة" : "Inbound") : (lang === "ar" ? "صادرة" : "Outbound")}
-                    </small>
-                  </span>
-                  <span className="min-w-0">
-                    <b className="block truncate text-xs text-text">{call.intent || (lang === "ar" ? "غير مصنفة" : "Unclassified")}</b>
-                    <small className="mt-0.5 block truncate text-[11px] text-text-muted">{call.summary || call.recordingState}</small>
-                  </span>
-                  <span className="num text-xs font-semibold text-text">{formatCallDuration(call.durationSeconds, lang)}</span>
-                  <span><Pill tone={qualityTone(call.qualityScore)}>{fmtQuality(call.qualityScore)}</Pill></span>
-                  <ChevronDown size={17} className={`text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
-                </button>
-                {open && <EmployeeCallDetail call={call} lang={lang} />}
-              </article>
-            );
-          })}
+        <div>
+          {callGroups.map((group) => <section key={group.key} className={group.key === "remaining" ? "border-t-8 border-surface-2" : ""}>
+            <div className={`flex items-center justify-between border-b px-4 py-3 ${group.warning ? "border-danger/15 bg-danger/5" : "border-border bg-surface-2/60"}`}>
+              <b className={`text-xs ${group.warning ? "text-danger" : "text-text"}`}>{group.label}</b>
+              <Pill tone={group.warning ? "danger" : "neutral"}>{fmtNum(group.calls.length)}</Pill>
+            </div>
+            <div className="divide-y divide-border">
+              {group.calls.map((call) => {
+                const open = selectedCallId === call.id;
+                return (
+                  <article key={call.id} className="bg-surface transition-colors hover:bg-surface-2/55">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(open ? null : call.id)}
+                      className="grid w-full gap-3 p-4 text-start sm:grid-cols-[minmax(180px,1.3fr)_minmax(140px,1fr)_110px_100px_28px] sm:items-center"
+                    >
+                      <span className="min-w-0">
+                        <b className="block truncate text-sm text-text">{call.customerNumber || "—"}</b>
+                        <small className="mt-0.5 block text-[11px] text-text-muted">
+                          {formatCallDate(call.startedAt, lang)} · {call.callType === "inbound" ? (lang === "ar" ? "واردة" : "Inbound") : (lang === "ar" ? "صادرة" : "Outbound")}
+                        </small>
+                      </span>
+                      <span className="min-w-0">
+                        <b className="block truncate text-xs text-text">{call.intent || (lang === "ar" ? "غير مصنفة" : "Unclassified")}</b>
+                        <small className="mt-0.5 block truncate text-[11px] text-text-muted">{call.summary || call.recordingState}</small>
+                      </span>
+                      <span className="num text-xs font-semibold text-text">{formatCallDuration(call.durationSeconds, lang)}</span>
+                      <span><Pill tone={qualityTone(call.qualityScore)}>{fmtQuality(call.qualityScore)}</Pill></span>
+                      <ChevronDown size={17} className={`text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+                    </button>
+                    {open && <EmployeeCallDetail call={call} lang={lang} />}
+                  </article>
+                );
+              })}
+            </div>
+          </section>)}
         </div>
       )}
     </Card>
@@ -1866,21 +1914,23 @@ function EmployeeCallDetail({ call, lang }: { call: CallsHubCall; lang: "ar" | "
           <span className="text-[10px] text-text-muted">Deepgram Nova-3 · Arabic dialect-aware correction</span>
         </div>
         {data.transcript.length ? (
-          <div className="max-h-80 space-y-2 overflow-y-auto pe-1">
-            {data.transcript.map((segment) => (
-              <div key={segment.id} className="grid grid-cols-[76px_1fr] gap-3 rounded-xl bg-surface-2 p-3">
-                <span className="text-[10px] font-semibold text-brand">{segment.speaker_role === "agent" ? (lang === "ar" ? "الموظف" : "Agent") : (lang === "ar" ? "العميل" : "Customer")}<small className="num mt-1 block font-normal text-text-muted">{formatTranscriptTime(segment.start_seconds || 0)}</small></span>
-                <p className="text-xs leading-relaxed text-text">{segment.text}</p>
-              </div>
-            ))}
+          <div className="max-h-80 overflow-y-auto rounded-xl border border-border bg-surface-2/60 p-4 pe-3">
+            <p className="text-sm leading-[2.1] text-text" dir="auto">
+              {data.transcript.map((segment, index) => {
+                const agent = segment.speaker_role === "agent";
+                const lowConfidence = typeof segment.confidence === "number" && (segment.confidence <= 1 ? segment.confidence < 0.6 : segment.confidence < 60);
+                return <span key={segment.id}>{index > 0 && " "}<b className="me-1 text-[10px] text-brand">{agent ? (lang === "ar" ? "الموظف:" : "Agent:") : (lang === "ar" ? "العميل:" : "Customer:")}</b>{lowConfidence && !(segment.suspect_terms?.length) ? <mark className="rounded bg-warning-soft px-1 text-text" title={lang === "ar" ? "مقطع مشتبه به ولا يعتمد عليه في الخصم" : "Suspect segment excluded from deductions"}>{segment.text}</mark> : highlightSuspectText(segment.text, segment.suspect_terms ?? [], lang)}</span>;
+              })}
+            </p>
+            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[10px] text-text-muted"><span className="h-2.5 w-2.5 rounded-sm bg-warning-soft" />{lang === "ar" ? "الكلام المظلل مشتبه به ولا يستخدم كدليل خصم." : "Highlighted text is uncertain and is never used as deduction evidence."}</div>
           </div>
         ) : (
-          <p className="text-xs text-text-muted">{lang === "ar" ? "النص لسه قيد المعالجة أو المكالمة خارج عينة التحليل." : "The transcript is still processing or this call is outside the selected sample."}</p>
+          <p className="text-xs text-text-muted">{lang === "ar" ? "النص ما زال قيد المعالجة أو لا يوجد تسجيل صالح للمكالمة." : "The transcript is still processing or this call has no eligible recording."}</p>
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] text-text-muted">
         <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={13} className="text-success" />{lang === "ar" ? "الحسابات تتم برمجيًا بعد استخراج الأدلة؛ الموديل لا يحدد الدرجة بنفسه." : "The model extracts evidence; deterministic code calculates the score."}</span>
-        <a href="https://web-production-c7b78.up.railway.app/#archive" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح Calls Hub" : "Open Calls Hub"}<ExternalLink size={12} /></a>
+        <span className="flex flex-wrap items-center gap-3"><a href={`https://web-production-c7b78.up.railway.app/?call=${encodeURIComponent(call.id)}#archive`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح نفس المكالمة في Calls Hub" : "Open this call in Calls Hub"}<ExternalLink size={12} /></a><a href="https://engosoft-pbx.ras.yeastar.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح Yeastar" : "Open Yeastar"}<ExternalLink size={12} /></a></span>
       </div>
     </div>
   );
@@ -2456,7 +2506,7 @@ function formatCallHours(seconds: number | null, lang: "ar" | "en"): string {
   const totalMinutes = Math.max(0, Math.round(seconds / 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (lang === "ar") return hours > 0 ? `${fmtNum(hours)} س ${fmtNum(minutes)} د` : `${fmtNum(minutes)} د`;
+  if (lang === "ar") return hours > 0 ? `${fmtNum(hours)} ساعة و${fmtNum(minutes)} دقيقة` : `${fmtNum(minutes)} دقيقة`;
   return hours > 0 ? `${fmtNum(hours)}h ${fmtNum(minutes)}m` : `${fmtNum(minutes)}m`;
 }
 
@@ -2469,12 +2519,23 @@ function formatCallDuration(seconds: number | null, lang: "ar" | "en"): string {
   if (hours > 0) {
     const minuteRemainder = Math.floor((total % 3600) / 60);
     return lang === "ar"
-      ? `${fmtNum(hours)} س ${fmtNum(minuteRemainder)} د`
+      ? `${fmtNum(hours)} ساعة و${fmtNum(minuteRemainder)} دقيقة`
       : `${fmtNum(hours)}h ${fmtNum(minuteRemainder)}m`;
   }
   return lang === "ar"
-    ? `${fmtNum(minutes)} د ${fmtNum(remainder)} ث`
+    ? `${fmtNum(minutes)} دقيقة و${fmtNum(remainder)} ثانية`
     : `${fmtNum(minutes)}m ${fmtNum(remainder)}s`;
+}
+
+function highlightSuspectText(text: string, terms: string[], lang: "ar" | "en"): ReactNode {
+  const cleaned = [...new Set(terms.map((term) => term.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!cleaned.length) return text;
+  const escaped = cleaned.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const expression = new RegExp(`(${escaped.join("|")})`, "giu");
+  const suspect = new Set(cleaned.map((term) => term.toLocaleLowerCase("ar")));
+  return text.split(expression).map((part, index) => suspect.has(part.toLocaleLowerCase("ar"))
+    ? <mark key={`${part}-${index}`} className="rounded bg-warning-soft px-1 text-text" title={lang === "ar" ? "كلمة مشتبه بها ولا تستخدم كدليل خصم" : "Suspect word excluded from deductions"}>{part}</mark>
+    : part);
 }
 
 function fmtQuality(value: number | null): string {
@@ -2500,11 +2561,6 @@ function formatCallDate(value: string, lang: "ar" | "en"): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatTranscriptTime(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export function monthLabel(month: string, lang: "ar" | "en"): string {

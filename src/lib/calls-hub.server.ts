@@ -211,6 +211,7 @@ export async function getCallsHubEmployeeCalls(input: {
   page?: number;
   pageSize?: number;
   playableFirst?: boolean;
+  reviewFirst?: boolean;
 }): Promise<CallsHubEmployeeCalls> {
   if (!/^\d{1,16}$/.test(input.extension)) throw new Error("Invalid employee extension");
   const page = Math.max(1, Math.min(100_000, Math.trunc(input.page || 1)));
@@ -224,6 +225,7 @@ export async function getCallsHubEmployeeCalls(input: {
   url.searchParams.set("page", String(page));
   url.searchParams.set("page_size", String(pageSize));
   if (input.playableFirst) url.searchParams.set("playable_first", "true");
+  if (input.reviewFirst) url.searchParams.set("review_first", "true");
   const body = (await fetchJson(url)) as Record<string, unknown>;
   const employee = (body.employee || {}) as Record<string, unknown>;
   const rawCalls = Array.isArray(body.calls) ? body.calls : [];
