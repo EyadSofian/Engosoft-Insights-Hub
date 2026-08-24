@@ -20,6 +20,7 @@ const reason = (row) => {
 const rows = alerts.map((row) => \`<tr>
   <td style="padding:12px;border-bottom:1px solid #e5eaf2;font-weight:700">\${escapeHtml(row.course)}</td>
   <td style="padding:12px;border-bottom:1px solid #e5eaf2;text-align:center">\${row.current.leads}</td>
+  <td style="padding:12px;border-bottom:1px solid #e5eaf2;text-align:center">\${row.baseline.totalLeads}</td>
   <td style="padding:12px;border-bottom:1px solid #e5eaf2;text-align:center">\${Number(row.baseline.leadsPerDay).toFixed(1)}</td>
   <td style="padding:12px;border-bottom:1px solid #e5eaf2;text-align:center;color:#b42318;font-weight:700">\${row.leadDeltaPct == null ? '—' : Number(row.leadDeltaPct).toFixed(0) + '%'}</td>
   <td style="padding:12px;border-bottom:1px solid #e5eaf2;text-align:center">\${money(row.current.cpl)}</td>
@@ -30,17 +31,17 @@ const html = \`<!doctype html><html dir="rtl" lang="ar"><body style="margin:0;ba
     <div style="padding:22px 24px;background:#102f5c;color:#fff">
       <div style="font-size:13px;opacity:.75">ENGOSOFT INSIGHTS</div>
       <h1 style="margin:7px 0 4px;font-size:24px">تنبيه تغيّر أداء الدورات</h1>
-      <div style="font-size:14px;opacity:.86">يوم \${escapeHtml(report.anchorDate)} · مقارنة بنفس يوم الأسبوع خلال \${report.baselineWeeks} أسابيع</div>
+      <div style="font-size:14px;opacity:.86">يوم \${escapeHtml(report.anchorDate)} · متوسط \${escapeHtml(report.comparisonPeriod.from)} إلى \${escapeHtml(report.comparisonPeriod.to)} (\${report.comparisonPeriod.days} يوم)</div>
     </div>
     <div style="padding:20px 24px">
       <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:#fff1f0;color:#b42318;font-weight:700">\${alerts.length} دورة تحتاج مراجعة</div>
       <table style="width:100%;border-collapse:collapse;margin-top:18px;font-size:13px">
         <thead><tr style="background:#f2f5fa;color:#52647d">
-          <th style="padding:11px;text-align:right">الدورة</th><th style="padding:11px">ليدز اليوم</th><th style="padding:11px">المتوقع</th><th style="padding:11px">التغيّر</th><th style="padding:11px">CPL</th><th style="padding:11px;text-align:right">سبب التنبيه</th>
+          <th style="padding:11px;text-align:right">الدورة</th><th style="padding:11px">ليدز اليوم</th><th style="padding:11px">ليدز الفترة</th><th style="padding:11px">المتوسط اليومي</th><th style="padding:11px">التغيّر</th><th style="padding:11px">CPL</th><th style="padding:11px;text-align:right">سبب التنبيه</th>
         </tr></thead><tbody>\${rows}</tbody>
       </table>
       <a href="${APP_URL}/courses#daily-lead-monitor" style="display:inline-block;margin-top:20px;padding:11px 18px;border-radius:10px;background:#1762aa;color:#fff;text-decoration:none;font-weight:700">فتح التفاصيل في الداشبورد</a>
-      <p style="margin:18px 0 0;color:#6b7c93;font-size:12px;line-height:1.8">لا يتم الإرسال عند التغيّرات الصغيرة أو عند تأخر أحد مصادر البيانات. الحد الأدنى: متوسط 3 ليدز يوميًا لهبوط الحجم، وارتفاع CPL بنسبة 30% على الأقل مع حجم عينة كافٍ.</p>
+      <p style="margin:18px 0 0;color:#6b7c93;font-size:12px;line-height:1.8">المتوسط اليومي = إجمالي ليدز الدورة في الفترة ÷ عدد أيامها. لا يتم الإرسال عند التغيّرات الصغيرة أو عند تأخر أحد مصادر البيانات. الحد الأدنى: متوسط 3 ليدز يوميًا لهبوط الحجم، وارتفاع CPL بنسبة 30% على الأقل مع حجم عينة كافٍ.</p>
     </div>
   </div>
 </body></html>\`;
@@ -208,7 +209,7 @@ const workflow = {
         width: 760,
         height: 210,
         content:
-          "## Course lead anomaly monitor\n- Runs at 10:00 Africa/Cairo after the previous day is complete.\n- Compares each course with the same weekday across 8 prior weeks.\n- Alerts only for a material lead drop, a CPL increase of at least 30%, or spend with zero leads.\n- Stale cross-source data pauses alerts instead of producing false accusations.\n- Dashboard API is the single source for the UI, email, and Telegram notification.",
+          "## Course lead anomaly monitor\n- Runs at 10:00 Africa/Cairo after the previous day is complete.\n- Compares each course with its month-to-date daily average (or the date range selected in the dashboard).\n- Alerts only for a material lead drop, a CPL increase of at least 30%, or spend with zero leads.\n- Stale cross-source data pauses alerts instead of producing false accusations.\n- Dashboard API is the single source for the UI, email, and Telegram notification.",
       },
     },
   ],

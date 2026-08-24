@@ -28,8 +28,8 @@ export interface CourseLeadSignal {
     spendPerDay: number;
     cpl: number | null;
     totalLeads: number;
-    /** Same-weekday observations where this course actually had paid delivery. */
-    activeDays: number;
+    /** Calendar-day denominator used by the selected-period daily average. */
+    periodDays: number;
   };
   leadDeltaPct: number | null;
   cplDeltaPct: number | null;
@@ -41,6 +41,12 @@ export interface CourseLeadAlertReport {
   anchorDate: string;
   baselineWeeks: number;
   baselineDates: string[];
+  comparisonPeriod: {
+    from: string;
+    to: string;
+    days: number;
+    mode: "selected_period_average";
+  };
   freshness: {
     ok: boolean;
     ageDays: number;
@@ -73,6 +79,13 @@ function safeNumber(value: number): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function inclusiveDayCount(from: string, to: string): number {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+  return Math.floor((end - start) / DAY_MS) + 1;
+}
+
 function pctChange(current: number, baseline: number): number | null {
   return baseline > 0 && Number.isFinite(current / baseline)
     ? ((current - baseline) / baseline) * 100
@@ -87,11 +100,7 @@ function severityRank(status: CourseLeadSignalStatus): number {
   return status === "critical" ? 2 : status === "warning" ? 1 : 0;
 }
 
-/**
- * Detects operational course changes against the same weekday in prior weeks.
- * Comparing Thursday with earlier Thursdays prevents the weekend pattern from
- * being misreported as a sudden performance failure.
- */
+/** Detects operational course changes against the selected-period daily average. */
 export function analyzeCourseLeadFacts(
   facts: CourseDailyFact[],
   options: {
@@ -102,6 +111,8 @@ export function analyzeCourseLeadFacts(
     freshnessAgeDays?: number;
     freshnessMessage?: string;
     suppressAlerts?: boolean;
+    comparisonFrom?: string;
+    comparisonTo?: string;
   },
 ): CourseLeadAlertReport {
   const baselineWeeks = Math.max(4, Math.min(12, options.baselineWeeks ?? 8));
@@ -112,6 +123,9 @@ export function analyzeCourseLeadFacts(
   const trendDates = Array.from({ length: trendDays }, (_, index) =>
     shiftDay(options.anchorDate, index - trendDays + 1),
   );
+  const comparisonFrom = options.comparisonFrom || `${options.anchorDate.slice(0, 7)}-01`;
+  const comparisonTo = options.comparisonTo || options.anchorDate;
+  const comparisonDays = inclusiveDayCount(comparisonFrom, comparisonTo);
   const relevantDates = new Set([options.anchorDate, ...baselineDates, ...trendDates]);
   const byCourse = new Map<
     string,
@@ -121,7 +135,8 @@ export function analyzeCourseLeadFacts(
   for (const fact of facts) {
     const name = fact.course.trim();
     const key = courseKey(name);
-    if (!name || !key || !relevantDates.has(fact.date)) continue;
+    const insideComparison = fact.date >= comparisonFrom && fact.date <= comparisonTo;
+    if (!name || !key || (!relevantDates.has(fact.date) && !insideComparison)) continue;
     let course = byCourse.get(key);
     if (!course) {
       course = { name, days: new Map() };
@@ -136,17 +151,13 @@ export function analyzeCourseLeadFacts(
   const rows: CourseLeadSignal[] = [];
   for (const [key, course] of byCourse) {
     const currentRaw = course.days.get(options.anchorDate) ?? { leads: 0, spend: 0 };
-    const baselineRaw = baselineDates.map(
-      (date) => course.days.get(date) ?? { leads: 0, spend: 0 },
-    );
-    // A quiet week with no campaign is not evidence of expected performance.
-    // Compare only with matching weekdays on which the course actually spent.
-    const activeBaseline = baselineRaw.filter((day) => day.spend > 0);
-    const activeBaselineDays = activeBaseline.length;
-    const baselineLeads = activeBaseline.reduce((sum, day) => sum + day.leads, 0);
-    const baselineSpend = activeBaseline.reduce((sum, day) => sum + day.spend, 0);
-    const baselineLeadsPerDay = activeBaselineDays ? baselineLeads / activeBaselineDays : 0;
-    const baselineSpendPerDay = activeBaselineDays ? baselineSpend / activeBaselineDays : 0;
+    const comparisonRows = [...course.days.entries()]
+      .filter(([date]) => date >= comparisonFrom && date <= comparisonTo)
+      .map(([, day]) => day);
+    const baselineLeads = comparisonRows.reduce((sum, day) => sum + day.leads, 0);
+    const baselineSpend = comparisonRows.reduce((sum, day) => sum + day.spend, 0);
+    const baselineLeadsPerDay = comparisonDays ? baselineLeads / comparisonDays : 0;
+    const baselineSpendPerDay = comparisonDays ? baselineSpend / comparisonDays : 0;
     const currentCpl = currentRaw.leads > 0 ? currentRaw.spend / currentRaw.leads : null;
     const baselineCpl = baselineLeads > 0 ? baselineSpend / baselineLeads : null;
     const leadDeltaPct = pctChange(currentRaw.leads, baselineLeadsPerDay);
@@ -154,9 +165,9 @@ export function analyzeCourseLeadFacts(
       currentCpl !== null && baselineCpl !== null ? pctChange(currentCpl, baselineCpl) : null;
     const issues: CourseLeadAlertKind[] = [];
     const hasCurrentCampaignSpend = currentRaw.spend > 0;
-    const hasComparableCampaignHistory = activeBaselineDays >= 3;
+    const hasComparablePeriod = comparisonDays >= 3;
 
-    if (!options.suppressAlerts && hasCurrentCampaignSpend && hasComparableCampaignHistory) {
+    if (!options.suppressAlerts && hasCurrentCampaignSpend && hasComparablePeriod) {
       if (currentRaw.leads === 0 && currentRaw.spend >= 20 && baselineLeadsPerDay >= 1) {
         issues.push("spend_without_leads");
       }
@@ -227,7 +238,7 @@ export function analyzeCourseLeadFacts(
         spendPerDay: baselineSpendPerDay,
         cpl: baselineCpl,
         totalLeads: baselineLeads,
-        activeDays: activeBaselineDays,
+        periodDays: comparisonDays,
       },
       leadDeltaPct,
       cplDeltaPct,
@@ -250,6 +261,12 @@ export function analyzeCourseLeadFacts(
     anchorDate: options.anchorDate,
     baselineWeeks,
     baselineDates,
+    comparisonPeriod: {
+      from: comparisonFrom,
+      to: comparisonTo,
+      days: comparisonDays,
+      mode: "selected_period_average",
+    },
     freshness: {
       ok: !options.suppressAlerts,
       ageDays: freshnessAgeDays,

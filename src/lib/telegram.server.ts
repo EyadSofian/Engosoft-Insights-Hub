@@ -245,7 +245,9 @@ export async function buildCourseAlertMessage(
   const alerts = current.rows.filter((row) => row.status !== "stable");
   const lines: string[] = [
     `🚨 *${esc("تنبيه تغيّر أداء الدورات")}*`,
-    esc(`يوم ${current.anchorDate} · مقارنة بنفس يوم الأسبوع خلال ${current.baselineWeeks} أسابيع`),
+    esc(
+      `يوم ${current.anchorDate} · مقارنة بمتوسط ${current.comparisonPeriod.from} إلى ${current.comparisonPeriod.to} (${current.comparisonPeriod.days} يوم)`,
+    ),
     "",
   ];
 

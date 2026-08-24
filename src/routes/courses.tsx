@@ -558,11 +558,16 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                     ? `${fmtNum(report.summary.courseCount)} دورة بصرف فعلي`
                     : `${fmtNum(report.summary.courseCount)} spending courses`}
                 </Pill>
+                <Pill tone="neutral">
+                  {lang === "ar"
+                    ? `الأساس: ${fmtDate(report.comparisonPeriod.from, lang)} — ${fmtDate(report.comparisonPeriod.to, lang)} · ${fmtNum(report.comparisonPeriod.days)} يوم`
+                    : `Basis: ${fmtDate(report.comparisonPeriod.from, lang)} — ${fmtDate(report.comparisonPeriod.to, lang)} · ${fmtNum(report.comparisonPeriod.days)} days`}
+                </Pill>
               </div>
               <p className="mt-1 max-w-3xl text-xs leading-5 text-text-muted">
                 {lang === "ar"
-                  ? `آخر يوم مكتمل ${fmtDate(report.anchorDate, lang)}. نعرض افتراضيًا الدورات التي ظهر لها صرف حملات في هذا اليوم، ونقارن فقط بنفس يوم الأسبوع من الأسابيع التي كان فيها صرف فعلي خلال آخر ${report.baselineWeeks} أسابيع. يلزم 3 أيام مقارنة على الأقل لإصدار إنذار.`
-                  : `Latest complete day ${fmtDate(report.anchorDate, lang)}. The default view contains courses with campaign spend on that day and compares only matching weekdays that also had spend within the last ${report.baselineWeeks} weeks. At least 3 comparison days are required for an alert.`}
+                  ? `ليدز اليوم تخص آخر يوم مكتمل ${fmtDate(report.anchorDate, lang)}. المتوسط المتوقع = إجمالي ليدز الدورة في الفترة المختارة ÷ ${fmtNum(report.comparisonPeriod.days)} يوم، وهو نفس أساس أرقام الدورات في الصفحة. نعرض افتراضيًا الدورات التي ظهر لها صرف حملات في يوم القياس.`
+                  : `Day leads are for the latest complete day, ${fmtDate(report.anchorDate, lang)}. Expected leads = the course's total leads in the selected period ÷ ${fmtNum(report.comparisonPeriod.days)} calendar days, matching the course totals on this page. The default view shows courses with campaign spend on the measured day.`}
               </p>
             </div>
           </div>
@@ -644,12 +649,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
         <>
           <div className="space-y-2 p-3 md:hidden">
             {rows.map((row) => (
-              <CourseLeadMobileCard
-                key={row.key}
-                row={row}
-                baselineWeeks={report.baselineWeeks}
-                paused={!report.freshness.ok}
-              />
+              <CourseLeadMobileCard key={row.key} row={row} paused={!report.freshness.ok} />
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
@@ -664,15 +664,15 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                     {lang === "ar" ? "ليدز اليوم" : "Day leads"}
                   </th>
                   <th className="px-3 py-3 text-center">
-                    {lang === "ar" ? "المتوقع" : "Expected"}
+                    {lang === "ar" ? "متوسط الفترة" : "Period average"}
                   </th>
                   <th className="px-3 py-3 text-center">{lang === "ar" ? "التغيّر" : "Change"}</th>
                   <th className="px-3 py-3 text-center">CPL</th>
                   <th className="px-3 py-3 text-center">
-                    {lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
+                    {lang === "ar" ? "CPL الفترة" : "Period CPL"}
                   </th>
                   <th className="px-3 py-3 text-center">
-                    {lang === "ar" ? "أيام المقارنة" : "Comparison days"}
+                    {lang === "ar" ? "ليدز الفترة" : "Period leads"}
                   </th>
                   <th className="px-3 py-3 text-center">
                     {lang === "ar" ? "آخر 14 يوم" : "Last 14 days"}
@@ -703,7 +703,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
                       {fmtUSD(row.baseline.cpl)}
                     </td>
                     <td className="num px-3 py-3 text-center text-text-muted">
-                      {fmtNum(row.baseline.activeDays)} / {fmtNum(report.baselineWeeks)}
+                      {fmtNum(row.baseline.totalLeads)}
                     </td>
                     <td className="px-3 py-3">
                       <MiniLeadTrend row={row} />
@@ -769,15 +769,7 @@ function MonitorStat({
   );
 }
 
-function CourseLeadMobileCard({
-  row,
-  baselineWeeks,
-  paused,
-}: {
-  row: CourseLeadSignal;
-  baselineWeeks: number;
-  paused: boolean;
-}) {
+function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: boolean }) {
   const { lang } = useI18n();
   return (
     <article className="rounded-xl border border-border bg-surface-2/35 p-3">
@@ -785,7 +777,7 @@ function CourseLeadMobileCard({
         <div>
           <h3 className="text-sm font-semibold text-text">{row.course}</h3>
           <p className="mt-0.5 text-[10.5px] text-text-muted">
-            {lang === "ar" ? "مقارنة بنفس يوم الأسبوع" : "Compared with the same weekday"}
+            {lang === "ar" ? "مقارنة بمتوسط الفترة المختارة" : "Compared with period average"}
           </p>
         </div>
         <CourseSignalStatus row={row} paused={paused} />
@@ -796,7 +788,7 @@ function CourseLeadMobileCard({
           value={fmtUSD(row.current.spend)}
         />
         <MobileMetric
-          label={lang === "ar" ? "ليدز اليوم / المتوقع" : "Day / expected leads"}
+          label={lang === "ar" ? "ليدز اليوم / متوسط الفترة" : "Day / period average"}
           value={`${fmtNum(row.current.leads)} / ${row.baseline.leadsPerDay.toFixed(1)}`}
         />
         <div>
@@ -807,12 +799,12 @@ function CourseLeadMobileCard({
         </div>
         <MobileMetric label="CPL" value={fmtUSD(row.current.cpl)} />
         <MobileMetric
-          label={lang === "ar" ? "CPL المعتاد" : "Expected CPL"}
+          label={lang === "ar" ? "CPL الفترة" : "Period CPL"}
           value={fmtUSD(row.baseline.cpl)}
         />
         <MobileMetric
-          label={lang === "ar" ? "أيام المقارنة" : "Comparison days"}
-          value={`${fmtNum(row.baseline.activeDays)} / ${fmtNum(baselineWeeks)}`}
+          label={lang === "ar" ? "إجمالي ليدز الفترة" : "Period leads"}
+          value={fmtNum(row.baseline.totalLeads)}
         />
       </div>
       <div className="mt-3">
@@ -866,7 +858,7 @@ function CourseSignalStatus({ row, paused = false }: { row: CourseLeadSignal; pa
   if (!row.hasCurrentCampaignSpend) {
     return <Pill tone="neutral">{lang === "ar" ? "لا يوجد صرف حالي" : "No current spend"}</Pill>;
   }
-  if (row.baseline.activeDays < 3) {
+  if (row.baseline.periodDays < 3) {
     return <Pill tone="neutral">{lang === "ar" ? "عينة غير كافية" : "Limited history"}</Pill>;
   }
   if (row.status === "stable") {

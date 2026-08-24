@@ -85,6 +85,11 @@ export async function buildCurrentCourseLeadAlertReport(filters: GlobalFilters =
         ? [yesterday, adMax, leadMax]
         : [yesterday, adMax || leadMax];
   const anchorDate = sourceMaxima.filter(Boolean).sort()[0] ?? yesterday;
+  // The KPI cards on the page follow the selected date window. Use that same
+  // calendar window for the expected daily rate; scheduled calls without UI
+  // filters default to month-to-date.
+  const comparisonTo = filters.to || cairoDay();
+  const comparisonFrom = filters.from || `${comparisonTo.slice(0, 7)}-01`;
   const freshnessAgeDays = dayDistance(anchorDate, yesterday);
   const suppressAlerts = !anchorDate || freshnessAgeDays > 2;
   const freshnessMessage = suppressAlerts
@@ -122,5 +127,7 @@ export async function buildCurrentCourseLeadAlertReport(filters: GlobalFilters =
     freshnessAgeDays,
     freshnessMessage,
     suppressAlerts,
+    comparisonFrom,
+    comparisonTo,
   });
 }
