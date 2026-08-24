@@ -182,7 +182,7 @@ const workflow = {
       position: [1120, 40],
       parameters: {
         method: "POST",
-        url: `=${APP_URL}/api/telegram/send-course-alerts?once=1`,
+        url: `${APP_URL}/api/telegram/send-course-alerts?once=1`,
         sendBody: false,
         options: { timeout: 120000 },
       },
