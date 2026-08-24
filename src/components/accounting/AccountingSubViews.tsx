@@ -274,7 +274,7 @@ export function AccountingAgentsView() {
     <div className="space-y-5">
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
-          ? `التحصيل والفواتير من حسابات Odoo حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. الليدز والإغلاقات من Odoo، والمكالمات من Yeastar بعد تخزينها في PostgreSQL على Railway.`
+          ? `التحصيل والفواتير والليدز من Odoo حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. المكالمات من Yeastar.`
           : `Collections use Odoo ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Leads and closures come from Odoo; Yeastar calls are stored in Railway PostgreSQL.`}
       </Notice>
       {!data.callsHub.ok && (
@@ -327,18 +327,18 @@ export function AccountingAgentsView() {
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 xl:gap-4">
         <KpiCard
           index={0}
-          label={lang === "ar" ? "الموظفون النشطون" : "Active employees"}
+          label={lang === "ar" ? "الموظفون" : "Active employees"}
           value={fmtNum(data.summary.agents)}
           sub={
             data.targets.matched > 0
-              ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "بتارجت منشور" : "with a published target"}`
+              ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "لهم تارجت" : "with a published target"}`
               : undefined
           }
           icon={<Users size={18} />}
         />
         <KpiCard
           index={1}
-          label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+          label={lang === "ar" ? "التحصيل" : "Paid collections"}
           value={fmtUSDFull(data.summary.paidRevenue)}
           sub={invoiceCount(data.summary.invoices, lang)}
           icon={<ReceiptText size={18} />}
@@ -346,34 +346,34 @@ export function AccountingAgentsView() {
         />
         <KpiCard
           index={2}
-          label={lang === "ar" ? "تارجت الفترة" : "Target for period"}
+          label={lang === "ar" ? "التارجت" : "Target for period"}
           // Prorated, so half a month shows half the quota. An em dash means no
           // target is published for this window — never a zero.
           value={data.targets.totalTarget === null ? "—" : fmtUSDFull(data.targets.totalTarget)}
           sub={
             data.targets.totalTarget === null
               ? lang === "ar"
-                ? "لا يوجد تارجت منشور للفترة"
+                ? "لا يوجد تارجت للفترة"
                 : "No target published for this window"
-              : `${lang === "ar" ? "الإنجاز" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`
+              : `${lang === "ar" ? "تم تحقيق" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`
           }
           icon={<Target size={18} />}
         />
         <KpiCard
           index={3}
-          label={lang === "ar" ? "ليدز دخلت الفترة" : "Leads created in period"}
+          label={lang === "ar" ? "الليدز الجديدة" : "Leads created in period"}
           value={fmtNum(data.summary.cleanLeads)}
-          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "منهم رابحة" : "became won"}`}
+          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "تم كسبها" : "became won"}`}
           icon={<UserRound size={18} />}
           info={<EmployeeMetricInfo metric="cohortWon" />}
         />
         <KpiCard
           index={4}
-          label={lang === "ar" ? "إغلاقات رابحة تمت في الفترة" : "Won closures during period"}
+          label={lang === "ar" ? "الصفقات الرابحة" : "Won closures during period"}
           value={fmtNum(data.summary.periodClosedWon)}
           sub={
             lang === "ar"
-              ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · ${fmtPct(data.summary.decidedConversionRate, 1)}`
+              ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · تحويل ${fmtPct(data.summary.decidedConversionRate, 1)}`
               : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`
           }
           icon={<Trophy size={18} />}
@@ -381,39 +381,39 @@ export function AccountingAgentsView() {
         />
         <KpiCard
           index={5}
-          label={lang === "ar" ? "إجمالي المكالمات" : "Total calls"}
+          label={lang === "ar" ? "المكالمات" : "Total calls"}
           value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
           sub={
             data.summary.answeredCalls === null
               ? lang === "ar"
-                ? "غير متاحة للفترة"
+                ? "لا توجد بيانات"
                 : "Unavailable for period"
-              : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`
+              : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "مردود عليها" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`
           }
           icon={<PhoneCall size={18} />}
         />
         <KpiCard
           index={6}
-          label={lang === "ar" ? "ساعات المكالمات" : "Call hours"}
+          label={lang === "ar" ? "وقت المكالمات" : "Call hours"}
           value={formatCallHours(data.summary.totalCallSeconds, lang)}
           sub={
             lang === "ar"
-              ? `${formatCallHours(data.summary.talkSeconds, lang)} وقت كلام فعلي`
+              ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
               : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`
           }
           icon={<Clock3 size={18} />}
         />
         <KpiCard
           index={7}
-          label={lang === "ar" ? "متوسط الجودة" : "Average quality"}
+          label={lang === "ar" ? "تقييم الجودة" : "Average quality"}
           value={fmtQuality(data.summary.averageQualityScore)}
           sub={
             data.summary.analyzedCalls === null
               ? lang === "ar"
-                ? "بيانات التقييم غير متاحة"
+                ? "لا يوجد تقييم"
                 : "Quality data unavailable"
               : lang === "ar"
-                ? `${fmtNum(data.summary.analyzedCalls)} عينة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} للمراجعة`
+                ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
                 : `${fmtNum(data.summary.analyzedCalls)} analyzed samples · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`
           }
           icon={<CircleGauge size={18} />}
@@ -440,20 +440,20 @@ export function AccountingAgentsView() {
             </div>
           }
         >
-          {lang === "ar" ? "توزيع الليدز وتغطية المكالمات والمحادثات" : "Lead distribution, calls, and chats"}
+          {lang === "ar" ? "الليدز والمكالمات والشات" : "Lead distribution, calls, and chats"}
         </SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-7">
-          <MiniMetric label={lang === "ar" ? "ليدز متوزعة" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
           <MiniMetric label={lang === "ar" ? "تم الاتصال بها" : "Leads called"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "بدون أي مكالمة" : "Never called"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "لم يتم الاتصال بها" : "Never called"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "نسبة التغطية" : "Coverage rate"} value={fmtPct(data.summary.leadCallCoverageRate, 1)} />
-          <MiniMetric label={lang === "ar" ? "محادثات الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
+          <MiniMetric label={lang === "ar" ? "نسبة الاتصال" : "Coverage rate"} value={fmtPct(data.summary.leadCallCoverageRate, 1)} />
+          <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
           <MiniMetric label={lang === "ar" ? "أول رد" : "First response"} value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)} />
         </div>
         <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
           {lang === "ar"
-            ? "ده تقرير توزيع حالي حسب الموظف المعيّن على الليد في Odoo. سجل مين من الأدمن غيّر التوزيع محتاج قراءة Tracking History في Odoo، ومش بننسب آخر تعديل عادي على الليد للأدمن على إنه عملية توزيع."
+            ? "التوزيع حسب الموظف المسجل على الليد في Odoo. لمعرفة من غيّر التوزيع نحتاج سجل التعديلات من Odoo."
             : "This is the current distribution by the salesperson assigned in Odoo. Identifying which admin changed an assignment requires Odoo tracking history; a normal last edit is not mislabeled as a distribution event."}
         </p>
       </Card>
@@ -480,7 +480,7 @@ export function AccountingAgentsView() {
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "بحث عن موظف أو فريق" : "Search employee or team"}
+              {lang === "ar" ? "ابحث بالاسم" : "Search employee or team"}
             </span>
             <span className="relative block">
               <Search
@@ -498,7 +498,7 @@ export function AccountingAgentsView() {
 
           <div className="table-wrap scroll-hint-x">
             <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "رتّب الكروت حسب" : "Rank cards by"}
+              {lang === "ar" ? "الترتيب حسب" : "Rank cards by"}
             </span>
             <Segmented
               value={sortBy}
@@ -513,7 +513,7 @@ export function AccountingAgentsView() {
             />
             <p className="mt-1.5 text-[10px] text-text-subtle">
               {lang === "ar"
-                ? "بيغيّر الترتيب وأهم رقم في الكارت، مش إجمالي الفترة."
+                ? "يغيّر ترتيب الموظفين فقط."
                 : "Changes card order and emphasis, not period totals."}
             </p>
           </div>
@@ -574,12 +574,12 @@ function TargetNotices({ targets }: { targets: AgentsResponse["targets"] }) {
           tone="warning"
           title={
             lang === "ar"
-              ? `${fmtNum(targets.unmatched.length)} تارجت منشور بلا موظف مطابق`
+              ? `${fmtNum(targets.unmatched.length)} تارجت غير مطابق`
               : `${fmtNum(targets.unmatched.length)} published targets matched no employee`
           }
         >
           {lang === "ar"
-            ? `${targets.unmatched.map((row) => row.name).join("، ")} — يا إما مفيش أي نشاط ليهم في الفترة دي، يا إما الاسم مكتوب في ملف التارجت غير المكتوب في أودو ومحتاج يتضاف كاسم بديل. مش بنوزّع التارجت ده على حد تاني.`
+            ? `${targets.unmatched.map((row) => row.name).join("، ")} — الموظف بلا نشاط في الفترة أو اسمه مختلف في Odoo. التارجت لن ينتقل لموظف آخر.`
             : `${targets.unmatched.map((row) => row.name).join(", ")} — either they had no activity in this period, or the workbook spells them differently from Odoo and needs an alias. Their quota is never reassigned to anyone else.`}
         </Notice>
       )}
@@ -588,12 +588,12 @@ function TargetNotices({ targets }: { targets: AgentsResponse["targets"] }) {
           tone="warning"
           title={
             lang === "ar"
-              ? "التارجت يغطي جزءاً من الفترة فقط"
+              ? "التارجت لا يغطي كل الفترة"
               : "The target covers only part of this window"
           }
         >
           {lang === "ar"
-            ? `التارجت منشور لـ ${targets.publishedMonths.map((month) => monthLabel(month, lang)).join("، ")} بس، والفترة المختارة بتمتد لـ ${fmtNum(targets.monthsMissing.length)} شهر تاني بلا تارجت. نسبة الإنجاز هنا بتقارن مبيعات الفترة كلها بتارجت الشهور المنشورة فقط — اختر شهراً بعينه عشان تبقى المقارنة عادلة.`
+            ? `يوجد تارجت لـ ${targets.publishedMonths.map((month) => monthLabel(month, lang)).join("، ")} فقط. اختر شهرًا واحدًا لمقارنة أدق.`
             : `Targets exist for ${targets.publishedMonths.join(", ")} only, while this window spans ${fmtNum(targets.monthsMissing.length)} further month(s) with none. The percentage therefore compares whole-window sales against the published months alone — pick a single month for a fair comparison.`}
         </Notice>
       )}
