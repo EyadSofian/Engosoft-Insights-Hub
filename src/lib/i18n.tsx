@@ -407,12 +407,12 @@ interface AppCtx {
 const Ctx = createContext<AppCtx | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("ar");
+  const [lang, setLangState] = useState<Lang>("en");
   const [theme, setThemeState] = useState<Theme>("light");
 
   // Restore preferences after hydration so SSR markup stays stable.
   useEffect(() => {
-    const storedLang = window.localStorage.getItem("engo_lang") as Lang | null;
+    const storedLang = window.localStorage.getItem("engo_lang_v2") as Lang | null;
     if (storedLang === "ar" || storedLang === "en") setLangState(storedLang);
 
     const storedTheme = window.localStorage.getItem("engo_theme") as Theme | null;
@@ -435,7 +435,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
-    window.localStorage.setItem("engo_lang", l);
+    window.localStorage.setItem("engo_lang_v2", l);
   }, []);
 
   const setTheme = useCallback((t: Theme) => {

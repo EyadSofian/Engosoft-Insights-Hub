@@ -1882,6 +1882,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           adset,
           adsetOrigin: origin,
           contact: str(r["اسم جهة الاتصال"]),
+          phone: str(r["Phone"]),
+          mobile: str(r["Mobile"]),
           salesperson: str(r["Salesperson"]),
           salesTeam: str(r["Sales Team"]) || str(r["فريق المبيعات"]),
           subTeam: str(r["فريق المبيعات"]),
@@ -2228,6 +2230,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         return {
           id: str(r["__odoo_id"]),
           contact: str(r["اسم جهة الاتصال"]),
+          phone: str(r["Phone"]),
+          mobile: str(r["Mobile"]),
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),

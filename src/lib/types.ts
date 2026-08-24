@@ -102,6 +102,8 @@ export interface CrmLeadRow {
   adset: string;
   adsetOrigin: AdSetOrigin;
   contact: string;
+  phone: string;
+  mobile: string;
   salesperson: string;
   /** Parent team, e.g. "Operation Team". */
   salesTeam: string;
@@ -266,6 +268,8 @@ export interface WebsiteSaleRow {
 export interface LostRow {
   id: string;
   contact: string;
+  phone: string;
+  mobile: string;
   campaignName: string;
   campaignId: string;
   campaignKey: string;

@@ -36,6 +36,8 @@ interface OdooCrmLead {
   partner_name?: string | false;
   contact_name?: string | false;
   priority?: string | false;
+  phone?: string | false;
+  mobile?: string | false;
   user_id?: M2O;
   team_id?: M2O;
   stage_id?: M2O;
@@ -258,6 +260,8 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "Campaign ID": custom(lead, fields.campaignId),
     "اسم جهة الاتصال":
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
+    Phone: display(lead.phone),
+    Mobile: display(lead.mobile),
     Salesperson: m2oName(lead.user_id),
     "فريق المبيعات": m2oName(lead.team_id),
     "Sales Team": m2oName(lead.team_id),
@@ -295,6 +299,8 @@ function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "Campaign ID": custom(lead, fields.campaignId),
     "اسم جهة الاتصال":
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
+    Phone: display(lead.phone),
+    Mobile: display(lead.mobile),
     "مندوب المبيعات": m2oName(lead.user_id),
     "فريق المبيعات": m2oName(lead.team_id),
     المرحلة: rawStage,
@@ -376,6 +382,8 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
     "partner_name",
     "contact_name",
     "priority",
+    "phone",
+    "mobile",
     "user_id",
     "team_id",
     "stage_id",

@@ -44,8 +44,8 @@ function Teams() {
         title={lang === "ar" ? "أداء الموظفين وفرق المبيعات" : "Employees and sales teams"}
         subtitle={
           lang === "ar"
-            ? "التحصيل من الفواتير المدفوعة، والعملاء وWon/Lost من CRM، والمكالمات وسرعة التواصل من نظام SLA."
-            : "Collections come from paid invoices, CRM supplies leads and Won/Lost, and SLA supplies calls and contact speed."
+            ? "التحصيل من الفواتير المدفوعة، والليدز من Odoo، والمكالمات وتقييم الجودة من Yeastar، والمحادثات من Chatwoot."
+            : "Paid invoices supply collections, Odoo supplies leads, Yeastar supplies calls and quality scores, and Chatwoot supplies conversations."
         }
       />
 

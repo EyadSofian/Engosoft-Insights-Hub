@@ -2,6 +2,7 @@ import type { GlobalFilters, TeamAgg } from "./types";
 import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
 import { normalizePersonName } from "./person-name.ts";
+import { integrationPersonMatchScore } from "./integration-person.ts";
 import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import {
   MIN_DECIDED_OUTCOMES,
@@ -16,6 +17,17 @@ import { targetMonths, targetsByPerson, windowTarget, type TargetSource } from "
 import { loadTargetSource } from "./sales-targets.server";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
+import {
+  chatwootConfigured,
+  getChatwootAgentSnapshot,
+  type ChatwootAgentMetric,
+} from "./chatwoot.server";
+import {
+  getCallsHubLeadCalls,
+  getCallsHubSummary,
+  type CallsHubLeadCallAggregate,
+  type CallsHubEmployeeSummary,
+} from "./calls-hub.server";
 
 export interface AgentAnalyticsRow {
   key: string;
@@ -34,11 +46,33 @@ export interface AgentAnalyticsRow {
   newLeads: number;
   contactedLeads: number;
   uncontactedLeads: number;
+  /** Odoo leads currently assigned to the employee in the selected cohort. */
+  distributedLeads: number;
+  /** Assigned leads whose phone matched at least one PBX call in the window. */
+  calledDistributedLeads: number | null;
+  uncalledDistributedLeads: number | null;
+  callsFromDistributedLeads: number | null;
+  callsByAssignedEmployee: number | null;
+  leadCallCoverageRate: number | null;
+  /** Yeastar extension used to load the employee's call samples on demand. */
+  callExtension: string | null;
+  /** All inbound and outbound calls in the selected date window. */
+  totalCalls: number | null;
   outboundCalls: number | null;
   answeredCalls: number | null;
   answerRate: number | null;
   contactRate: number | null;
   talkSeconds: number | null;
+  totalCallSeconds: number | null;
+  averageCallSeconds: number | null;
+  analyzedCalls: number | null;
+  averageQualityScore: number | null;
+  qualityNeedsReview: number | null;
+  chatConversations: number | null;
+  chatResolved: number | null;
+  chatAverageFirstResponseSeconds: number | null;
+  chatAverageResolutionSeconds: number | null;
+  chatAverageReplySeconds: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
   slaLost: number;
@@ -239,6 +273,20 @@ export interface AgentAnalyticsResult {
     outboundCalls: number | null;
     answeredCalls: number | null;
     answerRate: number | null;
+    totalCallSeconds: number | null;
+    talkSeconds: number | null;
+    analyzedCalls: number | null;
+    averageQualityScore: number | null;
+    qualityNeedsReview: number | null;
+    distributedLeads: number;
+    calledDistributedLeads: number | null;
+    uncalledDistributedLeads: number | null;
+    callsFromDistributedLeads: number | null;
+    callsByAssignedEmployee: number | null;
+    leadCallCoverageRate: number | null;
+    chatConversations: number | null;
+    chatResolved: number | null;
+    chatAverageFirstResponseSeconds: number | null;
   };
   targets: TargetCoverage;
   sla: {
@@ -258,6 +306,23 @@ export interface AgentAnalyticsResult {
      */
     salesConfigured: boolean;
   };
+  callsHub: {
+    ok: boolean;
+    source: string;
+    fetchedAt: string;
+    error?: string;
+    callsAvailable: boolean;
+    qualityAvailable: boolean;
+    recordsAvailable: boolean;
+    leadCoverageAvailable: boolean;
+  };
+  chatwoot: {
+    ok: boolean;
+    source: string;
+    fetchedAt: string;
+    error?: string;
+    metricsAvailable: boolean;
+  };
 }
 
 const num = (value: unknown): number => {
@@ -268,6 +333,18 @@ const num = (value: unknown): number => {
 export { normalizePersonName };
 
 const monthKey = (value: string): string => value.slice(0, 7);
+
+function cairoDateParts(): { today: string; monthStart: string } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const today = `${values.year}-${values.month}-${values.day}`;
+  return { today, monthStart: `${values.year}-${values.month}-01` };
+}
 
 function monthEnd(month: string): string {
   const [year, rawMonth] = month.split("-").map(Number);
@@ -336,6 +413,9 @@ interface MutableAgent extends AgentAnalyticsRow {
    * "he sold nothing". Only the row count separates them.
    */
   operationalRows: number;
+  callsHubMatched: boolean;
+  leadPhoneKeys: Set<string>;
+  chatwootMatched: boolean;
 }
 
 interface MutableDimension {
@@ -426,11 +506,29 @@ const blank = (key: string, name: string): MutableAgent => ({
   newLeads: 0,
   contactedLeads: 0,
   uncontactedLeads: 0,
+  distributedLeads: 0,
+  calledDistributedLeads: null,
+  uncalledDistributedLeads: null,
+  callsFromDistributedLeads: null,
+  callsByAssignedEmployee: null,
+  leadCallCoverageRate: null,
+  callExtension: null,
+  totalCalls: null,
   outboundCalls: 0,
   answeredCalls: 0,
   answerRate: null,
   contactRate: null,
   talkSeconds: 0,
+  totalCallSeconds: null,
+  averageCallSeconds: null,
+  analyzedCalls: null,
+  averageQualityScore: null,
+  qualityNeedsReview: null,
+  chatConversations: null,
+  chatResolved: null,
+  chatAverageFirstResponseSeconds: null,
+  chatAverageResolutionSeconds: null,
+  chatAverageReplySeconds: null,
   avgFirstCallMinutes: null,
   slaWon: 0,
   slaLost: 0,
@@ -452,6 +550,9 @@ const blank = (key: string, name: string): MutableAgent => ({
   months: new Set(),
   latestOpenMonth: "",
   operationalRows: 0,
+  callsHubMatched: false,
+  leadPhoneKeys: new Set(),
+  chatwootMatched: false,
 });
 
 const normalizeDimension = (value: string): string =>
@@ -850,6 +951,172 @@ function mergeSlaRep(map: Map<string, MutableAgent>, rows: SlaRepMonthly[]) {
   }
 }
 
+/**
+ * The Calls Hub owns the call facts. The legacy SLA feed remains useful for
+ * CRM timing, but its monthly call totals must never be added to the live PBX
+ * totals or the employee would be counted twice.
+ */
+function mergeCallsHubEmployees(
+  map: Map<string, MutableAgent>,
+  employees: CallsHubEmployeeSummary[],
+) {
+  for (const source of employees) {
+    const exactKey = normalizePersonName(source.name);
+    if (!exactKey) continue;
+    const exact = map.get(exactKey);
+    const candidates = exact
+      ? []
+      : [...map.entries()]
+          .map(([candidateKey, candidate]) => ({
+            candidateKey,
+            candidate,
+            score: integrationPersonMatchScore(candidate.name, source.name),
+          }))
+          .filter((candidate) => candidate.score > 0);
+    const bestScore = Math.max(0, ...candidates.map((candidate) => candidate.score));
+    const best = candidates.filter((candidate) => candidate.score === bestScore);
+    // A short PBX name is attached only when it points to one employee. When
+    // two Odoo people could match, retaining a separate PBX row is safer than
+    // crediting calls to the wrong person.
+    const matched = exact
+      ? ([exactKey, exact] as const)
+      : best.length === 1
+        ? ([best[0].candidateKey, best[0].candidate] as const)
+        : null;
+    const key = matched?.[0] ?? exactKey;
+    const row = matched?.[1] ?? blank(key, source.name);
+    row.callExtension = source.extension;
+    row.totalCalls = source.totalCalls;
+    // Kept for response compatibility; the UI labels this as all PBX calls.
+    row.outboundCalls = source.totalCalls;
+    row.answeredCalls = source.answeredCalls;
+    row.totalCallSeconds = source.periodCallSeconds;
+    row.talkSeconds = source.periodTalkSeconds;
+    row.averageCallSeconds = source.averageCallSeconds;
+    row.analyzedCalls = source.analyzedCalls;
+    row.averageQualityScore = source.averageScore;
+    row.qualityNeedsReview = source.needsReview;
+    row.callsHubMatched = true;
+    map.set(key, row);
+  }
+}
+
+function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAgentMetric[]) {
+  for (const source of agents) {
+    const exactKey = normalizePersonName(source.name);
+    if (!exactKey) continue;
+    const exact = map.get(exactKey);
+    const candidates = exact
+      ? []
+      : [...map.entries()]
+          .map(([candidateKey, candidate]) => ({
+            candidateKey,
+            candidate,
+            score: integrationPersonMatchScore(candidate.name, source.name),
+          }))
+          .filter((candidate) => candidate.score > 0);
+    const bestScore = Math.max(0, ...candidates.map((candidate) => candidate.score));
+    const best = candidates.filter((candidate) => candidate.score === bestScore);
+    const matched = exact
+      ? ([exactKey, exact] as const)
+      : best.length === 1
+        ? ([best[0].candidateKey, best[0].candidate] as const)
+        : null;
+    const key = matched?.[0] ?? exactKey;
+    const row = matched?.[1] ?? blank(key, source.name);
+    row.chatConversations = source.conversations;
+    row.chatResolved = source.resolved;
+    row.chatAverageFirstResponseSeconds = source.averageFirstResponseSeconds;
+    row.chatAverageResolutionSeconds = source.averageResolutionSeconds;
+    row.chatAverageReplySeconds = source.averageReplySeconds;
+    row.chatwootMatched = true;
+    map.set(key, row);
+  }
+}
+
+const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+
+function phoneVariants(value: string): string[] {
+  const digits = value
+    .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
+    .replace(/\D/g, "");
+  if (digits.length < 7) return [];
+  return [...new Set([digits, digits.length >= 10 ? digits.slice(-10) : "", digits.length >= 9 ? digits.slice(-9) : ""].filter(Boolean))];
+}
+
+function mergeLeadCallCoverage(
+  map: Map<string, MutableAgent>,
+  data: FilteredData,
+  calls: CallsHubLeadCallAggregate[],
+) {
+  const callsByPhone = new Map<string, CallsHubLeadCallAggregate[]>();
+  for (const call of calls) {
+    for (const variant of phoneVariants(call.phone)) {
+      const rows = callsByPhone.get(variant) ?? [];
+      rows.push(call);
+      callsByPhone.set(variant, rows);
+    }
+  }
+  for (const row of map.values()) {
+    row.distributedLeads = 0;
+    row.calledDistributedLeads = 0;
+    row.uncalledDistributedLeads = 0;
+    row.callsFromDistributedLeads = 0;
+    row.callsByAssignedEmployee = 0;
+    row.leadPhoneKeys.clear();
+  }
+
+  const leads = new Map<
+    string,
+    { id: string; salesperson: string; phone: string; mobile: string }
+  >();
+  for (const lead of [...data.crm, ...data.lost]) {
+    if (!lead.id || !lead.salesperson) continue;
+    leads.set(lead.id, lead);
+  }
+  for (const lead of leads.values()) {
+    const key = normalizePersonName(lead.salesperson);
+    if (!key) continue;
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    row.distributedLeads += 1;
+    const matches = new Map<string, CallsHubLeadCallAggregate>();
+    for (const number of [lead.phone, lead.mobile]) {
+      for (const variant of phoneVariants(number)) {
+        for (const call of callsByPhone.get(variant) ?? []) {
+          matches.set(`${call.phone}|${call.agentExtension}|${call.agentName}`, call);
+        }
+        if (matches.size) break;
+      }
+    }
+    if (!matches.size) {
+      row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
+      map.set(key, row);
+      continue;
+    }
+    row.calledDistributedLeads = (row.calledDistributedLeads ?? 0) + 1;
+    for (const call of matches.values()) {
+      const phoneKey = `${call.phone}|${call.agentExtension}|${call.agentName}`;
+      if (row.leadPhoneKeys.has(phoneKey)) continue;
+      row.leadPhoneKeys.add(phoneKey);
+      row.callsFromDistributedLeads = (row.callsFromDistributedLeads ?? 0) + call.totalCalls;
+      const sameOwner =
+        normalizePersonName(call.agentName) === key ||
+        (row.callExtension && call.agentExtension === row.callExtension);
+      if (sameOwner) {
+        row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
+      }
+    }
+    map.set(key, row);
+  }
+
+  for (const row of map.values()) {
+    row.leadCallCoverageRate =
+      row.distributedLeads > 0
+        ? ((row.calledDistributedLeads ?? 0) / row.distributedLeads) * 100
+        : null;
+  }
+}
+
 function mergeSlaSales(map: Map<string, MutableAgent>, rows: SlaSalesSummary[]) {
   for (const source of rows) {
     const key = normalizePersonName(source.user_name || "");
@@ -1082,6 +1349,32 @@ export async function buildAgentAnalytics(
     salesAvailable: false,
     salesConfigured: false,
   };
+  let callsHubStatus: AgentAnalyticsResult["callsHub"] = {
+    ok: false,
+    source: "Engosoft Calls Hub · Yeastar",
+    fetchedAt: "",
+    callsAvailable: false,
+    qualityAvailable: false,
+    recordsAvailable: false,
+    leadCoverageAvailable: false,
+  };
+  let chatwootStatus: AgentAnalyticsResult["chatwoot"] = {
+    ok: false,
+    source: "Chatwoot · Agent reports",
+    fetchedAt: "",
+    metricsAvailable: false,
+  };
+  const fallbackRange = cairoDateParts();
+  const integrationFrom = filters.from || fallbackRange.monthStart;
+  const integrationTo = filters.to || fallbackRange.today;
+  // Start independent network reads together. The old implementation waited
+  // for the SLA store before even contacting the PBX, which made the employee
+  // page pay every upstream latency one after another.
+  const callsSnapshotPromise = getCallsHubSummary(integrationFrom, integrationTo);
+  const leadCallsPromise = getCallsHubLeadCalls(integrationFrom, integrationTo).catch(() => null);
+  const chatwootPromise = chatwootConfigured()
+    ? getChatwootAgentSnapshot(integrationFrom, integrationTo)
+    : Promise.resolve(null);
   try {
     const snapshot = await Promise.race([
       getSlaSnapshot(),
@@ -1123,6 +1416,48 @@ export async function buildAgentAnalytics(
     slaStatus.error = error instanceof Error ? error.message : String(error);
   }
 
+  try {
+    const callsSnapshot = await callsSnapshotPromise;
+    mergeCallsHubEmployees(map, callsSnapshot.employees);
+    let leadCoverageAvailable = false;
+    const leadCalls = await leadCallsPromise;
+    if (leadCalls) {
+      mergeLeadCallCoverage(map, data, leadCalls);
+      leadCoverageAvailable = true;
+    }
+    const totalCalls = callsSnapshot.employees.reduce((sum, row) => sum + row.totalCalls, 0);
+    const analyzedCalls = callsSnapshot.employees.reduce((sum, row) => sum + row.analyzedCalls, 0);
+    callsHubStatus = {
+      ok: true,
+      source: callsSnapshot.source,
+      fetchedAt: callsSnapshot.fetchedAt,
+      callsAvailable: callsSnapshot.employees.length > 0,
+      qualityAvailable: analyzedCalls > 0,
+      recordsAvailable: totalCalls > 0,
+      leadCoverageAvailable,
+    };
+    // Preserve the old response field for existing consumers while migrating
+    // its call side to the canonical Calls Hub source.
+    slaStatus.callsAvailable = callsHubStatus.callsAvailable;
+    slaStatus.callsThrough = callsSnapshot.range.to;
+  } catch (error) {
+    callsHubStatus.error = error instanceof Error ? error.message : String(error);
+  }
+
+  try {
+    const chatSnapshot = await chatwootPromise;
+    if (!chatSnapshot) throw new Error("Chatwoot analytics are not configured");
+    mergeChatwootAgents(map, chatSnapshot.agents);
+    chatwootStatus = {
+      ok: true,
+      source: chatSnapshot.source,
+      fetchedAt: chatSnapshot.fetchedAt,
+      metricsAvailable: chatSnapshot.agents.some((row) => row.conversations > 0),
+    };
+  } catch (error) {
+    chatwootStatus.error = error instanceof Error ? error.message : String(error);
+  }
+
   const selectedAgents = [...map.values()].filter((row) => {
     if (!normalizedEquals(row.name, filters.salesperson)) return false;
     if (
@@ -1133,9 +1468,12 @@ export async function buildAgentAnalytics(
     return true;
   });
   if (slaStatus.ok) {
-    slaStatus.callsAvailable = selectedAgents.some(
-      (row) => num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
-    );
+    if (!callsHubStatus.ok) {
+      slaStatus.callsAvailable = selectedAgents.some(
+        (row) =>
+          num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
+      );
+    }
     // Row count, not value. Testing for a non-zero total was the only signal
     // available while the report had no feed, but it reads a real reported zero
     // as "no data" — which now matters, because a zero month is a fact about
@@ -1163,7 +1501,19 @@ export async function buildAgentAnalytics(
       row.courseProfile =
         courseProfiles.get(row.key) ??
         blankCourseProfile(data.snapshot.health.lostAuthority !== "unavailable");
-      if (!slaStatus.callsAvailable) {
+      if (callsHubStatus.ok && !row.callsHubMatched) {
+        row.callExtension = null;
+        row.totalCalls = null;
+        row.outboundCalls = null;
+        row.answeredCalls = null;
+        row.talkSeconds = null;
+        row.totalCallSeconds = null;
+        row.averageCallSeconds = null;
+        row.analyzedCalls = null;
+        row.averageQualityScore = null;
+        row.qualityNeedsReview = null;
+      } else if (!slaStatus.callsAvailable) {
+        row.totalCalls = null;
         row.outboundCalls = null;
         row.answeredCalls = null;
         row.talkSeconds = null;
@@ -1193,6 +1543,8 @@ export async function buildAgentAnalytics(
         row.slaLost > 0 ||
         (row.outboundCalls ?? 0) > 0 ||
         (row.answeredCalls ?? 0) > 0 ||
+        (row.analyzedCalls ?? 0) > 0 ||
+        (row.chatConversations ?? 0) > 0 ||
         (row.operationalSales ?? 0) !== 0 ||
         (row.operationalDeals ?? 0) > 0,
     )
@@ -1211,6 +1563,30 @@ export async function buildAgentAnalytics(
         acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
       if (row.answeredCalls !== null)
         acc.answeredCalls = (acc.answeredCalls ?? 0) + row.answeredCalls;
+      if (row.totalCallSeconds !== null)
+        acc.totalCallSeconds = (acc.totalCallSeconds ?? 0) + row.totalCallSeconds;
+      if (row.talkSeconds !== null) acc.talkSeconds = (acc.talkSeconds ?? 0) + row.talkSeconds;
+      if (row.analyzedCalls !== null)
+        acc.analyzedCalls = (acc.analyzedCalls ?? 0) + row.analyzedCalls;
+      if (row.qualityNeedsReview !== null)
+        acc.qualityNeedsReview = (acc.qualityNeedsReview ?? 0) + row.qualityNeedsReview;
+      acc.distributedLeads += row.distributedLeads;
+      if (row.calledDistributedLeads !== null)
+        acc.calledDistributedLeads =
+          (acc.calledDistributedLeads ?? 0) + row.calledDistributedLeads;
+      if (row.uncalledDistributedLeads !== null)
+        acc.uncalledDistributedLeads =
+          (acc.uncalledDistributedLeads ?? 0) + row.uncalledDistributedLeads;
+      if (row.callsFromDistributedLeads !== null)
+        acc.callsFromDistributedLeads =
+          (acc.callsFromDistributedLeads ?? 0) + row.callsFromDistributedLeads;
+      if (row.callsByAssignedEmployee !== null)
+        acc.callsByAssignedEmployee =
+          (acc.callsByAssignedEmployee ?? 0) + row.callsByAssignedEmployee;
+      if (row.chatConversations !== null)
+        acc.chatConversations = (acc.chatConversations ?? 0) + row.chatConversations;
+      if (row.chatResolved !== null)
+        acc.chatResolved = (acc.chatResolved ?? 0) + row.chatResolved;
       return acc;
     },
     {
@@ -1227,6 +1603,28 @@ export async function buildAgentAnalytics(
       outboundCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
       answeredCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
       answerRate: null as number | null,
+      totalCallSeconds: slaStatus.callsAvailable ? 0 : (null as number | null),
+      talkSeconds: slaStatus.callsAvailable ? 0 : (null as number | null),
+      analyzedCalls: callsHubStatus.ok ? 0 : (null as number | null),
+      averageQualityScore: null as number | null,
+      qualityNeedsReview: callsHubStatus.ok ? 0 : (null as number | null),
+      distributedLeads: 0,
+      calledDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      uncalledDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      callsFromDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      callsByAssignedEmployee: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      leadCallCoverageRate: null as number | null,
+      chatConversations: chatwootStatus.ok ? 0 : (null as number | null),
+      chatResolved: chatwootStatus.ok ? 0 : (null as number | null),
+      chatAverageFirstResponseSeconds: null as number | null,
     },
   );
   summary.conversionRate = summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
@@ -1237,6 +1635,33 @@ export async function buildAgentAnalytics(
   summary.answerRate =
     (summary.outboundCalls ?? 0) > 0
       ? ((summary.answeredCalls ?? 0) / (summary.outboundCalls ?? 1)) * 100
+      : null;
+  const scoredEmployees = agents.filter(
+    (row) => row.averageQualityScore !== null && (row.analyzedCalls ?? 0) > 0,
+  );
+  const scoredCalls = scoredEmployees.reduce((sum, row) => sum + (row.analyzedCalls ?? 0), 0);
+  summary.averageQualityScore =
+    scoredCalls > 0
+      ? scoredEmployees.reduce(
+          (sum, row) => sum + (row.averageQualityScore ?? 0) * (row.analyzedCalls ?? 0),
+          0,
+        ) / scoredCalls
+      : null;
+  summary.leadCallCoverageRate =
+    summary.distributedLeads > 0 && summary.calledDistributedLeads !== null
+      ? (summary.calledDistributedLeads / summary.distributedLeads) * 100
+      : null;
+  const chatRows = agents.filter(
+    (row) => row.chatAverageFirstResponseSeconds !== null && (row.chatConversations ?? 0) > 0,
+  );
+  const chatWeight = chatRows.reduce((sum, row) => sum + (row.chatConversations ?? 0), 0);
+  summary.chatAverageFirstResponseSeconds =
+    chatWeight > 0
+      ? chatRows.reduce(
+          (sum, row) =>
+            sum + (row.chatAverageFirstResponseSeconds ?? 0) * (row.chatConversations ?? 0),
+          0,
+        ) / chatWeight
       : null;
 
   // After `agents` is final, so every row that reaches the screen carries its
@@ -1258,5 +1683,7 @@ export async function buildAgentAnalytics(
     },
     summary,
     sla: slaStatus,
+    callsHub: callsHubStatus,
+    chatwoot: chatwootStatus,
   };
 }

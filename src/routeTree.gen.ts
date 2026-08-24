@@ -34,6 +34,9 @@ import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
+import { Route as ApiEmployeeCallDetailRouteImport } from './routes/api/employee-call-detail'
+import { Route as ApiEmployeeCallRecordingRouteImport } from './routes/api/employee-call-recording'
+import { Route as ApiEmployeeCallsRouteImport } from './routes/api/employee-calls'
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -183,6 +186,22 @@ const ApiCoursesRoute = ApiCoursesRouteImport.update({
   path: '/api/courses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEmployeeCallDetailRoute = ApiEmployeeCallDetailRouteImport.update({
+  id: '/api/employee-call-detail',
+  path: '/api/employee-call-detail',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEmployeeCallRecordingRoute =
+  ApiEmployeeCallRecordingRouteImport.update({
+    id: '/api/employee-call-recording',
+    path: '/api/employee-call-recording',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiEmployeeCallsRoute = ApiEmployeeCallsRouteImport.update({
+  id: '/api/employee-calls',
+  path: '/api/employee-calls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFiltersRoute = ApiFiltersRouteImport.update({
   id: '/api/filters',
   path: '/api/filters',
@@ -325,6 +344,9 @@ export interface FileRoutesByFullPath {
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
+  '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
+  '/api/employee-calls': typeof ApiEmployeeCallsRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -375,6 +397,9 @@ export interface FileRoutesByTo {
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
+  '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
+  '/api/employee-calls': typeof ApiEmployeeCallsRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -426,6 +451,9 @@ export interface FileRoutesById {
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
+  '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
+  '/api/employee-calls': typeof ApiEmployeeCallsRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -478,6 +506,9 @@ export interface FileRouteTypes {
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
+    | '/api/employee-call-detail'
+    | '/api/employee-call-recording'
+    | '/api/employee-calls'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -528,6 +559,9 @@ export interface FileRouteTypes {
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
+    | '/api/employee-call-detail'
+    | '/api/employee-call-recording'
+    | '/api/employee-calls'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -578,6 +612,9 @@ export interface FileRouteTypes {
     | '/api/campaigns'
     | '/api/chat'
     | '/api/courses'
+    | '/api/employee-call-detail'
+    | '/api/employee-call-recording'
+    | '/api/employee-calls'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -629,6 +666,9 @@ export interface RootRouteChildren {
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
+  ApiEmployeeCallDetailRoute: typeof ApiEmployeeCallDetailRoute
+  ApiEmployeeCallRecordingRoute: typeof ApiEmployeeCallRecordingRoute
+  ApiEmployeeCallsRoute: typeof ApiEmployeeCallsRoute
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -831,6 +871,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCoursesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/employee-call-detail': {
+      id: '/api/employee-call-detail'
+      path: '/api/employee-call-detail'
+      fullPath: '/api/employee-call-detail'
+      preLoaderRoute: typeof ApiEmployeeCallDetailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/employee-call-recording': {
+      id: '/api/employee-call-recording'
+      path: '/api/employee-call-recording'
+      fullPath: '/api/employee-call-recording'
+      preLoaderRoute: typeof ApiEmployeeCallRecordingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/employee-calls': {
+      id: '/api/employee-calls'
+      path: '/api/employee-calls'
+      fullPath: '/api/employee-calls'
+      preLoaderRoute: typeof ApiEmployeeCallsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/filters': {
       id: '/api/filters'
       path: '/api/filters'
@@ -1021,6 +1082,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiCoursesRoute: ApiCoursesRoute,
+  ApiEmployeeCallDetailRoute: ApiEmployeeCallDetailRoute,
+  ApiEmployeeCallRecordingRoute: ApiEmployeeCallRecordingRoute,
+  ApiEmployeeCallsRoute: ApiEmployeeCallsRoute,
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,
