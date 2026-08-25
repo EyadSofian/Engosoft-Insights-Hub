@@ -66,6 +66,8 @@ import type {
 } from "@/lib/agent-analytics.server";
 import type { CallsHubCall, CallsHubEmployeeCalls } from "@/lib/calls-hub.server";
 
+const QUALITY_REVIEW_THRESHOLD = 85;
+
 interface EmployeeEvidenceResponse {
   ok: boolean;
   employee: string;
@@ -2078,8 +2080,8 @@ function EmployeeCallsList({
   const { data, isLoading, error, refetch } = useApi<CallsHubEmployeeCalls>(
     `/api/employee-calls?extension=${encodeURIComponent(row.callExtension || "")}&page_size=50`,
   );
-  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < 70) ?? [];
-  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= 70) ?? [];
+  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < QUALITY_REVIEW_THRESHOLD) ?? [];
+  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= QUALITY_REVIEW_THRESHOLD) ?? [];
   const callGroups = [
     { key: "review", label: lang === "ar" ? "مكالمات تحتاج مراجعة" : "Calls needing review", calls: reviewCalls, warning: true },
     { key: "remaining", label: lang === "ar" ? "باقي المكالمات" : "Remaining calls", calls: remainingCalls, warning: false },
@@ -2093,8 +2095,8 @@ function EmployeeCallsList({
           </SectionTitle>
           <p className="mt-1 text-[11px] text-text-muted">
             {lang === "ar"
-              ? "المكالمات الأقل من 70 تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله."
-              : "Calls below 70 appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction."}
+              ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
+              : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
           </p>
         </div>
         {data && (
