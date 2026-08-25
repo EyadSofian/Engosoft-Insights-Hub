@@ -108,7 +108,7 @@ export interface AgentPerformanceScore {
   callQuality: number | null;
   salesExecution: number | null;
   chatFollowUp: number | null;
-  weights: { callQuality: 40; salesExecution: 40; chatFollowUp: 20 };
+  weights: { callQuality: 100; salesExecution: 0; chatFollowUp: 0 };
   evidence: {
     analyzedCalls: number;
     leadCoverageRate: number | null;
@@ -575,7 +575,7 @@ const blank = (key: string, name: string): MutableAgent => ({
     callQuality: null,
     salesExecution: null,
     chatFollowUp: null,
-    weights: { callQuality: 40, salesExecution: 40, chatFollowUp: 20 },
+    weights: { callQuality: 100, salesExecution: 0, chatFollowUp: 0 },
     evidence: {
       analyzedCalls: 0,
       leadCoverageRate: null,
@@ -1082,10 +1082,9 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
 /**
- * A transparent, non-LLM employee score. Every component is a visible number
- * on the same profile: call audits, assigned-lead execution, and unanswered
- * Chatwoot work. Missing sources are excluded and the remaining weights are
- * normalized instead of silently becoming zero.
+ * The employee score is the audited PBX call-quality score. Sales execution
+ * and Chatwoot follow-up stay visible as operational evidence, but they do not
+ * alter the PBX score or silently substitute for missing call audits.
  */
 function employeePerformanceScore(row: AgentAnalyticsRow): AgentPerformanceScore {
   const callQuality =
@@ -1112,21 +1111,12 @@ function employeePerformanceScore(row: AgentAnalyticsRow): AgentPerformanceScore
         30 * (1 - Math.min(1, unread / conversations)),
       );
 
-  const components = [
-    { value: callQuality, weight: 40 },
-    { value: salesExecution, weight: 40 },
-    { value: chatFollowUp, weight: 20 },
-  ].filter((part): part is { value: number; weight: number } => part.value !== null);
-  const availableWeight = components.reduce((sum, part) => sum + part.weight, 0);
-  const overall = availableWeight
-    ? components.reduce((sum, part) => sum + part.value * part.weight, 0) / availableWeight
-    : null;
   return {
-    overall,
+    overall: callQuality,
     callQuality,
     salesExecution,
     chatFollowUp,
-    weights: { callQuality: 40, salesExecution: 40, chatFollowUp: 20 },
+    weights: { callQuality: 100, salesExecution: 0, chatFollowUp: 0 },
     evidence: {
       analyzedCalls: Math.max(0, row.analyzedCalls ?? 0),
       leadCoverageRate: row.leadCallCoverageRate,

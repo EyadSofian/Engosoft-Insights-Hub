@@ -1220,25 +1220,25 @@ function AgentPerformanceSheet({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-brand">{lang === "ar" ? "تقييم الموظف" : "Employee score"}</div>
-                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "درجة واحدة من 3 جوانب" : "One score from 3 performance areas"}</h3>
-                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "جودة المكالمات 40% + متابعة الليدز والمبيعات 40% + متابعة محادثات العملاء 20%. كل رقم تحته الدليل المستخدم." : "Call quality 40% + lead and sales execution 40% + customer chat follow-up 20%. Every component shows its evidence."}</p>
+                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "السكور الرسمي من جودة مكالمات PBX" : "Official score from PBX call quality"}</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "السكور لا يخلط المبيعات أو Chatwoot مع تقييم PBX. مؤشرات الليدز والمحادثات معروضة بجواره للتشخيص والمتابعة فقط." : "The score does not mix sales or Chatwoot into the PBX rating. Lead and conversation indicators remain beside it for diagnosis and follow-up only."}</p>
               </div>
               <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
                 <div className="num text-3xl font-bold text-brand">{fmtQuality(row.performanceScore.overall)}</div>
-                <small className="text-[10px] text-text-muted">{lang === "ar" ? "التقييم الشامل" : "Overall score"}</small>
+                <small className="text-[10px] text-text-muted">{lang === "ar" ? "سكور PBX" : "PBX score"}</small>
               </div>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "جودة المكالمات · 40%" : "Call quality · 40%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "جودة مكالمات PBX · أساس السكور" : "PBX call quality · score basis"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
                 <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.analyzedCalls)} مكالمة مكتملة التحليل` : `${fmtNum(row.performanceScore.evidence.analyzedCalls)} completed call analyses`}</p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "الليدز والمبيعات · 40%" : "Leads and sales · 40%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "الليدز والمبيعات · مؤشر مساعد" : "Leads and sales · supporting indicator"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
                 <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `تم الاتصال بـ ${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} من الليدز · نسبة البيع ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)}` : `${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} lead coverage · ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} conversion`}</p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "متابعة المحادثات · 20%" : "Chat follow-up · 20%"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "متابعة Chatwoot · لا تدخل في السكور" : "Chatwoot follow-up · not scored"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
                 <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.chatConversations)} محادثة · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} عميل ينتظر ردًا · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} غير مقروءة` : `${fmtNum(row.performanceScore.evidence.chatConversations)} conversations · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} awaiting reply · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} unread`}</p>
               </div>
             </div>

@@ -46,6 +46,7 @@ import {
   type DisplayCurrency,
 } from "@/lib/display-currency";
 import { fxRatesFromFilters } from "@/lib/fx-rates";
+import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import type {
   CampaignActivity,
   DataHealth,
@@ -104,24 +105,6 @@ interface CourseSaleContribution {
   averageSalePrice: number | null;
 }
 
-interface BusinessInsightsResponse {
-  bestEmployee: {
-    key: string;
-    name: string;
-    team: string;
-    paidRevenue: number;
-    leads: number;
-    won: number;
-    conversionRate: number | null;
-  } | null;
-  targets: {
-    totalTarget: number | null;
-    complete: boolean;
-    monthsMissing: string[];
-    matchedEmployees: number;
-  };
-}
-
 type TrendGrain = "day" | "week";
 
 interface MoneyPoint extends Record<string, string | number> {
@@ -162,7 +145,7 @@ interface BusinessSignals {
   topCourse: CourseSaleContribution | null;
   courseTargetShare: number | null;
   targetComplete: boolean;
-  bestEmployee: BusinessInsightsResponse["bestEmployee"];
+  bestEmployee: AgentAnalyticsResult["agents"][number] | null;
   bestCampaign: PerfRow | null;
   risk: { title: string; detail: string };
   decision: { title: string; detail: string; href: string };
@@ -170,14 +153,21 @@ interface BusinessSignals {
 
 function businessSignals(
   data: OverviewResp,
-  workforce: BusinessInsightsResponse | undefined,
+  workforce: AgentAnalyticsResult | undefined,
   lang: "ar" | "en",
 ): BusinessSignals {
   const topCourse = data.courseSales[0] ?? null;
   const target = workforce?.targets.totalTarget ?? null;
   const courseTargetShare =
     topCourse && target !== null && target > 0 ? (topCourse.revenue / target) * 100 : null;
-  const bestEmployee = workforce?.bestEmployee ?? null;
+  const bestEmployee =
+    [...(workforce?.agents ?? [])]
+      .filter((agent) => agent.averageQualityScore !== null && (agent.analyzedCalls ?? 0) > 0)
+      .sort(
+        (a, b) =>
+          (b.averageQualityScore ?? 0) - (a.averageQualityScore ?? 0) ||
+          (b.analyzedCalls ?? 0) - (a.analyzedCalls ?? 0),
+      )[0] ?? null;
 
   let risk: BusinessSignals["risk"];
   if (data.fetchErrors.length || data.staleTabs.length) {
@@ -332,7 +322,7 @@ function BusinessDecisionCockpit({
         />
         <DecisionMetric
           icon={<UserRoundCheck size={18} />}
-          label={lang === "ar" ? "أفضل موظف مبيعات" : "Top sales employee"}
+          label={lang === "ar" ? "أفضل موظف حسب PBX" : "Top employee by PBX"}
           value={
             workforceLoading
               ? lang === "ar"
@@ -342,10 +332,10 @@ function BusinessDecisionCockpit({
           }
           detail={
             employee
-              ? `${fmtUSD(employee.paidRevenue)} ${lang === "ar" ? "تحصيل" : "collected"} · ${fmtPct(employee.conversionRate, 1)} ${lang === "ar" ? "إغلاق" : "conversion"}`
+              ? `PBX ${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"} · Chatwoot: ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "تنتظر رد" : "awaiting"} · ${fmtNum(employee.chatUnreadConversations)} ${lang === "ar" ? "غير مقروءة" : "unread"}`
               : lang === "ar"
-                ? "لا توجد مبيعات منسوبة لموظف"
-                : "No employee-attributed sales"
+                ? "لا توجد مكالمات PBX محللة في الفترة"
+                : "No analyzed PBX calls in this period"
           }
         />
         <DecisionMetric
@@ -415,7 +405,7 @@ function DecisionMetric({
       <div className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-white" title={value}>
         {value}
       </div>
-      <p className="mt-1.5 line-clamp-2 min-h-9 text-[10.5px] leading-[1.15rem] text-white/50">
+      <p className="mt-1.5 line-clamp-3 min-h-[3.4rem] text-[10.5px] leading-[1.15rem] text-white/50">
         {detail}
       </p>
     </div>
@@ -426,7 +416,7 @@ function Overview() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
-  const workforce = useApi<BusinessInsightsResponse>("/api/business-insights");
+  const workforce = useApi<AgentAnalyticsResult>("/api/teams");
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
   const [revenueGrain, setRevenueGrain] = useState<TrendGrain>("week");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
