@@ -87,6 +87,8 @@ export interface AgentAnalyticsRow {
   chatAverageFirstResponseSeconds: number | null;
   chatAverageResolutionSeconds: number | null;
   chatAverageReplySeconds: number | null;
+  /** Exact Chatwoot agent id used only to load conversation evidence on demand. */
+  chatwootAgentId: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
   slaLost: number;
@@ -555,6 +557,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   chatAverageFirstResponseSeconds: null,
   chatAverageResolutionSeconds: null,
   chatAverageReplySeconds: null,
+  chatwootAgentId: null,
   avgFirstCallMinutes: null,
   slaWon: 0,
   slaLost: 0,
@@ -1093,6 +1096,7 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
     row.chatAverageFirstResponseSeconds = source.averageFirstResponseSeconds;
     row.chatAverageResolutionSeconds = source.averageResolutionSeconds;
     row.chatAverageReplySeconds = source.averageReplySeconds;
+    row.chatwootAgentId = source.id;
     row.chatwootMatched = true;
     map.set(key, row);
   }
