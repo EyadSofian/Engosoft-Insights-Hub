@@ -51,6 +51,7 @@ export const Route = createFileRoute("/api/employee-evidence")({
           callsByPhone.set(key, [...(callsByPhone.get(key) ?? []), call]);
         }
         const odooBaseUrl = odooConfig().url;
+        const callsHubBaseUrl = (process.env.CALLS_HUB_URL || "https://web-production-c7b78.up.railway.app").replace(/\/+$/, "");
         const leadUrl = (rawId: string) => {
           const id = Number(rawId);
           return Number.isInteger(id) && id > 0
@@ -82,6 +83,12 @@ export const Route = createFileRoute("/api/employee-evidence")({
                 .filter(Boolean)
                 .sort()
                 .at(-1) ?? null,
+            latestCallUrl:
+              ownerCalls
+                .filter((call) => call.latestCallId)
+                .sort((left, right) => right.latestCallAt.localeCompare(left.latestCallAt))
+                .map((call) => `${callsHubBaseUrl}/?call=${encodeURIComponent(call.latestCallId)}#archive`)
+                .at(0) ?? null,
           };
         };
         const activeLeads = data.crm

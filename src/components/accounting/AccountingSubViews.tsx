@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { TargetEditor } from "@/components/accounting/TargetEditor";
 import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
 import type { EmployeeMetricKey } from "@/lib/employee-metric-catalog";
@@ -49,6 +49,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   AgentAnalyticsResult as AgentsResponse,
   AgentAnalyticsRow as AgentRow,
@@ -79,6 +86,7 @@ interface EmployeeEvidenceResponse {
       ownerCalls: number;
       firstCallAt: string | null;
       latestCallAt: string | null;
+      latestCallUrl: string | null;
     }>;
     total: number;
     truncated: boolean;
@@ -111,6 +119,21 @@ interface EmployeeEvidenceResponse {
     }>;
   };
   chatwootError: string | null;
+}
+
+type EmployeeEvidenceKind = "target" | "sales" | "leads" | "calls" | "chatwoot";
+
+const EmployeeEvidenceContext = createContext<
+  { openEvidence: (kind: EmployeeEvidenceKind) => void } | null
+>(null);
+
+function evidenceKindFromHref(href: string): EmployeeEvidenceKind | null {
+  if (href.includes("target")) return "target";
+  if (href.includes("sales")) return "sales";
+  if (href.includes("lead")) return "leads";
+  if (href.includes("call")) return "calls";
+  if (href.includes("chat")) return "chatwoot";
+  return null;
 }
 
 export interface AccountingMonth {
@@ -792,6 +815,27 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
 
 function EvidenceLink({ href }: { href: string }) {
   const { lang } = useI18n();
+  const evidence = useContext(EmployeeEvidenceContext);
+  const kind = evidenceKindFromHref(href);
+  if (evidence && kind) {
+    const labels: Record<EmployeeEvidenceKind, { ar: string; en: string }> = {
+      target: { ar: "تفاصيل التارجت", en: "Target details" },
+      sales: { ar: "سجلات المبيعات", en: "Sales records" },
+      leads: { ar: "الليدز واتصالاتها", en: "Leads and contacts" },
+      calls: { ar: "المكالمات والتقييم", en: "Calls and scores" },
+      chatwoot: { ar: "محادثات Chatwoot", en: "Chatwoot conversations" },
+    };
+    return (
+      <button
+        type="button"
+        onClick={() => evidence.openEvidence(kind)}
+        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[10px] font-semibold text-brand transition-colors hover:bg-brand-soft"
+      >
+        {labels[kind][lang]}
+        <ArrowUpRight size={12} aria-hidden="true" />
+      </button>
+    );
+  }
   return (
     <a href={href} className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline">
       {lang === "ar" ? "عرض الدليل" : "View evidence"}
@@ -844,7 +888,13 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
   );
 }
 
-function EmployeeEvidencePanel({ row }: { row: AgentRow }) {
+function EmployeeEvidencePanel({
+  row,
+  kind,
+}: {
+  row: AgentRow;
+  kind: Extract<EmployeeEvidenceKind, "sales" | "leads" | "chatwoot">;
+}) {
   const { lang } = useI18n();
   const query = `/api/employee-evidence?employee=${encodeURIComponent(row.name)}${row.callExtension ? `&extension=${encodeURIComponent(row.callExtension)}` : ""}${row.chatwootAgentId ? `&chatwoot_agent_id=${row.chatwootAgentId}` : ""}`;
   const { data, isLoading, error, refetch } = useApi<EmployeeEvidenceResponse>(query);
@@ -856,39 +906,105 @@ function EmployeeEvidencePanel({ row }: { row: AgentRow }) {
         : lang === "ar" ? "مفتوح" : "Open";
 
   return (
-    <section id="employee-record-evidence" className="scroll-mt-24 space-y-3">
+    <section className="space-y-3">
       <div>
         <div className="text-xs font-semibold text-brand">{lang === "ar" ? "السجلات الأصلية" : "Source records"}</div>
-        <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "الدليل وراء أرقام الموظف" : "Evidence behind the employee KPIs"}</h3>
-        <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "روابط Odoo وChatwoot أدناه مبنية من IDs حقيقية. السجل الذي لا يحمل ID لا نضع له رابطًا." : "Odoo and Chatwoot links below are built from real record IDs. A record without an ID never receives a synthetic link."}</p>
+        <h3 className="mt-0.5 text-lg font-bold text-text">
+          {kind === "sales"
+            ? lang === "ar" ? "التحصيل وأوامر البيع" : "Collections and sale orders"
+            : kind === "leads"
+              ? lang === "ar" ? "الليدز واتصالات الموظف بها" : "Leads and the employee's calls"
+              : lang === "ar" ? "محادثات الموظف في Chatwoot" : "Employee Chatwoot conversations"}
+        </h3>
+        <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "هذه القائمة تخص الرقم الذي ضغطت عليه فقط، وكل زر يفتح السجل الأصلي مباشرة." : "This list only supports the KPI you opened, and every action opens the original record directly."}</p>
       </div>
-      {isLoading ? <div className="grid gap-3 md:grid-cols-3"><Skeleton className="h-44" /><Skeleton className="h-44" /><Skeleton className="h-44" /></div> : error ? <ErrorState message={(error as Error).message} onRetry={() => refetch()} /> : data && (
-        <div className="grid gap-3 xl:grid-cols-3">
-          <article id="employee-sales-evidence" className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-surface">
+      {isLoading ? <Skeleton className="h-80" /> : error ? <ErrorState message={(error as Error).message} onRetry={() => refetch()} /> : data && (
+        <div>
+          {kind === "sales" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
             <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "أوامر البيع والفواتير" : "Sale orders and invoices"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.orders.total)}</bdi> {lang === "ar" ? "أمر بيع" : "orders"} · <bdi dir="ltr" className="num">{fmtUSDFull(data.orders.amount)}</bdi></p><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.invoices.paidTotal)}</bdi> {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}{data.invoices.creditNoteTotal > 0 ? <> · <bdi dir="ltr" className="num">{fmtNum(data.invoices.creditNoteTotal)}</bdi> {lang === "ar" ? "إشعار دائن" : "credit notes"}</> : null} · <bdi dir="ltr" className="num">{fmtUSDFull(data.invoices.amount)}</bdi></p></header>
             <div className="max-h-72 divide-y divide-border overflow-auto">
               {data.orders.rows.slice(0, 8).map((order) => <div key={order.orderRef} className="px-4 py-3"><div className="flex items-start justify-between gap-3"><bdi dir="ltr" className="num text-xs font-semibold text-text">{order.orderRef}</bdi><strong className="num text-xs text-brand">{fmtUSDFull(order.usdSales)}</strong></div><p className="mt-1 truncate text-[10px] text-text-muted">{order.customer || order.course || "—"}</p></div>)}
               {data.orders.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد أوامر بيع في الفترة." : "No sale orders in this period."}</p>}
               {data.invoices.rows.slice(0, 6).map((invoice) => <div key={invoice.movement} className="bg-surface-2/45 px-4 py-3"><div className="flex items-start justify-between gap-3"><span className="min-w-0"><bdi dir="ltr" className="num block truncate text-xs font-semibold text-text">{invoice.movement}</bdi><small className="mt-0.5 block truncate text-[10px] text-text-muted">{invoice.partner || "—"} · {invoice.paymentDate}</small></span><strong className={`num shrink-0 text-xs ${invoice.isCreditNote ? "text-danger" : "text-brand"}`}>{fmtUSDFull(invoice.usdPaid)}</strong></div><small className="mt-1 block text-[10px] text-text-muted">{invoice.isCreditNote ? (lang === "ar" ? "إشعار دائن مخصوم من الصافي" : "Credit note deducted from net") : (lang === "ar" ? "فاتورة مدفوعة" : "Paid invoice")}</small></div>)}
             </div>
-          </article>
-          <article id="employee-lead-evidence" className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-surface">
+          </article>}
+          {kind === "leads" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
             <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "الليدز في Odoo" : "Odoo leads"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.leads.total)}</bdi> {lang === "ar" ? "ليد في الفترة" : "leads in period"}</p></header>
             <div className="max-h-72 divide-y divide-border overflow-auto">
-              {data.leads.rows.slice(0, 12).map((lead) => <div key={`${lead.outcome}-${lead.id}`} className="flex items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><b className="block truncate text-xs text-text">{lead.contact || lead.phone || `#${lead.id}`}</b><small className="mt-0.5 block truncate text-[10px] text-text-muted">{outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}</small><small className="mt-1 block text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(lead.ownerCalls)}</bdi> {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} · {lead.calledByOwner ? (lang === "ar" ? "تم التواصل" : "contacted") : (lang === "ar" ? "لم يتواصل" : "not contacted")}</small></div>{lead.url ? <a href={lead.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح Odoo" : "Open Odoo"}<ExternalLink size={11} className="ms-1 inline" /></a> : <bdi dir="ltr" className="num text-[10px] text-text-muted">#{lead.id}</bdi>}</div>)}
+              {data.leads.rows.map((lead) => <div key={`${lead.outcome}-${lead.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="min-w-0 flex-1"><b className="block truncate text-xs text-text">{lead.contact || lead.phone || `#${lead.id}`}</b><small className="mt-0.5 block truncate text-[10px] text-text-muted">{outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}</small><small className="mt-1 block text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(lead.ownerCalls)}</bdi> {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} · {lead.calledByOwner ? (lang === "ar" ? "تم التواصل" : "contacted") : (lang === "ar" ? "لم يتواصل" : "not contacted")}</small></div><span className="flex shrink-0 flex-wrap gap-1.5">{lead.latestCallUrl && <a href={lead.latestCallUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}<ExternalLink size={11} className="ms-1 inline" /></a>}{lead.url ? <a href={lead.url} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح الليد" : "Open lead"}<ExternalLink size={11} className="ms-1 inline" /></a> : <bdi dir="ltr" className="num text-[10px] text-text-muted">#{lead.id}</bdi>}</span></div>)}
               {data.leads.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد ليدز في الفترة." : "No leads in this period."}</p>}
             </div>
-          </article>
-          <article id="employee-chat-evidence" className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-surface">
+          </article>}
+          {kind === "chatwoot" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
             <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "محادثات Chatwoot" : "Chatwoot conversations"}</b><p className="mt-0.5 text-[10px] text-text-muted">{data.chatwoot ? <><bdi dir="ltr" className="num">{fmtNum(data.chatwoot.total)}</bdi> {lang === "ar" ? "محادثة في الفترة" : "conversations in period"}</> : (lang === "ar" ? "لا يوجد موظف Chatwoot مطابق" : "No matched Chatwoot agent")}</p></header>
             <div className="max-h-72 divide-y divide-border overflow-auto">
               {data.chatwoot?.conversations.slice(0, 12).map((conversation) => <a key={conversation.id} href={conversation.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2"><div className="min-w-0"><b className="block truncate text-xs text-text">{conversation.contactName || `#${conversation.id}`}</b><small className="mt-0.5 block text-[10px] text-text-muted">{conversation.awaitingReply ? (lang === "ar" ? "العميل ينتظر ردًا" : "Customer awaiting reply") : (lang === "ar" ? "تم الرد" : "Replied")} · <bdi dir="ltr" className="num">{fmtNum(conversation.unreadMessages)}</bdi> {lang === "ar" ? "غير مقروءة" : "unread"}</small></div><ExternalLink size={13} className="shrink-0 text-brand" /></a>)}
               {!data.chatwoot?.conversations.length && <p className="p-4 text-xs text-text-muted">{data.chatwootError || (lang === "ar" ? "لا توجد محادثات قابلة للفتح في الفترة." : "No openable conversations in this period.")}</p>}
             </div>
-          </article>
+          </article>}
         </div>
       )}
     </section>
+  );
+}
+
+function EmployeeEvidenceDialog({
+  row,
+  kind,
+  onOpenChange,
+}: {
+  row: AgentRow;
+  kind: EmployeeEvidenceKind | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { lang } = useI18n();
+  const titles: Record<EmployeeEvidenceKind, { ar: string; en: string }> = {
+    target: { ar: "دليل التارجت", en: "Target evidence" },
+    sales: { ar: "دليل التحصيل والمبيعات", en: "Sales and collections evidence" },
+    leads: { ar: "دليل الليدز والاتصالات", en: "Lead and contact evidence" },
+    calls: { ar: "دليل المكالمات والجودة", en: "Call and quality evidence" },
+    chatwoot: { ar: "دليل محادثات Chatwoot", en: "Chatwoot conversation evidence" },
+  };
+  return (
+    <Dialog open={kind !== null} onOpenChange={onOpenChange}>
+      <DialogContent
+        dir={lang === "ar" ? "rtl" : "ltr"}
+        className="max-h-[88vh] w-[min(94vw,920px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
+      >
+        {kind && <>
+          <DialogHeader className="sticky top-0 z-10 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+            <DialogTitle>{titles[kind][lang]}</DialogTitle>
+            <DialogDescription className="text-xs text-text-muted">
+              {lang === "ar"
+                ? `السجلات الخاصة بـ ${row.name} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
+                : `Only ${row.name}'s records for the selected period. Each evidence view contains one source and one purpose.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 sm:p-5">
+            {kind === "target" && (
+              <div className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-5">
+                {row.target ? <>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <MiniMetric label={lang === "ar" ? "التارجت المنشور" : "Published target"} value={fmtUSDFull(row.target.target)} />
+                    <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDFull(row.paidRevenue)} />
+                    <MiniMetric label={lang === "ar" ? "نسبة الإنجاز" : "Achievement"} value={fmtPct(row.target.achievementPaid, 1)} />
+                  </div>
+                  <p className="mt-4 text-xs leading-relaxed text-text-muted">
+                    {lang === "ar"
+                      ? `كود الموظف ${row.target.employeeId} · الشهور: ${row.target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · المسؤول: ${row.target.teamLeader}.`
+                      : `Employee ${row.target.employeeId} · months: ${row.target.monthsCovered.join(", ") || "—"} · owner: ${row.target.teamLeader}.`}
+                  </p>
+                </> : <p className="text-sm text-text-muted">{lang === "ar" ? "لا يوجد تارجت منشور لهذا الموظف في الفترة." : "No published target for this employee and period."}</p>}
+              </div>
+            )}
+            {(kind === "sales" || kind === "leads" || kind === "chatwoot") && (
+              <EmployeeEvidencePanel row={row} kind={kind} />
+            )}
+            {kind === "calls" && <EmployeeCallsPanel row={row} />}
+          </div>
+        </>}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1275,12 +1391,14 @@ function AgentPerformanceSheet({
   const { lang } = useI18n();
   const [courseMetric, setCourseMetric] = useState<"revenue" | "invoices" | "leads">("revenue");
   const [invoiceCourse, setInvoiceCourse] = useState<AgentCoursePerformance | null>(null);
+  const [evidenceKind, setEvidenceKind] = useState<EmployeeEvidenceKind | null>(null);
   useEffect(() => {
     setCourseMetric("revenue");
     // Closing the sheet with the dialog open leaves it open. Without this it
     // reopens on the next employee, showing one person's invoices under
     // another person's name.
     setInvoiceCourse(null);
+    setEvidenceKind(null);
   }, [row?.key]);
   useEffect(() => {
     if (!row || !open || typeof window === "undefined" || !window.location.hash.startsWith("#employee-")) return;
@@ -1335,6 +1453,7 @@ function AgentPerformanceSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
+      <EmployeeEvidenceContext.Provider value={{ openEvidence: setEvidenceKind }}>
       <SheetContent
         side={lang === "ar" ? "left" : "right"}
         className="w-[min(100vw,1040px)] max-w-none overflow-y-auto border-border bg-surface p-0 text-text [&>button]:z-30 [&>button]:text-white [&>button]:opacity-100 rtl:[&>button]:left-4 rtl:[&>button]:right-auto sm:max-w-[1040px]"
@@ -1858,8 +1977,19 @@ function AgentPerformanceSheet({
               ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس، والتصنيفات اللي مش كورس زي «أخرى» مستبعدة من الترتيب ومعروضة في سطر تحت الكروت؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
               : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold, and non-course buckets such as "Other" are held out of the ranking and reported on a line under the cards; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
           </Notice>
-          <EmployeeEvidencePanel row={row} />
-          <EmployeeCallsPanel row={row} />
+          <section className="rounded-2xl border border-brand/15 bg-brand-soft/25 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <b className="text-sm text-text">{lang === "ar" ? "السجلات التفصيلية" : "Detailed source records"}</b>
+                <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "افتح نوع الدليل الذي تحتاجه مباشرة؛ كل مصدر يظهر منفصلًا عن الآخر." : "Open the exact evidence you need; every source is kept separate."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <EvidenceLink href="#employee-lead-evidence" />
+                <EvidenceLink href="#employee-call-evidence" />
+                <EvidenceLink href="#employee-chat-evidence" />
+              </div>
+            </div>
+          </section>
         </div>
         {invoiceCourse && (
           <CourseInvoicesDialog
@@ -1868,7 +1998,15 @@ function AgentPerformanceSheet({
             onClose={() => setInvoiceCourse(null)}
           />
         )}
+        <EmployeeEvidenceDialog
+          row={row}
+          kind={evidenceKind}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setEvidenceKind(null);
+          }}
+        />
       </SheetContent>
+      </EmployeeEvidenceContext.Provider>
     </Sheet>
   );
 }
