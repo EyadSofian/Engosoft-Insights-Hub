@@ -444,10 +444,12 @@ export function AccountingAgentsView() {
         </SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "تم الاتصال بها" : "Leads called"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "لم يتم الاتصال بها" : "Never called"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "اتصل بها الموظف المسؤول" : "Called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "لم يتصل بها الموظف المسؤول" : "Not called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads))} />
+          <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "نسبة الاتصال" : "Coverage rate"} value={fmtPct(data.summary.leadCallCoverageRate, 1)} />
+          <MiniMetric label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"} value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)} />
           <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
           <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
           <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={data.summary.chatUnreadConversations === null ? "—" : fmtNum(data.summary.chatUnreadConversations)} />
@@ -931,8 +933,8 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
                 lang === "ar" ? "ليدز متوزعة" : "Assigned leads",
-                lang === "ar" ? "تم الاتصال" : "Leads called",
-                lang === "ar" ? "بدون مكالمة" : "Never called",
+                lang === "ar" ? "اتصل بنفسه" : "Called by owner",
+                lang === "ar" ? "لم يتصل بهم" : "Not called by owner",
                 lang === "ar" ? "مكالمات الليدز" : "Lead calls",
                 lang === "ar" ? "رابحة" : "Won",
                 lang === "ar" ? "خاسرة" : "Lost",
@@ -1009,10 +1011,12 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.distributedLeads)}</td>
                 <td className="num px-3 py-3 text-end">
-                  {row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)}
+                  {row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
                 </td>
                 <td className="num px-3 py-3 text-end">
-                  {row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
+                  {row.ownerCalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)}
@@ -1220,28 +1224,63 @@ function AgentPerformanceSheet({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-brand">{lang === "ar" ? "تقييم الموظف" : "Employee score"}</div>
-                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "السكور الرسمي من جودة مكالمات PBX" : "Official score from PBX call quality"}</h3>
-                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "السكور لا يخلط المبيعات أو Chatwoot مع تقييم PBX. مؤشرات الليدز والمحادثات معروضة بجواره للتشخيص والمتابعة فقط." : "The score does not mix sales or Chatwoot into the PBX rating. Lead and conversation indicators remain beside it for diagnosis and follow-up only."}</p>
+                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "تقييم عملي من 4 جوانب" : "A practical score from 4 performance areas"}</h3>
+                <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "جودة المكالمات 25 نقطة + التواصل مع الليدز والبيع 30 + متابعة Chatwoot 20 + تحقيق التارجت 25. البيانات الناقصة لا نوزع نقاطها على باقي الأجزاء، والعينات الصغيرة لا تعطي درجة كاملة." : "Call quality earns 25 points + lead and sales execution 30 + Chatwoot follow-up 20 + target attainment 25. Missing evidence is never redistributed, and tiny samples cannot earn full weight."}</p>
               </div>
               <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
                 <div className="num text-3xl font-bold text-brand">{fmtQuality(row.performanceScore.overall)}</div>
-                <small className="text-[10px] text-text-muted">{lang === "ar" ? "سكور PBX" : "PBX score"}</small>
+                <small className="block text-[10px] text-text-muted">{lang === "ar" ? "نقاط مكتسبة من 100" : "Earned points out of 100"}</small>
+                <small className="mt-0.5 block text-[10px] font-medium text-brand">
+                  {lang === "ar" ? `تغطية الأدلة ${fmtPct(row.performanceScore.dataCoverage, 0)}` : `${fmtPct(row.performanceScore.dataCoverage, 0)} evidence coverage`}
+                </small>
               </div>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "جودة مكالمات PBX · أساس السكور" : "PBX call quality · score basis"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.analyzedCalls)} مكالمة مكتملة التحليل` : `${fmtNum(row.performanceScore.evidence.analyzedCalls)} completed call analyses`}</p>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `جودة المكالمات · ${row.performanceScore.weights.callQuality} نقطة` : `Call quality · ${row.performanceScore.weights.callQuality} pts`}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.analyzedCalls)} محللة من ${row.performanceScore.evidence.answeredCalls === null ? "—" : fmtNum(row.performanceScore.evidence.answeredCalls)} مكالمة تم الرد عليها · كسب ${fmtScorePoints(row.performanceScore.earnedPoints.callQuality)} نقطة` : `${fmtNum(row.performanceScore.evidence.analyzedCalls)} analyzed of ${row.performanceScore.evidence.answeredCalls === null ? "—" : fmtNum(row.performanceScore.evidence.answeredCalls)} answered calls · earned ${fmtScorePoints(row.performanceScore.earnedPoints.callQuality)} pts`}</p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "الليدز والمبيعات · مؤشر مساعد" : "Leads and sales · supporting indicator"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `تم الاتصال بـ ${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} من الليدز · نسبة البيع ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)}` : `${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} lead coverage · ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} conversion`}</p>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `التواصل والبيع · ${row.performanceScore.weights.salesExecution} نقطة` : `Lead execution · ${row.performanceScore.weights.salesExecution} pts`}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `اتصل بنفسه بـ ${row.performanceScore.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.performanceScore.evidence.ownerCalledDistributedLeads)} من ${fmtNum(row.performanceScore.evidence.distributedLeads)} ليد (${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)}) · التحويل ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} · كسب ${fmtScorePoints(row.performanceScore.earnedPoints.salesExecution)} نقطة` : `Personally called ${row.performanceScore.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.performanceScore.evidence.ownerCalledDistributedLeads)} of ${fmtNum(row.performanceScore.evidence.distributedLeads)} leads (${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)}) · ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} conversion · earned ${fmtScorePoints(row.performanceScore.earnedPoints.salesExecution)} pts`}</p>
               </div>
               <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "متابعة Chatwoot · لا تدخل في السكور" : "Chatwoot follow-up · not scored"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.chatConversations)} محادثة · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} عميل ينتظر ردًا · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} غير مقروءة` : `${fmtNum(row.performanceScore.evidence.chatConversations)} conversations · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} awaiting reply · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} unread`}</p>
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `متابعة Chatwoot · ${row.performanceScore.weights.chatFollowUp} نقطة` : `Chatwoot follow-up · ${row.performanceScore.weights.chatFollowUp} pts`}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.chatConversations)} محادثة · رد على ${fmtNum(row.performanceScore.evidence.chatRepliedConversations)} · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} ينتظرون ردًا · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} غير مقروءة · كسب ${fmtScorePoints(row.performanceScore.earnedPoints.chatFollowUp)} نقطة` : `${fmtNum(row.performanceScore.evidence.chatConversations)} conversations · replied to ${fmtNum(row.performanceScore.evidence.chatRepliedConversations)} · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} awaiting reply · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} unread · earned ${fmtScorePoints(row.performanceScore.earnedPoints.chatFollowUp)} pts`}</p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-3.5">
+                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `تحقيق التارجت · ${row.performanceScore.weights.targetAttainment} نقطة` : `Target attainment · ${row.performanceScore.weights.targetAttainment} pts`}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.targetAttainment)}</span></div>
+                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+                  {row.performanceScore.evidence.targetBasis === "orders"
+                    ? lang === "ar"
+                      ? `حسب أوامر البيع المؤكدة في الفترة · كسب ${fmtScorePoints(row.performanceScore.earnedPoints.targetAttainment)} نقطة`
+                      : `Based on confirmed sale orders in the period · earned ${fmtScorePoints(row.performanceScore.earnedPoints.targetAttainment)} pts`
+                    : row.performanceScore.evidence.targetBasis === "collections"
+                      ? lang === "ar"
+                        ? `حسب التحصيل المدفوع لعدم توفر أوامر البيع · كسب ${fmtScorePoints(row.performanceScore.earnedPoints.targetAttainment)} نقطة`
+                        : `Paid collections fallback because sale orders are unavailable · earned ${fmtScorePoints(row.performanceScore.earnedPoints.targetAttainment)} pts`
+                      : lang === "ar"
+                        ? row.target && !row.target.complete
+                          ? "الفترة أطول من الشهور المنشور لها تارجت؛ لم نحسب نسبة جزئية مضللة."
+                          : "لا يوجد تارجت صالح للحساب في الفترة."
+                        : row.target && !row.target.complete
+                          ? "The window exceeds the published target months, so no misleading partial ratio is scored."
+                          : "No scoreable target exists for this period."}
+                </p>
               </div>
             </div>
+            {row.performanceScore.missing.length > 0 && (
+              <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+                {lang === "ar"
+                  ? "الدرجة محافظة: أي جزء بلا بيانات كافية أخذ 0 نقطة مؤقتًا بدل ما نقاطه ترفع باقي الأجزاء."
+                  : "This is a conservative score: a component without enough evidence temporarily earns 0 points instead of inflating the remaining components."}
+              </p>
+            )}
+            <p className="mt-3 text-[10px] leading-relaxed text-text-subtle">
+              {lang === "ar"
+                ? `داخل جزء التواصل والبيع: 70% للاتصال الشخصي بالليدز و30% للتحويل، ويصل جزء التحويل لكامل درجته عند ${fmtPct(row.performanceScore.evidence.conversionBenchmarkPercent, 0)}. جودة المكالمات تحتاج 5 مكالمات محللة وتُراعى نسبة المكالمات التي اكتمل تحليلها، وChatwoot يحتاج 10 محادثات ليأخذ وزنه كاملًا. تحقيق التارجت يتوقف عند 100% داخل التقييم حتى لو تجاوزه الموظف.`
+                : `Inside lead execution, 70% comes from personally contacting assigned leads and 30% from conversion; the conversion sub-score reaches full marks at ${fmtPct(row.performanceScore.evidence.conversionBenchmarkPercent, 0)}. Call quality needs 5 audited calls and is adjusted for analysis coverage, while Chatwoot needs 10 conversations for full weight. Target attainment is capped at 100% inside the score even when the employee exceeds quota.`}
+            </p>
           </section>
 
           <section className="space-y-3">
@@ -1306,15 +1345,16 @@ function AgentPerformanceSheet({
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز المتوزعة" : "Assigned lead coverage"}</b>
-                <Pill tone={row.leadCallCoverageRate === null ? "neutral" : row.leadCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadCallCoverageRate, 1)}</Pill>
+                <b className="text-sm text-text">{lang === "ar" ? "تواصل الموظف مع الليدز المتوزعة عليه" : "Employee contact with assigned leads"}</b>
+                <Pill tone={row.leadOwnerCallCoverageRate === null ? "neutral" : row.leadOwnerCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadOwnerCallCoverageRate, 1)}</Pill>
               </div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "متوزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "تم الاتصال" : "Called"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "بدون اتصال" : "Never called"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "اتصل بهم بنفسه" : "Called by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "اتصل بهم أي موظف" : "Called by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "لم يتصل بهم أحد" : "Never called by anyone"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "من الموظف نفسه" : "By assigned owner"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
+                <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
               </div>
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
@@ -1324,6 +1364,7 @@ function AgentPerformanceSheet({
               </div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "المحادثات" : "Conversations"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
+                <MiniMetric label={lang === "ar" ? "تم الرد عليها" : "Replied to"} value={row.chatConversations === null ? "—" : fmtNum(row.performanceScore.evidence.chatRepliedConversations)} />
                 <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
                 <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={row.chatUnreadConversations === null ? "—" : fmtNum(row.chatUnreadConversations)} />
                 <MiniMetric label={lang === "ar" ? "رسائل غير مقروءة" : "Unread messages"} value={row.chatUnreadMessages === null ? "—" : fmtNum(row.chatUnreadMessages)} />
@@ -2540,6 +2581,10 @@ function highlightSuspectText(text: string, terms: string[], lang: "ar" | "en"):
 
 function fmtQuality(value: number | null): string {
   return value === null || !Number.isFinite(value) ? "—" : `${Math.round(value)}/100`;
+}
+
+function fmtScorePoints(value: number): string {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
 function qualityTone(value: number | null): "success" | "brand" | "warning" | "danger" | "neutral" {
