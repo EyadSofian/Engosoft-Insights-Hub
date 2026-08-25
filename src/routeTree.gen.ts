@@ -22,6 +22,7 @@ import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
 import { Route as OrganicRouteImport } from './routes/organic'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as SalesRouteImport } from './routes/sales'
+import { Route as SocialMediaRouteImport } from './routes/social-media'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as WebsiteRouteImport } from './routes/website'
 import { Route as WeekendRouteImport } from './routes/weekend'
@@ -30,6 +31,7 @@ import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiAgentCourseInvoicesRouteImport } from './routes/api/agent-course-invoices'
+import { Route as ApiBusinessInsightsRouteImport } from './routes/api/business-insights'
 import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -128,6 +130,11 @@ const SalesRoute = SalesRouteImport.update({
   path: '/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SocialMediaRoute = SocialMediaRouteImport.update({
+  id: '/social-media',
+  path: '/social-media',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -166,6 +173,11 @@ const ApiAdsRoute = ApiAdsRouteImport.update({
 const ApiAgentCourseInvoicesRoute = ApiAgentCourseInvoicesRouteImport.update({
   id: '/api/agent-course-invoices',
   path: '/api/agent-course-invoices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBusinessInsightsRoute = ApiBusinessInsightsRouteImport.update({
+  id: '/api/business-insights',
+  path: '/api/business-insights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCampaignRiskRoute = ApiCampaignRiskRouteImport.update({
@@ -345,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
+  '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/weekend': typeof WeekendRoute
@@ -353,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/business-insights': typeof ApiBusinessInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -400,6 +414,7 @@ export interface FileRoutesByTo {
   '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
+  '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/weekend': typeof WeekendRoute
@@ -408,6 +423,7 @@ export interface FileRoutesByTo {
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/business-insights': typeof ApiBusinessInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -456,6 +472,7 @@ export interface FileRoutesById {
   '/organic': typeof OrganicRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
+  '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
   '/website': typeof WebsiteRoute
   '/weekend': typeof WeekendRoute
@@ -464,6 +481,7 @@ export interface FileRoutesById {
   '/api/accounting-export': typeof ApiAccountingExportRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/business-insights': typeof ApiBusinessInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -513,6 +531,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/products'
     | '/sales'
+    | '/social-media'
     | '/teams'
     | '/website'
     | '/weekend'
@@ -521,6 +540,7 @@ export interface FileRouteTypes {
     | '/api/accounting-export'
     | '/api/ads'
     | '/api/agent-course-invoices'
+    | '/api/business-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -568,6 +588,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/products'
     | '/sales'
+    | '/social-media'
     | '/teams'
     | '/website'
     | '/weekend'
@@ -576,6 +597,7 @@ export interface FileRouteTypes {
     | '/api/accounting-export'
     | '/api/ads'
     | '/api/agent-course-invoices'
+    | '/api/business-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -623,6 +645,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/products'
     | '/sales'
+    | '/social-media'
     | '/teams'
     | '/website'
     | '/weekend'
@@ -631,6 +654,7 @@ export interface FileRouteTypes {
     | '/api/accounting-export'
     | '/api/ads'
     | '/api/agent-course-invoices'
+    | '/api/business-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -679,6 +703,7 @@ export interface RootRouteChildren {
   OrganicRoute: typeof OrganicRoute
   ProductsRoute: typeof ProductsRoute
   SalesRoute: typeof SalesRoute
+  SocialMediaRoute: typeof SocialMediaRoute
   TeamsRoute: typeof TeamsRoute
   WebsiteRoute: typeof WebsiteRoute
   WeekendRoute: typeof WeekendRoute
@@ -687,6 +712,7 @@ export interface RootRouteChildren {
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiAgentCourseInvoicesRoute: typeof ApiAgentCourseInvoicesRoute
+  ApiBusinessInsightsRoute: typeof ApiBusinessInsightsRoute
   ApiCampaignRiskRoute: typeof ApiCampaignRiskRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -814,6 +840,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/social-media': {
+      id: '/social-media'
+      path: '/social-media'
+      fullPath: '/social-media'
+      preLoaderRoute: typeof SocialMediaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams': {
       id: '/teams'
       path: '/teams'
@@ -868,6 +901,13 @@ declare module '@tanstack/react-router' {
       path: '/api/agent-course-invoices'
       fullPath: '/api/agent-course-invoices'
       preLoaderRoute: typeof ApiAgentCourseInvoicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/business-insights': {
+      id: '/api/business-insights'
+      path: '/api/business-insights'
+      fullPath: '/api/business-insights'
+      preLoaderRoute: typeof ApiBusinessInsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/campaign-risk': {
@@ -1111,6 +1151,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrganicRoute: OrganicRoute,
   ProductsRoute: ProductsRoute,
   SalesRoute: SalesRoute,
+  SocialMediaRoute: SocialMediaRoute,
   TeamsRoute: TeamsRoute,
   WebsiteRoute: WebsiteRoute,
   WeekendRoute: WeekendRoute,
@@ -1119,6 +1160,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAccountingExportRoute: ApiAccountingExportRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiAgentCourseInvoicesRoute: ApiAgentCourseInvoicesRoute,
+  ApiBusinessInsightsRoute: ApiBusinessInsightsRoute,
   ApiCampaignRiskRoute: ApiCampaignRiskRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,

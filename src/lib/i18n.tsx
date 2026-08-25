@@ -19,9 +19,10 @@ type Entry = { ar: string; en: string };
  */
 export const DICT = {
   app_title: { ar: "منصة إنجوسوفت للتحليلات", en: "Engosoft Insights" },
-  app_sub: { ar: "تحليلات التسويق والحسابات", en: "Marketing & Accounting Intelligence" },
+  app_sub: { ar: "ذكاء الأعمال والأداء", en: "Business & Performance Intelligence" },
 
   // nav
+  business_analytics: { ar: "تحليلات البيزنس", en: "Business analytics" },
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
   weekend: { ar: "أداء الويك إند", en: "Weekend performance" },
@@ -38,6 +39,11 @@ export const DICT = {
   products: { ar: "المنتجات", en: "Products" },
   teams: { ar: "أداء الموظفين", en: "Employee Performance" },
   yoy: { ar: "مقارنة سنوية", en: "Year over year" },
+  lead_quality: { ar: "جودة وأعداد الليدز", en: "Lead quality" },
+  comparisons: { ar: "المقارنات", en: "Comparisons" },
+  social_media: { ar: "السوشيال ميديا", en: "Social media" },
+  channel_performance: { ar: "أداء قنوات التواصل", en: "Channel performance" },
+  moderation: { ar: "الموديريشن", en: "Moderation" },
   more: { ar: "المزيد", en: "More" },
   // Short forms for the mobile bar, where five labels share one row.
   overview_short: { ar: "الرئيسية", en: "Home" },

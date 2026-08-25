@@ -16,7 +16,7 @@ export function SectionTabs() {
   const { t, lang } = useI18n();
   const section = sectionForPathname(pathname);
 
-  if (!section || section.id === "overview") return null;
+  if (!section || section.items.length < 2) return null;
 
   const SectionIcon = section.icon;
   const label = section.label[lang];
@@ -27,9 +27,7 @@ export function SectionTabs() {
       // A section with a single report has nothing to switch between, so on a
       // phone the row is 70px of pure chrome — the bottom nav already says
       // which section is open. It stays from `sm` up, where it costs nothing.
-      className={`border-b border-border bg-surface/95 ${
-        section.items.length < 2 ? "hidden sm:block" : ""
-      }`}
+      className="border-b border-border bg-surface/95 lg:hidden"
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
         <div className="hidden shrink-0 items-center gap-2 pe-3 text-sm font-semibold text-text sm:flex">

@@ -20,6 +20,7 @@ import {
 import type { ReactNode } from "react";
 import { PageHeader, Pill } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
+import { NAVIGATION_SECTIONS } from "@/lib/navigation";
 
 export const Route = createFileRoute("/guide")({ component: GuidePage });
 
@@ -60,6 +61,36 @@ function GuidePage() {
             <GuideLink to="/courses" label={ar ? "افتح الدورات" : "Open courses"} />
             <GuideLink to="/accounting" label={ar ? "راجع الفواتير" : "Review invoices"} />
           </div>
+        </div>
+      </section>
+
+      <section className="card p-4 sm:p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">
+            {ar ? "خريطة أقسام الداشبورد" : "Dashboard section map"}
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            {ar
+              ? "كل سؤال إداري له قسم واحد واضح؛ التقارير المرتبطة تظهر داخله بدون تكرار في القائمة."
+              : "Each management question has one clear workspace; related reports appear inside it without duplicating the sidebar."}
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {NAVIGATION_SECTIONS.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Link
+                key={section.id}
+                to={section.defaultTo}
+                className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-brand">
+                  <Icon size={18} />
+                </span>
+                <span>{section.label[lang]}</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -137,7 +168,7 @@ function GuidePage() {
           number="02"
           icon={<Megaphone size={19} />}
           title={ar ? "اعرف الحملة شغالة وحققت إيه" : "Check campaign status and results"}
-          path={ar ? "التسويق ← الحملات" : "Marketing → Campaigns"}
+          path={ar ? "الحملات ← أداء الحملات" : "Campaigns → Campaign performance"}
           description={
             ar
               ? "Active جاي من حالة المنصة ومش بيتغير مع فلتر التاريخ. نفس الصف يعرض صرف وليدز وLost وWon وإيراد الفترة؛ السهم يفتح إجمالي تاريخ الحملة وROAS وآخر يوم صرف."
@@ -153,7 +184,9 @@ function GuidePage() {
           icon={<Users size={19} />}
           title={ar ? "تابع الليدز والـLost" : "Track leads and Lost"}
           path={
-            ar ? "إدارة العملاء ← العملاء المحتملون / تحليل الخسائر" : "CRM → Leads / Lost Analysis"
+            ar
+              ? "جودة وأعداد الليدز ← العملاء المحتملون / تحليل الخسائر"
+              : "Lead quality → Leads / Lost Analysis"
           }
           description={
             ar
@@ -169,7 +202,7 @@ function GuidePage() {
           number="04"
           icon={<GraduationCap size={19} />}
           title={ar ? "قارن الدورات والحملات المرتبطة" : "Compare courses and linked campaigns"}
-          path={ar ? "التسويق ← الدورات" : "Marketing → Courses"}
+          path={ar ? "المبيعات ← الدورات" : "Sales → Courses"}
           description={
             ar
               ? "كل صف دورة يعرض إنفاق وليدز وLost وWon وأوامر بيع وفواتير وإيراد الفترة. اضغط الدورة لتشوف كل حملاتها، مصدر ربط الاسم، ومقارنة شهرين لنفس الدورة."
@@ -184,7 +217,7 @@ function GuidePage() {
           number="05"
           icon={<BadgeDollarSign size={19} />}
           title={ar ? "راجع الفاتورة وتاريخ التحصيل" : "Audit invoice recognition dates"}
-          path={ar ? "الحسابات ← الحسابات" : "Accounting → Accounting"}
+          path={ar ? "المبيعات ← الحسابات" : "Sales → Accounting"}
           description={
             ar
               ? "ابحث برقم أمر البيع أو الفاتورة. الوضع الافتراضي يستخدم Payment Date داخل حركة السداد، مش Due Date. الدفع المقدم ممكن يظهر قبل تاريخ إصدار الفاتورة، وده طبيعي لو Odoo رابط الحركة."
@@ -452,8 +485,8 @@ function MockAssistant({ ar }: { ar: boolean }) {
       </div>
       <div className="max-w-[92%] rounded-2xl rounded-es-sm bg-surface-2 px-3 py-2 text-xs leading-5 text-text">
         {ar
-          ? "افتح التسويق ← الحملات. الصف يعرض أرقام الفترة؛ والسهم يفتح إجمالي تاريخ الحملة."
-          : "Open Marketing → Campaigns. Rows show period figures; expand for lifetime totals."}
+          ? "افتح الحملات ← أداء الحملات. الصف يعرض أرقام الفترة؛ والسهم يفتح إجمالي تاريخ الحملة."
+          : "Open Campaigns → Campaign performance. Rows show period figures; expand for lifetime totals."}
       </div>
     </div>
   );

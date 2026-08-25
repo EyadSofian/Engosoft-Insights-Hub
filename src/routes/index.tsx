@@ -1,18 +1,22 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Award,
   BookOpenCheck,
+  BrainCircuit,
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
+  Crown,
   DollarSign,
   Info,
   Percent,
+  ShieldAlert,
   Target,
   TrendingDown,
   TrendingUp,
+  UserRoundCheck,
   Users,
   Timer,
 } from "lucide-react";
@@ -100,6 +104,24 @@ interface CourseSaleContribution {
   averageSalePrice: number | null;
 }
 
+interface BusinessInsightsResponse {
+  bestEmployee: {
+    key: string;
+    name: string;
+    team: string;
+    paidRevenue: number;
+    leads: number;
+    won: number;
+    conversionRate: number | null;
+  } | null;
+  targets: {
+    totalTarget: number | null;
+    complete: boolean;
+    monthsMissing: string[];
+    matchedEmployees: number;
+  };
+}
+
 type TrendGrain = "day" | "week";
 
 interface MoneyPoint extends Record<string, string | number> {
@@ -136,13 +158,282 @@ function moneyTrend(
     .map(([date, value]) => ({ date, value }));
 }
 
+interface BusinessSignals {
+  topCourse: CourseSaleContribution | null;
+  courseTargetShare: number | null;
+  targetComplete: boolean;
+  bestEmployee: BusinessInsightsResponse["bestEmployee"];
+  bestCampaign: PerfRow | null;
+  risk: { title: string; detail: string };
+  decision: { title: string; detail: string; href: string };
+}
+
+function businessSignals(
+  data: OverviewResp,
+  workforce: BusinessInsightsResponse | undefined,
+  lang: "ar" | "en",
+): BusinessSignals {
+  const topCourse = data.courseSales[0] ?? null;
+  const target = workforce?.targets.totalTarget ?? null;
+  const courseTargetShare =
+    topCourse && target !== null && target > 0 ? (topCourse.revenue / target) * 100 : null;
+  const bestEmployee = workforce?.bestEmployee ?? null;
+
+  let risk: BusinessSignals["risk"];
+  if (data.fetchErrors.length || data.staleTabs.length) {
+    const sources = [...data.fetchErrors, ...data.staleTabs].join(" · ");
+    risk = {
+      title: lang === "ar" ? "حداثة الداتا" : "Data freshness",
+      detail:
+        lang === "ar"
+          ? `مصادر تحتاج مراجعة: ${sources}`
+          : `Sources requiring attention: ${sources}`,
+    };
+  } else if (data.leak) {
+    risk = {
+      title: data.leak.name || (lang === "ar" ? "حملة عالية المخاطرة" : "High-risk campaign"),
+      detail:
+        lang === "ar"
+          ? `صرف ${fmtUSD(data.leak.spend)} مقابل ${fmtUSD(data.leak.revenue)} إيراد مرتبط.`
+          : `${fmtUSD(data.leak.spend)} spend versus ${fmtUSD(data.leak.revenue)} linked revenue.`,
+    };
+  } else if ((data.totals.lostRate ?? 0) >= 35) {
+    risk = {
+      title: lang === "ar" ? "نسبة Lost مرتفعة" : "High Lost rate",
+      detail: `${fmtPct(data.totals.lostRate, 1)} · ${fmtNum(data.totals.lost)} ${lang === "ar" ? "ليد" : "leads"}`,
+    };
+  } else {
+    risk = {
+      title: lang === "ar" ? "لا يوجد إنذار حرج ظاهر" : "No critical alert detected",
+      detail:
+        lang === "ar"
+          ? "استمر في مراقبة الصرف وجودة الليد يوميًا."
+          : "Keep monitoring spend and lead quality daily.",
+    };
+  }
+
+  let decision: BusinessSignals["decision"];
+  if (data.fetchErrors.length || data.staleTabs.length) {
+    decision = {
+      title:
+        lang === "ar"
+          ? "ثبّت مصادر الداتا قبل تغيير الميزانية"
+          : "Stabilize data before changing budget",
+      detail:
+        lang === "ar"
+          ? "القرار المالي المبني على مصدر ناقص أو نسخة قديمة قد يكون مضللاً؛ راجع المصادر المتأثرة أولاً."
+          : "A budget decision based on missing or stale sources can mislead; fix the affected feeds first.",
+      href: "/guide",
+    };
+  } else if (data.leak && data.leak.spend > data.leak.revenue) {
+    decision = {
+      title:
+        lang === "ar" ? `راجع أو خفّض ${data.leak.name}` : `Review or reduce ${data.leak.name}`,
+      detail:
+        lang === "ar"
+          ? "الحملة تصرف أكثر من الإيراد المرتبط بها في الفترة. افحص جودة الليد والتتبع قبل ضخ ميزانية إضافية."
+          : "This campaign spends more than its linked revenue. Audit lead quality and attribution before adding budget.",
+      href: "/campaigns",
+    };
+  } else if ((data.totals.lostRate ?? 0) >= 35) {
+    decision = {
+      title:
+        lang === "ar"
+          ? "الأولوية لتحسين المتابعة لا لزيادة الصرف"
+          : "Prioritize follow-up before more spend",
+      detail:
+        lang === "ar"
+          ? "نسبة Lost الحالية تشير أن تحسين سرعة وجودة المتابعة قد يحقق نتيجة أكبر من توسيع الحملات."
+          : "The current Lost rate suggests follow-up quality can create more value than campaign expansion.",
+      href: "/lost",
+    };
+  } else if (data.best) {
+    decision = {
+      title:
+        lang === "ar"
+          ? `اختبر زيادة منضبطة لـ ${data.best.name}`
+          : `Test a controlled increase for ${data.best.name}`,
+      detail:
+        lang === "ar"
+          ? "ابدأ بزيادة 10–15% مع مراقبة CPL وجودة الليد، ولا تعتبر ROAS وحده ضمانًا للاستمرار."
+          : "Start with a 10–15% increase while watching CPL and lead quality; ROAS alone is not a guarantee.",
+      href: "/campaigns",
+    };
+  } else {
+    decision = {
+      title:
+        lang === "ar"
+          ? "اجمع عينة أكبر قبل تغيير الخطة"
+          : "Collect a larger sample before changing course",
+      detail:
+        lang === "ar"
+          ? "لا توجد حملة مؤهلة بما يكفي لقرار توسّع أو إيقاف موثوق في الفترة الحالية."
+          : "No campaign has enough reliable evidence for a scale-or-stop decision in this period.",
+      href: "/campaigns",
+    };
+  }
+
+  return {
+    topCourse,
+    courseTargetShare,
+    targetComplete: workforce?.targets.complete ?? false,
+    bestEmployee,
+    bestCampaign: data.best,
+    risk,
+    decision,
+  };
+}
+
+function BusinessDecisionCockpit({
+  signals,
+  workforceLoading,
+  lang,
+}: {
+  signals: BusinessSignals;
+  workforceLoading: boolean;
+  lang: "ar" | "en";
+}) {
+  const employee = signals.bestEmployee;
+  const campaign = signals.bestCampaign;
+
+  return (
+    <section className="rounded-2xl border border-border bg-navy p-3.5 text-white shadow-[0_18px_50px_rgba(0,28,60,0.14)] sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-base font-bold">
+            <BrainCircuit size={20} className="text-electric" />
+            {lang === "ar" ? "غرفة القرار التنفيذي" : "Executive decision room"}
+          </div>
+          <p className="mt-1 text-xs leading-6 text-white/55">
+            {lang === "ar"
+              ? "ملخص قابل للتنفيذ من المبيعات والحملات والموظفين وجودة البيانات."
+              : "An actionable summary across sales, campaigns, people and data quality."}
+          </p>
+        </div>
+        <Pill tone="brand">{lang === "ar" ? "يتحدث مع الفلاتر" : "Filter-aware"}</Pill>
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <DecisionMetric
+          icon={<BookOpenCheck size={18} />}
+          label={lang === "ar" ? "أهم دورة" : "Top course"}
+          value={signals.topCourse?.course ?? "—"}
+          detail={
+            signals.topCourse
+              ? `${fmtUSD(signals.topCourse.revenue)} · ${
+                  signals.courseTargetShare !== null
+                    ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` (${lang === "ar" ? "جزئي" : "partial"})`}`
+                    : `${fmtPct(signals.topCourse.contribution, 1)} ${lang === "ar" ? "من إيراد الدورات" : "of course revenue"}`
+                }`
+              : lang === "ar"
+                ? "لا توجد مبيعات دورات مصنفة"
+                : "No classified course sales"
+          }
+        />
+        <DecisionMetric
+          icon={<UserRoundCheck size={18} />}
+          label={lang === "ar" ? "أفضل موظف مبيعات" : "Top sales employee"}
+          value={
+            workforceLoading
+              ? lang === "ar"
+                ? "جارٍ الحساب…"
+                : "Calculating…"
+              : (employee?.name ?? "—")
+          }
+          detail={
+            employee
+              ? `${fmtUSD(employee.paidRevenue)} ${lang === "ar" ? "تحصيل" : "collected"} · ${fmtPct(employee.conversionRate, 1)} ${lang === "ar" ? "إغلاق" : "conversion"}`
+              : lang === "ar"
+                ? "لا توجد مبيعات منسوبة لموظف"
+                : "No employee-attributed sales"
+          }
+        />
+        <DecisionMetric
+          icon={<Crown size={18} />}
+          label={lang === "ar" ? "أفضل حملة" : "Best campaign"}
+          value={campaign?.name ?? "—"}
+          detail={
+            campaign
+              ? `${fmtRoas(campaign.roas)} · ${fmtUSD(campaign.revenue)} ${lang === "ar" ? "إيراد" : "revenue"}`
+              : lang === "ar"
+                ? "لا توجد حملة مؤهلة"
+                : "No eligible campaign"
+          }
+        />
+        <DecisionMetric
+          icon={<ShieldAlert size={18} />}
+          label={lang === "ar" ? "أخطر نقطة الآن" : "Most urgent risk"}
+          value={signals.risk.title}
+          detail={signals.risk.detail}
+          warning
+        />
+      </div>
+
+      <div className="mt-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.07] p-3.5 sm:flex-row sm:items-center">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-electric text-navy">
+          <Target size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-electric">
+            {lang === "ar" ? "القرار المقترح" : "Recommended decision"}
+          </div>
+          <div className="mt-0.5 text-sm font-bold">{signals.decision.title}</div>
+          <p className="mt-1 text-[11.5px] leading-5 text-white/60">{signals.decision.detail}</p>
+        </div>
+        <a
+          href={signals.decision.href}
+          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-white px-4 text-xs font-bold text-navy transition-transform hover:-translate-y-0.5"
+        >
+          {lang === "ar" ? "افتح التحليل" : "Open analysis"}
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function DecisionMetric({
+  icon,
+  label,
+  value,
+  detail,
+  warning = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  warning?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.055] p-3.5">
+      <div
+        className={`mb-3 flex items-center gap-2 text-[11px] font-semibold ${warning ? "text-amber-300" : "text-white/55"}`}
+      >
+        {icon}
+        {label}
+      </div>
+      <div className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-white" title={value}>
+        {value}
+      </div>
+      <p className="mt-1.5 line-clamp-2 min-h-9 text-[10.5px] leading-[1.15rem] text-white/50">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
 function Overview() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
+  const workforce = useApi<BusinessInsightsResponse>("/api/business-insights");
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
   const [revenueGrain, setRevenueGrain] = useState<TrendGrain>("week");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
+  const business = useMemo(
+    () => (data ? businessSignals(data, workforce.data, lang) : null),
+    [data, workforce.data, lang],
+  );
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -176,8 +467,12 @@ function Overview() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={t("overview")}
-        subtitle={filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined}
+        title={t("business_analytics")}
+        subtitle={
+          lang === "ar"
+            ? `غرفة القرار التنفيذي${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
+            : `Executive decision room${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
+        }
       />
 
       {mobileAlertCount > 0 && (
@@ -319,6 +614,12 @@ function Overview() {
           </Notice>
         )}
       </div>
+
+      <BusinessDecisionCockpit
+        signals={business!}
+        workforceLoading={workforce.isLoading}
+        lang={lang}
+      />
 
       <details className="group card overflow-hidden sm:hidden">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
@@ -600,11 +901,6 @@ function Overview() {
               : "CRM leads can exceed platform-reported leads because some arrive from WhatsApp, referrals and other sources without matching ad spend."}
           </p>
         </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Spotlight tone="success" title={t("best_campaign")} row={data.best} />
-        <Spotlight tone="danger" title={t("money_leak")} row={data.leak} />
       </div>
 
       <CampaignActivityPanel activity={data.activity} />
@@ -1023,58 +1319,6 @@ function CpaCard({ totals }: { totals: Totals }) {
           : `${fmtUSD(totals.spend)} ÷ ${fmtNum(totals.won)} won deals`}
       </div>
     </div>
-  );
-}
-
-function Spotlight({
-  tone,
-  title,
-  row,
-}: {
-  tone: "success" | "danger";
-  title: string;
-  row: PerfRow | null;
-}) {
-  const { t, lang } = useI18n();
-  if (!row) {
-    return (
-      <Card>
-        <SectionTitle>{title}</SectionTitle>
-        <EmptyState label={t("no_data")} compact />
-      </Card>
-    );
-  }
-  return (
-    <Card>
-      <SectionTitle>{title}</SectionTitle>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <span className="text-sm font-semibold text-text leading-snug min-w-0" title={row.name}>
-          {row.name || "—"}
-        </span>
-        <RoasCell roas={row.roas} spend={row.spend} />
-      </div>
-      <dl className="grid grid-cols-2 gap-y-2 text-[13px]">
-        <dt className="text-text-muted">{t("spend")}</dt>
-        <dd className="text-end num font-medium">{fmtUSD(row.spend)}</dd>
-        <dt className="text-text-muted">{t("revenue")}</dt>
-        <dd className="text-end num font-medium">{fmtUSD(row.revenue)}</dd>
-        <dt className="text-text-muted">{t("crm_leads")}</dt>
-        <dd className="text-end num font-medium">{fmtNum(row.crmLeads)}</dd>
-        <dt className="text-text-muted">{t("cpl")}</dt>
-        <dd className="text-end num font-medium">{fmtUSDFull(row.cpl)}</dd>
-        <dt className="text-text-muted">{t("acos")}</dt>
-        <dd className="text-end">
-          <AcosPill acos={row.acos} />
-        </dd>
-      </dl>
-      {tone === "danger" && row.revenue <= 0 && row.spend > 0 && (
-        <p className="text-[12px] mt-3" style={{ color: "var(--danger)" }}>
-          {lang === "ar"
-            ? `أنفقت ${fmtUSD(row.spend)} ولم تُسجَّل أي إيراد مرتبط بها.`
-            : `Spent ${fmtUSD(row.spend)} and returned nothing traceable.`}
-        </p>
-      )}
-    </Card>
   );
 }
 

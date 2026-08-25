@@ -1,12 +1,14 @@
 import {
   BarChart3,
+  BrainCircuit,
   CalendarClock,
   CalendarRange,
   GraduationCap,
+  GitCompareArrows,
   Globe2,
-  LayoutDashboard,
   Leaf,
   Megaphone,
+  MessagesSquare,
   Receipt,
   TrendingDown,
   Users,
@@ -23,7 +25,15 @@ export interface NavigationItem {
 }
 
 export interface NavigationSection {
-  id: "overview" | "marketing" | "crm" | "accounting" | "website";
+  id:
+    | "business"
+    | "campaigns"
+    | "sales"
+    | "leads"
+    | "comparisons"
+    | "website"
+    | "media-buyers"
+    | "social";
   label: Record<Lang, string>;
   shortLabel: Record<Lang, string>;
   icon: LucideIcon;
@@ -33,43 +43,46 @@ export interface NavigationSection {
 }
 
 /**
- * The information architecture has two deliberate levels:
- * business domain first, then the report inside that domain.
- *
- * Year-over-year lives under Marketing because it compares the same spend,
- * lead and attributed-revenue facts as the other marketing reports. This keeps
- * the mobile navigation to five stable destinations instead of hiding a sixth
- * primary destination behind a "More" drawer.
+ * The information architecture mirrors an executive BI workspace: each primary
+ * section owns one business question and only reveals its detailed reports when
+ * it is active. Routes remain stable so bookmarks and shared links keep working.
  */
 export const NAVIGATION_SECTIONS: NavigationSection[] = [
   {
-    id: "overview",
-    label: { ar: "نظرة عامة", en: "Overview" },
-    shortLabel: { ar: "الرئيسية", en: "Home" },
-    icon: LayoutDashboard,
+    id: "business",
+    label: { ar: "تحليلات البيزنس", en: "Business analytics" },
+    shortLabel: { ar: "البيزنس", en: "Business" },
+    icon: BrainCircuit,
     defaultTo: "/",
-    items: [{ to: "/", key: "overview", icon: LayoutDashboard }],
+    items: [{ to: "/", key: "business_analytics", icon: BrainCircuit }],
   },
   {
-    id: "marketing",
-    label: { ar: "التسويق", en: "Marketing" },
-    shortLabel: { ar: "التسويق", en: "Marketing" },
+    id: "campaigns",
+    label: { ar: "الحملات", en: "Campaigns" },
+    shortLabel: { ar: "الحملات", en: "Campaigns" },
     icon: Megaphone,
     defaultTo: "/campaigns",
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
-      { to: "/weekend", key: "weekend", icon: CalendarClock },
-      { to: "/organic", key: "organic", icon: Leaf },
-      { to: "/courses", key: "courses", icon: GraduationCap },
-      { to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch },
       { to: "/ads", key: "ads_tech", icon: BarChart3 },
-      { to: "/yoy", key: "yoy", icon: CalendarRange },
     ],
   },
   {
-    id: "crm",
-    label: { ar: "إدارة العملاء", en: "CRM" },
-    shortLabel: { ar: "العملاء", en: "CRM" },
+    id: "sales",
+    label: { ar: "المبيعات", en: "Sales" },
+    shortLabel: { ar: "المبيعات", en: "Sales" },
+    icon: Receipt,
+    defaultTo: "/accounting",
+    aliases: ["/full-invoiced", "/sales", "/products"],
+    items: [
+      { to: "/accounting", key: "accounting", icon: Receipt },
+      { to: "/courses", key: "courses", icon: GraduationCap },
+    ],
+  },
+  {
+    id: "leads",
+    label: { ar: "جودة وأعداد الليدز", en: "Lead quality" },
+    shortLabel: { ar: "الليدز", en: "Leads" },
     icon: Users,
     defaultTo: "/leads",
     items: [
@@ -79,16 +92,15 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     ],
   },
   {
-    id: "accounting",
-    label: { ar: "الحسابات", en: "Accounting" },
-    shortLabel: { ar: "الحسابات", en: "Accounts" },
-    icon: Receipt,
-    defaultTo: "/accounting",
-    aliases: ["/full-invoiced"],
-    // The sales-funnel report is hidden, not deleted: `/sales` still exists and
-    // redirects into Accounting. Listing it here is the only switch that brings
-    // it back into the sidebar and the section tabs.
-    items: [{ to: "/accounting", key: "accounting", icon: Receipt }],
+    id: "comparisons",
+    label: { ar: "المقارنات", en: "Comparisons" },
+    shortLabel: { ar: "المقارنة", en: "Compare" },
+    icon: GitCompareArrows,
+    defaultTo: "/weekend",
+    items: [
+      { to: "/weekend", key: "weekend", icon: CalendarClock },
+      { to: "/yoy", key: "yoy", icon: CalendarRange },
+    ],
   },
   {
     id: "website",
@@ -97,6 +109,25 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     icon: Globe2,
     defaultTo: "/website",
     items: [{ to: "/website", key: "website", icon: Globe2 }],
+  },
+  {
+    id: "media-buyers",
+    label: { ar: "أداء الميديا بايرز", en: "Media buyers" },
+    shortLabel: { ar: "الميديا", en: "Media" },
+    icon: UserRoundSearch,
+    defaultTo: "/media-buyers",
+    items: [{ to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch }],
+  },
+  {
+    id: "social",
+    label: { ar: "السوشيال ميديا", en: "Social media" },
+    shortLabel: { ar: "السوشيال", en: "Social" },
+    icon: MessagesSquare,
+    defaultTo: "/social-media",
+    items: [
+      { to: "/social-media", key: "social_media", icon: MessagesSquare },
+      { to: "/organic", key: "organic", icon: Leaf },
+    ],
   },
 ];
 

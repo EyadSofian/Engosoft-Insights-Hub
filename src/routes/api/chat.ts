@@ -244,20 +244,20 @@ export const Route = createFileRoute("/api/chat")({
             )
           ) {
             return ar
-              ? "افتح **التسويق ← الحملات** أو [اضغط هنا](/campaigns). هتلاقي حالة Active من المنصات نفسها، وتحت كل حملة أرقام الفترة المختارة؛ افتح السهم لرؤية إجمالي تاريخها."
-              : "Open **Marketing → Campaigns** or [go there now](/campaigns). Active status comes from the ad platforms; each row shows the selected period and expands to lifetime totals.";
+              ? "افتح **الحملات ← أداء الحملات** أو [اضغط هنا](/campaigns). هتلاقي حالة Active من المنصات نفسها، وتحت كل حملة أرقام الفترة المختارة؛ افتح السهم لرؤية إجمالي تاريخها."
+              : "Open **Campaigns → Campaign performance** or [go there now](/campaigns). Active status comes from the ad platforms; each row shows the selected period and expands to lifetime totals.";
           }
           if (has("فين الليدز", "الليدز منين", "أجيب الليدز", "اجيب الليدز", "where are leads")) {
             return ar
-              ? "افتح **إدارة العملاء ← العملاء المحتملون** من [هنا](/leads). الليدز الحالية من CRM في Odoo، أما Lost فمن أرشيف Odoo المباشر وتلاقيه في [تحليل الخسائر](/lost)."
-              : "Open **CRM → Leads** [here](/leads). Current leads come from Odoo CRM; archived Lost is read directly from Odoo and appears in [Lost Analysis](/lost).";
+              ? "افتح **جودة وأعداد الليدز ← العملاء المحتملون** من [هنا](/leads). الليدز الحالية من CRM في Odoo، أما Lost فمن أرشيف Odoo المباشر وتلاقيه في [تحليل الخسائر](/lost)."
+              : "Open **Lead quality → Leads** [here](/leads). Current leads come from Odoo CRM; archived Lost is read directly from Odoo and appears in [Lost Analysis](/lost).";
           }
           if (
             has("فين الدورات", "الدورات منين", "أجيب الدورات", "اجيب الدورات", "where are courses")
           ) {
             return ar
-              ? "افتح **التسويق ← الدورات** أو [اضغط هنا](/courses). اختار الدورة لتشوف إنفاق وليدز وLost وWon وإيراد الفترة، والحملات المرتبطة ومقارنة الشهور."
-              : "Open **Marketing → Courses** [here](/courses). Select a course to see period spend, leads, Lost, Won, revenue, linked campaigns, and month comparisons.";
+              ? "افتح **المبيعات ← الدورات** أو [اضغط هنا](/courses). اختار الدورة لتشوف إنفاق وليدز وLost وWon وإيراد الفترة، والحملات المرتبطة ومقارنة الشهور."
+              : "Open **Sales → Courses** [here](/courses). Select a course to see period spend, leads, Lost, Won, revenue, linked campaigns, and month comparisons.";
           }
           if (has("cpl", "تكلفة العميل")) {
             return ar
@@ -287,7 +287,7 @@ export const Route = createFileRoute("/api/chat")({
             cpa: "total ad spend ÷ won deals.",
             lost: "Lost Analysis only. CRM stage Lost is excluded.",
             navigation:
-              "Campaigns: /campaigns. Leads: /leads. Archived Lost: /lost. Courses: /courses. Paid invoices: /accounting. Full user guide: /guide.",
+              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. Lead quality: /leads. Archived Lost: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
             revenue: "Accounting.USD Paid filtered by Payment Date at invoice product-line grain.",
             roas: "Accounting.USD Paid revenue ÷ total ad spend. attributedRoas uses campaign-linked Accounting revenue.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",
