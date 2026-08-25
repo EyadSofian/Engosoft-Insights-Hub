@@ -231,7 +231,8 @@ function Website() {
           lost: "مفقود",
           specialtyNote: "يجمع ليدز CRM ومبيعات الموقع الموحّدة حسب الكورس",
           reconciliation: "مطابقة مصادر المبيعات",
-          reconciliationHint: "Odoo + شيت Website Sales الخارجي حسب Order ID",
+          reconciliationHint:
+            "Odoo (موقع Engosoft أو Source=Website) + شيت Website Sales الخارجي حسب Order ID",
           odooOnlyOrders: "من Odoo فقط",
           matchedOrders: "متطابق بين المصدرين",
           externalOnlyOrders: "من الشيت فقط",
@@ -311,7 +312,8 @@ function Website() {
           lost: "lost",
           specialtyNote: "Combines Odoo CRM website leads and reconciled website sales by course",
           reconciliation: "Sales-source reconciliation",
-          reconciliationHint: "Odoo + external Website Sales sheet matched by Order ID",
+          reconciliationHint:
+            "Odoo (Engosoft website or Source=Website) + external Website Sales sheet matched by Order ID",
           odooOnlyOrders: "Odoo only",
           matchedOrders: "Matched across both sources",
           externalOnlyOrders: "External sheet only",

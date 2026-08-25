@@ -11,9 +11,10 @@ export const Route = createFileRoute("/api/website")({
         const filters = await parseFilters(request);
 
         // Website leads come from Odoo CRM Source=Website. Website revenue is
-        // reconciled by Order ID across Odoo and the approved external Website
-        // Sales sheet. Ad campaigns tagged `web` or `con` by Engosoft's naming
-        // convention are collected on this page.
+        // reconciled by Order ID across Odoo (`website_id=Engosoft` OR
+        // `Source=Website`) and the approved external Website Sales sheet. Ad
+        // campaigns tagged `web` or `con` by Engosoft's naming convention are
+        // collected on this page.
         const websiteFilters = {
           from: filters.from,
           to: filters.to,
@@ -543,7 +544,7 @@ export const Route = createFileRoute("/api/website")({
           ),
           asOf,
           salesSource:
-            "Order-ID reconciliation: Odoo sale.order website_id=Engosoft,state=sale + approved external Website Sales Google Sheet",
+            "Order-ID reconciliation: confirmed Odoo sale.order with website_id=Engosoft OR Source=Website + approved external Website Sales Google Sheet",
           salesDateBasis: "payment_date_fallback_external_date_fallback_order_date",
           contactAgeBasis: "last_stage_update_fallback_created_at",
           appliedFilters: websiteFilters,

@@ -520,7 +520,9 @@ async function fetchSnapshot(): Promise<ProductSnapshot> {
       medium: m2oName(order.medium_id),
       team: m2oName(order.team_id),
       salesperson: m2oName(order.user_id),
-      fromWebsite: Boolean(m2oId(order.website_id)),
+      // Sales-created orders often preserve Source=Website but lose
+      // `website_id`. Both values describe the same Website population.
+      fromWebsite: Boolean(m2oId(order.website_id)) || source.key === "website",
     });
   }
 
