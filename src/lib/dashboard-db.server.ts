@@ -21,6 +21,7 @@ export type DashboardDataset =
   | "pbx_extensions"
   | "sla_calls"
   | "sales_targets"
+  | "media_plans"
   /** Odoo's monthly operational sales report, one row per salesperson-month. */
   | "sales_summary";
 
@@ -68,6 +69,7 @@ const DATASETS = new Set<DashboardDataset>([
   "pbx_extensions",
   "sla_calls",
   "sales_targets",
+  "media_plans",
   "sales_summary",
 ]);
 
@@ -204,6 +206,7 @@ function baseStableKey(dataset: DashboardDataset, row: DashboardRow): string {
     pbx_extensions: ["extension"],
     sla_calls: ["call_id", "id", "ID"],
     sales_targets: ["employeeId"],
+    media_plans: ["month"],
     sales_summary: ["__odoo_id", "id", "ID"],
   };
   const explicit = first(row, candidates[dataset] ?? []);

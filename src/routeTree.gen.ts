@@ -48,6 +48,7 @@ import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
+import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
 import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
@@ -263,6 +264,11 @@ const ApiMediaPlanRoute = ApiMediaPlanRouteImport.update({
   path: '/api/media-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaPlanActivityRoute = ApiMediaPlanActivityRouteImport.update({
+  id: '/api/media-plan-activity',
+  path: '/api/media-plan-activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrganicRoute = ApiOrganicRouteImport.update({
   id: '/api/organic',
   path: '/api/organic',
@@ -395,6 +401,7 @@ export interface FileRoutesByFullPath {
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
+  '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -454,6 +461,7 @@ export interface FileRoutesByTo {
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
+  '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -514,6 +522,7 @@ export interface FileRoutesById {
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
+  '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -575,6 +584,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/media-buyers'
     | '/api/media-plan'
+    | '/api/media-plan-activity'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -634,6 +644,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/media-buyers'
     | '/api/media-plan'
+    | '/api/media-plan-activity'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -693,6 +704,7 @@ export interface FileRouteTypes {
     | '/api/lost'
     | '/api/media-buyers'
     | '/api/media-plan'
+    | '/api/media-plan-activity'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -753,6 +765,7 @@ export interface RootRouteChildren {
   ApiLostRoute: typeof ApiLostRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
+  ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
   ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
   ApiProductsRoute: typeof ApiProductsRoute
@@ -1048,6 +1061,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/media-plan-activity': {
+      id: '/api/media-plan-activity'
+      path: '/api/media-plan-activity'
+      fullPath: '/api/media-plan-activity'
+      preLoaderRoute: typeof ApiMediaPlanActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organic': {
       id: '/api/organic'
       path: '/api/organic'
@@ -1217,6 +1237,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLostRoute: ApiLostRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
+  ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
   ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,
   ApiProductsRoute: ApiProductsRoute,

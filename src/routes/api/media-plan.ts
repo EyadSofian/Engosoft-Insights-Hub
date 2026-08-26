@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  mediaPlanCourseKey,
-  mediaPlanForMonth,
-  mediaPlanMonths,
-  plannedCourseBudget,
-} from "@/lib/media-plan";
+import { matchMediaPlanCourse, plannedCourseBudget } from "@/lib/media-plan";
 import type { CourseAgg } from "@/lib/types";
 
 interface ActualCourse {
@@ -70,11 +65,19 @@ export const Route = createFileRoute("/api/media-plan")({
       GET: async ({ request }) => {
         const { computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
-        const { fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
+        const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
+          await import("@/lib/admin-auth.server");
 
         const query = new URL(request.url).searchParams;
         const requestedMonth = query.get("month") ?? undefined;
-        const plan = mediaPlanForMonth(requestedMonth);
+        const source = await loadMediaPlanSource();
+        const availableMonths = Object.keys(source.plans).sort((a, b) => b.localeCompare(a));
+        const selectedMonth =
+          (requestedMonth && source.plans[requestedMonth] ? requestedMonth : "") ||
+          availableMonths[0];
+        const plan = source.plans[selectedMonth];
+        const guard = authorizeWrite(request);
         const filters = await parseFilters(request);
         const window = monthWindow(plan.month);
         const scopedFilters = {
@@ -114,8 +117,8 @@ export const Route = createFileRoute("/api/media-plan")({
         }> = [];
 
         for (const course of courses) {
-          const key = mediaPlanCourseKey(course.course || course.name);
-          if (!key) {
+          const target = matchMediaPlanCourse(plan.courses, course.course, course.name);
+          if (!target) {
             if (course.spend > 0 || (course.platformLeads ?? 0) > 0 || course.crmLeads > 0) {
               unplanned.push({
                 course: course.course || course.name,
@@ -126,9 +129,9 @@ export const Route = createFileRoute("/api/media-plan")({
             }
             continue;
           }
-          const actual = actualByKey.get(key) ?? emptyActual();
+          const actual = actualByKey.get(target.key) ?? emptyActual();
           addActual(actual, course);
-          actualByKey.set(key, actual);
+          actualByKey.set(target.key, actual);
         }
 
         const today = cairoDate();
@@ -167,7 +170,6 @@ export const Route = createFileRoute("/api/media-plan")({
           (sum, row) => sum + row.targetBudgetUsd,
           0,
         );
-        const fx = fxRatesFromFilters(filters);
         const additionalBudgetUsd = plan.additionalActivities.reduce(
           (sum, row) => sum + row.budgetUsd,
           0,
@@ -199,18 +201,61 @@ export const Route = createFileRoute("/api/media-plan")({
             allSpend: totals.spend,
             unattributedOrUnplannedSpend: Math.max(0, totals.spend - targetedSpend),
             revenueUsd: totals.revenue,
-            revenueSar: totals.revenue * fx.SAR,
-            salesAchievement: divide(totals.revenue * fx.SAR, plan.salesTargetSar),
+            salesAchievement: divide(totals.revenue, plan.salesTargetUsd),
           },
           courses: courseRows,
           unplanned: unplanned.sort((a, b) => b.spend - a.spend),
-          availableMonths: mediaPlanMonths(),
+          availableMonths,
+          editable: source.editable && writesEnabled(),
+          edited: source.editedMonths.includes(plan.month),
+          auth: {
+            signedIn: guard.ok,
+            via: guard.ok ? guard.actor.via : null,
+            name: guard.ok ? guard.actor.name : "",
+            sso: ssoConfigured(),
+            adminCode: adminCodeConfigured(),
+          },
+          storeError: source.error,
           sources: [
             "ENGOSOFT Marketing Plan Aug 2026: lead, budget, sales and ownership targets",
             "July Media Plan and Media Buyers Plan: course CPL benchmarks",
           ],
           health: data.snapshot.health,
         });
+      },
+      POST: async ({ request }) => {
+        const { authorizeWrite } = await import("@/lib/admin-auth.server");
+        const guard = authorizeWrite(request);
+        if (!guard.ok) {
+          return Response.json(
+            { ok: false, error: guard.error },
+            { status: guard.status, headers: { "cache-control": "no-store" } },
+          );
+        }
+
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return Response.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
+        }
+
+        try {
+          const { saveMediaPlan } = await import("@/lib/media-plans.server");
+          const plan = await saveMediaPlan(
+            body,
+            guard.actor.email || guard.actor.name || guard.actor.id,
+          );
+          return Response.json(
+            { ok: true, plan, savedBy: guard.actor.name || guard.actor.id },
+            { headers: { "cache-control": "no-store" } },
+          );
+        } catch (error) {
+          return Response.json(
+            { ok: false, error: error instanceof Error ? error.message : "Saving failed." },
+            { status: 400, headers: { "cache-control": "no-store" } },
+          );
+        }
       },
     },
   },

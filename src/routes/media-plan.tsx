@@ -3,15 +3,19 @@ import { useState } from "react";
 import {
   ArrowUpRight,
   BadgeDollarSign,
+  CopyPlus,
   Gauge,
   Info,
   Landmark,
+  Pencil,
   Target,
   TriangleAlert,
   UserRoundCheck,
   Users,
   WalletCards,
 } from "lucide-react";
+import { MediaPlanActivityPanel } from "@/components/media-plan/MediaPlanActivityPanel";
+import { MediaPlanEditor } from "@/components/media-plan/MediaPlanEditor";
 import {
   Card,
   ErrorState,
@@ -22,11 +26,11 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
+import type { MonthlyMediaPlan } from "@/lib/media-plan";
 import { useApi } from "@/lib/use-api";
 
 export const Route = createFileRoute("/media-plan")({ component: MediaPlanPage });
 
-type PlanStatus = "approved" | "draft";
 type PlanPhase = "upcoming" | "active" | "complete";
 
 interface CourseRow {
@@ -56,21 +60,12 @@ interface CourseRow {
 }
 
 interface MediaPlanResponse {
-  plan: {
-    month: string;
-    status: PlanStatus;
-    basisMonth?: string;
-    leadTarget: number;
-    paidLeadTarget: number;
-    organicWebinarLeadTarget: number;
-    leadGenerationBudgetUsd: number;
-    salesTargetSar: number;
+  plan: MonthlyMediaPlan & {
     targetCpl: number | null;
     plannedCourseBudgetUsd: number;
     reserveBudgetUsd: number;
     additionalBudgetUsd: number;
     totalMarketingBudgetUsd: number;
-    additionalActivities: { key: string; label: string; budgetUsd: number }[];
   };
   window: {
     from: string;
@@ -91,7 +86,6 @@ interface MediaPlanResponse {
     allSpend: number;
     unattributedOrUnplannedSpend: number;
     revenueUsd: number;
-    revenueSar: number;
     salesAchievement: number | null;
   };
   courses: CourseRow[];
@@ -102,6 +96,16 @@ interface MediaPlanResponse {
     crmLeads: number;
   }[];
   availableMonths: string[];
+  editable: boolean;
+  edited: boolean;
+  auth: {
+    signedIn: boolean;
+    via: "sso" | "admin-code" | null;
+    name: string;
+    sso: boolean;
+    adminCode: boolean;
+  };
+  storeError: string;
   sources: string[];
 }
 
@@ -117,13 +121,6 @@ function monthName(month: string, lang: "ar" | "en"): string {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, number - 1, 1)));
-}
-
-function sar(value: number, lang: "ar" | "en"): string {
-  const formatted = new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
-    maximumFractionDigits: 0,
-  }).format(value);
-  return lang === "ar" ? `${formatted} ر.س` : `SAR ${formatted}`;
 }
 
 function courseState(row: CourseRow, phase: PlanPhase) {
@@ -143,6 +140,7 @@ function courseState(row: CourseRow, phase: PlanPhase) {
 function MediaPlanPage() {
   const { lang } = useI18n();
   const [month, setMonth] = useState("2026-09");
+  const [editor, setEditor] = useState<"edit" | "create" | null>(null);
   const { data, isLoading, error, refetch } = useApi<MediaPlanResponse>(
     `/api/media-plan?month=${month}`,
   );
@@ -160,13 +158,33 @@ function MediaPlanPage() {
               : "One planning board linking every course target and owner to actual spend and leads."
           }
         />
-        <Link
-          to="/media-buyers"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-brand transition-colors hover:bg-surface-2"
-        >
-          {lang === "ar" ? "فتح تقييم الميديا بايرز" : "Open buyer evaluation"}
-          <ArrowUpRight size={14} />
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {!!data && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditor("edit")}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-brand px-3 text-xs font-semibold text-white"
+              >
+                <Pencil size={14} /> {lang === "ar" ? "تعديل الخطة" : "Edit plan"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditor("create")}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
+              >
+                <CopyPlus size={14} /> {lang === "ar" ? "خطة شهر جديد" : "New month"}
+              </button>
+            </>
+          )}
+          <Link
+            to="/media-buyers"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand transition-colors hover:bg-surface-2"
+          >
+            {lang === "ar" ? "تقييم الميديا بايرز" : "Buyer evaluation"}
+            <ArrowUpRight size={14} />
+          </Link>
+        </div>
       </div>
 
       {isLoading || !data ? (
@@ -197,6 +215,11 @@ function MediaPlanPage() {
                         ? "خطة معتمدة"
                         : "Approved plan"}
                   </Pill>
+                  {data.edited && (
+                    <Pill tone="brand">
+                      {lang === "ar" ? "معدلة من الداشبورد" : "Dashboard edited"}
+                    </Pill>
+                  )}
                   <span className="text-xs text-white/55">
                     {data.window.from} - {data.window.to}
                   </span>
@@ -207,8 +230,8 @@ function MediaPlanPage() {
                 <p className="mt-2 max-w-2xl text-xs leading-relaxed text-white/65 sm:text-sm">
                   {data.plan.status === "draft" && data.plan.basisMonth
                     ? lang === "ar"
-                      ? `الأرقام منسوخة بوضوح من خطة ${monthName(data.plan.basisMonth, lang)} كخط أساس، مع CPL Benchmarks من خطة يوليو، لحين اعتماد أرقام سبتمبر النهائية.`
-                      : `Targets are visibly copied from ${monthName(data.plan.basisMonth, lang)} as a baseline, with July CPL benchmarks, until September is approved.`
+                      ? `الأرقام منسوخة بوضوح من خطة ${monthName(data.plan.basisMonth, lang)} كخط أساس، مع CPL Benchmarks من خطة يوليو، لحين اعتماد أرقام الشهر النهائية.`
+                      : `Targets are visibly copied from ${monthName(data.plan.basisMonth, lang)} as a baseline, with July CPL benchmarks, until this month is approved.`
                     : lang === "ar"
                       ? "الخطة المعتمدة للشهر مع مقارنة التنفيذ الفعلي."
                       : "Approved monthly targets compared with actual delivery."}
@@ -258,7 +281,7 @@ function MediaPlanPage() {
               />
               <HeroMetric
                 label={lang === "ar" ? "تارجت المبيعات" : "Sales target"}
-                value={sar(data.plan.salesTargetSar, lang)}
+                value={fmtUSDFull(data.plan.salesTargetUsd)}
                 sub={ratioPct(data.actual.salesAchievement)}
                 icon={<Landmark size={17} />}
               />
@@ -274,10 +297,14 @@ function MediaPlanPage() {
           {data.plan.status === "draft" && (
             <Notice tone="warning" icon={<TriangleAlert size={16} />}>
               {lang === "ar"
-                ? "أرقام سبتمبر ليست اعتمادًا إداريًا جديدًا بعد؛ هي Baseline من أغسطس حتى لا تبدأ لوحة المتابعة فارغة. غيّرها عند وصول الخطة النهائية قبل اتخاذ قرار زيادة أو خفض الميزانية."
-                : "September is not newly approved yet; it uses August as a visible baseline so tracking does not start empty. Replace it when management publishes the final plan."}
+                ? "الخطة دي مازالت مسودة. عدّل الأرقام واعتمدها من محرر الخطة قبل اتخاذ قرار زيادة أو خفض الميزانية."
+                : "This plan is still a draft. Edit and approve it before making budget allocation decisions."}
             </Notice>
           )}
+
+          {!!data.storeError && <Notice tone="warning">{data.storeError}</Notice>}
+
+          <MediaPlanActivityPanel month={data.plan.month} />
 
           <Card className="overflow-hidden">
             <SectionTitle
@@ -321,8 +348,8 @@ function MediaPlanPage() {
               />
               <ProgressRail
                 label={lang === "ar" ? "المبيعات المحصلة" : "Collected sales"}
-                actual={sar(data.actual.revenueSar, lang)}
-                target={sar(data.plan.salesTargetSar, lang)}
+                actual={fmtUSDFull(data.actual.revenueUsd)}
+                target={fmtUSDFull(data.plan.salesTargetUsd)}
                 ratio={data.actual.salesAchievement}
                 expected={data.window.elapsed}
                 accent="#e59318"
@@ -385,8 +412,8 @@ function MediaPlanPage() {
               <SectionTitle
                 hint={
                   lang === "ar"
-                    ? "دي ليست ضمن $20K الخاصة بتوليد الليدز."
-                    : "These activities sit outside the $20K lead-generation budget."
+                    ? `دي ليست ضمن ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} الخاصة بتوليد الليدز.`
+                    : `These activities sit outside the ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} lead-generation budget.`
                 }
               >
                 {lang === "ar" ? "الميزانية الإضافية" : "Additional activity budget"}
@@ -425,16 +452,16 @@ function MediaPlanPage() {
                   <Info size={15} className="mt-0.5 shrink-0 text-brand" />
                   <p>
                     {lang === "ar"
-                      ? "تارجت الدورات الست = 4,000 Paid Leads. الـ1,000 الباقية مستهدف Organic وWebinar، لذلك لا تُوزع مرتين على الدورات."
-                      : "The six course rows total 4,000 paid leads. The remaining 1,000 belong to Organic and Webinar, so they are not double-counted by course."}
+                      ? `تارجت الدورات = ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} Paid Leads. وتارجت Organic وWebinar منفصل حتى لا يتحسب مرتين.`
+                      : `Course rows total ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} paid leads. Organic and Webinar remain separate so they are not double-counted.`}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <UserRoundCheck size={15} className="mt-0.5 shrink-0 text-brand" />
                   <p>
                     {lang === "ar"
-                      ? "المسؤولون من خطة أغسطس: Sayed وShazly، مع المسؤوليات المشتركة ظاهرة بدل تقسيم الليدز افتراضيًا بينهم."
-                      : "Owners come from the August plan. Joint ownership remains explicit instead of inventing a split between buyers."}
+                      ? "المسؤولون قابلون للتعديل لكل شهر، والمسؤولية المشتركة تظل ظاهرة بدل تقسيم الليدز افتراضيًا."
+                      : "Owners are editable per month. Joint ownership stays explicit instead of inventing a lead split."}
                   </p>
                 </div>
                 {data.sources.map((source) => (
@@ -452,10 +479,26 @@ function MediaPlanPage() {
           {(data.actual.unattributedOrUnplannedSpend > 0 || data.unplanned.length > 0) && (
             <Notice tone="warning" icon={<TriangleAlert size={16} />}>
               {lang === "ar"
-                ? `يوجد ${fmtUSDFull(data.actual.unattributedOrUnplannedSpend)} صرف خارج الدورات الست أو غير قابل للربط بها في هذا الشهر. راجع أسماء الحملات قبل اعتباره جزءًا من تحقيق الخطة.`
-                : `${fmtUSDFull(data.actual.unattributedOrUnplannedSpend)} of spend is outside the six planned courses or cannot be attributed to them. Review campaign naming before counting it toward the plan.`}
+                ? `يوجد ${fmtUSDFull(data.actual.unattributedOrUnplannedSpend)} صرف خارج دورات الخطة أو غير قابل للربط بها في هذا الشهر. راجع أسماء الحملات وكلمات المطابقة قبل اعتباره جزءًا من تحقيق الخطة.`
+                : `${fmtUSDFull(data.actual.unattributedOrUnplannedSpend)} of spend is outside planned courses or cannot be attributed. Review campaign names and match terms before counting it toward the plan.`}
             </Notice>
           )}
+
+          <MediaPlanEditor
+            open={editor !== null}
+            onOpenChange={(open) => !open && setEditor(null)}
+            mode={editor ?? "edit"}
+            plan={data.plan}
+            editable={data.editable}
+            auth={data.auth}
+            storeError={data.storeError}
+            existingMonths={data.availableMonths}
+            onSaved={(savedMonth) => {
+              setMonth(savedMonth);
+              setEditor(null);
+              void refetch();
+            }}
+          />
         </>
       )}
     </div>
