@@ -287,7 +287,7 @@ export const Route = createFileRoute("/api/chat")({
             cpa: "total ad spend ÷ won deals.",
             lost: "Lost Analysis only. CRM stage Lost is excluded.",
             navigation:
-              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. Lead quality: /leads. Archived Lost: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
+              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. Lead quality: /leads. Archived Lost: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Monthly media plan: /media-plan. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
             revenue: "Accounting.USD Paid filtered by Payment Date at invoice product-line grain.",
             roas: "Accounting.USD Paid revenue ÷ total ad spend. attributedRoas uses campaign-linked Accounting revenue.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",

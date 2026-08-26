@@ -116,7 +116,10 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     shortLabel: { ar: "الميديا", en: "Media" },
     icon: UserRoundSearch,
     defaultTo: "/media-buyers",
-    items: [{ to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch }],
+    items: [
+      { to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch },
+      { to: "/media-plan", key: "media_plan", icon: CalendarRange },
+    ],
   },
   {
     id: "social",

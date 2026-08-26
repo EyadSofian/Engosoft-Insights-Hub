@@ -28,6 +28,7 @@ export const DICT = {
   weekend: { ar: "أداء الويك إند", en: "Weekend performance" },
   organic: { ar: "أورجانيك", en: "Organic" },
   media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
+  media_plan: { ar: "خطة الميديا الشهرية", en: "Monthly media plan" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
   accounting: { ar: "الحسابات", en: "Accounting" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
