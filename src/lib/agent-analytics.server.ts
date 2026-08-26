@@ -28,6 +28,13 @@ import {
   type CallsHubLeadCallAggregate,
   type CallsHubEmployeeSummary,
 } from "./calls-hub.server";
+import {
+  calculateEmployeePerformanceScore,
+  EMPLOYEE_SCORE_WEIGHTS,
+  type AgentPerformanceScore,
+} from "./employee-performance-score";
+
+export type { AgentPerformanceScore } from "./employee-performance-score";
 
 export interface AgentAnalyticsRow {
   key: string;
@@ -50,10 +57,14 @@ export interface AgentAnalyticsRow {
   distributedLeads: number;
   /** Assigned leads whose phone matched at least one PBX call in the window. */
   calledDistributedLeads: number | null;
+  /** Assigned leads called by this employee, not merely by any PBX extension. */
+  ownerCalledDistributedLeads: number | null;
   uncalledDistributedLeads: number | null;
   callsFromDistributedLeads: number | null;
   callsByAssignedEmployee: number | null;
   leadCallCoverageRate: number | null;
+  /** Employee's own called assigned leads ÷ all leads assigned to them. */
+  leadOwnerCallCoverageRate: number | null;
   /** Yeastar extension used to load the employee's call samples on demand. */
   callExtension: string | null;
   /** All inbound and outbound calls in the selected date window. */
@@ -76,6 +87,8 @@ export interface AgentAnalyticsRow {
   chatAverageFirstResponseSeconds: number | null;
   chatAverageResolutionSeconds: number | null;
   chatAverageReplySeconds: number | null;
+  /** Exact Chatwoot agent id used only to load conversation evidence on demand. */
+  chatwootAgentId: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
   slaLost: number;
@@ -101,22 +114,6 @@ export interface AgentAnalyticsRow {
   /** Published quota for this window, or `null` when none is published. */
   target: AgentTarget | null;
   performanceScore: AgentPerformanceScore;
-}
-
-export interface AgentPerformanceScore {
-  overall: number | null;
-  callQuality: number | null;
-  salesExecution: number | null;
-  chatFollowUp: number | null;
-  weights: { callQuality: 100; salesExecution: 0; chatFollowUp: 0 };
-  evidence: {
-    analyzedCalls: number;
-    leadCoverageRate: number | null;
-    leadConversionRate: number | null;
-    chatConversations: number;
-    chatAwaitingReply: number;
-    chatUnreadConversations: number;
-  };
 }
 
 export interface AgentTarget {
@@ -300,10 +297,12 @@ export interface AgentAnalyticsResult {
     qualityNeedsReview: number | null;
     distributedLeads: number;
     calledDistributedLeads: number | null;
+    ownerCalledDistributedLeads: number | null;
     uncalledDistributedLeads: number | null;
     callsFromDistributedLeads: number | null;
     callsByAssignedEmployee: number | null;
     leadCallCoverageRate: number | null;
+    leadOwnerCallCoverageRate: number | null;
     chatConversations: number | null;
     chatResolved: number | null;
     chatUnreadConversations: number | null;
@@ -532,10 +531,12 @@ const blank = (key: string, name: string): MutableAgent => ({
   uncontactedLeads: 0,
   distributedLeads: 0,
   calledDistributedLeads: null,
+  ownerCalledDistributedLeads: null,
   uncalledDistributedLeads: null,
   callsFromDistributedLeads: null,
   callsByAssignedEmployee: null,
   leadCallCoverageRate: null,
+  leadOwnerCallCoverageRate: null,
   callExtension: null,
   totalCalls: null,
   outboundCalls: 0,
@@ -556,6 +557,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   chatAverageFirstResponseSeconds: null,
   chatAverageResolutionSeconds: null,
   chatAverageReplySeconds: null,
+  chatwootAgentId: null,
   avgFirstCallMinutes: null,
   slaWon: 0,
   slaLost: 0,
@@ -575,14 +577,34 @@ const blank = (key: string, name: string): MutableAgent => ({
     callQuality: null,
     salesExecution: null,
     chatFollowUp: null,
-    weights: { callQuality: 100, salesExecution: 0, chatFollowUp: 0 },
+    targetAttainment: null,
+    weights: EMPLOYEE_SCORE_WEIGHTS,
+    dataCoverage: 0,
+    missing: ["callQuality", "salesExecution", "chatFollowUp", "targetAttainment"],
+    earnedPoints: {
+      callQuality: 0,
+      salesExecution: 0,
+      chatFollowUp: 0,
+      targetAttainment: 0,
+    },
     evidence: {
       analyzedCalls: 0,
+      answeredCalls: null,
+      callAnalysisCoverageRate: null,
+      callEvidenceFactor: 0,
+      distributedLeads: 0,
+      ownerCalledDistributedLeads: null,
       leadCoverageRate: null,
       leadConversionRate: null,
+      normalizedConversionScore: null,
+      conversionBenchmarkPercent: 20,
       chatConversations: 0,
+      chatRepliedConversations: 0,
       chatAwaitingReply: 0,
       chatUnreadConversations: 0,
+      targetAchievement: null,
+      targetBasis: null,
+      targetComplete: false,
     },
   },
   firstCallWeighted: 0,
@@ -1074,58 +1096,10 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
     row.chatAverageFirstResponseSeconds = source.averageFirstResponseSeconds;
     row.chatAverageResolutionSeconds = source.averageResolutionSeconds;
     row.chatAverageReplySeconds = source.averageReplySeconds;
+    row.chatwootAgentId = source.id;
     row.chatwootMatched = true;
     map.set(key, row);
   }
-}
-
-const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
-
-/**
- * The employee score is the audited PBX call-quality score. Sales execution
- * and Chatwoot follow-up stay visible as operational evidence, but they do not
- * alter the PBX score or silently substitute for missing call audits.
- */
-function employeePerformanceScore(row: AgentAnalyticsRow): AgentPerformanceScore {
-  const callQuality =
-    row.averageQualityScore !== null && (row.analyzedCalls ?? 0) > 0
-      ? clampPercent(row.averageQualityScore)
-      : null;
-  const salesParts: Array<{ value: number; weight: number }> = [];
-  if (row.leadCallCoverageRate !== null)
-    salesParts.push({ value: clampPercent(row.leadCallCoverageRate), weight: 60 });
-  if (row.conversionRate !== null)
-    salesParts.push({ value: clampPercent(row.conversionRate), weight: 40 });
-  const salesWeight = salesParts.reduce((sum, part) => sum + part.weight, 0);
-  const salesExecution = salesWeight
-    ? salesParts.reduce((sum, part) => sum + part.value * part.weight, 0) / salesWeight
-    : null;
-
-  const conversations = Math.max(0, row.chatConversations ?? 0);
-  const awaiting = Math.max(0, row.chatAwaitingReply ?? 0);
-  const unread = Math.max(0, row.chatUnreadConversations ?? 0);
-  const chatFollowUp = row.chatConversations === null || conversations === 0
-    ? null
-    : clampPercent(
-        70 * (1 - Math.min(1, awaiting / conversations)) +
-        30 * (1 - Math.min(1, unread / conversations)),
-      );
-
-  return {
-    overall: callQuality,
-    callQuality,
-    salesExecution,
-    chatFollowUp,
-    weights: { callQuality: 100, salesExecution: 0, chatFollowUp: 0 },
-    evidence: {
-      analyzedCalls: Math.max(0, row.analyzedCalls ?? 0),
-      leadCoverageRate: row.leadCallCoverageRate,
-      leadConversionRate: row.conversionRate,
-      chatConversations: conversations,
-      chatAwaitingReply: awaiting,
-      chatUnreadConversations: unread,
-    },
-  };
 }
 
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -1156,6 +1130,7 @@ function mergeLeadCallCoverage(
   for (const row of map.values()) {
     row.distributedLeads = 0;
     row.calledDistributedLeads = 0;
+    row.ownerCalledDistributedLeads = 0;
     row.uncalledDistributedLeads = 0;
     row.callsFromDistributedLeads = 0;
     row.callsByAssignedEmployee = 0;
@@ -1188,17 +1163,27 @@ function mergeLeadCallCoverage(
       continue;
     }
     row.calledDistributedLeads = (row.calledDistributedLeads ?? 0) + 1;
+    let calledByOwner = false;
     for (const call of matches.values()) {
+      const sameOwner =
+        normalizePersonName(call.agentName) === key ||
+        (row.callExtension && call.agentExtension === row.callExtension);
+      // Coverage is lead-grain: if two Odoo opportunities share a customer
+      // phone, each has still been reached by its assigned owner. Call totals,
+      // however, stay de-duplicated below so the same PBX call is not summed
+      // twice. The old order performed the de-duplication first and therefore
+      // under-counted owner coverage on the second opportunity.
+      if (sameOwner) calledByOwner = true;
       const phoneKey = `${call.phone}|${call.agentExtension}|${call.agentName}`;
       if (row.leadPhoneKeys.has(phoneKey)) continue;
       row.leadPhoneKeys.add(phoneKey);
       row.callsFromDistributedLeads = (row.callsFromDistributedLeads ?? 0) + call.totalCalls;
-      const sameOwner =
-        normalizePersonName(call.agentName) === key ||
-        (row.callExtension && call.agentExtension === row.callExtension);
       if (sameOwner) {
         row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
       }
+    }
+    if (calledByOwner) {
+      row.ownerCalledDistributedLeads = (row.ownerCalledDistributedLeads ?? 0) + 1;
     }
     map.set(key, row);
   }
@@ -1207,6 +1192,10 @@ function mergeLeadCallCoverage(
     row.leadCallCoverageRate =
       row.distributedLeads > 0
         ? ((row.calledDistributedLeads ?? 0) / row.distributedLeads) * 100
+        : null;
+    row.leadOwnerCallCoverageRate =
+      row.distributedLeads > 0
+        ? ((row.ownerCalledDistributedLeads ?? 0) / row.distributedLeads) * 100
         : null;
   }
 }
@@ -1646,7 +1635,31 @@ export async function buildAgentAnalytics(
     )
     .sort((a, b) => b.paidRevenue - a.paidRevenue || b.cleanLeads - a.cleanLeads);
 
-  for (const row of agents) row.performanceScore = employeePerformanceScore(row);
+  // Attach the quota before calculating the composite. Previously the score
+  // was finalised first, so target attainment could not participate at all.
+  // The source is the seed with any saved edits applied; a store that cannot be
+  // read falls back to the seed rather than reporting everyone as untargeted.
+  const { source: targetSource } = await loadTargetSource();
+  const targets = buildTargetCoverage(agents, [...map.values()], filters, targetSource);
+
+  for (const row of agents) {
+    row.performanceScore = calculateEmployeePerformanceScore({
+      averageQualityScore: row.averageQualityScore,
+      analyzedCalls: row.analyzedCalls,
+      answeredCalls: row.answeredCalls,
+      distributedLeads: row.distributedLeads,
+      ownerCalledDistributedLeads: row.ownerCalledDistributedLeads,
+      leadOwnerCallCoverageRate: row.leadOwnerCallCoverageRate,
+      cleanLeads: row.cleanLeads,
+      conversionRate: row.conversionRate,
+      chatConversations: row.chatConversations,
+      chatAwaitingReply: row.chatAwaitingReply,
+      chatUnreadConversations: row.chatUnreadConversations,
+      targetAchievementOrders: row.target?.achievementOrders ?? null,
+      targetAchievementPaid: row.target?.achievementPaid ?? null,
+      targetComplete: row.target?.complete ?? false,
+    });
+  }
 
   const summary = agents.reduce(
     (acc, row) => {
@@ -1672,6 +1685,9 @@ export async function buildAgentAnalytics(
       if (row.calledDistributedLeads !== null)
         acc.calledDistributedLeads =
           (acc.calledDistributedLeads ?? 0) + row.calledDistributedLeads;
+      if (row.ownerCalledDistributedLeads !== null)
+        acc.ownerCalledDistributedLeads =
+          (acc.ownerCalledDistributedLeads ?? 0) + row.ownerCalledDistributedLeads;
       if (row.uncalledDistributedLeads !== null)
         acc.uncalledDistributedLeads =
           (acc.uncalledDistributedLeads ?? 0) + row.uncalledDistributedLeads;
@@ -1717,6 +1733,9 @@ export async function buildAgentAnalytics(
       calledDistributedLeads: callsHubStatus.leadCoverageAvailable
         ? 0
         : (null as number | null),
+      ownerCalledDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
       uncalledDistributedLeads: callsHubStatus.leadCoverageAvailable
         ? 0
         : (null as number | null),
@@ -1727,6 +1746,7 @@ export async function buildAgentAnalytics(
         ? 0
         : (null as number | null),
       leadCallCoverageRate: null as number | null,
+      leadOwnerCallCoverageRate: null as number | null,
       chatConversations: chatwootStatus.ok ? 0 : (null as number | null),
       chatResolved: chatwootStatus.ok ? 0 : (null as number | null),
       chatUnreadConversations: chatwootStatus.ok ? 0 : (null as number | null),
@@ -1759,6 +1779,10 @@ export async function buildAgentAnalytics(
     summary.distributedLeads > 0 && summary.calledDistributedLeads !== null
       ? (summary.calledDistributedLeads / summary.distributedLeads) * 100
       : null;
+  summary.leadOwnerCallCoverageRate =
+    summary.distributedLeads > 0 && summary.ownerCalledDistributedLeads !== null
+      ? (summary.ownerCalledDistributedLeads / summary.distributedLeads) * 100
+      : null;
   const chatRows = agents.filter(
     (row) => row.chatAverageFirstResponseSeconds !== null && (row.chatConversations ?? 0) > 0,
   );
@@ -1771,13 +1795,6 @@ export async function buildAgentAnalytics(
           0,
         ) / chatWeight
       : null;
-
-  // After `agents` is final, so every row that reaches the screen carries its
-  // quota, and before the response is built so coverage can be reported with it.
-  // The source is the seed with any saved edits applied; a store that cannot be
-  // read falls back to the seed rather than reporting everyone as untargeted.
-  const { source: targetSource } = await loadTargetSource();
-  const targets = buildTargetCoverage(agents, [...map.values()], filters, targetSource);
 
   return {
     agents,

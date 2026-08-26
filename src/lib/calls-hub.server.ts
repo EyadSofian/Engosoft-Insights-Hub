@@ -69,6 +69,7 @@ export interface CallsHubLeadCallAggregate {
   answeredCalls: number;
   firstCallAt: string;
   latestCallAt: string;
+  latestCallId: string;
 }
 
 type CacheEntry = { expiresAt: number; value: CallsHubSummary };
@@ -200,6 +201,7 @@ export async function getCallsHubLeadCalls(
       answeredCalls: safeNumber(row.answeredCalls),
       firstCallAt: safeText(row.firstCallAt),
       latestCallAt: safeText(row.latestCallAt),
+      latestCallId: safeText(row.latestCallId),
     }];
   });
 }

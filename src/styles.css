@@ -283,6 +283,7 @@
   table :is(td, th) {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    unicode-bidi: isolate;
   }
 
   /* Latin numerals inside Arabic copy still read left-to-right.
@@ -296,7 +297,7 @@
    * `text-end`, and those utilities win over this base rule. */
   [dir="rtl"] .num {
     direction: ltr;
-    unicode-bidi: embed;
+    unicode-bidi: isolate;
     text-align: right;
   }
 

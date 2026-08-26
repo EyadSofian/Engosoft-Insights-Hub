@@ -19,8 +19,35 @@ export interface ChatwootSnapshot {
   unassignedConversations: number;
 }
 
+export interface ChatwootConversationEvidence {
+  id: number;
+  contactName: string;
+  status: string;
+  unreadMessages: number;
+  awaitingReply: boolean;
+  lastActivityAt: number;
+  url: string;
+}
+
+export interface ChatwootAgentConversationEvidence {
+  agentId: number;
+  total: number;
+  conversations: ChatwootConversationEvidence[];
+}
+
 const TTL_MS = 60_000;
 const cache = new Map<string, { expiresAt: number; value: ChatwootSnapshot }>();
+type AgentConversationActivity = {
+  unreadConversations: number;
+  unreadMessages: number;
+  awaitingReply: number;
+};
+type ConversationActivitySnapshot = {
+  byAgent: Map<number, AgentConversationActivity>;
+  unassignedConversations: number;
+  evidenceByAgent: Map<number, { total: number; conversations: ChatwootConversationEvidence[] }>;
+};
+const activityCache = new Map<string, { expiresAt: number; value: ConversationActivitySnapshot }>();
 
 function config() {
   return {
@@ -64,23 +91,28 @@ function unix(value: unknown): number {
 }
 
 async function conversationActivity(from: string, to: string) {
+  const cacheKey = `${from}:${to}`;
+  const cached = activityCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   const cfg = config();
   const since = unixStart(from);
   const until = unixEndInclusive(to);
-  const byAgent = new Map<number, {
-    unreadConversations: number;
-    unreadMessages: number;
-    awaitingReply: number;
-  }>();
+  const byAgent = new Map<number, AgentConversationActivity>();
+  const evidenceByAgent = new Map<
+    number,
+    { total: number; conversations: ChatwootConversationEvidence[] }
+  >();
   let unassignedConversations = 0;
   let expected = Number.POSITIVE_INFINITY;
   let seen = 0;
 
   for (let page = 1; page <= 100 && seen < expected; page += 1) {
     const params = new URLSearchParams({ status: "all", assignee_type: "all", page: String(page) });
-    const raw = object(await request(
-      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations?${params}`,
-    ));
+    const raw = object(
+      await request(
+        `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations?${params}`,
+      ),
+    );
     const data = object(raw?.data);
     const meta = object(data?.meta);
     const payload = Array.isArray(data?.payload) ? data.payload : [];
@@ -117,9 +149,65 @@ async function conversationActivity(from: string, to: string) {
         current.awaitingReply += 1;
       }
       byAgent.set(assigneeId, current);
+
+      const id = Number(row.id);
+      if (Number.isInteger(id) && id > 0) {
+        const currentEvidence = evidenceByAgent.get(assigneeId) ?? { total: 0, conversations: [] };
+        currentEvidence.total += 1;
+        const sender = object(conversationMeta?.sender);
+        currentEvidence.conversations.push({
+          id,
+          contactName: String(sender?.name || sender?.available_name || "").trim(),
+          status: String(row.status || "").trim(),
+          unreadMessages: unread,
+          awaitingReply: Boolean(
+            lastMessage &&
+            lastMessage.private !== true &&
+            (Number(lastMessage.message_type) === 0 || lastMessage.sender_type === "Contact"),
+          ),
+          lastActivityAt: lastActivity,
+          url: `${cfg.baseUrl}/app/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${id}`,
+        });
+        currentEvidence.conversations.sort(
+          (left, right) => right.lastActivityAt - left.lastActivityAt,
+        );
+        if (currentEvidence.conversations.length > 100) currentEvidence.conversations.length = 100;
+        evidenceByAgent.set(assigneeId, currentEvidence);
+      }
     }
   }
-  return { byAgent, unassignedConversations };
+  for (const evidence of evidenceByAgent.values()) {
+    evidence.conversations.sort((left, right) => right.lastActivityAt - left.lastActivityAt);
+  }
+  const result = { byAgent, unassignedConversations, evidenceByAgent };
+  activityCache.set(cacheKey, { expiresAt: Date.now() + TTL_MS, value: result });
+  return result;
+}
+
+/**
+ * Returns the actual conversations behind an employee's Chatwoot KPIs.
+ *
+ * The aggregate report carries counts only, so the employee profile cannot
+ * truthfully link a count to a conversation without this second, bounded query.
+ * URLs are built only from conversation ids returned by Chatwoot itself.
+ */
+export async function getChatwootAgentConversationEvidence(input: {
+  agentId: number;
+  from: string;
+  to: string;
+  limit?: number;
+}): Promise<ChatwootAgentConversationEvidence> {
+  if (!Number.isInteger(input.agentId) || input.agentId <= 0) {
+    throw new Error("A valid Chatwoot agent id is required");
+  }
+  const limit = Math.max(1, Math.min(100, Math.trunc(input.limit ?? 40)));
+  const activity = await conversationActivity(input.from, input.to);
+  const evidence = activity.evidenceByAgent.get(input.agentId) ?? { total: 0, conversations: [] };
+  return {
+    agentId: input.agentId,
+    total: evidence.total,
+    conversations: evidence.conversations.slice(0, limit),
+  };
 }
 
 function unixStart(date: string) {
@@ -130,7 +218,10 @@ function unixEndInclusive(date: string) {
   return Math.floor(Date.parse(`${date}T23:59:59Z`) / 1000);
 }
 
-export async function getChatwootAgentSnapshot(from: string, to: string): Promise<ChatwootSnapshot> {
+export async function getChatwootAgentSnapshot(
+  from: string,
+  to: string,
+): Promise<ChatwootSnapshot> {
   const key = `${from}:${to}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -140,7 +231,9 @@ export async function getChatwootAgentSnapshot(from: string, to: string): Promis
     until: String(unixEndInclusive(to)),
   });
   const [rawMetrics, rawAgents, activity] = await Promise.all([
-    request(`/api/v2/accounts/${encodeURIComponent(cfg.accountId)}/summary_reports/agent?${params}`),
+    request(
+      `/api/v2/accounts/${encodeURIComponent(cfg.accountId)}/summary_reports/agent?${params}`,
+    ),
     request(`/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/agents`),
     conversationActivity(from, to),
   ]);
@@ -175,18 +268,20 @@ export async function getChatwootAgentSnapshot(from: string, to: string): Promis
         unreadMessages: 0,
         awaitingReply: 0,
       };
-      return [{
-        id,
-        name,
-        conversations: Number(row.conversations_count || 0),
-        resolved: Number(row.resolved_conversations_count || 0),
-        unreadConversations: inbox.unreadConversations,
-        unreadMessages: inbox.unreadMessages,
-        awaitingReply: inbox.awaitingReply,
-        averageFirstResponseSeconds: numberOrNull(row.avg_first_response_time),
-        averageResolutionSeconds: numberOrNull(row.avg_resolution_time),
-        averageReplySeconds: numberOrNull(row.avg_reply_time),
-      }];
+      return [
+        {
+          id,
+          name,
+          conversations: Number(row.conversations_count || 0),
+          resolved: Number(row.resolved_conversations_count || 0),
+          unreadConversations: inbox.unreadConversations,
+          unreadMessages: inbox.unreadMessages,
+          awaitingReply: inbox.awaitingReply,
+          averageFirstResponseSeconds: numberOrNull(row.avg_first_response_time),
+          averageResolutionSeconds: numberOrNull(row.avg_resolution_time),
+          averageReplySeconds: numberOrNull(row.avg_reply_time),
+        },
+      ];
     }),
   };
   cache.set(key, { expiresAt: Date.now() + TTL_MS, value: result });

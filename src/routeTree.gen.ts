@@ -39,6 +39,7 @@ import { Route as ApiCoursesRouteImport } from './routes/api/courses'
 import { Route as ApiEmployeeCallDetailRouteImport } from './routes/api/employee-call-detail'
 import { Route as ApiEmployeeCallRecordingRouteImport } from './routes/api/employee-call-recording'
 import { Route as ApiEmployeeCallsRouteImport } from './routes/api/employee-calls'
+import { Route as ApiEmployeeEvidenceRouteImport } from './routes/api/employee-evidence'
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -215,6 +216,11 @@ const ApiEmployeeCallsRoute = ApiEmployeeCallsRouteImport.update({
   path: '/api/employee-calls',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEmployeeEvidenceRoute = ApiEmployeeEvidenceRouteImport.update({
+  id: '/api/employee-evidence',
+  path: '/api/employee-evidence',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFiltersRoute = ApiFiltersRouteImport.update({
   id: '/api/filters',
   path: '/api/filters',
@@ -368,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
+  '/api/employee-evidence': typeof ApiEmployeeEvidenceRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -424,6 +431,7 @@ export interface FileRoutesByTo {
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
+  '/api/employee-evidence': typeof ApiEmployeeEvidenceRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -481,6 +489,7 @@ export interface FileRoutesById {
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
+  '/api/employee-evidence': typeof ApiEmployeeEvidenceRoute
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
@@ -539,6 +548,7 @@ export interface FileRouteTypes {
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
+    | '/api/employee-evidence'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -595,6 +605,7 @@ export interface FileRouteTypes {
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
+    | '/api/employee-evidence'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -651,6 +662,7 @@ export interface FileRouteTypes {
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
+    | '/api/employee-evidence'
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
@@ -708,6 +720,7 @@ export interface RootRouteChildren {
   ApiEmployeeCallDetailRoute: typeof ApiEmployeeCallDetailRoute
   ApiEmployeeCallRecordingRoute: typeof ApiEmployeeCallRecordingRoute
   ApiEmployeeCallsRoute: typeof ApiEmployeeCallsRoute
+  ApiEmployeeEvidenceRoute: typeof ApiEmployeeEvidenceRoute
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -946,6 +959,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEmployeeCallsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/employee-evidence': {
+      id: '/api/employee-evidence'
+      path: '/api/employee-evidence'
+      fullPath: '/api/employee-evidence'
+      preLoaderRoute: typeof ApiEmployeeEvidenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/filters': {
       id: '/api/filters'
       path: '/api/filters'
@@ -1148,6 +1168,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEmployeeCallDetailRoute: ApiEmployeeCallDetailRoute,
   ApiEmployeeCallRecordingRoute: ApiEmployeeCallRecordingRoute,
   ApiEmployeeCallsRoute: ApiEmployeeCallsRoute,
+  ApiEmployeeEvidenceRoute: ApiEmployeeEvidenceRoute,
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,

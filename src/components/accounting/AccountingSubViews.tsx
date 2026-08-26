@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { TargetEditor } from "@/components/accounting/TargetEditor";
 import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
 import type { EmployeeMetricKey } from "@/lib/employee-metric-catalog";
@@ -49,6 +49,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   AgentAnalyticsResult as AgentsResponse,
   AgentAnalyticsRow as AgentRow,
@@ -58,6 +65,78 @@ import type {
   AgentTarget,
 } from "@/lib/agent-analytics.server";
 import type { CallsHubCall, CallsHubEmployeeCalls } from "@/lib/calls-hub.server";
+
+const QUALITY_REVIEW_THRESHOLD = 85;
+
+interface EmployeeEvidenceResponse {
+  ok: boolean;
+  employee: string;
+  range: { from: string; to: string };
+  leads: {
+    rows: Array<{
+      id: string;
+      contact: string;
+      phone: string;
+      stage: string;
+      course: string;
+      createdAt: string;
+      outcome: "won" | "open" | "lost";
+      url: string | null;
+      calledByAny: boolean;
+      calledByOwner: boolean;
+      totalCalls: number;
+      ownerCalls: number;
+      firstCallAt: string | null;
+      latestCallAt: string | null;
+      latestCallUrl: string | null;
+    }>;
+    total: number;
+    truncated: boolean;
+  };
+  orders: {
+    rows: Array<{ orderRef: string; customer: string; course: string; revenueDate: string; usdSales: number }>;
+    total: number;
+    truncated: boolean;
+    amount: number;
+  };
+  invoices: {
+    rows: Array<{ movement: string; partner: string; paymentDate: string; usdPaid: number; isCreditNote: boolean }>;
+    total: number;
+    truncated: boolean;
+    paidTotal: number;
+    creditNoteTotal: number;
+    amount: number;
+  };
+  chatwoot: null | {
+    agentId: number;
+    total: number;
+    conversations: Array<{
+      id: number;
+      contactName: string;
+      status: string;
+      unreadMessages: number;
+      awaitingReply: boolean;
+      lastActivityAt: number;
+      url: string;
+    }>;
+  };
+  chatwootError: string | null;
+}
+
+type EmployeeEvidenceKind = "target" | "sales" | "leads" | "calls" | "chatwoot";
+
+const EmployeeEvidenceContext = createContext<
+  { openEvidence: (kind: EmployeeEvidenceKind) => void } | null
+>(null);
+
+function evidenceKindFromHref(href: string): EmployeeEvidenceKind | null {
+  if (href.includes("target")) return "target";
+  if (href.includes("sales")) return "sales";
+  if (href.includes("lead")) return "leads";
+  if (href.includes("call")) return "calls";
+  if (href.includes("chat")) return "chatwoot";
+  return null;
+}
 
 export interface AccountingMonth {
   month: string;
@@ -230,6 +309,16 @@ export function AccountingAgentsView() {
   useEffect(() => {
     if (data && !data.callsHub.callsAvailable && sortBy === "calls") setSortBy("revenue");
   }, [data, sortBy]);
+  useEffect(() => {
+    if (!data || typeof window === "undefined") return;
+    const requested = new URLSearchParams(window.location.search).get("employee")?.trim();
+    if (!requested) return;
+    const normalized = requested.toLocaleLowerCase("en");
+    const match = data.agents.find(
+      (row) => row.key.toLocaleLowerCase("en") === normalized || row.name.toLocaleLowerCase("en") === normalized,
+    );
+    if (match) setSelectedAgentKey(match.key);
+  }, [data]);
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (isLoading || !data)
     return (
@@ -444,10 +533,12 @@ export function AccountingAgentsView() {
         </SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "تم الاتصال بها" : "Leads called"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "لم يتم الاتصال بها" : "Never called"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "اتصل بها الموظف المسؤول" : "Called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "لم يتصل بها الموظف المسؤول" : "Not called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads))} />
+          <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "نسبة الاتصال" : "Coverage rate"} value={fmtPct(data.summary.leadCallCoverageRate, 1)} />
+          <MiniMetric label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"} value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)} />
           <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
           <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
           <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={data.summary.chatUnreadConversations === null ? "—" : fmtNum(data.summary.chatUnreadConversations)} />
@@ -632,7 +723,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
   };
 
   return (
-    <section className="rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5">
+    <section id="employee-target-summary" className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-brand">
           <Target size={16} />
@@ -660,6 +751,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
               sub={target.monthsCovered.map((month) => monthLabel(month, lang)).join(" · ")}
               icon={<Target size={17} />}
               hero
+              evidenceHref="#employee-target-evidence"
             />
             <ProfileMetric
               label={lang === "ar" ? "إنجاز التحصيل" : "Collections vs target"}
@@ -667,6 +759,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
               value={fmtPct(target.achievementPaid, 1)}
               sub={gapLabel(target.gapPaid)}
               icon={<ReceiptText size={17} />}
+              evidenceHref="#employee-sales-evidence"
             />
             {/* Two different silences, two different sentences. "Unavailable for
                 period" covered both and sent readers hunting for a gap in the
@@ -683,6 +776,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
                     : "No sale orders on his name in this window"
               }
               icon={<Calculator size={17} />}
+              evidenceHref="#employee-sales-evidence"
             />
             <ProfileMetric
               label={lang === "ar" ? "كود الموظف" : "Employee code"}
@@ -709,9 +803,210 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
                 : `A target exists only for ${target.monthsCovered.join(", ")}, while the window is longer — the percentage is partial.`}
             </p>
           )}
+          <div id="employee-target-evidence" className="mt-3 scroll-mt-24 rounded-xl border border-brand/15 bg-surface/75 px-3 py-2 text-[10px] leading-relaxed text-text-muted">
+            <b className="text-text">{lang === "ar" ? "دليل التارجت المنشور:" : "Published target evidence:"}</b>{" "}
+            {lang === "ar"
+              ? `كود الموظف ${target.employeeId} · الشهور ${target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · القيمة ${money(target.target)}.`
+              : `Employee ${target.employeeId} · months ${target.monthsCovered.join(", ") || "—"} · value ${money(target.target)}.`}
+          </div>
         </>
       )}
     </section>
+  );
+}
+
+function EvidenceLink({ href }: { href: string }) {
+  const { lang } = useI18n();
+  const evidence = useContext(EmployeeEvidenceContext);
+  const kind = evidenceKindFromHref(href);
+  if (evidence && kind) {
+    const labels: Record<EmployeeEvidenceKind, { ar: string; en: string }> = {
+      target: { ar: "تفاصيل التارجت", en: "Target details" },
+      sales: { ar: "سجلات المبيعات", en: "Sales records" },
+      leads: { ar: "الليدز واتصالاتها", en: "Leads and contacts" },
+      calls: { ar: "المكالمات والتقييم", en: "Calls and scores" },
+      chatwoot: { ar: "محادثات Chatwoot", en: "Chatwoot conversations" },
+    };
+    return (
+      <button
+        type="button"
+        onClick={() => evidence.openEvidence(kind)}
+        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[10px] font-semibold text-brand transition-colors hover:bg-brand-soft"
+      >
+        {labels[kind][lang]}
+        <ArrowUpRight size={12} aria-hidden="true" />
+      </button>
+    );
+  }
+  return (
+    <a href={href} className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline">
+      {lang === "ar" ? "عرض الدليل" : "View evidence"}
+      <ArrowUpRight size={12} aria-hidden="true" />
+    </a>
+  );
+}
+
+function EmployeeScoreSummary({ row }: { row: AgentRow }) {
+  const { lang } = useI18n();
+  const score = row.performanceScore;
+  return (
+    <section id="employee-score-summary" className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/35 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold text-brand">{lang === "ar" ? "ملخص الأداء" : "Performance summary"}</div>
+          <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "النتيجة أولًا، ثم الدليل" : "Score first, evidence next"}</h3>
+          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "25 نقطة للمكالمات + 30 للتواصل والبيع + 20 لمتابعة Chatwoot + 25 لتحقيق التارجت. الجزء الذي لا توجد له بيانات يأخذ صفرًا ولا يرفع باقي الأجزاء." : "25 points for calls + 30 for lead execution + 20 for Chatwoot follow-up + 25 for target attainment. Missing evidence earns zero and never inflates the other areas."}</p>
+        </div>
+        <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
+          <div className="num text-3xl font-bold text-brand">{fmtQuality(score.overall)}</div>
+          <small className="block text-[10px] text-text-muted">{lang === "ar" ? "نقطة مكتسبة من 100" : "Earned points out of 100"}</small>
+          <small className="mt-0.5 block text-[10px] font-medium text-brand">{lang === "ar" ? `تغطية البيانات ${fmtPct(score.dataCoverage, 0)}` : `${fmtPct(score.dataCoverage, 0)} evidence coverage`}</small>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface p-3.5">
+          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `جودة المكالمات · ${score.weights.callQuality} نقطة` : `Call quality · ${score.weights.callQuality} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.callQuality)}</span></div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.analyzedCalls)} محللة من ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} مكالمة · ${fmtScorePoints(score.earnedPoints.callQuality)} نقطة مكتسبة` : `${fmtNum(score.evidence.analyzedCalls)} analyzed of ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} calls · ${fmtScorePoints(score.earnedPoints.callQuality)} pts earned`}</p>
+          <div className="mt-3"><EvidenceLink href="#employee-call-evidence" /></div>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-3.5">
+          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `التواصل والبيع · ${score.weights.salesExecution} نقطة` : `Lead execution · ${score.weights.salesExecution} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.salesExecution)}</span></div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `اتصل بنفسه بـ ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} من ${fmtNum(score.evidence.distributedLeads)} ليد · تغطية ${fmtPct(score.evidence.leadCoverageRate, 1)} · ${fmtScorePoints(score.earnedPoints.salesExecution)} نقطة مكتسبة` : `Personally called ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} of ${fmtNum(score.evidence.distributedLeads)} leads · ${fmtPct(score.evidence.leadCoverageRate, 1)} coverage · ${fmtScorePoints(score.earnedPoints.salesExecution)} pts earned`}</p>
+          <div className="mt-3"><EvidenceLink href="#employee-lead-evidence" /></div>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-3.5">
+          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `متابعة Chatwoot · ${score.weights.chatFollowUp} نقطة` : `Chatwoot follow-up · ${score.weights.chatFollowUp} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span></div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.chatConversations)} محادثة · تم الرد على ${fmtNum(score.evidence.chatRepliedConversations)} · ${fmtNum(score.evidence.chatAwaitingReply)} تنتظر ردًا · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة` : `${fmtNum(score.evidence.chatConversations)} conversations · ${fmtNum(score.evidence.chatRepliedConversations)} replied · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}</p>
+          <div className="mt-3"><EvidenceLink href="#employee-chat-evidence" /></div>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-3.5">
+          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `تحقيق التارجت · ${score.weights.targetAttainment} نقطة` : `Target attainment · ${score.weights.targetAttainment} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.targetAttainment)}</span></div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{score.evidence.targetBasis === "orders" ? (lang === "ar" ? "محسوب من أوامر البيع المؤكدة." : "Based on confirmed sale orders.") : score.evidence.targetBasis === "collections" ? (lang === "ar" ? "محسوب من التحصيل لعدم توفر أوامر البيع." : "Based on collections because orders are unavailable.") : (lang === "ar" ? "لا يوجد تارجت صالح للفترة." : "No scoreable target for this period.")} {lang === "ar" ? `${fmtScorePoints(score.earnedPoints.targetAttainment)} نقطة مكتسبة` : `${fmtScorePoints(score.earnedPoints.targetAttainment)} pts earned`}</p>
+          <div className="mt-3"><EvidenceLink href="#employee-target-summary" /></div>
+        </div>
+      </div>
+      {score.missing.length > 0 && <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "الدرجة محافظة: الجزء بلا بيانات كافية يأخذ صفرًا مؤقتًا." : "This is conservative: a component without enough evidence temporarily earns zero."}</p>}
+    </section>
+  );
+}
+
+function EmployeeEvidencePanel({
+  row,
+  kind,
+}: {
+  row: AgentRow;
+  kind: Extract<EmployeeEvidenceKind, "sales" | "leads" | "chatwoot">;
+}) {
+  const { lang } = useI18n();
+  const query = `/api/employee-evidence?employee=${encodeURIComponent(row.name)}${row.callExtension ? `&extension=${encodeURIComponent(row.callExtension)}` : ""}${row.chatwootAgentId ? `&chatwoot_agent_id=${row.chatwootAgentId}` : ""}`;
+  const { data, isLoading, error, refetch } = useApi<EmployeeEvidenceResponse>(query);
+  const outcomeLabel = (outcome: "won" | "open" | "lost") =>
+    outcome === "won"
+      ? lang === "ar" ? "تم البيع" : "Won"
+      : outcome === "lost"
+        ? lang === "ar" ? "لم يتم البيع" : "Lost"
+        : lang === "ar" ? "مفتوح" : "Open";
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <div className="text-xs font-semibold text-brand">{lang === "ar" ? "السجلات الأصلية" : "Source records"}</div>
+        <h3 className="mt-0.5 text-lg font-bold text-text">
+          {kind === "sales"
+            ? lang === "ar" ? "التحصيل وأوامر البيع" : "Collections and sale orders"
+            : kind === "leads"
+              ? lang === "ar" ? "الليدز واتصالات الموظف بها" : "Leads and the employee's calls"
+              : lang === "ar" ? "محادثات الموظف في Chatwoot" : "Employee Chatwoot conversations"}
+        </h3>
+        <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "هذه القائمة تخص الرقم الذي ضغطت عليه فقط، وكل زر يفتح السجل الأصلي مباشرة." : "This list only supports the KPI you opened, and every action opens the original record directly."}</p>
+      </div>
+      {isLoading ? <Skeleton className="h-80" /> : error ? <ErrorState message={(error as Error).message} onRetry={() => refetch()} /> : data && (
+        <div>
+          {kind === "sales" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "أوامر البيع والفواتير" : "Sale orders and invoices"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.orders.total)}</bdi> {lang === "ar" ? "أمر بيع" : "orders"} · <bdi dir="ltr" className="num">{fmtUSDFull(data.orders.amount)}</bdi></p><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.invoices.paidTotal)}</bdi> {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}{data.invoices.creditNoteTotal > 0 ? <> · <bdi dir="ltr" className="num">{fmtNum(data.invoices.creditNoteTotal)}</bdi> {lang === "ar" ? "إشعار دائن" : "credit notes"}</> : null} · <bdi dir="ltr" className="num">{fmtUSDFull(data.invoices.amount)}</bdi></p></header>
+            <div className="max-h-72 divide-y divide-border overflow-auto">
+              {data.orders.rows.slice(0, 8).map((order) => <div key={order.orderRef} className="px-4 py-3"><div className="flex items-start justify-between gap-3"><bdi dir="ltr" className="num text-xs font-semibold text-text">{order.orderRef}</bdi><strong className="num text-xs text-brand">{fmtUSDFull(order.usdSales)}</strong></div><p className="mt-1 truncate text-[10px] text-text-muted">{order.customer || order.course || "—"}</p></div>)}
+              {data.orders.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد أوامر بيع في الفترة." : "No sale orders in this period."}</p>}
+              {data.invoices.rows.slice(0, 6).map((invoice) => <div key={invoice.movement} className="bg-surface-2/45 px-4 py-3"><div className="flex items-start justify-between gap-3"><span className="min-w-0"><bdi dir="ltr" className="num block truncate text-xs font-semibold text-text">{invoice.movement}</bdi><small className="mt-0.5 block truncate text-[10px] text-text-muted">{invoice.partner || "—"} · {invoice.paymentDate}</small></span><strong className={`num shrink-0 text-xs ${invoice.isCreditNote ? "text-danger" : "text-brand"}`}>{fmtUSDFull(invoice.usdPaid)}</strong></div><small className="mt-1 block text-[10px] text-text-muted">{invoice.isCreditNote ? (lang === "ar" ? "إشعار دائن مخصوم من الصافي" : "Credit note deducted from net") : (lang === "ar" ? "فاتورة مدفوعة" : "Paid invoice")}</small></div>)}
+            </div>
+          </article>}
+          {kind === "leads" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "الليدز في Odoo" : "Odoo leads"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.leads.total)}</bdi> {lang === "ar" ? "ليد في الفترة" : "leads in period"}</p></header>
+            <div className="max-h-72 divide-y divide-border overflow-auto">
+              {data.leads.rows.map((lead) => <div key={`${lead.outcome}-${lead.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="min-w-0 flex-1"><b className="block truncate text-xs text-text">{lead.contact || lead.phone || `#${lead.id}`}</b><small className="mt-0.5 block truncate text-[10px] text-text-muted">{outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}</small><small className="mt-1 block text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(lead.ownerCalls)}</bdi> {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} · {lead.calledByOwner ? (lang === "ar" ? "تم التواصل" : "contacted") : (lang === "ar" ? "لم يتواصل" : "not contacted")}</small></div><span className="flex shrink-0 flex-wrap gap-1.5">{lead.latestCallUrl && <a href={lead.latestCallUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}<ExternalLink size={11} className="ms-1 inline" /></a>}{lead.url ? <a href={lead.url} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح الليد" : "Open lead"}<ExternalLink size={11} className="ms-1 inline" /></a> : <bdi dir="ltr" className="num text-[10px] text-text-muted">#{lead.id}</bdi>}</span></div>)}
+              {data.leads.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد ليدز في الفترة." : "No leads in this period."}</p>}
+            </div>
+          </article>}
+          {kind === "chatwoot" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "محادثات Chatwoot" : "Chatwoot conversations"}</b><p className="mt-0.5 text-[10px] text-text-muted">{data.chatwoot ? <><bdi dir="ltr" className="num">{fmtNum(data.chatwoot.total)}</bdi> {lang === "ar" ? "محادثة في الفترة" : "conversations in period"}</> : (lang === "ar" ? "لا يوجد موظف Chatwoot مطابق" : "No matched Chatwoot agent")}</p></header>
+            <div className="max-h-72 divide-y divide-border overflow-auto">
+              {data.chatwoot?.conversations.slice(0, 12).map((conversation) => <a key={conversation.id} href={conversation.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2"><div className="min-w-0"><b className="block truncate text-xs text-text">{conversation.contactName || `#${conversation.id}`}</b><small className="mt-0.5 block text-[10px] text-text-muted">{conversation.awaitingReply ? (lang === "ar" ? "العميل ينتظر ردًا" : "Customer awaiting reply") : (lang === "ar" ? "تم الرد" : "Replied")} · <bdi dir="ltr" className="num">{fmtNum(conversation.unreadMessages)}</bdi> {lang === "ar" ? "غير مقروءة" : "unread"}</small></div><ExternalLink size={13} className="shrink-0 text-brand" /></a>)}
+              {!data.chatwoot?.conversations.length && <p className="p-4 text-xs text-text-muted">{data.chatwootError || (lang === "ar" ? "لا توجد محادثات قابلة للفتح في الفترة." : "No openable conversations in this period.")}</p>}
+            </div>
+          </article>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmployeeEvidenceDialog({
+  row,
+  kind,
+  onOpenChange,
+}: {
+  row: AgentRow;
+  kind: EmployeeEvidenceKind | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { lang } = useI18n();
+  const titles: Record<EmployeeEvidenceKind, { ar: string; en: string }> = {
+    target: { ar: "دليل التارجت", en: "Target evidence" },
+    sales: { ar: "دليل التحصيل والمبيعات", en: "Sales and collections evidence" },
+    leads: { ar: "دليل الليدز والاتصالات", en: "Lead and contact evidence" },
+    calls: { ar: "دليل المكالمات والجودة", en: "Call and quality evidence" },
+    chatwoot: { ar: "دليل محادثات Chatwoot", en: "Chatwoot conversation evidence" },
+  };
+  return (
+    <Dialog open={kind !== null} onOpenChange={onOpenChange}>
+      <DialogContent
+        dir={lang === "ar" ? "rtl" : "ltr"}
+        className="max-h-[88vh] w-[min(94vw,920px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
+      >
+        {kind && <>
+          <DialogHeader className="sticky top-0 z-10 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+            <DialogTitle>{titles[kind][lang]}</DialogTitle>
+            <DialogDescription className="text-xs text-text-muted">
+              {lang === "ar"
+                ? `السجلات الخاصة بـ ${row.name} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
+                : `Only ${row.name}'s records for the selected period. Each evidence view contains one source and one purpose.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 sm:p-5">
+            {kind === "target" && (
+              <div className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-5">
+                {row.target ? <>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <MiniMetric label={lang === "ar" ? "التارجت المنشور" : "Published target"} value={fmtUSDFull(row.target.target)} />
+                    <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDFull(row.paidRevenue)} />
+                    <MiniMetric label={lang === "ar" ? "نسبة الإنجاز" : "Achievement"} value={fmtPct(row.target.achievementPaid, 1)} />
+                  </div>
+                  <p className="mt-4 text-xs leading-relaxed text-text-muted">
+                    {lang === "ar"
+                      ? `كود الموظف ${row.target.employeeId} · الشهور: ${row.target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · المسؤول: ${row.target.teamLeader}.`
+                      : `Employee ${row.target.employeeId} · months: ${row.target.monthsCovered.join(", ") || "—"} · owner: ${row.target.teamLeader}.`}
+                  </p>
+                </> : <p className="text-sm text-text-muted">{lang === "ar" ? "لا يوجد تارجت منشور لهذا الموظف في الفترة." : "No published target for this employee and period."}</p>}
+              </div>
+            )}
+            {(kind === "sales" || kind === "leads" || kind === "chatwoot") && (
+              <EmployeeEvidencePanel row={row} kind={kind} />
+            )}
+            {kind === "calls" && <EmployeeCallsPanel row={row} />}
+          </div>
+        </>}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -931,8 +1226,8 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
                 lang === "ar" ? "ليدز متوزعة" : "Assigned leads",
-                lang === "ar" ? "تم الاتصال" : "Leads called",
-                lang === "ar" ? "بدون مكالمة" : "Never called",
+                lang === "ar" ? "اتصل بنفسه" : "Called by owner",
+                lang === "ar" ? "لم يتصل بهم" : "Not called by owner",
                 lang === "ar" ? "مكالمات الليدز" : "Lead calls",
                 lang === "ar" ? "رابحة" : "Won",
                 lang === "ar" ? "خاسرة" : "Lost",
@@ -1009,10 +1304,12 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.distributedLeads)}</td>
                 <td className="num px-3 py-3 text-end">
-                  {row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)}
+                  {row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
                 </td>
                 <td className="num px-3 py-3 text-end">
-                  {row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
+                  {row.ownerCalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)}
@@ -1096,13 +1393,22 @@ function AgentPerformanceSheet({
   const { lang } = useI18n();
   const [courseMetric, setCourseMetric] = useState<"revenue" | "invoices" | "leads">("revenue");
   const [invoiceCourse, setInvoiceCourse] = useState<AgentCoursePerformance | null>(null);
+  const [evidenceKind, setEvidenceKind] = useState<EmployeeEvidenceKind | null>(null);
   useEffect(() => {
     setCourseMetric("revenue");
     // Closing the sheet with the dialog open leaves it open. Without this it
     // reopens on the next employee, showing one person's invoices under
     // another person's name.
     setInvoiceCourse(null);
+    setEvidenceKind(null);
   }, [row?.key]);
+  useEffect(() => {
+    if (!row || !open || typeof window === "undefined" || !window.location.hash.startsWith("#employee-")) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 160);
+    return () => window.clearTimeout(timer);
+  }, [open, row?.key]);
   if (!row) return null;
 
   const { courseProfile } = row;
@@ -1149,6 +1455,7 @@ function AgentPerformanceSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
+      <EmployeeEvidenceContext.Provider value={{ openEvidence: setEvidenceKind }}>
       <SheetContent
         side={lang === "ar" ? "left" : "right"}
         className="w-[min(100vw,1040px)] max-w-none overflow-y-auto border-border bg-surface p-0 text-text [&>button]:z-30 [&>button]:text-white [&>button]:opacity-100 rtl:[&>button]:left-4 rtl:[&>button]:right-auto sm:max-w-[1040px]"
@@ -1175,6 +1482,7 @@ function AgentPerformanceSheet({
         </div>
 
         <div className="space-y-5 p-4 sm:p-7">
+          <EmployeeScoreSummary row={row} />
           {row.target && <AgentTargetPanel target={row.target} row={row} />}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <ProfileMetric
@@ -1184,6 +1492,7 @@ function AgentPerformanceSheet({
               sub={invoiceCount(row.invoices, lang)}
               icon={<ReceiptText size={17} />}
               hero
+              evidenceHref="#employee-sales-evidence"
             />
             <ProfileMetric
               label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
@@ -1195,6 +1504,7 @@ function AgentPerformanceSheet({
                   : `${fmtNum(row.won)} won · ${fmtNum(row.lost)} lost`
               }
               icon={<Users size={17} />}
+              evidenceHref="#employee-lead-evidence"
             />
             <ProfileMetric
               label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
@@ -1202,6 +1512,7 @@ function AgentPerformanceSheet({
               value={fmtPct(row.conversionRate, 1)}
               sub={lang === "ar" ? "الرابحة ÷ إجمالي الليدز" : "Won ÷ all leads"}
               icon={<ChartNoAxesCombined size={17} />}
+              evidenceHref="#employee-lead-evidence"
             />
             <ProfileMetric
               label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
@@ -1213,39 +1524,31 @@ function AgentPerformanceSheet({
                   : `${fmtNum(row.slaWon)} won · ${fmtNum(row.slaLost)} lost · closed in period`
               }
               icon={<Trophy size={17} />}
+              evidenceHref="#employee-lead-evidence"
             />
           </div>
 
-          <section className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-brand">{lang === "ar" ? "تقييم الموظف" : "Employee score"}</div>
-                <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "السكور الرسمي من جودة مكالمات PBX" : "Official score from PBX call quality"}</h3>
-                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "السكور لا يخلط المبيعات أو Chatwoot مع تقييم PBX. مؤشرات الليدز والمحادثات معروضة بجواره للتشخيص والمتابعة فقط." : "The score does not mix sales or Chatwoot into the PBX rating. Lead and conversation indicators remain beside it for diagnosis and follow-up only."}</p>
-              </div>
-              <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
-                <div className="num text-3xl font-bold text-brand">{fmtQuality(row.performanceScore.overall)}</div>
-                <small className="text-[10px] text-text-muted">{lang === "ar" ? "سكور PBX" : "PBX score"}</small>
-              </div>
+          <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div><div className="text-xs font-semibold text-brand">{lang === "ar" ? "التواصل والبيع" : "Lead execution"}</div><h3 id="employee-lead-execution-title" className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "هل اتصل الموظف بالليدز التي وُزعت عليه؟" : "Did the employee contact their assigned leads?"}</h3></div>
+              <EvidenceLink href="#employee-lead-evidence" />
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "جودة مكالمات PBX · أساس السكور" : "PBX call quality · score basis"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.callQuality)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.analyzedCalls)} مكالمة مكتملة التحليل` : `${fmtNum(row.performanceScore.evidence.analyzedCalls)} completed call analyses`}</p>
-              </div>
-              <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "الليدز والمبيعات · مؤشر مساعد" : "Leads and sales · supporting indicator"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.salesExecution)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `تم الاتصال بـ ${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} من الليدز · نسبة البيع ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)}` : `${fmtPct(row.performanceScore.evidence.leadCoverageRate, 1)} lead coverage · ${fmtPct(row.performanceScore.evidence.leadConversionRate, 1)} conversion`}</p>
-              </div>
-              <div className="rounded-xl border border-border bg-surface p-3.5">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? "متابعة Chatwoot · لا تدخل في السكور" : "Chatwoot follow-up · not scored"}</b><span className="num font-bold text-brand">{fmtQuality(row.performanceScore.chatFollowUp)}</span></div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(row.performanceScore.evidence.chatConversations)} محادثة · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} عميل ينتظر ردًا · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} غير مقروءة` : `${fmtNum(row.performanceScore.evidence.chatConversations)} conversations · ${fmtNum(row.performanceScore.evidence.chatAwaitingReply)} awaiting reply · ${fmtNum(row.performanceScore.evidence.chatUnreadConversations)} unread`}</p>
+            <div className="rounded-2xl border border-border bg-surface p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز بواسطة صاحب الليد" : "Owner lead coverage"}</b><Pill tone={row.leadOwnerCallCoverageRate === null ? "neutral" : row.leadOwnerCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadOwnerCallCoverageRate, 1)}</Pill></div>
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                <MiniMetric label={lang === "ar" ? "موزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "اتصل بها بنفسه" : "Called by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
               </div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
               <div className="text-xs font-semibold text-brand">
                 {lang === "ar" ? "أداء المكالمات" : "Call performance"}
               </div>
@@ -1259,6 +1562,8 @@ function AgentPerformanceSheet({
                   ? "كل الأرقام محسوبة على نفس الفترة المختارة أعلى الصفحة؛ وقت الكلام الفعلي لا يشمل الرنين والانتظار."
                   : "Every figure uses the selected page date range; actual talk time excludes ringing and waiting."}
               </p>
+              </div>
+              <EvidenceLink href="#employee-call-evidence" />
             </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <ProfileMetric
@@ -1272,6 +1577,7 @@ function AgentPerformanceSheet({
                     : `${fmtNum(row.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(row.answerRate, 1)}`
                 }
                 icon={<PhoneCall size={17} />}
+                evidenceHref="#employee-call-evidence"
               />
               <ProfileMetric
                 label={lang === "ar" ? "الوقت من الاتصال إلى الإغلاق" : "Dial-to-hangup time"}
@@ -1282,12 +1588,14 @@ function AgentPerformanceSheet({
                     : `${formatCallHours(row.talkSeconds, lang)} actual talk time`
                 }
                 icon={<Clock3 size={17} />}
+                evidenceHref="#employee-call-evidence"
               />
               <ProfileMetric
                 label={lang === "ar" ? "متوسط مدة المكالمة" : "Average call length"}
                 value={formatCallDuration(row.averageCallSeconds, lang)}
                 sub={lang === "ar" ? "للمكالمات التي تم الرد عليها" : "Across answered calls"}
                 icon={<AudioLines size={17} />}
+                evidenceHref="#employee-call-evidence"
               />
               <ProfileMetric
                 label={lang === "ar" ? "متوسط الجودة" : "Average quality"}
@@ -1302,28 +1610,17 @@ function AgentPerformanceSheet({
                       : `${fmtNum(row.analyzedCalls)} analyzed · ${fmtNum(row.qualityNeedsReview ?? 0)} to review`
                 }
                 icon={<CircleGauge size={17} />}
+                evidenceHref="#employee-call-evidence"
               />
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز المتوزعة" : "Assigned lead coverage"}</b>
-                <Pill tone={row.leadCallCoverageRate === null ? "neutral" : row.leadCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadCallCoverageRate, 1)}</Pill>
-              </div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                <MiniMetric label={lang === "ar" ? "متوزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "تم الاتصال" : "Called"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "بدون اتصال" : "Never called"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "من الموظف نفسه" : "By assigned owner"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <b className="text-sm text-text">{lang === "ar" ? "أداء محادثات Chatwoot" : "Chatwoot conversation performance"}</b>
-                <Pill tone={row.chatConversations === null ? "neutral" : "success"}>{row.chatConversations === null ? (lang === "ar" ? "غير مطابق" : "Not matched") : "Connected"}</Pill>
+                <span className="flex items-center gap-2"><EvidenceLink href="#employee-chat-evidence" /><Pill tone={row.chatConversations === null ? "neutral" : "success"}>{row.chatConversations === null ? (lang === "ar" ? "غير مطابق" : "Not matched") : "Connected"}</Pill></span>
               </div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "المحادثات" : "Conversations"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
+                <MiniMetric label={lang === "ar" ? "تم الرد عليها" : "Replied to"} value={row.chatConversations === null ? "—" : fmtNum(row.performanceScore.evidence.chatRepliedConversations)} />
                 <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
                 <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={row.chatUnreadConversations === null ? "—" : fmtNum(row.chatUnreadConversations)} />
                 <MiniMetric label={lang === "ar" ? "رسائل غير مقروءة" : "Unread messages"} value={row.chatUnreadMessages === null ? "—" : fmtNum(row.chatUnreadMessages)} />
@@ -1332,7 +1629,6 @@ function AgentPerformanceSheet({
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "حالة Open أو Snoozed أو Resolved لا تخصم وحدها. الذي يهم: هل آخر رسالة من العميل وما زال ينتظر رد الموظف، وهل توجد رسائل غير مقروءة." : "Open, Snoozed, or Resolved does not affect the score by itself. What matters is whether the customer's message is still awaiting an agent reply and whether messages are unread."}</p>
             </div>
-            <EmployeeCallsPanel row={row} />
           </section>
 
           {!courseProfile.lostDataAvailable && (
@@ -1683,6 +1979,19 @@ function AgentPerformanceSheet({
               ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس، والتصنيفات اللي مش كورس زي «أخرى» مستبعدة من الترتيب ومعروضة في سطر تحت الكروت؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
               : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold, and non-course buckets such as "Other" are held out of the ranking and reported on a line under the cards; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
           </Notice>
+          <section className="rounded-2xl border border-brand/15 bg-brand-soft/25 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <b className="text-sm text-text">{lang === "ar" ? "السجلات التفصيلية" : "Detailed source records"}</b>
+                <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "افتح نوع الدليل الذي تحتاجه مباشرة؛ كل مصدر يظهر منفصلًا عن الآخر." : "Open the exact evidence you need; every source is kept separate."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <EvidenceLink href="#employee-lead-evidence" />
+                <EvidenceLink href="#employee-call-evidence" />
+                <EvidenceLink href="#employee-chat-evidence" />
+              </div>
+            </div>
+          </section>
         </div>
         {invoiceCourse && (
           <CourseInvoicesDialog
@@ -1691,7 +2000,15 @@ function AgentPerformanceSheet({
             onClose={() => setInvoiceCourse(null)}
           />
         )}
+        <EmployeeEvidenceDialog
+          row={row}
+          kind={evidenceKind}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setEvidenceKind(null);
+          }}
+        />
       </SheetContent>
+      </EmployeeEvidenceContext.Provider>
     </Sheet>
   );
 }
@@ -1761,30 +2078,30 @@ function EmployeeCallsList({
   lang: "ar" | "en";
 }) {
   const { data, isLoading, error, refetch } = useApi<CallsHubEmployeeCalls>(
-    `/api/employee-calls?extension=${encodeURIComponent(row.callExtension || "")}&page_size=20`,
+    `/api/employee-calls?extension=${encodeURIComponent(row.callExtension || "")}&page_size=50`,
   );
-  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < 70) ?? [];
-  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= 70) ?? [];
+  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < QUALITY_REVIEW_THRESHOLD) ?? [];
+  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= QUALITY_REVIEW_THRESHOLD) ?? [];
   const callGroups = [
     { key: "review", label: lang === "ar" ? "مكالمات تحتاج مراجعة" : "Calls needing review", calls: reviewCalls, warning: true },
     { key: "remaining", label: lang === "ar" ? "باقي المكالمات" : "Remaining calls", calls: remainingCalls, warning: false },
   ].filter((group) => group.calls.length > 0);
   return (
-    <Card padded={false}>
+    <div id="employee-call-evidence" className="scroll-mt-24"><Card padded={false}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
         <div>
           <SectionTitle className="mb-0">
-            {lang === "ar" ? "كل مكالمات الموظف وتقييمها" : "All employee calls and scores"}
+            {lang === "ar" ? "دليل المكالمات وتقييمها" : "Call evidence and scores"}
           </SectionTitle>
           <p className="mt-1 text-[11px] text-text-muted">
             {lang === "ar"
-              ? "المكالمات الأقل من 70 تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله."
-              : "Calls below 70 appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction."}
+              ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
+              : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
           </p>
         </div>
         {data && (
           <Pill tone="brand">
-            {fmtNum(data.total)} {lang === "ar" ? "مكالمة في الفترة" : "calls in period"}
+            <bdi dir="ltr" className="num">{fmtNum(data.calls.length)}</bdi> {lang === "ar" ? "معروضة من" : "shown of"} <bdi dir="ltr" className="num">{fmtNum(data.total)}</bdi>
           </Pill>
         )}
       </div>
@@ -1827,7 +2144,7 @@ function EmployeeCallsList({
                       <span><Pill tone={qualityTone(call.qualityScore)}>{fmtQuality(call.qualityScore)}</Pill></span>
                       <ChevronDown size={17} className={`text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
                     </button>
-                    {open && <EmployeeCallDetail call={call} lang={lang} />}
+                    {open && <EmployeeCallDetail call={call} lang={lang} appUrl={data.appUrl} />}
                   </article>
                 );
               })}
@@ -1835,11 +2152,11 @@ function EmployeeCallsList({
           </section>)}
         </div>
       )}
-    </Card>
+    </Card></div>
   );
 }
 
-function EmployeeCallDetail({ call, lang }: { call: CallsHubCall; lang: "ar" | "en" }) {
+function EmployeeCallDetail({ call, lang, appUrl }: { call: CallsHubCall; lang: "ar" | "en"; appUrl: string }) {
   const { data, isLoading, error, refetch } = useApi<CallDetailResponse>(
     `/api/employee-call-detail?id=${encodeURIComponent(call.id)}`,
   );
@@ -1930,7 +2247,7 @@ function EmployeeCallDetail({ call, lang }: { call: CallsHubCall; lang: "ar" | "
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] text-text-muted">
         <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={13} className="text-success" />{lang === "ar" ? "الحسابات تتم برمجيًا بعد استخراج الأدلة؛ الموديل لا يحدد الدرجة بنفسه." : "The model extracts evidence; deterministic code calculates the score."}</span>
-        <span className="flex flex-wrap items-center gap-3"><a href={`https://web-production-c7b78.up.railway.app/?call=${encodeURIComponent(call.id)}#archive`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح نفس المكالمة في Calls Hub" : "Open this call in Calls Hub"}<ExternalLink size={12} /></a><a href="https://engosoft-pbx.ras.yeastar.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح Yeastar" : "Open Yeastar"}<ExternalLink size={12} /></a></span>
+        <span className="flex flex-wrap items-center gap-3"><a href={`${appUrl.replace(/\/+$/, "")}/?call=${encodeURIComponent(call.id)}#archive`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح نفس المكالمة في Calls Hub" : "Open this call in Calls Hub"}<ExternalLink size={12} /></a><a href="https://engosoft-pbx.ras.yeastar.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح Yeastar" : "Open Yeastar"}<ExternalLink size={12} /></a></span>
       </div>
     </div>
   );
@@ -1943,6 +2260,7 @@ function ProfileMetric({
   icon,
   hero = false,
   explain,
+  evidenceHref,
 }: {
   label: string;
   value: string;
@@ -1951,7 +2269,10 @@ function ProfileMetric({
   hero?: boolean;
   /** Shows the "where does this number come from?" popover next to the label. */
   explain?: EmployeeMetricKey;
+  /** A real record/calculation section; omitted when no drill-down exists. */
+  evidenceHref?: string;
 }) {
+  const { lang } = useI18n();
   return (
     <div
       className={`rounded-2xl border p-3.5 ${hero ? "border-brand/20 bg-brand-soft" : "border-border bg-surface"}`}
@@ -1965,6 +2286,15 @@ function ProfileMetric({
       </div>
       <div className="num mt-2 text-xl font-bold text-text sm:text-2xl">{value}</div>
       <div className="mt-1 text-[11px] text-text-muted">{sub}</div>
+      {evidenceHref && (
+        <a
+          href={evidenceHref}
+          className="mt-3 inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline"
+        >
+          {lang === "ar" ? "عرض الدليل" : "View evidence"}
+          <ArrowUpRight size={12} aria-hidden="true" />
+        </a>
+      )}
     </div>
   );
 }
@@ -2506,7 +2836,11 @@ function formatCallHours(seconds: number | null, lang: "ar" | "en"): string {
   const totalMinutes = Math.max(0, Math.round(seconds / 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (lang === "ar") return hours > 0 ? `${fmtNum(hours)} ساعة و${fmtNum(minutes)} دقيقة` : `${fmtNum(minutes)} دقيقة`;
+  if (lang === "ar") return bidiArabic(
+    hours > 0
+      ? `${bidiNumber(hours)}\u00a0ساعة و${bidiNumber(minutes)}\u00a0دقيقة`
+      : `${bidiNumber(minutes)}\u00a0دقيقة`,
+  );
   return hours > 0 ? `${fmtNum(hours)}h ${fmtNum(minutes)}m` : `${fmtNum(minutes)}m`;
 }
 
@@ -2519,12 +2853,20 @@ function formatCallDuration(seconds: number | null, lang: "ar" | "en"): string {
   if (hours > 0) {
     const minuteRemainder = Math.floor((total % 3600) / 60);
     return lang === "ar"
-      ? `${fmtNum(hours)} ساعة و${fmtNum(minuteRemainder)} دقيقة`
+      ? bidiArabic(`${bidiNumber(hours)}\u00a0ساعة و${bidiNumber(minuteRemainder)}\u00a0دقيقة`)
       : `${fmtNum(hours)}h ${fmtNum(minuteRemainder)}m`;
   }
   return lang === "ar"
-    ? `${fmtNum(minutes)} دقيقة و${fmtNum(remainder)} ثانية`
+    ? bidiArabic(`${bidiNumber(minutes)}\u00a0دقيقة و${bidiNumber(remainder)}\u00a0ثانية`)
     : `${fmtNum(minutes)}m ${fmtNum(remainder)}s`;
+}
+
+function bidiNumber(value: number): string {
+  return `\u2066${fmtNum(value)}\u2069`;
+}
+
+function bidiArabic(value: string): string {
+  return `\u2067${value}\u2069`;
 }
 
 function highlightSuspectText(text: string, terms: string[], lang: "ar" | "en"): ReactNode {
@@ -2540,6 +2882,10 @@ function highlightSuspectText(text: string, terms: string[], lang: "ar" | "en"):
 
 function fmtQuality(value: number | null): string {
   return value === null || !Number.isFinite(value) ? "—" : `${Math.round(value)}/100`;
+}
+
+function fmtScorePoints(value: number): string {
+  return value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
 function qualityTone(value: number | null): "success" | "brand" | "warning" | "danger" | "neutral" {
