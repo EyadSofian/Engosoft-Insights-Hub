@@ -316,7 +316,7 @@ export const Route = createFileRoute("/api/accounting-export")({
           const courses = buildAccountingCourses(rows);
           const header = ar
             ? [
-                "الكورس",
+                "الكاتجوري",
                 "المنتج",
                 "كود المنتج",
                 "النوع",
@@ -326,7 +326,7 @@ export const Route = createFileRoute("/api/accounting-export")({
                 "الكمية",
                 "الإيراد بالدولار",
                 "نسبة المنتج من إجمالي الحسابات",
-                "نسبة المنتج داخل الكورس",
+                "نسبة المنتج داخل الكاتجوري",
                 "متوسط الوحدة بالدولار",
                 "المصادر",
                 "الفعاليات",
@@ -334,7 +334,7 @@ export const Route = createFileRoute("/api/accounting-export")({
                 "قاعدة الحساب",
               ]
             : [
-                "Course",
+                "Product Category Group",
                 "Product",
                 "Product Code",
                 "Type",
@@ -344,7 +344,7 @@ export const Route = createFileRoute("/api/accounting-export")({
                 "Quantity",
                 "Revenue USD",
                 "Share of Accounting Revenue %",
-                "Share within Course %",
+                "Share within Category %",
                 "Average Unit USD",
                 "Sources",
                 "Events",

@@ -1,12 +1,6 @@
 import type { AccountingRow } from "./types";
-import {
-  UNATTRIBUTED,
-  buildDepartmentMatcher,
-  buildFamilyAliases,
-  deriveFamily,
-  detectVariant,
-  normalizeSource,
-} from "./product-taxonomy";
+import { UNATTRIBUTED, detectVariant, normalizeSource } from "./product-taxonomy.ts";
+import { accountingBusinessCategory } from "./accounting-category.ts";
 
 export interface AccountingBreakdown {
   key: string;
@@ -79,8 +73,6 @@ interface FamilyBucket extends Bucket {
   products: Map<string, ProductBucket>;
 }
 
-const UNCLASSIFIED = "__unclassified__";
-
 function quantity(row: AccountingRow): number {
   const value = Math.abs(Number(row.quantity));
   return Number.isFinite(value) ? value : 0;
@@ -119,40 +111,40 @@ function breakdown(map: Map<string, Bucket>): AccountingBreakdown[] {
 }
 
 /**
- * Builds the paid-invoice course explorer.
+ * Builds the paid-invoice Product Category explorer.
  *
- * Course and modality come only from the product/category/event dimensions.
- * Marketing source is a separate breakdown, so a missing source can never turn
- * a Recorded or Event product into an unclassified course.
+ * The top level follows the finance workbook's category names while every raw
+ * Odoo product remains visible inside its category. Marketing source stays a
+ * separate breakdown and never changes category or modality.
  */
 export function buildAccountingCourses(rows: AccountingRow[]) {
-  const department = buildDepartmentMatcher(rows.map((row) => row.productCategory).filter(Boolean));
   const descriptors = rows.map((row) => {
     const variantKey = detectVariant(
       [row.product, row.event, row.eventStage].filter(Boolean).join(" "),
       row.productCategory,
     );
-    const derived = row.product
-      ? deriveFamily(row.product, department, variantKey)
-      : { key: UNCLASSIFIED, label: "Unclassified" };
-    return { row, variantKey, derived };
+    const rawCategory = row.productCategory || row.category || row.mainCategory;
+    return {
+      row,
+      variantKey,
+      rawCategory,
+      businessCategory: accountingBusinessCategory(rawCategory),
+    };
   });
 
-  const aliases = buildFamilyAliases(descriptors.map(({ derived }) => derived));
-  const familyLabels = new Map(descriptors.map(({ derived }) => [derived.key, derived.label]));
   const families = new Map<string, FamilyBucket>();
   const allVariants = new Map<string, Bucket>();
   const allSources = new Map<string, Bucket>();
 
-  for (const { row, variantKey, derived } of descriptors) {
-    const familyKey = aliases.get(derived.key) ?? derived.key;
-    const family = familyLabels.get(familyKey) ?? derived.label;
+  for (const { row, variantKey, rawCategory, businessCategory } of descriptors) {
+    const familyKey = businessCategory.key;
+    const family = businessCategory.label;
     const qty = quantity(row);
     const invoiceId = row.movement;
     const source = normalizeSource(row.source);
     const sourceKey = source.key || UNATTRIBUTED;
     const sourceName = source.label;
-    const category = row.productCategory || row.mainCategory || "";
+    const category = rawCategory;
     const productKey = `${row.productCode}\u001f${row.product}\u001f${category}`;
 
     const familyBucket = families.get(familyKey) ?? {
@@ -160,7 +152,7 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
       label: family,
       familyKey,
       family,
-      category,
+      category: family,
       quantity: 0,
       revenueUsd: 0,
       invoiceIds: new Set<string>(),
@@ -175,7 +167,7 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
     familyBucket.revenueUsd += row.usdPaid;
     familyBucket.lines += 1;
     if (invoiceId && !row.isCreditNote) familyBucket.invoiceIds.add(invoiceId);
-    if (!familyBucket.category && category) familyBucket.category = category;
+    if (!familyBucket.category) familyBucket.category = family;
 
     addBucket(familyBucket.variants, variantKey, variantKey, row, qty);
     addBucket(familyBucket.sources, sourceKey, sourceName, row, qty);
@@ -255,7 +247,10 @@ export function buildAccountingCourses(rows: AccountingRow[]) {
       quantity: familyRows.reduce((sum, family) => sum + family.quantity, 0),
       quantityAvailable: rows.some((row) => Math.abs(row.quantity) > 0),
       invoices: new Set(
-        rows.filter((row) => !row.isCreditNote).map((row) => row.movement).filter(Boolean),
+        rows
+          .filter((row) => !row.isCreditNote)
+          .map((row) => row.movement)
+          .filter(Boolean),
       ).size,
       revenueUsd: familyRows.reduce((sum, family) => sum + family.revenueUsd, 0),
       withoutSourceRevenue:

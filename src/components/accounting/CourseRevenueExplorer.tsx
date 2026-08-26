@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, Layers3, ReceiptText, X } from "lucide-react";
 import { BarList, Card, Pill, SectionTitle } from "@/components/ui-bits";
-import { fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
-import { familyLabel, sourceLabel, variantLabel } from "@/lib/product-taxonomy";
+import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { sourceLabel, variantLabel } from "@/lib/product-taxonomy";
 import { useModalGuard } from "@/lib/ui-store";
 
 export interface CourseBreakdown {
@@ -101,14 +101,14 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
         <SectionTitle
           hint={
             lang === "ar"
-              ? "اضغط على أي كورس لرؤية Event وRecorded وكل منتج وفاتورته. التصنيف من المنتج نفسه وليس من مصدر التسويق."
-              : "Select a course to inspect Event, Recorded and every invoiced product. Classification comes from the product, not marketing source."
+              ? "كل كارت يجمع كل منتجات Odoo تحت كاتجوري مالية واحدة. اضغط لعرض المنتجات والفواتير والأنواع داخلها."
+              : "Each card groups all Odoo products under one finance category. Select it to inspect products, invoices, and types."
           }
           action={
             <div className="hidden items-center gap-2 text-[11px] text-text-muted sm:flex">
               <BookOpen size={15} />
               <span className="num">{fmtNum(data.summary.families)}</span>
-              <span>{lang === "ar" ? "كورس" : "courses"}</span>
+              <span>{lang === "ar" ? "كاتجوري" : "categories"}</span>
               <span aria-hidden="true">·</span>
               <Layers3 size={15} />
               <span className="num">{fmtNum(data.summary.products)}</span>
@@ -116,7 +116,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
             </div>
           }
         >
-          {lang === "ar" ? "تفاصيل مبيعات الكورسات" : "Course sales detail"}
+          {lang === "ar" ? "المبيعات حسب الكاتجوري" : "Sales by product category"}
         </SectionTitle>
 
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
@@ -125,8 +125,8 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
               key={row.familyKey}
               type="button"
               onClick={() => setOpen(row)}
-              className="group min-h-28 rounded-xl border border-border p-3 text-start transition-colors hover:border-brand/40 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              aria-label={`${familyLabel(row.familyKey, row.family, lang)} — ${fmtUSDExact(row.revenueUsd)}`}
+              className="group relative min-h-32 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-2/45 p-4 text-start shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              aria-label={`${row.family} — ${fmtUSDFull(row.revenueUsd)}`}
             >
               <div className="flex items-start gap-3">
                 <span className="num mt-0.5 w-6 shrink-0 text-[12px] font-semibold text-text-subtle">
@@ -135,17 +135,17 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-[14px] font-semibold text-text">
-                        {familyLabel(row.familyKey, row.family, lang)}
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand/75">
+                        {lang === "ar" ? "Product Category" : "Product category"}
                       </p>
-                      <p className="mt-0.5 truncate text-[11px] text-text-subtle">
-                        {row.category ||
-                          (lang === "ar" ? "بدون فئة مسجّلة" : "No category recorded")}
+                      <p className="truncate text-[15px] font-bold text-text">{row.family}</p>
+                      <p className="mt-1 truncate text-[11px] text-text-subtle">
+                        {fmtNum(row.products.length)} {lang === "ar" ? "منتج" : "products"}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span className="num text-[14px] font-semibold text-text">
-                        {fmtUSDExact(row.revenueUsd)}
+                        {fmtUSDFull(row.revenueUsd)}
                       </span>
                       <ChevronRight
                         size={16}
@@ -200,8 +200,8 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
                 ? "عرض أقل"
                 : "Show less"
               : lang === "ar"
-                ? `عرض كل الكورسات (${fmtNum(data.families.length)})`
-                : `Show all courses (${fmtNum(data.families.length)})`}
+                ? `عرض كل الكاتجوريز (${fmtNum(data.families.length)})`
+                : `Show all categories (${fmtNum(data.families.length)})`}
           </button>
         )}
       </Card>
@@ -265,16 +265,16 @@ function CourseDrawer({
         <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
           <div className="min-w-0">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <Pill tone="brand">{lang === "ar" ? "فواتير مدفوعة" : "Paid invoices"}</Pill>
+              <Pill tone="brand">{lang === "ar" ? "Product Category" : "Product category"}</Pill>
               <span className="text-[11px] text-text-muted">
-                {course.category || (lang === "ar" ? "بدون فئة مسجّلة" : "No category recorded")}
+                {fmtNum(course.products.length)} {lang === "ar" ? "منتج من Odoo" : "Odoo products"}
               </span>
             </div>
             <h2 id="accounting-course-title" className="text-lg font-semibold text-text">
-              {familyLabel(course.familyKey, course.family, lang)}
+              {course.family}
             </h2>
             <p className="mt-1 text-xs text-text-muted">
-              <span className="num">{fmtUSDExact(course.revenueUsd)}</span> ·{" "}
+              <span className="num">{fmtUSDFull(course.revenueUsd)}</span> ·{" "}
               {quantityAvailable && (
                 <>
                   {fmtNum(course.quantity)} {lang === "ar" ? "وحدة" : "units"} ·{" "}
@@ -297,8 +297,8 @@ function CourseDrawer({
           {sourceMissing && (
             <div className="rounded-xl border border-border bg-surface-2 p-3 text-xs leading-relaxed text-text-muted">
               {lang === "ar"
-                ? `${fmtUSDExact(sourceMissing.revenueUsd)} بدون مصدر تسويقي مسجّل. ده لا يغيّر تصنيف الكورس أو نوعه؛ Recorded وEvent مأخوذان من اسم المنتج/الفعالية.`
-                : `${fmtUSDExact(sourceMissing.revenueUsd)} has no recorded marketing source. That does not change course or modality classification; Recorded and Event come from the product/event fields.`}
+                ? `${fmtUSDFull(sourceMissing.revenueUsd)} بدون مصدر تسويقي مسجّل. ده لا يغيّر Product Category أو نوع المنتج؛ Recorded وEvent مأخوذان من اسم المنتج/الفعالية.`
+                : `${fmtUSDFull(sourceMissing.revenueUsd)} has no recorded marketing source. That does not change Product Category or modality; Recorded and Event come from product/event fields.`}
             </div>
           )}
 
@@ -311,8 +311,8 @@ function CourseDrawer({
               }
             >
               {lang === "ar"
-                ? "المنتجات والأنواع داخل الكورس"
-                : "Products and types in this course"}
+                ? "المنتجات والأنواع داخل الكاتجوري"
+                : "Products and types in this category"}
             </SectionTitle>
             <div className="table-wrap scroll-hint-x rounded-xl border border-border">
               <table className="w-full min-w-[660px] text-sm">
@@ -363,7 +363,7 @@ function CourseDrawer({
                       )}
                       <td className="num px-3 py-3 text-end">{fmtNum(product.invoices)}</td>
                       <td className="num px-3 py-3 text-end font-semibold text-text">
-                        {fmtUSDExact(product.revenueUsd)}
+                        {fmtUSDFull(product.revenueUsd)}
                       </td>
                     </tr>
                   ))}
@@ -379,11 +379,11 @@ function CourseDrawer({
                 items={course.variants.map((row) => ({
                   label: variantLabel(row.key, lang),
                   value: row.revenueUsd,
-                  meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtNum(
+                  meta: `${fmtUSDFull(row.revenueUsd)} · ${fmtNum(
                     quantityAvailable ? row.quantity : row.invoices,
                   )} ${quantityAvailable ? (lang === "ar" ? "وحدة" : "units") : lang === "ar" ? "فاتورة" : "invoices"}`,
                 }))}
-                format={fmtUSDExact}
+                format={fmtUSDFull}
                 color="var(--chart-3)"
               />
             </section>
@@ -395,12 +395,12 @@ function CourseDrawer({
                 items={course.sources.map((row) => ({
                   label: sourceLabel(row.key, row.label, lang),
                   value: row.revenueUsd,
-                  meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtPct(
+                  meta: `${fmtUSDFull(row.revenueUsd)} · ${fmtPct(
                     course.revenueUsd ? (row.revenueUsd / course.revenueUsd) * 100 : null,
                     1,
                   )}`,
                 }))}
-                format={fmtUSDExact}
+                format={fmtUSDFull}
               />
             </section>
           </div>
@@ -432,9 +432,9 @@ function CourseDrawer({
                     items={course.eventStages.map((row) => ({
                       label: row.label,
                       value: row.revenueUsd,
-                      meta: `${fmtUSDExact(row.revenueUsd)} · ${fmtNum(row.invoices)}`,
+                      meta: `${fmtUSDFull(row.revenueUsd)} · ${fmtNum(row.invoices)}`,
                     }))}
-                    format={fmtUSDExact}
+                    format={fmtUSDFull}
                     color="var(--chart-5)"
                   />
                 </div>
@@ -484,14 +484,14 @@ function EventRows({
           type="button"
           onClick={() => onSelect(row)}
           className="group block w-full rounded-xl border border-transparent p-2 text-start transition-colors hover:border-brand/25 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          aria-label={`${row.label} — ${fmtUSDExact(row.revenueUsd)}`}
+          aria-label={`${row.label} — ${fmtUSDFull(row.revenueUsd)}`}
         >
           <span className="mb-1 flex items-start justify-between gap-3">
             <span className="min-w-0 truncate text-[13px] font-medium text-text" title={row.label}>
               {row.label}
             </span>
             <span className="num shrink-0 text-[12px] font-semibold text-text">
-              {fmtUSDExact(row.revenueUsd)} · {fmtNum(row.invoices)}
+              {fmtUSDFull(row.revenueUsd)} · {fmtNum(row.invoices)}
             </span>
           </span>
           <span className="block h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -546,9 +546,7 @@ function EventDetailDialog({
             <h3 id="accounting-event-title" className="mt-3 text-lg font-semibold text-text">
               {event.label}
             </h3>
-            <p className="mt-1 text-xs text-text-muted">
-              {familyLabel(course.familyKey, course.family, lang)}
-            </p>
+            <p className="mt-1 text-xs text-text-muted">{course.family}</p>
           </div>
           <button
             type="button"
@@ -565,7 +563,7 @@ function EventDetailDialog({
           <div className="rounded-xl bg-surface-2 p-3">
             <dt className="text-[11px] text-text-muted">{lang === "ar" ? "الإيراد" : "Revenue"}</dt>
             <dd className="num mt-1 break-all text-base font-semibold text-text">
-              {fmtUSDExact(event.revenueUsd)}
+              {fmtUSDFull(event.revenueUsd)}
             </dd>
           </div>
           <div className="rounded-xl bg-surface-2 p-3">
@@ -586,7 +584,7 @@ function EventDetailDialog({
           )}
           <div className="rounded-xl bg-surface-2 p-3">
             <dt className="text-[11px] text-text-muted">
-              {lang === "ar" ? "نسبتها من إيراد الكورس" : "Share of course revenue"}
+              {lang === "ar" ? "نسبتها من إيراد الكاتجوري" : "Share of category revenue"}
             </dt>
             <dd className="num mt-1 text-base font-semibold text-text">{fmtPct(share, 2)}</dd>
           </div>
