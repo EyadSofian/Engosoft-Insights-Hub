@@ -43,7 +43,8 @@
     "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs",
     "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs",
     "test:weekend-analysis": "node --experimental-strip-types scripts/test-weekend-analysis.mjs",
-    "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs"
+    "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs",
+    "test:uncalled-leads": "node --experimental-strip-types scripts/test-uncalled-leads.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

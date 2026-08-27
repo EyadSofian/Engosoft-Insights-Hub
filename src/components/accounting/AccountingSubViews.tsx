@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { TargetEditor } from "@/components/accounting/TargetEditor";
 import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
+import {
+  UncalledLeadsDialog,
+  type UncalledScope,
+} from "@/components/accounting/UncalledLeadsDialog";
 import type { EmployeeMetricKey } from "@/lib/employee-metric-catalog";
 import {
   ArrowUpRight,
@@ -305,6 +309,7 @@ export function AccountingAgentsView() {
   const [search, setSearch] = useState("");
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
   const [editingTargets, setEditingTargets] = useState(false);
+  const [uncalledScope, setUncalledScope] = useState<UncalledScope | null>(null);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
     if (data && !data.callsHub.callsAvailable && sortBy === "calls") setSortBy("revenue");
@@ -534,9 +539,54 @@ export function AccountingAgentsView() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
           <MiniMetric label={lang === "ar" ? "اتصل بها الموظف المسؤول" : "Called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "لم يتصل بها الموظف المسؤول" : "Not called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads))} />
+          <MiniMetric
+            label={lang === "ar" ? "لم يتصل بها الموظف المسؤول" : "Not called by assigned owner"}
+            value={
+              data.summary.ownerCalledDistributedLeads === null
+                ? "—"
+                : fmtNum(
+                    Math.max(
+                      0,
+                      data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads,
+                    ),
+                  )
+            }
+            hint={
+              lang === "ar" ? "يشمل ليدز اتصل بها زميل آخر" : "Includes leads a colleague called"
+            }
+            onDrill={
+              data.summary.ownerCalledDistributedLeads === null
+                ? undefined
+                : () => setUncalledScope("owner")
+            }
+            drillLabel={
+              lang === "ar"
+                ? "اعرض الليدز التي لم يتصل بها الموظف المسؤول"
+                : "Show the leads the assigned owner never called"
+            }
+          />
           <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"} value={data.summary.uncalledDistributedLeads === null ? "—" : fmtNum(data.summary.uncalledDistributedLeads)} />
+          <MiniMetric
+            label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"}
+            value={
+              data.summary.uncalledDistributedLeads === null
+                ? "—"
+                : fmtNum(data.summary.uncalledDistributedLeads)
+            }
+            hint={
+              lang === "ar"
+                ? "لا مكالمة من أي موظف داخل الفترة"
+                : "No call from any employee inside the window"
+            }
+            onDrill={
+              data.summary.uncalledDistributedLeads === null
+                ? undefined
+                : () => setUncalledScope("none")
+            }
+            drillLabel={
+              lang === "ar" ? "اعرض الليدز التي لم يتصل بها أحد" : "Show the leads nobody called"
+            }
+          />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"} value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)} />
           <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
@@ -644,6 +694,13 @@ export function AccountingAgentsView() {
         open={selectedAgent !== null}
         onOpenChange={(next) => {
           if (!next) setSelectedAgentKey(null);
+        }}
+      />
+
+      <UncalledLeadsDialog
+        scope={uncalledScope}
+        onOpenChange={(next) => {
+          if (!next) setUncalledScope(null);
         }}
       />
     </div>
@@ -1009,6 +1066,7 @@ function EmployeeEvidenceDialog({
     </Dialog>
   );
 }
+
 
 /** Achievement pill: green once the prorated quota is met, grey while short. */
 function TargetPill({ value }: { value: number | null }) {
@@ -1394,6 +1452,7 @@ function AgentPerformanceSheet({
   const [courseMetric, setCourseMetric] = useState<"revenue" | "invoices" | "leads">("revenue");
   const [invoiceCourse, setInvoiceCourse] = useState<AgentCoursePerformance | null>(null);
   const [evidenceKind, setEvidenceKind] = useState<EmployeeEvidenceKind | null>(null);
+  const [uncalledScope, setUncalledScope] = useState<UncalledScope | null>(null);
   useEffect(() => {
     setCourseMetric("revenue");
     // Closing the sheet with the dialog open leaves it open. Without this it
@@ -1401,6 +1460,7 @@ function AgentPerformanceSheet({
     // another person's name.
     setInvoiceCourse(null);
     setEvidenceKind(null);
+    setUncalledScope(null);
   }, [row?.key]);
   useEffect(() => {
     if (!row || !open || typeof window === "undefined" || !window.location.hash.startsWith("#employee-")) return;
@@ -1538,8 +1598,21 @@ function AgentPerformanceSheet({
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "موزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "اتصل بها بنفسه" : "Called by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
+                <MiniMetric
+                  label={lang === "ar" ? "لم يتصل بها هو" : "Not called by this employee"}
+                  value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
+                  hint={lang === "ar" ? "يشمل ليدز اتصل بها زميل آخر" : "Includes leads a colleague called"}
+                  onDrill={row.ownerCalledDistributedLeads === null ? undefined : () => setUncalledScope("owner")}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتصل بها` : `Show the leads ${row.name} never called`}
+                />
                 <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"} value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)} />
+                <MiniMetric
+                  label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"}
+                  value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
+                  hint={lang === "ar" ? "لا مكالمة من أي موظف داخل الفترة" : "No call from any employee inside the window"}
+                  onDrill={row.uncalledDistributedLeads === null ? undefined : () => setUncalledScope("none")}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتصل بها أحد` : `Show ${row.name}'s leads that nobody called`}
+                />
                 <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
               </div>
@@ -2005,6 +2078,13 @@ function AgentPerformanceSheet({
           kind={evidenceKind}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setEvidenceKind(null);
+          }}
+        />
+        <UncalledLeadsDialog
+          scope={uncalledScope}
+          employee={row.name}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setUncalledScope(null);
           }}
         />
       </SheetContent>
@@ -2928,9 +3008,26 @@ export function monthLabel(month: string, lang: "ar" | "en"): string {
  * the short version lives in the title here, and the full breakdown lives on
  * the matching metric inside the drawer.
  */
-function MiniMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">
+/**
+ * A one-line figure. With `onDrill` it becomes a button that opens the records
+ * behind the number — the un-contacted counters use that; the rest do not, so a
+ * tile only invites a click when there is something to open.
+ */
+export function MiniMetric({
+  label,
+  value,
+  hint,
+  onDrill,
+  drillLabel,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  onDrill?: () => void;
+  drillLabel?: string;
+}) {
+  const body = (
+    <>
       <div
         className="truncate text-[10px] text-text-muted"
         title={hint ? `${label} — ${hint}` : label}
@@ -2940,7 +3037,28 @@ function MiniMetric({ label, value, hint }: { label: string; value: string; hint
       <div className="num mt-1 truncate text-sm font-semibold text-text" title={value}>
         {value}
       </div>
-    </div>
+    </>
+  );
+  if (!onDrill) {
+    return (
+      <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">{body}</div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onDrill}
+      aria-label={drillLabel || label}
+      className="group min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2 text-start transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
+    >
+      <div className="flex items-center justify-between gap-1">
+        <div className="min-w-0 flex-1">{body}</div>
+        <ArrowUpRight
+          size={13}
+          className="mt-3 shrink-0 text-text-subtle transition-colors group-hover:text-brand"
+        />
+      </div>
+    </button>
   );
 }
 

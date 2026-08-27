@@ -1882,8 +1882,20 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           adset,
           adsetOrigin: origin,
           contact: str(r["اسم جهة الاتصال"]),
-          phone: str(r["Phone"]),
-          mobile: str(r["Mobile"]),
+          // Both spellings, because the two upstreams disagree. The PostgreSQL
+          // dataset the n8n sync writes carries `Phone`/`Mobile`; the Google
+          // Sheet the app falls back to when that dataset is empty names the
+          // same two columns `رقم الهاتف` and `الهاتف المحمول` — verified live
+          // on 2026-08-27, where 15,555 of 15,565 CRM rows held a number under
+          // the Arabic heading and none held one under the English heading.
+          //
+          // Reading only the English name made the fallback silently lose every
+          // phone, and a lead with no phone cannot match a Yeastar call: lead
+          // coverage would read 0%, "لم يتصل بها أحد" would jump to the whole
+          // population, and nothing would report an error. Same `||` fallback
+          // the Sales Team and Source columns above already use.
+          phone: str(r["Phone"]) || str(r["رقم الهاتف"]),
+          mobile: str(r["Mobile"]) || str(r["الهاتف المحمول"]),
           salesperson: str(r["Salesperson"]),
           salesTeam: str(r["Sales Team"]) || str(r["فريق المبيعات"]),
           subTeam: str(r["فريق المبيعات"]),
@@ -2230,8 +2242,9 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         return {
           id: str(r["__odoo_id"]),
           contact: str(r["اسم جهة الاتصال"]),
-          phone: str(r["Phone"]),
-          mobile: str(r["Mobile"]),
+          // Same dual spelling as the CRM tab above.
+          phone: str(r["Phone"]) || str(r["رقم الهاتف"]),
+          mobile: str(r["Mobile"]) || str(r["الهاتف المحمول"]),
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),

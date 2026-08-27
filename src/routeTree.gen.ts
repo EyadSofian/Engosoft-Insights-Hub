@@ -57,6 +57,7 @@ import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
+import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
@@ -309,6 +310,11 @@ const ApiTeamsRoute = ApiTeamsRouteImport.update({
   path: '/api/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUncalledLeadsRoute = ApiUncalledLeadsRouteImport.update({
+  id: '/api/uncalled-leads',
+  path: '/api/uncalled-leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebsiteRoute = ApiWebsiteRouteImport.update({
   id: '/api/website',
   path: '/api/website',
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/api/sales': typeof ApiSalesRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
@@ -470,6 +477,7 @@ export interface FileRoutesByTo {
   '/api/sales': typeof ApiSalesRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
@@ -531,6 +539,7 @@ export interface FileRoutesById {
   '/api/sales': typeof ApiSalesRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
+  '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
@@ -593,6 +602,7 @@ export interface FileRouteTypes {
     | '/api/sales'
     | '/api/targets'
     | '/api/teams'
+    | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
@@ -653,6 +663,7 @@ export interface FileRouteTypes {
     | '/api/sales'
     | '/api/targets'
     | '/api/teams'
+    | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
@@ -713,6 +724,7 @@ export interface FileRouteTypes {
     | '/api/sales'
     | '/api/targets'
     | '/api/teams'
+    | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
@@ -774,6 +786,7 @@ export interface RootRouteChildren {
   ApiSalesRoute: typeof ApiSalesRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
+  ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
@@ -1124,6 +1137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/uncalled-leads': {
+      id: '/api/uncalled-leads'
+      path: '/api/uncalled-leads'
+      fullPath: '/api/uncalled-leads'
+      preLoaderRoute: typeof ApiUncalledLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/website': {
       id: '/api/website'
       path: '/api/website'
@@ -1246,6 +1266,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSalesRoute: ApiSalesRoute,
   ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
+  ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
