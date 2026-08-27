@@ -33,6 +33,7 @@ import {
   EMPLOYEE_SCORE_WEIGHTS,
   type AgentPerformanceScore,
 } from "./employee-performance-score";
+import { callCanCoverLead, leadCallAggregateKey } from "./uncalled-leads";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
@@ -1139,7 +1140,7 @@ function mergeLeadCallCoverage(
 
   const leads = new Map<
     string,
-    { id: string; salesperson: string; phone: string; mobile: string }
+    { id: string; salesperson: string; phone: string; mobile: string; createdAt: string }
   >();
   for (const lead of [...data.crm, ...data.lost]) {
     if (!lead.id || !lead.salesperson) continue;
@@ -1154,7 +1155,8 @@ function mergeLeadCallCoverage(
     const leadPhoneKeys = new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean));
     for (const phone of leadPhoneKeys) {
       for (const call of callsByPhone.get(phone) ?? []) {
-        matches.set(`${call.phone}|${call.agentExtension}|${call.agentName}`, call);
+        if (!callCanCoverLead(call, lead.createdAt)) continue;
+        matches.set(leadCallAggregateKey(call), call);
       }
     }
     if (!matches.size) {
@@ -1174,9 +1176,9 @@ function mergeLeadCallCoverage(
       // twice. The old order performed the de-duplication first and therefore
       // under-counted owner coverage on the second opportunity.
       if (sameOwner) calledByOwner = true;
-      const phoneKey = `${call.phone}|${call.agentExtension}|${call.agentName}`;
-      if (row.leadPhoneKeys.has(phoneKey)) continue;
-      row.leadPhoneKeys.add(phoneKey);
+      const matchedCallKey = leadCallAggregateKey(call);
+      if (row.leadPhoneKeys.has(matchedCallKey)) continue;
+      row.leadPhoneKeys.add(matchedCallKey);
       row.callsFromDistributedLeads = (row.callsFromDistributedLeads ?? 0) + call.totalCalls;
       if (sameOwner) {
         row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
@@ -1529,7 +1531,14 @@ export async function buildAgentAnalytics(
   }
 
   try {
-    const chatSnapshot = await chatwootPromise;
+    // Chatwoot's conversation activity walks paginated inbox results. On a
+    // cold Railway process that can take tens of seconds; employee accounting
+    // must not stay blank while a secondary source warms. The original promise
+    // keeps running and fills its one-minute cache for the next request.
+    const chatSnapshot = await Promise.race([
+      chatwootPromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5_000)),
+    ]);
     if (!chatSnapshot) throw new Error("Chatwoot analytics are not configured");
     mergeChatwootAgents(map, chatSnapshot.agents);
     chatwootStatus = {
@@ -1683,8 +1692,7 @@ export async function buildAgentAnalytics(
         acc.qualityNeedsReview = (acc.qualityNeedsReview ?? 0) + row.qualityNeedsReview;
       acc.distributedLeads += row.distributedLeads;
       if (row.calledDistributedLeads !== null)
-        acc.calledDistributedLeads =
-          (acc.calledDistributedLeads ?? 0) + row.calledDistributedLeads;
+        acc.calledDistributedLeads = (acc.calledDistributedLeads ?? 0) + row.calledDistributedLeads;
       if (row.ownerCalledDistributedLeads !== null)
         acc.ownerCalledDistributedLeads =
           (acc.ownerCalledDistributedLeads ?? 0) + row.ownerCalledDistributedLeads;
@@ -1699,8 +1707,7 @@ export async function buildAgentAnalytics(
           (acc.callsByAssignedEmployee ?? 0) + row.callsByAssignedEmployee;
       if (row.chatConversations !== null)
         acc.chatConversations = (acc.chatConversations ?? 0) + row.chatConversations;
-      if (row.chatResolved !== null)
-        acc.chatResolved = (acc.chatResolved ?? 0) + row.chatResolved;
+      if (row.chatResolved !== null) acc.chatResolved = (acc.chatResolved ?? 0) + row.chatResolved;
       if (row.chatUnreadConversations !== null)
         acc.chatUnreadConversations =
           (acc.chatUnreadConversations ?? 0) + row.chatUnreadConversations;
@@ -1730,21 +1737,13 @@ export async function buildAgentAnalytics(
       averageQualityScore: null as number | null,
       qualityNeedsReview: callsHubStatus.ok ? 0 : (null as number | null),
       distributedLeads: 0,
-      calledDistributedLeads: callsHubStatus.leadCoverageAvailable
-        ? 0
-        : (null as number | null),
+      calledDistributedLeads: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
       ownerCalledDistributedLeads: callsHubStatus.leadCoverageAvailable
         ? 0
         : (null as number | null),
-      uncalledDistributedLeads: callsHubStatus.leadCoverageAvailable
-        ? 0
-        : (null as number | null),
-      callsFromDistributedLeads: callsHubStatus.leadCoverageAvailable
-        ? 0
-        : (null as number | null),
-      callsByAssignedEmployee: callsHubStatus.leadCoverageAvailable
-        ? 0
-        : (null as number | null),
+      uncalledDistributedLeads: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
+      callsFromDistributedLeads: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
+      callsByAssignedEmployee: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
       leadCallCoverageRate: null as number | null,
       leadOwnerCallCoverageRate: null as number | null,
       chatConversations: chatwootStatus.ok ? 0 : (null as number | null),

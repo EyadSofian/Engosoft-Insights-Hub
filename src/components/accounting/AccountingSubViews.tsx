@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { TargetEditor } from "@/components/accounting/TargetEditor";
 import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
+import { MiniMetric } from "@/components/accounting/MiniMetric";
+import { monthLabel } from "@/components/accounting/accounting-format";
 import {
   UncalledLeadsDialog,
   type UncalledScope,
@@ -310,6 +312,7 @@ export function AccountingAgentsView() {
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
   const [editingTargets, setEditingTargets] = useState(false);
   const [uncalledScope, setUncalledScope] = useState<UncalledScope | null>(null);
+  const [uncalledEmployee, setUncalledEmployee] = useState<string | null>(null);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
     if (data && !data.callsHub.callsAvailable && sortBy === "calls") setSortBy("revenue");
@@ -557,7 +560,10 @@ export function AccountingAgentsView() {
             onDrill={
               data.summary.ownerCalledDistributedLeads === null
                 ? undefined
-                : () => setUncalledScope("owner")
+                : () => {
+                    setUncalledEmployee(null);
+                    setUncalledScope("owner");
+                  }
             }
             drillLabel={
               lang === "ar"
@@ -581,7 +587,10 @@ export function AccountingAgentsView() {
             onDrill={
               data.summary.uncalledDistributedLeads === null
                 ? undefined
-                : () => setUncalledScope("none")
+                : () => {
+                    setUncalledEmployee(null);
+                    setUncalledScope("none");
+                  }
             }
             drillLabel={
               lang === "ar" ? "اعرض الليدز التي لم يتصل بها أحد" : "Show the leads nobody called"
@@ -686,7 +695,14 @@ export function AccountingAgentsView() {
           onSelect={(row) => setSelectedAgentKey(row.key)}
         />
       ) : (
-        <AgentTable rows={visibleAgents} onSelect={(row) => setSelectedAgentKey(row.key)} />
+        <AgentTable
+          rows={visibleAgents}
+          onSelect={(row) => setSelectedAgentKey(row.key)}
+          onOpenUncalled={(row) => {
+            setUncalledEmployee(row.name);
+            setUncalledScope("owner");
+          }}
+        />
       )}
 
       <AgentPerformanceSheet
@@ -699,8 +715,12 @@ export function AccountingAgentsView() {
 
       <UncalledLeadsDialog
         scope={uncalledScope}
+        employee={uncalledEmployee ?? undefined}
         onOpenChange={(next) => {
-          if (!next) setUncalledScope(null);
+          if (!next) {
+            setUncalledScope(null);
+            setUncalledEmployee(null);
+          }
         }}
       />
     </div>
@@ -1262,7 +1282,15 @@ function AgentCards({
   );
 }
 
-function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: AgentRow) => void }) {
+function AgentTable({
+  rows,
+  onSelect,
+  onOpenUncalled,
+}: {
+  rows: AgentRow[];
+  onSelect: (row: AgentRow) => void;
+  onOpenUncalled: (row: AgentRow) => void;
+}) {
   const { lang } = useI18n();
   return (
     <Card padded={false}>
@@ -1364,10 +1392,34 @@ function AgentTable({ rows, onSelect }: { rows: AgentRow[]; onSelect: (row: Agen
                 <td className="num px-3 py-3 text-end">
                   {row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
                 </td>
-                <td className="num px-3 py-3 text-end">
-                  {row.ownerCalledDistributedLeads === null
-                    ? "—"
-                    : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
+                <td className="px-3 py-3 text-end">
+                  {row.ownerCalledDistributedLeads === null ? (
+                    <span className="num text-text-muted">—</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenUncalled(row);
+                      }}
+                      className="group inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/25 px-2 py-1 font-semibold text-brand hover:border-brand/45 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                      aria-label={
+                        lang === "ar"
+                          ? `عرض ليدز ${row.name} التي لم يتصل بها`
+                          : `Show leads ${row.name} did not call`
+                      }
+                    >
+                      <bdi dir="ltr" className="num">
+                        {fmtNum(
+                          Math.max(
+                            0,
+                            row.distributedLeads - row.ownerCalledDistributedLeads,
+                          ),
+                        )}
+                      </bdi>
+                      <ArrowUpRight size={12} className="transition-transform group-hover:-translate-y-0.5" />
+                    </button>
+                  )}
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)}
@@ -1591,7 +1643,14 @@ function AgentPerformanceSheet({
           <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div><div className="text-xs font-semibold text-brand">{lang === "ar" ? "التواصل والبيع" : "Lead execution"}</div><h3 id="employee-lead-execution-title" className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "هل اتصل الموظف بالليدز التي وُزعت عليه؟" : "Did the employee contact their assigned leads?"}</h3></div>
-              <EvidenceLink href="#employee-lead-evidence" />
+              <button
+                type="button"
+                onClick={() => setUncalledScope("owner")}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[11px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+              >
+                <PhoneCall size={13} />
+                {lang === "ar" ? "فلتر الليدز التي لم يتصل بها" : "Filter leads not called"}
+              </button>
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز بواسطة صاحب الليد" : "Owner lead coverage"}</b><Pill tone={row.leadOwnerCallCoverageRate === null ? "neutral" : row.leadOwnerCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadOwnerCallCoverageRate, 1)}</Pill></div>
@@ -1615,6 +1674,28 @@ function AgentPerformanceSheet({
                 />
                 <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
+                <MiniMetric
+                  label={lang === "ar" ? "مكالمات الموظف لكل ليد" : "Owner calls per lead"}
+                  value={
+                    row.callsByAssignedEmployee === null || row.distributedLeads <= 0
+                      ? "—"
+                      : (row.callsByAssignedEmployee / row.distributedLeads).toFixed(2)
+                  }
+                  hint={
+                    lang === "ar"
+                      ? `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} مكالمة ÷ ${fmtNum(row.distributedLeads)} ليد في الفترة`
+                      : `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} calls ÷ ${fmtNum(row.distributedLeads)} period leads`
+                  }
+                />
+                <MiniMetric
+                  label={lang === "ar" ? "نسبة إغلاق الفترة" : "Period close rate"}
+                  value={fmtPct(row.decidedConversionRate, 1)}
+                  hint={
+                    lang === "ar"
+                      ? `${fmtNum(row.slaWon)} رابحة من ${fmtNum(row.slaWon + row.slaLost)} صفقة متحسمة`
+                      : `${fmtNum(row.slaWon)} won of ${fmtNum(row.slaWon + row.slaLost)} decided deals`
+                  }
+                />
               </div>
             </div>
           </section>
@@ -2987,79 +3068,6 @@ function formatCallDate(value: string, lang: "ar" | "en"): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-export function monthLabel(month: string, lang: "ar" | "en"): string {
-  const [year, rawMonth] = month.split("-").map(Number);
-  if (!year || !rawMonth) return month;
-  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, rawMonth - 1, 1)));
-}
-
-/**
- * `hint` explains the label on hover rather than in a popover.
- *
- * These sit inside the employee card, which is itself one big `<button>`. The
- * info popover used in the drawer renders a button of its own, and a button
- * inside a button is invalid markup that React will not hydrate cleanly — so
- * the short version lives in the title here, and the full breakdown lives on
- * the matching metric inside the drawer.
- */
-/**
- * A one-line figure. With `onDrill` it becomes a button that opens the records
- * behind the number — the un-contacted counters use that; the rest do not, so a
- * tile only invites a click when there is something to open.
- */
-export function MiniMetric({
-  label,
-  value,
-  hint,
-  onDrill,
-  drillLabel,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  onDrill?: () => void;
-  drillLabel?: string;
-}) {
-  const body = (
-    <>
-      <div
-        className="truncate text-[10px] text-text-muted"
-        title={hint ? `${label} — ${hint}` : label}
-      >
-        {label}
-      </div>
-      <div className="num mt-1 truncate text-sm font-semibold text-text" title={value}>
-        {value}
-      </div>
-    </>
-  );
-  if (!onDrill) {
-    return (
-      <div className="min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2">{body}</div>
-    );
-  }
-  return (
-    <button
-      type="button"
-      onClick={onDrill}
-      aria-label={drillLabel || label}
-      className="group min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2 text-start transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
-    >
-      <div className="flex items-center justify-between gap-1">
-        <div className="min-w-0 flex-1">{body}</div>
-        <ArrowUpRight
-          size={13}
-          className="mt-3 shrink-0 text-text-subtle transition-colors group-hover:text-brand"
-        />
-      </div>
-    </button>
-  );
 }
 
 function ProgressMetric({

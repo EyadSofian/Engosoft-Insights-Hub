@@ -21,10 +21,11 @@ import {
 } from "@/components/ui/dialog";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
-import { MiniMetric, monthLabel } from "@/components/accounting/AccountingSubViews";
+import { MiniMetric } from "@/components/accounting/MiniMetric";
+import { monthLabel } from "@/components/accounting/accounting-format";
 
 export type UncalledScope = "none" | "owner";
-type UncalledStatus = "critical" | "warning" | "stable";
+type UncalledStatus = "fresh" | "critical" | "warning" | "stable";
 
 interface UncalledLeadsResponse {
   ok: boolean;
@@ -43,13 +44,15 @@ interface UncalledLeadsResponse {
     rescuedByColleague: number | null;
     calls: number | null;
     callsPerLead: number | null;
+    ownerCalls: number | null;
+    ownerCallsPerLead: number | null;
     won: number;
     lost: number;
     closeRate: number | null;
     conversionRate: number | null;
     contactRate: number | null;
     ownerContactRate: number | null;
-    severity: { critical: number; warning: number; stable: number };
+    severity: { fresh: number; critical: number; warning: number; stable: number };
   };
   months: Array<{
     month: string;
@@ -60,6 +63,8 @@ interface UncalledLeadsResponse {
     ownerUncalled: number;
     calls: number;
     callsPerLead: number | null;
+    ownerCalls: number;
+    ownerCallsPerLead: number | null;
     won: number;
     lost: number;
     closeRate: number | null;
@@ -102,7 +107,7 @@ interface UncalledLeadsResponse {
 const UNCALLED_REASON_LABELS: Record<string, { ar: string; en: string }> = {
   hot_priority: { ar: "أولوية Hot", en: "Hot priority" },
   active_deal: { ar: "عرض سعر أو مهتم", en: "Live quotation or interest" },
-  fresh_window: { ar: "جديد داخل أول أيام", en: "Inside first-response window" },
+  fresh_window: { ar: "جديد داخل مهلة الرد", en: "Inside response grace window" },
   reply_without_call: { ar: "رد مسجّل بلا مكالمة", en: "Reply logged, no PBX call" },
   stalled_stage: { ar: "مرحلة متوقفة", en: "Parked stage" },
   aging_untouched: { ar: "يكبر بلا تواصل", en: "Ageing untouched" },
@@ -110,13 +115,17 @@ const UNCALLED_REASON_LABELS: Record<string, { ar: string; en: string }> = {
   junk_stage: { ar: "رقم خطأ أو بيانات قديمة", en: "Wrong number or old data" },
 };
 
-function uncalledStatusTone(status: UncalledStatus): "danger" | "warning" | "neutral" {
-  return status === "critical" ? "danger" : status === "warning" ? "warning" : "neutral";
+function uncalledStatusTone(status: UncalledStatus): "danger" | "warning" | "brand" | "neutral" {
+  if (status === "critical") return "danger";
+  if (status === "warning") return "warning";
+  if (status === "fresh") return "brand";
+  return "neutral";
 }
 
 function uncalledStatusLabel(status: UncalledStatus, lang: "ar" | "en"): string {
   if (status === "critical") return lang === "ar" ? "حرج" : "Critical";
   if (status === "warning") return lang === "ar" ? "للمتابعة" : "Watch";
+  if (status === "fresh") return lang === "ar" ? "جديد داخل المهلة" : "New — in grace window";
   return lang === "ar" ? "غير عاجل" : "Not urgent";
 }
 
@@ -137,14 +146,14 @@ export function UncalledLeadsDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { lang } = useI18n();
-  const [sort, setSort] = useState<"urgent" | "newest" | "oldest">("urgent");
+  const [sort, setSort] = useState<"urgent" | "newest" | "oldest">("newest");
   const [status, setStatus] = useState<UncalledStatus | "all">("all");
   const [page, setPage] = useState(1);
 
   // A new tile is a new question: reopening must not inherit the last filter.
   useEffect(() => {
     if (scope) {
-      setSort("urgent");
+      setSort("newest");
       setStatus("all");
       setPage(1);
     }
@@ -154,7 +163,9 @@ export function UncalledLeadsDialog({
   const query =
     `/api/uncalled-leads?scope=${scope ?? "none"}&sort=${sort}&status=${status}&page=${page}&pageSize=50` +
     (employee ? `&employee=${encodeURIComponent(employee)}` : "");
-  const { data, isLoading, error, refetch } = useApi<UncalledLeadsResponse>(query);
+  const { data, isLoading, error, refetch } = useApi<UncalledLeadsResponse>(query, {
+    enabled: scope !== null,
+  });
 
   const dayLabel = (days: number | null) =>
     days === null
@@ -219,7 +230,7 @@ export function UncalledLeadsDialog({
                     </Notice>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
                     <MiniMetric
                       label={lang === "ar" ? "في هذه القائمة" : "In this list"}
                       value={fmtNum(data.leads.unfilteredTotal)}
@@ -239,6 +250,15 @@ export function UncalledLeadsDialog({
                       }
                     />
                     <MiniMetric
+                      label={lang === "ar" ? "جديد داخل المهلة" : "New — in grace window"}
+                      value={fmtNum(data.summary.severity.fresh)}
+                      hint={
+                        lang === "ar"
+                          ? "داخل مهلة الرد؛ لا يُصنف حرجًا في يوم إنشائه"
+                          : "Inside the response grace period; never critical on creation day"
+                      }
+                    />
+                    <MiniMetric
                       label={lang === "ar" ? "نسبة الإغلاق" : "Close rate"}
                       value={fmtPct(data.summary.closeRate, 1)}
                       hint={
@@ -248,16 +268,16 @@ export function UncalledLeadsDialog({
                       }
                     />
                     <MiniMetric
-                      label={lang === "ar" ? "مكالمات لكل ليد" : "Calls per lead"}
+                      label={lang === "ar" ? "مكالمات المسؤول لكل ليد" : "Owner calls per lead"}
                       value={
-                        data.summary.callsPerLead === null
+                        data.summary.ownerCallsPerLead === null
                           ? "—"
-                          : data.summary.callsPerLead.toFixed(2)
+                          : data.summary.ownerCallsPerLead.toFixed(2)
                       }
                       hint={
                         lang === "ar"
-                          ? `${data.summary.calls === null ? "—" : fmtNum(data.summary.calls)} مكالمة على ليدز الفترة`
-                          : `${data.summary.calls === null ? "—" : fmtNum(data.summary.calls)} calls on period leads`
+                          ? `${data.summary.ownerCalls === null ? "—" : fmtNum(data.summary.ownerCalls)} مكالمة من أصحاب الليدز على ليدز الفترة`
+                          : `${data.summary.ownerCalls === null ? "—" : fmtNum(data.summary.ownerCalls)} calls by assigned owners on period leads`
                       }
                     />
                   </div>
@@ -283,7 +303,7 @@ export function UncalledLeadsDialog({
                       </p>
                     </header>
                     <div className="table-wrap max-h-56 overflow-auto">
-                      <table className="w-full min-w-[640px] text-start text-[11px]">
+                      <table className="w-full min-w-[960px] text-start text-[11px]">
                         <thead className="sticky top-0 bg-surface-2/90 text-text-muted">
                           <tr>
                             <th className="px-3 py-2 text-start font-medium">
@@ -303,6 +323,12 @@ export function UncalledLeadsDialog({
                             </th>
                             <th className="px-3 py-2 text-start font-medium">
                               {lang === "ar" ? "مكالمات/ليد" : "Calls/lead"}
+                            </th>
+                            <th className="px-3 py-2 text-start font-medium">
+                              {lang === "ar" ? "مكالمات المسؤول" : "Owner calls"}
+                            </th>
+                            <th className="px-3 py-2 text-start font-medium">
+                              {lang === "ar" ? "مكالمات المسؤول/ليد" : "Owner calls/lead"}
                             </th>
                             <th className="px-3 py-2 text-start font-medium">
                               {lang === "ar" ? "نسبة الإغلاق" : "Close rate"}
@@ -325,13 +351,19 @@ export function UncalledLeadsDialog({
                               <td className="num px-3 py-2">
                                 {row.callsPerLead === null ? "—" : row.callsPerLead.toFixed(2)}
                               </td>
+                              <td className="num px-3 py-2">{fmtNum(row.ownerCalls)}</td>
+                              <td className="num px-3 py-2">
+                                {row.ownerCallsPerLead === null
+                                  ? "—"
+                                  : row.ownerCallsPerLead.toFixed(2)}
+                              </td>
                               <td className="num px-3 py-2">{fmtPct(row.closeRate, 1)}</td>
                               <td className="num px-3 py-2">{fmtPct(row.contactRate, 1)}</td>
                             </tr>
                           ))}
                           {data.months.length === 0 && (
                             <tr>
-                              <td colSpan={8} className="px-3 py-4 text-text-muted">
+                              <td colSpan={10} className="px-3 py-4 text-text-muted">
                                 {lang === "ar"
                                   ? "لا توجد ليدز في الفترة."
                                   : "No leads in this period."}
@@ -373,6 +405,10 @@ export function UncalledLeadsDialog({
                           {
                             value: "all",
                             label: `${lang === "ar" ? "الكل" : "All"} (${fmtNum(data.leads.unfilteredTotal)})`,
+                          },
+                          {
+                            value: "fresh",
+                            label: `${lang === "ar" ? "جديد داخل المهلة" : "New — in grace window"} (${fmtNum(data.summary.severity.fresh)})`,
                           },
                           {
                             value: "critical",

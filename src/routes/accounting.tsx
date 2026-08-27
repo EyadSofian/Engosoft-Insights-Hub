@@ -22,7 +22,6 @@ import {
   type AccountingCourses,
 } from "@/components/accounting/CourseRevenueExplorer";
 import {
-  AccountingAgentsView,
   AccountingMonthlyView,
   AccountingProfitabilityView,
   type AccountingMonth,
@@ -118,7 +117,7 @@ function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
-  const [view, setView] = useState<"summary" | "months" | "agents" | "profitability">("summary");
+  const [view, setView] = useState<"summary" | "months" | "profitability">("summary");
   const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
@@ -400,10 +399,6 @@ function Accounting() {
               label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison",
             },
             {
-              value: "agents",
-              label: lang === "ar" ? "أداء الموظفين" : "Employee performance",
-            },
-            {
               value: "profitability",
               label: lang === "ar" ? "الربحية" : "Profitability",
             },
@@ -612,7 +607,6 @@ function Accounting() {
           )}
 
           {view === "months" && <AccountingMonthlyView monthly={data.monthly} />}
-          {view === "agents" && <AccountingAgentsView />}
           {view === "profitability" && <AccountingProfitabilityView />}
         </>
       )}

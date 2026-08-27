@@ -65,6 +65,8 @@ export interface CallsHubLeadCallAggregate {
   phone: string;
   agentName: string;
   agentExtension: string;
+  /** Cairo calendar day. Present on the corrected Calls Hub contract. */
+  callDate: string;
   totalCalls: number;
   answeredCalls: number;
   firstCallAt: string;
@@ -74,6 +76,9 @@ export interface CallsHubLeadCallAggregate {
 
 type CacheEntry = { expiresAt: number; value: CallsHubSummary };
 const summaryCache = new Map<string, CacheEntry>();
+const summaryInFlight = new Map<string, Promise<CallsHubSummary>>();
+const leadCallsCache = new Map<string, { expiresAt: number; value: CallsHubLeadCallAggregate[] }>();
+const leadCallsInFlight = new Map<string, Promise<CallsHubLeadCallAggregate[]>>();
 
 const safeNumber = (value: unknown): number => {
   const parsed = Number(value);
@@ -162,48 +167,69 @@ export async function getCallsHubSummary(from: string, to: string): Promise<Call
   const cacheKey = `${from}:${to}`;
   const cached = summaryCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const running = summaryInFlight.get(cacheKey);
+  if (running) return running;
 
-  const url = new URL("/api/dashboard", `${baseUrl()}/`);
-  url.searchParams.set("from", from);
-  url.searchParams.set("to", to);
-  const body = (await fetchJson(url)) as Record<string, unknown>;
-  const rawEmployees = Array.isArray(body.employees) ? body.employees : [];
-  const result: CallsHubSummary = {
-    ok: true,
-    source: "Engosoft Calls Hub · Yeastar",
-    fetchedAt: safeText(body.generatedAt) || new Date().toISOString(),
-    range: { from, to },
-    employees: rawEmployees.map(employeeSummary).filter(Boolean) as CallsHubEmployeeSummary[],
-  };
-  summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value: result });
-  return result;
+  const request = (async () => {
+    const url = new URL("/api/dashboard", `${baseUrl()}/`);
+    url.searchParams.set("from", from);
+    url.searchParams.set("to", to);
+    const body = (await fetchJson(url)) as Record<string, unknown>;
+    const rawEmployees = Array.isArray(body.employees) ? body.employees : [];
+    const result: CallsHubSummary = {
+      ok: true,
+      source: "Engosoft Calls Hub · Yeastar",
+      fetchedAt: safeText(body.generatedAt) || new Date().toISOString(),
+      range: { from, to },
+      employees: rawEmployees.map(employeeSummary).filter(Boolean) as CallsHubEmployeeSummary[],
+    };
+    summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value: result });
+    return result;
+  })().finally(() => summaryInFlight.delete(cacheKey));
+  summaryInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function getCallsHubLeadCalls(
   from: string,
   to: string,
 ): Promise<CallsHubLeadCallAggregate[]> {
-  const url = new URL("/api/integrations/insights/lead-calls", `${baseUrl()}/`);
-  url.searchParams.set("from", from);
-  url.searchParams.set("to", to);
-  const body = (await fetchJson(url)) as Record<string, unknown>;
-  const rows = Array.isArray(body.rows) ? body.rows : [];
-  return rows.flatMap((value) => {
-    if (!value || typeof value !== "object") return [];
-    const row = value as Record<string, unknown>;
-    const phone = safeText(row.phone);
-    if (!phone) return [];
-    return [{
-      phone,
-      agentName: safeText(row.agentName),
-      agentExtension: safeText(row.agentExtension),
-      totalCalls: safeNumber(row.totalCalls),
-      answeredCalls: safeNumber(row.answeredCalls),
-      firstCallAt: safeText(row.firstCallAt),
-      latestCallAt: safeText(row.latestCallAt),
-      latestCallId: safeText(row.latestCallId),
-    }];
-  });
+  const cacheKey = `${from}:${to}`;
+  const cached = leadCallsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const running = leadCallsInFlight.get(cacheKey);
+  if (running) return running;
+
+  const request = (async () => {
+    const url = new URL("/api/integrations/insights/lead-calls", `${baseUrl()}/`);
+    url.searchParams.set("from", from);
+    url.searchParams.set("to", to);
+    const body = (await fetchJson(url)) as Record<string, unknown>;
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    const value = rows.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as Record<string, unknown>;
+      const phone = safeText(row.phone);
+      if (!phone) return [];
+      return [
+        {
+          phone,
+          agentName: safeText(row.agentName),
+          agentExtension: safeText(row.agentExtension),
+          callDate: safeText(row.callDate),
+          totalCalls: safeNumber(row.totalCalls),
+          answeredCalls: safeNumber(row.answeredCalls),
+          firstCallAt: safeText(row.firstCallAt),
+          latestCallAt: safeText(row.latestCallAt),
+          latestCallId: safeText(row.latestCallId),
+        },
+      ];
+    });
+    leadCallsCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value });
+    return value;
+  })().finally(() => leadCallsInFlight.delete(cacheKey));
+  leadCallsInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function getCallsHubEmployeeCalls(input: {

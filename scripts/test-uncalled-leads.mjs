@@ -3,9 +3,11 @@ import {
   AGING_WINDOW_DAYS,
   FRESH_WINDOW_DAYS,
   claimsAnsweredReply,
+  callCanCoverLead,
   closeRateOf,
   isHotPriority,
   leadAgeDays,
+  leadCallAggregateKey,
   leadStageBucket,
   sortUncalledLeads,
   summarizeUncalledMonths,
@@ -64,6 +66,29 @@ const facts = (over = {}) => ({
   assert.equal(leadStageBucket("Something New"), "other", "an unseen stage stays actionable");
 }
 
+/* --- a call before lead creation cannot count as follow-up ---------------- */
+{
+  const before = {
+    phone: "966500000000",
+    agentName: "Agent",
+    agentExtension: "101",
+    callDate: "2026-08-05",
+    firstCallAt: "2026-08-05T09:00:00Z",
+    latestCallAt: "2026-08-05T09:05:00Z",
+  };
+  const after = { ...before, callDate: "2026-08-11" };
+  assert.ok(
+    !callCanCoverLead(before, "2026-08-10"),
+    "an older customer call does not cover a new opportunity",
+  );
+  assert.ok(callCanCoverLead(after, "2026-08-10"), "a call after creation does cover it");
+  assert.notEqual(
+    leadCallAggregateKey(before),
+    leadCallAggregateKey(after),
+    "daily aggregates never collapse a month of calls into one row",
+  );
+}
+
 /* --- priority and the hand-filled calling reply --------------------------- */
 {
   assert.ok(isHotPriority("Very Hot"), "Very Hot is hot");
@@ -100,13 +125,19 @@ const facts = (over = {}) => ({
   );
   assert.equal(
     uncalledLeadSeverity(facts({ stage: "Fresh", ageDays: FRESH_WINDOW_DAYS })).status,
-    "critical",
-    "inside the first-response window a fresh lead is still winnable",
+    "warning",
+    "a fresh lead from a prior day needs follow-up but is not an automatic emergency",
   );
   assert.equal(
     uncalledLeadSeverity(facts({ stage: "Fresh", ageDays: FRESH_WINDOW_DAYS + 1 })).status,
     "warning",
     "one day past it, the same lead drops to a warning",
+  );
+  assert.equal(
+    uncalledLeadSeverity(facts({ stage: "Quotation / عرض سعر", priority: "Very Hot", ageDays: 0 }))
+      .status,
+    "fresh",
+    "a lead created today stays inside the response grace period even when hot",
   );
 
   /**
@@ -178,22 +209,23 @@ const facts = (over = {}) => ({
     { id: "1", createdAt: "2026-08-01", status: "warning" },
     { id: "2", createdAt: "2026-06-01", status: "critical" },
     { id: "3", createdAt: "2026-08-20", status: "critical" },
+    { id: "5", createdAt: "2026-08-26", status: "fresh" },
     { id: "4", createdAt: "2026-08-25", status: "stable" },
   ];
 
   assert.deepEqual(
     sortUncalledLeads(rows, "urgent").map((row) => row.id),
-    ["3", "2", "1", "4"],
+    ["3", "2", "1", "5", "4"],
     "critical first, and the newest critical lead leads the queue",
   );
   assert.deepEqual(
     sortUncalledLeads(rows, "newest").map((row) => row.id),
-    ["4", "3", "1", "2"],
+    ["5", "4", "3", "1", "2"],
     "the plain chronological view ignores severity",
   );
   assert.deepEqual(
     sortUncalledLeads(rows, "oldest").map((row) => row.id),
-    ["2", "1", "3", "4"],
+    ["2", "1", "3", "4", "5"],
     "and reverses cleanly",
   );
 
@@ -213,11 +245,46 @@ const facts = (over = {}) => ({
 /* --- the monthly ratios behind "بالنسبة للشهر" ---------------------------- */
 {
   const months = summarizeUncalledMonths([
-    { month: "2026-07", calledByAny: true, calledByOwner: true, calls: 3, outcome: "won" },
-    { month: "2026-07", calledByAny: true, calledByOwner: false, calls: 2, outcome: "lost" },
-    { month: "2026-07", calledByAny: false, calledByOwner: false, calls: 0, outcome: "open" },
-    { month: "2026-08", calledByAny: false, calledByOwner: false, calls: 0, outcome: "open" },
-    { month: "", calledByAny: false, calledByOwner: false, calls: 0, outcome: "open" },
+    {
+      month: "2026-07",
+      calledByAny: true,
+      calledByOwner: true,
+      calls: 3,
+      ownerCalls: 2,
+      outcome: "won",
+    },
+    {
+      month: "2026-07",
+      calledByAny: true,
+      calledByOwner: false,
+      calls: 2,
+      ownerCalls: 0,
+      outcome: "lost",
+    },
+    {
+      month: "2026-07",
+      calledByAny: false,
+      calledByOwner: false,
+      calls: 0,
+      ownerCalls: 0,
+      outcome: "open",
+    },
+    {
+      month: "2026-08",
+      calledByAny: false,
+      calledByOwner: false,
+      calls: 0,
+      ownerCalls: 0,
+      outcome: "open",
+    },
+    {
+      month: "",
+      calledByAny: false,
+      calledByOwner: false,
+      calls: 0,
+      ownerCalls: 0,
+      outcome: "open",
+    },
   ]);
 
   assert.equal(months.length, 2, "a lead with no creation month has no month to sit in");
@@ -229,6 +296,8 @@ const facts = (over = {}) => ({
   assert.equal(july.ownerUncalled, 2, "the owner counter includes the colleague's rescue");
   assert.equal(july.calls, 5);
   assert.equal(july.callsPerLead, 5 / 3, "effort per assigned lead");
+  assert.equal(july.ownerCalls, 2, "the employee's own calls stay separate from colleague calls");
+  assert.equal(july.ownerCallsPerLead, 2 / 3, "owner effort per assigned lead");
   assert.equal(july.closeRate, 50, "won ÷ decided — the open lead is not a loss");
   assert.equal(july.conversionRate, (1 / 3) * 100, "won ÷ every assigned lead");
   assert.equal(july.contactRate, (2 / 3) * 100);
@@ -259,8 +328,22 @@ const facts = (over = {}) => ({
   assert.equal(closeRateOf(0, 0, true), null, "nothing decided is still nothing decided");
 
   const facts = [
-    { month: "2026-08", calledByAny: false, calledByOwner: false, calls: 0, outcome: "won" },
-    { month: "2026-08", calledByAny: false, calledByOwner: false, calls: 0, outcome: "open" },
+    {
+      month: "2026-08",
+      calledByAny: false,
+      calledByOwner: false,
+      calls: 0,
+      ownerCalls: 0,
+      outcome: "won",
+    },
+    {
+      month: "2026-08",
+      calledByAny: false,
+      calledByOwner: false,
+      calls: 0,
+      ownerCalls: 0,
+      outcome: "open",
+    },
   ];
   assert.equal(
     summarizeUncalledMonths(facts, { lostAvailable: false })[0].closeRate,

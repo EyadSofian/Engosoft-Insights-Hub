@@ -6,7 +6,7 @@ import { useFilters } from "@/lib/filter-store";
  * its own query string (e.g. `?grain=adset`); those params are merged rather
  * than concatenated, which would otherwise produce a second `?` and be dropped.
  */
-export function useApi<T>(path: string) {
+export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
   const filters = useFilters();
 
   const [base, own = ""] = path.split("?");
@@ -17,6 +17,11 @@ export function useApi<T>(path: string) {
 
   return useQuery<T>({
     queryKey: [base, own, filters],
+    // Detail dialogs pass `enabled: false` while closed. Besides avoiding work
+    // the reader never asked for, this matters for expensive joins such as
+    // Odoo leads + Yeastar calls: mounting a hidden dialog must not double the
+    // employee page's upstream traffic.
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const res = await fetch(url);
       if (!res.ok) {

@@ -23,14 +23,14 @@
  */
 
 /** Same three-level vocabulary the course monitor already uses. */
-export type UncalledLeadStatus = "critical" | "warning" | "stable";
+export type UncalledLeadStatus = "fresh" | "critical" | "warning" | "stable";
 
 export type UncalledLeadReason =
   /** Odoo priority is Hot or Very Hot and nobody dialled it. */
   | "hot_priority"
   /** A quotation or proposal is live on the record — the deal is in flight. */
   | "active_deal"
-  /** Brand new and still inside the first-response window. */
+  /** Brand new and still inside the first-response grace window. */
   | "fresh_window"
   /** `Calling reply?` says the customer answered, yet the PBX has no such call. */
   | "reply_without_call"
@@ -48,8 +48,9 @@ export type LeadStageBucket = "deal" | "fresh" | "stalled" | "junk" | "won" | "o
 /**
  * The first-response window, in days.
  *
- * A lead this young that nobody has phoned is still winnable, which is why it
- * outranks an older record carrying a warmer stage.
+ * This remains useful as an explanatory window, but freshness is not an
+ * incident. A lead created today is labelled `fresh`, never `critical` merely
+ * because it is new. The manager explicitly called out that false alarm.
  */
 export const FRESH_WINDOW_DAYS = 3;
 
@@ -57,6 +58,34 @@ export const FRESH_WINDOW_DAYS = 3;
 export const AGING_WINDOW_DAYS = 21;
 
 const DAY_MS = 86_400_000;
+
+export interface DatedLeadCallAggregate {
+  phone: string;
+  agentName: string;
+  agentExtension: string;
+  callDate: string;
+  firstCallAt: string;
+  latestCallAt: string;
+}
+
+/** Cairo day from the new contract, with a safe fallback during deployment. */
+export function leadCallDate(call: DatedLeadCallAggregate): string {
+  return (
+    call.callDate.slice(0, 10) || call.latestCallAt.slice(0, 10) || call.firstCallAt.slice(0, 10)
+  );
+}
+
+/** A phone call before the opportunity existed is not follow-up on that lead. */
+export function callCanCoverLead(call: DatedLeadCallAggregate, leadCreatedAt: string): boolean {
+  const callDate = leadCallDate(call);
+  const createdDate = leadCreatedAt.slice(0, 10);
+  return !createdDate || !callDate || callDate >= createdDate;
+}
+
+/** Day grain is part of the identity: otherwise a month of calls collapses to one. */
+export function leadCallAggregateKey(call: DatedLeadCallAggregate): string {
+  return `${call.phone}|${call.agentExtension}|${call.agentName}|${leadCallDate(call)}`;
+}
 
 /**
  * Odoo stage labels are bilingual and carry a team suffix.
@@ -179,23 +208,32 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   if (bucket === "stalled") reasons.push("stalled_stage");
   if (!reasons.length && age !== null && age <= AGING_WINDOW_DAYS) reasons.push("aging_untouched");
 
+  // Date-grain CRM data cannot prove that today's response SLA has elapsed.
+  // Treating every same-day lead as critical punishes employees before they
+  // have had a working chance to call it and floods the queue with false red.
+  // Other reasons are still retained so tomorrow's escalation is explainable.
+  if (age === 0) {
+    if (!reasons.includes("fresh_window")) reasons.unshift("fresh_window");
+    return { status: "fresh", reasons };
+  }
+
   const critical = reasons.some(
     (reason) =>
-      reason === "hot_priority" ||
-      reason === "active_deal" ||
-      reason === "fresh_window" ||
-      reason === "reply_without_call",
+      reason === "hot_priority" || reason === "active_deal" || reason === "reply_without_call",
   );
   const warning = reasons.some(
     (reason) =>
-      reason === "stalled_stage" || reason === "aging_untouched" || reason === "won_without_call",
+      reason === "fresh_window" ||
+      reason === "stalled_stage" ||
+      reason === "aging_untouched" ||
+      reason === "won_without_call",
   );
 
   return { status: critical ? "critical" : warning ? "warning" : "stable", reasons };
 }
 
 export function severityRank(status: UncalledLeadStatus): number {
-  return status === "critical" ? 2 : status === "warning" ? 1 : 0;
+  return status === "critical" ? 3 : status === "warning" ? 2 : status === "fresh" ? 1 : 0;
 }
 
 export type UncalledLeadSort = "urgent" | "newest" | "oldest";
@@ -209,10 +247,9 @@ export interface SortableUncalledLead {
 /**
  * "اللي تاريخها قريب تبقى هي في الأول وحالاتها حرجة".
  *
- * The default puts severity first and recency second, which reads the request
- * the way it was meant: among the rows that are actually critical, the newest
- * one is the one still worth a phone call this morning. `newest` and `oldest`
- * stay available for a reader who wants the plain chronological list.
+ * The dialog defaults to `newest`, matching the requested work queue. `urgent`
+ * remains available and puts severity first, then the newest lead inside each
+ * severity band; `oldest` is useful for clearing the long tail.
  */
 export function sortUncalledLeads<T extends SortableUncalledLead>(
   rows: T[],
@@ -240,6 +277,8 @@ export interface MonthlyLeadFact {
   calledByOwner: boolean;
   /** Calls matched to this lead's phone from any employee, de-duplicated. */
   calls: number;
+  /** Calls made by the assigned employee, de-duplicated at phone/day grain. */
+  ownerCalls: number;
   outcome: "won" | "lost" | "open";
 }
 
@@ -253,6 +292,8 @@ export interface UncalledLeadMonth {
   calls: number;
   /** Calls per assigned lead — the effort ratio, `null` with no leads. */
   callsPerLead: number | null;
+  ownerCalls: number;
+  ownerCallsPerLead: number | null;
   won: number;
   lost: number;
   /** Won ÷ decided. The same definition the tab labels "نسبة الإغلاق". */
@@ -309,6 +350,8 @@ export function summarizeUncalledMonths(
       ownerUncalled: 0,
       calls: 0,
       callsPerLead: null,
+      ownerCalls: 0,
+      ownerCallsPerLead: null,
       won: 0,
       lost: 0,
       closeRate: null,
@@ -321,12 +364,14 @@ export function summarizeUncalledMonths(
     if (fact.calledByOwner) row.ownerCalled += 1;
     else row.ownerUncalled += 1;
     row.calls += Math.max(0, fact.calls);
+    row.ownerCalls += Math.max(0, fact.ownerCalls);
     if (fact.outcome === "won") row.won += 1;
     if (fact.outcome === "lost") row.lost += 1;
     months.set(fact.month, row);
   }
   for (const row of months.values()) {
     row.callsPerLead = row.leads > 0 ? row.calls / row.leads : null;
+    row.ownerCallsPerLead = row.leads > 0 ? row.ownerCalls / row.leads : null;
     row.closeRate = closeRateOf(row.won, row.lost, lostAvailable);
     row.conversionRate = row.leads > 0 ? (row.won / row.leads) * 100 : null;
     row.contactRate = row.leads > 0 ? (row.called / row.leads) * 100 : null;

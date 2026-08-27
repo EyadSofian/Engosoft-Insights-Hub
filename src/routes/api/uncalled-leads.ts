@@ -23,10 +23,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const { integrationPersonMatchScore } = await import("@/lib/integration-person");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { isArchivedWonStage } = await import("@/lib/archived-won");
-        const { getCallsHubLeadCalls, getCallsHubSummary } = await import("@/lib/calls-hub.server");
+        const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
         const {
           closeRateOf,
+          callCanCoverLead,
           leadAgeDays,
+          leadCallAggregateKey,
           sortUncalledLeads,
           summarizeUncalledMonths,
           uncalledLeadSeverity,
@@ -47,10 +49,13 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         }
         const rawSort = url.searchParams.get("sort");
         const sort: UncalledLeadSort =
-          rawSort === "newest" || rawSort === "oldest" ? rawSort : "urgent";
+          rawSort === "urgent" || rawSort === "oldest" ? rawSort : "newest";
         const rawStatus = url.searchParams.get("status");
         const statusFilter: UncalledLeadStatus | "all" =
-          rawStatus === "critical" || rawStatus === "warning" || rawStatus === "stable"
+          rawStatus === "fresh" ||
+          rawStatus === "critical" ||
+          rawStatus === "warning" ||
+          rawStatus === "stable"
             ? rawStatus
             : "all";
         const page = Math.max(
@@ -129,10 +134,14 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           if (key && !ownerNames.has(key)) ownerNames.set(key, row.salesperson);
         }
         const extensionByOwner = new Map<string, string>();
-        const callsHubSummary = await getCallsHubSummary(filters.from, filters.to).catch(
-          () => null,
-        );
-        for (const agent of callsHubSummary?.employees ?? []) {
+        const pbxAgents = new Map<string, { name: string; extension: string }>();
+        for (const call of leadCalls) {
+          const key = `${normalizePersonName(call.agentName)}\u0000${call.agentExtension}`;
+          if (!pbxAgents.has(key)) {
+            pbxAgents.set(key, { name: call.agentName, extension: call.agentExtension });
+          }
+        }
+        for (const agent of pbxAgents.values()) {
           const exactKey = normalizePersonName(agent.name);
           if (!exactKey) continue;
           if (ownerNames.has(exactKey)) {
@@ -247,10 +256,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
 
         /** Per owner, the `(phone, extension, agent)` pairs already counted. */
         const callKeysByOwner = new Map<string, Set<string>>();
+        const ownerCallKeysByOwner = new Map<string, Set<string>>();
         let assignedLeads = 0;
         let calledByAnyTotal = 0;
         let calledByOwnerTotal = 0;
         let matchedCallTotal = 0;
+        let matchedOwnerCallTotal = 0;
         let wonTotal = 0;
         let lostTotal = 0;
 
@@ -264,7 +275,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           const matches = new Map<string, (typeof leadCalls)[number]>();
           for (const key of new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean))) {
             for (const call of callsByPhone.get(key) ?? []) {
-              matches.set(`${call.phone}|${call.agentExtension}|${call.agentName}`, call);
+              // A call made before this Odoo opportunity existed cannot prove
+              // that the employee followed up this lead. New Calls Hub rows
+              // carry Cairo callDate at day grain; `latestCallAt` keeps the
+              // deployment backward-compatible while both apps roll out.
+              if (!callCanCoverLead(call, lead.createdAt)) continue;
+              matches.set(leadCallAggregateKey(call), call);
             }
           }
           const matched = [...matches.values()];
@@ -290,16 +306,27 @@ export const Route = createFileRoute("/api/uncalled-leads")({
            */
           const ownerCallKeys = callKeysByOwner.get(ownerKey) ?? new Set<string>();
           callKeysByOwner.set(ownerKey, ownerCallKeys);
+          const employeeCallKeys = ownerCallKeysByOwner.get(ownerKey) ?? new Set<string>();
+          ownerCallKeysByOwner.set(ownerKey, employeeCallKeys);
           let dedupedCalls = 0;
+          let dedupedOwnerCalls = 0;
           for (const [key, call] of matches) {
             if (ownerCallKeys.has(key)) continue;
             ownerCallKeys.add(key);
             dedupedCalls += call.totalCalls;
+            const sameOwner =
+              normalizePersonName(call.agentName) === ownerKey ||
+              (!!ownerExtension && call.agentExtension === ownerExtension);
+            if (sameOwner && !employeeCallKeys.has(key)) {
+              employeeCallKeys.add(key);
+              dedupedOwnerCalls += call.totalCalls;
+            }
           }
 
           if (calledByAny) calledByAnyTotal += 1;
           if (calledByOwner) calledByOwnerTotal += 1;
           matchedCallTotal += dedupedCalls;
+          matchedOwnerCallTotal += dedupedOwnerCalls;
           if (lead.outcome === "won") wonTotal += 1;
           if (lead.outcome === "lost") lostTotal += 1;
 
@@ -310,6 +337,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             // De-duplicated, so the months still add up to the period total. A
             // phone shared across months lands in the first month that used it.
             calls: dedupedCalls,
+            ownerCalls: dedupedOwnerCalls,
             outcome: lead.outcome,
           });
 
@@ -374,6 +402,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         }
 
         const severityCounts = {
+          fresh: rows.filter((row) => row.status === "fresh").length,
           critical: rows.filter((row) => row.status === "critical").length,
           warning: rows.filter((row) => row.status === "warning").length,
           stable: rows.filter((row) => row.status === "stable").length,
@@ -408,6 +437,9 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             calls: callsAvailable ? matchedCallTotal : null,
             callsPerLead:
               callsAvailable && assignedLeads > 0 ? matchedCallTotal / assignedLeads : null,
+            ownerCalls: callsAvailable ? matchedOwnerCallTotal : null,
+            ownerCallsPerLead:
+              callsAvailable && assignedLeads > 0 ? matchedOwnerCallTotal / assignedLeads : null,
             won: wonTotal,
             lost: lostTotal,
             closeRate: closeRateOf(wonTotal, lostTotal, lostAvailable),

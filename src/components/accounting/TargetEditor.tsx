@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { fmtUSDFull, useI18n } from "@/lib/i18n";
-import { monthLabel } from "@/components/accounting/AccountingSubViews";
+import { monthLabel } from "@/components/accounting/accounting-format";
 
 /** Where the admin code is kept between visits. Never sent anywhere but this app. */
 const CODE_KEY = "engosoft-admin-code";

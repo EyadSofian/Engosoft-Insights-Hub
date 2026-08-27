@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/employee-evidence")({
         const { odooConfig } = await import("@/lib/odoo.server");
         const { isArchivedWonStage } = await import("@/lib/archived-won");
         const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
+        const { callCanCoverLead } = await import("@/lib/uncalled-leads");
         const { chatwootConfigured, getChatwootAgentConversationEvidence } =
           await import("@/lib/chatwoot.server");
 
@@ -51,15 +52,19 @@ export const Route = createFileRoute("/api/employee-evidence")({
           callsByPhone.set(key, [...(callsByPhone.get(key) ?? []), call]);
         }
         const odooBaseUrl = odooConfig().url;
-        const callsHubBaseUrl = (process.env.CALLS_HUB_URL || "https://web-production-c7b78.up.railway.app").replace(/\/+$/, "");
+        const callsHubBaseUrl = (
+          process.env.CALLS_HUB_URL || "https://web-production-c7b78.up.railway.app"
+        ).replace(/\/+$/, "");
         const leadUrl = (rawId: string) => {
           const id = Number(rawId);
           return Number.isInteger(id) && id > 0
             ? `${odooBaseUrl}/web#id=${id}&model=crm.lead&view_type=form`
             : null;
         };
-        const withCallEvidence = <T extends { phone: string }>(lead: T) => {
-          const calls = callsByPhone.get(phoneKey(lead.phone)) ?? [];
+        const withCallEvidence = <T extends { phone: string; createdAt: string }>(lead: T) => {
+          const calls = (callsByPhone.get(phoneKey(lead.phone)) ?? []).filter((call) =>
+            callCanCoverLead(call, lead.createdAt),
+          );
           const ownerCalls = calls.filter(
             (call) =>
               normalizePersonName(call.agentName) === employeeKey ||
@@ -87,7 +92,10 @@ export const Route = createFileRoute("/api/employee-evidence")({
               ownerCalls
                 .filter((call) => call.latestCallId)
                 .sort((left, right) => right.latestCallAt.localeCompare(left.latestCallAt))
-                .map((call) => `${callsHubBaseUrl}/?call=${encodeURIComponent(call.latestCallId)}#archive`)
+                .map(
+                  (call) =>
+                    `${callsHubBaseUrl}/?call=${encodeURIComponent(call.latestCallId)}#archive`,
+                )
                 .at(0) ?? null,
           };
         };
