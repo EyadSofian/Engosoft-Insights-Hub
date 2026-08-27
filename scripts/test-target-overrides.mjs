@@ -15,14 +15,14 @@ const override = (employeeId, target, month = "2026-08") => ({
 const totalFor = (source, month) => source[month].reduce((sum, row) => sum + (row.target ?? 0), 0);
 
 /* --- an edit is a delta, not a replacement --------------------------------- */
-// A save that mentions one person must not disturb the other twenty-nine. This
+// A save that mentions one person must not disturb the rest of the roster. This
 // is what stops a dropped or half-filled request from wiping the month.
 {
   const merged = applyOverrides(SALES_TARGETS, [override("346", 12000)]);
   assert.equal(merged["2026-08"].length, SALES_TARGETS["2026-08"].length, "roster unchanged");
   assert.equal(merged["2026-08"].find((r) => r.employeeId === "346").target, 12000);
   // Everyone else keeps the published quota: only Sherif's 9,000 → 12,000 moved.
-  assert.equal(totalFor(merged, "2026-08"), 138_276 + 3000);
+  assert.equal(totalFor(merged, "2026-08"), 135_276 + 3000);
 }
 
 /* --- the seed is never mutated --------------------------------------------- */
@@ -53,7 +53,7 @@ const totalFor = (source, month) => source[month].reduce((sum, row) => sum + (ro
   const merged = applyOverrides(SALES_TARGETS, [override("457", 5000)]);
   const row = merged["2026-08"].find((r) => r.employeeId === "457");
   assert.equal(row.target, 5000);
-  assert.equal(row.name, "Mennatallah walid Mohamed Fathy", "identity is kept from the seed");
+  assert.equal(row.name, "Mennatallah walid", "Odoo identity is kept from the seed");
   assert.equal(merged["2026-08"].length, SALES_TARGETS["2026-08"].length);
 }
 
@@ -69,7 +69,7 @@ const totalFor = (source, month) => source[month].reduce((sum, row) => sum + (ro
     people.byName.get(normalizePersonName("Sherif Waleed Ahmed Mohamed")).entry.employeeId,
     "346",
   );
-  assert.equal(totalFor(merged, "2026-08"), 138_276, "August untouched");
+  assert.equal(totalFor(merged, "2026-08"), 135_276, "August untouched");
 }
 
 // An alias declared in the seed survives into an edited month, so a renamed

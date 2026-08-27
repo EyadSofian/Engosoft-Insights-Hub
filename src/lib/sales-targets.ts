@@ -1,16 +1,16 @@
 // Monthly sales targets per salesperson.
 //
-// Source of record: the management workbook ("Mahfouz Aug Target.xlsx"), one
-// sheet per month. Values are transcribed here rather than read from a file so
-// the dashboard has no runtime dependency on a spreadsheet nobody deploys.
+// Source of record: `All sales report AUG from 1-8 till 25-8-2026 all (1).numbers`,
+// first Numbers sheet `Report Total Sales `, received 2026-08-28. Values are
+// transcribed here rather than read at runtime so the dashboard has no deploy
+// dependency on a workbook stored in one person's iCloud Drive.
 //
 // Two properties of the workbook are load-bearing and must survive any edit:
 //
-// 1. Some employees are spelled differently there than in Odoo — the workbook
-//    carries the full legal name (`… Saeed Hassan Al-Gamal`) or a role suffix
-//    (`(website)`) where Odoo carries the short one. Those are declared in
-//    `aliases`, never guessed, because a fuzzy match across name lengths puts
-//    one person's target on another.
+// 1. The displayed `name` is Odoo's current `res.users` name. Where the workbook
+//    carries the HR/legal name (`Ahmed Shaaban Ali Muhammad`) or a role suffix
+//    (`(website)`), that spelling is an explicit alias. The mapping was checked
+//    against live `hr.employee.user_id` on 2026-08-28; it is never fuzzy-guessed.
 // 2. A blank target is not zero. Maternity leave and the Operation staff are
 //    deliberately untargeted while still producing sales, so `target: null`
 //    means "no target published" and is reported as an em dash, while
@@ -22,9 +22,9 @@ import { normalizePersonName } from "./person-name.ts";
 export interface SalesTarget {
   /** Employee id as written in the workbook — the stable identity across renames. */
   employeeId: string;
-  /** Workbook spelling, used as the display label when no employee row matched. */
+  /** Odoo's current salesperson display name. */
   name: string;
-  /** Other spellings of the same person that appear in Odoo. */
+  /** HR/workbook spellings that resolve to the same Odoo salesperson. */
   aliases: string[];
   teamLeader: string;
   supervisor: string;
@@ -43,10 +43,12 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     // Saudi Branch — Manager: Mahfouz Afify
     {
       employeeId: "335",
-      name: "Abdullah Mohsen Abdul Hamid Saeed Hassan Al-Gamal",
-      // Odoo transliterates the surname differently ("Abdelhamed … eljamal").
-      // Verified against a live /api/teams response, not guessed.
-      aliases: ["Abdullah Mohsen Abdelhamed Saeed Hassan eljamal", "Abdullah Mohsen Abdul Hamid"],
+      name: "Abdullah Mohsen Abdelhamed Saeed Hassan eljamal",
+      aliases: [
+        "Abdullah Mohsen Abdul Hamid Saeed Hassan Al-Gamal",
+        "Mr.Abdullah Mohsen Abdul Hamid Saeed Hassan Al-Gamal",
+        "Abdullah Mohsen Abdul Hamid",
+      ],
       teamLeader: "Mahfouz Afify",
       supervisor: "Mahfouz Afify",
       branch: "Saudi Branch",
@@ -176,25 +178,26 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
       teamLeader: "Hady Mahmoud Fahmy",
       supervisor: "Bahaa Ramadan",
       branch: "Egypt",
-      target: 9000,
+      target: 7773,
       note: "",
     },
     {
       employeeId: "637",
-      name: "moaz ali mohammed",
+      name: "Moaz Ali Mohammed",
       aliases: [],
       teamLeader: "Hady Mahmoud Fahmy",
       supervisor: "Bahaa Ramadan",
       branch: "Egypt",
-      target: 3000,
+      target: 1904,
       note: "",
     },
 
     // Team leader: Nader Aziz — Supervisor: Asmaa Fathy
     {
       employeeId: "292",
-      name: "Ahmed Shaaban Ali Muhammad",
-      aliases: [],
+      // Workbook/HR name → live Odoo user, verified through hr.employee.user_id.
+      name: "Ahmed El-Shiekh",
+      aliases: ["Ahmed Shaaban Ali Muhammad"],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
@@ -213,9 +216,12 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     },
     {
       employeeId: "378",
-      name: "Ahmed Farouk Mohamed Mohamed Abdel Dayem",
-      // Odoo carries only the first two name parts, in capitals.
-      aliases: ["AHMED FAROUK", "Ahmed Farouk Mohamed Mohamed"],
+      name: "AHMED FAROUK",
+      aliases: [
+        "Ahmed Farouk Mohamed Mohamed Abdel Dayem",
+        "Mr.Ahmed Farouk Mohamed Mohamed Abdel Dayem",
+        "Ahmed Farouk Mohamed Mohamed",
+      ],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
@@ -224,7 +230,7 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     },
     {
       employeeId: "631",
-      name: "Ahmed Ehab hosny ahmed",
+      name: "Ahmed Ehab Hosny Ahmed",
       aliases: [],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
@@ -234,10 +240,8 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     },
     {
       employeeId: "619",
-      name: "Hazem talaat",
-      // One `a` fewer in Odoo — enough for the normalizer to treat them as two
-      // different people, which is precisely why aliases are declared.
-      aliases: ["Hazem Talat"],
+      name: "Hazem Talat",
+      aliases: ["Hazem talaat", "Hazem Taalat Abdel Azem"],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
@@ -246,8 +250,8 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     },
     {
       employeeId: "632",
-      name: "mahmoud hassan elsayed amer (website)",
-      aliases: ["mahmoud hassan elsayed amer"],
+      name: "Mahmoud Hassan Elsayed Amer",
+      aliases: ["mahmoud hassan elsayed amer (website)"],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
@@ -257,19 +261,17 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     {
       employeeId: "418",
       name: "Nader Aziz",
-      aliases: [],
+      aliases: ["Mr.Nader Refaat Aziz Naguib", "Nader Refaat Aziz Naguib"],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
-      // A real zero, not a blank: the team leader carries the team's target, not
-      // a personal one, so his achievement must read 0 rather than an em dash.
-      target: 0,
-      note: "تارجت الفريق وليس شخصي",
+      target: null,
+      note: "لا يوجد تارجت شخصي منشور في الشيت المحدّث",
     },
     {
       employeeId: "457",
-      name: "Mennatallah walid Mohamed Fathy",
-      aliases: [],
+      name: "Mennatallah walid",
+      aliases: ["Mennatallah walid Mohamed Fathy", "Miss.Mennatallah walid Mohamed Fathy"],
       teamLeader: "Nader Aziz",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
@@ -285,18 +287,31 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
       teamLeader: "Asmaa Fathy",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
-      target: 3000,
+      target: 2323,
       note: "",
     },
     {
       employeeId: "235",
       name: "Mohamed Sami Mahmoud Abdel Hamid",
-      aliases: [],
+      aliases: ["Mr.Muhammad Samy Mahmoud Abdel Hamid"],
       teamLeader: "Asmaa Fathy",
       supervisor: "Asmaa Fathy",
       branch: "Egypt",
       target: 3000,
       note: "",
+    },
+
+    // Website salespeople listed separately in the workbook. The report calls
+    // employee 381 “Direct Website”; Odoo's linked user is Amira.
+    {
+      employeeId: "381",
+      name: "Amira Muhammad Salah al-Din Awad",
+      aliases: ["Direct Website"],
+      teamLeader: "Website",
+      supervisor: "Asmaa Fathy",
+      branch: "Egypt",
+      target: null,
+      note: "مبيعات الموقع بدون تارجت منشور",
     },
 
     // Operation — Mahfouz Afify. They produce sales but carry no quota, so they
@@ -307,12 +322,14 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
     ...(
       [
         ["642", "Ahmed Alaa Sayed Mostafa", []],
-        ["303", "Ahmed Hisham Abdel kader Mohamed Abdel Moneim", ["Ahmed Hesham"]],
-        ["244", "Rami Emad Al-Sayed Fathi Al-Sayed Mohamed", []],
+        ["303", "Ahmed Hesham", ["Ahmed Hisham Abdel kader Mohamed Abdel Moneim"]],
+        ["244", "Ramy Emad", ["Rami Emad Al-Sayed Fathi Al-Sayed Mohamed"]],
         ["472", "Wafaa Ahmed Adel Ahmed", []],
-        ["417", "Abdul Rahman Adel Ali Hassan", ["Abdulrahman Adel"]],
-        ["261", "Abdulrahman Tareq Abdullwahab", []],
+        ["399", "mennaallah magdy", ["Menna Tullah Magdy Saleh Mahmoud"]],
+        ["417", "Abdulrahman Adel", ["Abdul Rahman Adel Ali Hassan"]],
+        ["261", "Abdulrahman Tareq Abdullwahab", ["Abdul Rahman Tarik Abdul Wahab"]],
         ["529", "Mahmoud Abdel Naser sayed Mahmoud", []],
+        ["350", "Asmaa Fathy", ["Asmaa Fathi Saleh Abdel Rahman"]],
       ] as const
     ).map(([employeeId, name, aliases]): SalesTarget => ({
       employeeId,

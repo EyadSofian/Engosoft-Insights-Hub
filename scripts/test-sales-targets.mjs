@@ -18,19 +18,26 @@ const august = SALES_TARGETS[MONTH];
 const sum = (rows) => rows.reduce((total, row) => total + (row.target ?? 0), 0);
 const byLeader = (leader) => august.filter((row) => row.teamLeader === leader);
 
-assert.equal(sum(august), 138_276, "Total Mahfouz Target");
+assert.equal(august.length, 34, "every employee row in the updated first sheet is represented");
+assert.equal(
+  august.filter((row) => row.target !== null).length,
+  22,
+  "only employees with a published number carry a target",
+);
+assert.equal(sum(august), 135_276, "GRAND TOTAL — ALL EMPLOYEES");
 assert.equal(sum(byLeader("Bahaa Ramdan")), 57_276, "Subtotal — Bahaa Ramdan");
 assert.equal(sum(byLeader("Ahmed Saeed")), 10_000, "Subtotal - Ahmed saeed");
-assert.equal(sum(byLeader("Hady Mahmoud Fahmy")), 15_000, "Subtotal — Hady mahmoud fahmy");
+assert.equal(sum(byLeader("Hady Mahmoud Fahmy")), 12_677, "Subtotal — Hady mahmoud fahmy");
 assert.equal(sum(byLeader("Nader Aziz")), 40_000, "Subtotal — Nader Aziz");
-assert.equal(sum(byLeader("Asmaa Fathy")), 6_000, "Subtotal — Asmaa Fathy");
+assert.equal(sum(byLeader("Asmaa Fathy")), 5_323, "Subtotal — Asmaa Fathy");
 assert.equal(sum(byLeader("Mahfouz Afify")), 10_000, "Total Target Saudi Brunch");
 assert.equal(sum(byLeader("Operation")), 0, "Operation carries no quota");
+assert.equal(sum(byLeader("Website")), 0, "Direct website salesperson has no personal quota");
 
 // The workbook's own supervisor rollups.
 const bySupervisor = (name) => august.filter((row) => row.supervisor === name);
-assert.equal(sum(bySupervisor("Bahaa Ramadan")), 82_276, "Total Target Bahaa");
-assert.equal(sum(bySupervisor("Asmaa Fathy")), 46_000, "Total Target Asmaa");
+assert.equal(sum(bySupervisor("Bahaa Ramadan")), 79_953, "Total Target Bahaa");
+assert.equal(sum(bySupervisor("Asmaa Fathy")), 45_323, "Total Target Asmaa");
 
 /* --- a blank target is not a zero ------------------------------------------ */
 
@@ -39,12 +46,12 @@ assert.equal(onLeave.target, null, "maternity leave publishes no target");
 assert.equal(onLeave.note, "أجازة وضع");
 
 const teamLeader = august.find((row) => row.employeeId === "418");
-assert.equal(teamLeader.target, 0, "a real zero must stay 0, not null");
+assert.equal(teamLeader.target, null, "the updated sheet publishes no personal quota for Nader");
 
 assert.equal(
   august.filter((row) => row.target === null).length,
-  8,
-  "one maternity leave plus seven Operation staff",
+  12,
+  "every blank target in the updated first sheet remains deliberately untargeted",
 );
 
 /* --- the three names Odoo spells differently ------------------------------- */
@@ -61,15 +68,21 @@ assert.equal(resolve("Abdullah Mohsen Abdelhamed Saeed Hassan eljamal")?.employe
 assert.equal(resolve("AHMED FAROUK")?.employeeId, "378");
 assert.equal(resolve("Hazem Talat")?.employeeId, "619");
 assert.equal(resolve("Mahmoud Hassan Elsayed Amer")?.employeeId, "632");
+assert.equal(resolve("Ahmed El-Shiekh")?.employeeId, "292");
 // Operation staff resolve too, so they read as "untargeted", not "no target".
 assert.equal(resolve("Ahmed Hesham")?.employeeId, "303");
 assert.equal(resolve("Abdulrahman Adel")?.employeeId, "417");
+assert.equal(resolve("mennaallah magdy")?.employeeId, "399");
+assert.equal(resolve("Asmaa Fathy")?.employeeId, "350");
+assert.equal(resolve("Amira Muhammad Salah al-Din Awad")?.employeeId, "381");
 
 assert.equal(resolve("Abdullah Mohsen Abdul Hamid")?.employeeId, "335");
 assert.equal(resolve("Ahmed Farouk Mohamed Mohamed")?.employeeId, "378");
 assert.equal(resolve("mahmoud hassan elsayed amer")?.employeeId, "632");
+assert.equal(resolve("Ahmed Shaaban Ali Muhammad")?.employeeId, "292");
 // The workbook spelling has to keep working too.
 assert.equal(resolve("mahmoud hassan elsayed amer (website)")?.employeeId, "632");
+assert.equal(resolve("Direct Website")?.employeeId, "381");
 assert.equal(resolve("Mr.Mohamad Abdullah Mohamad Mohsen")?.employeeId, "482");
 assert.equal(resolve("MENNA TULLAH MUSTAFA ALI MUSTAFA")?.employeeId, "503");
 
