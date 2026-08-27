@@ -313,6 +313,7 @@ export function AccountingAgentsView() {
   const [editingTargets, setEditingTargets] = useState(false);
   const [uncalledScope, setUncalledScope] = useState<UncalledScope | null>(null);
   const [uncalledEmployee, setUncalledEmployee] = useState<string | null>(null);
+  const [autoOpenedUncalled, setAutoOpenedUncalled] = useState(false);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
     if (data && !data.callsHub.callsAvailable && sortBy === "calls") setSortBy("revenue");
@@ -327,6 +328,21 @@ export function AccountingAgentsView() {
     );
     if (match) setSelectedAgentKey(match.key);
   }, [data]);
+  useEffect(() => {
+    if (
+      autoOpenedUncalled ||
+      data?.summary.uncalledDistributedLeads === null ||
+      !data?.summary.uncalledDistributedLeads
+    ) {
+      return;
+    }
+    // The employee page is an action surface: open the company-wide queue once
+    // after its real Yeastar/Odoo match has loaded. Closing it is respected for
+    // the remainder of this visit; entering the page again opens a fresh queue.
+    setAutoOpenedUncalled(true);
+    setUncalledEmployee(null);
+    setUncalledScope("none");
+  }, [autoOpenedUncalled, data]);
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (isLoading || !data)
     return (

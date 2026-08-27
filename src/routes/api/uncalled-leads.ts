@@ -51,13 +51,15 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const sort: UncalledLeadSort =
           rawSort === "urgent" || rawSort === "oldest" ? rawSort : "newest";
         const rawStatus = url.searchParams.get("status");
-        const statusFilter: UncalledLeadStatus | "all" =
+        const statusFilter: UncalledLeadStatus | "actionable" | "all" =
+          rawStatus === "actionable" ||
           rawStatus === "fresh" ||
           rawStatus === "critical" ||
           rawStatus === "warning" ||
-          rawStatus === "stable"
+          rawStatus === "stable" ||
+          rawStatus === "all"
             ? rawStatus
-            : "all";
+            : "actionable";
         const page = Math.max(
           1,
           Math.min(10_000, Math.trunc(Number(url.searchParams.get("page")) || 1)),
@@ -408,7 +410,11 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           stable: rows.filter((row) => row.status === "stable").length,
         };
         const filtered =
-          statusFilter === "all" ? rows : rows.filter((row) => row.status === statusFilter);
+          statusFilter === "all"
+            ? rows
+            : statusFilter === "actionable"
+              ? rows.filter((row) => row.status !== "stable")
+              : rows.filter((row) => row.status === statusFilter);
         const ordered = sortUncalledLeads(filtered, sort);
         const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize));
         const safePage = Math.min(page, totalPages);

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import {
-  AGING_WINDOW_DAYS,
   FRESH_WINDOW_DAYS,
   claimsAnsweredReply,
   callCanCoverLead,
@@ -130,8 +129,8 @@ const facts = (over = {}) => ({
   );
   assert.equal(
     uncalledLeadSeverity(facts({ stage: "Fresh", ageDays: FRESH_WINDOW_DAYS + 1 })).status,
-    "warning",
-    "one day past it, the same lead drops to a warning",
+    "critical",
+    "one day past the response window, the same lead escalates",
   );
   assert.equal(
     uncalledLeadSeverity(facts({ stage: "Quotation / عرض سعر", priority: "Very Hot", ageDays: 0 }))
@@ -159,7 +158,7 @@ const facts = (over = {}) => ({
   );
 }
 
-/* --- warnings, and the point where a lead stops being an omission --------- */
+/* --- warnings and overdue actionable leads -------------------------------- */
 {
   assert.equal(
     uncalledLeadSeverity(facts({ stage: "Postponed", ageDays: 400 })).status,
@@ -167,15 +166,23 @@ const facts = (over = {}) => ({
     "a parked lead is a warning, not an emergency",
   );
   assert.equal(
-    uncalledLeadSeverity(facts({ ageDays: AGING_WINDOW_DAYS })).status,
+    uncalledLeadSeverity(facts({ ageDays: FRESH_WINDOW_DAYS })).status,
     "warning",
-    "an ordinary lead inside the ageing window is still an omission",
+    "an ordinary lead inside the response window needs follow-up",
   );
   assert.equal(
-    uncalledLeadSeverity(facts({ ageDays: AGING_WINDOW_DAYS + 1 })).status,
-    "stable",
-    "past it, with nothing else on the record, it is history",
+    uncalledLeadSeverity(facts({ ageDays: FRESH_WINDOW_DAYS + 1 })).status,
+    "critical",
+    "past the response window, an untouched actionable lead is critical",
   );
+  for (const stage of ["Contact", "Awareness"]) {
+    const overdue = uncalledLeadSeverity(facts({ stage, ageDays: 26 }));
+    assert.equal(overdue.status, "critical", `${stage} never becomes harmless with age`);
+    assert.ok(
+      overdue.reasons.includes("aging_untouched"),
+      `${stage} explains that its response window is overdue`,
+    );
+  }
 
   // An archived win with no matching call is a data question, not a sales one.
   const won = uncalledLeadSeverity(facts({ stage: "Won / ربح", ageDays: 300 }));

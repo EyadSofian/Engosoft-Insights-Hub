@@ -54,9 +54,6 @@ export type LeadStageBucket = "deal" | "fresh" | "stalled" | "junk" | "won" | "o
  */
 export const FRESH_WINDOW_DAYS = 3;
 
-/** Past this age an untouched lead stops being an omission and becomes history. */
-export const AGING_WINDOW_DAYS = 21;
-
 const DAY_MS = 86_400_000;
 
 export interface DatedLeadCallAggregate {
@@ -206,7 +203,14 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   }
   if (bucket === "won") reasons.push("won_without_call");
   if (bucket === "stalled") reasons.push("stalled_stage");
-  if (!reasons.length && age !== null && age <= AGING_WINDOW_DAYS) reasons.push("aging_untouched");
+  // Age never turns an actionable CRM stage into harmless history. Contact,
+  // Awareness and unknown live stages stay in the work queue until somebody
+  // calls them or Odoo moves them to an explicit junk/closed stage. The first
+  // three days are the response grace window; from day four the omission is
+  // overdue and therefore critical.
+  if (!reasons.length && age !== null) {
+    reasons.push(age <= FRESH_WINDOW_DAYS ? "fresh_window" : "aging_untouched");
+  }
 
   // Date-grain CRM data cannot prove that today's response SLA has elapsed.
   // Treating every same-day lead as critical punishes employees before they
@@ -219,13 +223,15 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
 
   const critical = reasons.some(
     (reason) =>
-      reason === "hot_priority" || reason === "active_deal" || reason === "reply_without_call",
+      reason === "hot_priority" ||
+      reason === "active_deal" ||
+      reason === "reply_without_call" ||
+      reason === "aging_untouched",
   );
   const warning = reasons.some(
     (reason) =>
       reason === "fresh_window" ||
       reason === "stalled_stage" ||
-      reason === "aging_untouched" ||
       reason === "won_without_call",
   );
 

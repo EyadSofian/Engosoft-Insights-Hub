@@ -26,6 +26,7 @@ import { monthLabel } from "@/components/accounting/accounting-format";
 
 export type UncalledScope = "none" | "owner";
 type UncalledStatus = "fresh" | "critical" | "warning" | "stable";
+type UncalledStatusFilter = UncalledStatus | "actionable" | "all";
 
 interface UncalledLeadsResponse {
   ok: boolean;
@@ -110,7 +111,7 @@ const UNCALLED_REASON_LABELS: Record<string, { ar: string; en: string }> = {
   fresh_window: { ar: "جديد داخل مهلة الرد", en: "Inside response grace window" },
   reply_without_call: { ar: "رد مسجّل بلا مكالمة", en: "Reply logged, no PBX call" },
   stalled_stage: { ar: "مرحلة متوقفة", en: "Parked stage" },
-  aging_untouched: { ar: "يكبر بلا تواصل", en: "Ageing untouched" },
+  aging_untouched: { ar: "تجاوز مهلة الاتصال", en: "Response window overdue" },
   won_without_call: { ar: "رابح بلا مكالمة", en: "Won with no call" },
   junk_stage: { ar: "رقم خطأ أو بيانات قديمة", en: "Wrong number or old data" },
 };
@@ -126,7 +127,7 @@ function uncalledStatusLabel(status: UncalledStatus, lang: "ar" | "en"): string 
   if (status === "critical") return lang === "ar" ? "حرج" : "Critical";
   if (status === "warning") return lang === "ar" ? "للمتابعة" : "Watch";
   if (status === "fresh") return lang === "ar" ? "جديد داخل المهلة" : "New — in grace window";
-  return lang === "ar" ? "غير عاجل" : "Not urgent";
+  return lang === "ar" ? "مستبعد من المتابعة" : "No follow-up expected";
 }
 
 /**
@@ -147,14 +148,14 @@ export function UncalledLeadsDialog({
 }) {
   const { lang } = useI18n();
   const [sort, setSort] = useState<"urgent" | "newest" | "oldest">("newest");
-  const [status, setStatus] = useState<UncalledStatus | "all">("all");
+  const [status, setStatus] = useState<UncalledStatusFilter>("actionable");
   const [page, setPage] = useState(1);
 
   // A new tile is a new question: reopening must not inherit the last filter.
   useEffect(() => {
     if (scope) {
       setSort("newest");
-      setStatus("all");
+      setStatus("actionable");
       setPage(1);
     }
   }, [scope, employee]);
@@ -232,12 +233,12 @@ export function UncalledLeadsDialog({
 
                   <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
                     <MiniMetric
-                      label={lang === "ar" ? "في هذه القائمة" : "In this list"}
-                      value={fmtNum(data.leads.unfilteredTotal)}
+                      label={lang === "ar" ? "المعروض في الفلتر" : "Shown by filter"}
+                      value={fmtNum(data.leads.total)}
                       hint={
                         lang === "ar"
-                          ? `من ${fmtNum(data.summary.assignedLeads)} ليد موزعة`
-                          : `of ${fmtNum(data.summary.assignedLeads)} assigned`
+                          ? `${fmtNum(data.leads.unfilteredTotal)} إجمالي غير متصل بها من ${fmtNum(data.summary.assignedLeads)} ليد موزعة`
+                          : `${fmtNum(data.leads.unfilteredTotal)} total uncalled of ${fmtNum(data.summary.assignedLeads)} assigned`
                       }
                     />
                     <MiniMetric
@@ -403,8 +404,8 @@ export function UncalledLeadsDialog({
                         onChange={setStatus}
                         options={[
                           {
-                            value: "all",
-                            label: `${lang === "ar" ? "الكل" : "All"} (${fmtNum(data.leads.unfilteredTotal)})`,
+                            value: "actionable",
+                            label: `${lang === "ar" ? "تحتاج إجراء" : "Action required"} (${fmtNum(data.summary.severity.fresh + data.summary.severity.critical + data.summary.severity.warning)})`,
                           },
                           {
                             value: "fresh",
@@ -420,7 +421,11 @@ export function UncalledLeadsDialog({
                           },
                           {
                             value: "stable",
-                            label: `${lang === "ar" ? "غير عاجل" : "Not urgent"} (${fmtNum(data.summary.severity.stable)})`,
+                            label: `${lang === "ar" ? "مستبعدة" : "Excluded"} (${fmtNum(data.summary.severity.stable)})`,
+                          },
+                          {
+                            value: "all",
+                            label: `${lang === "ar" ? "الكل" : "All"} (${fmtNum(data.leads.unfilteredTotal)})`,
                           },
                         ]}
                       />
