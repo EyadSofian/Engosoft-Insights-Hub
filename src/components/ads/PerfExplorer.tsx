@@ -16,6 +16,11 @@ import { filterStore, useFilters } from "@/lib/filter-store";
 import { useApi } from "@/lib/use-api";
 import { METRIC_GROUP_LABEL, METRICS, type MetricKey } from "@/lib/metric-catalog";
 import type { CampaignOperationalState, PerfRow } from "@/lib/types";
+import {
+  CAMPAIGN_RETURN_COLOR,
+  campaignReturnBand,
+  type CampaignReturnBand,
+} from "@/lib/campaign-return-band";
 import { DataTable, type Col } from "@/components/DataTable";
 import { exportCsv } from "@/lib/csv";
 import { EmptyState, Segmented, Skeleton } from "@/components/ui-bits";
@@ -592,6 +597,7 @@ export function PerfExplorer({
         </p>
       )}
       {view !== "all" && <p className="text-[11px] leading-5 text-text-muted">{quickViewHint}</p>}
+      {grain === "campaign" && spendAvailable && <CampaignReturnLegend />}
     </div>
   );
 
@@ -1451,6 +1457,7 @@ function buildColumns({
       sortValue: (r) => nameOf(r),
       render: (r) => (
         <div className="flex min-w-0 items-start gap-2">
+          {grain === "campaign" && spendAvailable && <CampaignReturnMarker row={r} />}
           <div className="min-w-0">
             <div
               className={`truncate max-w-[210px] ${
@@ -1683,6 +1690,73 @@ function buildColumns({
       render: (r) => <AcosBadge row={r} />,
     },
   ];
+}
+
+function campaignReturnCopy(band: Exclude<CampaignReturnBand, "unrated">, lang: Lang) {
+  const copy = {
+    loss: {
+      ar: "أحمر: الإنفاق أكبر من الإيراد",
+      en: "Red: spend is higher than revenue",
+    },
+    breakeven: {
+      ar: "برتقالي: الإيراد من 1.00× إلى 1.10× الإنفاق",
+      en: "Orange: revenue is 1.00x–1.10x spend",
+    },
+    positive: {
+      ar: "أصفر: الإيراد أكبر من 1.10× وحتى 2.00× الإنفاق",
+      en: "Yellow: revenue is above 1.10x and up to 2.00x spend",
+    },
+    strong: {
+      ar: "أخضر: الإيراد أكبر من 2.00× الإنفاق",
+      en: "Green: revenue is above 2.00x spend",
+    },
+  } as const;
+  return copy[band][lang];
+}
+
+function CampaignReturnMarker({ row }: { row: PerfRow }) {
+  const { lang } = useI18n();
+  const band = campaignReturnBand(row.spend, row.revenue);
+  if (band === "unrated") return null;
+
+  const ratio = row.revenue / row.spend;
+  return (
+    <span
+      className="mt-1 h-2.5 w-10 shrink-0 rounded-full"
+      style={{ background: CAMPAIGN_RETURN_COLOR[band] }}
+      title={`${campaignReturnCopy(band, lang)} · ${ratio.toFixed(2)}×${
+        row.partialSpend ? (lang === "ar" ? " · الإنفاق جزئي" : " · partial spend") : ""
+      }`}
+      aria-label={`${campaignReturnCopy(band, lang)} · ${ratio.toFixed(2)}×`}
+    />
+  );
+}
+
+function CampaignReturnLegend() {
+  const { lang } = useI18n();
+  const bands: Exclude<CampaignReturnBand, "unrated">[] = [
+    "loss",
+    "breakeven",
+    "positive",
+    "strong",
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-surface-2/55 px-3 py-2 text-[10.5px] text-text-muted">
+      <span className="font-semibold text-text">
+        {lang === "ar" ? "لون العائد:" : "Return color:"}
+      </span>
+      {bands.map((band) => (
+        <span key={band} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span
+            className="h-2 w-5 rounded-full"
+            style={{ background: CAMPAIGN_RETURN_COLOR[band] }}
+          />
+          {campaignReturnCopy(band, lang)}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function RoasBadge({ row }: { row: PerfRow }) {

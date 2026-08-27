@@ -2,6 +2,7 @@ import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { PerfRow } from "@/lib/types";
+import { CAMPAIGN_RETURN_COLOR, campaignReturnBand } from "@/lib/campaign-return-band";
 import { EmptyState } from "@/components/ui-bits";
 import { AdSetOriginBadge, InferredCourse } from "@/components/metric-bits";
 import { VerdictChip } from "./MetricCard";
@@ -59,6 +60,10 @@ export function PerfCards({
           activeCampaignKeys?.has(r.campaignKey) === true ||
           activeCampaignKeys?.has(r.key) === true;
         const websiteConversion = r.objective === "website_conversion";
+        const returnBand =
+          grain === "campaign" && spendAvailable
+            ? campaignReturnBand(r.spend, r.revenue)
+            : "unrated";
         // At campaign grain the "parent" is the campaign itself, which would
         // print the title twice.
         const parent =
@@ -76,8 +81,15 @@ export function PerfCards({
               type="button"
               onClick={() => onRowClick?.(r)}
               disabled={!onRowClick}
-              className={`card w-full h-full text-start flex flex-col card-hover hover:shadow-md hover:-translate-y-0.5 disabled:cursor-default cursor-pointer ${ownerMode ? "p-3 gap-2" : "p-3.5 gap-2.5"}`}
+              className={`card relative w-full h-full overflow-hidden text-start flex flex-col card-hover hover:shadow-md hover:-translate-y-0.5 disabled:cursor-default cursor-pointer ${ownerMode ? "p-3 gap-2" : "p-3.5 gap-2.5"}`}
             >
+              {returnBand !== "unrated" && (
+                <span
+                  className="absolute inset-y-0 start-0 w-1"
+                  style={{ background: CAMPAIGN_RETURN_COLOR[returnBand] }}
+                  aria-hidden="true"
+                />
+              )}
               <div className="flex items-start justify-between gap-2">
                 <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
                   {r.platforms.length ? (
