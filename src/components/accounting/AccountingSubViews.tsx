@@ -548,7 +548,9 @@ export function AccountingAgentsView() {
                   : lang === "ar" ? "مطابقة المكالمات غير متاحة" : "Call matching unavailable"}
               </Pill>
               <Pill tone={data.chatwoot.ok ? "success" : "warning"}>
-                {data.chatwoot.ok ? "Chatwoot connected" : "Chatwoot unavailable"}
+                {data.chatwoot.ok
+                  ? lang === "ar" ? "Chatwoot متصل" : "Chatwoot connected"
+                  : lang === "ar" ? "تعذّر تحميل Chatwoot" : "Chatwoot unavailable"}
               </Pill>
             </div>
           }
@@ -615,9 +617,9 @@ export function AccountingAgentsView() {
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
           <MiniMetric label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"} value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)} />
           <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
-          <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
-          <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={data.summary.chatUnreadConversations === null ? "—" : fmtNum(data.summary.chatUnreadConversations)} />
-          <MiniMetric label={lang === "ar" ? "محادثات بلا موظف" : "Unassigned conversations"} value={data.chatwoot.unassignedConversations === null ? "—" : fmtNum(data.chatwoot.unassignedConversations)} />
+          <MiniMetric label={lang === "ar" ? "عملاء ينتظرون الرد الآن" : "Awaiting reply now"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
+          <MiniMetric label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open conversations now"} value={data.summary.chatOpenConversations === null ? "—" : fmtNum(data.summary.chatOpenConversations)} />
+          <MiniMetric label={lang === "ar" ? "محادثات بلا موظف الآن" : "Unassigned now"} value={data.chatwoot.unassignedConversations === null ? "—" : fmtNum(data.chatwoot.unassignedConversations)} />
           <MiniMetric label={lang === "ar" ? "أول رد" : "First response"} value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)} />
         </div>
         <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
@@ -625,6 +627,11 @@ export function AccountingAgentsView() {
             ? "التوزيع حسب الموظف المسجل على الليد في Odoo. لمعرفة من غيّر التوزيع نحتاج سجل التعديلات من Odoo."
             : "This is the current distribution by the salesperson assigned in Odoo. Identifying which admin changed an assignment requires Odoo tracking history; a normal last edit is not mislabeled as a distribution event."}
         </p>
+        {!data.chatwoot.ok && data.chatwoot.error && (
+          <p className="mt-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[10px] leading-relaxed text-text-muted">
+            {lang === "ar" ? `سبب تعذّر Chatwoot: ${data.chatwoot.error}` : `Chatwoot error: ${data.chatwoot.error}`}
+          </p>
+        )}
       </Card>
 
       <Card>
@@ -969,7 +976,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
           <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `متابعة Chatwoot · ${score.weights.chatFollowUp} نقطة` : `Chatwoot follow-up · ${score.weights.chatFollowUp} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span></div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.chatConversations)} محادثة · تم الرد على ${fmtNum(score.evidence.chatRepliedConversations)} · ${fmtNum(score.evidence.chatAwaitingReply)} تنتظر ردًا · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة` : `${fmtNum(score.evidence.chatConversations)} conversations · ${fmtNum(score.evidence.chatRepliedConversations)} replied · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.chatConversations)} محادثة مفتوحة الآن · ${fmtNum(score.evidence.chatRepliedConversations)} لا تنتظر ردًا · ${fmtNum(score.evidence.chatAwaitingReply)} ينتظرون الرد · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة` : `${fmtNum(score.evidence.chatConversations)} open now · ${fmtNum(score.evidence.chatRepliedConversations)} not awaiting · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}</p>
           <div className="mt-3"><EvidenceLink href="#employee-chat-evidence" /></div>
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
@@ -1481,7 +1488,7 @@ function AgentTable({
                 <td className="num px-3 py-3 text-end">
                   {row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
                   <div className="mt-0.5 text-[10px] text-text-muted">
-                    {row.chatAwaitingReply === null ? "—" : `${fmtNum(row.chatAwaitingReply)} ${lang === "ar" ? "تنتظر ردًا" : "awaiting reply"}`} · {row.chatUnreadConversations === null ? "—" : `${fmtNum(row.chatUnreadConversations)} ${lang === "ar" ? "غير مقروءة" : "unread"}`}
+                    {row.chatAwaitingReply === null ? "—" : `${fmtNum(row.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting reply"}`} · {row.chatOpenConversations === null ? "—" : `${fmtNum(row.chatOpenConversations)} ${lang === "ar" ? "محادثة مفتوحة الآن" : "open now"}`}
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end">
@@ -1790,14 +1797,13 @@ function AgentPerformanceSheet({
               </div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "المحادثات" : "Conversations"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
-                <MiniMetric label={lang === "ar" ? "تم الرد عليها" : "Replied to"} value={row.chatConversations === null ? "—" : fmtNum(row.performanceScore.evidence.chatRepliedConversations)} />
-                <MiniMetric label={lang === "ar" ? "عملاء ينتظرون ردًا" : "Customers awaiting reply"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
-                <MiniMetric label={lang === "ar" ? "محادثات غير مقروءة" : "Unread conversations"} value={row.chatUnreadConversations === null ? "—" : fmtNum(row.chatUnreadConversations)} />
-                <MiniMetric label={lang === "ar" ? "رسائل غير مقروءة" : "Unread messages"} value={row.chatUnreadMessages === null ? "—" : fmtNum(row.chatUnreadMessages)} />
+                <MiniMetric label={lang === "ar" ? "تم حلها في الفترة" : "Resolved in period"} value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)} />
+                <MiniMetric label={lang === "ar" ? "عملاء ينتظرون الرد الآن" : "Awaiting reply now"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
+                <MiniMetric label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open conversations now"} value={row.chatOpenConversations === null ? "—" : fmtNum(row.chatOpenConversations)} />
                 <MiniMetric label={lang === "ar" ? "متوسط أول رد" : "Avg. first response"} value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)} />
                 <MiniMetric label={lang === "ar" ? "متوسط الرد" : "Avg. reply"} value={formatCallDuration(row.chatAverageReplySeconds, lang)} />
               </div>
-              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "حالة Open أو Snoozed أو Resolved لا تخصم وحدها. الذي يهم: هل آخر رسالة من العميل وما زال ينتظر رد الموظف، وهل توجد رسائل غير مقروءة." : "Open, Snoozed, or Resolved does not affect the score by itself. What matters is whether the customer's message is still awaiting an agent reply and whether messages are unread."}</p>
+              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "المحادثات وإغلاقها ومتوسط أول رد تخص الفترة المختارة. المفتوحة ومن ينتظرون ردًا هي حالة العمل الآن. لا نعتبر المحادثة سيئة لمجرد أنها مفتوحة." : "Conversation totals, resolutions, and first response use the selected period. Open and awaiting-reply counts are the live workload now. An open conversation is not penalized by itself."}</p>
             </div>
           </section>
 

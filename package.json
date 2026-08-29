@@ -30,6 +30,7 @@
     "test:target-overrides": "node --experimental-strip-types scripts/test-target-overrides.mjs",
     "test:integration-person": "node --experimental-strip-types scripts/test-integration-person.mjs",
     "test:employee-score": "node --experimental-strip-types scripts/test-employee-performance-score.mjs",
+    "test:chatwoot": "node --experimental-strip-types scripts/test-chatwoot-architecture.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
     "lint": "eslint .",

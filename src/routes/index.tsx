@@ -332,7 +332,7 @@ function BusinessDecisionCockpit({
           }
           detail={
             employee
-              ? `PBX ${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"} · Chatwoot: ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "تنتظر رد" : "awaiting"} · ${fmtNum(employee.chatUnreadConversations)} ${lang === "ar" ? "غير مقروءة" : "unread"}`
+              ? `PBX ${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"} · Chatwoot: ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting"} · ${fmtNum(employee.chatOpenConversations)} ${lang === "ar" ? "محادثة مفتوحة الآن" : "open now"}`
               : lang === "ar"
                 ? "لا توجد مكالمات PBX محللة في الفترة"
                 : "No analyzed PBX calls in this period"

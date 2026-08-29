@@ -99,4 +99,14 @@ const complete = (overrides = {}) => ({
   assert.equal(score.evidence.chatRepliedConversations, 6);
 }
 
+{
+  // The bounded Chatwoot reports do not expose unread counts. Missing unread
+  // evidence must not silently receive the full four read-status points.
+  const score = calculateEmployeePerformanceScore(complete({ chatUnreadConversations: null }));
+  assert.equal(score.chatFollowUp, 100);
+  assert.equal(score.earnedPoints.chatFollowUp, 16);
+  assert.equal(score.dataCoverage, 96);
+  assert.equal(score.overall, 96);
+}
+
 console.log("employee performance score tests passed.");

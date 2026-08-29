@@ -156,20 +156,37 @@ export function calculateEmployeePerformanceScore(
   const awaiting = safeCount(input.chatAwaitingReply);
   const unread = safeCount(input.chatUnreadConversations);
   const repliedConversations = Math.max(0, conversations - Math.min(conversations, awaiting));
+  const replyEvidenceAvailable =
+    input.chatConversations !== null && input.chatAwaitingReply !== null && conversations > 0;
+  const readEvidenceAvailable =
+    input.chatConversations !== null && input.chatUnreadConversations !== null && conversations > 0;
+  const availableChatShare =
+    (replyEvidenceAvailable ? EMPLOYEE_SCORE_RULES.chatReplyShare : 0) +
+    (readEvidenceAvailable ? EMPLOYEE_SCORE_RULES.chatReadShare : 0);
   const chatFollowUp =
-    input.chatConversations === null || conversations === 0
+    availableChatShare === 0
       ? null
       : clampPercent(
-          EMPLOYEE_SCORE_RULES.chatReplyShare * (repliedConversations / conversations) +
-            EMPLOYEE_SCORE_RULES.chatReadShare *
-              (1 - Math.min(1, unread / conversations)),
+          ((replyEvidenceAvailable
+            ? EMPLOYEE_SCORE_RULES.chatReplyShare * (repliedConversations / conversations)
+            : 0) +
+            (readEvidenceAvailable
+              ? EMPLOYEE_SCORE_RULES.chatReadShare *
+                (1 - Math.min(1, unread / conversations))
+              : 0)) /
+            availableChatShare *
+            100,
         );
   const chatSampleFactor = Math.min(
     1,
     conversations / EMPLOYEE_SCORE_RULES.minimumChatSample,
   );
   const chatEffectiveWeight =
-    chatFollowUp === null ? 0 : EMPLOYEE_SCORE_WEIGHTS.chatFollowUp * chatSampleFactor;
+    chatFollowUp === null
+      ? 0
+      : EMPLOYEE_SCORE_WEIGHTS.chatFollowUp *
+        chatSampleFactor *
+        (availableChatShare / 100);
   const chatPoints = (chatFollowUp ?? 0) * chatEffectiveWeight / 100;
 
   // Confirmed sale orders measure what the employee sold inside the selected

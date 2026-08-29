@@ -82,6 +82,8 @@ export interface AgentAnalyticsRow {
   qualityNeedsReview: number | null;
   chatConversations: number | null;
   chatResolved: number | null;
+  /** Current open Chatwoot conversations, independent of the selected period. */
+  chatOpenConversations: number | null;
   chatUnreadConversations: number | null;
   chatUnreadMessages: number | null;
   chatAwaitingReply: number | null;
@@ -306,6 +308,7 @@ export interface AgentAnalyticsResult {
     leadOwnerCallCoverageRate: number | null;
     chatConversations: number | null;
     chatResolved: number | null;
+    chatOpenConversations: number | null;
     chatUnreadConversations: number | null;
     chatUnreadMessages: number | null;
     chatAwaitingReply: number | null;
@@ -345,6 +348,9 @@ export interface AgentAnalyticsResult {
     fetchedAt: string;
     error?: string;
     metricsAvailable: boolean;
+    /** Live account workload from Chatwoot, not a selected-period total. */
+    openConversations: number | null;
+    awaitingReply: number | null;
     unassignedConversations: number | null;
   };
 }
@@ -552,6 +558,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   qualityNeedsReview: null,
   chatConversations: null,
   chatResolved: null,
+  chatOpenConversations: null,
   chatUnreadConversations: null,
   chatUnreadMessages: null,
   chatAwaitingReply: null,
@@ -1091,6 +1098,7 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
     const row = matched?.[1] ?? blank(key, source.name);
     row.chatConversations = source.conversations;
     row.chatResolved = source.resolved;
+    row.chatOpenConversations = source.openConversations;
     row.chatUnreadConversations = source.unreadConversations;
     row.chatUnreadMessages = source.unreadMessages;
     row.chatAwaitingReply = source.awaitingReply;
@@ -1448,6 +1456,8 @@ export async function buildAgentAnalytics(
     source: "Chatwoot · Agent reports",
     fetchedAt: "",
     metricsAvailable: false,
+    openConversations: null,
+    awaitingReply: null,
     unassignedConversations: null,
   };
   const fallbackRange = cairoDateParts();
@@ -1531,21 +1541,19 @@ export async function buildAgentAnalytics(
   }
 
   try {
-    // Chatwoot's conversation activity walks paginated inbox results. On a
-    // cold Railway process that can take tens of seconds; employee accounting
-    // must not stay blank while a secondary source warms. The original promise
-    // keeps running and fills its one-minute cache for the next request.
-    const chatSnapshot = await Promise.race([
-      chatwootPromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5_000)),
-    ]);
-    if (!chatSnapshot) throw new Error("Chatwoot analytics are not configured");
+    // The snapshot uses bounded report endpoints, so latency no longer grows
+    // with the account's full conversation history. Keep real upstream errors
+    // distinct from missing configuration instead of disguising a timeout.
+    const chatSnapshot = await chatwootPromise;
+    if (!chatSnapshot) throw new Error("Chatwoot is not configured");
     mergeChatwootAgents(map, chatSnapshot.agents);
     chatwootStatus = {
       ok: true,
       source: chatSnapshot.source,
       fetchedAt: chatSnapshot.fetchedAt,
       metricsAvailable: chatSnapshot.agents.some((row) => row.conversations > 0),
+      openConversations: chatSnapshot.openConversations,
+      awaitingReply: chatSnapshot.awaitingReply,
       unassignedConversations: chatSnapshot.unassignedConversations,
     };
   } catch (error) {
@@ -1661,7 +1669,10 @@ export async function buildAgentAnalytics(
       leadOwnerCallCoverageRate: row.leadOwnerCallCoverageRate,
       cleanLeads: row.cleanLeads,
       conversionRate: row.conversionRate,
-      chatConversations: row.chatConversations,
+      // The live workload report supplies both sides of this ratio. Mixing a
+      // selected-period conversation total with today's unattended count made
+      // the old score mathematically invalid.
+      chatConversations: row.chatOpenConversations,
       chatAwaitingReply: row.chatAwaitingReply,
       chatUnreadConversations: row.chatUnreadConversations,
       targetAchievementOrders: row.target?.achievementOrders ?? null,
@@ -1708,6 +1719,8 @@ export async function buildAgentAnalytics(
       if (row.chatConversations !== null)
         acc.chatConversations = (acc.chatConversations ?? 0) + row.chatConversations;
       if (row.chatResolved !== null) acc.chatResolved = (acc.chatResolved ?? 0) + row.chatResolved;
+      if (row.chatOpenConversations !== null)
+        acc.chatOpenConversations = (acc.chatOpenConversations ?? 0) + row.chatOpenConversations;
       if (row.chatUnreadConversations !== null)
         acc.chatUnreadConversations =
           (acc.chatUnreadConversations ?? 0) + row.chatUnreadConversations;
@@ -1748,8 +1761,9 @@ export async function buildAgentAnalytics(
       leadOwnerCallCoverageRate: null as number | null,
       chatConversations: chatwootStatus.ok ? 0 : (null as number | null),
       chatResolved: chatwootStatus.ok ? 0 : (null as number | null),
-      chatUnreadConversations: chatwootStatus.ok ? 0 : (null as number | null),
-      chatUnreadMessages: chatwootStatus.ok ? 0 : (null as number | null),
+      chatOpenConversations: chatwootStatus.ok ? 0 : (null as number | null),
+      chatUnreadConversations: null as number | null,
+      chatUnreadMessages: null as number | null,
       chatAwaitingReply: chatwootStatus.ok ? 0 : (null as number | null),
       chatAverageFirstResponseSeconds: null as number | null,
     },

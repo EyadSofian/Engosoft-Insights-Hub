@@ -84,7 +84,7 @@ function SocialMedia() {
           (agent) =>
             agent.chatConversations !== null ||
             agent.chatAwaitingReply !== null ||
-            agent.chatUnreadConversations !== null,
+            agent.chatOpenConversations !== null,
         )
         .sort(
           (a, b) =>
@@ -287,8 +287,8 @@ function SocialMedia() {
                 hero={(chat.summary.chatAwaitingReply ?? 0) > 0}
               />
               <KpiCard
-                label={lang === "ar" ? "محادثات غير مقروءة" : "Unread chats"}
-                value={fmtNum(chat.summary.chatUnreadConversations)}
+                label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open now"}
+                value={fmtNum(chat.summary.chatOpenConversations)}
                 icon={<Inbox size={16} />}
               />
               <KpiCard
@@ -325,7 +325,7 @@ function SocialMedia() {
                         {lang === "ar" ? "تنتظر رد" : "Awaiting"}
                       </th>
                       <th className="px-4 py-3 text-end">
-                        {lang === "ar" ? "غير مقروء" : "Unread"}
+                        {lang === "ar" ? "مفتوحة الآن" : "Open now"}
                       </th>
                       <th className="px-4 py-3 text-end">
                         {lang === "ar" ? "متوسط أول رد" : "Avg first reply"}
@@ -346,7 +346,7 @@ function SocialMedia() {
                           {fmtNum(agent.chatAwaitingReply)}
                         </td>
                         <td className="num px-4 py-3 text-end">
-                          {fmtNum(agent.chatUnreadConversations)}
+                          {fmtNum(agent.chatOpenConversations)}
                         </td>
                         <td className="num px-4 py-3 text-end">
                           {duration(agent.chatAverageFirstResponseSeconds, lang)}
