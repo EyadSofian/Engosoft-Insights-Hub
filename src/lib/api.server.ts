@@ -5,9 +5,8 @@ import { DEFAULT_FX_RATES } from "./fx-rates";
 
 /**
  * Reads filters off the query string. With no explicit window the range falls
- * back to year-to-date — ad spend now covers the whole year, so the old
- * Meta-window default (and the period-mismatch warning it needed) is gone.
- * `range=all` opts out.
+ * back to month-to-date, anchored to the freshest source date. `range=all`
+ * opts out.
  */
 export async function parseFilters(request: Request): Promise<GlobalFilters> {
   const p = new URL(request.url).searchParams;

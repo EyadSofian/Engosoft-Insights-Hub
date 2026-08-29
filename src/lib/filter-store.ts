@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { AcquisitionChannel, DatePreset, GlobalFilters, Platform } from "./types";
 import { DEFAULT_FX_RATES } from "./fx-rates";
+import { DEFAULT_DATE_PRESET } from "./reporting-window";
 
 type Listener = () => void;
 
@@ -29,9 +30,9 @@ const defaultFxFilters = (): Pick<GlobalFilters, "fxEgp" | "fxSar"> => ({
 
 let state: GlobalFilters = { ...defaultFxFilters() };
 let fxHydrated = false;
-/** Year to date. Ad spend now covers the whole year, so this is the honest default. */
-let preset: DatePreset = "year";
-/** Prevent the default-year effect from immediately undoing a cleared custom range. */
+/** Month to date is the dashboard's opening period. */
+let preset: DatePreset = DEFAULT_DATE_PRESET;
+/** Prevent the default-month effect from immediately undoing a cleared custom range. */
 let manualDateMode = false;
 const listeners = new Set<Listener>();
 
@@ -159,7 +160,7 @@ export const filterStore = {
   reset() {
     const { fxEgp, fxSar } = state;
     state = { ...defaultFxFilters(), fxEgp, fxSar };
-    preset = "year";
+    preset = DEFAULT_DATE_PRESET;
     manualDateMode = false;
     emit();
   },

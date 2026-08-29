@@ -46,7 +46,7 @@ export interface GlobalFilters {
   mainCategory?: string;
   salesTeam?: string;
   salesperson?: string;
-  /** "all" opts out of the default year-to-date range. */
+  /** "all" opts out of the default month-to-date range. */
   range?: "all";
   /** Include traffic/unknown ad accounts in efficiency denominators. */
   includeNonLead?: "1";

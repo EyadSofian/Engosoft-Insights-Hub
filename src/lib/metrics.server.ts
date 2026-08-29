@@ -14,7 +14,7 @@ import {
 import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
-import { approvedReportingEnd, REPORTING_WINDOW_START } from "./reporting-window";
+import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
@@ -560,12 +560,12 @@ function teamHasPerson(all: Snapshot, team: string, person: string): boolean {
   return personTeamCache.map.get(person) === team;
 }
 
-/** Default window: 1 January through the newest available source date. */
+/** Default window: first day of the freshest data month through its latest date. */
 export async function getDefaultRange(): Promise<{ from: string; to: string }> {
   const all = await loadAllData();
   const latest =
     [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
-  return { from: REPORTING_WINDOW_START, to: approvedReportingEnd(latest) };
+  return defaultReportingMonth(latest);
 }
 
 /* --- close time ------------------------------------------------------------ */
@@ -2051,8 +2051,8 @@ export function computeLeadOrigin(data: FilteredData): {
 /**
  * True when the previous window sits inside the range the sheet actually covers.
  *
- * The default year-to-date window is 200 days, so its predecessor starts in
- * mid-2025 — where this sheet holds 109 stray invoice rows and nothing else.
+ * A long custom window can put its predecessor before complete source coverage
+ * — where this sheet holds a thin tail of invoice rows and nothing else.
  * Comparing against that produced a "+5,959%" revenue delta on the Overview:
  * arithmetically correct, completely meaningless. When the previous window
  * predates complete data, no delta is shown at all.

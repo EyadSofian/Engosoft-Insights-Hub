@@ -46,7 +46,8 @@
     "test:weekend-analysis": "node --experimental-strip-types scripts/test-weekend-analysis.mjs",
     "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs",
     "test:campaign-return-band": "node --experimental-strip-types scripts/test-campaign-return-band.mjs",
-    "test:uncalled-leads": "node --experimental-strip-types scripts/test-uncalled-leads.mjs"
+    "test:uncalled-leads": "node --experimental-strip-types scripts/test-uncalled-leads.mjs",
+    "test:default-period": "node --experimental-strip-types scripts/test-default-period.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

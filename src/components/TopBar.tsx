@@ -21,7 +21,7 @@ import {
   setAcquisitionFilter,
   useFilters,
 } from "@/lib/filter-store";
-import { approvedReportingEnd } from "@/lib/reporting-window";
+import { approvedReportingEnd, DEFAULT_DATE_PRESET } from "@/lib/reporting-window";
 import { useModalGuard } from "@/lib/ui-store";
 import type { AcquisitionChannel, CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "@/lib/constants";
@@ -125,12 +125,12 @@ export function TopBar({ title }: { title?: string }) {
     filterStore.hydrateFx();
   }, []);
 
-  // Anchor the default year window to the newest available source date so a
+  // Anchor the default month window to the newest available source date so a
   // preset never silently hides recent valid rows.
   useEffect(() => {
     if (!latest || filters.from || filters.to || filters.range || filterStore.isManualDateMode())
       return;
-    filterStore.setPreset("year", latest);
+    filterStore.setPreset(DEFAULT_DATE_PRESET, latest);
   }, [latest, filters.from, filters.to, filters.range]);
 
   const doRefresh = async () => {
