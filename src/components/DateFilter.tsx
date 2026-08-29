@@ -4,7 +4,7 @@ import { DayPicker, DayButton, type DateRange } from "react-day-picker";
 import { ar, enGB } from "date-fns/locale";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { useI18n, type Lang } from "@/lib/i18n";
-import { filterStore, presetWindow, useFilters } from "@/lib/filter-store";
+import { filterStore, presetWindow, useFilters, usePreset } from "@/lib/filter-store";
 import { useModalGuard } from "@/lib/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DatePreset, GlobalFilters } from "@/lib/types";
@@ -34,10 +34,24 @@ const PRESET_KEY: Record<DatePreset, PresetKey> = {
 };
 
 /** Which named preset — if any — the current range matches. Null means custom. */
-function activePreset(f: GlobalFilters, latest?: string): DatePreset | null {
+function activePreset(
+  f: GlobalFilters,
+  latest?: string,
+  preferred?: DatePreset,
+): DatePreset | null {
   if (f.range === "all") return "all";
   if (!f.from || !f.to) return null;
+
+  // On the 30th day of a month, “This month” and “Last 30 days” resolve to the
+  // same dates. Keep the preset the user/store actually chose instead of
+  // relabelling it according to whichever mathematical match appears first.
+  if (preferred && preferred !== "all") {
+    const w = presetWindow(preferred, latest);
+    if (w.from === f.from && w.to === f.to) return preferred;
+  }
+
   for (const p of ["7d", "30d", "month", "year"] as const) {
+    if (p === preferred) continue;
     const w = presetWindow(p, latest);
     if (w.from === f.from && w.to === f.to) return p;
   }
@@ -176,7 +190,8 @@ export function DateRangePanel({
 }) {
   const { t, lang, dir } = useI18n();
   const filters = useFilters();
-  const active = activePreset(filters, latest);
+  const preferred = usePreset();
+  const active = activePreset(filters, latest, preferred);
 
   const [showCal, setShowCal] = useState(!collapsibleCalendar || active === null);
   // Open the calendar automatically when the range becomes custom.
@@ -289,7 +304,8 @@ export function DateRangePanel({
 function useRangeLabel(latest?: string): string {
   const { t, lang } = useI18n();
   const filters = useFilters();
-  const active = activePreset(filters, latest);
+  const preferred = usePreset();
+  const active = activePreset(filters, latest, preferred);
   if (active) return t(PRESET_KEY[active]);
   if (filters.from) {
     return filters.to
