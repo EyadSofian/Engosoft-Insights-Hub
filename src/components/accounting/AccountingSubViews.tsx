@@ -508,7 +508,8 @@ export function AccountingAgentsView() {
         <KpiCard
           index={6}
           label={lang === "ar" ? "وقت المكالمات" : "Call hours"}
-          value={formatCallHours(data.summary.totalCallSeconds, lang)}
+          value={<CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />}
+          valueWrap
           sub={
             lang === "ar"
               ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
@@ -3025,6 +3026,32 @@ function formatCallHours(seconds: number | null, lang: "ar" | "en"): string {
       : `${bidiNumber(minutes)}\u00a0دقيقة`,
   );
   return hours > 0 ? `${fmtNum(hours)}h ${fmtNum(minutes)}m` : `${fmtNum(minutes)}m`;
+}
+
+function CallHoursKpiValue({ seconds, lang }: { seconds: number | null; lang: "ar" | "en" }) {
+  if (seconds === null || !Number.isFinite(seconds)) return <>—</>;
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const unitClass = "text-[0.62em] font-semibold tracking-normal text-text-muted";
+  return (
+    <span
+      className="inline-flex max-w-full flex-wrap items-baseline justify-start gap-x-2 gap-y-1"
+      dir={lang === "ar" ? "rtl" : "ltr"}
+      aria-label={formatCallHours(seconds, lang)}
+    >
+      {hours > 0 && (
+        <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+          <bdi dir="ltr">{fmtNum(hours)}</bdi>
+          <span className={unitClass}>{lang === "ar" ? "ساعة" : "hours"}</span>
+        </span>
+      )}
+      <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+        <bdi dir="ltr">{fmtNum(minutes)}</bdi>
+        <span className={unitClass}>{lang === "ar" ? "دقيقة" : "minutes"}</span>
+      </span>
+    </span>
+  );
 }
 
 function formatCallDuration(seconds: number | null, lang: "ar" | "en"): string {

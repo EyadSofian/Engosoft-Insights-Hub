@@ -150,6 +150,7 @@ export function KpiCard({
   icon,
   index = 0,
   subWrap = false,
+  valueWrap = false,
   info,
 }: {
   label: string;
@@ -162,6 +163,8 @@ export function KpiCard({
   index?: number;
   /** Allow explanatory KPI source text to wrap instead of silently truncating. */
   subWrap?: boolean;
+  /** Allow long semantic values, such as Arabic durations, to wrap without ellipsis. */
+  valueWrap?: boolean;
   /** Optional "where does this number come from?" control, shown by the label. */
   info?: ReactNode;
 }) {
@@ -202,7 +205,11 @@ export function KpiCard({
       </div>
 
       <div
-        className="num mt-2.5 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] font-semibold leading-none tracking-[-0.025em] sm:mt-3"
+        className={`num mt-2.5 max-w-full font-semibold tracking-[-0.025em] sm:mt-3 ${
+          valueWrap
+            ? "overflow-visible whitespace-normal text-[clamp(1rem,3.4vw,1.55rem)] leading-[1.2]"
+            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] leading-none"
+        }`}
         style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
       >
         {value}
