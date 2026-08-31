@@ -86,8 +86,10 @@ function buildCsvRow(
     ctr_link: csvMaybe(r.ctrLink, 4),
     platform_leads: r.platformLeads ?? "",
     crm_leads: r.crmLeads,
+    follow_up: r.followUp,
     won: r.won,
     paid_invoices: r.invoices,
+    invoice_conversion_rate: csvMaybe(r.invoiceConversionRate),
     fully_invoiced_sales_orders: r.salesOrders,
     conversion_rate: csvMaybe(r.conversionRate),
     lost: r.lost,
@@ -118,6 +120,7 @@ type QuickViewKey =
   | "watch"
   | "weak"
   | "early"
+  | "bestConversion"
   | "bestRoas"
   | "worst"
   | "topSpend"
@@ -189,6 +192,23 @@ const QUICK_VIEWS: QuickView[] = [
       en: "Fewer than 30 leads or not through a full sales cycle yet",
     },
     apply: (rows) => rows,
+  },
+  {
+    key: "bestConversion",
+    ar: "أعلى تحويل لفاتورة",
+    en: "Highest invoice conversion",
+    hint: {
+      ar: "الحملات التي عندها 20 ليد على الأقل، مرتبة حسب الفواتير المدفوعة ÷ ليدز CRM",
+      en: "Campaigns with at least 20 leads, ranked by paid invoices divided by CRM leads",
+    },
+    apply: (rows) =>
+      rows
+        .filter((r) => r.crmLeads >= 20 && r.invoiceConversionRate !== null)
+        .sort(
+          (a, b) =>
+            (b.invoiceConversionRate ?? 0) - (a.invoiceConversionRate ?? 0) ||
+            b.invoices - a.invoices,
+        ),
   },
   {
     key: "attributedRevenue",
@@ -1041,6 +1061,14 @@ function RowDrawer({
     value: <span className="num">{fmtNum(row.invoices)}</span>,
   });
   facts.push({
+    label: lang === "ar" ? "قيد المتابعة" : "Follow-up",
+    value: <span className="num">{fmtNum(row.followUp)}</span>,
+  });
+  facts.push({
+    label: lang === "ar" ? "تحويل ليد إلى فاتورة" : "Lead-to-invoice conversion",
+    value: <span className="num">{maybeCell(row.invoiceConversionRate, (v) => fmtPct(v, 2))}</span>,
+  });
+  facts.push({
     label: lang === "ar" ? "أوامر البيع المفوترة بالكامل" : "Fully invoiced sales orders",
     value: <span className="num">{fmtNum(row.salesOrders)}</span>,
   });
@@ -1574,10 +1602,19 @@ function buildColumns({
       render: (r) => fmtNum(r.crmLeads),
     },
     {
+      key: "followUp",
+      group: "crm",
+      label: lang === "ar" ? "قيد المتابعة" : "Follow-up",
+      header: lang === "ar" ? "Follow up" : "Follow-up",
+      align: "right",
+      sortValue: (r) => r.followUp,
+      render: (r) => fmtNum(r.followUp),
+    },
+    {
       key: "won",
       group: "crm",
-      label: label("won"),
-      header: header("won"),
+      label: lang === "ar" ? "Closed Won في CRM" : "CRM Closed Won",
+      header: lang === "ar" ? "Closed Won" : "Closed Won",
       align: "right",
       sortValue: (r) => r.won,
       render: (r) => fmtNum(r.won),
@@ -1598,7 +1635,6 @@ function buildColumns({
       label: label("lost"),
       header: header("lost"),
       align: "right",
-      hideByDefault: true,
       sortValue: (r) => r.lost,
       render: (r) => fmtNum(r.lost),
     },
@@ -1630,6 +1666,15 @@ function buildColumns({
       align: "right",
       sortValue: (r) => r.invoices,
       render: (r) => fmtNum(r.invoices),
+    },
+    {
+      key: "invoiceConversionRate",
+      group: "accounting",
+      label: lang === "ar" ? "تحويل الليد إلى فاتورة" : "Lead-to-invoice conversion",
+      header: lang === "ar" ? "تحويل لفاتورة" : "Invoice conv.",
+      align: "right",
+      sortValue: (r) => sortMaybe(r.invoiceConversionRate),
+      render: (r) => maybeCell(r.invoiceConversionRate, (v) => fmtPct(v, 2)),
     },
     {
       key: "salesOrders",

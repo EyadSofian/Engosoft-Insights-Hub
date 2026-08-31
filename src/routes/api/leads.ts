@@ -4,14 +4,20 @@ export const Route = createFileRoute("/api/leads")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, computeTotals, computeLeadOrigin, groupBy } = await import(
-          "@/lib/metrics.server"
-        );
+        const { getFiltered, computeTotals, computeLeadOrigin, groupBy } =
+          await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
+        const { buildSalesFunnel } = await import("@/lib/sales-funnel.server");
+        const { leadStageBucket } = await import("@/lib/uncalled-leads");
+        const salesFunnel = buildSalesFunnel(data, filters);
+        const followUpRows = data.crm.filter((lead) => {
+          const bucket = leadStageBucket(lead.cleanedStage || lead.stage);
+          return !lead.isWon && bucket !== "won" && bucket !== "junk";
+        });
 
         const detail = capped(
           data.crm.map((c) => ({
@@ -35,6 +41,19 @@ export const Route = createFileRoute("/api/leads")({
 
         return json({
           totals: computeTotals(data),
+          pipeline: {
+            followUp: followUpRows.length,
+            fresh: followUpRows.filter(
+              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "fresh",
+            ).length,
+            stalled: followUpRows.filter(
+              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "stalled",
+            ).length,
+            activeDeals: followUpRows.filter(
+              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "deal",
+            ).length,
+          },
+          salesFunnel,
           origin: computeLeadOrigin(data),
           byStage: groupBy(data.crm, (c) => c.cleanedStage || "—"),
           bySource: groupBy(data.crm, (c) => labels.get(c.sourceKey) ?? c.source ?? "—"),
@@ -42,10 +61,13 @@ export const Route = createFileRoute("/api/leads")({
           byTeam: groupBy(data.crm, (c) => c.salesTeam || "—"),
           bySubTeam: groupBy(data.crm, (c) => c.subTeam || "—"),
           bySalesperson: groupBy(data.crm, (c) => c.salesperson || "—"),
-          byCampaign: groupBy(data.crm.filter((c) => c.fromCampaign), (c) => c.campaignName || "—"),
+          byCampaign: groupBy(
+            data.crm.filter((c) => c.fromCampaign),
+            (c) => c.campaignName || "—",
+          ),
           byPriority: groupBy(data.crm, (c) => c.priority || "—"),
-          byMonth: groupBy(data.crm, (c) => (c.createdAt ? c.createdAt.slice(0, 7) : "—")).sort((a, b) =>
-            a.label.localeCompare(b.label),
+          byMonth: groupBy(data.crm, (c) => (c.createdAt ? c.createdAt.slice(0, 7) : "—")).sort(
+            (a, b) => a.label.localeCompare(b.label),
           ),
           detail,
           health: data.snapshot.health,

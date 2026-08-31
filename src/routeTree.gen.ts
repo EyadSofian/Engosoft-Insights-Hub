@@ -37,6 +37,7 @@ import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCourseLeadAlertsRouteImport } from './routes/api/course-lead-alerts'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
+import { Route as ApiCrmCallsRouteImport } from './routes/api/crm-calls'
 import { Route as ApiEmployeeCallDetailRouteImport } from './routes/api/employee-call-detail'
 import { Route as ApiEmployeeCallRecordingRouteImport } from './routes/api/employee-call-recording'
 import { Route as ApiEmployeeCallsRouteImport } from './routes/api/employee-calls'
@@ -207,6 +208,11 @@ const ApiCourseLeadAlertsRoute = ApiCourseLeadAlertsRouteImport.update({
 const ApiCoursesRoute = ApiCoursesRouteImport.update({
   id: '/api/courses',
   path: '/api/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCrmCallsRoute = ApiCrmCallsRouteImport.update({
+  id: '/api/crm-calls',
+  path: '/api/crm-calls',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEmployeeCallDetailRoute = ApiEmployeeCallDetailRouteImport.update({
@@ -396,6 +402,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/crm-calls': typeof ApiCrmCallsRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -457,6 +464,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/crm-calls': typeof ApiCrmCallsRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -519,6 +527,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
+  '/api/crm-calls': typeof ApiCrmCallsRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -582,6 +591,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/course-lead-alerts'
     | '/api/courses'
+    | '/api/crm-calls'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -643,6 +653,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/course-lead-alerts'
     | '/api/courses'
+    | '/api/crm-calls'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -704,6 +715,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/course-lead-alerts'
     | '/api/courses'
+    | '/api/crm-calls'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -766,6 +778,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiCourseLeadAlertsRoute: typeof ApiCourseLeadAlertsRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
+  ApiCrmCallsRoute: typeof ApiCrmCallsRoute
   ApiEmployeeCallDetailRoute: typeof ApiEmployeeCallDetailRoute
   ApiEmployeeCallRecordingRoute: typeof ApiEmployeeCallRecordingRoute
   ApiEmployeeCallsRoute: typeof ApiEmployeeCallsRoute
@@ -995,6 +1008,13 @@ declare module '@tanstack/react-router' {
       path: '/api/courses'
       fullPath: '/api/courses'
       preLoaderRoute: typeof ApiCoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/crm-calls': {
+      id: '/api/crm-calls'
+      path: '/api/crm-calls'
+      fullPath: '/api/crm-calls'
+      preLoaderRoute: typeof ApiCrmCallsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/employee-call-detail': {
@@ -1246,6 +1266,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiCourseLeadAlertsRoute: ApiCourseLeadAlertsRoute,
   ApiCoursesRoute: ApiCoursesRoute,
+  ApiCrmCallsRoute: ApiCrmCallsRoute,
   ApiEmployeeCallDetailRoute: ApiEmployeeCallDetailRoute,
   ApiEmployeeCallRecordingRoute: ApiEmployeeCallRecordingRoute,
   ApiEmployeeCallsRoute: ApiEmployeeCallsRoute,

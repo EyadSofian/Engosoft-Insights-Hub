@@ -20,6 +20,7 @@ import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
 import { isOperationalStateCurrent } from "./campaign-status-policy";
+import { leadStageBucket } from "./uncalled-leads";
 import type {
   AdRow,
   AccountingRow,
@@ -817,6 +818,7 @@ interface Bucket {
   linkClicks: number | null;
   platformLeads: number | null;
   crmLeads: number;
+  followUp: number;
   won: number;
   lost: number;
   revenue: number;
@@ -856,6 +858,7 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
         linkClicks: null,
         platformLeads: null,
         crmLeads: 0,
+        followUp: 0,
         won: 0,
         lost: 0,
         revenue: 0,
@@ -907,6 +910,8 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     const b = touch(dimension);
     b.crmLeads++;
     if (c.isWon) b.won++;
+    const stageBucket = leadStageBucket(c.cleanedStage || c.stage);
+    if (!c.isWon && stageBucket !== "won" && stageBucket !== "junk") b.followUp++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       b.closeTotal += c.daysToClose;
       b.closeSample++;
@@ -1003,12 +1008,14 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
       cpc: div(b.spend, b.clicksAll),
       platformLeads: b.platformLeads,
       crmLeads: b.crmLeads,
+      followUp: b.followUp,
       won: b.won,
       lost: b.lost,
       conversionRate: pctOf(b.won, b.crmLeads),
       lostRate: pctOf(b.lost, b.crmLeads),
       revenue: b.revenue,
       invoices: b.invoiceRefs.size,
+      invoiceConversionRate: pctOf(b.invoiceRefs.size, b.crmLeads),
       salesOrders: b.salesOrderRefs.size,
       revenuePerLead: div(b.revenue, b.crmLeads),
       cpl: b.platformLeads === null ? null : div(b.spend, b.platformLeads),
@@ -1209,12 +1216,14 @@ export async function computeRecentCampaignActivity(
       cpc: div(state.spend24h, state.clicks24h),
       platformLeads: state.platformLeads24h,
       crmLeads: 0,
+      followUp: 0,
       won: 0,
       lost: 0,
       conversionRate: null,
       lostRate: null,
       revenue: 0,
       invoices: 0,
+      invoiceConversionRate: null,
       salesOrders: 0,
       revenuePerLead: null,
       cpl: state.platformLeads24h === null ? null : div(state.spend24h, state.platformLeads24h),
@@ -1609,8 +1618,10 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
         cpc: null,
         platformLeads: null,
         crmLeads: 0,
+        followUp: 0,
         won: 0,
         lost: 0,
+        invoiceConversionRate: null,
         conversionRate: null,
         lostRate: null,
         revenue: 0,
@@ -1678,6 +1689,8 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     const a = get(c.course, c.mainCategory);
     a.crmLeads++;
     if (c.isWon) a.won++;
+    const stageBucket = leadStageBucket(c.cleanedStage || c.stage);
+    if (!c.isWon && stageBucket !== "won" && stageBucket !== "junk") a.followUp++;
     if (c.daysToClose !== null && c.daysToClose >= 0) {
       a.closeTotal += c.daysToClose;
       a.closeSample++;
@@ -1717,6 +1730,7 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
 
   for (const a of map.values()) {
     a.invoices = invoiceRefs.get(a.key)?.size ?? 0;
+    a.invoiceConversionRate = pctOf(a.invoices, a.crmLeads);
     a.salesOrders = salesOrderRefs.get(a.key)?.size ?? 0;
     // Backward-compatible alias used by older course consumers.
     a.orders = a.invoices;

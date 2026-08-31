@@ -409,8 +409,12 @@ export interface PerfRow {
   cpc: Maybe;
   platformLeads: Maybe;
   crmLeads: number;
+  /** Actionable CRM leads still in the pipeline (Won and junk/old-data stages excluded). */
+  followUp: number;
   won: number;
   lost: number;
+  /** Paid-invoice conversion: distinct Accounting invoices ÷ CRM leads. */
+  invoiceConversionRate: Maybe;
   conversionRate: Maybe;
   lostRate: Maybe;
   revenue: number;

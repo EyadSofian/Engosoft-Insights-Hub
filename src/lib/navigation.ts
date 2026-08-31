@@ -25,15 +25,7 @@ export interface NavigationItem {
 }
 
 export interface NavigationSection {
-  id:
-    | "business"
-    | "campaigns"
-    | "sales"
-    | "leads"
-    | "comparisons"
-    | "website"
-    | "media-buyers"
-    | "social";
+  id: "business" | "campaigns" | "sales" | "leads" | "comparisons" | "media-buyers" | "social";
   label: Record<Lang, string>;
   shortLabel: Record<Lang, string>;
   icon: LucideIcon;
@@ -65,6 +57,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
       { to: "/ads", key: "ads_tech", icon: BarChart3 },
+      { to: "/website", key: "website", icon: Globe2 },
     ],
   },
   {
@@ -81,8 +74,8 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
   },
   {
     id: "leads",
-    label: { ar: "جودة وأعداد الليدز", en: "Lead quality" },
-    shortLabel: { ar: "الليدز", en: "Leads" },
+    label: { ar: "CRM إدارة العملاء", en: "CRM management" },
+    shortLabel: { ar: "CRM", en: "CRM" },
     icon: Users,
     defaultTo: "/leads",
     items: [
@@ -101,14 +94,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
       { to: "/weekend", key: "weekend", icon: CalendarClock },
       { to: "/yoy", key: "yoy", icon: CalendarRange },
     ],
-  },
-  {
-    id: "website",
-    label: { ar: "الموقع الإلكتروني", en: "Website" },
-    shortLabel: { ar: "الموقع", en: "Website" },
-    icon: Globe2,
-    defaultTo: "/website",
-    items: [{ to: "/website", key: "website", icon: Globe2 }],
   },
   {
     id: "media-buyers",

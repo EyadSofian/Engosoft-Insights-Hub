@@ -7,7 +7,6 @@ import {
   BarList,
   Card,
   ErrorState,
-  KpiCard,
   Notice,
   PageHeader,
   SectionTitle,
@@ -19,6 +18,8 @@ import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/t
 import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
 
 export const Route = createFileRoute("/lost")({ component: Lost });
+
+type ShareView = "reason" | "course" | "team" | "salesperson" | "source" | "month";
 
 interface LostRowView {
   createdAt: string;
@@ -53,6 +54,7 @@ interface Resp {
 function Lost() {
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
+  const [shareView, setShareView] = useState<ShareView>("reason");
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -160,34 +162,35 @@ function Lost() {
             </Notice>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard
-              index={0}
-              label={t("total_lost")}
-              value={fmtNum(data.breakdown.total)}
-              sub={
-                lang === "ar"
-                  ? "ليدز الفترة دي حسب تاريخ الإنشاء"
-                  : "This period's lead cohort by creation date"
-              }
-            />
-            <KpiCard
-              index={1}
-              label={lang === "ar" ? "CRM بدون Lost" : "Non-lost CRM"}
-              value={fmtNum(data.totals.crmLeads)}
-            />
-            <KpiCard
-              index={2}
-              label={t("lost_rate")}
-              value={fmtPct(data.totals.lostRate, 2)}
-              sub={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`}
-            />
-            <KpiCard
-              index={3}
-              label={lang === "ar" ? "عدد الأسباب" : "Distinct reasons"}
-              value={fmtNum(data.breakdown.byReason.length)}
-            />
-          </div>
+          <Card padded={false} className="overflow-hidden">
+            <div className="grid grid-cols-2 divide-x divide-y divide-border md:grid-cols-4 md:divide-y-0 rtl:divide-x-reverse">
+              <LostMetric
+                label={t("total_lost")}
+                value={fmtNum(data.breakdown.total)}
+                note={lang === "ar" ? "حسب تاريخ إنشاء الليد" : "By lead creation date"}
+              />
+              <LostMetric
+                label={t("lost_rate")}
+                value={fmtPct(data.totals.lostRate, 2)}
+                note={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`}
+              />
+              <LostMetric
+                label={lang === "ar" ? "اتقفل خلال الفترة" : "Closed in period"}
+                value={fmtNum(data.closureMovement.closedLost)}
+                note={lang === "ar" ? "حسب تاريخ الإغلاق" : "By close date"}
+              />
+              <LostMetric
+                label={lang === "ar" ? "أقدم سبب متكرر" : "Top recurring reason"}
+                value={data.breakdown.byReason[0]?.label || "—"}
+                note={
+                  data.breakdown.byReason[0]
+                    ? `${fmtNum(data.breakdown.byReason[0].count)} · ${fmtPct(data.breakdown.byReason[0].share, 1)}`
+                    : undefined
+                }
+                compact
+              />
+            </div>
+          </Card>
 
           <Card className="border-brand/20 bg-brand-soft/35">
             <SectionTitle
@@ -238,129 +241,187 @@ function Lost() {
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Share title={t("loss_reason")} rows={data.breakdown.byReason} />
-            <Share title={t("by_course")} rows={data.breakdown.byCourse} />
-            <Share title={t("by_team")} rows={data.breakdown.byTeam} />
-            <Share title={t("by_month")} rows={data.breakdown.byMonth} sorted />
-            <Share title={t("by_salesperson")} rows={data.breakdown.bySalesperson} />
-            <Share title={t("by_source")} rows={data.breakdown.bySource} />
-          </div>
-
           <Card>
             <SectionTitle
               hint={
                 lang === "ar"
-                  ? "نسبة ضياع كل فريق محسوبة على عملائه هو، لا على إجمالي الخسائر — الفريق الكبير يخسر أكثر عدداً وأقل نسبةً."
-                  : "Each team's lost rate is measured against its own leads, not the total lost pile."
+                  ? "اختار زاوية واحدة بدل عرض كل الرسومات معًا."
+                  : "Choose one lens instead of displaying every chart at once."
               }
             >
-              {lang === "ar" ? "نسبة الضياع لكل فريق" : "Lost rate per team"}
+              {lang === "ar" ? "أين تتجمع الخسائر؟" : "Where are losses concentrated?"}
             </SectionTitle>
-            <div className="table-wrap scroll-hint-x">
-              <table className="w-full text-sm min-w-[420px]">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                    <th className="text-start py-2">{t("team")}</th>
-                    <th className="text-end py-2">{t("crm_leads")}</th>
-                    <th className="text-end py-2">{t("lost_count")}</th>
-                    <th className="text-end py-2">{t("lost_rate")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.teamLostRates.map((r) => (
-                    <tr key={r.team} className="border-t border-border">
-                      <td className="py-2.5 pe-3 truncate max-w-[220px]" title={r.team}>
-                        {r.team}
-                      </td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.leads)}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.lost)}</td>
-                      <td className="py-2.5 text-end num font-medium">{fmtPct(r.rate, 1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="hscroll mb-5 flex gap-2">
+              {(
+                [
+                  ["reason", t("loss_reason")],
+                  ["course", t("by_course")],
+                  ["team", t("by_team")],
+                  ["salesperson", t("by_salesperson")],
+                  ["source", t("by_source")],
+                  ["month", t("by_month")],
+                ] as [ShareView, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setShareView(key)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${shareView === key ? "border-danger bg-danger-soft text-danger" : "border-border text-text-muted hover:bg-surface-2"}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+            <ShareRows rows={shareRows(data.breakdown, shareView)} sorted={shareView === "month"} />
           </Card>
 
-          <Card>
-            <SectionTitle
-              action={
-                <Segmented
-                  value={matrixView}
-                  onChange={setMatrixView}
-                  options={[
-                    { value: "team", label: t("by_team") },
-                    { value: "course", label: t("by_course") },
-                  ]}
-                />
-              }
-              hint={
-                lang === "ar"
-                  ? "النسبة من إجمالي الخسائر في كل خلية"
-                  : "Each cell is a share of total lost"
-              }
-            >
-              {lang === "ar" ? "سبب الضياع × " : "Loss reason × "}
-              {matrixView === "team" ? t("team") : t("course")}
-            </SectionTitle>
-            <MatrixTable
-              matrix={
-                matrixView === "team" ? data.breakdown.reasonByTeam : data.breakdown.reasonByCourse
-              }
-            />
-          </Card>
+          <details className="card overflow-hidden">
+            <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+              {lang === "ar"
+                ? "تحليل متقدم: نسب الفرق ومصفوفة الأسباب"
+                : "Advanced: team rates and reason matrix"}
+            </summary>
+            <div className="space-y-5 border-t border-border p-4 sm:p-5">
+              <div className="table-wrap scroll-hint-x">
+                <table className="w-full min-w-[420px] text-sm">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                      <th className="py-2 text-start">{t("team")}</th>
+                      <th className="py-2 text-end">{t("crm_leads")}</th>
+                      <th className="py-2 text-end">{t("lost_count")}</th>
+                      <th className="py-2 text-end">{t("lost_rate")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.teamLostRates.map((row) => (
+                      <tr key={row.team} className="border-t border-border">
+                        <td className="max-w-[220px] truncate py-2.5 pe-3" title={row.team}>
+                          {row.team}
+                        </td>
+                        <td className="num py-2.5 text-end">{fmtNum(row.leads)}</td>
+                        <td className="num py-2.5 text-end">{fmtNum(row.lost)}</td>
+                        <td className="num py-2.5 text-end font-medium">{fmtPct(row.rate, 1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <SectionTitle
+                action={
+                  <Segmented
+                    value={matrixView}
+                    onChange={setMatrixView}
+                    options={[
+                      { value: "team", label: t("by_team") },
+                      { value: "course", label: t("by_course") },
+                    ]}
+                  />
+                }
+              >
+                {lang === "ar" ? "سبب الضياع × " : "Loss reason × "}
+                {matrixView === "team" ? t("team") : t("course")}
+              </SectionTitle>
+              <MatrixTable
+                matrix={
+                  matrixView === "team"
+                    ? data.breakdown.reasonByTeam
+                    : data.breakdown.reasonByCourse
+                }
+              />
+            </div>
+          </details>
 
-          <DataTable
-            rows={data.detail.rows}
-            cols={cols}
-            searchable={(r) =>
-              `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
-            }
-            initialSort={{ key: "reportingDate", dir: -1 }}
-            csvFilename="engosoft-lost"
-            maxHeight={620}
-            csvRow={(r) => ({
-              created: r.createdAt,
-              close_date: r.closeDate,
-              reporting_date: r.reportingDate,
-              reason: r.reason,
-              course: r.course,
-              main_category: r.mainCategory,
-              sales_team: r.salesTeam,
-              salesperson: r.salesperson,
-              source: r.source,
-              campaign: r.campaign,
-              ad_name: r.adName,
-              stage: r.stage,
-            })}
-          />
+          <details className="card overflow-hidden">
+            <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+              {lang === "ar"
+                ? `السجلات التفصيلية (${fmtNum(data.detail.total)})`
+                : `Detailed records (${fmtNum(data.detail.total)})`}
+            </summary>
+            <div className="border-t border-border p-3">
+              <DataTable
+                rows={data.detail.rows}
+                cols={cols}
+                searchable={(r) =>
+                  `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
+                }
+                initialSort={{ key: "reportingDate", dir: -1 }}
+                csvFilename="engosoft-lost"
+                maxHeight={620}
+                csvRow={(r) => ({
+                  created: r.createdAt,
+                  close_date: r.closeDate,
+                  reporting_date: r.reportingDate,
+                  reason: r.reason,
+                  course: r.course,
+                  main_category: r.mainCategory,
+                  sales_team: r.salesTeam,
+                  salesperson: r.salesperson,
+                  source: r.source,
+                  campaign: r.campaign,
+                  ad_name: r.adName,
+                  stage: r.stage,
+                })}
+              />
+            </div>
+          </details>
         </>
       )}
     </div>
   );
 }
 
-function Share({ title, rows, sorted }: { title: string; rows: Grouped[]; sorted?: boolean }) {
+function LostMetric({
+  label,
+  value,
+  note,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className="min-h-28 p-4 sm:p-5">
+      <div className="text-[11px] font-semibold text-text-muted">{label}</div>
+      <div
+        className={`mt-2 font-semibold text-text ${compact ? "line-clamp-2 text-base leading-snug" : "num text-2xl"}`}
+      >
+        {value}
+      </div>
+      {note && <div className="mt-2 text-[10px] text-text-subtle">{note}</div>}
+    </div>
+  );
+}
+
+function shareRows(breakdown: LostBreakdown, view: ShareView): Grouped[] {
+  return {
+    reason: breakdown.byReason,
+    course: breakdown.byCourse,
+    team: breakdown.byTeam,
+    salesperson: breakdown.bySalesperson,
+    source: breakdown.bySource,
+    month: breakdown.byMonth,
+  }[view];
+}
+
+function ShareRows({ rows, sorted }: { rows: Grouped[]; sorted?: boolean }) {
   const items = (sorted ? rows : [...rows].sort((a, b) => b.count - a.count)).slice(0, 10);
   return (
-    <Card>
-      <SectionTitle>{title}</SectionTitle>
-      <BarList
-        items={items.map((g) => ({
-          label: g.label,
-          value: g.count,
-          meta: (
-            <span>
-              <span className="num">{fmtNum(g.count)}</span>
-              <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
-            </span>
-          ),
-        }))}
-        format={fmtNum}
-        color="var(--danger)"
-      />
-    </Card>
+    <BarList
+      items={items.map((g) => ({
+        label: g.label,
+        value: g.count,
+        meta: (
+          <span>
+            <span className="num">{fmtNum(g.count)}</span>
+            <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
+          </span>
+        ),
+      }))}
+      format={fmtNum}
+      color="var(--danger)"
+    />
   );
 }
 
