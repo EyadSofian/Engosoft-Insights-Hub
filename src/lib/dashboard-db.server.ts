@@ -22,6 +22,8 @@ export type DashboardDataset =
   | "sla_calls"
   | "sales_targets"
   | "media_plans"
+  /** Phone → Chatwoot conversation evidence maintained by backfill + webhook. */
+  | "chatwoot_phone_evidence"
   /** Odoo's monthly operational sales report, one row per salesperson-month. */
   | "sales_summary";
 
@@ -70,6 +72,7 @@ const DATASETS = new Set<DashboardDataset>([
   "sla_calls",
   "sales_targets",
   "media_plans",
+  "chatwoot_phone_evidence",
   "sales_summary",
 ]);
 
@@ -207,6 +210,7 @@ function baseStableKey(dataset: DashboardDataset, row: DashboardRow): string {
     sla_calls: ["call_id", "id", "ID"],
     sales_targets: ["employeeId"],
     media_plans: ["month"],
+    chatwoot_phone_evidence: ["phoneKey"],
     sales_summary: ["__odoo_id", "id", "ID"],
   };
   const explicit = first(row, candidates[dataset] ?? []);

@@ -538,8 +538,8 @@ export function AccountingAgentsView() {
         <SectionTitle
           hint={
             lang === "ar"
-              ? "التوزيع الحالي من حقل Salesperson في Odoo، والمكالمة تُطابق برقم الهاتف مع Yeastar داخل نفس الفترة."
-              : "Current assignment comes from Odoo Salesperson; calls are matched by phone number against Yeastar in the same date range."
+              ? "التوزيع من Odoo، والتواصل يُثبت برقم الهاتف من مكالمات Yeastar أو رسائل وردود الموظفين في Chatwoot."
+              : "Assignment comes from Odoo; contact is proven by phone using Yeastar calls or employee messages and replies in Chatwoot."
           }
           action={
             <div className="flex flex-wrap gap-1.5">
@@ -560,9 +560,9 @@ export function AccountingAgentsView() {
         </SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "اتصل بها الموظف المسؤول" : "Called by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "تواصل معها الموظف المسؤول" : "Contacted by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
           <MiniMetric
-            label={lang === "ar" ? "لم يتصل بها الموظف المسؤول" : "Not called by assigned owner"}
+            label={lang === "ar" ? "لم يتواصل معها الموظف المسؤول" : "Not contacted by assigned owner"}
             value={
               data.summary.ownerCalledDistributedLeads === null
                 ? "—"
@@ -574,7 +574,7 @@ export function AccountingAgentsView() {
                   )
             }
             hint={
-              lang === "ar" ? "يشمل ليدز اتصل بها زميل آخر" : "Includes leads a colleague called"
+              lang === "ar" ? "يشمل ليدز تابعها زميل آخر" : "Includes leads handled by a colleague"
             }
             onDrill={
               data.summary.ownerCalledDistributedLeads === null
@@ -586,13 +586,13 @@ export function AccountingAgentsView() {
             }
             drillLabel={
               lang === "ar"
-                ? "اعرض الليدز التي لم يتصل بها الموظف المسؤول"
-                : "Show the leads the assigned owner never called"
+                ? "اعرض الليدز التي لم يتواصل معها الموظف المسؤول"
+                : "Show the leads the assigned owner never contacted"
             }
           />
-          <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
+          <MiniMetric label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
           <MiniMetric
-            label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"}
+            label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
             value={
               data.summary.uncalledDistributedLeads === null
                 ? "—"
@@ -600,8 +600,8 @@ export function AccountingAgentsView() {
             }
             hint={
               lang === "ar"
-                ? "لا مكالمة من أي موظف داخل الفترة"
-                : "No call from any employee inside the window"
+                ? "لا مكالمة ولا رسالة أو رد من موظف"
+                : "No employee call, message, or reply"
             }
             onDrill={
               data.summary.uncalledDistributedLeads === null
@@ -612,7 +612,7 @@ export function AccountingAgentsView() {
                   }
             }
             drillLabel={
-              lang === "ar" ? "اعرض الليدز التي لم يتصل بها أحد" : "Show the leads nobody called"
+              lang === "ar" ? "اعرض الليدز التي لم يتواصل معها أحد" : "Show the leads nobody contacted"
             }
           />
           <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
@@ -1205,6 +1205,13 @@ function AgentCards({
             <MiniMetric
               label={lang === "ar" ? "محادثات الشات" : "Chat conversations"}
               value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
+              hint={
+                row.chatAwaitingReply === null
+                  ? undefined
+                  : lang === "ar"
+                    ? `${fmtNum(row.chatAwaitingReply)} عميل ينتظر رده الآن`
+                    : `${fmtNum(row.chatAwaitingReply)} customers await a reply now`
+              }
             />
             <MiniMetric
               label={lang === "ar" ? "ليدز دخلت" : "New leads"}
@@ -1336,8 +1343,8 @@ function AgentTable({
                 lang === "ar" ? "الفواتير" : "Invoices",
                 lang === "ar" ? "العملاء" : "Leads",
                 lang === "ar" ? "ليدز متوزعة" : "Assigned leads",
-                lang === "ar" ? "اتصل بنفسه" : "Called by owner",
-                lang === "ar" ? "لم يتصل بهم" : "Not called by owner",
+                lang === "ar" ? "تواصل بنفسه" : "Contacted by owner",
+                lang === "ar" ? "لم يتواصل معهم" : "Not contacted by owner",
                 lang === "ar" ? "مكالمات الليدز" : "Lead calls",
                 lang === "ar" ? "رابحة" : "Won",
                 lang === "ar" ? "خاسرة" : "Lost",
@@ -1429,8 +1436,8 @@ function AgentTable({
                       className="group inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/25 px-2 py-1 font-semibold text-brand hover:border-brand/45 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
                       aria-label={
                         lang === "ar"
-                          ? `عرض ليدز ${row.name} التي لم يتصل بها`
-                          : `Show leads ${row.name} did not call`
+                          ? `عرض ليدز ${row.name} التي لم يتواصل معها`
+                          : `Show leads ${row.name} did not contact`
                       }
                     >
                       <bdi dir="ltr" className="num">
@@ -1488,8 +1495,17 @@ function AgentTable({
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
-                  <div className="mt-0.5 text-[10px] text-text-muted">
-                    {row.chatAwaitingReply === null ? "—" : `${fmtNum(row.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting reply"}`} · {row.chatOpenConversations === null ? "—" : `${fmtNum(row.chatOpenConversations)} ${lang === "ar" ? "محادثة مفتوحة الآن" : "open now"}`}
+                  <div className="mt-1 flex flex-col gap-0.5 text-[10px] text-text-muted">
+                    <span>
+                      {row.chatAwaitingReply === null
+                        ? "—"
+                        : `${fmtNum(row.chatAwaitingReply)} ${lang === "ar" ? "تنتظر رد الموظف" : "await employee reply"}`}
+                    </span>
+                    <span>
+                      {row.chatOpenConversations === null
+                        ? "—"
+                        : `${fmtNum(row.chatOpenConversations)} ${lang === "ar" ? "مفتوحة الآن" : "open now"}`}
+                    </span>
                   </div>
                 </td>
                 <td className="num px-3 py-3 text-end">
@@ -1673,28 +1689,28 @@ function AgentPerformanceSheet({
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[11px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
               >
                 <PhoneCall size={13} />
-                {lang === "ar" ? "فلتر الليدز التي لم يتصل بها" : "Filter leads not called"}
+                {lang === "ar" ? "فلتر الليدز التي لم يتواصل معها" : "Filter leads not contacted"}
               </button>
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز بواسطة صاحب الليد" : "Owner lead coverage"}</b><Pill tone={row.leadOwnerCallCoverageRate === null ? "neutral" : row.leadOwnerCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadOwnerCallCoverageRate, 1)}</Pill></div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
                 <MiniMetric label={lang === "ar" ? "موزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "اتصل بها بنفسه" : "Called by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "تواصل معها بنفسه" : "Contacted by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
                 <MiniMetric
-                  label={lang === "ar" ? "لم يتصل بها هو" : "Not called by this employee"}
+                  label={lang === "ar" ? "لم يتواصل معها هو" : "Not contacted by this employee"}
                   value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
-                  hint={lang === "ar" ? "يشمل ليدز اتصل بها زميل آخر" : "Includes leads a colleague called"}
+                  hint={lang === "ar" ? "يشمل ليدز تابعها زميل آخر" : "Includes leads handled by a colleague"}
                   onDrill={row.ownerCalledDistributedLeads === null ? undefined : () => setUncalledScope("owner")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتصل بها` : `Show the leads ${row.name} never called`}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتواصل معها` : `Show the leads ${row.name} never contacted`}
                 />
-                <MiniMetric label={lang === "ar" ? "اتصل بها أي موظف" : "Called by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
+                <MiniMetric label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
                 <MiniMetric
-                  label={lang === "ar" ? "لم يتصل بها أحد" : "Never called by anyone"}
+                  label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
                   value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
-                  hint={lang === "ar" ? "لا مكالمة من أي موظف داخل الفترة" : "No call from any employee inside the window"}
+                  hint={lang === "ar" ? "لا مكالمة ولا رسالة أو رد من موظف" : "No employee call, message, or reply"}
                   onDrill={row.uncalledDistributedLeads === null ? undefined : () => setUncalledScope("none")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتصل بها أحد` : `Show ${row.name}'s leads that nobody called`}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتواصل معها أحد` : `Show ${row.name}'s leads that nobody contacted`}
                 />
                 <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
@@ -1797,14 +1813,21 @@ function AgentPerformanceSheet({
                 <span className="flex items-center gap-2"><EvidenceLink href="#employee-chat-evidence" /><Pill tone={row.chatConversations === null ? "neutral" : "success"}>{row.chatConversations === null ? (lang === "ar" ? "غير مطابق" : "Not matched") : "Connected"}</Pill></span>
               </div>
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                <MiniMetric label={lang === "ar" ? "المحادثات" : "Conversations"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
-                <MiniMetric label={lang === "ar" ? "تم حلها في الفترة" : "Resolved in period"} value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)} />
-                <MiniMetric label={lang === "ar" ? "عملاء ينتظرون الرد الآن" : "Awaiting reply now"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
-                <MiniMetric label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open conversations now"} value={row.chatOpenConversations === null ? "—" : fmtNum(row.chatOpenConversations)} />
+                <MiniMetric label={lang === "ar" ? "كل محادثات الفترة" : "All conversations in period"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
+                <MiniMetric label={lang === "ar" ? "تم التعامل معها وإغلاقها" : "Handled and resolved"} value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)} />
+                <MiniMetric label={lang === "ar" ? "تنتظر رد الموظف الآن" : "Await employee reply now"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
+                <MiniMetric label={lang === "ar" ? "كل المفتوح الآن" : "All open now"} value={row.chatOpenConversations === null ? "—" : fmtNum(row.chatOpenConversations)} />
+                <MiniMetric
+                  label={lang === "ar" ? "مفتوحة ولا تنتظر رده" : "Open, not awaiting agent"}
+                  value={
+                    row.chatOpenConversations === null || row.chatAwaitingReply === null
+                      ? "—"
+                      : fmtNum(Math.max(0, row.chatOpenConversations - row.chatAwaitingReply))
+                  }
+                />
                 <MiniMetric label={lang === "ar" ? "متوسط أول رد" : "Avg. first response"} value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)} />
-                <MiniMetric label={lang === "ar" ? "متوسط الرد" : "Avg. reply"} value={formatCallDuration(row.chatAverageReplySeconds, lang)} />
               </div>
-              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "المحادثات وإغلاقها ومتوسط أول رد تخص الفترة المختارة. المفتوحة ومن ينتظرون ردًا هي حالة العمل الآن. لا نعتبر المحادثة سيئة لمجرد أنها مفتوحة." : "Conversation totals, resolutions, and first response use the selected period. Open and awaiting-reply counts are the live workload now. An open conversation is not penalized by itself."}</p>
+              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "«كل محادثات الفترة» و«تم إغلاقها» حسب التاريخ المختار. أما «المفتوح الآن» و«تنتظر رد الموظف» فهي حالة Chatwoot الحالية. لأن الفريق لا يغلق كل المحادثات، فعدد المنتظرين هو المؤشر الأوضح لمن يحتاج ردًا الآن." : "Period conversations and resolved conversations follow the selected dates. Open and awaiting-reply counts are the current Chatwoot workload. Because not every conversation is closed, awaiting reply is the clearest action metric."}</p>
             </div>
           </section>
 

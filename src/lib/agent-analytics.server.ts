@@ -18,8 +18,10 @@ import { loadTargetSource } from "./sales-targets.server";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
 import {
+  chatwootPhoneKey,
   chatwootConfigured,
   getChatwootAgentSnapshot,
+  getChatwootPhoneConversationEvidence,
   type ChatwootAgentMetric,
 } from "./chatwoot.server";
 import {
@@ -33,7 +35,7 @@ import {
   EMPLOYEE_SCORE_WEIGHTS,
   type AgentPerformanceScore,
 } from "./employee-performance-score";
-import { callCanCoverLead, leadCallAggregateKey } from "./uncalled-leads";
+import { callCanCoverLead, leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
@@ -1123,10 +1125,12 @@ function phoneKey(value: string): string {
   return digits.length >= 9 ? digits.slice(-9) : "";
 }
 
-function mergeLeadCallCoverage(
+async function mergeLeadCallCoverage(
   map: Map<string, MutableAgent>,
   data: FilteredData,
   calls: CallsHubLeadCallAggregate[],
+  from: string,
+  to: string,
 ) {
   const callsByPhone = new Map<string, CallsHubLeadCallAggregate[]>();
   for (const call of calls) {
@@ -1150,24 +1154,68 @@ function mergeLeadCallCoverage(
     string,
     { id: string; salesperson: string; phone: string; mobile: string; createdAt: string }
   >();
-  for (const lead of [...data.crm, ...data.lost]) {
+  // Current follow-up excludes every closed row. Archived Lost belongs in
+  // funnel reporting, while this metric answers "who still needs contact?".
+  for (const lead of data.crm) {
     if (!lead.id || !lead.salesperson) continue;
+    if (lead.isWon || leadStageBucket(lead.stage) === "lost") continue;
     leads.set(lead.id, lead);
   }
+
+  const callMatchesByLead = new Map<string, CallsHubLeadCallAggregate[]>();
+  const chatCandidatePhones: string[] = [];
   for (const lead of leads.values()) {
     const key = normalizePersonName(lead.salesperson);
     if (!key) continue;
     const row = map.get(key) ?? blank(key, lead.salesperson);
-    row.distributedLeads += 1;
     const matches = new Map<string, CallsHubLeadCallAggregate>();
-    const leadPhoneKeys = new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean));
-    for (const phone of leadPhoneKeys) {
+    for (const phone of new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean))) {
       for (const call of callsByPhone.get(phone) ?? []) {
         if (!callCanCoverLead(call, lead.createdAt)) continue;
         matches.set(leadCallAggregateKey(call), call);
       }
     }
-    if (!matches.size) {
+    const matched = [...matches.values()];
+    callMatchesByLead.set(lead.id, matched);
+    const ownerCalled = matched.some(
+      (call) =>
+        normalizePersonName(call.agentName) === key ||
+        (row.callExtension && call.agentExtension === row.callExtension),
+    );
+    if (!ownerCalled) chatCandidatePhones.push(lead.phone, lead.mobile);
+  }
+  const chatBatch = chatwootConfigured()
+    ? await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(() => null)
+    : null;
+  const chatsByPhone = chatBatch?.evidence ?? new Map();
+  const periodStart = Date.parse(`${from}T00:00:00Z`) / 1000;
+  const periodEnd = Date.parse(`${to}T23:59:59Z`) / 1000;
+
+  for (const lead of leads.values()) {
+    const key = normalizePersonName(lead.salesperson);
+    if (!key) continue;
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    row.distributedLeads += 1;
+    const matched = callMatchesByLead.get(lead.id) ?? [];
+    const matches = new Map(matched.map((call) => [leadCallAggregateKey(call), call]));
+    const createdAt = Date.parse(`${lead.createdAt.slice(0, 10)}T00:00:00Z`) / 1000;
+    const chatMatches = [...new Set([lead.phone, lead.mobile].map(chatwootPhoneKey).filter(Boolean))]
+      .flatMap((phone) => chatsByPhone.get(phone) ?? [])
+      .filter(
+        (chat) =>
+          chat.agentContactedAt > 0 &&
+          chat.agentContactedAt >= periodStart &&
+          (!Number.isFinite(createdAt) || chat.agentContactedAt >= createdAt) &&
+          chat.agentContactedAt <= periodEnd,
+      );
+    const chatByAny = chatMatches.length > 0;
+    const chatByOwner = chatMatches.some(
+      (chat) =>
+        [...(chat.agentNames ?? []), chat.assigneeName]
+          .filter(Boolean)
+          .some((name) => integrationPersonMatchScore(lead.salesperson, name) > 0),
+    );
+    if (!matches.size && !chatByAny) {
       row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
       map.set(key, row);
       continue;
@@ -1192,7 +1240,7 @@ function mergeLeadCallCoverage(
         row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
       }
     }
-    if (calledByOwner) {
+    if (calledByOwner || chatByOwner) {
       row.ownerCalledDistributedLeads = (row.ownerCalledDistributedLeads ?? 0) + 1;
     }
     map.set(key, row);
@@ -1518,7 +1566,7 @@ export async function buildAgentAnalytics(
     let leadCoverageAvailable = false;
     const leadCalls = await leadCallsPromise;
     if (leadCalls) {
-      mergeLeadCallCoverage(map, data, leadCalls);
+      await mergeLeadCallCoverage(map, data, leadCalls, integrationFrom, integrationTo);
       leadCoverageAvailable = true;
     }
     const totalCalls = callsSnapshot.employees.reduce((sum, row) => sum + row.totalCalls, 0);

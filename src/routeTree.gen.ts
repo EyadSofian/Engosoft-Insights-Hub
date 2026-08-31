@@ -63,6 +63,7 @@ import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
+import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/telegram.send-course-alerts'
@@ -341,6 +342,11 @@ const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
   path: '/api/auth/sso',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatwootWebhookRoute = ApiChatwootWebhookRouteImport.update({
+  id: '/api/chatwoot/webhook',
+  path: '/api/chatwoot/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   id: '/api/ingest/dataset',
   path: '/api/ingest/dataset',
@@ -428,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
+  '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
@@ -490,6 +497,7 @@ export interface FileRoutesByTo {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
+  '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
@@ -553,6 +561,7 @@ export interface FileRoutesById {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
+  '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
@@ -617,6 +626,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
+    | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
@@ -679,6 +689,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
+    | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
@@ -741,6 +752,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/auth/sso'
+    | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
@@ -804,6 +816,7 @@ export interface RootRouteChildren {
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
+  ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendCourseAlertsRoute: typeof ApiTelegramSendCourseAlertsRoute
@@ -1192,6 +1205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chatwoot/webhook': {
+      id: '/api/chatwoot/webhook'
+      path: '/api/chatwoot/webhook'
+      fullPath: '/api/chatwoot/webhook'
+      preLoaderRoute: typeof ApiChatwootWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest/dataset': {
       id: '/api/ingest/dataset'
       path: '/api/ingest/dataset'
@@ -1292,6 +1312,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
+  ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendCourseAlertsRoute: ApiTelegramSendCourseAlertsRoute,

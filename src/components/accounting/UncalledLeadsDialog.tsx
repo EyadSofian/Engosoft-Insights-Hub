@@ -35,6 +35,9 @@ interface UncalledLeadsResponse {
   range: { from: string; to: string };
   callsAvailable: boolean;
   callsError: string | null;
+  chatwootAvailable: boolean;
+  chatwootComplete: boolean;
+  chatwootError: string | null;
   lostAvailable: boolean;
   summary: {
     assignedLeads: number;
@@ -47,6 +50,9 @@ interface UncalledLeadsResponse {
     callsPerLead: number | null;
     ownerCalls: number | null;
     ownerCallsPerLead: number | null;
+    chatContacted: number | null;
+    chatContactedByOwner: number | null;
+    chatAwaitingReply: number | null;
     won: number;
     lost: number;
     closeRate: number | null;
@@ -77,6 +83,7 @@ interface UncalledLeadsResponse {
       id: string;
       contact: string;
       phone: string;
+      phoneNumbers: string[];
       salesperson: string;
       stage: string;
       course: string;
@@ -91,6 +98,18 @@ interface UncalledLeadsResponse {
       totalCalls: number;
       calledBy: string[];
       latestCallAt: string | null;
+      contactedViaChat: boolean;
+      chatByOwner: boolean;
+      chatAwaitingReply: boolean;
+      chatConversationCount: number;
+      chatEmployeeReplied: boolean;
+      chatOwnerReplied: boolean;
+      latestChatStatus: string | null;
+      latestChatOpen: boolean | null;
+      chatEvidenceComplete: boolean;
+      chatAssignees: string[];
+      latestChatAt: number | null;
+      latestChatUrl: string | null;
       status: UncalledStatus;
       reasons: string[];
       url: string | null;
@@ -114,6 +133,7 @@ const UNCALLED_REASON_LABELS: Record<string, { ar: string; en: string }> = {
   aging_untouched: { ar: "تجاوز مهلة الاتصال", en: "Response window overdue" },
   won_without_call: { ar: "رابح بلا مكالمة", en: "Won with no call" },
   junk_stage: { ar: "رقم خطأ أو بيانات قديمة", en: "Wrong number or old data" },
+  chat_awaiting_reply: { ar: "رسالة عميل تنتظر الرد", en: "Customer message awaiting reply" },
 };
 
 function uncalledStatusTone(status: UncalledStatus): "danger" | "warning" | "brand" | "neutral" {
@@ -128,6 +148,21 @@ function uncalledStatusLabel(status: UncalledStatus, lang: "ar" | "en"): string 
   if (status === "warning") return lang === "ar" ? "للمتابعة" : "Watch";
   if (status === "fresh") return lang === "ar" ? "جديد داخل المهلة" : "New — in grace window";
   return lang === "ar" ? "مستبعد من المتابعة" : "No follow-up expected";
+}
+
+function chatStatusLabel(
+  status: string | null,
+  open: boolean | null,
+  lang: "ar" | "en",
+): string {
+  if (!status) return lang === "ar" ? "لا توجد محادثة" : "No conversation";
+  if (status === "resolved" || status === "closed") {
+    return lang === "ar" ? "مغلقة" : "Resolved";
+  }
+  if (status === "pending") return lang === "ar" ? "معلّقة" : "Pending";
+  if (status === "snoozed") return lang === "ar" ? "مؤجلة" : "Snoozed";
+  if (open) return lang === "ar" ? "مفتوحة" : "Open";
+  return status;
 }
 
 /**
@@ -191,21 +226,21 @@ export function UncalledLeadsDialog({
               <DialogTitle>
                 {scope === "none"
                   ? lang === "ar"
-                    ? "ليدز لم يتصل بها أحد"
-                    : "Leads nobody called"
+                    ? "ليدز لم يتواصل معها أحد"
+                    : "Leads nobody contacted"
                   : lang === "ar"
-                    ? "ليدز لم يتصل بها الموظف المسؤول"
-                    : "Leads the assigned owner never called"}
+                    ? "ليدز لم يتواصل معها الموظف المسؤول"
+                    : "Leads the assigned owner never contacted"}
                 {employee ? ` — ${employee}` : ""}
               </DialogTitle>
               <DialogDescription className="text-xs leading-relaxed text-text-muted">
                 {scope === "none"
                   ? lang === "ar"
-                    ? "لا توجد أي مكالمة على رقم الليد في Yeastar داخل الفترة المختارة — لا من الموظف المسؤول ولا من غيره."
-                    : "No Yeastar call matched the lead's phone inside the selected window — not from its owner, not from anyone else."
+                    ? "لا توجد مكالمة Yeastar ولا رسالة أو رد من موظف في Chatwoot بعد إنشاء الليد. رسالة العميل وحدها لا تُحسب متابعة وتظهر كرابط عاجل للرد."
+                    : "No Yeastar call and no employee message or reply in Chatwoot after the lead was created. A customer-only message is not follow-up and stays linked for action."
                   : lang === "ar"
-                    ? "الموظف المسؤول لم يتصل بها. القائمة تشمل ليدز اتصل بها زميل آخر، ولذلك رقمها أكبر دائمًا من «لم يتصل بها أحد»."
-                    : "The assigned owner never dialled these. The list includes leads a colleague did call, which is why this figure always exceeds “nobody called”."}
+                    ? "الموظف المسؤول لم يتواصل معها بمكالمة أو Chatwoot. القائمة قد تشمل ليدز تابعها زميل آخر، ولذلك رقمها أكبر من «لم يتواصل معها أحد»."
+                    : "The assigned owner neither called nor followed up in Chatwoot. Leads handled by a colleague remain here, so this count can exceed “nobody contacted”."}
               </DialogDescription>
             </DialogHeader>
 
@@ -216,18 +251,25 @@ export function UncalledLeadsDialog({
                 <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
               ) : data ? (
                 <>
-                  {!data.lostAvailable && (
-                    <Notice tone="warning">
-                      {lang === "ar"
-                        ? "مصدر الليدز الخاسرة غير متاح الآن، فالمقام ناقص ونسبة الإغلاق تظهر «—» بدل رقم يبدو 100%."
-                        : "The Lost feed is unavailable, so the denominator is incomplete and the close rate is withheld rather than shown as a flattering 100%."}
-                    </Notice>
-                  )}
                   {!data.callsAvailable && (
                     <Notice tone="warning">
                       {lang === "ar"
                         ? `مطابقة المكالمات غير متاحة الآن، فلا يمكن تأكيد من اتصل بمن. ${data.callsError ?? ""}`
                         : `Call matching is unavailable, so contact cannot be confirmed. ${data.callsError ?? ""}`}
+                    </Notice>
+                  )}
+                  {!data.chatwootAvailable && (
+                    <Notice tone="warning">
+                      {lang === "ar"
+                        ? `تعذر الاتصال بـChatwoot الآن؛ نتائج Odoo وYeastar ما زالت ظاهرة. ${data.chatwootError ?? ""}`
+                        : `Chatwoot is unavailable right now; Odoo and Yeastar results are still shown. ${data.chatwootError ?? ""}`}
+                    </Notice>
+                  )}
+                  {data.chatwootAvailable && !data.chatwootComplete && (
+                    <Notice tone="warning">
+                      {lang === "ar"
+                        ? "بيانات Chatwoot المحفوظة ظاهرة، وبعض الأرقام الجديدة تُستكمل مزامنتها في الخلفية."
+                        : "Cached Chatwoot evidence is shown while a few new phone numbers finish syncing in the background."}
                     </Notice>
                   )}
 
@@ -260,12 +302,16 @@ export function UncalledLeadsDialog({
                       }
                     />
                     <MiniMetric
-                      label={lang === "ar" ? "نسبة الإغلاق" : "Close rate"}
-                      value={fmtPct(data.summary.closeRate, 1)}
+                      label={lang === "ar" ? "متابعة عبر Chatwoot" : "Chatwoot follow-up"}
+                      value={
+                        data.summary.chatContacted === null
+                          ? "—"
+                          : fmtNum(data.summary.chatContacted)
+                      }
                       hint={
                         lang === "ar"
-                          ? `${fmtNum(data.summary.won)} رابحة · ${fmtNum(data.summary.lost)} خاسرة`
-                          : `${fmtNum(data.summary.won)} won · ${fmtNum(data.summary.lost)} lost`
+                          ? `${data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} رسالة عميل تنتظر الرد`
+                          : `${data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} customer messages awaiting reply`
                       }
                     />
                     <MiniMetric
@@ -286,8 +332,8 @@ export function UncalledLeadsDialog({
                   {scope === "owner" && data.summary.rescuedByColleague !== null && (
                     <p className="rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[11px] leading-relaxed text-text-muted">
                       {lang === "ar"
-                        ? `منهم ${fmtNum(data.summary.rescuedByColleague)} ليد اتصل بها زميل آخر بدل الموظف المسؤول، والباقي (${fmtNum(data.summary.uncalled ?? 0)}) لم يتصل بها أحد إطلاقًا.`
-                        : `${fmtNum(data.summary.rescuedByColleague)} of these were called by a colleague instead of their owner; the remaining ${fmtNum(data.summary.uncalled ?? 0)} were never called by anyone.`}
+                        ? `منهم ${fmtNum(data.summary.rescuedByColleague)} ليد تواصل معها زميل آخر بدل الموظف المسؤول، والباقي (${fmtNum(data.summary.uncalled ?? 0)}) لم يتواصل معها أي موظف.`
+                        : `${fmtNum(data.summary.rescuedByColleague)} were contacted by a colleague instead of their owner; the remaining ${fmtNum(data.summary.uncalled ?? 0)} were not contacted by any employee.`}
                     </p>
                   )}
 
@@ -314,10 +360,10 @@ export function UncalledLeadsDialog({
                               {lang === "ar" ? "الليدز" : "Leads"}
                             </th>
                             <th className="px-3 py-2 text-start font-medium">
-                              {lang === "ar" ? "لم يتصل بها أحد" : "Nobody called"}
+                              {lang === "ar" ? "لم يتواصل معها أحد" : "Nobody contacted"}
                             </th>
                             <th className="px-3 py-2 text-start font-medium">
-                              {lang === "ar" ? "لم يتصل بها المسؤول" : "Owner never called"}
+                              {lang === "ar" ? "لم يتواصل معها المسؤول" : "Owner never contacted"}
                             </th>
                             <th className="px-3 py-2 text-start font-medium">
                               {lang === "ar" ? "المكالمات" : "Calls"}
@@ -505,13 +551,20 @@ export function UncalledLeadsDialog({
                             {!employee && (
                               <small className="mt-0.5 block truncate text-[10px] text-text-muted">
                                 {lang === "ar" ? "المسؤول" : "Owner"}: {lead.salesperson || "—"}
-                                {scope === "owner" && lead.calledBy.length > 0 && (
+                              {scope === "owner" && lead.calledBy.length > 0 && (
                                   <>
                                     {" "}
                                     · {lang === "ar" ? "اتصل بها" : "called by"}{" "}
                                     {lead.calledBy.join("، ")}
                                   </>
-                                )}
+                              )}
+                              {scope === "owner" && lead.chatAssignees.length > 0 && (
+                                <>
+                                  {" "}
+                                  · {lang === "ar" ? "Chatwoot مع" : "Chatwoot by"}{" "}
+                                  {lead.chatAssignees.join("، ")}
+                                </>
+                              )}
                               </small>
                             )}
                             {lead.reasons.length > 0 && (
@@ -526,8 +579,97 @@ export function UncalledLeadsDialog({
                                 ))}
                               </div>
                             )}
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9px]">
+                              {lead.chatConversationCount > 0 ? (
+                                <>
+                                  <span className="rounded-md border border-brand/20 bg-brand-soft/40 px-2 py-1 font-semibold text-brand">
+                                    {lang === "ar"
+                                      ? `${fmtNum(lead.chatConversationCount)} محادثة Chatwoot`
+                                      : `${fmtNum(lead.chatConversationCount)} Chatwoot conversation${lead.chatConversationCount === 1 ? "" : "s"}`}
+                                  </span>
+                                  <span
+                                    className={`rounded-md border px-2 py-1 font-semibold ${
+                                      lead.chatAwaitingReply
+                                        ? "border-danger/25 bg-danger-soft text-danger"
+                                        : "border-success/25 bg-success-soft text-success"
+                                    }`}
+                                  >
+                                    {lead.chatAwaitingReply
+                                      ? lang === "ar"
+                                        ? "العميل ينتظر رد الموظف"
+                                        : "Customer awaits employee reply"
+                                      : lead.chatEmployeeReplied
+                                        ? lang === "ar"
+                                          ? "رد موظف على العميل"
+                                          : "Employee replied"
+                                        : lang === "ar"
+                                          ? "لا يوجد رد موظف"
+                                          : "No employee reply"}
+                                  </span>
+                                  <span className="rounded-md border border-border bg-surface-2/60 px-2 py-1 text-text-muted">
+                                    {chatStatusLabel(
+                                      lead.latestChatStatus,
+                                      lead.latestChatOpen,
+                                      lang,
+                                    )}
+                                  </span>
+                                  {scope === "owner" && (
+                                    <span className="rounded-md border border-border bg-surface-2/60 px-2 py-1 text-text-muted">
+                                      {lead.chatOwnerReplied
+                                        ? lang === "ar"
+                                          ? "الموظف المسؤول هو من رد"
+                                          : "Assigned owner replied"
+                                        : lead.chatEmployeeReplied
+                                          ? lang === "ar"
+                                            ? "رد زميل آخر"
+                                            : "Another employee replied"
+                                          : lang === "ar"
+                                            ? "المسؤول لم يرد"
+                                            : "Owner did not reply"}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span
+                                  className={`rounded-md border px-2 py-1 ${
+                                    lead.chatEvidenceComplete
+                                      ? "border-border bg-surface-2/60 text-text-muted"
+                                      : "border-warning/25 bg-warning-soft text-warning"
+                                  }`}
+                                >
+                                  {lang === "ar"
+                                    ? lead.chatEvidenceComplete
+                                      ? "لا توجد محادثة Chatwoot لهذا الرقم"
+                                      : "جارٍ فحص Chatwoot لهذا الرقم"
+                                    : lead.chatEvidenceComplete
+                                      ? "No Chatwoot conversation for this number"
+                                      : "Checking Chatwoot for this number"}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <span className="flex shrink-0 flex-wrap gap-1.5">
+                            {lead.latestChatUrl && (
+                              <a
+                                href={lead.latestChatUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold hover:bg-brand-soft ${
+                                  lead.chatAwaitingReply
+                                    ? "border-danger/25 bg-danger-soft text-danger"
+                                    : "border-brand/20 bg-brand-soft/40 text-brand"
+                                }`}
+                              >
+                                {lead.chatAwaitingReply
+                                  ? lang === "ar"
+                                    ? "رد على رسالة العميل"
+                                    : "Reply to customer"
+                                  : lang === "ar"
+                                    ? "فتح محادثة Chatwoot"
+                                    : "Open Chatwoot chat"}
+                                <ExternalLink size={11} className="ms-1 inline" />
+                              </a>
+                            )}
                             {lead.latestCallUrl && (
                               <a
                                 href={lead.latestCallUrl}
@@ -569,8 +711,8 @@ export function UncalledLeadsDialog({
 
                   <p className="text-[10px] leading-relaxed text-text-muted">
                     {lang === "ar"
-                      ? "المطابقة تتم بآخر 9 أرقام من رقم الهاتف بين Odoo و Yeastar، وداخل نفس الفترة فقط: مكالمة تمت قبل بداية الفترة أو بعد نهايتها لا تُحتسب. «عمر الليد» محسوب حتى نهاية الفترة المختارة، لا حتى اليوم."
-                      : "Matching uses the last nine phone digits between Odoo and Yeastar, inside the selected window only: a call placed before it starts or after it ends does not count. Age is measured to the end of the selected window, not to today."}
+                      ? "المطابقة تتم بآخر 9 أرقام من الهاتف بين Odoo وYeastar وChatwoot، وداخل الفترة المختارة فقط. الليدز Lost وWon لا تدخل قائمة المتابعة، ورسالة العميل بلا رد تظل حالة عاجلة."
+                      : "Matching uses the final nine phone digits across Odoo, Yeastar, and Chatwoot inside the selected window. Lost and Won leads are excluded; a customer message without an employee reply remains urgent."}
                   </p>
                 </>
               ) : null}

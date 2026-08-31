@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   getChatwootAgentConversationEvidence,
   getChatwootAgentSnapshot,
+  getChatwootPhoneConversationEvidence,
+  ingestChatwootPhoneWebhook,
 } from "../src/lib/chatwoot.server.ts";
 
 process.env.CHATWOOT_BASE_URL = "https://chat.example.test";
@@ -105,6 +107,90 @@ const json = (value) =>
   assert.equal(filters[0].values[0], 7);
   assert.equal(filters[1].values[0], "2030-02-01T00:00:00.000Z");
   assert.equal(filters[2].values[0], "2030-03-01T00:00:00.000Z");
+}
+
+{
+  const calls = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/contacts/search?q=500000001")) {
+      return json({
+        payload: [
+          { id: 81, name: "Customer", phone_number: "+966500000001" },
+          { id: 82, name: "Near match", phone_number: "+966500000099" },
+        ],
+      });
+    }
+    if (url.includes("/contacts/81/conversations")) {
+      return json({
+        payload: [
+          {
+            id: 91,
+            status: "open",
+            last_activity_at: 1_893_456_300,
+            first_reply_created_at: 1_893_456_200,
+            meta: { assignee: { id: 7, available_name: "Sara Agent" } },
+            last_non_activity_message: {
+              message_type: 0,
+              sender_type: "Contact",
+              private: false,
+              created_at: 1_893_456_300,
+            },
+          },
+          {
+            id: 92,
+            status: "resolved",
+            last_activity_at: 1_893_456_100,
+            first_reply_created_at: 1_893_456_000,
+            meta: { assignee: { id: 7, available_name: "Sara Agent" } },
+            last_non_activity_message: {
+              message_type: 0,
+              sender_type: "Contact",
+              private: false,
+              created_at: 1_893_456_100,
+            },
+          },
+        ],
+      });
+    }
+    throw new Error(`Unexpected Chatwoot URL: ${url}`);
+  };
+
+  const batch = await getChatwootPhoneConversationEvidence([
+    "+966 50 000 0001",
+    "0500000001",
+  ]);
+  assert.equal(calls.length, 2, "duplicate phone formats share one search and one contact read");
+  assert.equal(batch.complete, true);
+  const rows = batch.evidence.get("500000001");
+  assert.equal(rows.length, 2, "near phone search results never become evidence");
+  const openRow = rows.find((row) => row.conversationId === 91);
+  const resolvedRow = rows.find((row) => row.conversationId === 92);
+  assert.equal(openRow.agentContactedAt, 1_893_456_200);
+  assert.equal(openRow.awaitingReply, true);
+  assert.match(openRow.url, /\/conversations\/91$/);
+  assert.equal(resolvedRow.awaitingReply, false, "a resolved chat never waits for an agent reply");
+
+  const webhook = await ingestChatwootPhoneWebhook({
+    event: "message_created",
+    created_at: 1_893_456_400,
+    message_type: "outgoing",
+    sender: { id: 7, type: "user", name: "Sara Agent" },
+    contact: { id: 81, name: "Customer", phone_number: "+966500000001" },
+    conversation: {
+      id: 91,
+      status: "open",
+      meta: {
+        sender: { id: 81, name: "Customer", phone_number: "+966500000001" },
+        assignee: { id: 7, available_name: "Sara Agent" },
+      },
+    },
+  });
+  assert.equal(webhook.accepted, true);
+  const afterWebhook = await getChatwootPhoneConversationEvidence(["0500000001"]);
+  assert.equal(afterWebhook.evidence.get("500000001")[0].awaitingReply, false);
+  assert.equal(afterWebhook.evidence.get("500000001")[0].agentContactedAt, 1_893_456_400);
 }
 
 console.log("Chatwoot bounded-path tests passed.");

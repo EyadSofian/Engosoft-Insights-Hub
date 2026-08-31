@@ -41,9 +41,11 @@ export type UncalledLeadReason =
   /** Marked Won without a single matching call — a reconciliation flag. */
   | "won_without_call"
   /** Wrong Number, old data, auto-dialer residue: no action is expected. */
-  | "junk_stage";
+  | "junk_stage"
+  /** The customer wrote in Chatwoot and no employee reply is proven yet. */
+  | "chat_awaiting_reply";
 
-export type LeadStageBucket = "deal" | "fresh" | "stalled" | "junk" | "won" | "other";
+export type LeadStageBucket = "deal" | "fresh" | "stalled" | "junk" | "won" | "lost" | "other";
 
 /**
  * The first-response window, in days.
@@ -112,6 +114,7 @@ function stageParts(stage: string): string[] {
  */
 const STAGE_BUCKETS: Record<Exclude<LeadStageBucket, "other">, string[]> = {
   won: ["won", "ربح"],
+  lost: ["lost", "خسارة", "خاسر"],
   deal: [
     "quotation",
     "عرض سعر",
@@ -131,7 +134,7 @@ export function leadStageBucket(stage: string): LeadStageBucket {
   if (!parts.length) return "other";
   // Won is tested first: an archived win still carries `Won / ربح` and must
   // never be read as an omission by the sales floor.
-  for (const bucket of ["won", "deal", "fresh", "stalled", "junk"] as const) {
+  for (const bucket of ["won", "lost", "deal", "fresh", "stalled", "junk"] as const) {
     if (parts.some((part) => STAGE_BUCKETS[bucket].includes(part))) return bucket;
   }
   return "other";
@@ -168,6 +171,8 @@ export interface UncalledLeadFacts {
   ageDays: number | null;
   /** True when any employee reached it — false on the "never called" list. */
   calledByAny: boolean;
+  /** A customer message with no proven employee response is a real action item. */
+  chatAwaitingReply?: boolean;
 }
 
 export interface UncalledLeadSeverity {
@@ -188,7 +193,9 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   // Junk short-circuits everything. A Wrong Number that nobody called is the
   // system working, and letting it inherit `hot_priority` from a stale Odoo
   // field would bury the real work under noise.
-  if (bucket === "junk") return { status: "stable", reasons: ["junk_stage"] };
+  if (bucket === "junk" || bucket === "lost" || bucket === "won") {
+    return { status: "stable", reasons: ["junk_stage"] };
+  }
 
   const reasons: UncalledLeadReason[] = [];
   const age = facts.ageDays;
@@ -201,8 +208,8 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   if (!facts.calledByAny && claimsAnsweredReply(facts.callingReply)) {
     reasons.push("reply_without_call");
   }
-  if (bucket === "won") reasons.push("won_without_call");
   if (bucket === "stalled") reasons.push("stalled_stage");
+  if (facts.chatAwaitingReply) reasons.push("chat_awaiting_reply");
   // Age never turns an actionable CRM stage into harmless history. Contact,
   // Awareness and unknown live stages stay in the work queue until somebody
   // calls them or Odoo moves them to an explicit junk/closed stage. The first
@@ -216,7 +223,7 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   // Treating every same-day lead as critical punishes employees before they
   // have had a working chance to call it and floods the queue with false red.
   // Other reasons are still retained so tomorrow's escalation is explainable.
-  if (age === 0) {
+  if (age === 0 && !facts.chatAwaitingReply) {
     if (!reasons.includes("fresh_window")) reasons.unshift("fresh_window");
     return { status: "fresh", reasons };
   }
@@ -226,13 +233,13 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
       reason === "hot_priority" ||
       reason === "active_deal" ||
       reason === "reply_without_call" ||
+      reason === "chat_awaiting_reply" ||
       reason === "aging_untouched",
   );
   const warning = reasons.some(
     (reason) =>
       reason === "fresh_window" ||
-      reason === "stalled_stage" ||
-      reason === "won_without_call",
+      reason === "stalled_stage" || reason === "won_without_call",
   );
 
   return { status: critical ? "critical" : warning ? "warning" : "stable", reasons };

@@ -49,6 +49,7 @@ const facts = (over = {}) => ({
     ["Re-assign", "fresh"],
     ["Technical Proposal ( presales )", "deal"],
     ["Retention / إعادة شراء", "deal"],
+    ["Lost / خسارة", "lost"],
   ];
   for (const [stage, bucket] of observed) {
     assert.equal(leadStageBucket(stage), bucket, `${stage} belongs in ${bucket}`);
@@ -184,10 +185,18 @@ const facts = (over = {}) => ({
     );
   }
 
-  // An archived win with no matching call is a data question, not a sales one.
+  // Closed rows belong in outcome reporting, never in the current follow-up queue.
   const won = uncalledLeadSeverity(facts({ stage: "Won / ربح", ageDays: 300 }));
-  assert.equal(won.status, "warning", "a win with no call is worth reconciling");
-  assert.ok(won.reasons.includes("won_without_call"), "and says so");
+  assert.equal(won.status, "stable", "a win is excluded from active follow-up");
+  const lost = uncalledLeadSeverity(facts({ stage: "Lost / خسارة", ageDays: 300 }));
+  assert.equal(lost.status, "stable", "a lost lead is excluded from active follow-up");
+}
+
+/* --- an unanswered Chatwoot message is actionable, not proof of follow-up - */
+{
+  const waiting = uncalledLeadSeverity(facts({ ageDays: 1, chatAwaitingReply: true }));
+  assert.equal(waiting.status, "critical");
+  assert.ok(waiting.reasons.includes("chat_awaiting_reply"));
 }
 
 /* --- several reasons can fire on one lead --------------------------------- */
