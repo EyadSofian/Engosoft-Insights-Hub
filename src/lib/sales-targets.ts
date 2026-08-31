@@ -356,6 +356,50 @@ export function targetMonths(source: TargetSource = SALES_TARGETS): string[] {
   return Object.keys(source).sort();
 }
 
+/** A real calendar month, shared by the API and the month-creation UI. */
+export function isTargetMonth(value: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+export interface MonthlyTargetRoster {
+  /** The month the manager asked to view or prepare. */
+  month: string;
+  /** Whether this month is already stored/published as its own roster. */
+  exists: boolean;
+  /** The prior roster copied only as a starting point for a new month. */
+  basisMonth: string;
+  /** Detached rows: editing a draft must never mutate a historic month. */
+  rows: SalesTarget[];
+}
+
+const cloneTarget = (row: SalesTarget): SalesTarget => ({ ...row, aliases: [...row.aliases] });
+
+/**
+ * Resolve a month without inventing a target history.
+ *
+ * A new month begins with the newest earlier roster as an explicitly labelled
+ * draft. Saving it writes a complete, independent monthly roster, so changing
+ * September can never change the already-reported August achievement.
+ */
+export function targetRosterForMonth(
+  month: string,
+  source: TargetSource = SALES_TARGETS,
+): MonthlyTargetRoster {
+  const months = targetMonths(source);
+  const current = source[month];
+  if (current?.length) {
+    return { month, exists: true, basisMonth: month, rows: current.map(cloneTarget) };
+  }
+
+  const basisMonth = months.filter((candidate) => candidate < month).at(-1) ?? months.at(-1) ?? "";
+  return {
+    month,
+    exists: false,
+    basisMonth,
+    rows: (source[basisMonth] ?? []).map(cloneTarget),
+  };
+}
+
 /** Every spelling that must resolve to this person. */
 export function targetNameKeys(entry: SalesTarget): string[] {
   return [entry.name, ...entry.aliases].map(normalizePersonName).filter(Boolean);

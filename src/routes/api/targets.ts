@@ -19,14 +19,19 @@ export const Route = createFileRoute("/api/targets")({
     handlers: {
       GET: async ({ request }) => {
         const { loadTargetSource } = await import("@/lib/sales-targets.server");
-        const { targetMonths } = await import("@/lib/sales-targets");
+        const { isTargetMonth, targetMonths, targetRosterForMonth } =
+          await import("@/lib/sales-targets");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
         const snapshot = await loadTargetSource();
         const months = targetMonths(snapshot.source);
         const requested = new URL(request.url).searchParams.get("month") ?? "";
-        const month = months.includes(requested) ? requested : (months.at(-1) ?? "");
+        // A manager may prepare September before it has any stored edits. The
+        // route returns a clearly labelled copy of the latest earlier roster;
+        // it never silently changes the historic August source.
+        const month = isTargetMonth(requested) ? requested : (months.at(-1) ?? "");
+        const roster = targetRosterForMonth(month, snapshot.source);
         const overridden = new Set(
           snapshot.overrides.filter((row) => row.month === month).map((row) => row.employeeId),
         );
@@ -37,6 +42,8 @@ export const Route = createFileRoute("/api/targets")({
             ok: true,
             month,
             months,
+            exists: roster.exists,
+            basisMonth: roster.basisMonth,
             editable: snapshot.editable && writesEnabled(),
             // So the screen can explain what to configure instead of showing a
             // save button that will always fail.
@@ -48,7 +55,7 @@ export const Route = createFileRoute("/api/targets")({
               adminCode: adminCodeConfigured(),
             },
             storeError: snapshot.error,
-            rows: (snapshot.source[month] ?? []).map((entry) => ({
+            rows: roster.rows.map((entry) => ({
               employeeId: entry.employeeId,
               name: entry.name,
               teamLeader: entry.teamLeader,
@@ -85,7 +92,7 @@ export const Route = createFileRoute("/api/targets")({
 
         const body = payload as { month?: unknown; edits?: unknown };
         const month = typeof body.month === "string" ? body.month : "";
-        if (!/^\d{4}-\d{2}$/.test(month)) {
+        if (!/^(?:\d{4})-(?:0[1-9]|1[0-2])$/.test(month)) {
           return Response.json({ ok: false, error: "month must be YYYY-MM." }, { status: 400 });
         }
         if (!Array.isArray(body.edits) || body.edits.length === 0) {

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import {
   SALES_TARGETS,
   daysInMonth,
+  isTargetMonth,
   monthCoverage,
   monthsInWindow,
   targetIndexForMonth,
+  targetRosterForMonth,
   targetsByPerson,
   windowTarget,
 } from "../src/lib/sales-targets.ts";
@@ -108,6 +110,32 @@ const leaveMonthly = people.byName.get(
   normalizePersonName("Mennatallah walid Mohamed Fathy"),
 ).monthly;
 assert.deepEqual(leaveMonthly, [{ month: "2026-08", target: null }]);
+
+/* --- preparing the next monthly roster ------------------------------------ */
+
+assert.equal(isTargetMonth("2026-09"), true);
+assert.equal(isTargetMonth("2026-13"), false);
+assert.equal(isTargetMonth("August"), false);
+
+const septemberDraft = targetRosterForMonth("2026-09");
+assert.equal(septemberDraft.exists, false, "September begins as a new monthly draft");
+assert.equal(septemberDraft.basisMonth, "2026-08", "new months copy the latest earlier roster");
+assert.equal(
+  septemberDraft.rows.length,
+  august.length,
+  "the whole team is copied, not one employee",
+);
+assert.notEqual(
+  septemberDraft.rows[0],
+  august[0],
+  "draft editing cannot mutate historic August rows",
+);
+septemberDraft.rows[0].target = 1;
+assert.notEqual(august[0].target, 1, "August remains immutable while September is prepared");
+
+const existingAugust = targetRosterForMonth("2026-08");
+assert.equal(existingAugust.exists, true);
+assert.equal(existingAugust.basisMonth, "2026-08");
 
 /* --- calendar ------------------------------------------------------------- */
 

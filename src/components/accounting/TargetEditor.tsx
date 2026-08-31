@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KeyRound, Loader2, Save, Target } from "lucide-react";
+import { CalendarPlus, KeyRound, Loader2, Save, Target } from "lucide-react";
 import { Notice, Pill } from "@/components/ui-bits";
 import {
   Sheet,
@@ -29,6 +29,9 @@ interface TargetsResponse {
   ok: boolean;
   month: string;
   months: string[];
+  /** False means the displayed roster is a safe starting copy, not saved yet. */
+  exists: boolean;
+  basisMonth: string;
   editable: boolean;
   auth: {
     signedIn: boolean;
@@ -75,23 +78,36 @@ export function TargetEditor({
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     setLoading(true);
     setError("");
+    setData(null);
     fetch(`/api/targets${month ? `?month=${month}` : ""}`, { credentials: "include" })
-      .then((response) => response.json() as Promise<TargetsResponse>)
+      .then(async (response) => {
+        const body = (await response.json()) as TargetsResponse & { error?: string };
+        if (!response.ok || !body.ok) throw new Error(body.error || "Could not load the targets.");
+        return body;
+      })
       .then((body) => {
+        if (cancelled) return;
         setData(body);
-        setMonth(body.month);
+        if (body.month !== month) setMonth(body.month);
         setDraft(
           Object.fromEntries(
             body.rows.map((row) => [row.employeeId, row.target === null ? "" : String(row.target)]),
           ),
         );
       })
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : "Could not load the targets."),
-      )
-      .finally(() => setLoading(false));
+      .catch((cause: unknown) => {
+        if (!cancelled)
+          setError(cause instanceof Error ? cause.message : "Could not load the targets.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, month]);
 
   const total = Object.values(draft).reduce((sum, value) => {
@@ -105,8 +121,10 @@ export function TargetEditor({
     return current.trim() !== original;
   });
 
+  const isNewMonth = !!data && !data.exists;
+  const editsToSave = isNewMonth ? (data?.rows ?? []) : changed;
   const save = async () => {
-    if (!data || !changed.length) return;
+    if (!data || !editsToSave.length) return;
     setSaving(true);
     setError("");
     setSaved("");
@@ -120,7 +138,10 @@ export function TargetEditor({
         },
         body: JSON.stringify({
           month,
-          edits: changed.map((row) => {
+          // New months must save every person as a full snapshot. Sending only
+          // one changed row would make September look like it has one employee
+          // and corrupt all team/achievement comparisons for that period.
+          edits: editsToSave.map((row) => {
             const value = (draft[row.employeeId] ?? "").trim();
             return { employeeId: row.employeeId, target: value === "" ? null : Number(value) };
           }),
@@ -133,14 +154,20 @@ export function TargetEditor({
       if (code) localStorage.setItem(CODE_KEY, code);
       setSaved(
         lang === "ar"
-          ? `اتحفظ ${body.saved} تارجت لشهر ${monthLabel(month, lang)}.`
-          : `Saved ${body.saved} targets for ${monthLabel(month, lang)}.`,
+          ? `${isNewMonth ? "اتعمل" : "اتحفظ"} ${body.saved} تارجت لشهر ${monthLabel(month, lang)}.`
+          : `${isNewMonth ? "Created" : "Saved"} ${body.saved} targets for ${monthLabel(month, lang)}.`,
       );
       onSaved();
       // Re-read so "edited" badges and the roster reflect what was stored.
       setMonth((current) => current);
       const refreshed = await fetch(`/api/targets?month=${month}`, { credentials: "include" });
-      setData((await refreshed.json()) as TargetsResponse);
+      const fresh = (await refreshed.json()) as TargetsResponse;
+      setData(fresh);
+      setDraft(
+        Object.fromEntries(
+          fresh.rows.map((row) => [row.employeeId, row.target === null ? "" : String(row.target)]),
+        ),
+      );
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Saving failed.");
     } finally {
@@ -163,12 +190,12 @@ export function TargetEditor({
             <span>{lang === "ar" ? "إدارة التارجت" : "Manage targets"}</span>
           </div>
           <SheetTitle className="mt-1 text-xl font-bold text-text">
-            {lang === "ar" ? "تعديل تارجت الموظفين" : "Edit employee targets"}
+            {lang === "ar" ? "تارجت الموظفين الشهري" : "Monthly employee targets"}
           </SheetTitle>
           <SheetDescription className="text-sm text-text-muted">
             {lang === "ar"
-              ? "الخانة الفاضية معناها «مفيش تارجت منشور» — زي أجازة الوضع وموظفي العمليات — وبتظهر شرطة مش صفر. لو كتبت 0 يبقى صفر حقيقي."
-              : "An empty box means no quota is published — maternity leave, Operation staff — and shows as a dash, not 0%. Typing 0 is a real zero."}
+              ? "اختار أي شهر: لكل شهر نسخة مستقلة. الخانة الفاضية معناها «مفيش تارجت منشور»، وكتابة 0 تعني صفر حقيقي."
+              : "Choose any month: each month is stored independently. Empty means no quota; 0 is a real zero."}
           </SheetDescription>
         </SheetHeader>
 
@@ -192,24 +219,77 @@ export function TargetEditor({
             </Notice>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(160px,.6fr)_1fr]">
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-text-muted">
-                {lang === "ar" ? "الشهر" : "Month"}
-              </span>
-              <select
-                value={month}
-                onChange={(event) => setMonth(event.target.value)}
-                className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
-              >
-                {(data?.months ?? []).map((value) => (
-                  <option key={value} value={value}>
-                    {monthLabel(value, lang)}
+          <div className="rounded-2xl border border-border bg-surface-2/55 p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-text">
+                  {lang === "ar" ? "اختيار فترة التارجت" : "Choose target period"}
+                </div>
+                <div className="mt-0.5 text-[11px] text-text-muted">
+                  {lang === "ar"
+                    ? "اعمل سبتمبر اليوم، وبعدها أكتوبر من نفس الزر؛ كل شهر يظل محفوظًا وحده."
+                    : "Create September now and October later; every month remains independent."}
+                </div>
+              </div>
+              {!!data && (
+                <Pill tone={data.exists ? "success" : "warning"}>
+                  {data.exists
+                    ? lang === "ar"
+                      ? "شهر محفوظ"
+                      : "Saved month"
+                    : lang === "ar"
+                      ? "شهر جديد"
+                      : "New month"}
+                </Pill>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "الشهر المطلوب" : "Target month"}
+                </span>
+                <input
+                  type="month"
+                  value={month}
+                  // Browsers emit `input` while someone picks a month and
+                  // `change` once the picker is committed. Listening to both
+                  // keeps the displayed roster in lockstep with either path.
+                  onInput={(event) => setMonth(event.currentTarget.value)}
+                  onChange={(event) => setMonth(event.currentTarget.value)}
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "افتح شهرًا محفوظًا" : "Open saved month"}
+                </span>
+                <select
+                  value={data?.months.includes(month) ? month : ""}
+                  onChange={(event) => event.target.value && setMonth(event.target.value)}
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                >
+                  <option value="">
+                    {lang === "ar" ? "اختيار من الشهور الموجودة" : "Choose a saved month"}
                   </option>
-                ))}
-              </select>
-            </label>
+                  {(data?.months ?? []).map((value) => (
+                    <option key={value} value={value}>
+                      {monthLabel(value, lang)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
 
+          {!!data && !data.exists && (
+            <Notice tone="info" title={lang === "ar" ? "مسودة شهر جديد" : "New month draft"}>
+              {lang === "ar"
+                ? `القائمة الظاهرة الآن نسخة تأسيسية من ${monthLabel(data.basisMonth, lang)}. عدّل أرقام ${monthLabel(month, lang)} ثم اضغط «إنشاء تارجت الشهر»؛ أغسطس لن يتغير.`
+                : `This roster starts as a copy of ${monthLabel(data.basisMonth, lang)}. Edit ${monthLabel(month, lang)} then create it; the historic month stays unchanged.`}
+            </Notice>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(160px,.6fr)_1fr]">
             {needsCode && (
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-muted">
@@ -300,23 +380,39 @@ export function TargetEditor({
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <span className="text-xs text-text-muted">
-              {changed.length
+              {isNewMonth
                 ? lang === "ar"
-                  ? `${changed.length} تغيير لسه ماتحفظش`
-                  : `${changed.length} unsaved change(s)`
-                : lang === "ar"
-                  ? "مفيش تغييرات"
-                  : "No changes"}
+                  ? `${editsToSave.length} موظف سيتحفظون كخطة مستقلة للشهر الجديد`
+                  : `${editsToSave.length} employees will be saved as an independent month`
+                : changed.length
+                  ? lang === "ar"
+                    ? `${changed.length} تغيير لسه ماتحفظش`
+                    : `${changed.length} unsaved change(s)`
+                  : lang === "ar"
+                    ? "مفيش تغييرات"
+                    : "No changes"}
             </span>
             <button
               type="button"
               onClick={save}
-              disabled={saving || !changed.length || blocked}
+              disabled={saving || !editsToSave.length || blocked}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white transition-opacity disabled:opacity-45"
               style={{ background: "var(--brand)" }}
             >
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {lang === "ar" ? "احفظ التارجت" : "Save targets"}
+              {saving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : isNewMonth ? (
+                <CalendarPlus size={16} />
+              ) : (
+                <Save size={16} />
+              )}
+              {isNewMonth
+                ? lang === "ar"
+                  ? "إنشاء تارجت الشهر"
+                  : "Create monthly targets"
+                : lang === "ar"
+                  ? "احفظ التارجت"
+                  : "Save targets"}
             </button>
           </div>
         </div>
