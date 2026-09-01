@@ -9,6 +9,7 @@ import {
   type ComplianceFilters,
   type ComplianceResponse,
 } from "@/components/pricing/PriceComplianceTab";
+import { PriceCourseSummaryTab } from "@/components/pricing/PriceCourseSummaryTab";
 import { PriceManageTab } from "@/components/pricing/PriceManageTab";
 import {
   PriceSearchTab,
@@ -18,9 +19,9 @@ import {
 import { ADMIN_CODE_KEY, writeJson, type AuthState } from "@/components/pricing/pricing-ui";
 import { useI18n } from "@/lib/i18n";
 
-type Tab = "search" | "manage" | "compliance" | "alerts";
+type Tab = "summary" | "search" | "manage" | "compliance" | "alerts";
 
-const TABS: Tab[] = ["search", "manage", "compliance", "alerts"];
+const TABS: Tab[] = ["summary", "search", "manage", "compliance", "alerts"];
 
 /**
  * The Price Book.
@@ -65,7 +66,7 @@ function PricingPage() {
   const { lang, t } = useI18n();
   const navigate = useNavigate({ from: "/pricing" });
   const search = useSearch({ from: "/pricing" });
-  const tab: Tab = search.tab ?? "search";
+  const tab: Tab = search.tab ?? "summary";
 
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(emptySearchFilters);
   const [complianceFilters, setComplianceFilters] =
@@ -91,7 +92,7 @@ function PricingPage() {
 
   const catalog = useQuery({
     queryKey: ["pricing-catalog", searchFilters, selectedBookId],
-    enabled: tab === "search",
+    enabled: tab === "search" || tab === "summary",
     staleTime: 60_000,
     queryFn: () =>
       getJson<Parameters<typeof PriceSearchTab>[0]["data"]>(
@@ -247,6 +248,7 @@ function PricingPage() {
   );
 
   const tabLabel: Record<Tab, string> = {
+    summary: t("pb_tab_summary"),
     search: t("pb_tab_search"),
     manage: t("pb_tab_manage"),
     compliance: t("pb_tab_compliance"),
@@ -268,6 +270,18 @@ function PricingPage() {
 
       {!!error && <Notice tone="danger">{error}</Notice>}
       {!!message && <Notice tone="info">{message}</Notice>}
+
+      {tab === "summary" && (
+        <PriceCourseSummaryTab
+          filters={searchFilters}
+          onFilters={setSearchFilters}
+          data={catalog.data}
+          facets={facets.data}
+          loading={catalog.isLoading}
+          error={catalog.error instanceof Error ? catalog.error.message : undefined}
+          onRetry={() => void catalog.refetch()}
+        />
+      )}
 
       {tab === "search" && (
         <PriceSearchTab

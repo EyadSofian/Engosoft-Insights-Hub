@@ -60,6 +60,7 @@ export const DICT = {
     en: "Published course prices, and how paid invoices measured up against them",
   },
   pb_tab_search: { ar: "البحث عن سعر", en: "Find a price" },
+  pb_tab_summary: { ar: "ملخص أسعار الدورات", en: "Course price summary" },
   pb_tab_manage: { ar: "إدارة الأسعار", en: "Manage prices" },
   pb_tab_compliance: { ar: "مراقبة الالتزام", en: "Compliance" },
   pb_tab_alerts: { ar: "التنبيهات", en: "Alerts" },
