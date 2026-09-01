@@ -640,84 +640,103 @@ export function PriceComplianceTab({
 
         {!loading && !!data?.rows.length && (
           <>
-            <div className="hscroll">
-              <table className="w-full min-w-[1100px] text-[12px]">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-text-subtle">
+            <div className="grid gap-3 xl:grid-cols-2">
+              {data.rows.map((row) => (
+                <article
+                  key={row.invoiceLineId}
+                  className={`relative overflow-hidden rounded-2xl border bg-surface p-4 ${
+                    row.complianceStatus === "below_minimum" ? "border-danger/25" : "border-border"
+                  }`}
+                >
+                  <span
+                    className={`absolute inset-y-0 start-0 w-1 ${
+                      row.complianceStatus === "below_minimum" ? "bg-danger" : "bg-brand"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold text-text-subtle">
+                        {lang === "ar"
+                          ? `كود ${row.productCode || "—"}`
+                          : `Code ${row.productCode || "—"}`}
+                      </div>
+                      <h3 className="mt-1 line-clamp-2 text-[13px] font-black leading-snug text-text">
+                        {row.productName}
+                      </h3>
+                    </div>
+                    <Pill tone={statusTone(row.complianceStatus)}>
+                      {statusLabel(row.complianceStatus, lang)}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-text-muted">
+                    <span>
+                      <b className="text-text">{lang === "ar" ? "الموظف:" : "Owner:"}</b>{" "}
+                      {row.salesperson || "—"}
+                    </span>
+                    <span>
+                      <b className="text-text">{lang === "ar" ? "الدفع:" : "Payment:"}</b>{" "}
+                      {methodLabel(row.paymentMethod, lang)}
+                    </span>
+                    <span className="tabular-nums">
+                      <b className="text-text">{lang === "ar" ? "التاريخ:" : "Date:"}</b>{" "}
+                      {row.paymentDate || row.invoiceDate || row.saleDate || "—"}
+                    </span>
+                    <span className="tabular-nums">
+                      <b className="text-text">{lang === "ar" ? "الكمية:" : "Qty:"}</b>{" "}
+                      {row.quantity}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {[
-                      lang === "ar" ? "الفاتورة" : "Invoice",
-                      lang === "ar" ? "تاريخ البيع" : "Sale",
-                      lang === "ar" ? "الفاتورة" : "Invoiced",
-                      lang === "ar" ? "الدفع" : "Paid",
-                      lang === "ar" ? "الموظف" : "Salesperson",
-                      lang === "ar" ? "المنتج" : "Product",
-                      lang === "ar" ? "الطريقة" : "Method",
-                      lang === "ar" ? "الكمية" : "Qty",
-                      lang === "ar" ? "سعر الوحدة" : "Unit price",
-                      lang === "ar" ? "المسموح" : "Allowed",
-                      lang === "ar" ? "الفرق" : "Gap",
-                      lang === "ar" ? "الخصم %" : "Below %",
-                      lang === "ar" ? "الحالة" : "Status",
-                    ].map((label) => (
-                      <th key={label} className="py-2 pe-3 text-start font-semibold">
-                        {label}
-                      </th>
+                      {
+                        label: lang === "ar" ? "سعر البيع" : "Sold",
+                        value: fmtMoney(row.actualUnitPrice, row.currency, lang),
+                      },
+                      {
+                        label: lang === "ar" ? "الحد الأدنى" : "Floor",
+                        value: fmtMoney(row.allowedMinimum, row.currency, lang),
+                      },
+                      {
+                        label: lang === "ar" ? "الفارق" : "Gap",
+                        value:
+                          row.varianceAmount > 0
+                            ? fmtMoney(row.varianceAmount, row.currency, lang)
+                            : "—",
+                      },
+                      {
+                        label: lang === "ar" ? "أقل بنسبة" : "Below by",
+                        value:
+                          row.variancePercent !== null && row.variancePercent > 0
+                            ? fmtPct(row.variancePercent * 100, 1)
+                            : "—",
+                      },
+                    ].map((metric) => (
+                      <div key={metric.label} className="rounded-xl bg-surface-2 px-2.5 py-2">
+                        <div className="text-[9px] text-text-subtle">{metric.label}</div>
+                        <div className="mt-0.5 truncate text-[11px] font-black tabular-nums text-text">
+                          {metric.value}
+                        </div>
+                      </div>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.rows.map((row) => (
-                    <tr key={row.invoiceLineId} className="border-t border-border align-top">
-                      <td className="py-2 pe-3">
-                        <button
-                          type="button"
-                          onClick={() => setOpenInvoice(row.invoiceNumber)}
-                          className="cursor-pointer font-medium text-brand underline-offset-2 hover:underline"
-                        >
-                          {row.invoiceNumber}
-                        </button>
-                      </td>
-                      <td className="py-2 pe-3 tabular-nums">{row.saleDate || "—"}</td>
-                      <td className="py-2 pe-3 tabular-nums">{row.invoiceDate || "—"}</td>
-                      <td className="py-2 pe-3 tabular-nums">{row.paymentDate || "—"}</td>
-                      <td className="py-2 pe-3">{row.salesperson || "—"}</td>
-                      <td className="py-2 pe-3">
-                        <div className="font-medium text-text">{row.productName}</div>
-                        <div className="text-[11px] text-text-subtle">{row.productCode || "—"}</div>
-                      </td>
-                      <td className="py-2 pe-3">{methodLabel(row.paymentMethod, lang)}</td>
-                      <td className="py-2 pe-3 tabular-nums">{row.quantity}</td>
-                      <td className="py-2 pe-3 tabular-nums">
-                        {fmtMoney(row.actualUnitPrice, row.currency, lang)}
-                      </td>
-                      <td className="py-2 pe-3 tabular-nums">
-                        {fmtMoney(row.allowedMinimum, row.currency, lang)}
-                        {row.allowedMaximum !== null && row.allowedMaximum !== row.allowedMinimum
-                          ? ` – ${fmtMoney(row.allowedMaximum, row.currency, lang)}`
-                          : ""}
-                      </td>
-                      <td className="py-2 pe-3 tabular-nums">
-                        {row.varianceAmount > 0
-                          ? fmtMoney(row.varianceAmount, row.currency, lang)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pe-3 tabular-nums">
-                        {row.variancePercent !== null && row.variancePercent > 0
-                          ? fmtPct(row.variancePercent * 100, 1)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pe-3">
-                        <Pill tone={statusTone(row.complianceStatus)}>
-                          {statusLabel(row.complianceStatus, lang)}
-                        </Pill>
-                        <p className="mt-1 max-w-[280px] text-[11px] leading-snug text-text-muted">
-                          {auditReasonLabel(row, lang)}
-                        </p>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </div>
+
+                  <div className="mt-3 flex items-end justify-between gap-3 border-t border-border pt-2.5">
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-text-muted">
+                      {auditReasonLabel(row, lang)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setOpenInvoice(row.invoiceNumber)}
+                      className="shrink-0 rounded-xl bg-brand-soft px-3 py-2 text-[10px] font-bold text-brand hover:bg-brand hover:text-white"
+                    >
+                      {lang === "ar" ? "فتح الفاتورة" : "Open invoice"}
+                    </button>
+                  </div>
+                </article>
+              ))}
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-2 text-[12px]">

@@ -79,35 +79,35 @@ export function CriticalInvoicesPanel({
       </div>
 
       {loading ? (
-        <div className="grid gap-2.5 p-3.5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-2 p-3">
           {Array.from({ length: 3 }, (_, index) => (
-            <Skeleton key={index} className="h-40 rounded-2xl" />
+            <Skeleton key={index} className="h-28 rounded-2xl" />
           ))}
         </div>
       ) : invoices.length ? (
-        <div className="grid gap-2.5 p-3.5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-2 p-3">
           {invoices.map(({ row, count }) => (
             <article
               key={row.invoiceNumber}
-              className="relative overflow-hidden rounded-2xl border border-danger/20 bg-surface px-3.5 py-3 shadow-sm"
+              className="relative grid gap-3 overflow-hidden rounded-2xl border border-danger/20 bg-surface px-4 py-3 shadow-sm lg:grid-cols-[minmax(180px,0.9fr)_minmax(240px,1.35fr)_minmax(240px,1.1fr)_auto] lg:items-center"
             >
               <span className="absolute inset-y-0 start-0 w-1 bg-danger" aria-hidden="true" />
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-danger">
-                    <UserRound size={12} aria-hidden="true" />
-                    {ar ? "مسؤول الفاتورة" : "Invoice owner"}
-                  </div>
-                  <h3 className="mt-1 truncate text-[13px] font-black text-text">
-                    {row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}
-                  </h3>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-danger">
+                  <UserRound size={12} aria-hidden="true" />
+                  {ar ? "مسؤول الفاتورة" : "Invoice owner"}
                 </div>
-                <Pill tone="danger">
-                  {fmtNum(count)} {ar ? "بند" : "lines"}
-                </Pill>
+                <h3 className="mt-1 truncate text-[13px] font-black text-text">
+                  {row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}
+                </h3>
+                <div className="mt-1">
+                  <Pill tone="danger">
+                    {fmtNum(count)} {ar ? "بند مخالف" : "breached lines"}
+                  </Pill>
+                </div>
               </div>
 
-              <div className="mt-2.5 rounded-xl bg-danger-soft/35 px-3 py-2.5">
+              <div className="min-w-0 rounded-xl bg-danger-soft/35 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <strong className="truncate text-[11px] text-text">{row.invoiceNumber}</strong>
                   <span className="shrink-0 text-[9px] tabular-nums text-text-subtle">
@@ -120,17 +120,20 @@ export function CriticalInvoicesPanel({
                     ? ` · ${ar ? `و${fmtNum(count - 1)} بنود أخرى` : `+${count - 1} more`}`
                     : ""}
                 </div>
-                <div className="mt-1.5 text-[11px] font-bold tabular-nums text-danger">
-                  {fmtMoney(row.actualUnitPrice, row.currency, lang)} ←{" "}
-                  {ar ? "الحد الأدنى" : "floor"} {fmtMoney(row.allowedMinimum, row.currency, lang)}
-                </div>
               </div>
 
-              <p className="mt-2 line-clamp-2 min-h-8 text-[10px] leading-relaxed text-text-muted">
-                {auditReasonLabel(row, lang)}
-              </p>
+              <div className="min-w-0">
+                <div className="text-[11px] font-black tabular-nums text-danger">
+                  {ar ? "سعر البيع" : "Sold"} {fmtMoney(row.actualUnitPrice, row.currency, lang)}
+                  <span className="mx-1.5 text-text-subtle">←</span>
+                  {ar ? "الحد الأدنى" : "floor"} {fmtMoney(row.allowedMinimum, row.currency, lang)}
+                </div>
+                <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-text-muted">
+                  {auditReasonLabel(row, lang)}
+                </p>
+              </div>
 
-              <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 lg:min-w-[230px]">
                 <button
                   type="button"
                   onClick={() => setOpenInvoice(row.invoiceNumber)}

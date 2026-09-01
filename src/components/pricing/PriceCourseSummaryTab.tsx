@@ -89,35 +89,50 @@ const activeOffers = (entry: CatalogEntry) =>
   );
 
 type ContentKind = "all" | "course" | "package" | "offer";
+type PriceMode = "course" | "package";
 
-const isPackage = (entry: CatalogEntry) =>
+const hasPackage = (entry: CatalogEntry) =>
   entry.prices.some(
     (price) =>
       price.scope === "bundle" || price.scope === "level" || Boolean(price.bundleName?.trim()),
   );
 
+const hasIndividual = (entry: CatalogEntry) =>
+  entry.prices.some((price) => price.scope === "individual");
+
 const matchesKind = (entry: CatalogEntry, kind: ContentKind) => {
   if (kind === "all") return true;
-  if (kind === "package") return isPackage(entry);
+  if (kind === "package") return hasPackage(entry);
   if (kind === "offer") return activeOffers(entry).length > 0;
-  return !isPackage(entry);
+  return hasIndividual(entry);
+};
+
+const packageLabel = (value: string, ar: boolean) => {
+  if (!ar) return value;
+  return value
+    .replace(/Management/gi, "الإدارة")
+    .replace(/Mech\s*&\s*Elec/gi, "الميكانيكا والكهرباء")
+    .replace(/Architecture\s*&\s*Decor/gi, "العمارة والديكور")
+    .replace(/Civil Courses/gi, "الهندسة المدنية")
+    .replace(/Record(?:ed)?/gi, "مسجل")
+    .replace(/Online/gi, "أونلاين")
+    .replace(/Offline/gi, "حضوري");
 };
 
 const activeSellPrice = (
   entry: CatalogEntry,
   methods: string[],
   currency: string,
+  mode: PriceMode,
 ): CatalogPrice | undefined => {
-  const preferredScopes = isPackage(entry) ? ["bundle", "level"] : ["individual"];
-  const available = entry.prices.filter(
+  const scopes = mode === "package" ? ["bundle", "level"] : ["individual"];
+  const candidates = entry.prices.filter(
     (price) =>
       price.active &&
       price.currency === currency &&
       (methods.includes(price.paymentMethod) || price.paymentMethod === "any") &&
-      !["offer", "incentive"].includes(price.scope),
+      scopes.includes(price.scope),
   );
-  const preferred = available.filter((price) => preferredScopes.includes(price.scope));
-  const candidates = preferred.length ? preferred : available;
   if (!candidates.length) return undefined;
   const floors = candidates
     .map((price) => price.minimum ?? price.exact ?? price.maximum)
@@ -161,9 +176,22 @@ function PriceBlock({
   );
 }
 
-function CoursePriceDialog({ entry, onClose }: { entry: CatalogEntry; onClose: () => void }) {
+function CoursePriceDialog({
+  entry,
+  mode,
+  onClose,
+}: {
+  entry: CatalogEntry;
+  mode: PriceMode;
+  onClose: () => void;
+}) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const displayPrices = entry.prices.filter((price) =>
+    mode === "package"
+      ? price.scope === "bundle" || price.scope === "level"
+      : price.scope === "individual" || price.scope === "offer",
+  );
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-end bg-black/45 sm:place-items-center sm:p-6"
@@ -186,7 +214,15 @@ function CoursePriceDialog({ entry, onClose }: { entry: CatalogEntry; onClose: (
               )}
             </div>
             <h2 className="mt-3 text-[19px] font-black leading-snug text-text">
-              {entry.courseName}
+              {mode === "package"
+                ? `${ar ? "باقة" : "Package"} ${packageLabel(
+                    entry.prices.find(
+                      (price) =>
+                        (price.scope === "bundle" || price.scope === "level") && price.bundleName,
+                    )?.bundleName || entry.courseName,
+                    ar,
+                  )}`
+                : entry.courseName}
             </h2>
             <p className="mt-1 text-[11px] text-text-muted">
               {specializationLabel(entry.specialization, ar)} · {entry.subcategory || "—"}
@@ -203,7 +239,7 @@ function CoursePriceDialog({ entry, onClose }: { entry: CatalogEntry; onClose: (
         </div>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          {entry.prices.map((price) => (
+          {displayPrices.map((price) => (
             <div
               key={price.id}
               className={`rounded-2xl border p-3.5 ${
@@ -240,15 +276,22 @@ function CoursePriceDialog({ entry, onClose }: { entry: CatalogEntry; onClose: (
   );
 }
 
-function CourseCompactCard({ entry }: { entry: CatalogEntry }) {
+function CourseCompactCard({ entry, mode }: { entry: CatalogEntry; mode: PriceMode }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   const [open, setOpen] = useState(false);
-  const instalment = activeSellPrice(entry, ["tabby", "tamara"], "SAR");
-  const cash = activeSellPrice(entry, ["cash", "cashier"], "SAR");
-  const egypt = activeSellPrice(entry, ["any", "cash", "cashier"], "EGP");
+  const instalment = activeSellPrice(entry, ["tabby", "tamara"], "SAR", mode);
+  const cash = activeSellPrice(entry, ["cash", "cashier"], "SAR", mode);
+  const egypt = activeSellPrice(entry, ["any", "cash", "cashier"], "EGP", mode);
   const offers = activeOffers(entry);
   const accent = ACCENTS[entry.specialization] ?? ACCENTS.Others;
+  const bundleName = entry.prices.find(
+    (price) => (price.scope === "bundle" || price.scope === "level") && price.bundleName,
+  )?.bundleName;
+  const title =
+    mode === "package"
+      ? `${ar ? "باقة" : "Package"} ${packageLabel(bundleName || entry.courseName, ar)}`
+      : entry.courseName;
 
   return (
     <>
@@ -266,10 +309,11 @@ function CourseCompactCard({ entry }: { entry: CatalogEntry }) {
             <div className="flex flex-wrap items-center gap-1.5">
               <Pill tone="brand">#{entry.rawCode || "—"}</Pill>
               <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
+              {mode === "package" && <Pill tone="warning">{ar ? "باقة" : "Package"}</Pill>}
               {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
             </div>
             <h3 className="mt-2 line-clamp-2 min-h-9 text-[12px] font-black leading-snug text-text">
-              {entry.courseName}
+              {title}
             </h3>
           </div>
           <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${accent.icon}`}>
@@ -308,7 +352,7 @@ function CourseCompactCard({ entry }: { entry: CatalogEntry }) {
           </div>
         </div>
       </button>
-      {open && <CoursePriceDialog entry={entry} onClose={() => setOpen(false)} />}
+      {open && <CoursePriceDialog entry={entry} mode={mode} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -384,7 +428,14 @@ export function PriceCourseSummaryTab({
               <button
                 type="button"
                 key={value}
-                onClick={() => onFilters({ ...filters, specialization: value, subcategory: "all" })}
+                onClick={() =>
+                  onFilters({
+                    ...filters,
+                    q: "",
+                    specialization: value,
+                    subcategory: "all",
+                  })
+                }
                 className={`min-h-9 rounded-xl border px-3.5 text-[11px] font-bold transition ${
                   filters.specialization === value
                     ? "border-brand bg-brand text-white"
@@ -474,7 +525,7 @@ export function PriceCourseSummaryTab({
                 {specializationLabel(specialization, ar)}
               </h2>
               <span className="text-[10px] text-text-subtle">
-                {entries.length} {ar ? "دورة" : "courses"}
+                {entries.length} {ar ? (kind === "package" ? "باقة" : "نتيجة") : "results"}
               </span>
             </div>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -482,6 +533,7 @@ export function PriceCourseSummaryTab({
                 <CourseCompactCard
                   key={`${entry.code}:${entry.deliveryType}:${entry.subcategory}:${entry.level}`}
                   entry={entry}
+                  mode={kind === "package" || !hasIndividual(entry) ? "package" : "course"}
                 />
               ))}
             </div>

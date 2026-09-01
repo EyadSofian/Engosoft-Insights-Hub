@@ -28,7 +28,8 @@ export const Route = createFileRoute("/api/pricing/invoices/$movement")({
           const detail = await complianceRows({ search: movement, limit: 200 });
           const lines = detail.rows.filter((row) => row.invoiceNumber === movement);
           const payments = await readStoredPayments([movement]);
-          const odooBase = (process.env.ODOO_URL || "").replace(/\/+$/, "");
+          const { odooConfig } = await import("@/lib/odoo.server");
+          const odooBase = odooConfig().url;
 
           return json({
             ok: true,
