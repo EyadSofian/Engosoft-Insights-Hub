@@ -72,6 +72,7 @@ function PricingPage() {
   const [complianceFilters, setComplianceFilters] =
     useState<ComplianceFilters>(emptyComplianceFilters);
   const [selectedBookId, setSelectedBookId] = useState("");
+  const [manageQuery, setManageQuery] = useState("");
   const [adminCode, setAdminCode] = useState("");
   const [busy, setBusy] = useState<"" | "recalculate" | "digest">("");
   const [message, setMessage] = useState("");
@@ -86,7 +87,7 @@ function PricingPage() {
   }, []);
 
   const setTab = (next: Tab) =>
-    void navigate({ search: { tab: next === "search" ? undefined : next } });
+    void navigate({ search: { tab: next === "summary" ? undefined : next } });
 
   /* --- data ------------------------------------------------------------- */
 
@@ -127,12 +128,12 @@ function PricingPage() {
   });
 
   const items = useQuery({
-    queryKey: ["pricing-items", selectedBookId],
+    queryKey: ["pricing-items", selectedBookId, manageQuery],
     enabled: tab === "manage",
     staleTime: 30_000,
     queryFn: () =>
       getJson<Parameters<typeof PriceManageTab>[0]["items"]>(
-        `/api/pricing/items${query({ bookId: selectedBookId, limit: 300 })}`,
+        `/api/pricing/items${query({ bookId: selectedBookId, q: manageQuery, limit: 500 })}`,
       ),
   });
 
@@ -302,6 +303,8 @@ function PricingPage() {
           loading={books.isLoading || items.isLoading}
           selectedBookId={selectedBookId || items.data?.book?.id || ""}
           onSelectBook={setSelectedBookId}
+          itemQuery={manageQuery}
+          onItemQuery={setManageQuery}
           onChanged={refreshAll}
         />
       )}

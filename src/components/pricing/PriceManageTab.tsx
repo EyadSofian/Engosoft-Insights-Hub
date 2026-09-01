@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BadgeDollarSign,
+  ChevronDown,
+  ChevronUp,
   CopyPlus,
   FileSpreadsheet,
   History,
@@ -8,6 +11,7 @@ import {
   Pencil,
   RefreshCw,
   Rocket,
+  Search,
   Undo2,
   Upload,
 } from "lucide-react";
@@ -114,6 +118,8 @@ export function PriceManageTab({
   loading,
   selectedBookId,
   onSelectBook,
+  itemQuery,
+  onItemQuery,
   onChanged,
 }: {
   books?: BooksResponse;
@@ -121,6 +127,8 @@ export function PriceManageTab({
   loading: boolean;
   selectedBookId: string;
   onSelectBook: (id: string) => void;
+  itemQuery: string;
+  onItemQuery: (query: string) => void;
   onChanged: () => void;
 }) {
   const { lang, t } = useI18n();
@@ -133,6 +141,8 @@ export function PriceManageTab({
   const [showImport, setShowImport] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
+  const [queryDraft, setQueryDraft] = useState(itemQuery);
+  const [expandedCourse, setExpandedCourse] = useState("");
 
   useEffect(() => {
     try {
@@ -187,6 +197,15 @@ export function PriceManageTab({
     [items?.items],
   );
 
+  const courseGroups = useMemo(() => {
+    const groups = new Map<string, PriceItem[]>();
+    for (const item of items?.items ?? []) {
+      const key = `${item.rawProductCode || "—"}::${item.courseName}::${item.deliveryType}`;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    return [...groups.entries()];
+  }, [items?.items]);
+
   return (
     <div className="space-y-4">
       {!canWrite && (
@@ -224,6 +243,58 @@ export function PriceManageTab({
         </Card>
       )}
 
+      <Card className="relative overflow-hidden border-brand/25 p-0">
+        <div className="absolute inset-y-0 start-0 w-1 bg-brand" aria-hidden="true" />
+        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)] lg:items-center">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-md">
+              <BadgeDollarSign size={21} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-[16px] font-bold text-text">
+                {lang === "ar" ? "عدّل سعر دورة بالكود" : "Edit a course by code"}
+              </h2>
+              <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-text-muted">
+                {lang === "ar"
+                  ? "اكتب كود الدورة أو جزءًا من اسمها. هتظهر لك ككرت واحد، افتحه واختر سعر تابي أو الكاش أو العرض اللي عايز تعدله."
+                  : "Enter a course code or part of its name. Open the result card and choose the exact pricing rule to edit."}
+              </p>
+            </div>
+          </div>
+          <form
+            role="search"
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onItemQuery(queryDraft.trim());
+              setExpandedCourse("");
+            }}
+          >
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute inset-y-0 start-3 my-auto text-text-subtle"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                value={queryDraft}
+                onChange={(event) => setQueryDraft(event.target.value)}
+                aria-label={lang === "ar" ? "كود الدورة أو اسمها" : "Course code or name"}
+                placeholder={lang === "ar" ? "مثال: 586 أو CFM…" : "Example: 586 or CFM…"}
+                className="min-h-12 w-full rounded-xl border border-border bg-surface ps-9 pe-3 text-[14px] text-text"
+              />
+            </div>
+            <button
+              type="submit"
+              className="min-h-12 rounded-xl bg-brand px-4 text-[13px] font-bold text-white"
+            >
+              {lang === "ar" ? "فتح السعر" : "Open price"}
+            </button>
+          </form>
+        </div>
+      </Card>
+
       {/* --- versions ---------------------------------------------------- */}
       <Card>
         <SectionTitle
@@ -260,51 +331,19 @@ export function PriceManageTab({
         {loading && <Skeleton className="h-24 w-full rounded-xl" />}
         {!loading && !books?.books.length && <EmptyState label={t("pb_no_book")} />}
 
-        <div className="hscroll">
-          <table className="w-full min-w-[720px] text-[13px]">
-            <thead>
-              <tr className="text-start text-[11px] uppercase tracking-wide text-text-subtle">
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "النسخة" : "Version"}
-                </th>
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "الاسم" : "Name"}
-                </th>
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "الفترة" : "Effective"}
-                </th>
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "الحالة" : "Status"}
-                </th>
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "الصفوف" : "Rows"}
-                </th>
-                <th className="py-2 text-start font-semibold">
-                  {lang === "ar" ? "إجراءات" : "Actions"}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {(books?.books ?? []).map((row) => (
-                <tr
-                  key={row.id}
-                  className={`border-t border-border ${row.id === selectedBookId ? "bg-brand-soft/40" : ""}`}
-                >
-                  <td className="py-2 tabular-nums">v{row.version}</td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => onSelectBook(row.id)}
-                      className="cursor-pointer text-start font-medium text-brand underline-offset-2 hover:underline"
-                    >
-                      {row.name}
-                    </button>
-                    <div className="text-[11px] text-text-subtle">{row.sourceName}</div>
-                  </td>
-                  <td className="py-2 whitespace-nowrap tabular-nums">
-                    {row.effectiveFrom || "—"} → {row.effectiveTo || "—"}
-                  </td>
-                  <td className="py-2">
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(books?.books ?? []).map((row) => (
+            <article
+              key={row.id}
+              className={`rounded-2xl border p-4 transition ${
+                row.id === selectedBookId
+                  ? "border-brand bg-brand-soft/40 shadow-sm"
+                  : "border-border bg-surface-2/45"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
                     <Pill tone={statusTone(row.status)}>
                       {row.status === "published"
                         ? t("pb_published")
@@ -312,95 +351,109 @@ export function PriceManageTab({
                           ? t("pb_draft")
                           : t("pb_archived")}
                     </Pill>
-                  </td>
-                  <td className="py-2 tabular-nums">{row.itemCount}</td>
-                  <td className="py-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      {row.status === "draft" && (
-                        <button
-                          type="button"
-                          disabled={!canWrite || busy !== ""}
-                          onClick={() =>
-                            run("publish", async () => {
-                              await writeJson(
-                                "/api/pricing/publish",
-                                "POST",
-                                { bookId: row.id, action: "publish" },
-                                code,
-                              );
-                              return lang === "ar"
-                                ? "تم النشر. شغّل إعادة التحليل عشان التقارير تستخدم الأسعار الجديدة."
-                                : "Published. Re-run the audit so the reports use the new prices.";
-                            })
-                          }
-                          className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg px-2.5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                          style={{ background: "var(--brand)" }}
-                        >
-                          <Rocket size={13} aria-hidden="true" />
-                          {t("pb_publish")}
-                        </button>
-                      )}
-                      {row.status === "archived" && (
-                        <button
-                          type="button"
-                          disabled={!canWrite || busy !== ""}
-                          onClick={() =>
-                            run("rollback", async () => {
-                              await writeJson(
-                                "/api/pricing/publish",
-                                "POST",
-                                { bookId: row.id, action: "rollback" },
-                                code,
-                              );
-                              return lang === "ar"
-                                ? "تم الرجوع لهذه النسخة. التاريخ محفوظ ولم يُحذف شيء."
-                                : "Rolled back to this version. Nothing was deleted.";
-                            })
-                          }
-                          className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Undo2 size={13} aria-hidden="true" />
-                          {t("pb_rollback")}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={!canWrite || busy !== ""}
-                        onClick={() => {
-                          const from = todayIso().slice(0, 8) + "01";
-                          void run("copy", async () => {
-                            const result = await writeJson(
-                              "/api/pricing/books",
-                              "POST",
-                              {
-                                name: `${row.name} — copy`,
-                                effectiveFrom: from,
-                                effectiveTo: monthEnd(from),
-                                taxInclusive: row.taxInclusive,
-                                baseCurrency: row.baseCurrency,
-                                notes: `Copied from v${row.version}`,
-                                copyFromId: row.id,
-                              },
-                              code,
-                            );
-                            const created = result.book as PriceBookSummary | undefined;
-                            if (created) onSelectBook(created.id);
-                            return lang === "ar"
-                              ? "تم إنشاء مسودة جديدة بنفس الأسعار. عدّلها ثم انشرها."
-                              : "A new draft was created with the same prices. Edit it, then publish.";
-                          });
-                        }}
-                        className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <CopyPlus size={13} aria-hidden="true" />
-                        {lang === "ar" ? "نسخة جديدة" : "New version"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <Pill tone="neutral">v{row.version}</Pill>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSelectBook(row.id)}
+                    className="cursor-pointer text-start text-[14px] font-bold text-text hover:text-brand"
+                  >
+                    {row.name}
+                  </button>
+                  <p className="mt-1 text-[11px] text-text-subtle">{row.sourceName}</p>
+                </div>
+                <div className="text-end">
+                  <div className="text-[20px] font-black tabular-nums text-brand">
+                    {row.itemCount}
+                  </div>
+                  <div className="text-[10px] text-text-subtle">
+                    {lang === "ar" ? "قاعدة" : "rules"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 rounded-xl bg-surface p-3 text-[11px] tabular-nums text-text-muted">
+                {row.effectiveFrom || "—"} → {row.effectiveTo || "—"}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {row.status === "draft" && (
+                  <button
+                    type="button"
+                    disabled={!canWrite || busy !== ""}
+                    onClick={() =>
+                      run("publish", async () => {
+                        await writeJson(
+                          "/api/pricing/publish",
+                          "POST",
+                          { bookId: row.id, action: "publish" },
+                          code,
+                        );
+                        return lang === "ar"
+                          ? "تم النشر. شغّل إعادة التحليل عشان التقارير تستخدم الأسعار الجديدة."
+                          : "Published. Re-run the audit so the reports use the new prices.";
+                      })
+                    }
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-brand px-2.5 text-[12px] font-semibold text-white disabled:opacity-50"
+                  >
+                    <Rocket size={13} aria-hidden="true" /> {t("pb_publish")}
+                  </button>
+                )}
+                {row.status === "archived" && (
+                  <button
+                    type="button"
+                    disabled={!canWrite || busy !== ""}
+                    onClick={() =>
+                      run("rollback", async () => {
+                        await writeJson(
+                          "/api/pricing/publish",
+                          "POST",
+                          { bookId: row.id, action: "rollback" },
+                          code,
+                        );
+                        return lang === "ar"
+                          ? "تم الرجوع لهذه النسخة. التاريخ محفوظ ولم يُحذف شيء."
+                          : "Rolled back to this version. Nothing was deleted.";
+                      })
+                    }
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text disabled:opacity-50"
+                  >
+                    <Undo2 size={13} aria-hidden="true" /> {t("pb_rollback")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={!canWrite || busy !== ""}
+                  onClick={() => {
+                    const from = todayIso().slice(0, 8) + "01";
+                    void run("copy", async () => {
+                      const result = await writeJson(
+                        "/api/pricing/books",
+                        "POST",
+                        {
+                          name: `${row.name} — copy`,
+                          effectiveFrom: from,
+                          effectiveTo: monthEnd(from),
+                          taxInclusive: row.taxInclusive,
+                          baseCurrency: row.baseCurrency,
+                          notes: `Copied from v${row.version}`,
+                          copyFromId: row.id,
+                        },
+                        code,
+                      );
+                      const created = result.book as PriceBookSummary | undefined;
+                      if (created) onSelectBook(created.id);
+                      return lang === "ar"
+                        ? "تم إنشاء مسودة جديدة بنفس الأسعار. عدّلها ثم انشرها."
+                        : "A new draft was created with the same prices. Edit it, then publish.";
+                    });
+                  }}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text disabled:opacity-50"
+                >
+                  <CopyPlus size={13} aria-hidden="true" />
+                  {lang === "ar" ? "نسخة قابلة للتعديل" : "Editable copy"}
+                </button>
+              </div>
+            </article>
+          ))}
         </div>
       </Card>
 
@@ -481,10 +534,10 @@ export function PriceManageTab({
             </div>
           }
         >
-          {lang === "ar" ? "صفوف الأسعار" : "Price rows"}
+          {lang === "ar" ? "نتيجة البحث عن السعر" : "Price search result"}
         </SectionTitle>
 
-        {!isDraft && book && (
+        {!isDraft && book && !!itemQuery && (
           <Notice tone="info">
             {lang === "ar"
               ? "دي نسخة منشورة، والتعديل عليها مقفول عن قصد. اعمل «نسخة جديدة» عشان تعدّل، والفواتير القديمة تفضل مربوطة بأسعارها."
@@ -494,89 +547,126 @@ export function PriceManageTab({
 
         {loading && <Skeleton className="mt-3 h-64 w-full rounded-xl" />}
 
-        {!loading && !!items?.items.length && (
-          <div className="hscroll mt-3">
-            <table className="w-full min-w-[900px] text-[13px]">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-text-subtle">
-                  <th className="py-2 text-start font-semibold">{t("pb_code")}</th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "الدورة" : "Course"}
-                  </th>
-                  <th className="py-2 text-start font-semibold">{t("pb_delivery")}</th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "النوع" : "Scope"}
-                  </th>
-                  <th className="py-2 text-start font-semibold">{t("pb_payment_method")}</th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "السعر" : "Price"}
-                  </th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "الحالة" : "State"}
-                  </th>
-                  <th className="py-2 text-start font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.items.map((item) => (
-                  <tr key={item.id} className="border-t border-border">
-                    <td className="py-2 tabular-nums">{item.rawProductCode || "—"}</td>
-                    <td className="py-2">
-                      <div className="font-medium text-text">{item.courseName}</div>
-                      <div className="text-[11px] text-text-subtle">
-                        {item.sourceSheet}:{item.sourceRow} · {item.subcategory}
+        {!loading && !itemQuery && (
+          <div className="mt-3 rounded-2xl border border-dashed border-brand/30 bg-brand-soft/25 px-4 py-10 text-center">
+            <Search size={24} className="mx-auto text-brand" aria-hidden="true" />
+            <p className="mt-2 text-[13px] font-bold text-text">
+              {lang === "ar"
+                ? "اكتب كود الدورة بالأعلى لفتح أسعارها"
+                : "Enter a course code above to open its prices"}
+            </p>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {lang === "ar"
+                ? "لن نعرض مئات الصفوف بدون طلبك."
+                : "Hundreds of rows stay hidden until you ask for one."}
+            </p>
+          </div>
+        )}
+
+        {!loading && !!itemQuery && !courseGroups.length && (
+          <EmptyState
+            label={lang === "ar" ? "لم نجد كودًا أو دورة مطابقة" : "No matching code or course"}
+          />
+        )}
+
+        {!loading && !!itemQuery && !!courseGroups.length && (
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {courseGroups.map(([key, rows]) => {
+              const first = rows[0];
+              const open = expandedCourse === key;
+              return (
+                <article
+                  key={key}
+                  className="overflow-hidden rounded-2xl border border-brand/20 bg-surface"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCourse(open ? "" : key)}
+                    className="w-full cursor-pointer p-4 text-start"
+                    aria-expanded={open}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
+                          <BadgeDollarSign size={18} aria-hidden="true" />
+                        </span>
+                        <div>
+                          <div className="mb-1 flex flex-wrap gap-1.5">
+                            <Pill tone="brand">#{first.rawProductCode || "—"}</Pill>
+                            <Pill tone="neutral">{deliveryLabel(first.deliveryType, lang)}</Pill>
+                          </div>
+                          <h3 className="text-[14px] font-bold text-text">{first.courseName}</h3>
+                          <p className="mt-1 text-[11px] text-text-muted">
+                            {rows.length}{" "}
+                            {lang === "ar" ? "قاعدة سعر داخل الكرت" : "pricing rules in this card"}
+                          </p>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-2">{deliveryLabel(item.deliveryType, lang)}</td>
-                    <td className="py-2">{scopeLabel(item.pricingScope, lang)}</td>
-                    <td className="py-2">{methodLabel(item.paymentMethod, lang)}</td>
-                    <td className="py-2 tabular-nums">
-                      {bandText(
-                        {
-                          exact: item.exactPrice,
-                          minimum: item.minimumPrice,
-                          maximum: item.maximumPrice,
-                          currency: item.currency,
-                        },
-                        lang,
-                      )}
-                    </td>
-                    <td className="py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {item.onHold && (
-                          <Pill tone="danger">{lang === "ar" ? "موقوف" : "Hold"}</Pill>
-                        )}
-                        {!item.active && (
-                          <Pill tone="warning">{lang === "ar" ? "غير منشور" : "Inactive"}</Pill>
-                        )}
-                        {item.requiresReview && <Pill tone="warning">{t("pb_needs_review")}</Pill>}
-                        {!item.odooProductId && (
-                          <Pill tone="neutral">{lang === "ar" ? "بدون أودو" : "No Odoo id"}</Pill>
-                        )}
+                      {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </button>
+
+                  {open && (
+                    <div className="animate-in fade-in border-t border-border bg-surface-2/55 p-3 duration-200">
+                      <div className="grid gap-2">
+                        {rows.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3"
+                          >
+                            <div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Pill tone="neutral">{methodLabel(item.paymentMethod, lang)}</Pill>
+                                <Pill tone="brand">{scopeLabel(item.pricingScope, lang)}</Pill>
+                                {item.onHold && (
+                                  <Pill tone="danger">{lang === "ar" ? "موقوف" : "Hold"}</Pill>
+                                )}
+                                {!item.active && (
+                                  <Pill tone="warning">
+                                    {lang === "ar" ? "غير منشور" : "Inactive"}
+                                  </Pill>
+                                )}
+                              </div>
+                              <div className="mt-2 text-[16px] font-black tabular-nums text-text">
+                                {bandText(
+                                  {
+                                    exact: item.exactPrice,
+                                    minimum: item.minimumPrice,
+                                    maximum: item.maximumPrice,
+                                    currency: item.currency,
+                                  },
+                                  lang,
+                                )}
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-text-subtle">
+                                {item.sourceSheet}:{item.sourceRow}
+                                {item.country ? ` · ${item.country}` : ""}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!isDraft || !canWrite}
+                              onClick={() => setEditing(item)}
+                              title={
+                                isDraft
+                                  ? undefined
+                                  : lang === "ar"
+                                    ? "اعمل نسخة قابلة للتعديل أولًا"
+                                    : "Create an editable copy first"
+                              }
+                              className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-brand/25 px-3 text-[12px] font-bold text-brand disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Pencil size={13} aria-hidden="true" />
+                              {lang === "ar" ? "تعديل هذا السعر" : "Edit this price"}
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    </td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        disabled={!isDraft || !canWrite}
-                        onClick={() => setEditing(item)}
-                        title={
-                          isDraft
-                            ? undefined
-                            : lang === "ar"
-                              ? "النسخة المنشورة غير قابلة للتعديل"
-                              : "A published version cannot be edited"
-                        }
-                        className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Pencil size={13} aria-hidden="true" />
-                        {lang === "ar" ? "تعديل" : "Edit"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
       </Card>

@@ -1,5 +1,16 @@
 import { useMemo, useState } from "react";
-import { BadgePercent, Boxes, CircleAlert, Gift, OctagonMinus, Search, Tag } from "lucide-react";
+import {
+  BadgePercent,
+  Boxes,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  CircleDollarSign,
+  Gift,
+  OctagonMinus,
+  Search,
+  Tag,
+} from "lucide-react";
 import { Card, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -151,6 +162,7 @@ function PriceRow({ price }: { price: CatalogPrice }) {
 
 function CourseCard({ entry }: { entry: CatalogEntry }) {
   const { lang } = useI18n();
+  const [open, setOpen] = useState(false);
   const groups = useMemo(() => {
     const order = ["individual", "level", "bundle", "offer", "incentive"];
     return order
@@ -160,30 +172,78 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
       }))
       .filter((group) => group.prices.length);
   }, [entry.prices]);
+  const individualPrices = entry.prices.filter(
+    (price) => price.active && price.scope === "individual",
+  );
+  const previewPool = individualPrices.some((price) => price.currency === "SAR")
+    ? individualPrices.filter((price) => price.currency === "SAR")
+    : individualPrices;
+  const numericPrices = previewPool
+    .map((price) => price.minimum ?? price.exact ?? price.maximum)
+    .filter((value): value is number => value !== null);
+  const previewPrice = previewPool.find(
+    (price) =>
+      price.active &&
+      price.scope === "individual" &&
+      (price.minimum ?? price.exact ?? price.maximum) === Math.min(...numericPrices),
+  );
 
   return (
-    <Card className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-snug text-text">{entry.courseName}</h3>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-text-muted">
-            <span className="inline-flex items-center gap-1">
-              <Tag size={12} aria-hidden="true" />
-              {entry.rawCode || "—"}
+    <Card className="group flex flex-col overflow-hidden border-brand/15 p-0 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="w-full cursor-pointer p-4 text-start"
+        aria-expanded={open}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+              <CircleDollarSign size={19} aria-hidden="true" />
             </span>
-            <span aria-hidden="true">·</span>
-            <span>{entry.subcategory || entry.specialization}</span>
-            <span aria-hidden="true">·</span>
-            <span>{deliveryLabel(entry.deliveryType, lang)}</span>
-            {!!entry.level && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{entry.level}</span>
-              </>
-            )}
-          </p>
+            <div className="min-w-0">
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                <Pill tone="brand">
+                  <Tag size={11} className="me-1" aria-hidden="true" />
+                  {entry.rawCode || "—"}
+                </Pill>
+                <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
+              </div>
+              <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-text">
+                {entry.courseName}
+              </h3>
+              <p className="mt-1 text-[11px] text-text-muted">
+                {entry.subcategory || entry.specialization}
+                {!!entry.level && ` · ${entry.level}`}
+              </p>
+            </div>
+          </div>
+          <span className="text-text-subtle">
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </span>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+
+        <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-surface-2 p-3">
+          <div>
+            <div className="text-[10px] font-semibold text-text-muted">
+              {lang === "ar" ? "السعر يبدأ من" : "Price starts at"}
+            </div>
+            <div className="mt-1 text-[16px] font-black tabular-nums text-brand">
+              {previewPrice ? bandText(previewPrice, lang) : "—"}
+            </div>
+          </div>
+          <span className="text-[11px] font-bold text-brand">
+            {open
+              ? lang === "ar"
+                ? "إغلاق التفاصيل"
+                : "Close details"
+              : lang === "ar"
+                ? "عرض كل الأسعار"
+                : "View all prices"}
+          </span>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1">
           {entry.onHold && (
             <Pill tone="danger">
               <OctagonMinus size={11} className="me-1" aria-hidden="true" />
@@ -218,20 +278,24 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
             <Pill tone="neutral">{lang === "ar" ? "غير مربوط بأودو" : "Not linked to Odoo"}</Pill>
           )}
         </div>
-      </div>
+      </button>
 
-      {groups.map((group) => (
-        <div key={group.scope}>
-          {group.scope !== "individual" && (
-            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-subtle">
-              {scopeLabel(group.scope, lang)}
-            </p>
-          )}
-          {group.prices.map((price) => (
-            <PriceRow key={price.id} price={price} />
+      {open && (
+        <div className="animate-in fade-in slide-in-from-top-1 border-t border-border bg-surface-2/50 p-4 duration-200">
+          {groups.map((group) => (
+            <div key={group.scope} className="rounded-xl bg-surface px-3 first:mt-0 [&+&]:mt-2">
+              {group.scope !== "individual" && (
+                <p className="pt-2 text-[11px] font-semibold uppercase tracking-wide text-text-subtle">
+                  {scopeLabel(group.scope, lang)}
+                </p>
+              )}
+              {group.prices.map((price) => (
+                <PriceRow key={price.id} price={price} />
+              ))}
+            </div>
           ))}
         </div>
-      ))}
+      )}
     </Card>
   );
 }
@@ -409,7 +473,7 @@ export function PriceSearchTab({
                 {entries.length}
               </span>
             </h2>
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {entries.map((entry) => (
                 <CourseCard
                   key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}

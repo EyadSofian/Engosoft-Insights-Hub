@@ -1,10 +1,17 @@
-import { useState } from "react";
-import { BellRing, Link2, Send, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  Link2,
+  Send,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Card, EmptyState, Notice, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
   fmtMoney,
-  matchLabel,
   methodLabel,
   severityLabel,
   severityTone,
@@ -46,6 +53,13 @@ const SEVERITY_MEANING: Record<string, { ar: string; en: string }> = {
   },
 };
 
+const SEVERITY_CARD: Record<string, string> = {
+  critical: "border-danger/35 bg-danger-soft/50 text-danger",
+  warning: "border-warning/35 bg-warning-soft/50 text-warning",
+  needs_review: "border-brand/30 bg-brand-soft/45 text-brand",
+  informational: "border-success/30 bg-success-soft/45 text-success",
+};
+
 /**
  * The alerts tab.
  *
@@ -75,11 +89,32 @@ export function PriceAlertsTab({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [activeSeverity, setActiveSeverity] = useState<string>("all");
+  const [openCourse, setOpenCourse] = useState("");
 
-  const grouped = SEVERITY_ORDER.map((severity) => ({
-    severity,
-    rows: (data?.alerts ?? []).filter((row) => row.severity === severity),
-  })).filter((group) => group.rows.length);
+  const courseAlerts = useMemo(() => {
+    const visible = (data?.alerts ?? []).filter(
+      (row) => activeSeverity === "all" || row.severity === activeSeverity,
+    );
+    const groups = new Map<string, (AuditRow & { alertKey: string })[]>();
+    for (const row of visible) {
+      const key = `${row.productCode || "—"}::${row.productName || "—"}`;
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    return [...groups.entries()].sort(([, left], [, right]) => {
+      const leftRank = Math.min(
+        ...left.map((row) =>
+          SEVERITY_ORDER.indexOf(row.severity as (typeof SEVERITY_ORDER)[number]),
+        ),
+      );
+      const rightRank = Math.min(
+        ...right.map((row) =>
+          SEVERITY_ORDER.indexOf(row.severity as (typeof SEVERITY_ORDER)[number]),
+        ),
+      );
+      return leftRank - rightRank || right.length - left.length;
+    });
+  }, [activeSeverity, data?.alerts]);
 
   const link = async () => {
     if (!linking) return;
@@ -123,12 +158,15 @@ export function PriceAlertsTab({
       {!!note && <Notice tone="info">{note}</Notice>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          {SEVERITY_ORDER.map((severity) => (
-            <Pill key={severity} tone={severityTone(severity)}>
-              {severityLabel(severity, lang)} · {fmtNum(data?.bySeverity[severity] ?? 0)}
-            </Pill>
-          ))}
+        <div>
+          <h2 className="text-[16px] font-bold text-text">
+            {lang === "ar" ? "نظرة سريعة على تنبيهات الأسعار" : "Price alerts overview"}
+          </h2>
+          <p className="mt-1 text-[11px] text-text-muted">
+            {lang === "ar"
+              ? "اختار نوع التنبيه، وبعدها افتح كرت الدورة فقط لو محتاج التفاصيل."
+              : "Choose an alert type, then open only the course you need."}
+          </p>
         </div>
         <button
           type="button"
@@ -152,76 +190,145 @@ export function PriceAlertsTab({
         </button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {SEVERITY_ORDER.map((severity) => {
+          const count = data?.bySeverity[severity] ?? 0;
+          const active = activeSeverity === severity;
+          return (
+            <button
+              type="button"
+              key={severity}
+              onClick={() => {
+                setActiveSeverity(active ? "all" : severity);
+                setOpenCourse("");
+              }}
+              className={`relative min-h-32 overflow-hidden rounded-2xl border p-4 text-start transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${SEVERITY_CARD[severity]} ${active ? "ring-2 ring-current ring-offset-2 ring-offset-[var(--surface)]" : ""}`}
+            >
+              <span className="absolute -end-3 -top-5 text-[78px] font-black leading-none opacity-[0.08]">
+                {count}
+              </span>
+              <span className="grid size-9 place-items-center rounded-xl bg-current/10">
+                {severity === "critical" ? (
+                  <TriangleAlert size={17} aria-hidden="true" />
+                ) : severity === "informational" ? (
+                  <ShieldCheck size={17} aria-hidden="true" />
+                ) : (
+                  <CircleAlert size={17} aria-hidden="true" />
+                )}
+              </span>
+              <div className="mt-4 text-[24px] font-black tabular-nums">{fmtNum(count)}</div>
+              <div className="text-[12px] font-bold">{severityLabel(severity, lang)}</div>
+              <div className="mt-1 line-clamp-1 text-[10px] opacity-80">
+                {SEVERITY_MEANING[severity]?.[lang]}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       {loading && <Skeleton className="h-64 w-full rounded-2xl" />}
 
-      {!loading && !grouped.length && (
+      {!loading && !courseAlerts.length && (
         <EmptyState
           label={lang === "ar" ? "لا توجد تنبيهات في هذه الفترة" : "No alerts in this period"}
         />
       )}
 
-      {grouped.map((group) => (
-        <Card key={group.severity}>
-          <SectionTitle hint={SEVERITY_MEANING[group.severity]?.[lang]}>
-            <span className="inline-flex items-center gap-2">
-              {group.severity === "critical" ? (
-                <TriangleAlert size={16} aria-hidden="true" />
-              ) : (
-                <BellRing size={16} aria-hidden="true" />
-              )}
-              {severityLabel(group.severity, lang)}
-              <Pill tone={severityTone(group.severity)}>{group.rows.length}</Pill>
-            </span>
-          </SectionTitle>
-
-          <ul className="space-y-2">
-            {group.rows.map((row) => (
-              <li key={row.invoiceLineId} className="rounded-xl border border-border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-text">
-                      {row.productName}{" "}
-                      <span className="font-normal text-text-subtle">
-                        ({row.productCode || "—"})
+      {!loading && !!courseAlerts.length && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {courseAlerts.map(([key, rows]) => {
+            const first = rows[0];
+            const worst = [...rows].sort(
+              (left, right) =>
+                SEVERITY_ORDER.indexOf(left.severity as (typeof SEVERITY_ORDER)[number]) -
+                SEVERITY_ORDER.indexOf(right.severity as (typeof SEVERITY_ORDER)[number]),
+            )[0];
+            const open = openCourse === key;
+            return (
+              <article
+                key={key}
+                className={`overflow-hidden rounded-2xl border ${SEVERITY_CARD[worst.severity]}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenCourse(open ? "" : key)}
+                  className="w-full cursor-pointer p-4 text-start"
+                  aria-expanded={open}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap gap-1.5">
+                        <Pill tone={severityTone(worst.severity)}>
+                          {severityLabel(worst.severity, lang)}
+                        </Pill>
+                        <Pill tone="neutral">#{first.productCode || "—"}</Pill>
+                      </div>
+                      <h3 className="line-clamp-2 text-[14px] font-bold text-text">
+                        {first.productName || "—"}
+                      </h3>
+                      <p className="mt-1 text-[11px] text-text-muted">
+                        {rows.length}{" "}
+                        {lang === "ar" ? "حالة على هذا الكورس" : "cases for this course"}
+                      </p>
+                    </div>
+                    <div className="text-end">
+                      <div className="text-[10px] font-semibold text-text-muted">
+                        {lang === "ar" ? "بيع فعلي / أقل مسموح" : "Actual / floor"}
+                      </div>
+                      <div className="mt-1 text-[13px] font-black tabular-nums text-text">
+                        {fmtMoney(worst.actualUnitPrice, worst.currency, lang)}
+                        <span className="mx-1 text-text-subtle">/</span>
+                        {fmtMoney(worst.allowedMinimum, worst.currency, lang)}
+                      </div>
+                      <span className="mt-2 inline-block text-current">
+                        {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
                       </span>
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-text-muted">
-                      <span>{row.invoiceNumber}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{row.salesperson || "—"}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{methodLabel(row.paymentMethod, lang)}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{row.paymentDate || row.invoiceDate || "—"}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{matchLabel(row.matchType, lang)}</span>
+                  </div>
+                </button>
+
+                {open && (
+                  <div className="animate-in fade-in border-t border-current/15 bg-surface p-3 duration-200">
+                    <div className="space-y-2">
+                      {rows.map((row) => (
+                        <div
+                          key={row.invoiceLineId}
+                          className="rounded-xl border border-border bg-surface-2/55 p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-[12px] font-bold text-text">
+                                {row.invoiceNumber}
+                              </div>
+                              <div className="mt-1 text-[10px] text-text-muted">
+                                {row.salesperson || "—"} · {methodLabel(row.paymentMethod, lang)} ·{" "}
+                                {row.paymentDate || row.invoiceDate || "—"}
+                              </div>
+                            </div>
+                            <div className="text-end">
+                              <Pill tone={severityTone(row.severity)}>
+                                {statusLabel(row.complianceStatus, lang)}
+                              </Pill>
+                              {row.variancePercent !== null && row.variancePercent > 0 && (
+                                <div className="mt-1 text-[11px] font-bold tabular-nums text-danger">
+                                  −{fmtPct(row.variancePercent * 100, 1)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <p className="mt-2 text-[11px] leading-snug text-text-muted">
+                            {row.reason}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="text-end">
-                    <Pill tone={severityTone(row.severity)}>
-                      {statusLabel(row.complianceStatus, lang)}
-                    </Pill>
-                    <div className="mt-1 text-[13px] font-semibold tabular-nums text-text">
-                      {fmtMoney(row.actualUnitPrice, row.currency, lang)}
-                      {row.allowedMinimum !== null && (
-                        <span className="ms-1 text-[11px] font-normal text-text-muted">
-                          / {fmtMoney(row.allowedMinimum, row.currency, lang)}
-                        </span>
-                      )}
-                    </div>
-                    {row.variancePercent !== null && row.variancePercent > 0 && (
-                      <div className="text-[11px] text-danger tabular-nums">
-                        −{fmtPct(row.variancePercent * 100, 1)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="mt-1.5 text-[12px] leading-snug text-text-muted">{row.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ))}
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       {/* --- rows waiting to be linked ----------------------------------- */}
       <Card>

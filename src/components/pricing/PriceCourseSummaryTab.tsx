@@ -3,19 +3,16 @@ import {
   BadgePercent,
   Banknote,
   BookOpenCheck,
-  OctagonMinus,
+  ChevronDown,
+  ChevronUp,
+  GraduationCap,
+  Layers3,
   Search,
   WalletCards,
 } from "lucide-react";
 import { Card, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
-import {
-  bandText,
-  deliveryLabel,
-  methodLabel,
-  type CatalogEntry,
-  type CatalogPrice,
-} from "./pricing-ui";
+import { bandText, deliveryLabel, type CatalogEntry, type CatalogPrice } from "./pricing-ui";
 import type { CatalogResponse, SearchFilters } from "./PriceSearchTab";
 
 interface FacetResponse {
@@ -90,53 +87,121 @@ function PriceCell({
   );
 }
 
-function MobileCourseCard({ entry }: { entry: CatalogEntry }) {
+const CATEGORY_ACCENTS = [
+  { border: "border-brand/35", surface: "bg-brand-soft/55", icon: "bg-brand text-white" },
+  { border: "border-warning/35", surface: "bg-warning-soft/55", icon: "bg-warning text-white" },
+  { border: "border-success/35", surface: "bg-success-soft/55", icon: "bg-success text-white" },
+  { border: "border-danger/25", surface: "bg-danger-soft/45", icon: "bg-danger text-white" },
+] as const;
+
+function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accentIndex: number }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const [open, setOpen] = useState(false);
   const instalment = activeIndividual(entry, ["tabby", "tamara"], "SAR");
   const cash = activeIndividual(entry, ["cash", "cashier"], "SAR");
   const egypt = activeIndividual(entry, ["any", "cash", "cashier"], "EGP");
   const offer = activeOffer(entry);
   const packages = packagePrices(entry);
+  const accent = CATEGORY_ACCENTS[accentIndex % CATEGORY_ACCENTS.length];
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="border-b border-border bg-surface-2/70 p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-[14px] font-bold leading-snug text-text">{entry.courseName}</h3>
-            <p className="mt-1 text-[11px] text-text-muted">
-              {entry.rawCode || "—"} · {deliveryLabel(entry.deliveryType, lang)}
-            </p>
+    <Card
+      className={`group overflow-hidden border ${accent.border} p-0 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="w-full cursor-pointer p-4 text-start"
+        aria-expanded={open}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={`grid size-10 shrink-0 place-items-center rounded-xl ${accent.icon} shadow-sm`}
+            >
+              <GraduationCap size={18} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <Pill tone="brand">#{entry.rawCode || "—"}</Pill>
+                <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
+                {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
+              </div>
+              <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-text">
+                {entry.courseName}
+              </h3>
+            </div>
           </div>
-          {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-px bg-border">
-        {[
-          [ar ? "تابي / تمارا" : "Tabby / Tamara", instalment],
-          [ar ? "كاش / كاشير" : "Cash / cashier", cash],
-          [ar ? "السعر بالمصري" : "Egypt price", egypt],
-          [ar ? "العرض الحالي" : "Current offer", offer],
-        ].map(([label, price]) => (
-          <div key={String(label)} className="min-h-20 bg-surface p-3">
-            <div className="mb-1 text-[10px] font-semibold text-text-muted">{String(label)}</div>
-            <PriceCell
-              price={price as CatalogPrice | undefined}
-              empty={ar ? "غير محدد" : "Not set"}
-            />
-          </div>
-        ))}
-      </div>
-      {!!packages.length && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 text-[11px]">
-          <Pill tone="brand">{ar ? "باقات متاحة" : "Packages available"}</Pill>
-          <span className="text-text-muted">
-            {packages
-              .slice(0, 2)
-              .map((price) => bandText(price, lang))
-              .join(" · ")}
+          <span className="mt-1 text-text-subtle">
+            {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
           </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className={`rounded-xl ${accent.surface} p-3`}>
+            <div className="text-[10px] font-semibold text-text-muted">
+              {ar ? "تابي / تمارا" : "Tabby / Tamara"}
+            </div>
+            <div className="mt-1">
+              <PriceCell price={instalment} empty={ar ? "غير محدد" : "Not set"} />
+            </div>
+          </div>
+          <div className="rounded-xl bg-surface-2 p-3">
+            <div className="text-[10px] font-semibold text-text-muted">
+              {ar ? "كاش / كاشير" : "Cash / cashier"}
+            </div>
+            <div className="mt-1">
+              <PriceCell price={cash} empty={ar ? "غير محدد" : "Not set"} />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-brand">
+          <span>
+            {open
+              ? ar
+                ? "إخفاء التفاصيل"
+                : "Hide details"
+              : ar
+                ? "فتح تفاصيل السعر"
+                : "Open price details"}
+          </span>
+          <span className="text-text-subtle">
+            {entry.prices.length} {ar ? "سعر" : "prices"}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="animate-in fade-in slide-in-from-top-1 border-t border-border bg-surface-2/55 p-4 duration-200">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="mb-1 text-[10px] font-semibold text-text-muted">
+                {ar ? "السعر بالمصري" : "Egypt price"}
+              </div>
+              <PriceCell price={egypt} empty={ar ? "غير محدد" : "Not set"} />
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="mb-1 text-[10px] font-semibold text-text-muted">
+                {ar ? "العرض الحالي" : "Current offer"}
+              </div>
+              <PriceCell price={offer} empty={ar ? "لا يوجد عرض" : "No offer"} accent />
+            </div>
+          </div>
+          {!!packages.length && (
+            <div className="mt-3 rounded-xl border border-brand/20 bg-brand-soft/40 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                <Pill tone="brand">{ar ? "باقات متاحة" : "Packages available"}</Pill>
+                <span className="font-semibold text-text">
+                  {packages
+                    .slice(0, 3)
+                    .map((price) => bandText(price, lang))
+                    .join(" · ")}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -171,6 +236,7 @@ export function PriceCourseSummaryTab({
   const { lang } = useI18n();
   const ar = lang === "ar";
   const [draft, setDraft] = useState(filters.q);
+  const [showCourses, setShowCourses] = useState(Boolean(filters.q));
 
   const grouped = useMemo(() => {
     const buckets = new Map<string, CatalogEntry[]>();
@@ -179,6 +245,15 @@ export function PriceCourseSummaryTab({
       buckets.set(key, [...(buckets.get(key) ?? []), entry]);
     }
     return [...buckets.entries()];
+  }, [data?.entries]);
+
+  const overview = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of data?.entries ?? []) {
+      const key = entry.specialization || "Others";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].filter(([key]) => isCourseSpecialization(key));
   }, [data?.entries]);
 
   if (error) return <ErrorState message={error} onRetry={onRetry} />;
@@ -222,6 +297,7 @@ export function PriceCourseSummaryTab({
           onSubmit={(event) => {
             event.preventDefault();
             onFilters({ ...filters, q: draft });
+            setShowCourses(true);
           }}
         >
           <div className="relative min-w-0 flex-1">
@@ -251,9 +327,10 @@ export function PriceCourseSummaryTab({
           </span>
           <select
             value={filters.specialization}
-            onChange={(event) =>
-              onFilters({ ...filters, specialization: event.target.value, subcategory: "all" })
-            }
+            onChange={(event) => {
+              onFilters({ ...filters, specialization: event.target.value, subcategory: "all" });
+              setShowCourses(true);
+            }}
             className="min-h-11 rounded-xl border border-border bg-surface px-3 text-[13px] text-text"
           >
             <option value="all">{ar ? "كل التخصصات" : "All specializations"}</option>
@@ -266,7 +343,86 @@ export function PriceCourseSummaryTab({
         </label>
       </Card>
 
+      {!loading && !filters.q && !showCourses && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+            <div>
+              <div className="flex items-center gap-2 text-brand">
+                <Layers3 size={16} aria-hidden="true" />
+                <h2 className="text-[15px] font-bold text-text">
+                  {ar ? "ابدأ من التخصص" : "Start with a specialization"}
+                </h2>
+              </div>
+              <p className="mt-1 text-[11px] text-text-muted">
+                {ar
+                  ? "اضغط على أي كرت لعرض الدورات والأسعار داخله."
+                  : "Open a card to browse its courses and prices."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onFilters({ ...filters, specialization: "all" });
+                setShowCourses(true);
+              }}
+              className="min-h-10 rounded-xl border border-border px-3 text-[12px] font-semibold text-brand hover:bg-brand-soft/40"
+            >
+              {ar ? "عرض كل الدورات" : "Show all courses"}
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {overview.map(([specialization, count], index) => {
+              const accent = CATEGORY_ACCENTS[index % CATEGORY_ACCENTS.length];
+              return (
+                <button
+                  type="button"
+                  key={specialization}
+                  onClick={() => {
+                    onFilters({ ...filters, specialization, subcategory: "all" });
+                    setShowCourses(true);
+                  }}
+                  className={`group relative min-h-32 overflow-hidden rounded-2xl border ${accent.border} ${accent.surface} p-4 text-start transition duration-200 hover:-translate-y-1 hover:shadow-lg`}
+                >
+                  <span className="absolute -end-4 -top-5 text-[72px] font-black leading-none text-current opacity-[0.045]">
+                    {String(count).padStart(2, "0")}
+                  </span>
+                  <span className={`grid size-10 place-items-center rounded-xl ${accent.icon}`}>
+                    <GraduationCap size={18} aria-hidden="true" />
+                  </span>
+                  <div className="mt-4 flex items-end justify-between gap-3">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-text">
+                        {specializationLabel(specialization, ar)}
+                      </h3>
+                      <p className="mt-0.5 text-[11px] text-text-muted">
+                        {count} {ar ? "دورة متاحة" : "available courses"}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-brand">
+                      {ar ? "فتح ←" : "Open →"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
+
+      {!loading && showCourses && !filters.q && (
+        <button
+          type="button"
+          onClick={() => {
+            onFilters({ ...filters, specialization: "all", subcategory: "all" });
+            setShowCourses(false);
+          }}
+          className="inline-flex min-h-10 items-center rounded-xl border border-border px-3 text-[12px] font-bold text-brand hover:bg-brand-soft/35"
+        >
+          {ar ? "← الرجوع لنظرة التخصصات" : "← Back to specialization overview"}
+        </button>
+      )}
 
       {loading && (
         <div className="space-y-3">
@@ -281,6 +437,7 @@ export function PriceCourseSummaryTab({
       )}
 
       {!loading &&
+        (showCourses || Boolean(filters.q)) &&
         grouped.map(([specialization, entries]) => (
           <section key={specialization} className="space-y-2">
             <div className="flex items-center justify-between gap-2 px-1">
@@ -292,109 +449,15 @@ export function PriceCourseSummaryTab({
               </span>
             </div>
 
-            <div className="space-y-2 lg:hidden">
-              {entries.map((entry) => (
-                <MobileCourseCard
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {entries.map((entry, index) => (
+                <CourseSummaryCard
                   key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}
                   entry={entry}
+                  accentIndex={index}
                 />
               ))}
             </div>
-
-            <Card className="hidden overflow-x-auto p-0 lg:block">
-              <table className="w-full min-w-[980px] border-collapse text-start">
-                <thead className="bg-surface-2/90 text-[11px] text-text-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-start font-semibold">
-                      {ar ? "الدورة" : "Course"}
-                    </th>
-                    <th className="px-3 py-3 text-start font-semibold">
-                      {ar ? "النوع" : "Delivery"}
-                    </th>
-                    <th className="px-3 py-3 text-start font-semibold">
-                      {ar ? "تابي / تمارا" : "Tabby / Tamara"}
-                    </th>
-                    <th className="px-3 py-3 text-start font-semibold">
-                      {ar ? "كاش / كاشير" : "Cash / cashier"}
-                    </th>
-                    <th className="px-3 py-3 text-start font-semibold">
-                      {ar ? "السعر بالمصري" : "Egypt price"}
-                    </th>
-                    <th className="px-3 py-3 text-start font-semibold">
-                      {ar ? "العرض أو الباقة" : "Offer / package"}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry) => {
-                    const instalment = activeIndividual(entry, ["tabby", "tamara"], "SAR");
-                    const cash = activeIndividual(entry, ["cash", "cashier"], "SAR");
-                    const egypt = activeIndividual(entry, ["any", "cash", "cashier"], "EGP");
-                    const offer = activeOffer(entry);
-                    const packages = packagePrices(entry);
-                    return (
-                      <tr
-                        key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}
-                        className="border-t border-border align-top transition-colors hover:bg-brand-soft/25"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-start gap-2">
-                            {entry.onHold && (
-                              <OctagonMinus size={15} className="mt-0.5 shrink-0 text-danger" />
-                            )}
-                            <div>
-                              <div className="max-w-[330px] text-[13px] font-bold leading-snug text-text">
-                                {entry.courseName}
-                              </div>
-                              <div className="mt-0.5 text-[10px] text-text-subtle">
-                                {entry.rawCode || "—"} ·{" "}
-                                {entry.subcategory || specializationLabel(entry.specialization, ar)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-[12px] text-text-muted">
-                          {deliveryLabel(entry.deliveryType, lang)}
-                          {!!entry.level && <div className="mt-0.5 text-[10px]">{entry.level}</div>}
-                        </td>
-                        <td className="px-3 py-3">
-                          <PriceCell price={instalment} empty={ar ? "غير محدد" : "Not set"} />
-                        </td>
-                        <td className="px-3 py-3">
-                          <PriceCell price={cash} empty={ar ? "غير محدد" : "Not set"} />
-                        </td>
-                        <td className="px-3 py-3">
-                          <PriceCell price={egypt} empty={ar ? "غير محدد" : "Not set"} />
-                        </td>
-                        <td className="px-3 py-3">
-                          {offer ? (
-                            <div>
-                              <PriceCell price={offer} empty="—" accent />
-                              <div className="mt-1 text-[10px] text-text-subtle">
-                                {methodLabel(offer.paymentMethod, lang)}
-                                {offer.validTo ? ` · ${ar ? "حتى" : "until"} ${offer.validTo}` : ""}
-                              </div>
-                            </div>
-                          ) : packages.length ? (
-                            <div className="space-y-1">
-                              <Pill tone="brand">{ar ? "باقة" : "Package"}</Pill>
-                              <div className="text-[11px] font-semibold text-text">
-                                {packages
-                                  .slice(0, 2)
-                                  .map((price) => bandText(price, lang))
-                                  .join(" · ")}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-[12px] text-text-subtle">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </Card>
           </section>
         ))}
 
