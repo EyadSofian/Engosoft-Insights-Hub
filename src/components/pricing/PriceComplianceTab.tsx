@@ -28,6 +28,7 @@ import {
   statusLabel,
   statusTone,
   type AuditRow,
+  type OdooInvoiceVerification,
   type PriceBookSummary,
 } from "./pricing-ui";
 
@@ -113,7 +114,8 @@ export function InvoiceDialog({ movement, onClose }: { movement: string; onClose
       breakdown: { method: string; raw: string; amount: number }[];
       source: string;
     } | null;
-    odooSearchUrl: string;
+    odooRecordUrl: string;
+    odooVerification: OdooInvoiceVerification;
     error?: string;
   } | null>(null);
 
@@ -129,7 +131,19 @@ export function InvoiceDialog({ movement, onClose }: { movement: string; onClose
           setData({
             lines: [],
             payment: null,
-            odooSearchUrl: "",
+            odooRecordUrl: "",
+            odooVerification: {
+              status: "unavailable",
+              recordId: null,
+              exactName: movement,
+              companyId: null,
+              companyName: "",
+              state: "",
+              moveType: "",
+              auditedLineCount: 0,
+              verifiedLineCount: null,
+              allAuditedLinesMatched: null,
+            },
             error: "Could not load the invoice.",
           });
         }
@@ -207,6 +221,32 @@ export function InvoiceDialog({ movement, onClose }: { movement: string; onClose
           </div>
         )}
 
+        {!!data?.odooVerification && (
+          <Notice tone={data.odooVerification.status === "matched" ? "info" : "warning"}>
+            {data.odooVerification.status === "matched"
+              ? ar
+                ? `تمت مطابقة رقم الفاتورة مباشرةً مع سجل Odoo رقم ${data.odooVerification.recordId}${
+                    data.odooVerification.allAuditedLinesMatched
+                      ? `، وتطابقت البنود الـ${data.odooVerification.verifiedLineCount}.`
+                      : data.odooVerification.verifiedLineCount === null
+                        ? ". تعذر التحقق من البنود حاليًا."
+                        : `، لكن تطابق ${data.odooVerification.verifiedLineCount} من ${data.odooVerification.auditedLineCount} بندًا فقط.`
+                  }`
+                : `Exact Odoo match: account.move #${data.odooVerification.recordId}.`
+              : data.odooVerification.status === "not_found"
+                ? ar
+                  ? "رقم الفاتورة غير موجود في Odoo؛ لذلك لن يظهر أي رابط تقديري."
+                  : "This invoice number was not found in Odoo. No guessed link is shown."
+                : data.odooVerification.status === "ambiguous"
+                  ? ar
+                    ? "ظهر أكثر من سجل مطابق في Odoo؛ تم إيقاف الرابط حتى تتم المراجعة."
+                    : "Multiple Odoo records matched; the link is disabled."
+                  : ar
+                    ? "تعذر التحقق المباشر من Odoo الآن؛ تم إيقاف الرابط بدلًا من تخمينه."
+                    : "Live Odoo verification is unavailable; the link is disabled."}
+          </Notice>
+        )}
+
         {!!data?.lines.length && (
           <ul className="mt-3 space-y-2">
             {data.lines.map((line) => (
@@ -237,15 +277,15 @@ export function InvoiceDialog({ movement, onClose }: { movement: string; onClose
           </ul>
         )}
 
-        {!!data?.odooSearchUrl && (
+        {data?.odooVerification.status === "matched" && !!data.odooRecordUrl && (
           <a
-            href={data.odooSearchUrl}
+            href={data.odooRecordUrl}
             target="_blank"
             rel="noreferrer noopener"
             className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-brand"
           >
             <ExternalLink size={14} aria-hidden="true" />
-            {ar ? "فتح الفاتورة في أودو" : "Open this invoice in Odoo"}
+            {ar ? "فتح سجل الفاتورة الموثّق في أودو" : "Open verified Odoo invoice"}
           </a>
         )}
       </div>

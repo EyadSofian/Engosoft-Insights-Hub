@@ -129,6 +129,19 @@ export interface AuditRow {
   productName: string;
 }
 
+export interface OdooInvoiceVerification {
+  status: "matched" | "not_found" | "ambiguous" | "unavailable";
+  recordId: number | null;
+  exactName: string;
+  companyId: number | null;
+  companyName: string;
+  state: string;
+  moveType: string;
+  auditedLineCount: number;
+  verifiedLineCount: number | null;
+  allAuditedLinesMatched: boolean | null;
+}
+
 /* --- labels ---------------------------------------------------------------- */
 
 type Bilingual = { ar: string; en: string };

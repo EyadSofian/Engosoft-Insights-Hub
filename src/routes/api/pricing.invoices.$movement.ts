@@ -28,19 +28,22 @@ export const Route = createFileRoute("/api/pricing/invoices/$movement")({
           const detail = await complianceRows({ search: movement, limit: 200 });
           const lines = detail.rows.filter((row) => row.invoiceNumber === movement);
           const payments = await readStoredPayments([movement]);
-          const { odooConfig } = await import("@/lib/odoo.server");
-          const odooBase = odooConfig().url;
+          const { verifyOdooInvoice } = await import("@/lib/pricing/odoo-invoice-reference.server");
+          const odoo = await verifyOdooInvoice(
+            movement,
+            lines.map((line) => line.invoiceLineId),
+          );
 
           return json({
             ok: true,
             invoiceNumber: movement,
             lines,
             payment: payments.get(movement) ?? null,
-            // A link, never a credential: whoever opens it authenticates to Odoo
-            // themselves.
-            odooSearchUrl: odooBase
-              ? `${odooBase}/odoo/action-account.action_move_out_invoice_type?search=${encodeURIComponent(movement)}`
-              : "",
+            // This URL is emitted only after an exact live `account.move` match.
+            // Whoever opens it authenticates to Odoo themselves; no credentials
+            // are ever included in the response.
+            odooRecordUrl: odoo.recordUrl,
+            odooVerification: odoo.verification,
             error: detail.error,
           });
         } catch (error) {

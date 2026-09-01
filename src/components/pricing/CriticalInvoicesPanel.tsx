@@ -3,7 +3,12 @@ import { AlertTriangle, ExternalLink, FileSearch, UserRound } from "lucide-react
 import { Card, Pill, Skeleton } from "@/components/ui-bits";
 import { fmtNum, useI18n } from "@/lib/i18n";
 import { InvoiceDialog } from "./PriceComplianceTab";
-import { auditReasonLabel, fmtMoney, type AuditRow } from "./pricing-ui";
+import {
+  auditReasonLabel,
+  fmtMoney,
+  type AuditRow,
+  type OdooInvoiceVerification,
+} from "./pricing-ui";
 
 function invoiceDate(row: AuditRow): string {
   return row.paymentDate || row.invoiceDate || row.saleDate || "";
@@ -41,14 +46,28 @@ export function CriticalInvoicesPanel({
     const popup = window.open("", "_blank");
     try {
       const response = await fetch(`/api/pricing/invoices/${encodeURIComponent(movement)}`);
-      const body = (await response.json()) as { odooSearchUrl?: string };
-      if (!response.ok || !body.odooSearchUrl) throw new Error("missing-link");
-      if (popup) popup.location.href = body.odooSearchUrl;
-      else window.open(body.odooSearchUrl, "_blank", "noopener,noreferrer");
-    } catch {
+      const body = (await response.json()) as {
+        odooRecordUrl?: string;
+        odooVerification?: OdooInvoiceVerification;
+      };
+      if (!response.ok || body.odooVerification?.status !== "matched" || !body.odooRecordUrl) {
+        throw new Error(body.odooVerification?.status || "unavailable");
+      }
+      if (popup) popup.location.href = body.odooRecordUrl;
+      else window.open(body.odooRecordUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
       popup?.close();
+      const reason = error instanceof Error ? error.message : "unavailable";
       setOpenError(
-        ar ? "تعذر فتح الفاتورة في أودو. افتح التفاصيل وحاول مرة أخرى." : "Could not open Odoo.",
+        ar
+          ? reason === "not_found"
+            ? `لم يتم العثور على الفاتورة ${movement} في أودو؛ لم يتم إنشاء رابط تقديري.`
+            : reason === "ambiguous"
+              ? `يوجد أكثر من سجل برقم ${movement} في أودو؛ أوقفنا الفتح حتى تتم المراجعة.`
+              : "تعذر التحقق من الفاتورة مباشرةً في أودو الآن؛ لم يتم إنشاء رابط تقديري."
+          : reason === "not_found"
+            ? `Invoice ${movement} was not found in Odoo. No guessed link was created.`
+            : "Odoo could not be verified. No guessed link was created.",
       );
     } finally {
       setOpeningOdoo("");
@@ -154,8 +173,8 @@ export function CriticalInvoicesPanel({
                       ? "جاري الفتح…"
                       : "Opening…"
                     : ar
-                      ? "فتح في أودو"
-                      : "Open in Odoo"}
+                      ? "تحقق وافتح في أودو"
+                      : "Verify & open in Odoo"}
                 </button>
               </div>
             </article>
