@@ -37,6 +37,7 @@ import {
   type AuthState,
 } from "@/components/pricing/pricing-ui";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
+import { useFilters } from "@/lib/filter-store";
 
 type Tab = "prices" | "invoices" | "team" | "advisor" | "manage" | "alerts";
 
@@ -82,6 +83,7 @@ async function getJson<T>(url: string): Promise<T> {
 function PricingPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const globalFilters = useFilters();
   const navigate = useNavigate({ from: "/pricing" });
   const search = useSearch({ from: "/pricing" });
   const tab: Tab = search.tab ?? "prices";
@@ -106,6 +108,24 @@ function PricingPage() {
   }, []);
 
   useEffect(() => setQuickSearch(searchFilters.q), [searchFilters.q]);
+
+  // The period shown in the global top bar is the period the pricing audit uses.
+  // Keeping a second silent date window here would make a correct percentage
+  // look untrustworthy as soon as the user changes the top-level preset.
+  useEffect(() => {
+    const hasGlobalPeriod =
+      Boolean(globalFilters.from || globalFilters.to) || globalFilters.range === "all";
+    if (!hasGlobalPeriod && !globalFilters.dateBasis) return;
+    setComplianceFilters((current) => {
+      const from = hasGlobalPeriod ? (globalFilters.from ?? "") : current.from;
+      const to = hasGlobalPeriod ? (globalFilters.to ?? "") : current.to;
+      const dateBasis = globalFilters.dateBasis ?? current.dateBasis;
+      if (from === current.from && to === current.to && dateBasis === current.dateBasis) {
+        return current;
+      }
+      return { ...current, from, to, dateBasis, offset: 0 };
+    });
+  }, [globalFilters.dateBasis, globalFilters.from, globalFilters.range, globalFilters.to]);
 
   const setTab = (next: Tab) =>
     void navigate({ search: { tab: next === "prices" ? undefined : next } });

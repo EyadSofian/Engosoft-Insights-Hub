@@ -27,9 +27,13 @@ export function PriceComplianceInfo({
   const rate = kpis?.complianceRate;
   const review = kpis?.needsReviewLines ?? 0;
   const period =
-    from === to
-      ? fmtDate(from, lang)
-      : `${ar ? "من" : "from"} ${fmtDate(from, lang)} ${ar ? "إلى" : "to"} ${fmtDate(to, lang)}`;
+    !from && !to
+      ? ar
+        ? "كل الفترات"
+        : "All time"
+      : from === to
+        ? fmtDate(from, lang)
+        : `${ar ? "من" : "from"} ${fmtDate(from, lang)} ${ar ? "إلى" : "to"} ${fmtDate(to, lang)}`;
 
   return (
     <Popover>
@@ -110,8 +114,8 @@ export function PriceComplianceInfo({
 
           <p className="border-t border-border pt-2 text-[10px] font-semibold text-text-muted">
             {ar
-              ? "هذه النسبة لا تعني كل مبيعات الشركة؛ هي تخص الفترة والفلاتر الظاهرة أعلى الداشبورد فقط."
-              : "This is not all company sales; it follows the active dashboard period and filters."}
+              ? "هذه النسبة لا تعني كل مبيعات الشركة؛ هي تخص فترة التاريخ الظاهرة أعلى الداشبورد. فلتر القنوات الإعلانية لا يؤثر على تقرير الأسعار."
+              : "This is not all company sales. It follows the top date period; advertising-channel filters do not affect pricing compliance."}
           </p>
         </div>
       </PopoverContent>
