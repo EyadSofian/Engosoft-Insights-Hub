@@ -159,6 +159,15 @@ console.log(`  candidate lines   ${result.candidateLines}`);
 console.log(`  audited           ${result.auditedLines}`);
 console.log(`  skipped unchanged ${result.skippedUnchanged}`);
 console.log(`  payments read     ${result.paymentsRead}`);
+console.log(`  line facts read   ${result.lineFactsRead}`);
+console.log(`  lines w/o qty     ${result.linesMissingQuantity}`);
+if (result.lineFactsRejected) {
+  console.log(
+    `  WARNING: ${result.lineFactsRejected} stored line ids resolved to a different invoice in\n` +
+      "  Odoo. Those lines are excluded rather than judged with a borrowed quantity;\n" +
+      "  check what the accounting sync writes into __odoo_line_id.",
+  );
+}
 console.log(`  products resolved ${result.productsResolved}`);
 console.log(`  Odoo calls        ${result.odooCalls}`);
 if (result.unknownPaymentValues?.length) {

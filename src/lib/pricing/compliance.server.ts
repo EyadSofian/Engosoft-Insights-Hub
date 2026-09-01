@@ -186,6 +186,8 @@ export interface AuditRunResult {
   skippedUnchanged: number;
   paymentsRead: number;
   lineFactsRead: number;
+  /** Lines whose stored id resolved to a different invoice in Odoo. */
+  lineFactsRejected: number;
   linesMissingQuantity: number;
   productsResolved: number;
   odooCalls: number;
@@ -249,6 +251,7 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
     skippedUnchanged: 0,
     paymentsRead: 0,
     lineFactsRead: 0,
+    lineFactsRejected: 0,
     linesMissingQuantity: 0,
     productsResolved: 0,
     odooCalls: 0,
@@ -320,6 +323,7 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
   // three-seat invoice into one very expensive seat, so the real numbers are
   // read from `account.move.line` by id — once per line, then cached.
   let lineFactsRead = 0;
+  let lineFactsRejected = 0;
   const needsFacts = lines.filter((line) => line.quantity <= 0);
   if (needsFacts.length) {
     const cached = await readStoredLineFacts(needsFacts.map((line) => line.invoiceLineId));
@@ -342,6 +346,9 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
         for (const fact of read.facts.values())
           cached.set(fact.invoiceLineId, { ...fact, odooProductId: fact.odooProductId || null });
         lineFactsRead = read.facts.size;
+        // A high number here means the stored line ids do not identify Odoo
+        // invoice lines, which is the one assumption this enrichment makes.
+        lineFactsRejected = read.rejected;
       } catch {
         // Without them the affected lines are excluded with a reason, which is
         // honest. It must not fail the run for every other line.
@@ -520,6 +527,7 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
     skippedUnchanged: skipped,
     paymentsRead,
     lineFactsRead,
+    lineFactsRejected,
     linesMissingQuantity,
     productsResolved,
     odooCalls,
