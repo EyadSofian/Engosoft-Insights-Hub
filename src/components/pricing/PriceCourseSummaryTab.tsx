@@ -36,7 +36,7 @@ const specializationLabel = (value: string, arabic: boolean): string =>
   arabic ? SPECIALIZATION_AR[value] || value || "دورات أخرى" : value || "Other courses";
 
 const isCourseSpecialization = (value: string): boolean =>
-  Boolean(SPECIALIZATION_AR[value]) || !/(عرض|حافز|offer|incentive)/i.test(value);
+  Boolean(SPECIALIZATION_AR[value]) || !/(عرض|عروض|حافز|offer|incentive)/i.test(value);
 
 const activeIndividual = (entry: CatalogEntry, methods: string[], currency: string) =>
   entry.prices.find(
