@@ -3,22 +3,30 @@ import {
   BadgePercent,
   Banknote,
   BookOpenCheck,
-  CalendarClock,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
   GraduationCap,
-  Layers3,
-  Search,
   WalletCards,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import { Card, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
-import { bandText, deliveryLabel, type CatalogEntry, type CatalogPrice } from "./pricing-ui";
+import {
+  bandText,
+  deliveryLabel,
+  methodLabel,
+  scopeLabel,
+  type CatalogEntry,
+  type CatalogPrice,
+} from "./pricing-ui";
 import type { CatalogResponse, SearchFilters } from "./PriceSearchTab";
 
 interface FacetResponse {
   configured: boolean;
-  facets: { specializations: string[] } | null;
+  facets: {
+    specializations: string[];
+    deliveryTypes?: string[];
+  } | null;
 }
 
 const SPECIALIZATION_AR: Record<string, string> = {
@@ -30,41 +38,87 @@ const SPECIALIZATION_AR: Record<string, string> = {
   Others: "دورات أخرى",
 };
 
-const specializationLabel = (value: string, arabic: boolean): string =>
-  arabic ? SPECIALIZATION_AR[value] || value || "دورات أخرى" : value || "Other courses";
-
-const sourceLabel = (value: string, arabic: boolean): string =>
-  arabic ? SPECIALIZATION_AR[value] || value : value;
-
-const dateLabel = (value: string, lang: string): string => {
-  if (!value) return "";
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return value;
-  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
+const ACCENTS: Record<string, { border: string; icon: string; glow: string }> = {
+  Management: {
+    border: "border-danger/20",
+    icon: "bg-danger-soft text-danger",
+    glow: "from-danger/10",
+  },
+  "Mech & Elec": {
+    border: "border-brand/25",
+    icon: "bg-brand-soft text-brand",
+    glow: "from-brand/10",
+  },
+  "BIM all": {
+    border: "border-warning/25",
+    icon: "bg-warning-soft text-warning",
+    glow: "from-warning/10",
+  },
+  "Architecture & Decor": {
+    border: "border-brand/25",
+    icon: "bg-brand-soft text-brand",
+    glow: "from-brand/10",
+  },
+  "Civil Courses": {
+    border: "border-success/25",
+    icon: "bg-success-soft text-success",
+    glow: "from-success/10",
+  },
+  Others: {
+    border: "border-warning/20",
+    icon: "bg-warning-soft text-warning",
+    glow: "from-warning/10",
+  },
 };
 
-const isCourseSpecialization = (value: string): boolean =>
+const specializationLabel = (value: string, ar: boolean) =>
+  ar ? SPECIALIZATION_AR[value] || value || "دورات أخرى" : value || "Other courses";
+
+const isCourseSpecialization = (value: string) =>
   Boolean(SPECIALIZATION_AR[value]) || !/(عرض|عروض|حافز|offer|incentive)/i.test(value);
 
-const activeIndividual = (
+const today = () => new Date().toISOString().slice(0, 10);
+
+const activeOffers = (entry: CatalogEntry) =>
+  entry.prices.filter(
+    (price) =>
+      price.active &&
+      price.scope === "offer" &&
+      (!price.validFrom || price.validFrom <= today()) &&
+      (!price.validTo || price.validTo >= today()),
+  );
+
+type ContentKind = "all" | "course" | "package" | "offer";
+
+const isPackage = (entry: CatalogEntry) =>
+  entry.prices.some(
+    (price) =>
+      price.scope === "bundle" || price.scope === "level" || Boolean(price.bundleName?.trim()),
+  );
+
+const matchesKind = (entry: CatalogEntry, kind: ContentKind) => {
+  if (kind === "all") return true;
+  if (kind === "package") return isPackage(entry);
+  if (kind === "offer") return activeOffers(entry).length > 0;
+  return !isPackage(entry);
+};
+
+const activeSellPrice = (
   entry: CatalogEntry,
   methods: string[],
   currency: string,
 ): CatalogPrice | undefined => {
-  const candidates = entry.prices.filter(
+  const preferredScopes = isPackage(entry) ? ["bundle", "level"] : ["individual"];
+  const available = entry.prices.filter(
     (price) =>
       price.active &&
-      price.scope === "individual" &&
       price.currency === currency &&
-      methods.includes(price.paymentMethod),
+      (methods.includes(price.paymentMethod) || price.paymentMethod === "any") &&
+      !["offer", "incentive"].includes(price.scope),
   );
+  const preferred = available.filter((price) => preferredScopes.includes(price.scope));
+  const candidates = preferred.length ? preferred : available;
   if (!candidates.length) return undefined;
-
   const floors = candidates
     .map((price) => price.minimum ?? price.exact ?? price.maximum)
     .filter((value): value is number => value !== null);
@@ -72,7 +126,6 @@ const activeIndividual = (
     .map((price) => price.maximum ?? price.exact ?? price.minimum)
     .filter((value): value is number => value !== null);
   if (!floors.length || !ceilings.length) return candidates[0];
-
   const minimum = Math.min(...floors);
   const maximum = Math.max(...ceilings);
   return {
@@ -84,210 +137,182 @@ const activeIndividual = (
   };
 };
 
-const activeOffer = (entry: CatalogEntry) =>
-  entry.prices.find(
-    (price) =>
-      price.active &&
-      price.scope === "offer" &&
-      (!price.validFrom || price.validFrom <= new Date().toISOString().slice(0, 10)) &&
-      (!price.validTo || price.validTo >= new Date().toISOString().slice(0, 10)) &&
-      (price.exact !== null || price.minimum !== null || price.maximum !== null),
-  );
-
-const packagePrices = (entry: CatalogEntry) =>
-  entry.prices.filter(
-    (price) =>
-      price.active &&
-      (price.scope === "bundle" || price.scope === "level") &&
-      (price.exact !== null || price.minimum !== null || price.maximum !== null),
-  );
-
-function PriceCell({
+function PriceBlock({
+  label,
   price,
-  empty,
-  accent = false,
+  Icon,
 }: {
+  label: string;
   price?: CatalogPrice;
-  empty: string;
-  accent?: boolean;
+  Icon: LucideIcon;
 }) {
   const { lang } = useI18n();
-  if (!price) return <span className="text-[12px] text-text-subtle">{empty}</span>;
+  const ar = lang === "ar";
   return (
-    <div className="space-y-0.5">
-      <div
-        className={`text-[13px] font-bold tabular-nums ${accent ? "text-warning" : "text-text"}`}
-      >
-        {bandText(price, lang)}
+    <div className="min-w-0 rounded-xl border border-border/75 bg-surface/80 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
+        <Icon size={12} className="text-brand" aria-hidden="true" />
+        {label}
       </div>
-      {price.minimum !== null && price.maximum !== null && price.minimum !== price.maximum && (
-        <div className="text-[10px] text-text-subtle">
-          {lang === "ar" ? "أول رقم هو أقل سعر مسموح" : "The first value is the floor"}
-        </div>
-      )}
+      <div className="mt-1 truncate text-[13px] font-black tabular-nums text-text">
+        {price ? bandText(price, lang) : ar ? "غير محدد" : "Not set"}
+      </div>
     </div>
   );
 }
 
-const CATEGORY_ACCENTS = [
-  { border: "border-brand/35", surface: "bg-brand-soft/55", icon: "bg-brand text-white" },
-  { border: "border-warning/35", surface: "bg-warning-soft/55", icon: "bg-warning text-white" },
-  { border: "border-success/35", surface: "bg-success-soft/55", icon: "bg-success text-white" },
-  { border: "border-danger/25", surface: "bg-danger-soft/45", icon: "bg-danger text-white" },
-] as const;
-
-function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accentIndex: number }) {
+function CoursePriceDialog({ entry, onClose }: { entry: CatalogEntry; onClose: () => void }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [open, setOpen] = useState(false);
-  const instalment = activeIndividual(entry, ["tabby", "tamara"], "SAR");
-  const cash = activeIndividual(entry, ["cash", "cashier"], "SAR");
-  const egypt = activeIndividual(entry, ["any", "cash", "cashier"], "EGP");
-  const offer = activeOffer(entry);
-  const packages = packagePrices(entry);
-  const accent = CATEGORY_ACCENTS[accentIndex % CATEGORY_ACCENTS.length];
-
   return (
-    <Card
-      className={`group overflow-hidden border ${accent.border} p-0 transition-shadow hover:shadow-md`}
+    <div
+      className="fixed inset-0 z-50 grid place-items-end bg-black/45 sm:place-items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={entry.courseName}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <div className={`h-1 w-full ${accent.icon.split(" ")[0]}`} aria-hidden="true" />
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="w-full cursor-pointer px-5 py-4 text-start"
-        aria-expanded={open}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <span
-              className={`grid size-10 shrink-0 place-items-center rounded-xl ${accent.icon} shadow-sm`}
-            >
-              <GraduationCap size={18} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                <Pill tone="brand">#{entry.rawCode || "—"}</Pill>
-                <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
-                {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
-              </div>
-              <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-text">
-                {entry.courseName}
-              </h3>
-            </div>
-          </div>
-          <span className="mt-1 text-text-subtle">
-            {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-          </span>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className={`rounded-xl ${accent.surface} px-4 py-3`}>
-            <div className="text-[11px] font-semibold text-text-muted">
-              {ar ? "تابي / تمارا" : "Tabby / Tamara"}
-            </div>
-            <div className="mt-1">
-              <PriceCell price={instalment} empty={ar ? "غير محدد" : "Not set"} />
-            </div>
-          </div>
-          <div className="rounded-xl bg-surface-2 px-4 py-3">
-            <div className="text-[11px] font-semibold text-text-muted">
-              {ar ? "كاش / كاشير" : "Cash / cashier"}
-            </div>
-            <div className="mt-1">
-              <PriceCell price={cash} empty={ar ? "غير محدد" : "Not set"} />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-[12px] font-semibold text-brand">
-          <span>
-            {open
-              ? ar
-                ? "إخفاء التفاصيل"
-                : "Hide details"
-              : ar
-                ? "فتح تفاصيل السعر"
-                : "Open price details"}
-          </span>
-          <span className="text-text-subtle">
-            {entry.prices.length} {ar ? "سعر" : "prices"}
-          </span>
-        </div>
-      </button>
-
-      {open && (
-        <div className="animate-in fade-in border-t border-border bg-surface-2/55 px-5 py-4 duration-200">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-surface px-4 py-3">
-              <div className="mb-1 text-[11px] font-semibold text-text-muted">
-                {ar ? "السعر بالمصري" : "Egypt price"}
-              </div>
-              <PriceCell price={egypt} empty={ar ? "غير محدد" : "Not set"} />
-            </div>
-            <div className="rounded-xl border border-warning/30 bg-warning-soft/30 px-4 py-3">
-              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
-                <BadgePercent size={13} aria-hidden="true" />
-                {ar ? "سعر عرض منشور" : "Published offer price"}
-              </div>
-              <PriceCell price={offer} empty={ar ? "لا يوجد عرض ساري" : "No live offer"} accent />
-              {offer && (
-                <div className="mt-2 space-y-1 border-t border-warning/20 pt-2 text-[10px] leading-relaxed text-text-muted">
-                  <div>
-                    {ar ? "طريقة الدفع:" : "Payment:"}{" "}
-                    <strong>
-                      {offer.paymentMethod === "cash"
-                        ? ar
-                          ? "كاش"
-                          : "Cash"
-                        : offer.paymentMethod === "cashier"
-                          ? ar
-                            ? "كاشير"
-                            : "Cashier"
-                          : offer.paymentMethod}
-                    </strong>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <CalendarClock size={11} aria-hidden="true" />
-                    <span>
-                      {ar ? "المصدر: قائمة الأسعار" : "Source: price list"} ·{" "}
-                      {sourceLabel(offer.sourceSheet, ar)} · {ar ? "صف" : "row"} {offer.sourceRow}
-                      {offer.validTo
-                        ? ` · ${ar ? "حتى" : "until"} ${dateLabel(offer.validTo, lang)}`
-                        : ""}
-                    </span>
-                  </div>
-                </div>
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-[24px] border border-border bg-surface p-5 shadow-2xl sm:rounded-[24px] sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap gap-1.5">
+              <Pill tone="brand">#{entry.rawCode || "—"}</Pill>
+              <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
+              {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
+              {entry.requiresReview && (
+                <Pill tone="warning">{ar ? "يحتاج مراجعة" : "Needs review"}</Pill>
               )}
             </div>
+            <h2 className="mt-3 text-[19px] font-black leading-snug text-text">
+              {entry.courseName}
+            </h2>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {specializationLabel(entry.specialization, ar)} · {entry.subcategory || "—"}
+            </p>
           </div>
-          {!!packages.length && (
-            <div className="mt-3 rounded-xl border border-brand/20 bg-brand-soft/40 p-3">
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                <Pill tone="brand">{ar ? "باقات متاحة" : "Packages available"}</Pill>
-                <span className="font-semibold text-text">
-                  {packages
-                    .slice(0, 3)
-                    .map((price) => bandText(price, lang))
-                    .join(" · ")}
-                </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-border text-text-muted hover:bg-surface-2"
+            aria-label={ar ? "إغلاق" : "Close"}
+          >
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {entry.prices.map((price) => (
+            <div
+              key={price.id}
+              className={`rounded-2xl border p-3.5 ${
+                price.scope === "offer"
+                  ? "border-warning/30 bg-warning-soft/25"
+                  : "border-border bg-surface-2/45"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  <Pill tone={price.scope === "offer" ? "warning" : "neutral"}>
+                    {scopeLabel(price.scope, lang)}
+                  </Pill>
+                  <Pill tone="neutral">{methodLabel(price.paymentMethod, lang)}</Pill>
+                </div>
+                <strong className="text-[14px] tabular-nums text-text">
+                  {bandText(price, lang)}
+                </strong>
+              </div>
+              <div className="mt-2 text-[10px] leading-relaxed text-text-subtle">
+                {ar ? "مرجع قائمة الأسعار" : "Price-list reference"} · {ar ? "الصف" : "row"}{" "}
+                {price.sourceRow}
+                {price.validTo
+                  ? ` · ${ar ? "ساري حتى" : "valid until"} ${new Intl.DateTimeFormat(
+                      ar ? "ar-EG" : "en-GB",
+                    ).format(new Date(`${price.validTo}T00:00:00`))}`
+                  : ""}
               </div>
             </div>
-          )}
+          ))}
         </div>
-      )}
-    </Card>
+      </div>
+    </div>
   );
 }
 
-/**
- * A one-line-per-course price sheet for the sales floor.
- *
- * The full search tab preserves every rule and note. This view deliberately
- * reduces the same published data to the four answers a seller asks for most:
- * instalment, cash, Egyptian price and the live offer. No second copy of the
- * prices is created, so editing or publishing a book updates both views.
- */
+function CourseCompactCard({ entry }: { entry: CatalogEntry }) {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const [open, setOpen] = useState(false);
+  const instalment = activeSellPrice(entry, ["tabby", "tamara"], "SAR");
+  const cash = activeSellPrice(entry, ["cash", "cashier"], "SAR");
+  const egypt = activeSellPrice(entry, ["any", "cash", "cashier"], "EGP");
+  const offers = activeOffers(entry);
+  const accent = ACCENTS[entry.specialization] ?? ACCENTS.Others;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`group relative min-h-[188px] overflow-hidden rounded-2xl border ${accent.border} bg-surface p-3.5 text-start shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
+      >
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${accent.glow} to-transparent`}
+          aria-hidden="true"
+        />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Pill tone="brand">#{entry.rawCode || "—"}</Pill>
+              <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
+              {entry.onHold && <Pill tone="danger">{ar ? "موقوف" : "On hold"}</Pill>}
+            </div>
+            <h3 className="mt-2 line-clamp-2 min-h-9 text-[12px] font-black leading-snug text-text">
+              {entry.courseName}
+            </h3>
+          </div>
+          <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${accent.icon}`}>
+            <GraduationCap size={16} aria-hidden="true" />
+          </span>
+        </div>
+
+        <div className="relative mt-2.5 grid grid-cols-2 gap-2">
+          <PriceBlock
+            label={ar ? "تابي / تمارا" : "Tabby / Tamara"}
+            price={instalment}
+            Icon={WalletCards}
+          />
+          <PriceBlock label={ar ? "كاش" : "Cash"} price={cash} Icon={Banknote} />
+        </div>
+
+        <div className="relative mt-2.5 flex min-h-7 items-center justify-between gap-2 border-t border-border/70 pt-2">
+          <div className="min-w-0 text-[10px] text-text-muted">
+            <span>{ar ? "السعر المصري" : "Egypt price"}</span>
+            <strong className="ms-1.5 tabular-nums text-text">
+              {egypt ? bandText(egypt, lang) : "—"}
+            </strong>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {!!offers.length && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-1 text-[10px] font-bold text-warning">
+                <BadgePercent size={11} aria-hidden="true" />
+                {offers.length} {ar ? "عرض" : "offers"}
+              </span>
+            )}
+            <ChevronLeft
+              size={15}
+              className="text-text-subtle transition group-hover:-translate-x-0.5"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+      </button>
+      {open && <CoursePriceDialog entry={entry} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 export function PriceCourseSummaryTab({
   filters,
   onFilters,
@@ -296,7 +321,6 @@ export function PriceCourseSummaryTab({
   loading,
   error,
   onRetry,
-  embeddedSearch = true,
 }: {
   filters: SearchFilters;
   onFilters: (next: SearchFilters) => void;
@@ -305,240 +329,159 @@ export function PriceCourseSummaryTab({
   loading: boolean;
   error?: string;
   onRetry: () => void;
-  embeddedSearch?: boolean;
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [draft, setDraft] = useState(filters.q);
-  const [showCourses, setShowCourses] = useState(Boolean(filters.q));
+  const [kind, setKind] = useState<ContentKind>("all");
 
   const grouped = useMemo(() => {
-    const buckets = new Map<string, CatalogEntry[]>();
-    for (const entry of data?.entries ?? []) {
+    const groups = new Map<string, CatalogEntry[]>();
+    for (const entry of (data?.entries ?? []).filter((course) => matchesKind(course, kind))) {
       const key = entry.specialization || "Others";
-      buckets.set(key, [...(buckets.get(key) ?? []), entry]);
+      groups.set(key, [...(groups.get(key) ?? []), entry]);
     }
-    return [...buckets.entries()];
-  }, [data?.entries]);
+    return [...groups.entries()];
+  }, [data?.entries, kind]);
 
-  const overview = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of data?.entries ?? []) {
-      const key = entry.specialization || "Others";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return [...counts.entries()].filter(([key]) => isCourseSpecialization(key));
-  }, [data?.entries]);
+  const specializations = (facets?.facets?.specializations ?? []).filter(isCourseSpecialization);
+  const deliveryTypes = facets?.facets?.deliveryTypes ?? [];
 
   if (error) return <ErrorState message={error} onRetry={onRetry} />;
 
+  const visibleCount = grouped.reduce((sum, [, entries]) => sum + entries.length, 0);
+  const kindTabs: { value: ContentKind; label: string }[] = [
+    { value: "all", label: ar ? "الكل" : "All" },
+    { value: "course", label: ar ? "الدورات" : "Courses" },
+    { value: "package", label: ar ? "الباقات" : "Packages" },
+    { value: "offer", label: ar ? "العروض السارية" : "Live offers" },
+  ];
+
   return (
     <div className="space-y-4">
-      <Card className="border-brand/20 px-5 py-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <div className="flex items-center gap-2 text-brand">
-              <BookOpenCheck size={18} aria-hidden="true" />
-              <h2 className="text-[16px] font-bold">
-                {ar ? "ملخص أسعار كل دورة" : "Course price summary"}
+      <Card className="space-y-3.5 border-brand/20 p-3.5 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-brand">
+            <BookOpenCheck size={17} aria-hidden="true" />
+            <div>
+              <h2 className="text-[14px] font-black text-text">
+                {ar ? "اختر التخصص" : "Choose a specialization"}
               </h2>
+              <p className="mt-0.5 text-[10px] text-text-muted">
+                {ar
+                  ? "ستظهر الكورسات والباقات التابعة للتخصص فقط."
+                  : "Only courses and packages in the selected specialization appear."}
+              </p>
             </div>
-            <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-text-muted">
-              {ar
-                ? "اختر الدورة لمعرفة سعر الكاش والتقسيط. أي عرض يظهر هنا يكون منشورًا وساري التاريخ، مع توضيح مصدره."
-                : "Find a course and read instalment or cash pricing immediately. The first value in a range is the allowed floor."}
-            </p>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <WalletCards size={13} className="text-brand" /> {ar ? "سعر التقسيط" : "Instalment"}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Banknote size={13} className="text-success" /> {ar ? "سعر الكاش" : "Cash"}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <BadgePercent size={13} className="text-warning" />{" "}
-              {ar ? "العرض المنشور فقط" : "Published offers only"}
-            </span>
+          <Pill tone="brand">
+            {visibleCount} {ar ? "نتيجة" : "results"}
+          </Pill>
+        </div>
+
+        <div className="hscroll">
+          <div className="flex min-w-max gap-1.5 border-b border-border pb-3">
+            {["all", ...specializations].map((value) => (
+              <button
+                type="button"
+                key={value}
+                onClick={() => onFilters({ ...filters, specialization: value, subcategory: "all" })}
+                className={`min-h-9 rounded-xl border px-3.5 text-[11px] font-bold transition ${
+                  filters.specialization === value
+                    ? "border-brand bg-brand text-white"
+                    : "border-border bg-surface text-text-muted hover:bg-surface-2"
+                }`}
+              >
+                {value === "all"
+                  ? ar
+                    ? "كل التخصصات"
+                    : "All specializations"
+                  : specializationLabel(value, ar)}
+              </button>
+            ))}
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="hscroll">
+            <div className="flex min-w-max gap-1.5">
+              {kindTabs.map((item) => (
+                <button
+                  type="button"
+                  key={item.value}
+                  onClick={() => setKind(item.value)}
+                  className={`min-h-8 rounded-lg px-3 text-[10px] font-bold transition ${
+                    kind === item.value
+                      ? "bg-brand-soft text-brand ring-1 ring-brand/25"
+                      : "bg-surface-2 text-text-muted hover:text-text"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!!deliveryTypes.length && (
+            <div className="hscroll">
+              <div className="flex min-w-max gap-1.5">
+                {["all", ...deliveryTypes].map((value) => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => onFilters({ ...filters, deliveryType: value })}
+                    className={`min-h-8 rounded-lg border px-2.5 text-[10px] font-semibold transition ${
+                      filters.deliveryType === value
+                        ? "border-[#10262d] bg-[#10262d] text-white"
+                        : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+                    }`}
+                  >
+                    {value === "all"
+                      ? ar
+                        ? "كل الأنواع"
+                        : "All types"
+                      : deliveryLabel(value, lang)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
-      <Card
-        className={
-          embeddedSearch
-            ? "grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-end"
-            : "flex justify-end px-4 py-3"
-        }
-      >
-        {embeddedSearch && (
-          <form
-            role="search"
-            className="flex flex-col gap-2 sm:flex-row"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onFilters({ ...filters, q: draft });
-              setShowCourses(true);
-            }}
-          >
-            <div className="relative min-w-0 flex-1">
-              <Search
-                size={16}
-                className="pointer-events-none absolute inset-y-0 start-3 my-auto text-text-subtle"
-              />
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                type="search"
-                aria-label={ar ? "ابحث باسم الدورة أو الكود" : "Search by course or code"}
-                placeholder={ar ? "اكتب اسم الدورة أو الكود…" : "Course name or code…"}
-                className="min-h-11 w-full rounded-xl border border-border bg-surface ps-9 pe-3 text-[13px] text-text"
-              />
-            </div>
-            <button
-              type="submit"
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 text-[13px] font-bold text-white transition hover:brightness-110"
-            >
-              {ar ? "بحث" : "Search"}
-            </button>
-          </form>
-        )}
-        <label className="flex w-full min-w-0 flex-col gap-1 sm:w-60">
-          <span className="text-[10px] font-semibold text-text-muted">
-            {ar ? "التخصص" : "Specialization"}
-          </span>
-          <select
-            value={filters.specialization}
-            onChange={(event) => {
-              onFilters({ ...filters, specialization: event.target.value, subcategory: "all" });
-              setShowCourses(true);
-            }}
-            className="min-h-11 rounded-xl border border-border bg-surface px-3 text-[13px] text-text"
-          >
-            <option value="all">{ar ? "كل التخصصات" : "All specializations"}</option>
-            {(facets?.facets?.specializations ?? []).filter(isCourseSpecialization).map((value) => (
-              <option key={value} value={value}>
-                {specializationLabel(value, ar)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </Card>
-
-      {!loading && !filters.q && !showCourses && (
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3 px-1">
-            <div>
-              <div className="flex items-center gap-2 text-brand">
-                <Layers3 size={16} aria-hidden="true" />
-                <h2 className="text-[15px] font-bold text-text">
-                  {ar ? "ابدأ من التخصص" : "Start with a specialization"}
-                </h2>
-              </div>
-              <p className="mt-1 text-[11px] text-text-muted">
-                {ar
-                  ? "اضغط على أي كرت لعرض الدورات والأسعار داخله."
-                  : "Open a card to browse its courses and prices."}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onFilters({ ...filters, specialization: "all" });
-                setShowCourses(true);
-              }}
-              className="min-h-10 rounded-xl border border-border px-3 text-[12px] font-semibold text-brand hover:bg-brand-soft/40"
-            >
-              {ar ? "عرض كل الدورات" : "Show all courses"}
-            </button>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {overview.map(([specialization, count], index) => {
-              const accent = CATEGORY_ACCENTS[index % CATEGORY_ACCENTS.length];
-              return (
-                <button
-                  type="button"
-                  key={specialization}
-                  onClick={() => {
-                    onFilters({ ...filters, specialization, subcategory: "all" });
-                    setShowCourses(true);
-                  }}
-                  className={`group min-h-32 rounded-2xl border ${accent.border} ${accent.surface} p-5 text-start transition-shadow hover:shadow-md`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className={`grid size-10 place-items-center rounded-xl ${accent.icon}`}>
-                      <GraduationCap size={18} aria-hidden="true" />
-                    </span>
-                    <span className="rounded-full bg-surface/70 px-2.5 py-1 text-[12px] font-bold tabular-nums text-text">
-                      {count}
-                    </span>
-                  </div>
-                  <div className="mt-5 flex items-end justify-between gap-3">
-                    <div>
-                      <h3 className="text-[15px] font-bold text-text">
-                        {specializationLabel(specialization, ar)}
-                      </h3>
-                      <p className="mt-0.5 text-[11px] text-text-muted">
-                        {count} {ar ? "دورة متاحة" : "available courses"}
-                      </p>
-                    </div>
-                    <span className="text-[11px] font-bold text-brand">
-                      {ar ? "عرض الدورات" : "View courses"}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
-
-      {!loading && showCourses && !filters.q && (
-        <button
-          type="button"
-          onClick={() => {
-            onFilters({ ...filters, specialization: "all", subcategory: "all" });
-            setShowCourses(false);
-          }}
-          className="inline-flex min-h-10 items-center rounded-xl border border-border px-3 text-[12px] font-bold text-brand hover:bg-brand-soft/35"
-        >
-          {ar ? "← الرجوع لنظرة التخصصات" : "← Back to specialization overview"}
-        </button>
+      {!!data?.error && (
+        <Notice tone="warning">
+          {ar ? "تعذر تحميل بيانات قائمة الأسعار من قاعدة البيانات." : data.error}
+        </Notice>
       )}
 
       {loading && (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }, (_, index) => (
-            <Skeleton key={index} className="h-20 w-full rounded-2xl" />
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <Skeleton key={index} className="h-[188px] w-full rounded-2xl" />
           ))}
         </div>
       )}
 
-      {!loading && !data?.entries.length && !data?.error && (
+      {!loading && !visibleCount && !data?.error && (
         <EmptyState label={ar ? "لا توجد دورات مطابقة" : "No matching courses"} />
       )}
 
       {!loading &&
-        (showCourses || Boolean(filters.q)) &&
         grouped.map(([specialization, entries]) => (
-          <section key={specialization} className="space-y-2">
-            <div className="flex items-center justify-between gap-2 px-1">
-              <h2 className="text-[14px] font-bold text-text">
+          <section key={specialization} className="space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-[13px] font-black text-text">
                 {specializationLabel(specialization, ar)}
               </h2>
-              <span className="text-[11px] text-text-subtle">
+              <span className="text-[10px] text-text-subtle">
                 {entries.length} {ar ? "دورة" : "courses"}
               </span>
             </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              {entries.map((entry, index) => (
-                <CourseSummaryCard
-                  key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {entries.map((entry) => (
+                <CourseCompactCard
+                  key={`${entry.code}:${entry.deliveryType}:${entry.subcategory}:${entry.level}`}
                   entry={entry}
-                  accentIndex={index}
                 />
               ))}
             </div>
@@ -548,8 +491,8 @@ export function PriceCourseSummaryTab({
       {!!data?.truncated && (
         <Notice tone="info">
           {ar
-            ? "المعروض أول صفحة فقط. استخدم البحث أو التخصص للوصول لباقي الدورات."
-            : "Only the first page is shown. Use search or specialization to reach the rest."}
+            ? "استخدم البحث أو التخصص للوصول إلى بقية الدورات."
+            : "Use search or specialization to reach the remaining courses."}
         </Notice>
       )}
     </div>

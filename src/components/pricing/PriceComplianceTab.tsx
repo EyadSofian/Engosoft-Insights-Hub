@@ -19,6 +19,7 @@ import {
 } from "@/components/ui-bits";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
+  auditReasonLabel,
   fmtMoney,
   matchLabel,
   methodLabel,
@@ -101,8 +102,9 @@ export interface ComplianceResponse {
 
 const PAGE_SIZE = 50;
 
-function InvoiceDialog({ movement, onClose }: { movement: string; onClose: () => void }) {
+export function InvoiceDialog({ movement, onClose }: { movement: string; onClose: () => void }) {
   const { lang } = useI18n();
+  const ar = lang === "ar";
   const [data, setData] = useState<{
     lines: AuditRow[];
     payment: {
@@ -156,20 +158,42 @@ function InvoiceDialog({ movement, onClose }: { movement: string; onClose: () =>
             onClick={onClose}
             className="min-h-11 cursor-pointer rounded-lg border border-border px-3 text-[13px]"
           >
-            {lang === "ar" ? "إغلاق" : "Close"}
+            {ar ? "إغلاق" : "Close"}
           </button>
         </div>
 
         {!data && <Skeleton className="mt-3 h-40 w-full rounded-xl" />}
 
+        {!!data?.lines[0] && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-border bg-surface-2/60 px-3 py-2 text-[11px]">
+            <span className="text-text-muted">{ar ? "مسؤول الفاتورة" : "Invoice owner"}</span>
+            <strong className="text-text">
+              {data.lines[0].salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}
+            </strong>
+          </div>
+        )}
+
+        {!!data?.error && !data.lines.length && (
+          <Notice tone="warning">
+            {ar ? "تعذر تحميل بيانات الفاتورة كاملة. حاول مرة أخرى." : data.error}
+          </Notice>
+        )}
+
         {!!data?.payment && (
           <div className="mt-3 rounded-xl bg-surface-2 p-3 text-[12px]">
             <div className="font-semibold text-text">
-              {lang === "ar" ? "طريقة الدفع الفعلية" : "Settled payment"}:{" "}
+              {ar ? "طريقة الدفع الفعلية" : "Settled payment"}:{" "}
               {methodLabel(data.payment.method, lang)}
             </div>
             <div className="mt-1 text-text-muted">
-              {lang === "ar" ? "المصدر" : "Source"}: {data.payment.source}
+              {ar ? "مصدر التحقق" : "Source"}:{" "}
+              {ar
+                ? data.payment.source === "account_payment"
+                  ? "سجل المدفوعات في أودو"
+                  : data.payment.source === "payments_widget"
+                    ? "تفاصيل سداد الفاتورة في أودو"
+                    : "غير معروف"
+                : data.payment.source}
             </div>
             {!!data.payment.breakdown.length && (
               <ul className="mt-1 space-y-0.5 text-text-muted">
@@ -198,10 +222,10 @@ function InvoiceDialog({ movement, onClose }: { movement: string; onClose: () =>
                     {statusLabel(line.complianceStatus, lang)}
                   </Pill>
                 </div>
-                <p className="mt-1 text-text-muted">{line.reason}</p>
+                <p className="mt-1 text-text-muted">{auditReasonLabel(line, lang)}</p>
                 <p className="mt-1 tabular-nums text-text-muted">
                   {fmtMoney(line.actualUnitPrice, line.currency, lang)} ×{line.quantity} ·{" "}
-                  {lang === "ar" ? "المسموح" : "allowed"}{" "}
+                  {ar ? "النطاق المعتمد" : "allowed"}{" "}
                   {fmtMoney(line.allowedMinimum, line.currency, lang)}
                   {line.allowedMaximum !== null
                     ? ` – ${fmtMoney(line.allowedMaximum, line.currency, lang)}`
@@ -221,7 +245,7 @@ function InvoiceDialog({ movement, onClose }: { movement: string; onClose: () =>
             className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-brand"
           >
             <ExternalLink size={14} aria-hidden="true" />
-            {lang === "ar" ? "افتح الفاتورة في أودو" : "Open this invoice in Odoo"}
+            {ar ? "فتح الفاتورة في أودو" : "Open this invoice in Odoo"}
           </a>
         )}
       </div>
@@ -687,7 +711,7 @@ export function PriceComplianceTab({
                           {statusLabel(row.complianceStatus, lang)}
                         </Pill>
                         <p className="mt-1 max-w-[280px] text-[11px] leading-snug text-text-muted">
-                          {row.reason}
+                          {auditReasonLabel(row, lang)}
                         </p>
                       </td>
                     </tr>

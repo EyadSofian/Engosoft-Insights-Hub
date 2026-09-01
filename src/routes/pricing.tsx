@@ -14,6 +14,7 @@ import {
 import { Notice, Skeleton } from "@/components/ui-bits";
 import { PriceAdvisorTab } from "@/components/pricing/PriceAdvisorTab";
 import { PriceAlertsTab, type ExceptionsResponse } from "@/components/pricing/PriceAlertsTab";
+import { CriticalInvoicesPanel } from "@/components/pricing/CriticalInvoicesPanel";
 import {
   PriceComplianceTab,
   emptyComplianceFilters,
@@ -194,6 +195,24 @@ function PricingPage() {
       ),
   });
 
+  const criticalInvoices = useQuery({
+    queryKey: ["pricing-critical-invoices", complianceFilters.from, complianceFilters.to],
+    enabled: tab === "prices",
+    staleTime: 60_000,
+    queryFn: () =>
+      getJson<ComplianceResponse>(
+        `/api/pricing/compliance${query({
+          from: complianceFilters.from,
+          to: complianceFilters.to,
+          dateBasis: "payment",
+          status: "below_minimum",
+          severity: "critical",
+          limit: 18,
+          offset: 0,
+        })}`,
+      ),
+  });
+
   const exceptions = useQuery({
     queryKey: ["pricing-exceptions", complianceFilters.from, complianceFilters.to],
     enabled: tab === "alerts",
@@ -222,6 +241,7 @@ function PricingPage() {
     void filteredCatalog.refetch();
     void facets.refetch();
     void compliance.refetch();
+    void criticalInvoices.refetch();
     void exceptions.refetch();
   };
 
@@ -243,6 +263,7 @@ function PricingPage() {
           : `Audited ${run?.auditedLines ?? 0} new or changed lines out of ${run?.candidateLines ?? 0}; ${run?.skippedUnchanged ?? 0} were unchanged and skipped.`,
       );
       void compliance.refetch();
+      void criticalInvoices.refetch();
       void exceptions.refetch();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The audit run failed.");
@@ -376,7 +397,7 @@ function PricingPage() {
         <div className="grid gap-5 px-5 py-5 text-white lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-7">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-              ENGOSOFT · SALES CONTROL
+              {ar ? "ENGOSOFT · رقابة المبيعات" : "ENGOSOFT · SALES CONTROL"}
             </div>
             <h1 className="mt-2 text-[23px] font-black tracking-tight sm:text-[27px]">
               {ar ? "لوحة الأسعار والالتزام البيعي" : "Pricing & sales compliance"}
@@ -461,18 +482,24 @@ function PricingPage() {
       {!!message && <Notice tone="info">{message}</Notice>}
 
       {tab === "prices" && (
-        <PriceCourseSummaryTab
-          filters={searchFilters}
-          onFilters={setSearchFilters}
-          data={catalogData}
-          facets={facets.data}
-          loading={catalogLoading}
-          error={catalogError instanceof Error ? catalogError.message : undefined}
-          onRetry={() =>
-            void (hasCatalogFilters ? filteredCatalog.refetch() : fullCatalog.refetch())
-          }
-          embeddedSearch={false}
-        />
+        <>
+          <CriticalInvoicesPanel
+            rows={criticalInvoices.data?.rows ?? []}
+            total={criticalInvoices.data?.total ?? 0}
+            loading={criticalInvoices.isLoading}
+          />
+          <PriceCourseSummaryTab
+            filters={searchFilters}
+            onFilters={setSearchFilters}
+            data={catalogData}
+            facets={facets.data}
+            loading={catalogLoading}
+            error={catalogError instanceof Error ? catalogError.message : undefined}
+            onRetry={() =>
+              void (hasCatalogFilters ? filteredCatalog.refetch() : fullCatalog.refetch())
+            }
+          />
+        </>
       )}
 
       {tab === "invoices" && (

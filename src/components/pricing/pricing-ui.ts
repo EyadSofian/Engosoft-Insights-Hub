@@ -203,6 +203,39 @@ export const deliveryLabel = (value: string, lang: Lang): string =>
 export const scopeLabel = (value: string, lang: Lang): string => pick(SCOPE[value], lang, value);
 export const matchLabel = (value: string, lang: Lang): string => pick(MATCH[value], lang, value);
 
+/** A human explanation for an audit verdict; never expose an internal English reason in Arabic. */
+export function auditReasonLabel(row: AuditRow, lang: Lang): string {
+  if (lang !== "ar") return row.reason || statusLabel(row.complianceStatus, lang);
+  const actual = fmtMoney(row.actualUnitPrice, row.currency, lang);
+  const minimum = fmtMoney(row.allowedMinimum, row.currency, lang);
+  const maximum = fmtMoney(row.allowedMaximum, row.currency, lang);
+  const gap = fmtMoney(row.varianceAmount, row.currency, lang);
+  switch (row.complianceStatus) {
+    case "below_minimum":
+      return `تم البيع بسعر ${actual}، أقل من الحد الأدنى ${minimum} بفارق ${gap} لكل وحدة.`;
+    case "compliant":
+      return row.allowedMaximum !== null && row.allowedMaximum !== row.allowedMinimum
+        ? `سعر البيع ${actual} داخل النطاق المعتمد من ${minimum} إلى ${maximum}.`
+        : `سعر البيع ${actual} مطابق للسعر المعتمد.`;
+    case "compliant_offer":
+      return `سعر البيع ${actual} مطابق لعرض ساري وقت البيع.`;
+    case "above_list":
+      return `سعر البيع ${actual} أعلى من السعر المنشور ${maximum}.`;
+    case "unmatched_product":
+      return "تعذرت مطابقة المنتج بقائمة الأسعار ويحتاج إلى ربط معتمد.";
+    case "unknown_payment_method":
+      return "طريقة الدفع الفعلية غير معروفة وتحتاج إلى مراجعة.";
+    case "mixed_payment_review":
+      return "الفاتورة مدفوعة بأكثر من طريقة وتحتاج إلى مراجعة بشرية.";
+    case "expired_offer":
+      return "السعر يطابق عرضًا انتهت صلاحيته قبل تاريخ البيع.";
+    case "excluded":
+      return "هذا البند مستثنى من حكم الالتزام السعري.";
+    default:
+      return "تحتاج بيانات هذا البند إلى مراجعة.";
+  }
+}
+
 export const PAYMENT_METHOD_OPTIONS = ["tabby", "tamara", "cash", "cashier", "bank_transfer"];
 
 export type Tone = "neutral" | "brand" | "success" | "warning" | "danger";
