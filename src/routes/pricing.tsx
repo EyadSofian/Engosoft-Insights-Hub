@@ -311,15 +311,21 @@ function PricingPage() {
     .filter((entry) => entry.leakage > 0)
     .map((entry) => fmtMoney(entry.leakage, entry.currency, lang))
     .join(" + ");
+  const complianceRate = compliance.data?.kpis.complianceRate;
+  const complianceTone =
+    complianceRate == null
+      ? undefined
+      : complianceRate < 0.8
+        ? ("danger" as const)
+        : complianceRate < 0.95
+          ? ("warning" as const)
+          : ("success" as const);
 
   const metrics: { label: string; value: string; tone?: "danger" | "warning" | "success" }[] = [
     {
       label: ar ? "الالتزام بالأسعار" : "Price compliance",
-      value:
-        compliance.data?.kpis.complianceRate == null
-          ? "—"
-          : fmtPct(compliance.data.kpis.complianceRate * 100, 0),
-      tone: "success",
+      value: complianceRate == null ? "—" : fmtPct(complianceRate * 100, 0),
+      tone: complianceTone,
     },
     {
       label: ar ? "تحت الحد الأدنى" : "Below the floor",
