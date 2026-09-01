@@ -7,7 +7,8 @@
 // here rather than promised in a comment.
 import assert from "node:assert/strict";
 
-const { readPaymentMethods } = await import("../src/lib/pricing/payment-methods.server.ts");
+const { readPaymentMethods, readInvoiceLineFacts } =
+  await import("../src/lib/pricing/payment-methods.server.ts");
 const { summarize, buildRuleIndex, auditLine } =
   await import("../src/lib/pricing/pricing-engine.ts");
 
@@ -161,6 +162,64 @@ assert.equal(result.diagnostics.invoicesRequested, INVOICES);
   );
   assert.equal(offline.diagnostics.odooCalls, 0);
   assert.equal(offline.reads.size, 0, "no answer is better than a guessed one");
+}
+
+/* --- quantities are read in batches, and validated --------------------------- */
+
+{
+  let calls = 0;
+  const sizes = [];
+  const lines = Array.from({ length: 900 }, (_, index) => ({
+    invoiceLineId: String(200_000 + index),
+    invoiceNumber: `INVNT/2026/${index}`,
+  }));
+  const odoo = {
+    configured: () => true,
+    metadata: async () => ({
+      id: {},
+      move_id: {},
+      product_id: {},
+      quantity: {},
+      price_unit: {},
+      discount: {},
+      price_subtotal: {},
+      price_total: {},
+    }),
+    searchRead: async (model, domain) => {
+      calls++;
+      const ids = domain?.[0]?.[2] ?? [];
+      sizes.push(ids.length);
+      return ids.map((id) => ({
+        id,
+        // Two of them claim to belong to a different invoice than the one the
+        // snapshot recorded against that line id.
+        move_id: [1, id % 400 === 0 ? "SOMEONE/ELSE/1" : `INVNT/2026/${id - 200_000}`],
+        product_id: [4242, "[586] CFM Exam Simulator"],
+        quantity: 3,
+        price_unit: 200,
+        discount: 0,
+        price_subtotal: 600,
+        price_total: 600,
+      }));
+    },
+  };
+
+  const result = await readInvoiceLineFacts(lines, odoo);
+  assert.ok(calls <= 3, `900 lines must not become ${calls} Odoo calls`);
+  assert.ok(sizes.every((size) => size <= 500));
+  assert.equal(result.rejected, 3, "a line id that resolves to another invoice is dropped");
+  assert.equal(result.facts.size, 897);
+  assert.equal(result.facts.get("200001").quantity, 3, "the real quantity is read, not assumed");
+  assert.equal(result.facts.get("200001").odooProductId, 4242);
+  assert.ok(!result.facts.has("200000"), "the mismatched line carries no borrowed quantity");
+
+  // With Odoo unavailable it returns nothing rather than inventing a quantity.
+  const offline = await readInvoiceLineFacts(lines.slice(0, 3), {
+    ...odoo,
+    configured: () => false,
+  });
+  assert.equal(offline.facts.size, 0);
+  assert.equal(offline.odooCalls, 0);
 }
 
 /* --- roll-ups stay linear -------------------------------------------------- */

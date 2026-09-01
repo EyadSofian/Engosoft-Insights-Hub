@@ -426,6 +426,110 @@ export async function readPaymentMethods(
   };
 }
 
+/* --- invoice line facts ---------------------------------------------------- */
+
+export interface InvoiceLineFact {
+  invoiceLineId: string;
+  invoiceNumber: string;
+  odooProductId: number;
+  productCode: string;
+  quantity: number;
+  priceUnit: number;
+  discount: number;
+  priceSubtotal: number;
+  priceTotal: number;
+}
+
+/**
+ * Read quantity, product and price straight off the invoice lines.
+ *
+ * The stored accounting snapshot is an export built for revenue reporting, and
+ * it carries neither a quantity nor a product code — which are exactly the two
+ * fields a per-unit price comparison needs. Rather than assume a quantity of one
+ * (a three-seat invoice would then read as one very expensive seat), they are
+ * read from `account.move.line` by id, in batches, and cached.
+ *
+ * Every row is validated before it is trusted: the line's own move name has to
+ * equal the invoice number already stored against that line. A stored id that
+ * turns out to identify something else in Odoo is dropped rather than silently
+ * attaching another invoice's quantity to this one.
+ */
+export async function readInvoiceLineFacts(
+  lines: { invoiceLineId: string; invoiceNumber: string }[],
+  odoo: OdooReader = liveReader,
+): Promise<{ facts: Map<string, InvoiceLineFact>; odooCalls: number; rejected: number }> {
+  const facts = new Map<string, InvoiceLineFact>();
+  let odooCalls = 0;
+  let rejected = 0;
+
+  const expected = new Map<string, string>();
+  for (const line of lines) {
+    const id = Number(line.invoiceLineId);
+    if (Number.isInteger(id) && id > 0) expected.set(String(id), line.invoiceNumber);
+  }
+  if (!expected.size || !odoo.configured()) return { facts, odooCalls, rejected };
+
+  const meta = await odoo.metadata("account.move.line");
+  odooCalls++;
+  if (!meta.id) return { facts, odooCalls, rejected };
+
+  const wanted = [
+    "id",
+    "move_id",
+    "product_id",
+    "quantity",
+    "price_unit",
+    "discount",
+    "price_subtotal",
+    "price_total",
+  ].filter((field) => !!meta[field]);
+  if (!wanted.includes("quantity")) return { facts, odooCalls, rejected };
+
+  interface LineRow {
+    id: number;
+    move_id?: M2O;
+    product_id?: M2O;
+    quantity?: number;
+    price_unit?: number;
+    discount?: number;
+    price_subtotal?: number;
+    price_total?: number;
+  }
+
+  const ids = [...expected.keys()].map(Number);
+  for (const batch of chunks(ids, 500)) {
+    const rows = await odoo.searchRead<LineRow>(
+      "account.move.line",
+      [["id", "in", batch]],
+      wanted,
+      { context: { active_test: false } },
+    );
+    odooCalls++;
+    for (const row of rows) {
+      const key = String(row.id);
+      const invoiceNumber = expected.get(key);
+      if (!invoiceNumber) continue;
+      const moveName = text(m2oName(row.move_id));
+      if (moveName && invoiceNumber && moveName !== invoiceNumber) {
+        rejected++;
+        continue;
+      }
+      facts.set(key, {
+        invoiceLineId: key,
+        invoiceNumber: moveName || invoiceNumber,
+        odooProductId: m2oId(row.product_id),
+        productCode: "",
+        quantity: Number(row.quantity ?? 0) || 0,
+        priceUnit: Number(row.price_unit ?? 0) || 0,
+        discount: Number(row.discount ?? 0) || 0,
+        priceSubtotal: Number(row.price_subtotal ?? 0) || 0,
+        priceTotal: Number(row.price_total ?? 0) || 0,
+      });
+    }
+  }
+  return { facts, odooCalls, rejected };
+}
+
 /**
  * Odoo product ids for a batch of default codes.
  *

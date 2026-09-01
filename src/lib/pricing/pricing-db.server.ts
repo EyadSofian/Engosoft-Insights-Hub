@@ -205,6 +205,20 @@ CREATE TABLE IF NOT EXISTS invoice_payment_methods (
 );
 CREATE INDEX IF NOT EXISTS invoice_payment_methods_method_idx ON invoice_payment_methods (method);
 
+CREATE TABLE IF NOT EXISTS invoice_line_facts (
+  invoice_line_id text PRIMARY KEY,
+  invoice_number text NOT NULL DEFAULT '',
+  odoo_product_id integer,
+  product_code text NOT NULL DEFAULT '',
+  quantity numeric(14,4) NOT NULL DEFAULT 0,
+  price_unit numeric(14,4) NOT NULL DEFAULT 0,
+  discount numeric(9,4) NOT NULL DEFAULT 0,
+  price_subtotal numeric(14,2) NOT NULL DEFAULT 0,
+  price_total numeric(14,2) NOT NULL DEFAULT 0,
+  read_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS invoice_line_facts_invoice_idx ON invoice_line_facts (invoice_number);
+
 CREATE TABLE IF NOT EXISTS price_payment_aliases (
   alias text PRIMARY KEY,
   method text NOT NULL,
@@ -1172,6 +1186,107 @@ export async function writePaymentReads(reads: StoredPaymentRead[]): Promise<num
     }
     await client.query("COMMIT");
     return reads.length;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/* --- invoice line facts ---------------------------------------------------- */
+
+export interface StoredLineFact {
+  invoiceLineId: string;
+  invoiceNumber: string;
+  odooProductId: number | null;
+  productCode: string;
+  quantity: number;
+  priceUnit: number;
+  discount: number;
+  priceSubtotal: number;
+  priceTotal: number;
+}
+
+/**
+ * Quantity and product for lines the accounting export does not carry them for.
+ *
+ * Cached because they never change for a posted line: reading them once per line
+ * is the difference between a handful of Odoo calls and a per-page bill.
+ */
+export async function readStoredLineFacts(
+  invoiceLineIds: string[],
+): Promise<Map<string, StoredLineFact>> {
+  await ensurePricingSchema();
+  const unique = [...new Set(invoiceLineIds.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const out = new Map<string, StoredLineFact>();
+  for (let start = 0; start < unique.length; start += 5000) {
+    const result = await getPool().query(
+      `SELECT * FROM invoice_line_facts WHERE invoice_line_id = ANY($1::text[])`,
+      [unique.slice(start, start + 5000)],
+    );
+    for (const row of result.rows) {
+      out.set(str(row.invoice_line_id), {
+        invoiceLineId: str(row.invoice_line_id),
+        invoiceNumber: str(row.invoice_number),
+        odooProductId: num(row.odoo_product_id),
+        productCode: str(row.product_code),
+        quantity: Number(row.quantity ?? 0),
+        priceUnit: Number(row.price_unit ?? 0),
+        discount: Number(row.discount ?? 0),
+        priceSubtotal: Number(row.price_subtotal ?? 0),
+        priceTotal: Number(row.price_total ?? 0),
+      });
+    }
+  }
+  return out;
+}
+
+export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
+  await ensurePricingSchema();
+  if (!facts.length) return 0;
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    for (let start = 0; start < facts.length; start += 400) {
+      const chunk = facts.slice(start, start + 400);
+      const values: unknown[] = [];
+      const tuples = chunk.map((fact, index) => {
+        const offset = index * 9;
+        values.push(
+          fact.invoiceLineId,
+          fact.invoiceNumber,
+          fact.odooProductId,
+          fact.productCode,
+          fact.quantity,
+          fact.priceUnit,
+          fact.discount,
+          fact.priceSubtotal,
+          fact.priceTotal,
+        );
+        return `($${offset + 1},$${offset + 2},$${offset + 3},$${offset + 4},$${offset + 5},$${offset + 6},$${offset + 7},$${offset + 8},$${offset + 9})`;
+      });
+      await client.query(
+        `INSERT INTO invoice_line_facts
+           (invoice_line_id, invoice_number, odoo_product_id, product_code, quantity,
+            price_unit, discount, price_subtotal, price_total)
+         VALUES ${tuples.join(",")}
+         ON CONFLICT (invoice_line_id) DO UPDATE SET
+           invoice_number = EXCLUDED.invoice_number,
+           odoo_product_id = EXCLUDED.odoo_product_id,
+           product_code = EXCLUDED.product_code,
+           quantity = EXCLUDED.quantity,
+           price_unit = EXCLUDED.price_unit,
+           discount = EXCLUDED.discount,
+           price_subtotal = EXCLUDED.price_subtotal,
+           price_total = EXCLUDED.price_total,
+           read_at = now()`,
+        values,
+      );
+    }
+    await client.query("COMMIT");
+    return facts.length;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;

@@ -19,6 +19,7 @@ const {
   isCompositeCode,
   readAmbiguousDate,
   parsePricePhrases,
+  productCodeFromDisplayName,
 } = await import("../src/lib/pricing/pricing-normalize.ts");
 
 /* --- value normalization (no file needed) ---------------------------------- */
@@ -52,6 +53,18 @@ assert.equal(normalizeDeliveryType(""), "unknown");
 assert.equal(normalizeProductCode(586), "586");
 assert.equal(normalizeProductCode("586.0"), "586");
 assert.equal(normalizeProductCode(" 586 "), "586");
+
+// Odoo renders a product as `[code] name`. The accounting export this dashboard
+// stores has no code column at all, so that rendering is the only place the code
+// survives — reading it is exact, not a name match.
+assert.equal(productCodeFromDisplayName("[586] CFM Exam Simulator"), "586");
+assert.equal(productCodeFromDisplayName("[65 - 586] CFM + Exam"), "65 - 586");
+assert.equal(productCodeFromDisplayName("[911] Interior Design Using SketchUp & Canva"), "911");
+// Anything that is not code-shaped yields nothing rather than a phantom code.
+assert.equal(productCodeFromDisplayName("CFM Exam Simulator"), "");
+assert.equal(productCodeFromDisplayName("[Course] Advanced"), "");
+assert.equal(productCodeFromDisplayName("[] name"), "");
+assert.equal(productCodeFromDisplayName(""), "");
 
 // A composite code names more than one product and is never split silently.
 assert.equal(isCompositeCode("65 - 586"), true);

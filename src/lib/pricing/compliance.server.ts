@@ -27,11 +27,13 @@ import {
   queryAudits,
   readAuditFingerprints,
   readAuditState,
+  readStoredLineFacts,
   readStoredPayments,
   updatePriceItems,
   upsertProductMappings,
   writeAudits,
   writeAuditState,
+  writeLineFacts,
   writePaymentReads,
   type AuditQuery,
 } from "./pricing-db.server.ts";
@@ -42,11 +44,12 @@ import {
   type RuleIndex,
 } from "./pricing-engine.ts";
 import {
+  readInvoiceLineFacts,
   readPaymentMethods,
   resolveProductIdsByCode,
   resolveSaleOrderDates,
 } from "./payment-methods.server.ts";
-import { normalizeProductCode, text } from "./pricing-normalize.ts";
+import { normalizeProductCode, productCodeFromDisplayName, text } from "./pricing-normalize.ts";
 import type {
   AuditableInvoiceLine,
   InvoicePriceAudit,
@@ -117,9 +120,12 @@ export function toAuditableLines(rows: Raw[]): AuditableInvoiceLine[] {
         company: str(row, ["Company", "الشركة"]),
         country: str(row, ["Country", "الدولة"]),
         currency: str(row, ["Currency", "العملة"]).toUpperCase(),
-        productCode: normalizeProductCode(
-          str(row, ["Product Code", "Product Reference", "الرقم المرجعي"]),
-        ),
+        // The accounting export has a code column in some builds and not in
+        // others; where it is missing, Odoo's own `[code] name` rendering of the
+        // product still carries it exactly.
+        productCode:
+          normalizeProductCode(str(row, ["Product Code", "Product Reference", "الرقم المرجعي"])) ||
+          productCodeFromDisplayName(str(row, ["Product", "المنتج", "Course Name", "Course"])),
         productName: str(row, ["Product", "المنتج", "Course Name", "Course"]),
         odooProductId: Number(str(row, ["__odoo_product_id", "Product ID"])) || null,
         quantity: number(str(row, ["Quantity", "الكمية"])) || 0,
@@ -179,6 +185,8 @@ export interface AuditRunResult {
   auditedLines: number;
   skippedUnchanged: number;
   paymentsRead: number;
+  lineFactsRead: number;
+  linesMissingQuantity: number;
   productsResolved: number;
   odooCalls: number;
   unknownPaymentValues: string[];
@@ -240,6 +248,8 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
     auditedLines: 0,
     skippedUnchanged: 0,
     paymentsRead: 0,
+    lineFactsRead: 0,
+    linesMissingQuantity: 0,
     productsResolved: 0,
     odooCalls: 0,
     unknownPaymentValues: [],
@@ -302,6 +312,54 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
       // prerequisite. Without them every line uses its invoice date.
     }
   }
+
+  /* --- quantity and product, for exports that omit them -------------------- */
+  // The stored accounting rows are an export built for revenue reporting: in
+  // this deployment they carry no quantity at all. A per-unit comparison cannot
+  // be made up from a line total, and assuming one seat would quietly turn a
+  // three-seat invoice into one very expensive seat, so the real numbers are
+  // read from `account.move.line` by id — once per line, then cached.
+  let lineFactsRead = 0;
+  const needsFacts = lines.filter((line) => line.quantity <= 0);
+  if (needsFacts.length) {
+    const cached = await readStoredLineFacts(needsFacts.map((line) => line.invoiceLineId));
+    const missing = needsFacts.filter((line) => !cached.has(line.invoiceLineId));
+
+    if (missing.length && !options.offline && odooConfigured()) {
+      try {
+        const read = await readInvoiceLineFacts(
+          missing.map((line) => ({
+            invoiceLineId: line.invoiceLineId,
+            invoiceNumber: line.invoiceNumber,
+          })),
+        );
+        odooCalls += read.odooCalls;
+        const fresh = [...read.facts.values()].map((fact) => ({
+          ...fact,
+          odooProductId: fact.odooProductId || null,
+        }));
+        if (fresh.length) await writeLineFacts(fresh);
+        for (const fact of read.facts.values())
+          cached.set(fact.invoiceLineId, { ...fact, odooProductId: fact.odooProductId || null });
+        lineFactsRead = read.facts.size;
+      } catch {
+        // Without them the affected lines are excluded with a reason, which is
+        // honest. It must not fail the run for every other line.
+      }
+    }
+
+    for (const line of lines) {
+      const fact = cached.get(line.invoiceLineId);
+      if (!fact) continue;
+      if (line.quantity <= 0 && fact.quantity > 0) line.quantity = fact.quantity;
+      if (!line.odooProductId && fact.odooProductId) line.odooProductId = fact.odooProductId;
+      if (!line.productCode && fact.productCode) line.productCode = fact.productCode;
+      // Prefer the invoice line's own amounts when the export rounded them.
+      if (!line.untaxedTotal && fact.priceSubtotal) line.untaxedTotal = fact.priceSubtotal;
+      if (!line.totalInCurrency && fact.priceTotal) line.totalInCurrency = fact.priceTotal;
+    }
+  }
+  const linesMissingQuantity = lines.filter((line) => line.quantity <= 0).length;
 
   /* --- payment instruments ------------------------------------------------- */
   const invoiceNumbers = [...new Set(lines.map((line) => line.invoiceNumber).filter(Boolean))];
@@ -461,6 +519,8 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
     auditedLines: pending.length,
     skippedUnchanged: skipped,
     paymentsRead,
+    lineFactsRead,
+    linesMissingQuantity,
     productsResolved,
     odooCalls,
     unknownPaymentValues: [...new Set(unknownPaymentValues)].slice(0, 25),
@@ -497,6 +557,9 @@ export async function accountingReadiness(days = 90): Promise<{
   inWindow: number;
   withLineId: number;
   withProductCode: number;
+  codeFromColumn: number;
+  codeFromDisplayName: number;
+  lineFactsCached: number;
   withCurrency: number;
   withQuantity: number;
   creditNotes: number;
@@ -511,6 +574,9 @@ export async function accountingReadiness(days = 90): Promise<{
     inWindow: 0,
     withLineId: 0,
     withProductCode: 0,
+    codeFromColumn: 0,
+    codeFromDisplayName: 0,
+    lineFactsCached: 0,
     withCurrency: 0,
     withQuantity: 0,
     creditNotes: 0,
@@ -528,6 +594,13 @@ export async function accountingReadiness(days = 90): Promise<{
       return !!date && date >= from;
     });
     const lines = toAuditableLines(inWindow);
+    // Where the code came from matters: a column the export carries is one
+    // thing, a code recovered from Odoo's `[code] name` rendering is another,
+    // and an operator looking at a low coverage number needs to know which.
+    const codeFromColumn = inWindow.filter((row) =>
+      normalizeProductCode(str(row, ["Product Code", "Product Reference", "الرقم المرجعي"])),
+    ).length;
+    const cachedFacts = await readStoredLineFacts(lines.map((line) => line.invoiceLineId));
     return {
       ...blank,
       rows: snapshot.rows.length,
@@ -536,8 +609,15 @@ export async function accountingReadiness(days = 90): Promise<{
         str(row, ["__odoo_line_id", "Invoice Line ID", "Move Line ID", "__odoo_id"]),
       ).length,
       withProductCode: lines.filter((line) => !!line.productCode).length,
+      codeFromColumn,
+      codeFromDisplayName: lines.filter((line) => !!line.productCode).length - codeFromColumn,
+      lineFactsCached: cachedFacts.size,
       withCurrency: lines.filter((line) => !!line.currency).length,
-      withQuantity: lines.filter((line) => line.quantity > 0).length,
+      // Zero here is expected on an export with no quantity column: the audit
+      // reads it from `account.move.line` on its first run and caches it.
+      withQuantity: lines.filter(
+        (line) => line.quantity > 0 || (cachedFacts.get(line.invoiceLineId)?.quantity ?? 0) > 0,
+      ).length,
       creditNotes: lines.filter((line) => line.isCreditNote).length,
       currencies: [...new Set(lines.map((line) => line.currency).filter(Boolean))].sort(),
       syncedAt: snapshot.syncedAt,

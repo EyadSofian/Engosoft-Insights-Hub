@@ -218,6 +218,29 @@ export function normalizeProductCode(value: unknown): string {
     .trim();
 }
 
+/**
+ * Recover a product code from Odoo's own rendering of a product name.
+ *
+ * `product.display_name` is `[default_code] name`, so "[586] CFM Exam Simulator"
+ * carries the exact code even when the export has no code column — which is the
+ * case for the accounting rows this dashboard actually stores.
+ *
+ * This is not name matching. It reads a delimited field Odoo printed itself and
+ * fails closed on anything else: a name with no leading bracket, or a bracket
+ * holding something that is not a code, returns nothing rather than a guess.
+ */
+export function productCodeFromDisplayName(value: unknown): string {
+  const raw = text(value);
+  const match = raw.match(/^\[([^\]]{1,32})\]/);
+  if (!match) return "";
+  const code = normalizeProductCode(match[1]);
+  // A bracket has to hold something code-shaped, and every Engosoft product code
+  // contains a digit. Without that check a product called "[Course] Advanced"
+  // would invent the code COURSE, which matches nothing and only adds noise.
+  if (!/\d/.test(code)) return "";
+  return /^[A-Z0-9][A-Z0-9\s\-_/.+&]*$/i.test(code) ? code : "";
+}
+
 /** True when a code names more than one product, e.g. `65 - 586`. */
 export function isCompositeCode(value: unknown): boolean {
   const raw = normalizeProductCode(value);

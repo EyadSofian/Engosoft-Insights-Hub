@@ -351,6 +351,15 @@ so no spreadsheet dependency is added for it.
   invoice audited in August keeps August's numbers.
 - **Use the payment date to pick a price book.** Sale-order date first, invoice date
   second. Payment date remains the reporting default for the financial roll-up only.
+- **Invent a quantity.** The stored accounting export is built for revenue reporting
+  and carries no quantity column, so quantity, product id and line amounts are read
+  from `account.move.line` by id, in batches, and cached in `invoice_line_facts`. Each
+  row is only trusted when the line's own move name matches the invoice number already
+  stored against it. Assuming one seat would read a three-seat invoice as one very
+  expensive seat. That export has no product code column either; the code is recovered
+  from Odoo's own `[code] name` rendering of the product, which is an exact read of a
+  delimited field rather than a name match, and yields nothing when the bracket holds
+  anything that is not code-shaped.
 
 ### Cost
 
