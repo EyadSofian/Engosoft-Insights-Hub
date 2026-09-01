@@ -279,6 +279,21 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `POST /api/telegram/webhook`                   | Handles `/start`, `/stop`, `/report`, `/week`, `/status`                                                                                                     |
 | `GET /api/telegram/setup`                      | Whether the webhook is registered, subscriber count, schedule state                                                                                          |
 | `POST /api/telegram/setup`                     | Points Telegram at this deployment. Required once before the bot works                                                                                       |
+| `GET /api/pricing/catalog`                     | The published price book, grouped one card per course                                                                                                        |
+| `GET /api/pricing/facets`                      | Filter values for the price look-up, from the loaded book                                                                                                    |
+| `GET /api/pricing/books`                       | Every price-book version, its status, and the audit state                                                                                                    |
+| `GET /api/pricing/items`                       | The rows of one book, filtered and paginated                                                                                                                 |
+| `GET /api/pricing/compliance`                  | Compliance KPIs aggregated in PostgreSQL, plus one page of audited lines                                                                                     |
+| `GET /api/pricing/exceptions`                  | Alerts by severity, and the price rows still waiting for an Odoo link                                                                                        |
+| `GET /api/pricing/invoices/:movement`          | Every audited line on one invoice, with how its payment was read                                                                                             |
+| `GET /api/pricing/changelog`                   | Who changed which price, when, and why                                                                                                                       |
+| `GET /api/pricing/diagnostics`                 | Store/Odoo readiness; `?odoo=1` (signed in) probes the payment schema                                                                                        |
+| `POST /api/pricing/import/preview`             | Parses a workbook or Google Sheet and reports what it would import; `commit` creates a draft                                                                 |
+| `POST /api/pricing/books`                      | Creates a draft, optionally copied from an existing version                                                                                                  |
+| `PUT/POST /api/pricing/items`                  | Edits or adds a row on a **draft** book; refuses on a published one                                                                                          |
+| `POST /api/pricing/mappings`                   | Approves a product link or a payment-journal alias                                                                                                           |
+| `POST /api/pricing/publish`                    | Publishes, rolls back, or archives a version, atomically                                                                                                     |
+| `POST /api/pricing/recalculate`                | Re-runs the invoice audit; the only path that talks to Odoo                                                                                                  |
 
 Detail endpoints cap row payloads at 3,000 and set `truncated: true` past that.
 
@@ -293,6 +308,68 @@ leads. If the shared Ads/CRM date is more than two days old, alerts are paused r
 than sending false alarms. `scripts/build-course-lead-alert-workflow.mjs` produces the
 active n8n workflow that checks this endpoint at 10:00 `Africa/Cairo`, emails management
 through the native SMTP node and triggers the existing Telegram subscriber notification.
+
+## Price book and sales price compliance
+
+`/pricing` (Sales -> Price book) has four panels: find a price, manage prices, compliance,
+and alerts. It is the only feature here with its own relational tables — `price_books`,
+`price_book_items`, `price_product_mappings`, `price_change_log`, `invoice_price_audits`,
+`invoice_payment_methods`, `price_payment_aliases`, `price_alert_log` — because a price
+book is versioned, edited a row at a time, and has to still say in March what a course
+cost in January. `dashboard_rows` is a replace-the-whole-dataset cache and is the wrong
+shape for that.
+
+The flow is one-directional and needs a person in the middle:
+
+    workbook or Google Sheet -> preview -> draft -> publish -> reports
+
+Reading the sheet is never part of rendering a page. `.xlsx` is parsed in-process by
+`xlsx-reader.server.ts`, a ~200-line ZIP + SpreadsheetML reader over Node's own `zlib`,
+so no spreadsheet dependency is added for it.
+
+### Things this deliberately refuses to do
+
+- **Guess a payment method.** The price book prices Tabby, Tamara, cash and cashier
+  differently, and nothing on the invoice is evidence of which was used — not the
+  currency, not the country, not the amount, and not `invoice_payment_term_id`, which
+  says when a customer pays rather than how. The instrument is read from `account.payment`
+  reconciled against the invoice, falling back to `invoice_payments_widget`, in batches
+  keyed by invoice. An unrecognised journal stays `unknown` and appears as needing review.
+- **Match on a name.** The order is Odoo product id, exact product code, approved manual
+  link, approved alias. Two courses called "Navisworks" are a 500 SAR online event and a
+  385 SAR recording; a fuzzy match between them accuses somebody who did nothing wrong.
+  No confirmed match is `unmatched_product`, which is neither a pass nor a breach.
+- **Collapse a duplicated code.** Eleven codes repeat across the workbook and two of the
+  copies disagree about the floor. Every row is kept and a sale is judged against the
+  widest published band, so a mistake in the price list is the company's problem.
+- **Read `9/10/2026`.** Both readings are shown on the import screen and offers stay
+  unpublished until somebody picks one.
+- **Treat a package, an offer or a staff bonus as a course price.** Each is its own
+  `pricing_scope`. The incentive sheet renders as a badge and never authorises a sale.
+- **Edit a published version.** `updatePriceItems` throws `PublishedBookImmutable`.
+  Changing a price means copying the book into a new draft and publishing that, so an
+  invoice audited in August keeps August's numbers.
+- **Use the payment date to pick a price book.** Sale-order date first, invoice date
+  second. Payment date remains the reporting default for the financial roll-up only.
+
+### Cost
+
+Invoice facts come from the accounting rows already in PostgreSQL; this feature never
+re-reads invoices from Odoo and does not change how revenue is calculated. Odoo is
+touched for two things the snapshot does not carry — the settled payment instrument and
+the product id behind a code — both in batches, both cached in PostgreSQL. A line is
+re-judged only when its own numbers change or the price book that judged it does.
+Opening the tab runs no audit: `POST /api/pricing/recalculate` does, behind
+`authorizeWrite`, over the last ninety days unless `allTime` is asked for.
+
+### First import
+
+    DASHBOARD_ADMIN_SECRET=... node --experimental-strip-types scripts/import-price-book.mjs \
+      --file "New Price List.xlsx" --url https://<deployment> \
+      --name "September prices" --from 2026-09-01 --to 2026-09-30
+
+It previews, creates a draft and stops. Add `--publish --audit` once the counts look
+right, or do both from the Manage tab.
 
 ## Telegram report
 

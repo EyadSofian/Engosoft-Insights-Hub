@@ -5,6 +5,7 @@ import {
   CalendarRange,
   GraduationCap,
   GitCompareArrows,
+  BookMarked,
   Globe2,
   Leaf,
   Megaphone,
@@ -70,6 +71,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     items: [
       { to: "/accounting", key: "accounting", icon: Receipt },
       { to: "/courses", key: "courses", icon: GraduationCap },
+      { to: "/pricing", key: "price_book", icon: BookMarked },
     ],
   },
   {

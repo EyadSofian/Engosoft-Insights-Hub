@@ -531,9 +531,11 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
     const hasExplicitUsd = !!usdPaidReport && present(report[usdPaidReport]);
     const fx = FX_TO_USD[currency.toUpperCase()];
     if (!hasExplicitUsd && fx === undefined) missingCurrencyRate++;
-    const usdPaid = sign * Math.abs(
-      hasExplicitUsd ? number(report[usdPaidReport]) : Math.abs(totalInCurrency) * (fx ?? 0),
-    );
+    const usdPaid =
+      sign *
+      Math.abs(
+        hasExplicitUsd ? number(report[usdPaidReport]) : Math.abs(totalInCurrency) * (fx ?? 0),
+      );
     const teamValue = reportTeam ? report[reportTeam] : moveTeam ? move[moveTeam] : move.team_id;
     const teamId = m2oId(teamValue as M2O);
     const team = teamById.get(teamId);
@@ -550,6 +552,11 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
       "Invoice Date": invoiceOn,
       "Payment Date": paidOn || (isCreditNote ? invoiceOn : ""),
       Product: display(product?.display_name || product?.name || m2oName(report.product_id)),
+      // The product id is already in hand from the enrichment read above. Carrying
+      // it costs nothing and is the highest-confidence key the price-book audit
+      // can match on; a code can be edited or reused, an id cannot. It is
+      // additive: no revenue figure reads it.
+      __odoo_product_id: String(m2oId(report.product_id) || ""),
       "Product Code": display(product?.default_code),
       "Product Category": m2oName(report.product_categ_id) || m2oName(product?.categ_id),
       Quantity: String(number(report.quantity)),

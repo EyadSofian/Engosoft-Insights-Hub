@@ -21,6 +21,7 @@ import { Route as LostRouteImport } from './routes/lost'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
 import { Route as MediaPlanRouteImport } from './routes/media-plan'
 import { Route as OrganicRouteImport } from './routes/organic'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as SocialMediaRouteImport } from './routes/social-media'
@@ -65,11 +66,24 @@ import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
+import { Route as ApiPricingBooksRouteImport } from './routes/api/pricing.books'
+import { Route as ApiPricingCatalogRouteImport } from './routes/api/pricing.catalog'
+import { Route as ApiPricingChangelogRouteImport } from './routes/api/pricing.changelog'
+import { Route as ApiPricingComplianceRouteImport } from './routes/api/pricing.compliance'
+import { Route as ApiPricingDiagnosticsRouteImport } from './routes/api/pricing.diagnostics'
+import { Route as ApiPricingExceptionsRouteImport } from './routes/api/pricing.exceptions'
+import { Route as ApiPricingFacetsRouteImport } from './routes/api/pricing.facets'
+import { Route as ApiPricingItemsRouteImport } from './routes/api/pricing.items'
+import { Route as ApiPricingMappingsRouteImport } from './routes/api/pricing.mappings'
+import { Route as ApiPricingPublishRouteImport } from './routes/api/pricing.publish'
+import { Route as ApiPricingRecalculateRouteImport } from './routes/api/pricing.recalculate'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/telegram.send-course-alerts'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
 import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
+import { Route as ApiPricingImportPreviewRouteImport } from './routes/api/pricing.import.preview'
+import { Route as ApiPricingInvoicesMovementRouteImport } from './routes/api/pricing.invoices.$movement'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -129,6 +143,11 @@ const MediaPlanRoute = MediaPlanRouteImport.update({
 const OrganicRoute = OrganicRouteImport.update({
   id: '/organic',
   path: '/organic',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsRoute = ProductsRouteImport.update({
@@ -352,6 +371,61 @@ const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   path: '/api/ingest/dataset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPricingBooksRoute = ApiPricingBooksRouteImport.update({
+  id: '/api/pricing/books',
+  path: '/api/pricing/books',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingCatalogRoute = ApiPricingCatalogRouteImport.update({
+  id: '/api/pricing/catalog',
+  path: '/api/pricing/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingChangelogRoute = ApiPricingChangelogRouteImport.update({
+  id: '/api/pricing/changelog',
+  path: '/api/pricing/changelog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingComplianceRoute = ApiPricingComplianceRouteImport.update({
+  id: '/api/pricing/compliance',
+  path: '/api/pricing/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingDiagnosticsRoute = ApiPricingDiagnosticsRouteImport.update({
+  id: '/api/pricing/diagnostics',
+  path: '/api/pricing/diagnostics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingExceptionsRoute = ApiPricingExceptionsRouteImport.update({
+  id: '/api/pricing/exceptions',
+  path: '/api/pricing/exceptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingFacetsRoute = ApiPricingFacetsRouteImport.update({
+  id: '/api/pricing/facets',
+  path: '/api/pricing/facets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingItemsRoute = ApiPricingItemsRouteImport.update({
+  id: '/api/pricing/items',
+  path: '/api/pricing/items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingMappingsRoute = ApiPricingMappingsRouteImport.update({
+  id: '/api/pricing/mappings',
+  path: '/api/pricing/mappings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingPublishRoute = ApiPricingPublishRouteImport.update({
+  id: '/api/pricing/publish',
+  path: '/api/pricing/publish',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingRecalculateRoute = ApiPricingRecalculateRouteImport.update({
+  id: '/api/pricing/recalculate',
+  path: '/api/pricing/recalculate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTelegramPreviewRoute = ApiTelegramPreviewRouteImport.update({
   id: '/api/telegram/preview',
   path: '/api/telegram/preview',
@@ -378,6 +452,17 @@ const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
   path: '/api/telegram/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPricingImportPreviewRoute = ApiPricingImportPreviewRouteImport.update({
+  id: '/api/pricing/import/preview',
+  path: '/api/pricing/import/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingInvoicesMovementRoute =
+  ApiPricingInvoicesMovementRouteImport.update({
+    id: '/api/pricing/invoices/$movement',
+    path: '/api/pricing/invoices/$movement',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -392,6 +477,7 @@ export interface FileRoutesByFullPath {
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
@@ -436,11 +522,24 @@ export interface FileRoutesByFullPath {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/pricing/books': typeof ApiPricingBooksRoute
+  '/api/pricing/catalog': typeof ApiPricingCatalogRoute
+  '/api/pricing/changelog': typeof ApiPricingChangelogRoute
+  '/api/pricing/compliance': typeof ApiPricingComplianceRoute
+  '/api/pricing/diagnostics': typeof ApiPricingDiagnosticsRoute
+  '/api/pricing/exceptions': typeof ApiPricingExceptionsRoute
+  '/api/pricing/facets': typeof ApiPricingFacetsRoute
+  '/api/pricing/items': typeof ApiPricingItemsRoute
+  '/api/pricing/mappings': typeof ApiPricingMappingsRoute
+  '/api/pricing/publish': typeof ApiPricingPublishRoute
+  '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
+  '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -455,6 +554,7 @@ export interface FileRoutesByTo {
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
@@ -499,11 +599,24 @@ export interface FileRoutesByTo {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/pricing/books': typeof ApiPricingBooksRoute
+  '/api/pricing/catalog': typeof ApiPricingCatalogRoute
+  '/api/pricing/changelog': typeof ApiPricingChangelogRoute
+  '/api/pricing/compliance': typeof ApiPricingComplianceRoute
+  '/api/pricing/diagnostics': typeof ApiPricingDiagnosticsRoute
+  '/api/pricing/exceptions': typeof ApiPricingExceptionsRoute
+  '/api/pricing/facets': typeof ApiPricingFacetsRoute
+  '/api/pricing/items': typeof ApiPricingItemsRoute
+  '/api/pricing/mappings': typeof ApiPricingMappingsRoute
+  '/api/pricing/publish': typeof ApiPricingPublishRoute
+  '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
+  '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -519,6 +632,7 @@ export interface FileRoutesById {
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
+  '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
@@ -563,11 +677,24 @@ export interface FileRoutesById {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/pricing/books': typeof ApiPricingBooksRoute
+  '/api/pricing/catalog': typeof ApiPricingCatalogRoute
+  '/api/pricing/changelog': typeof ApiPricingChangelogRoute
+  '/api/pricing/compliance': typeof ApiPricingComplianceRoute
+  '/api/pricing/diagnostics': typeof ApiPricingDiagnosticsRoute
+  '/api/pricing/exceptions': typeof ApiPricingExceptionsRoute
+  '/api/pricing/facets': typeof ApiPricingFacetsRoute
+  '/api/pricing/items': typeof ApiPricingItemsRoute
+  '/api/pricing/mappings': typeof ApiPricingMappingsRoute
+  '/api/pricing/publish': typeof ApiPricingPublishRoute
+  '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
+  '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -584,6 +711,7 @@ export interface FileRouteTypes {
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
+    | '/pricing'
     | '/products'
     | '/sales'
     | '/social-media'
@@ -628,11 +756,24 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/pricing/books'
+    | '/api/pricing/catalog'
+    | '/api/pricing/changelog'
+    | '/api/pricing/compliance'
+    | '/api/pricing/diagnostics'
+    | '/api/pricing/exceptions'
+    | '/api/pricing/facets'
+    | '/api/pricing/items'
+    | '/api/pricing/mappings'
+    | '/api/pricing/publish'
+    | '/api/pricing/recalculate'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/pricing/import/preview'
+    | '/api/pricing/invoices/$movement'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -647,6 +788,7 @@ export interface FileRouteTypes {
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
+    | '/pricing'
     | '/products'
     | '/sales'
     | '/social-media'
@@ -691,11 +833,24 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/pricing/books'
+    | '/api/pricing/catalog'
+    | '/api/pricing/changelog'
+    | '/api/pricing/compliance'
+    | '/api/pricing/diagnostics'
+    | '/api/pricing/exceptions'
+    | '/api/pricing/facets'
+    | '/api/pricing/items'
+    | '/api/pricing/mappings'
+    | '/api/pricing/publish'
+    | '/api/pricing/recalculate'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/pricing/import/preview'
+    | '/api/pricing/invoices/$movement'
   id:
     | '__root__'
     | '/'
@@ -710,6 +865,7 @@ export interface FileRouteTypes {
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
+    | '/pricing'
     | '/products'
     | '/sales'
     | '/social-media'
@@ -754,11 +910,24 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/pricing/books'
+    | '/api/pricing/catalog'
+    | '/api/pricing/changelog'
+    | '/api/pricing/compliance'
+    | '/api/pricing/diagnostics'
+    | '/api/pricing/exceptions'
+    | '/api/pricing/facets'
+    | '/api/pricing/items'
+    | '/api/pricing/mappings'
+    | '/api/pricing/publish'
+    | '/api/pricing/recalculate'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/pricing/import/preview'
+    | '/api/pricing/invoices/$movement'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -774,6 +943,7 @@ export interface RootRouteChildren {
   MediaBuyersRoute: typeof MediaBuyersRoute
   MediaPlanRoute: typeof MediaPlanRoute
   OrganicRoute: typeof OrganicRoute
+  PricingRoute: typeof PricingRoute
   ProductsRoute: typeof ProductsRoute
   SalesRoute: typeof SalesRoute
   SocialMediaRoute: typeof SocialMediaRoute
@@ -818,11 +988,24 @@ export interface RootRouteChildren {
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
+  ApiPricingBooksRoute: typeof ApiPricingBooksRoute
+  ApiPricingCatalogRoute: typeof ApiPricingCatalogRoute
+  ApiPricingChangelogRoute: typeof ApiPricingChangelogRoute
+  ApiPricingComplianceRoute: typeof ApiPricingComplianceRoute
+  ApiPricingDiagnosticsRoute: typeof ApiPricingDiagnosticsRoute
+  ApiPricingExceptionsRoute: typeof ApiPricingExceptionsRoute
+  ApiPricingFacetsRoute: typeof ApiPricingFacetsRoute
+  ApiPricingItemsRoute: typeof ApiPricingItemsRoute
+  ApiPricingMappingsRoute: typeof ApiPricingMappingsRoute
+  ApiPricingPublishRoute: typeof ApiPricingPublishRoute
+  ApiPricingRecalculateRoute: typeof ApiPricingRecalculateRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendCourseAlertsRoute: typeof ApiTelegramSendCourseAlertsRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
   ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
+  ApiPricingImportPreviewRoute: typeof ApiPricingImportPreviewRoute
+  ApiPricingInvoicesMovementRoute: typeof ApiPricingInvoicesMovementRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -909,6 +1092,13 @@ declare module '@tanstack/react-router' {
       path: '/organic'
       fullPath: '/organic'
       preLoaderRoute: typeof OrganicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -1219,6 +1409,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestDatasetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pricing/books': {
+      id: '/api/pricing/books'
+      path: '/api/pricing/books'
+      fullPath: '/api/pricing/books'
+      preLoaderRoute: typeof ApiPricingBooksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/catalog': {
+      id: '/api/pricing/catalog'
+      path: '/api/pricing/catalog'
+      fullPath: '/api/pricing/catalog'
+      preLoaderRoute: typeof ApiPricingCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/changelog': {
+      id: '/api/pricing/changelog'
+      path: '/api/pricing/changelog'
+      fullPath: '/api/pricing/changelog'
+      preLoaderRoute: typeof ApiPricingChangelogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/compliance': {
+      id: '/api/pricing/compliance'
+      path: '/api/pricing/compliance'
+      fullPath: '/api/pricing/compliance'
+      preLoaderRoute: typeof ApiPricingComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/diagnostics': {
+      id: '/api/pricing/diagnostics'
+      path: '/api/pricing/diagnostics'
+      fullPath: '/api/pricing/diagnostics'
+      preLoaderRoute: typeof ApiPricingDiagnosticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/exceptions': {
+      id: '/api/pricing/exceptions'
+      path: '/api/pricing/exceptions'
+      fullPath: '/api/pricing/exceptions'
+      preLoaderRoute: typeof ApiPricingExceptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/facets': {
+      id: '/api/pricing/facets'
+      path: '/api/pricing/facets'
+      fullPath: '/api/pricing/facets'
+      preLoaderRoute: typeof ApiPricingFacetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/items': {
+      id: '/api/pricing/items'
+      path: '/api/pricing/items'
+      fullPath: '/api/pricing/items'
+      preLoaderRoute: typeof ApiPricingItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/mappings': {
+      id: '/api/pricing/mappings'
+      path: '/api/pricing/mappings'
+      fullPath: '/api/pricing/mappings'
+      preLoaderRoute: typeof ApiPricingMappingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/publish': {
+      id: '/api/pricing/publish'
+      path: '/api/pricing/publish'
+      fullPath: '/api/pricing/publish'
+      preLoaderRoute: typeof ApiPricingPublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/recalculate': {
+      id: '/api/pricing/recalculate'
+      path: '/api/pricing/recalculate'
+      fullPath: '/api/pricing/recalculate'
+      preLoaderRoute: typeof ApiPricingRecalculateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram/preview': {
       id: '/api/telegram/preview'
       path: '/api/telegram/preview'
@@ -1254,6 +1521,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pricing/import/preview': {
+      id: '/api/pricing/import/preview'
+      path: '/api/pricing/import/preview'
+      fullPath: '/api/pricing/import/preview'
+      preLoaderRoute: typeof ApiPricingImportPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing/invoices/$movement': {
+      id: '/api/pricing/invoices/$movement'
+      path: '/api/pricing/invoices/$movement'
+      fullPath: '/api/pricing/invoices/$movement'
+      preLoaderRoute: typeof ApiPricingInvoicesMovementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1270,6 +1551,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaBuyersRoute: MediaBuyersRoute,
   MediaPlanRoute: MediaPlanRoute,
   OrganicRoute: OrganicRoute,
+  PricingRoute: PricingRoute,
   ProductsRoute: ProductsRoute,
   SalesRoute: SalesRoute,
   SocialMediaRoute: SocialMediaRoute,
@@ -1314,11 +1596,24 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
+  ApiPricingBooksRoute: ApiPricingBooksRoute,
+  ApiPricingCatalogRoute: ApiPricingCatalogRoute,
+  ApiPricingChangelogRoute: ApiPricingChangelogRoute,
+  ApiPricingComplianceRoute: ApiPricingComplianceRoute,
+  ApiPricingDiagnosticsRoute: ApiPricingDiagnosticsRoute,
+  ApiPricingExceptionsRoute: ApiPricingExceptionsRoute,
+  ApiPricingFacetsRoute: ApiPricingFacetsRoute,
+  ApiPricingItemsRoute: ApiPricingItemsRoute,
+  ApiPricingMappingsRoute: ApiPricingMappingsRoute,
+  ApiPricingPublishRoute: ApiPricingPublishRoute,
+  ApiPricingRecalculateRoute: ApiPricingRecalculateRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendCourseAlertsRoute: ApiTelegramSendCourseAlertsRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
   ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
+  ApiPricingImportPreviewRoute: ApiPricingImportPreviewRoute,
+  ApiPricingInvoicesMovementRoute: ApiPricingInvoicesMovementRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

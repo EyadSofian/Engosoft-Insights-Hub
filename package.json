@@ -47,7 +47,14 @@
     "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs",
     "test:campaign-return-band": "node --experimental-strip-types scripts/test-campaign-return-band.mjs",
     "test:uncalled-leads": "node --experimental-strip-types scripts/test-uncalled-leads.mjs",
-    "test:default-period": "node --experimental-strip-types scripts/test-default-period.mjs"
+    "test:default-period": "node --experimental-strip-types scripts/test-default-period.mjs",
+    "test:price-book-parser": "node --experimental-strip-types scripts/test-price-book-parser.mjs",
+    "test:pricing-engine": "node --experimental-strip-types scripts/test-pricing-engine.mjs",
+    "test:price-versioning": "node --experimental-strip-types scripts/test-price-versioning.mjs",
+    "test:pricing-security": "node --experimental-strip-types scripts/test-pricing-security.mjs",
+    "test:pricing-performance": "node --experimental-strip-types scripts/test-pricing-performance.mjs",
+    "test:pricing": "npm run test:price-book-parser && npm run test:pricing-engine && npm run test:price-versioning && npm run test:pricing-security && npm run test:pricing-performance",
+    "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

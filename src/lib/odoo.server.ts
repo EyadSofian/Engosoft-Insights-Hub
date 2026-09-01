@@ -57,12 +57,18 @@ export function odooConfigured(): boolean {
 
 /** Raised for a reachable Odoo that refused the call, so routes can say why. */
 export class OdooError extends Error {
+  // Assigned in the body rather than declared as a constructor parameter
+  // property: Node's type stripping cannot compile that form, and it is what
+  // the repo's test scripts run under.
+  readonly kind: "auth" | "access" | "server" | "network" | "config";
+
   constructor(
     message: string,
-    readonly kind: "auth" | "access" | "server" | "network" | "config" = "server",
+    kind: "auth" | "access" | "server" | "network" | "config" = "server",
   ) {
     super(message);
     this.name = "OdooError";
+    this.kind = kind;
   }
 }
 
