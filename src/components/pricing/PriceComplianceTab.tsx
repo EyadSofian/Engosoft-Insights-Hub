@@ -428,7 +428,7 @@ export function PriceComplianceTab({
             }
             sub={
               lang === "ar"
-                ? `${fmtNum(kpis?.compliantLines ?? 0)} ملتزم من ${fmtNum(kpis?.judgedLines ?? 0)} بند محسوم`
+                ? `${fmtNum(kpis?.compliantLines ?? 0)} بند ملتزم من أصل ${fmtNum(kpis?.judgedLines ?? 0)} تم الحكم عليها`
                 : `${fmtNum(kpis?.compliantLines ?? 0)} compliant of ${fmtNum(kpis?.judgedLines ?? 0)} judged lines`
             }
             subWrap

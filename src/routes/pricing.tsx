@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BellRing,
@@ -22,6 +22,7 @@ import {
   type ComplianceResponse,
 } from "@/components/pricing/PriceComplianceTab";
 import { PriceCourseSummaryTab } from "@/components/pricing/PriceCourseSummaryTab";
+import { PriceComplianceInfo } from "@/components/pricing/PriceComplianceInfo";
 import { PriceManageTab } from "@/components/pricing/PriceManageTab";
 import {
   emptySearchFilters,
@@ -346,6 +347,7 @@ function PricingPage() {
     label: string;
     value: string;
     sub?: string;
+    info?: ReactNode;
     tone?: "danger" | "warning" | "success";
   }[] = [
     {
@@ -353,9 +355,17 @@ function PricingPage() {
       value: complianceRate == null ? "—" : fmtPct(complianceRate * 100, 0),
       sub: compliance.data
         ? ar
-          ? `${fmtNum(compliance.data.kpis.compliantLines)} ملتزم من ${fmtNum(compliance.data.kpis.judgedLines)} بند محسوم`
+          ? `${fmtNum(compliance.data.kpis.compliantLines)} بند ملتزم من أصل ${fmtNum(compliance.data.kpis.judgedLines)} تم الحكم عليها`
           : `${fmtNum(compliance.data.kpis.compliantLines)} of ${fmtNum(compliance.data.kpis.judgedLines)} judged lines compliant`
         : undefined,
+      info: (
+        <PriceComplianceInfo
+          from={complianceFilters.from}
+          to={complianceFilters.to}
+          dateBasis={complianceFilters.dateBasis}
+          kpis={compliance.data?.kpis}
+        />
+      ),
       tone: complianceTone,
     },
     {
@@ -440,7 +450,10 @@ function PricingPage() {
               key={metric.label}
               className={`min-h-[82px] px-4 py-3 ${index ? "border-s border-border" : ""} ${index > 1 ? "border-t border-border sm:border-t-0" : ""} ${index > 2 ? "sm:border-t sm:border-border xl:border-t-0" : ""}`}
             >
-              <div className="text-[10px] font-semibold text-text-muted">{metric.label}</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
+                <span>{metric.label}</span>
+                {metric.info}
+              </div>
               {compliance.isLoading && index < 4 ? (
                 <Skeleton className="mt-2 h-7 w-20 rounded-lg" />
               ) : (
