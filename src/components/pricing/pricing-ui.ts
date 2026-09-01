@@ -38,6 +38,8 @@ export interface PriceBookSummary {
 
 export interface CatalogPrice {
   id: string;
+  sourceSheet: string;
+  sourceRow: number;
   scope: string;
   bundleName: string;
   paymentMethod: string;

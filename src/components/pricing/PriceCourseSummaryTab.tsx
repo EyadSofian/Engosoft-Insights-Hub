@@ -3,6 +3,7 @@ import {
   BadgePercent,
   Banknote,
   BookOpenCheck,
+  CalendarClock,
   ChevronDown,
   ChevronUp,
   GraduationCap,
@@ -32,6 +33,21 @@ const SPECIALIZATION_AR: Record<string, string> = {
 const specializationLabel = (value: string, arabic: boolean): string =>
   arabic ? SPECIALIZATION_AR[value] || value || "دورات أخرى" : value || "Other courses";
 
+const sourceLabel = (value: string, arabic: boolean): string =>
+  arabic ? SPECIALIZATION_AR[value] || value : value;
+
+const dateLabel = (value: string, lang: string): string => {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+};
+
 const isCourseSpecialization = (value: string): boolean =>
   Boolean(SPECIALIZATION_AR[value]) || !/(عرض|عروض|حافز|offer|incentive)/i.test(value);
 
@@ -49,6 +65,8 @@ const activeOffer = (entry: CatalogEntry) =>
     (price) =>
       price.active &&
       price.scope === "offer" &&
+      (!price.validFrom || price.validFrom <= new Date().toISOString().slice(0, 10)) &&
+      (!price.validTo || price.validTo >= new Date().toISOString().slice(0, 10)) &&
       (price.exact !== null || price.minimum !== null || price.maximum !== null),
   );
 
@@ -107,12 +125,13 @@ function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accent
 
   return (
     <Card
-      className={`group overflow-hidden border ${accent.border} p-0 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg`}
+      className={`group overflow-hidden border ${accent.border} p-0 transition-shadow hover:shadow-md`}
     >
+      <div className={`h-1 w-full ${accent.icon.split(" ")[0]}`} aria-hidden="true" />
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="w-full cursor-pointer p-4 text-start"
+        className="w-full cursor-pointer px-5 py-4 text-start"
         aria-expanded={open}
       >
         <div className="flex items-start justify-between gap-3">
@@ -138,17 +157,17 @@ function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accent
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <div className={`rounded-xl ${accent.surface} p-3`}>
-            <div className="text-[10px] font-semibold text-text-muted">
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className={`rounded-xl ${accent.surface} px-4 py-3`}>
+            <div className="text-[11px] font-semibold text-text-muted">
               {ar ? "تابي / تمارا" : "Tabby / Tamara"}
             </div>
             <div className="mt-1">
               <PriceCell price={instalment} empty={ar ? "غير محدد" : "Not set"} />
             </div>
           </div>
-          <div className="rounded-xl bg-surface-2 p-3">
-            <div className="text-[10px] font-semibold text-text-muted">
+          <div className="rounded-xl bg-surface-2 px-4 py-3">
+            <div className="text-[11px] font-semibold text-text-muted">
               {ar ? "كاش / كاشير" : "Cash / cashier"}
             </div>
             <div className="mt-1">
@@ -157,7 +176,7 @@ function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accent
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-brand">
+        <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-[12px] font-semibold text-brand">
           <span>
             {open
               ? ar
@@ -174,19 +193,48 @@ function CourseSummaryCard({ entry, accentIndex }: { entry: CatalogEntry; accent
       </button>
 
       {open && (
-        <div className="animate-in fade-in slide-in-from-top-1 border-t border-border bg-surface-2/55 p-4 duration-200">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="mb-1 text-[10px] font-semibold text-text-muted">
+        <div className="animate-in fade-in border-t border-border bg-surface-2/55 px-5 py-4 duration-200">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-surface px-4 py-3">
+              <div className="mb-1 text-[11px] font-semibold text-text-muted">
                 {ar ? "السعر بالمصري" : "Egypt price"}
               </div>
               <PriceCell price={egypt} empty={ar ? "غير محدد" : "Not set"} />
             </div>
-            <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="mb-1 text-[10px] font-semibold text-text-muted">
-                {ar ? "العرض الحالي" : "Current offer"}
+            <div className="rounded-xl border border-warning/30 bg-warning-soft/30 px-4 py-3">
+              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
+                <BadgePercent size={13} aria-hidden="true" />
+                {ar ? "سعر عرض منشور" : "Published offer price"}
               </div>
-              <PriceCell price={offer} empty={ar ? "لا يوجد عرض" : "No offer"} accent />
+              <PriceCell price={offer} empty={ar ? "لا يوجد عرض ساري" : "No live offer"} accent />
+              {offer && (
+                <div className="mt-2 space-y-1 border-t border-warning/20 pt-2 text-[10px] leading-relaxed text-text-muted">
+                  <div>
+                    {ar ? "طريقة الدفع:" : "Payment:"}{" "}
+                    <strong>
+                      {offer.paymentMethod === "cash"
+                        ? ar
+                          ? "كاش"
+                          : "Cash"
+                        : offer.paymentMethod === "cashier"
+                          ? ar
+                            ? "كاشير"
+                            : "Cashier"
+                          : offer.paymentMethod}
+                    </strong>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <CalendarClock size={11} aria-hidden="true" />
+                    <span>
+                      {ar ? "المصدر: قائمة الأسعار" : "Source: price list"} ·{" "}
+                      {sourceLabel(offer.sourceSheet, ar)} · {ar ? "صف" : "row"} {offer.sourceRow}
+                      {offer.validTo
+                        ? ` · ${ar ? "حتى" : "until"} ${dateLabel(offer.validTo, lang)}`
+                        : ""}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {!!packages.length && (
@@ -260,9 +308,8 @@ export function PriceCourseSummaryTab({
 
   return (
     <div className="space-y-4">
-      <Card className="relative overflow-hidden border-brand/20 p-0">
-        <div className="absolute inset-y-0 start-0 w-1 bg-warning" aria-hidden="true" />
-        <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
+      <Card className="border-brand/20 px-5 py-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <div className="flex items-center gap-2 text-brand">
               <BookOpenCheck size={18} aria-hidden="true" />
@@ -272,28 +319,29 @@ export function PriceCourseSummaryTab({
             </div>
             <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-text-muted">
               {ar
-                ? "اختار الدورة واقرأ سعر التقسيط أو الكاش مباشرة. الأرقام من قائمة الأسعار المنشورة نفسها، وأول رقم في النطاق هو أقل سعر مسموح."
+                ? "اختر الدورة لمعرفة سعر الكاش والتقسيط. أي عرض يظهر هنا يكون منشورًا وساري التاريخ، مع توضيح مصدره."
                 : "Find a course and read instalment or cash pricing immediately. The first value in a range is the allowed floor."}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 text-[11px]">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 font-semibold text-brand">
-              <WalletCards size={13} /> {ar ? "تقسيط" : "Instalment"}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <WalletCards size={13} className="text-brand" /> {ar ? "سعر التقسيط" : "Instalment"}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1.5 font-semibold text-success">
-              <Banknote size={13} /> {ar ? "كاش" : "Cash"}
+            <span className="inline-flex items-center gap-1.5">
+              <Banknote size={13} className="text-success" /> {ar ? "سعر الكاش" : "Cash"}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 font-semibold text-warning">
-              <BadgePercent size={13} /> {ar ? "العرض" : "Offer"}
+            <span className="inline-flex items-center gap-1.5">
+              <BadgePercent size={13} className="text-warning" />{" "}
+              {ar ? "العرض المنشور فقط" : "Published offers only"}
             </span>
           </div>
         </div>
       </Card>
 
-      <Card className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_240px]">
+      <Card className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-end">
         <form
           role="search"
-          className="flex gap-2"
+          className="flex flex-col gap-2 sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
             onFilters({ ...filters, q: draft });
@@ -316,7 +364,7 @@ export function PriceCourseSummaryTab({
           </div>
           <button
             type="submit"
-            className="min-h-11 rounded-xl bg-brand px-4 text-[13px] font-bold text-white"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 text-[13px] font-bold text-white transition hover:brightness-110"
           >
             {ar ? "بحث" : "Search"}
           </button>
@@ -381,15 +429,17 @@ export function PriceCourseSummaryTab({
                     onFilters({ ...filters, specialization, subcategory: "all" });
                     setShowCourses(true);
                   }}
-                  className={`group relative min-h-32 overflow-hidden rounded-2xl border ${accent.border} ${accent.surface} p-4 text-start transition duration-200 hover:-translate-y-1 hover:shadow-lg`}
+                  className={`group min-h-32 rounded-2xl border ${accent.border} ${accent.surface} p-5 text-start transition-shadow hover:shadow-md`}
                 >
-                  <span className="absolute -end-4 -top-5 text-[72px] font-black leading-none text-current opacity-[0.045]">
-                    {String(count).padStart(2, "0")}
-                  </span>
-                  <span className={`grid size-10 place-items-center rounded-xl ${accent.icon}`}>
-                    <GraduationCap size={18} aria-hidden="true" />
-                  </span>
-                  <div className="mt-4 flex items-end justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={`grid size-10 place-items-center rounded-xl ${accent.icon}`}>
+                      <GraduationCap size={18} aria-hidden="true" />
+                    </span>
+                    <span className="rounded-full bg-surface/70 px-2.5 py-1 text-[12px] font-bold tabular-nums text-text">
+                      {count}
+                    </span>
+                  </div>
+                  <div className="mt-5 flex items-end justify-between gap-3">
                     <div>
                       <h3 className="text-[15px] font-bold text-text">
                         {specializationLabel(specialization, ar)}
@@ -399,7 +449,7 @@ export function PriceCourseSummaryTab({
                       </p>
                     </div>
                     <span className="text-[11px] font-bold text-brand">
-                      {ar ? "فتح ←" : "Open →"}
+                      {ar ? "عرض الدورات" : "View courses"}
                     </span>
                   </div>
                 </button>
@@ -449,7 +499,7 @@ export function PriceCourseSummaryTab({
               </span>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
               {entries.map((entry, index) => (
                 <CourseSummaryCard
                   key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}

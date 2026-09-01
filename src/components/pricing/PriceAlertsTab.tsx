@@ -4,6 +4,7 @@ import {
   ChevronUp,
   CircleAlert,
   Link2,
+  RefreshCw,
   Send,
   ShieldCheck,
   TriangleAlert,
@@ -60,6 +61,17 @@ const SEVERITY_CARD: Record<string, string> = {
   informational: "border-success/30 bg-success-soft/45 text-success",
 };
 
+const SOURCE_SHEET_AR: Record<string, string> = {
+  Management: "الإدارة",
+  "Mech & Elec": "الميكانيكا والكهرباء",
+  "BIM all": "نمذجة معلومات البناء BIM",
+  "Architecture & Decor": "العمارة والديكور",
+  "Civil Courses": "الهندسة المدنية",
+};
+
+const sourceLabel = (value: string, arabic: boolean): string =>
+  arabic ? SOURCE_SHEET_AR[value] || value : value;
+
 /**
  * The alerts tab.
  *
@@ -75,6 +87,8 @@ export function PriceAlertsTab({
   sending,
   canWrite,
   adminCode,
+  onResolveLinks,
+  resolvingLinks,
 }: {
   data?: ExceptionsResponse;
   loading: boolean;
@@ -82,15 +96,31 @@ export function PriceAlertsTab({
   sending: boolean;
   canWrite: boolean;
   adminCode: string;
+  onResolveLinks: () => void;
+  resolvingLinks: boolean;
 }) {
-  const { lang, t } = useI18n();
-  const [linking, setLinking] = useState<PriceItem | null>(null);
+  const { lang } = useI18n();
+  const [linking, setLinking] = useState<PriceItem[] | null>(null);
   const [productId, setProductId] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [activeSeverity, setActiveSeverity] = useState<string>("all");
   const [openCourse, setOpenCourse] = useState("");
+
+  const unlinkedGroups = useMemo(() => {
+    const groups = new Map<string, PriceItem[]>();
+    for (const item of data?.unlinked.items ?? []) {
+      const key = [
+        item.normalizedProductCode || item.rawProductCode || "no-code",
+        item.courseName || "—",
+        item.sourceSheet || "—",
+        item.sourceRow,
+      ].join("::");
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    return [...groups.values()];
+  }, [data?.unlinked.items]);
 
   const courseAlerts = useMemo(() => {
     const visible = (data?.alerts ?? []).filter(
@@ -125,15 +155,13 @@ export function PriceAlertsTab({
         "/api/pricing/mappings",
         "POST",
         {
-          mappings: [
-            {
-              priceItemId: linking.id,
-              odooProductId: Number(productId),
-              odooProductCode: linking.normalizedProductCode,
-              matchType: "manual",
-              confidence: 1,
-            },
-          ],
+          mappings: linking.map((item) => ({
+            priceItemId: item.id,
+            odooProductId: Number(productId),
+            odooProductCode: item.normalizedProductCode,
+            matchType: "manual",
+            confidence: 1,
+          })),
         },
         adminCode,
       );
@@ -164,7 +192,7 @@ export function PriceAlertsTab({
           </h2>
           <p className="mt-1 text-[11px] text-text-muted">
             {lang === "ar"
-              ? "اختار نوع التنبيه، وبعدها افتح كرت الدورة فقط لو محتاج التفاصيل."
+              ? "اختر نوع التنبيه، ثم افتح كرت الدورة لعرض التفاصيل."
               : "Choose an alert type, then open only the course you need."}
           </p>
         </div>
@@ -202,23 +230,22 @@ export function PriceAlertsTab({
                 setActiveSeverity(active ? "all" : severity);
                 setOpenCourse("");
               }}
-              className={`relative min-h-32 overflow-hidden rounded-2xl border p-4 text-start transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${SEVERITY_CARD[severity]} ${active ? "ring-2 ring-current ring-offset-2 ring-offset-[var(--surface)]" : ""}`}
+              className={`min-h-32 rounded-2xl border p-5 text-start transition-shadow hover:shadow-md ${SEVERITY_CARD[severity]} ${active ? "ring-2 ring-current ring-offset-2 ring-offset-[var(--surface)]" : ""}`}
             >
-              <span className="absolute -end-3 -top-5 text-[78px] font-black leading-none opacity-[0.08]">
-                {count}
-              </span>
-              <span className="grid size-9 place-items-center rounded-xl bg-current/10">
-                {severity === "critical" ? (
-                  <TriangleAlert size={17} aria-hidden="true" />
-                ) : severity === "informational" ? (
-                  <ShieldCheck size={17} aria-hidden="true" />
-                ) : (
-                  <CircleAlert size={17} aria-hidden="true" />
-                )}
-              </span>
-              <div className="mt-4 text-[24px] font-black tabular-nums">{fmtNum(count)}</div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-current/10">
+                  {severity === "critical" ? (
+                    <TriangleAlert size={17} aria-hidden="true" />
+                  ) : severity === "informational" ? (
+                    <ShieldCheck size={17} aria-hidden="true" />
+                  ) : (
+                    <CircleAlert size={17} aria-hidden="true" />
+                  )}
+                </span>
+                <div className="text-[28px] font-black tabular-nums">{fmtNum(count)}</div>
+              </div>
               <div className="text-[12px] font-bold">{severityLabel(severity, lang)}</div>
-              <div className="mt-1 line-clamp-1 text-[10px] opacity-80">
+              <div className="mt-1 text-[10px] leading-relaxed opacity-80">
                 {SEVERITY_MEANING[severity]?.[lang]}
               </div>
             </button>
@@ -252,7 +279,7 @@ export function PriceAlertsTab({
                 <button
                   type="button"
                   onClick={() => setOpenCourse(open ? "" : key)}
-                  className="w-full cursor-pointer p-4 text-start"
+                  className="w-full cursor-pointer px-5 py-4 text-start"
                   aria-expanded={open}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -335,18 +362,39 @@ export function PriceAlertsTab({
         <SectionTitle
           hint={
             lang === "ar"
-              ? "صفوف أسعار بدون منتج أودو مؤكد. البنود اللي بتقابلها في الفواتير بتتحسب «تحتاج ربط»، ومش بتطلع مخالفة."
+              ? "تم ربط الأكواد المطابقة تلقائيًا. الظاهر هنا فقط أكواد مركبة أو صفوف بلا كود وتحتاج مراجعة قبل اعتماد منتج أودو."
               : "Price rows with no confirmed Odoo product. Invoice lines that hit them are listed as needing a link, never as a breach."
           }
           action={
-            <Pill tone={data?.unlinked.total ? "warning" : "success"}>
-              {fmtNum(data?.unlinked.total ?? 0)}
-            </Pill>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onResolveLinks}
+                disabled={!canWrite || resolvingLinks}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-semibold text-text transition hover:bg-surface-2 disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={14}
+                  className={resolvingLinks ? "animate-spin" : ""}
+                  aria-hidden="true"
+                />
+                {resolvingLinks
+                  ? lang === "ar"
+                    ? "جارٍ الربط…"
+                    : "Linking…"
+                  : lang === "ar"
+                    ? "ربط الأكواد تلقائيًا"
+                    : "Auto-link codes"}
+              </button>
+              <Pill tone={data?.unlinked.total ? "warning" : "success"}>
+                {fmtNum(data?.unlinked.total ?? 0)}
+              </Pill>
+            </div>
           }
         >
           <span className="inline-flex items-center gap-2">
             <Link2 size={16} aria-hidden="true" />
-            {lang === "ar" ? "تحتاج ربط" : "Needs linking"}
+            {lang === "ar" ? "أكواد تحتاج مراجعة الربط" : "Codes needing link review"}
           </span>
         </SectionTitle>
 
@@ -354,46 +402,44 @@ export function PriceAlertsTab({
           <EmptyState label={lang === "ar" ? "كل الصفوف مربوطة" : "Every row is linked"} />
         )}
 
-        {!!data?.unlinked.items.length && (
-          <div className="hscroll">
-            <table className="w-full min-w-[640px] text-[12px]">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-text-subtle">
-                  <th className="py-2 text-start font-semibold">{t("pb_code")}</th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "الدورة" : "Course"}
-                  </th>
-                  <th className="py-2 text-start font-semibold">
-                    {lang === "ar" ? "المصدر" : "Source"}
-                  </th>
-                  <th className="py-2 text-start font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.unlinked.items.slice(0, 40).map((item) => (
-                  <tr key={item.id} className="border-t border-border">
-                    <td className="py-2 tabular-nums">{item.rawProductCode || "—"}</td>
-                    <td className="py-2">{item.courseName}</td>
-                    <td className="py-2 text-text-subtle">
-                      {item.sourceSheet}:{item.sourceRow}
-                    </td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        disabled={!canWrite}
-                        onClick={() => {
-                          setLinking(item);
-                          setProductId("");
-                        }}
-                        className="min-h-9 cursor-pointer rounded-lg border border-border px-2.5 text-[12px] font-medium disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {lang === "ar" ? "ربط بمنتج" : "Link a product"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {!!unlinkedGroups.length && (
+          <div className="grid gap-3 pt-2 sm:grid-cols-2">
+            {unlinkedGroups.slice(0, 40).map((items) => {
+              const item = items[0];
+              return (
+                <article
+                  key={`${item.id}-${item.sourceRow}`}
+                  className="rounded-2xl border border-border bg-surface-2/45 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Pill tone="neutral">{item.rawProductCode || "—"}</Pill>
+                      <h3 className="mt-2 line-clamp-2 text-[13px] font-semibold text-text">
+                        {item.courseName || (lang === "ar" ? "بدون اسم دورة" : "Unnamed course")}
+                      </h3>
+                    </div>
+                    <Pill tone="warning">
+                      {items.length} {lang === "ar" ? "قاعدة سعر" : "price rules"}
+                    </Pill>
+                  </div>
+                  <p className="mt-2 text-[11px] text-text-subtle">
+                    {sourceLabel(item.sourceSheet, lang === "ar")} · {lang === "ar" ? "صف" : "row"}{" "}
+                    {item.sourceRow}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canWrite}
+                    onClick={() => {
+                      setLinking(items);
+                      setProductId("");
+                    }}
+                    className="mt-3 min-h-10 w-full cursor-pointer rounded-xl border border-border px-3 text-[12px] font-semibold text-text transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {lang === "ar" ? "ربط الكود بمنتج أودو" : "Link code to an Odoo product"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         )}
       </Card>
@@ -409,11 +455,11 @@ export function PriceAlertsTab({
           }}
         >
           <div className="w-full max-w-md rounded-2xl bg-surface p-5">
-            <h2 className="text-[15px] font-semibold text-text">{linking.courseName}</h2>
+            <h2 className="text-[15px] font-semibold text-text">{linking[0].courseName}</h2>
             <p className="mt-1 text-[12px] text-text-muted">
               {lang === "ar"
-                ? "اكتب معرّف المنتج في أودو. الربط بيتسجل باسمك في السجل، وبيُستخدم في المطابقة بعد كده."
-                : "Enter the Odoo product id. The link is recorded against your name and used for matching from then on."}
+                ? `اكتب معرّف المنتج في أودو. سيتم تطبيق الربط على ${linking.length} قاعدة سعر وتسجيله في سجل المراجعة.`
+                : `Enter the Odoo product id. This link will apply to ${linking.length} price rules and be recorded in the audit log.`}
             </p>
             <label className="mt-3 flex flex-col gap-1">
               <span className="text-[11px] font-medium text-text-muted">Odoo product id</span>

@@ -330,6 +330,8 @@ function PricingPage() {
           sending={busy === "digest"}
           canWrite={canWrite}
           adminCode={adminCode}
+          onResolveLinks={() => void recalculate()}
+          resolvingLinks={busy === "recalculate"}
         />
       )}
     </div>

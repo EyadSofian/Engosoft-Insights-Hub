@@ -913,6 +913,8 @@ export interface CatalogEntry {
   /** One row per currency and payment method the course is priced in. */
   prices: {
     id: string;
+    sourceSheet: string;
+    sourceRow: number;
     scope: string;
     bundleName: string;
     paymentMethod: string;
@@ -963,6 +965,8 @@ export function groupCatalog(items: Awaited<ReturnType<typeof listPriceItems>>):
     entry.odooProductId = entry.odooProductId ?? item.odooProductId;
     entry.prices.push({
       id: item.id,
+      sourceSheet: item.sourceSheet,
+      sourceRow: item.sourceRow,
       scope: item.pricingScope,
       bundleName: item.bundleName,
       paymentMethod: item.paymentMethod,

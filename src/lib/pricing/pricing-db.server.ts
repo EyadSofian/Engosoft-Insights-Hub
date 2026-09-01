@@ -273,7 +273,15 @@ const num = (value: unknown): number | null => {
 };
 const isoDate = (value: unknown): string => {
   if (!value) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    // PostgreSQL DATE has no timezone. The pg driver materialises it at local
+    // midnight; converting that value to UTC can move Cairo dates one day
+    // backwards. Preserve the calendar fields exactly as stored.
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
   return str(value).slice(0, 10);
 };
 const isoTime = (value: unknown): string => {
@@ -318,7 +326,11 @@ function toItem(row: Record<string, unknown>): PriceBookItem {
     subcategory: str(row.subcategory),
     rawProductCode: str(row.raw_product_code),
     normalizedProductCode: str(row.normalized_product_code),
-    odooProductId: num(row.odoo_product_id),
+    // Published price books are immutable, so automatic exact-code matches
+    // live in price_product_mappings rather than rewriting the published row.
+    // Read the approved mapping as the effective product id so the UI does not
+    // incorrectly call a working code match "unlinked".
+    odooProductId: num(row.resolved_odoo_product_id) ?? num(row.odoo_product_id),
     courseName: str(row.course_name),
     normalizedCourseName: str(row.normalized_course_name),
     deliveryType: str(row.delivery_type) as PriceBookItem["deliveryType"],
@@ -755,10 +767,20 @@ export interface ItemQuery {
   offset?: number;
 }
 
+const RESOLVED_ODOO_PRODUCT_ID = `(SELECT m.odoo_product_id
+  FROM price_product_mappings m
+  WHERE m.price_item_id = i.id AND m.approved_by <> ''
+  ORDER BY CASE m.match_type WHEN 'manual' THEN 0 WHEN 'exact_code' THEN 1 ELSE 2 END,
+           m.approved_at DESC
+  LIMIT 1)`;
+
 export async function listPriceItems(bookId: string): Promise<PriceBookItem[]> {
   await ensurePricingSchema();
   const result = await getPool().query(
-    `SELECT * FROM price_book_items WHERE price_book_id = $1 ORDER BY source_sheet, source_row, payment_method`,
+    `SELECT i.*, ${RESOLVED_ODOO_PRODUCT_ID} AS resolved_odoo_product_id
+     FROM price_book_items i
+     WHERE i.price_book_id = $1
+     ORDER BY i.source_sheet, i.source_row, i.payment_method`,
     [bookId],
   );
   return result.rows.map(toItem);
@@ -768,7 +790,7 @@ export async function queryPriceItems(
   query: ItemQuery,
 ): Promise<{ items: PriceBookItem[]; total: number }> {
   await ensurePricingSchema();
-  const where: string[] = ["price_book_id = $1"];
+  const where: string[] = ["i.price_book_id = $1"];
   const values: unknown[] = [query.bookId];
   const add = (clause: string, value: unknown) => {
     values.push(value);
@@ -780,25 +802,26 @@ export async function queryPriceItems(
     values.push(term);
     const placeholder = `$${values.length}`;
     where.push(
-      `(lower(course_name) LIKE ${placeholder}
-        OR lower(normalized_course_name) LIKE ${placeholder}
-        OR lower(raw_product_code) LIKE ${placeholder}
-        OR lower(normalized_product_code) LIKE ${placeholder}
-        OR lower(bundle_name) LIKE ${placeholder}
-        OR lower(subcategory) LIKE ${placeholder})`,
+      `(lower(i.course_name) LIKE ${placeholder}
+        OR lower(i.normalized_course_name) LIKE ${placeholder}
+        OR lower(i.raw_product_code) LIKE ${placeholder}
+        OR lower(i.normalized_product_code) LIKE ${placeholder}
+        OR lower(i.bundle_name) LIKE ${placeholder}
+        OR lower(i.subcategory) LIKE ${placeholder})`,
     );
   }
-  if (query.specialization) add("specialization = $$", query.specialization);
-  if (query.subcategory) add("subcategory = $$", query.subcategory);
-  if (query.deliveryType) add("delivery_type = $$", query.deliveryType);
+  if (query.specialization) add("i.specialization = $$", query.specialization);
+  if (query.subcategory) add("i.subcategory = $$", query.subcategory);
+  if (query.deliveryType) add("i.delivery_type = $$", query.deliveryType);
   if (query.paymentMethod)
-    add("(payment_method = $$ OR payment_method = 'any')", query.paymentMethod);
-  if (query.currency) add("currency = $$", query.currency);
-  if (query.country) add("(country = $$ OR country = '')", query.country);
-  if (query.scope) add("pricing_scope = $$", query.scope);
-  if (query.activeOnly) where.push("active = true");
-  if (query.needsReviewOnly) where.push("requires_review = true");
-  if (query.unmappedOnly) where.push("odoo_product_id IS NULL");
+    add("(i.payment_method = $$ OR i.payment_method = 'any')", query.paymentMethod);
+  if (query.currency) add("i.currency = $$", query.currency);
+  if (query.country) add("(i.country = $$ OR i.country = '')", query.country);
+  if (query.scope) add("i.pricing_scope = $$", query.scope);
+  if (query.activeOnly) where.push("i.active = true");
+  if (query.needsReviewOnly) where.push("i.requires_review = true");
+  if (query.unmappedOnly)
+    where.push(`i.odoo_product_id IS NULL AND ${RESOLVED_ODOO_PRODUCT_ID} IS NULL`);
 
   const clause = where.join(" AND ");
   const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000);
@@ -806,13 +829,14 @@ export async function queryPriceItems(
 
   const [rows, total] = await Promise.all([
     getPool().query(
-      `SELECT * FROM price_book_items WHERE ${clause}
-        ORDER BY specialization, subcategory, course_name, pricing_scope, payment_method
+      `SELECT i.*, ${RESOLVED_ODOO_PRODUCT_ID} AS resolved_odoo_product_id
+       FROM price_book_items i WHERE ${clause}
+        ORDER BY i.specialization, i.subcategory, i.course_name, i.pricing_scope, i.payment_method
         LIMIT ${limit} OFFSET ${offset}`,
       values,
     ),
     getPool().query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM price_book_items WHERE ${clause}`,
+      `SELECT count(*)::text AS count FROM price_book_items i WHERE ${clause}`,
       values,
     ),
   ]);

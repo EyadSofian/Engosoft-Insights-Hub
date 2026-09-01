@@ -9,6 +9,7 @@ import {
   Gift,
   OctagonMinus,
   Search,
+  SlidersHorizontal,
   Tag,
 } from "lucide-react";
 import { Card, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
@@ -68,6 +69,53 @@ export const emptySearchFilters: SearchFilters = {
   country: "all",
   liveOffers: false,
 };
+
+const SPECIALIZATION_AR: Record<string, string> = {
+  Management: "الإدارة",
+  "Mech & Elec": "الميكانيكا والكهرباء",
+  "BIM all": "نمذجة معلومات البناء BIM",
+  "Architecture & Decor": "العمارة والديكور",
+  "Civil Courses": "الهندسة المدنية",
+  Others: "دورات أخرى",
+};
+
+const specializationLabel = (value: string, lang: string) =>
+  lang === "ar" ? SPECIALIZATION_AR[value] || value : value;
+
+const sourceLabel = (value: string, lang: string) =>
+  lang === "ar" ? SPECIALIZATION_AR[value] || value : value;
+
+const dateLabel = (value: string, lang: string): string => {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+};
+
+const liveOffer = (entry: CatalogEntry) => {
+  const today = new Date().toISOString().slice(0, 10);
+  return entry.prices.find(
+    (price) =>
+      price.scope === "offer" &&
+      price.active &&
+      (!price.validFrom || price.validFrom <= today) &&
+      (!price.validTo || price.validTo >= today),
+  );
+};
+
+const individualPrice = (entry: CatalogEntry, methods: string[]) =>
+  entry.prices.find(
+    (price) =>
+      price.active &&
+      price.scope === "individual" &&
+      price.currency === "SAR" &&
+      methods.includes(price.paymentMethod),
+  );
 
 function Select({
   label,
@@ -146,12 +194,20 @@ function PriceRow({ price }: { price: CatalogPrice }) {
         )}
         {!!price.validTo && (
           <span className="text-[11px] text-warning">
-            {lang === "ar" ? `ينتهي ${price.validTo}` : `ends ${price.validTo}`}
+            {lang === "ar"
+              ? `ساري حتى ${dateLabel(price.validTo, lang)}`
+              : `valid until ${dateLabel(price.validTo, lang)}`}
           </span>
         )}
       </div>
       {!!price.bundleName && (
         <p className="w-full text-[11px] text-text-muted">{price.bundleName}</p>
+      )}
+      {price.scope === "offer" && (
+        <p className="w-full text-[10px] leading-relaxed text-text-subtle">
+          {lang === "ar" ? "المصدر: قائمة الأسعار" : "Source: price list"} ·{" "}
+          {sourceLabel(price.sourceSheet, lang)} · {lang === "ar" ? "صف" : "row"} {price.sourceRow}
+        </p>
       )}
       {!!price.note && price.scope !== "individual" && (
         <p className="w-full text-[11px] leading-snug text-text-subtle">{price.note}</p>
@@ -172,28 +228,16 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
       }))
       .filter((group) => group.prices.length);
   }, [entry.prices]);
-  const individualPrices = entry.prices.filter(
-    (price) => price.active && price.scope === "individual",
-  );
-  const previewPool = individualPrices.some((price) => price.currency === "SAR")
-    ? individualPrices.filter((price) => price.currency === "SAR")
-    : individualPrices;
-  const numericPrices = previewPool
-    .map((price) => price.minimum ?? price.exact ?? price.maximum)
-    .filter((value): value is number => value !== null);
-  const previewPrice = previewPool.find(
-    (price) =>
-      price.active &&
-      price.scope === "individual" &&
-      (price.minimum ?? price.exact ?? price.maximum) === Math.min(...numericPrices),
-  );
+  const cash = individualPrice(entry, ["cash", "cashier"]);
+  const instalment = individualPrice(entry, ["tabby", "tamara"]);
+  const offer = liveOffer(entry);
 
   return (
-    <Card className="group flex flex-col overflow-hidden border-brand/15 p-0 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+    <Card className="group flex flex-col overflow-hidden border-border p-0 transition-shadow hover:border-brand/30 hover:shadow-md">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="w-full cursor-pointer p-4 text-start"
+        className="w-full cursor-pointer px-5 py-4 text-start"
         aria-expanded={open}
       >
         <div className="flex items-start justify-between gap-3">
@@ -213,47 +257,46 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
                 {entry.courseName}
               </h3>
               <p className="mt-1 text-[11px] text-text-muted">
-                {entry.subcategory || entry.specialization}
+                {specializationLabel(entry.specialization || entry.subcategory, lang)}
                 {!!entry.level && ` · ${entry.level}`}
               </p>
             </div>
           </div>
-          <span className="text-text-subtle">
-            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </span>
         </div>
 
-        <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-surface-2 p-3">
-          <div>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-surface-2 px-3 py-2.5">
             <div className="text-[10px] font-semibold text-text-muted">
-              {lang === "ar" ? "السعر يبدأ من" : "Price starts at"}
+              {lang === "ar" ? "كاش" : "Cash"}
             </div>
-            <div className="mt-1 text-[16px] font-black tabular-nums text-brand">
-              {previewPrice ? bandText(previewPrice, lang) : "—"}
+            <div className="mt-1 text-[14px] font-bold tabular-nums text-text">
+              {cash ? bandText(cash, lang) : "—"}
             </div>
           </div>
-          <span className="text-[11px] font-bold text-brand">
-            {open
-              ? lang === "ar"
-                ? "إغلاق التفاصيل"
-                : "Close details"
-              : lang === "ar"
-                ? "عرض كل الأسعار"
-                : "View all prices"}
-          </span>
+          <div className="rounded-xl bg-brand-soft/45 px-3 py-2.5">
+            <div className="text-[10px] font-semibold text-text-muted">
+              {lang === "ar" ? "تابي / تمارا" : "Tabby / Tamara"}
+            </div>
+            <div className="mt-1 text-[14px] font-bold tabular-nums text-brand">
+              {instalment ? bandText(instalment, lang) : "—"}
+            </div>
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-3 flex min-h-7 flex-wrap gap-1.5">
           {entry.onHold && (
             <Pill tone="danger">
               <OctagonMinus size={11} className="me-1" aria-hidden="true" />
               {lang === "ar" ? "موقوف — ممنوع البيع" : "On hold — do not sell"}
             </Pill>
           )}
-          {entry.prices.some((price) => price.scope === "offer" && price.active) && (
+          {offer && (
             <Pill tone="warning">
               <BadgePercent size={11} className="me-1" aria-hidden="true" />
-              {lang === "ar" ? "عرض" : "Offer"}
+              {lang === "ar" ? "عرض منشور" : "Published offer"}
+              {offer.validTo
+                ? ` · ${lang === "ar" ? "حتى" : "until"} ${dateLabel(offer.validTo, lang)}`
+                : ""}
             </Pill>
           )}
           {entry.prices.some((price) => price.scope === "incentive") && (
@@ -274,14 +317,23 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
               {lang === "ar" ? "يحتاج مراجعة" : "Needs review"}
             </Pill>
           )}
-          {!entry.odooProductId && (
-            <Pill tone="neutral">{lang === "ar" ? "غير مربوط بأودو" : "Not linked to Odoo"}</Pill>
-          )}
+        </div>
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-[12px] font-bold text-brand">
+          <span>
+            {open
+              ? lang === "ar"
+                ? "إخفاء التفاصيل"
+                : "Hide details"
+              : lang === "ar"
+                ? "عرض تفاصيل الأسعار"
+                : "View price details"}
+          </span>
+          {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
         </div>
       </button>
 
       {open && (
-        <div className="animate-in fade-in slide-in-from-top-1 border-t border-border bg-surface-2/50 p-4 duration-200">
+        <div className="animate-in fade-in border-t border-border bg-surface-2/50 p-4 duration-200">
           {groups.map((group) => (
             <div key={group.scope} className="rounded-xl bg-surface px-3 first:mt-0 [&+&]:mt-2">
               {group.scope !== "individual" && (
@@ -326,6 +378,7 @@ export function PriceSearchTab({
 }) {
   const { lang, t } = useI18n();
   const [draft, setDraft] = useState(filters.q);
+  const [showFilters, setShowFilters] = useState(false);
 
   const set = <K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) =>
     onFilters({ ...filters, [key]: value });
@@ -352,13 +405,13 @@ export function PriceSearchTab({
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-3">
+      <Card className="space-y-4 px-4 py-4">
         <form
           onSubmit={(event) => {
             event.preventDefault();
             set("q", draft);
           }}
-          className="flex items-center gap-2"
+          className="flex flex-col gap-2 sm:flex-row sm:items-center"
           role="search"
         >
           <div className="relative min-w-0 flex-1">
@@ -378,78 +431,97 @@ export function PriceSearchTab({
           </div>
           <button
             type="submit"
-            className="min-h-12 shrink-0 cursor-pointer rounded-xl px-4 text-[13px] font-semibold text-white"
+            className="inline-flex min-h-12 shrink-0 cursor-pointer items-center justify-center rounded-xl px-5 text-[13px] font-semibold text-white transition hover:brightness-110"
             style={{ background: "var(--brand)" }}
           >
             {lang === "ar" ? "بحث" : "Search"}
           </button>
         </form>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <Select
-            label={t("pb_specialization")}
-            value={filters.specialization}
-            onChange={(value) =>
-              onFilters({ ...filters, specialization: value, subcategory: "all" })
-            }
-            options={(facets?.facets?.specializations ?? []).map((value) => ({
-              value,
-              label: value,
-            }))}
-            allLabel={t("all")}
-          />
-          <Select
-            label={t("pb_subcategory")}
-            value={filters.subcategory}
-            onChange={(value) => set("subcategory", value)}
-            options={subcategories.map((value) => ({ value, label: value }))}
-            allLabel={t("all")}
-          />
-          <Select
-            label={t("pb_delivery")}
-            value={filters.deliveryType}
-            onChange={(value) => set("deliveryType", value)}
-            options={(facets?.facets?.deliveryTypes ?? []).map((value) => ({
-              value,
-              label: deliveryLabel(value, lang),
-            }))}
-            allLabel={t("all")}
-          />
-          <Select
-            label={t("pb_payment_method")}
-            value={filters.paymentMethod}
-            onChange={(value) => set("paymentMethod", value)}
-            options={["tabby", "tamara", "cash", "cashier", "bank_transfer"].map((value) => ({
-              value,
-              label: methodLabel(value, lang),
-            }))}
-            allLabel={t("all")}
-          />
-          <Select
-            label={t("pb_currency")}
-            value={filters.currency}
-            onChange={(value) => set("currency", value)}
-            options={(facets?.facets?.currencies ?? []).map((value) => ({ value, label: value }))}
-            allLabel={t("all")}
-          />
-          <Select
-            label={t("pb_country")}
-            value={filters.country}
-            onChange={(value) => set("country", value)}
-            options={(facets?.facets?.countries ?? []).map((value) => ({ value, label: value }))}
-            allLabel={t("all")}
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setShowFilters((value) => !value)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-semibold text-text hover:bg-surface-2"
+          >
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            {lang === "ar" ? "فلترة متقدمة" : "Advanced filters"}
+            {showFilters ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+          <span className="text-[11px] text-text-muted">
+            {lang === "ar" ? "ابحث بالكود أو اسم الدورة أولًا" : "Start with a code or course name"}
+          </span>
         </div>
 
-        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-text">
-          <input
-            type="checkbox"
-            checked={filters.liveOffers}
-            onChange={(event) => set("liveOffers", event.target.checked)}
-            className="size-4 accent-[var(--brand)]"
-          />
-          {t("pb_live_offers")}
-        </label>
+        {showFilters && (
+          <div className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Select
+              label={t("pb_specialization")}
+              value={filters.specialization}
+              onChange={(value) =>
+                onFilters({ ...filters, specialization: value, subcategory: "all" })
+              }
+              options={(facets?.facets?.specializations ?? []).map((value) => ({
+                value,
+                label: specializationLabel(value, lang),
+              }))}
+              allLabel={t("all")}
+            />
+            <Select
+              label={t("pb_subcategory")}
+              value={filters.subcategory}
+              onChange={(value) => set("subcategory", value)}
+              options={subcategories.map((value) => ({ value, label: value }))}
+              allLabel={t("all")}
+            />
+            <Select
+              label={t("pb_delivery")}
+              value={filters.deliveryType}
+              onChange={(value) => set("deliveryType", value)}
+              options={(facets?.facets?.deliveryTypes ?? []).map((value) => ({
+                value,
+                label: deliveryLabel(value, lang),
+              }))}
+              allLabel={t("all")}
+            />
+            <Select
+              label={t("pb_payment_method")}
+              value={filters.paymentMethod}
+              onChange={(value) => set("paymentMethod", value)}
+              options={["tabby", "tamara", "cash", "cashier", "bank_transfer"].map((value) => ({
+                value,
+                label: methodLabel(value, lang),
+              }))}
+              allLabel={t("all")}
+            />
+            <Select
+              label={t("pb_currency")}
+              value={filters.currency}
+              onChange={(value) => set("currency", value)}
+              options={(facets?.facets?.currencies ?? []).map((value) => ({ value, label: value }))}
+              allLabel={t("all")}
+            />
+            <Select
+              label={t("pb_country")}
+              value={filters.country}
+              onChange={(value) => set("country", value)}
+              options={(facets?.facets?.countries ?? []).map((value) => ({ value, label: value }))}
+              allLabel={t("all")}
+            />
+          </div>
+        )}
+
+        {showFilters && (
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-[13px] text-text">
+            <input
+              type="checkbox"
+              checked={filters.liveOffers}
+              onChange={(event) => set("liveOffers", event.target.checked)}
+              className="size-4 accent-[var(--brand)]"
+            />
+            {t("pb_live_offers")}
+          </label>
+        )}
       </Card>
 
       {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
@@ -467,13 +539,13 @@ export function PriceSearchTab({
       {!loading &&
         grouped.map(([specialization, entries]) => (
           <section key={specialization} className="space-y-2">
-            <h2 className="text-[13px] font-semibold text-text-muted">
-              {specialization}
-              <span className="ms-2 text-[11px] font-normal text-text-subtle">
+            <h2 className="flex items-center gap-2 text-[13px] font-semibold text-text-muted">
+              {specializationLabel(specialization, lang)}
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold tabular-nums text-text-subtle">
                 {entries.length}
               </span>
             </h2>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
               {entries.map((entry) => (
                 <CourseCard
                   key={`${entry.code}${entry.deliveryType}${entry.subcategory}${entry.level}`}
