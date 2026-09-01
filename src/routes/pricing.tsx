@@ -1,7 +1,18 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Notice, PageHeader, Segmented } from "@/components/ui-bits";
+import {
+  BellRing,
+  ClipboardCheck,
+  Compass,
+  ListChecks,
+  Search,
+  Settings2,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
+import { Notice, Skeleton } from "@/components/ui-bits";
+import { PriceAdvisorTab } from "@/components/pricing/PriceAdvisorTab";
 import { PriceAlertsTab, type ExceptionsResponse } from "@/components/pricing/PriceAlertsTab";
 import {
   PriceComplianceTab,
@@ -12,30 +23,34 @@ import {
 import { PriceCourseSummaryTab } from "@/components/pricing/PriceCourseSummaryTab";
 import { PriceManageTab } from "@/components/pricing/PriceManageTab";
 import {
-  PriceSearchTab,
   emptySearchFilters,
+  type CatalogResponse,
   type SearchFilters,
 } from "@/components/pricing/PriceSearchTab";
-import { ADMIN_CODE_KEY, writeJson, type AuthState } from "@/components/pricing/pricing-ui";
-import { useI18n } from "@/lib/i18n";
+import { PriceTeamTab } from "@/components/pricing/PriceTeamTab";
+import {
+  ADMIN_CODE_KEY,
+  fmtMoney,
+  writeJson,
+  type AuthState,
+} from "@/components/pricing/pricing-ui";
+import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 
-type Tab = "summary" | "search" | "manage" | "compliance" | "alerts";
+type Tab = "prices" | "invoices" | "team" | "advisor" | "manage" | "alerts";
 
-const TABS: Tab[] = ["summary", "search", "manage", "compliance", "alerts"];
+const TABS: Tab[] = ["prices", "invoices", "team", "advisor", "manage", "alerts"];
+const LEGACY_TABS: Record<string, Tab> = {
+  summary: "prices",
+  search: "prices",
+  compliance: "invoices",
+};
 
-/**
- * The Price Book.
- *
- * One route with four panels rather than four routes, because they share a
- * price-book selection and an admin code, and a salesperson moving between
- * "what does this cost" and "was it sold correctly" should not lose either.
- * The active panel lives in the URL, so a link to the compliance view still
- * opens the compliance view.
- */
 export const Route = createFileRoute("/pricing")({
-  validateSearch: (search: Record<string, unknown>): { tab?: Tab } => ({
-    tab: TABS.includes(search.tab as Tab) ? (search.tab as Tab) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
+    const raw = typeof search.tab === "string" ? search.tab : "";
+    const tab = LEGACY_TABS[raw] ?? (TABS.includes(raw as Tab) ? (raw as Tab) : undefined);
+    return { tab: tab === "prices" ? undefined : tab };
+  },
   component: PricingPage,
 });
 
@@ -63,12 +78,14 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 function PricingPage() {
-  const { lang, t } = useI18n();
+  const { lang } = useI18n();
+  const ar = lang === "ar";
   const navigate = useNavigate({ from: "/pricing" });
   const search = useSearch({ from: "/pricing" });
-  const tab: Tab = search.tab ?? "summary";
+  const tab: Tab = search.tab ?? "prices";
 
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(emptySearchFilters);
+  const [quickSearch, setQuickSearch] = useState("");
   const [complianceFilters, setComplianceFilters] =
     useState<ComplianceFilters>(emptyComplianceFilters);
   const [selectedBookId, setSelectedBookId] = useState("");
@@ -86,19 +103,37 @@ function PricingPage() {
     }
   }, []);
 
+  useEffect(() => setQuickSearch(searchFilters.q), [searchFilters.q]);
+
   const setTab = (next: Tab) =>
-    void navigate({ search: { tab: next === "summary" ? undefined : next } });
+    void navigate({ search: { tab: next === "prices" ? undefined : next } });
 
-  /* --- data ------------------------------------------------------------- */
+  const hasCatalogFilters = useMemo(
+    () =>
+      Boolean(searchFilters.q) ||
+      searchFilters.specialization !== "all" ||
+      searchFilters.subcategory !== "all" ||
+      searchFilters.deliveryType !== "all" ||
+      searchFilters.paymentMethod !== "all" ||
+      searchFilters.currency !== "all" ||
+      searchFilters.country !== "all" ||
+      searchFilters.liveOffers,
+    [searchFilters],
+  );
 
-  const catalog = useQuery({
-    queryKey: ["pricing-catalog", searchFilters, selectedBookId],
-    enabled: tab === "search" || tab === "summary",
+  const fullCatalog = useQuery({
+    queryKey: ["pricing-catalog-full"],
+    staleTime: 5 * 60_000,
+    queryFn: () => getJson<CatalogResponse>(`/api/pricing/catalog${query({ limit: 1000 })}`),
+  });
+
+  const filteredCatalog = useQuery({
+    queryKey: ["pricing-catalog-filtered", searchFilters],
+    enabled: tab === "prices" && hasCatalogFilters,
     staleTime: 60_000,
     queryFn: () =>
-      getJson<Parameters<typeof PriceSearchTab>[0]["data"]>(
+      getJson<CatalogResponse>(
         `/api/pricing/catalog${query({
-          bookId: selectedBookId,
           q: searchFilters.q,
           specialization: searchFilters.specialization,
           subcategory: searchFilters.subcategory,
@@ -107,17 +142,16 @@ function PricingPage() {
           currency: searchFilters.currency,
           country: searchFilters.country,
           liveOffers: searchFilters.liveOffers ? 1 : undefined,
+          limit: 1000,
         })}`,
       ),
   });
 
   const facets = useQuery({
-    queryKey: ["pricing-facets", selectedBookId],
+    queryKey: ["pricing-facets"],
     staleTime: 5 * 60_000,
     queryFn: () =>
-      getJson<Parameters<typeof PriceSearchTab>[0]["facets"]>(
-        `/api/pricing/facets${query({ bookId: selectedBookId })}`,
-      ),
+      getJson<Parameters<typeof PriceCourseSummaryTab>[0]["facets"]>("/api/pricing/facets"),
   });
 
   const books = useQuery({
@@ -138,8 +172,7 @@ function PricingPage() {
   });
 
   const compliance = useQuery({
-    queryKey: ["pricing-compliance", complianceFilters],
-    enabled: tab === "compliance",
+    queryKey: ["pricing-compliance", complianceFilters, tab === "invoices"],
     staleTime: 60_000,
     queryFn: () =>
       getJson<ComplianceResponse>(
@@ -154,6 +187,7 @@ function PricingPage() {
           status: complianceFilters.status,
           severity: complianceFilters.severity,
           q: complianceFilters.q,
+          rows: tab === "invoices" ? undefined : 0,
           limit: 50,
           offset: complianceFilters.offset,
         })}`,
@@ -174,14 +208,18 @@ function PricingPage() {
       ),
   });
 
+  const catalogData = hasCatalogFilters ? filteredCatalog.data : fullCatalog.data;
+  const catalogLoading = hasCatalogFilters ? filteredCatalog.isLoading : fullCatalog.isLoading;
+  const catalogError = hasCatalogFilters ? filteredCatalog.error : fullCatalog.error;
   const auth: AuthState | undefined =
-    books.data?.auth ?? items.data?.auth ?? exceptions.data?.auth ?? catalog.data?.auth;
+    books.data?.auth ?? items.data?.auth ?? exceptions.data?.auth ?? fullCatalog.data?.auth;
   const canWrite = !!auth?.editable;
 
   const refreshAll = () => {
     void books.refetch();
     void items.refetch();
-    void catalog.refetch();
+    void fullCatalog.refetch();
+    void filteredCatalog.refetch();
     void facets.refetch();
     void compliance.refetch();
     void exceptions.refetch();
@@ -200,7 +238,7 @@ function PricingPage() {
       )) as { run?: { auditedLines: number; skippedUnchanged: number; candidateLines: number } };
       const run = result.run;
       setMessage(
-        lang === "ar"
+        ar
           ? `تم تحليل ${run?.auditedLines ?? 0} بند جديد أو متغيّر من ${run?.candidateLines ?? 0}، وتم تخطي ${run?.skippedUnchanged ?? 0} بند لم يتغيّر.`
           : `Audited ${run?.auditedLines ?? 0} new or changed lines out of ${run?.candidateLines ?? 0}; ${run?.skippedUnchanged ?? 0} were unchanged and skipped.`,
       );
@@ -229,10 +267,10 @@ function PricingPage() {
       const digest = result.digest;
       setMessage(
         digest?.skipped
-          ? lang === "ar"
+          ? ar
             ? "لا توجد حالات جديدة لم يسبق التنبيه عليها."
             : "Nothing new to announce; every finding has already been sent."
-          : lang === "ar"
+          : ar
             ? `تم إرسال ${digest?.newFindings ?? 0} حالة جديدة إلى ${digest?.sent ?? 0} مشترك.`
             : `Sent ${digest?.newFindings ?? 0} new findings to ${digest?.sent ?? 0} subscribers.`,
       );
@@ -243,58 +281,222 @@ function PricingPage() {
     }
   };
 
-  const complianceFacets = useMemo(
-    () => ({ currencies: facets.data?.facets?.currencies ?? ["SAR", "EGP"] }),
-    [facets.data],
-  );
-
-  const tabLabel: Record<Tab, string> = {
-    summary: t("pb_tab_summary"),
-    search: t("pb_tab_search"),
-    manage: t("pb_tab_manage"),
-    compliance: t("pb_tab_compliance"),
-    alerts: t("pb_tab_alerts"),
+  const openSalesperson = (salesperson: string) => {
+    setComplianceFilters({ ...emptyComplianceFilters, salesperson, offset: 0 });
+    setTab("invoices");
   };
+
+  const searchPrices = (event: FormEvent) => {
+    event.preventDefault();
+    setSearchFilters({ ...emptySearchFilters, q: quickSearch.trim() });
+    setTab("prices");
+  };
+
+  const entries = fullCatalog.data?.entries ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const activeOfferCourses = new Set(
+    entries
+      .filter((entry) =>
+        entry.prices.some(
+          (price) =>
+            price.active &&
+            price.scope === "offer" &&
+            (!price.validFrom || price.validFrom <= today) &&
+            (!price.validTo || price.validTo >= today),
+        ),
+      )
+      .map((entry) => `${entry.code}:${entry.deliveryType}:${entry.subcategory}`),
+  ).size;
+  const leakage = (compliance.data?.byCurrency ?? [])
+    .filter((entry) => entry.leakage > 0)
+    .map((entry) => fmtMoney(entry.leakage, entry.currency, lang))
+    .join(" + ");
+
+  const metrics: { label: string; value: string; tone?: "danger" | "warning" | "success" }[] = [
+    {
+      label: ar ? "الالتزام بالأسعار" : "Price compliance",
+      value:
+        compliance.data?.kpis.complianceRate == null
+          ? "—"
+          : fmtPct(compliance.data.kpis.complianceRate * 100, 0),
+      tone: "success",
+    },
+    {
+      label: ar ? "تحت الحد الأدنى" : "Below the floor",
+      value: compliance.data ? fmtNum(compliance.data.kpis.belowMinimumLines) : "—",
+      tone: "danger",
+    },
+    {
+      label: ar ? "قيمة الفارق" : "Price gap",
+      value: leakage || "—",
+      tone: "danger",
+    },
+    {
+      label: ar ? "تحتاج مراجعة" : "Needs review",
+      value: compliance.data ? fmtNum(compliance.data.kpis.needsReviewLines) : "—",
+      tone: "warning",
+    },
+    {
+      label: ar ? "دورات منشورة" : "Published courses",
+      value: fullCatalog.data ? fmtNum(entries.length) : "—",
+    },
+    {
+      label: ar ? "عروض سارية" : "Live offers",
+      value: fullCatalog.data ? fmtNum(activeOfferCourses) : "—",
+    },
+  ];
+
+  const tabDefinitions: { value: Tab; label: string; Icon: LucideIcon; admin?: boolean }[] = [
+    { value: "prices", label: ar ? "قائمة الأسعار" : "Price list", Icon: ListChecks },
+    {
+      value: "invoices",
+      label: ar ? "الفواتير والالتزام" : "Invoices & compliance",
+      Icon: ClipboardCheck,
+    },
+    { value: "team", label: ar ? "أداء الفريق" : "Team performance", Icon: UsersRound },
+    { value: "advisor", label: ar ? "اقتراح السعر" : "Price advisor", Icon: Compass },
+    {
+      value: "manage",
+      label: ar ? "إدارة الأسعار" : "Manage prices",
+      Icon: Settings2,
+      admin: true,
+    },
+    { value: "alerts", label: ar ? "التنبيهات والربط" : "Alerts & links", Icon: BellRing },
+  ];
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t("price_book")} subtitle={t("price_book_sub")} />
+      <section className="overflow-hidden rounded-[22px] border border-[#1c3942] bg-[#10262d] shadow-sm">
+        <div className="grid gap-5 px-5 py-5 text-white lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-7">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+              ENGOSOFT · SALES CONTROL
+            </div>
+            <h1 className="mt-2 text-[23px] font-black tracking-tight sm:text-[27px]">
+              {ar ? "لوحة الأسعار والالتزام البيعي" : "Pricing & sales compliance"}
+            </h1>
+            <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-white/62">
+              {ar
+                ? "السعر المعتمد، الفواتير الفعلية، أداء الفريق، وقرار البيع في مكان واحد."
+                : "Approved pricing, actual invoices, team behavior and the sales decision in one place."}
+            </p>
+          </div>
+          <form onSubmit={searchPrices} className="relative" role="search">
+            <Search
+              size={16}
+              className="pointer-events-none absolute inset-y-0 start-3 my-auto text-white/45"
+              aria-hidden="true"
+            />
+            <input
+              value={quickSearch}
+              onChange={(event) => setQuickSearch(event.target.value)}
+              placeholder={ar ? "ابحث باسم الدورة أو الكود" : "Search course name or code"}
+              aria-label={ar ? "بحث في الأسعار" : "Search prices"}
+              className="min-h-12 w-full rounded-xl border border-white/15 bg-white/7 ps-10 pe-3 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-white/35 focus:bg-white/10"
+            />
+          </form>
+        </div>
 
-      <div className="hscroll">
-        <Segmented
-          size="md"
-          value={tab}
-          onChange={setTab}
-          options={TABS.map((value) => ({ value, label: tabLabel[value] }))}
-        />
-      </div>
+        <div className="grid grid-cols-2 border-t border-white/10 bg-surface sm:grid-cols-3 xl:grid-cols-6">
+          {metrics.map((metric, index) => (
+            <div
+              key={metric.label}
+              className={`min-h-[82px] px-4 py-3 ${index ? "border-s border-border" : ""} ${index > 1 ? "border-t border-border sm:border-t-0" : ""} ${index > 2 ? "sm:border-t sm:border-border xl:border-t-0" : ""}`}
+            >
+              <div className="text-[10px] font-semibold text-text-muted">{metric.label}</div>
+              {compliance.isLoading && index < 4 ? (
+                <Skeleton className="mt-2 h-7 w-20 rounded-lg" />
+              ) : (
+                <div
+                  className={`mt-1 text-[21px] font-black tabular-nums ${
+                    metric.tone === "danger"
+                      ? "text-danger"
+                      : metric.tone === "warning"
+                        ? "text-warning"
+                        : metric.tone === "success"
+                          ? "text-success"
+                          : "text-text"
+                  }`}
+                >
+                  {metric.value}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <nav
+        className="hscroll rounded-2xl border border-border bg-surface px-2 shadow-sm"
+        aria-label={ar ? "أقسام لوحة الأسعار" : "Pricing dashboard sections"}
+      >
+        <div className="flex min-w-max items-stretch">
+          {tabDefinitions.map(({ value, label, Icon, admin }) => (
+            <button
+              type="button"
+              key={value}
+              onClick={() => setTab(value)}
+              className={`relative inline-flex min-h-14 items-center gap-2 px-4 text-[12px] font-bold transition ${
+                admin ? "ms-2 border-s border-border" : ""
+              } ${tab === value ? "text-text" : "text-text-muted hover:text-text"}`}
+              aria-current={tab === value ? "page" : undefined}
+            >
+              <Icon size={15} className={tab === value ? "text-brand" : "text-text-subtle"} />
+              {label}
+              {tab === value && (
+                <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-brand" />
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {!!error && <Notice tone="danger">{error}</Notice>}
       {!!message && <Notice tone="info">{message}</Notice>}
 
-      {tab === "summary" && (
+      {tab === "prices" && (
         <PriceCourseSummaryTab
           filters={searchFilters}
           onFilters={setSearchFilters}
-          data={catalog.data}
+          data={catalogData}
           facets={facets.data}
-          loading={catalog.isLoading}
-          error={catalog.error instanceof Error ? catalog.error.message : undefined}
-          onRetry={() => void catalog.refetch()}
+          loading={catalogLoading}
+          error={catalogError instanceof Error ? catalogError.message : undefined}
+          onRetry={() =>
+            void (hasCatalogFilters ? filteredCatalog.refetch() : fullCatalog.refetch())
+          }
+          embeddedSearch={false}
         />
       )}
 
-      {tab === "search" && (
-        <PriceSearchTab
-          filters={searchFilters}
-          onFilters={setSearchFilters}
-          data={catalog.data}
-          facets={facets.data}
-          loading={catalog.isLoading}
-          error={catalog.error instanceof Error ? catalog.error.message : undefined}
-          onRetry={() => void catalog.refetch()}
+      {tab === "invoices" && (
+        <PriceComplianceTab
+          data={compliance.data}
+          filters={complianceFilters}
+          onFilters={setComplianceFilters}
+          loading={compliance.isLoading}
+          facets={{ currencies: ["SAR", "EGP"] }}
+          onRecalculate={() => void recalculate()}
+          recalculating={busy === "recalculate"}
+          canWrite={canWrite}
+          showOverview={false}
+          showTeamBreakdown={false}
         />
       )}
+
+      {tab === "team" && (
+        <PriceTeamTab
+          data={compliance.data}
+          catalog={entries}
+          loading={compliance.isLoading || fullCatalog.isLoading}
+          onOpenSalesperson={openSalesperson}
+          onSendDigest={() => void sendDigest()}
+          sending={busy === "digest"}
+          canWrite={canWrite}
+        />
+      )}
+
+      {tab === "advisor" && <PriceAdvisorTab entries={entries} />}
 
       {tab === "manage" && (
         <PriceManageTab
@@ -306,19 +508,6 @@ function PricingPage() {
           itemQuery={manageQuery}
           onItemQuery={setManageQuery}
           onChanged={refreshAll}
-        />
-      )}
-
-      {tab === "compliance" && (
-        <PriceComplianceTab
-          data={compliance.data}
-          filters={complianceFilters}
-          onFilters={setComplianceFilters}
-          loading={compliance.isLoading}
-          facets={complianceFacets}
-          onRecalculate={() => void recalculate()}
-          recalculating={busy === "recalculate"}
-          canWrite={canWrite}
         />
       )}
 

@@ -51,14 +51,38 @@ const dateLabel = (value: string, lang: string): string => {
 const isCourseSpecialization = (value: string): boolean =>
   Boolean(SPECIALIZATION_AR[value]) || !/(عرض|عروض|حافز|offer|incentive)/i.test(value);
 
-const activeIndividual = (entry: CatalogEntry, methods: string[], currency: string) =>
-  entry.prices.find(
+const activeIndividual = (
+  entry: CatalogEntry,
+  methods: string[],
+  currency: string,
+): CatalogPrice | undefined => {
+  const candidates = entry.prices.filter(
     (price) =>
       price.active &&
       price.scope === "individual" &&
       price.currency === currency &&
       methods.includes(price.paymentMethod),
   );
+  if (!candidates.length) return undefined;
+
+  const floors = candidates
+    .map((price) => price.minimum ?? price.exact ?? price.maximum)
+    .filter((value): value is number => value !== null);
+  const ceilings = candidates
+    .map((price) => price.maximum ?? price.exact ?? price.minimum)
+    .filter((value): value is number => value !== null);
+  if (!floors.length || !ceilings.length) return candidates[0];
+
+  const minimum = Math.min(...floors);
+  const maximum = Math.max(...ceilings);
+  return {
+    ...candidates[0],
+    exact: minimum === maximum ? minimum : null,
+    minimum,
+    maximum,
+    requiresReview: candidates.some((price) => price.requiresReview),
+  };
+};
 
 const activeOffer = (entry: CatalogEntry) =>
   entry.prices.find(
@@ -272,6 +296,7 @@ export function PriceCourseSummaryTab({
   loading,
   error,
   onRetry,
+  embeddedSearch = true,
 }: {
   filters: SearchFilters;
   onFilters: (next: SearchFilters) => void;
@@ -280,6 +305,7 @@ export function PriceCourseSummaryTab({
   loading: boolean;
   error?: string;
   onRetry: () => void;
+  embeddedSearch?: boolean;
 }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -338,38 +364,46 @@ export function PriceCourseSummaryTab({
         </div>
       </Card>
 
-      <Card className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-end">
-        <form
-          role="search"
-          className="flex flex-col gap-2 sm:flex-row"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onFilters({ ...filters, q: draft });
-            setShowCourses(true);
-          }}
-        >
-          <div className="relative min-w-0 flex-1">
-            <Search
-              size={16}
-              className="pointer-events-none absolute inset-y-0 start-3 my-auto text-text-subtle"
-            />
-            <input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              type="search"
-              aria-label={ar ? "ابحث باسم الدورة أو الكود" : "Search by course or code"}
-              placeholder={ar ? "اكتب اسم الدورة أو الكود…" : "Course name or code…"}
-              className="min-h-11 w-full rounded-xl border border-border bg-surface ps-9 pe-3 text-[13px] text-text"
-            />
-          </div>
-          <button
-            type="submit"
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 text-[13px] font-bold text-white transition hover:brightness-110"
+      <Card
+        className={
+          embeddedSearch
+            ? "grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-end"
+            : "flex justify-end px-4 py-3"
+        }
+      >
+        {embeddedSearch && (
+          <form
+            role="search"
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onFilters({ ...filters, q: draft });
+              setShowCourses(true);
+            }}
           >
-            {ar ? "بحث" : "Search"}
-          </button>
-        </form>
-        <label className="flex min-w-0 flex-col gap-1">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute inset-y-0 start-3 my-auto text-text-subtle"
+              />
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                type="search"
+                aria-label={ar ? "ابحث باسم الدورة أو الكود" : "Search by course or code"}
+                placeholder={ar ? "اكتب اسم الدورة أو الكود…" : "Course name or code…"}
+                className="min-h-11 w-full rounded-xl border border-border bg-surface ps-9 pe-3 text-[13px] text-text"
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 text-[13px] font-bold text-white transition hover:brightness-110"
+            >
+              {ar ? "بحث" : "Search"}
+            </button>
+          </form>
+        )}
+        <label className="flex w-full min-w-0 flex-col gap-1 sm:w-60">
           <span className="text-[10px] font-semibold text-text-muted">
             {ar ? "التخصص" : "Specialization"}
           </span>

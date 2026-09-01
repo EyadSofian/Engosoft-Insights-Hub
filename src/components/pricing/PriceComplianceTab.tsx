@@ -45,9 +45,19 @@ export interface ComplianceFilters {
   offset: number;
 }
 
+const currentMonthRange = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return { from: `${year}-${month}-01`, to: `${year}-${month}-${day}` };
+};
+
+const DEFAULT_MONTH = currentMonthRange();
+
 export const emptyComplianceFilters: ComplianceFilters = {
-  from: "",
-  to: "",
+  from: DEFAULT_MONTH.from,
+  to: DEFAULT_MONTH.to,
   dateBasis: "payment",
   company: "all",
   currency: "all",
@@ -237,6 +247,8 @@ export function PriceComplianceTab({
   onRecalculate,
   recalculating,
   canWrite,
+  showOverview = true,
+  showTeamBreakdown = true,
 }: {
   data?: ComplianceResponse;
   filters: ComplianceFilters;
@@ -246,6 +258,8 @@ export function PriceComplianceTab({
   onRecalculate: () => void;
   recalculating: boolean;
   canWrite: boolean;
+  showOverview?: boolean;
+  showTeamBreakdown?: boolean;
 }) {
   const { lang, t } = useI18n();
   const [openInvoice, setOpenInvoice] = useState("");
@@ -302,13 +316,13 @@ export function PriceComplianceTab({
         </button>
       </div>
 
-      {loading && !kpis ? (
+      {showOverview && loading && !kpis ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 8 }, (_, index) => (
             <Skeleton key={index} className="h-32 w-full rounded-2xl" />
           ))}
         </div>
-      ) : (
+      ) : showOverview ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard
             index={0}
@@ -413,7 +427,32 @@ export function PriceComplianceTab({
             subWrap
           />
         </div>
-      )}
+      ) : null}
+
+      <div className="hscroll -mb-1">
+        <div className="flex min-w-max gap-2 pb-1">
+          {[
+            ["all", lang === "ar" ? "كل الفواتير" : "All invoices"],
+            ["below_minimum", lang === "ar" ? "تحت الحد الأدنى" : "Below floor"],
+            ["compliant_offer", lang === "ar" ? "بسعر عرض" : "Offer price"],
+            ["compliant", lang === "ar" ? "ملتزم" : "Compliant"],
+            ["unknown_payment_method", lang === "ar" ? "يحتاج مراجعة" : "Needs review"],
+          ].map(([value, label]) => (
+            <button
+              type="button"
+              key={value}
+              onClick={() => set("status", value)}
+              className={`min-h-9 rounded-xl border px-3 text-[12px] font-semibold transition ${
+                filters.status === value
+                  ? "border-[#10262d] bg-[#10262d] text-white"
+                  : "border-border bg-surface text-text-muted hover:bg-surface-2"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <Card className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {(
@@ -521,7 +560,7 @@ export function PriceComplianceTab({
         </label>
       </Card>
 
-      {!!data?.bySalesperson.length && (
+      {showTeamBreakdown && !!data?.bySalesperson.length && (
         <Card>
           <SectionTitle
             hint={
