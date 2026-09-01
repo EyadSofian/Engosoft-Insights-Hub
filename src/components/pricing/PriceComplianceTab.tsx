@@ -79,6 +79,8 @@ export interface ComplianceResponse {
     auditedLines: number;
     eligibleLines: number;
     matchedLines: number;
+    judgedLines: number;
+    compliantLines: number;
     coverage: number | null;
     complianceRate: number | null;
     belowMinimumLines: number;
@@ -424,7 +426,11 @@ export function PriceComplianceTab({
                 ? "—"
                 : fmtPct(kpis.complianceRate * 100, 1)
             }
-            sub={lang === "ar" ? "محسوبة على البنود المطابقة فقط" : "over matched lines only"}
+            sub={
+              lang === "ar"
+                ? `${fmtNum(kpis?.compliantLines ?? 0)} ملتزم من ${fmtNum(kpis?.judgedLines ?? 0)} بند محسوم`
+                : `${fmtNum(kpis?.compliantLines ?? 0)} compliant of ${fmtNum(kpis?.judgedLines ?? 0)} judged lines`
+            }
             subWrap
             icon={<ShieldCheck size={16} aria-hidden="true" />}
           />

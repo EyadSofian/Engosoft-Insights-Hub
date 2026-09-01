@@ -1555,6 +1555,7 @@ export async function aggregateAudits(query: AuditQuery): Promise<{
          count(*)::int AS audited,
          count(*) FILTER (WHERE compliance_status <> 'excluded')::int AS eligible,
          count(*) FILTER (WHERE compliance_status NOT IN ('excluded','unmatched_product'))::int AS matched,
+         count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_offer','above_list','below_minimum'))::int AS judged,
          count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_offer','above_list'))::int AS compliant,
          count(*) FILTER (WHERE compliance_status = 'below_minimum')::int AS below_minimum,
          count(*) FILTER (WHERE compliance_status = 'unmatched_product')::int AS unmatched,

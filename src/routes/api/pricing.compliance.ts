@@ -35,10 +35,13 @@ export const Route = createFileRoute("/api/pricing/compliance")({
             auditedLines: totals.audited ?? 0,
             eligibleLines: totals.eligible ?? 0,
             matchedLines: totals.matched ?? 0,
+            judgedLines: totals.judged ?? 0,
+            compliantLines: totals.compliant ?? 0,
             coverage: ratio(totals.matched, totals.eligible),
-            // Judged lines only. A line nobody could match is neither kept nor
-            // broken, and counting it as a failure would punish a data gap.
-            complianceRate: ratio(totals.compliant, totals.matched),
+            // A verdict needs both a matched rule and a known payment method.
+            // Unknown/mixed payment rows remain visible under “needs review”
+            // but cannot honestly count as either compliant or non-compliant.
+            complianceRate: ratio(totals.compliant, totals.judged),
             belowMinimumLines: totals.below_minimum ?? 0,
             belowMinimumValue: totals.leakage ?? 0,
             unmatchedLines: totals.unmatched ?? 0,

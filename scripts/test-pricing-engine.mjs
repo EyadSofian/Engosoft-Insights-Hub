@@ -465,6 +465,7 @@ assert.notEqual(
       options,
       book,
     ),
+    auditLine(line({ totalInCurrency: 500 }), paid("unknown"), index, options, book),
     auditLine(
       line({ isCreditNote: true, totalInCurrency: -500 }),
       paid("cash"),
@@ -474,14 +475,16 @@ assert.notEqual(
     ),
   ];
   const totals = summarize(audits);
-  assert.equal(totals.auditedLines, 4);
+  assert.equal(totals.auditedLines, 5);
   assert.equal(totals.excludedLines, 1, "the credit note is not part of the population");
-  assert.equal(totals.eligibleLines, 3);
-  assert.equal(totals.matchedLines, 2);
-  assert.equal(Math.round(totals.coverage * 100) / 100, 0.67);
-  // Compliance is measured over matched lines. Counting the unmatched one as a
-  // failure would make a renamed product look like a discipline problem.
+  assert.equal(totals.eligibleLines, 4);
+  assert.equal(totals.matchedLines, 3);
+  assert.equal(Math.round(totals.coverage * 100) / 100, 0.75);
+  assert.equal(totals.judgedLines, 2);
+  // Neither an unmatched product nor an unknown payment method is a pricing
+  // verdict. Both stay visible as data-quality findings without lowering the rate.
   assert.equal(totals.complianceRate, 0.5);
+  assert.equal(totals.unknownPaymentLines, 1);
   assert.equal(totals.belowMinimumLines, 1);
   assert.equal(totals.belowMinimumValue, 80);
   assert.deepEqual(totals.byCurrencyLeakage, { SAR: 80 });

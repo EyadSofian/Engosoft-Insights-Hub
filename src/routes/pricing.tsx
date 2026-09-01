@@ -342,10 +342,20 @@ function PricingPage() {
           ? ("warning" as const)
           : ("success" as const);
 
-  const metrics: { label: string; value: string; tone?: "danger" | "warning" | "success" }[] = [
+  const metrics: {
+    label: string;
+    value: string;
+    sub?: string;
+    tone?: "danger" | "warning" | "success";
+  }[] = [
     {
       label: ar ? "الالتزام بالأسعار" : "Price compliance",
       value: complianceRate == null ? "—" : fmtPct(complianceRate * 100, 0),
+      sub: compliance.data
+        ? ar
+          ? `${fmtNum(compliance.data.kpis.compliantLines)} ملتزم من ${fmtNum(compliance.data.kpis.judgedLines)} بند محسوم`
+          : `${fmtNum(compliance.data.kpis.compliantLines)} of ${fmtNum(compliance.data.kpis.judgedLines)} judged lines compliant`
+        : undefined,
       tone: complianceTone,
     },
     {
@@ -447,6 +457,9 @@ function PricingPage() {
                 >
                   {metric.value}
                 </div>
+              )}
+              {!!metric.sub && (
+                <div className="mt-0.5 text-[9px] text-text-subtle">{metric.sub}</div>
               )}
             </div>
           ))}

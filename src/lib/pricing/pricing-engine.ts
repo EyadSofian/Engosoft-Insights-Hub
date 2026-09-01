@@ -616,6 +616,7 @@ export interface ComplianceTotals {
   eligibleLines: number;
   matchedLines: number;
   coverage: number | null;
+  judgedLines: number;
   compliantLines: number;
   complianceRate: number | null;
   belowMinimumLines: number;
@@ -641,6 +642,7 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
   const byCurrencyLeakage: Record<string, number> = {};
   let eligible = 0;
   let matched = 0;
+  let judged = 0;
   let compliant = 0;
   let belowMinimum = 0;
   let belowMinimumValue = 0;
@@ -658,6 +660,14 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
     }
     eligible++;
     if (audit.complianceStatus !== "unmatched_product") matched++;
+    if (
+      audit.complianceStatus === "compliant" ||
+      audit.complianceStatus === "compliant_offer" ||
+      audit.complianceStatus === "above_list" ||
+      audit.complianceStatus === "below_minimum"
+    ) {
+      judged++;
+    }
     if (
       audit.complianceStatus === "compliant" ||
       audit.complianceStatus === "compliant_offer" ||
@@ -682,9 +692,9 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
     eligibleLines: eligible,
     matchedLines: matched,
     coverage: eligible > 0 ? matched / eligible : null,
+    judgedLines: judged,
     compliantLines: compliant,
-    // Judged lines only: a line nobody could match is neither kept nor broken.
-    complianceRate: matched > 0 ? compliant / matched : null,
+    complianceRate: judged > 0 ? compliant / judged : null,
     belowMinimumLines: belowMinimum,
     belowMinimumValue: money(belowMinimumValue),
     unmatchedLines: unmatched,
