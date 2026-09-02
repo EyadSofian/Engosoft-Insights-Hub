@@ -7,6 +7,25 @@ export interface DemandMetric {
 export const normalizeDemandKey = (value: string): string =>
   value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
 
+/**
+ * The commercial order management wants to see before demand decides the rest.
+ * Matching uses both the course name and its subcategory because some workbook
+ * rows carry the family only in one of those fields.
+ */
+const COURSE_DISPLAY_PRIORITY = [
+  /\bcfm\b/i,
+  /\bpmp\b/i,
+  /\bautomotive\b/i,
+  /\belectrical\b/i,
+  /\bcmrp\b/i,
+];
+
+export function courseDisplayPriority(name: string, subcategory = ""): number {
+  const value = `${name} ${subcategory}`;
+  const rank = COURSE_DISPLAY_PRIORITY.findIndex((pattern) => pattern.test(value));
+  return rank === -1 ? COURSE_DISPLAY_PRIORITY.length : rank;
+}
+
 /** Most requested first, then seats, with a stable human-readable tie-break. */
 export function compareDemand(
   a: { demand?: DemandMetric; name: string },

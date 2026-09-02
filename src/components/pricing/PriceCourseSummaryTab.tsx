@@ -3,7 +3,7 @@ import { Filter, TrendingUp, X } from "lucide-react";
 import { EmptyState, ErrorState, Notice, Skeleton } from "@/components/ui-bits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fmtDate, fmtNum, useI18n } from "@/lib/i18n";
-import { compareDemand } from "@/lib/pricing/catalog-demand";
+import { compareDemand, courseDisplayPriority } from "@/lib/pricing/catalog-demand";
 import { CourseCompactRow, CourseListRow } from "./CourseListRow";
 import { CourseDetailPanel } from "./CourseDetailPanel";
 import { OdooPackageList } from "./OdooPackageList";
@@ -59,6 +59,9 @@ const packageLabel = (value: string, ar: boolean) => {
     .replace(/Online/gi, "أونلاين")
     .replace(/Offline/gi, "حضوري");
 };
+
+const PRIORITY_GROUP = "__display_priority__";
+const PRIORITY_LABEL = "CFM · PMP · Automotive · Electrical · CMRP";
 
 export type CatalogContentKind = "all" | "course" | "package" | "offer" | "negotiable" | "breached";
 
@@ -145,14 +148,29 @@ export function PriceCourseSummaryTab({
   );
 
   const grouped = useMemo(() => {
+    const priority = visible
+      .filter((entry) => courseDisplayPriority(entry.courseName, entry.subcategory) < 5)
+      .sort(
+        (a, b) =>
+          courseDisplayPriority(a.courseName, a.subcategory) -
+            courseDisplayPriority(b.courseName, b.subcategory) ||
+          compareDemand(
+            { name: a.courseName, demand: a.demand },
+            { name: b.courseName, demand: b.demand },
+          ),
+      );
     const groups = new Map<string, CatalogEntry[]>();
     for (const entry of visible) {
+      if (courseDisplayPriority(entry.courseName, entry.subcategory) < 5) continue;
       const key = entry.specialization || "Others";
       groups.set(key, [...(groups.get(key) ?? []), entry]);
     }
     const demandOf = (entries: CatalogEntry[]) =>
       entries.reduce((sum, entry) => sum + (entry.demand?.orders ?? 0), 0);
-    return [...groups.entries()].sort(([, a], [, b]) => demandOf(b) - demandOf(a));
+    const rest = [...groups.entries()].sort(([, a], [, b]) => demandOf(b) - demandOf(a));
+    return priority.length
+      ? ([[PRIORITY_GROUP, priority], ...rest] as [string, CatalogEntry[]][])
+      : rest;
   }, [visible]);
 
   const openEntry = useMemo(
@@ -402,12 +420,36 @@ export function PriceCourseSummaryTab({
         grouped.map(([specialization, entries]) => (
           <section
             key={specialization}
-            className="overflow-hidden rounded-xl border border-border bg-surface"
+            className={`overflow-hidden rounded-xl border bg-surface ${
+              specialization === PRIORITY_GROUP ? "border-brand/30" : "border-border"
+            }`}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2/60 px-3 py-2 sm:px-4">
-              <h2 className="text-[12.5px] font-bold text-text">
-                {specializationLabel(specialization, ar)}
-              </h2>
+            <div
+              className={`flex items-center justify-between gap-3 border-b border-border px-3 py-2 sm:px-4 ${
+                specialization === PRIORITY_GROUP ? "bg-brand-soft/70" : "bg-surface-2/60"
+              }`}
+            >
+              <div className="min-w-0">
+                <h2
+                  className={`text-[12.5px] font-bold ${
+                    specialization === PRIORITY_GROUP ? "text-brand" : "text-text"
+                  }`}
+                >
+                  {specialization === PRIORITY_GROUP
+                    ? ar
+                      ? "أولوية العرض"
+                      : "Display priority"
+                    : specializationLabel(specialization, ar)}
+                </h2>
+                {specialization === PRIORITY_GROUP && (
+                  <p
+                    className="num mt-0.5 truncate text-[10px] font-medium text-text-muted"
+                    dir="ltr"
+                  >
+                    {PRIORITY_LABEL}
+                  </p>
+                )}
+              </div>
               <span className="num text-[10.5px] text-text-subtle">
                 {fmtNum(entries.length)} {ar ? "دورة" : "courses"} ·{" "}
                 {fmtNum(entries.reduce((sum, entry) => sum + (entry.demand?.orders ?? 0), 0))}{" "}

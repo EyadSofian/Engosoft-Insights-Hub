@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { chromeScrollDecision } from "../src/lib/chrome-policy.ts";
-import { compareDemand, normalizeDemandKey } from "../src/lib/pricing/catalog-demand.ts";
+import {
+  compareDemand,
+  courseDisplayPriority,
+  normalizeDemandKey,
+} from "../src/lib/pricing/catalog-demand.ts";
 import {
   inferPackageSpecialization,
   mapTrainingPackages,
@@ -27,6 +31,27 @@ const demandSorted = [
 assert.deepEqual(
   demandSorted.map((item) => item.name),
   ["Course", "Package", "Zero"],
+);
+
+assert.deepEqual(
+  [
+    ["Other course", "Others"],
+    ["Management - CMRP - Recorded", "Management"],
+    ["Electrical - Lighting", "Electrical Package"],
+    ["Automotive Mechanical & Electrical", "Automotive"],
+    ["PMP + Exam", "Management"],
+    ["CFM Exam Simulator", "CFM"],
+  ]
+    .sort((a, b) => courseDisplayPriority(a[0], a[1]) - courseDisplayPriority(b[0], b[1]))
+    .map(([name]) => name),
+  [
+    "CFM Exam Simulator",
+    "PMP + Exam",
+    "Automotive Mechanical & Electrical",
+    "Electrical - Lighting",
+    "Management - CMRP - Recorded",
+    "Other course",
+  ],
 );
 
 assert.equal(inferPackageSpecialization("BIM Manager Professional Track"), "BIM all");
