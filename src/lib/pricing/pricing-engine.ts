@@ -387,7 +387,9 @@ export function judgeLine(
   // 250-SAR component inside a 2,500-SAR package is not a 350-SAR discount on a
   // 600-SAR standalone course. Odoo is authoritative here because it preserves
   // both the selected pricelist and the sale line that produced the invoice.
-  if (line.pricingContext === "package") {
+  if (line.pricingContext === "package" || line.pricingContext === "offer_bundle") {
+    const isPublishedOfferBundle = line.pricingContext === "offer_bundle";
+    const contextMatch: MatchType = isPublishedOfferBundle ? "price_book_bundle" : "odoo_pricelist";
     const packagePriceExTax = line.odooExpectedUnitPrice;
     const packageActual = actualUnitPrice(line, options.taxInclusive);
     const lineTaxFactor =
@@ -402,8 +404,8 @@ export function judgeLine(
     if (packageActual === null || packagePrice === null || packagePrice <= 0) {
       return empty(
         "package_price_unresolved",
-        `Odoo identifies this as a package component${line.pricingContextName ? ` (${line.pricingContextName})` : ""}, but its agreed component price could not be read safely. It is not treated as a breach.`,
-        "odoo_pricelist",
+        `${isPublishedOfferBundle ? "The price book and Odoo order identify" : "Odoo identifies"} this as a package component${line.pricingContextName ? ` (${line.pricingContextName})` : ""}, but its agreed component allocation could not be read safely. It is not treated as a breach.`,
+        contextMatch,
         packageActual ?? price,
         "none",
       );
@@ -412,9 +414,27 @@ export function judgeLine(
     const tolerance = 0.01;
     const varianceAmount = money(packagePrice - packageActual);
     const variancePercent = packagePrice > 0 ? varianceAmount / packagePrice : null;
-    const source = line.pricingContextName || line.odooPricelistName || "Odoo package pricelist";
+    const source =
+      line.pricingContextName ||
+      line.odooPricelistName ||
+      (isPublishedOfferBundle ? "published bundled offer" : "Odoo package pricelist");
 
     if (packageActual > packagePrice + tolerance) {
+      if (isPublishedOfferBundle) {
+        return {
+          status: "compliant_offer",
+          severity: "none",
+          reason: `This Odoo line is one component of the published bundled offer ${source}. The invoice bundle meets its total price, so the standalone course floor does not apply.`,
+          allowedMinimum: packagePrice,
+          allowedMaximum: null,
+          priceItemId: line.pricingContextItemId ?? "",
+          matchType: contextMatch,
+          varianceAmount: 0,
+          variancePercent: 0,
+          leakageAmount: 0,
+          actualUnitPrice: packageActual,
+        };
+      }
       return {
         status: "above_list",
         severity: "informational",
@@ -422,7 +442,7 @@ export function judgeLine(
         allowedMinimum: packagePrice,
         allowedMaximum: packagePrice,
         priceItemId: "",
-        matchType: "odoo_pricelist",
+        matchType: contextMatch,
         varianceAmount,
         variancePercent,
         leakageAmount: 0,
@@ -432,13 +452,15 @@ export function judgeLine(
 
     if (packageActual + tolerance >= packagePrice) {
       return {
-        status: "compliant_package",
+        status: isPublishedOfferBundle ? "compliant_offer" : "compliant_package",
         severity: "none",
-        reason: `Package component sold at its Odoo-agreed price of ${packagePrice} ${line.currency} from ${source}; the standalone course price does not apply.`,
+        reason: isPublishedOfferBundle
+          ? `This Odoo line is one component of the published bundled offer ${source}. The invoice bundle meets its total price, so the standalone course floor does not apply.`
+          : `Package component sold at its Odoo-agreed price of ${packagePrice} ${line.currency} from ${source}; the standalone course price does not apply.`,
         allowedMinimum: packagePrice,
         allowedMaximum: packagePrice,
-        priceItemId: "",
-        matchType: "odoo_pricelist",
+        priceItemId: line.pricingContextItemId ?? "",
+        matchType: contextMatch,
         varianceAmount: 0,
         variancePercent: 0,
         leakageAmount: 0,
@@ -449,11 +471,13 @@ export function judgeLine(
     return {
       status: "below_minimum",
       severity: severityFor("below_minimum", variancePercent, criticalShare),
-      reason: `Package component sold at ${packageActual} ${line.currency}, below its Odoo-agreed ${packagePrice} price from ${source}. Short by ${varianceAmount} per unit.`,
+      reason: isPublishedOfferBundle
+        ? `The Odoo order matches the published bundled offer ${source}, but its invoice total is below that bundled price. The bundle is short by ${varianceAmount}.`
+        : `Package component sold at ${packageActual} ${line.currency}, below its Odoo-agreed ${packagePrice} price from ${source}. Short by ${varianceAmount} per unit.`,
       allowedMinimum: packagePrice,
       allowedMaximum: packagePrice,
-      priceItemId: "",
-      matchType: "odoo_pricelist",
+      priceItemId: line.pricingContextItemId ?? "",
+      matchType: contextMatch,
       varianceAmount,
       variancePercent,
       leakageAmount: money(varianceAmount * line.quantity),
@@ -706,7 +730,12 @@ export function auditLine(
     company: line.company,
     productCode: line.productCode,
     productName: line.productName,
-    priceSource: line.pricingContext === "package" ? "odoo_package" : "price_book",
+    priceSource:
+      line.pricingContext === "package"
+        ? "odoo_package"
+        : line.pricingContext === "offer_bundle"
+          ? "price_book_bundle"
+          : "price_book",
     pricingContext: line.pricingContext,
     pricingContextName: line.pricingContextName,
     odooSaleOrderName: line.odooSaleOrderName,
@@ -794,7 +823,8 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
     ) {
       compliant++;
     }
-    if (audit.pricingContext === "package") packageLines++;
+    if (audit.pricingContext === "package" || audit.pricingContext === "offer_bundle")
+      packageLines++;
     if (audit.complianceStatus === "above_list") aboveList++;
     if (audit.complianceStatus === "below_minimum") {
       belowMinimum++;

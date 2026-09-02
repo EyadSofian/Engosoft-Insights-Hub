@@ -241,6 +241,10 @@ const SCOPE: Record<string, Bilingual> = {
 
 const MATCH: Record<string, Bilingual> = {
   odoo_pricelist: { ar: "سعر الباقة من Odoo", en: "Odoo package price" },
+  price_book_bundle: {
+    ar: "عرض مجمّع مطابق لبنود Odoo",
+    en: "Published bundle matched to Odoo lines",
+  },
   odoo_product_id: { ar: "مطابقة بمعرّف أودو", en: "Matched by Odoo product id" },
   exact_code: { ar: "مطابقة بالكود", en: "Matched by exact code" },
   manual: { ar: "ربط يدوي معتمد", en: "Approved manual link" },
@@ -266,9 +270,11 @@ export function auditReasonLabel(row: AuditRow, lang: Lang): string {
   const gap = fmtMoney(row.varianceAmount, row.currency, lang);
   switch (row.complianceStatus) {
     case "below_minimum":
-      return row.priceSource === "odoo_package"
-        ? `تم البيع بسعر ${actual}، أقل من سعر الكورس داخل الباقة على Odoo وهو ${minimum}، بفارق ${gap} لكل وحدة.`
-        : `تم البيع بسعر ${actual}، أقل من الحد الأدنى ${minimum} بفارق ${gap} لكل وحدة.`;
+      return row.priceSource === "price_book_bundle"
+        ? `إجمالي العرض المجمّع أقل من سعره المنشور، والفارق ${gap}. لا تتم مقارنة مكوناته كأسعار دورات منفردة.`
+        : row.priceSource === "odoo_package"
+          ? `تم البيع بسعر ${actual}، أقل من سعر الكورس داخل الباقة على Odoo وهو ${minimum}، بفارق ${gap} لكل وحدة.`
+          : `تم البيع بسعر ${actual}، أقل من الحد الأدنى ${minimum} بفارق ${gap} لكل وحدة.`;
     case "compliant":
       return row.allowedMaximum !== null && row.allowedMaximum !== row.allowedMinimum
         ? `سعر البيع ${actual} داخل النطاق المعتمد من ${minimum} إلى ${maximum}.`
@@ -276,7 +282,9 @@ export function auditReasonLabel(row: AuditRow, lang: Lang): string {
     case "compliant_package":
       return `سعر البيع ${actual} مطابق لسعر هذا الكورس داخل الباقة على Odoo، وليس سعره كدورة منفردة.`;
     case "compliant_offer":
-      return `سعر البيع ${actual} مطابق لعرض ساري وقت البيع.`;
+      return row.priceSource === "price_book_bundle"
+        ? "هذه الدورة مكوّن داخل عرض مجمّع مطابق لبنود أمر البيع على Odoo. تمت مراجعة إجمالي العرض مرة واحدة، ولا ينطبق عليها سعر الدورة المنفردة."
+        : `سعر البيع ${actual} مطابق لعرض ساري وقت البيع.`;
     case "above_list":
       return `سعر البيع ${actual} أعلى من السعر المنشور ${maximum}.`;
     case "unmatched_product":

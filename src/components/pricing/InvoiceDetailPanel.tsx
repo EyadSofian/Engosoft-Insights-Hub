@@ -209,10 +209,14 @@ export function InvoiceDetailPanel({
                   />
                   <DetailStat
                     label={
-                      line.pricingContext === "package"
+                      line.pricingContext === "package" || line.pricingContext === "offer_bundle"
                         ? ar
-                          ? "سعر الباقة الموزّع"
-                          : "Package allocation"
+                          ? line.pricingContext === "offer_bundle"
+                            ? "حصة البند من العرض"
+                            : "سعر الباقة الموزّع"
+                          : line.pricingContext === "offer_bundle"
+                            ? "Offer allocation"
+                            : "Package allocation"
                         : ar
                           ? "الحد الأدنى"
                           : "Floor"
@@ -239,10 +243,16 @@ export function InvoiceDetailPanel({
                   />
                 </div>
 
-                {line.pricingContext === "package" && (
+                {(line.pricingContext === "package" || line.pricingContext === "offer_bundle") && (
                   <div className="mt-2 rounded-md border border-success/20 bg-success-soft px-2.5 py-2 text-[11px] leading-relaxed text-text-muted">
                     <span className="font-semibold text-success">
-                      {ar ? "مرجع السعر: باقة على Odoo" : "Price source: Odoo package"}
+                      {line.pricingContext === "offer_bundle"
+                        ? ar
+                          ? "مرجع السعر: عرض مجمّع مطابق لطلب Odoo"
+                          : "Price source: published bundle matched to Odoo"
+                        : ar
+                          ? "مرجع السعر: باقة على Odoo"
+                          : "Price source: Odoo package"}
                     </span>
                     {(line.pricingContextName || line.odooPricelistName) && (
                       <span>

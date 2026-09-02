@@ -16,6 +16,7 @@ const {
   summarize,
   auditLine,
 } = await import("../src/lib/pricing/pricing-engine.ts");
+const { applyPublishedBundleOffer } = await import("../src/lib/pricing/bundle-offers.ts");
 
 let ruleSeq = 0;
 const rule = (patch = {}) => ({
@@ -72,6 +73,8 @@ const line = (patch = {}) => ({
   odooPricelistItemId: null,
   odooPricelistItemName: "",
   odooExpectedUnitPrice: null,
+  odooListUnitPrice: null,
+  odooDiscountPercent: null,
   ...patch,
 });
 
@@ -363,6 +366,82 @@ assert.equal(actualUnitPrice(line({ untaxedTotal: 400, totalInCurrency: 460 }), 
 }
 
 /* --- packages -------------------------------------------------------------- */
+
+// The workbook publishes one 699-SAR Tabby offer for three Odoo products:
+// PMP online, the exam simulator, and recorded Primavera. Odoo allocates that
+// total over three lines with one shared discount. It is one bundled sale, not
+// three standalone-course violations.
+{
+  const bundleLines = [
+    line({
+      invoiceLineId: "pmp",
+      invoiceNumber: "INVNT/2026/002301",
+      productCode: "109",
+      productName: "Management - PMP - Event",
+      untaxedTotal: 323.83,
+      totalInCurrency: 372.4,
+      odooSaleOrderLineId: 58763,
+      odooSaleOrderName: "S19618",
+      odooListUnitPrice: 1000,
+      odooDiscountPercent: 62.76,
+    }),
+    line({
+      invoiceLineId: "exam",
+      invoiceNumber: "INVNT/2026/002301",
+      productCode: "583",
+      productName: "PMP Exam Simulator",
+      untaxedTotal: 102.01,
+      totalInCurrency: 117.31,
+      odooSaleOrderLineId: 58762,
+      odooSaleOrderName: "S19618",
+      odooListUnitPrice: 315,
+      odooDiscountPercent: 62.76,
+    }),
+    line({
+      invoiceLineId: "primavera",
+      invoiceNumber: "INVNT/2026/002301",
+      productCode: "110",
+      productName: "Management - PRIMAVERA",
+      untaxedTotal: 182.97,
+      totalInCurrency: 210.41,
+      odooSaleOrderLineId: 58761,
+      odooSaleOrderName: "S19618",
+      odooListUnitPrice: 565,
+      odooDiscountPercent: 62.76,
+    }),
+  ];
+  const offer = {
+    id: "offer-pmp-bundle",
+    sourceSheet: "عروض ",
+    sourceRow: 16,
+    courseName: "PMP + Exam Simulator + PRIMAVERA (Recorded)",
+    bundleName: "PMP + Exam Simulator + PRIMAVERA (Recorded)",
+    pricingScope: "offer",
+    paymentMethod: "tabby",
+    currency: "SAR",
+    exactPrice: 699,
+    minimumPrice: 699,
+    active: true,
+    requiresReview: false,
+    validFrom: "",
+    validTo: "",
+    rawSourceData: {
+      bundle_component_codes: "109,583,110",
+      bundle_primary_code: "109",
+    },
+  };
+  const contextualized = applyPublishedBundleOffer(bundleLines, paid("tabby"), [offer], true);
+  assert.ok(contextualized.every((entry) => entry.pricingContext === "offer_bundle"));
+  assert.ok(
+    contextualized.every((entry) => judge([], entry, paid("tabby")).status === "compliant_offer"),
+    "the 700.12 Odoo allocation satisfies the one 699-SAR published bundle",
+  );
+  assert.ok(
+    contextualized.every(
+      (entry) => judge([], entry, paid("tabby")).matchType === "price_book_bundle",
+    ),
+  );
+}
 
 // The same course can be worth 600 alone and 250 as one component of a package.
 // Odoo's linked sale line is the authority for the package component, so the

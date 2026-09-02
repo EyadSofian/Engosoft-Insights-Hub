@@ -32,10 +32,10 @@ export type PriceMethodScope = PaymentMethod | "any";
 export type PricingScope = "individual" | "bundle" | "level" | "offer" | "incentive";
 
 /** The commercial context Odoo says the invoice line was sold in. */
-export type PricingContext = "individual" | "package" | "unknown";
+export type PricingContext = "individual" | "package" | "offer_bundle" | "unknown";
 
 /** The authority used for the final per-line comparison. */
-export type AuditPriceSource = "price_book" | "odoo_package";
+export type AuditPriceSource = "price_book" | "odoo_package" | "price_book_bundle";
 
 export type PriceBookStatus = "draft" | "published" | "archived";
 
@@ -170,7 +170,13 @@ export interface PriceRule {
 }
 
 export type MatchType =
-  "odoo_pricelist" | "odoo_product_id" | "exact_code" | "manual" | "alias" | "none";
+  | "odoo_pricelist"
+  | "price_book_bundle"
+  | "odoo_product_id"
+  | "exact_code"
+  | "manual"
+  | "alias"
+  | "none";
 
 export interface ProductMapping {
   priceItemId: string;
@@ -219,6 +225,12 @@ export interface AuditableInvoiceLine {
   odooPricelistItemName: string;
   /** Tax-exclusive unit price agreed on the linked Odoo sale order line. */
   odooExpectedUnitPrice: number | null;
+  /** Odoo's undiscounted sale-line unit price, used only to verify bundle lineage. */
+  odooListUnitPrice: number | null;
+  /** Discount stored on the linked sale line. Equal values are evidence of one bundle allocation. */
+  odooDiscountPercent: number | null;
+  /** Price-book item that defines an invoice-level bundled offer. */
+  pricingContextItemId?: string;
 }
 
 export interface PaymentRead {

@@ -27,6 +27,7 @@ import {
   priceCell,
   readAmbiguousDate,
   text,
+  westernDigits,
   type AmbiguousDate,
 } from "./pricing-normalize.ts";
 import type { DeliveryType, PriceBookItem, PriceMethodScope } from "./pricing-types.ts";
@@ -924,6 +925,58 @@ export function parsePriceWorkbook(sheets: ParsedSheet[], options: ParseOptions 
 
 /* --- narrative sheets ------------------------------------------------------ */
 
+interface NarrativeBundleOffer {
+  name: string;
+  componentCodes: string[];
+  primaryCode: string;
+  prices: { method: PriceMethodScope; currency: string; amount: number; country: string }[];
+}
+
+/**
+ * The offers sheet is mostly unstructured broadcast copy. Recognise only the
+ * one offer whose components and prices are stated explicitly enough to audit:
+ * PMP online + its exam simulator + recorded Primavera. Everything else keeps
+ * the existing unpublished/manual-review path.
+ */
+export function parseNarrativeBundleOffer(value: unknown): NarrativeBundleOffer | null {
+  const raw = westernDigits(text(value));
+  if (
+    !/\bPMP\b/i.test(raw) ||
+    !/محاكي(?:\s+الاختبار)?/i.test(raw) ||
+    !/(?:برمافيرا|بريمافيرا|primavera)/i.test(raw)
+  ) {
+    return null;
+  }
+
+  const amount = (pattern: RegExp): number | null => {
+    const match = raw.match(pattern);
+    if (!match) return null;
+    const parsed = Number(match[1].replace(/,/g, ""));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+  const tabby = amount(/(\d[\d,]*(?:\.\d+)?)\s*ريال\s*تابي(?:\s*و\s*تمارا)?/i);
+  const cash = amount(/(\d[\d,]*(?:\.\d+)?)\s*ريال\s*كاش/i);
+  const egypt = amount(/(\d[\d,]*(?:\.\d+)?)\s*جنيه/i);
+  if (tabby === null || cash === null) return null;
+
+  return {
+    name: "PMP + Exam Simulator + PRIMAVERA (Recorded)",
+    componentCodes: ["109", "583", "110"],
+    primaryCode: "109",
+    prices: [
+      { method: "tabby", currency: "SAR", amount: tabby, country: "" },
+      { method: "tamara", currency: "SAR", amount: tabby, country: "" },
+      { method: "cash", currency: "SAR", amount: cash, country: "" },
+      { method: "cashier", currency: "SAR", amount: cash, country: "" },
+      ...(egypt === null
+        ? []
+        : [
+            { method: "any" as PriceMethodScope, currency: "EGP", amount: egypt, country: "Egypt" },
+          ]),
+    ],
+  };
+}
+
 /**
  * The offers page and the staff incentive page.
  *
@@ -1018,6 +1071,60 @@ function parseNarrativeSheet(
     for (let column = 0; column < cells.length; column++) {
       const raw = text(cells[column]);
       if (raw.length < 12) continue;
+      const structuredBundle = parseNarrativeBundleOffer(raw);
+      if (structuredBundle) {
+        const componentList = structuredBundle.componentCodes.join(",");
+        for (const price of structuredBundle.prices) {
+          items.push({
+            sourceSheet: sheet.name,
+            sourceRow: row + 1,
+            specialization: sheet.name.trim(),
+            subcategory: "Announced offers",
+            rawProductCode: structuredBundle.componentCodes.join(" + "),
+            // Deliberately blank: this is an invoice-level offer and must never
+            // be matched to the primary PMP line on its own.
+            normalizedProductCode: "",
+            odooProductId: null,
+            courseName: structuredBundle.name,
+            normalizedCourseName: normalizeCourseName(structuredBundle.name),
+            deliveryType: "online",
+            rawDeliveryType: "Online + recorded components",
+            level: "",
+            pricingScope: "offer",
+            bundleName: structuredBundle.name,
+            paymentMethod: price.method,
+            currency: price.currency,
+            exactPrice: price.amount,
+            minimumPrice: price.amount,
+            maximumPrice: null,
+            validFrom: "",
+            validTo: "",
+            country: price.country,
+            company: "",
+            active: true,
+            requiresReview: false,
+            onHold: false,
+            note: `Published bundled offer. Applies only when Odoo contains all components: ${componentList}.`,
+            rawSourceData: {
+              column: String(column + 1),
+              text: raw,
+              bundle_component_codes: componentList,
+              bundle_primary_code: structuredBundle.primaryCode,
+              bundle_match: "exact_odoo_order",
+            },
+          });
+          imported++;
+        }
+        issues.push({
+          sheet: sheet.name,
+          row: row + 1,
+          severity: "info",
+          code: "structured_bundle_offer",
+          message: "Explicit multi-course offer imported as one invoice-level price.",
+          detail: `${structuredBundle.name}: ${componentList}`,
+        });
+        continue;
+      }
       const dated = readAmbiguousDate(raw);
       if (dated) {
         offerWindows.push({

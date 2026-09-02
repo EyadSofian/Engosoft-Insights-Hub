@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const { readXlsx } = await import("../src/lib/pricing/xlsx-reader.server.ts");
-const { parsePriceWorkbook, detectLayout } =
+const { parsePriceWorkbook, detectLayout, parseNarrativeBundleOffer } =
   await import("../src/lib/pricing/price-book-parser.ts");
 const {
   priceCell,
@@ -94,6 +94,23 @@ assert.deepEqual(
 );
 // Free Arabic prose yields nothing to publish, which is the point.
 assert.deepEqual(parsePricePhrases("أي دورة مسجلة منفردة بسعر 199 ريال للكاش فقط"), []);
+
+const pmpBundle = parseNarrativeBundleOffer(
+  "PMP ٦٩٩ ريال تابي و تمارا شامل محاكي الاختبار و شامل برمافيرا مسجل ٥٥٠ ريال كاش",
+);
+assert.ok(pmpBundle, "the explicit PMP bundle must be structured, not left as prose");
+assert.deepEqual(pmpBundle.componentCodes, ["109", "583", "110"]);
+assert.deepEqual(
+  pmpBundle.prices
+    .filter((price) => price.currency === "SAR")
+    .map((price) => [price.method, price.amount]),
+  [
+    ["tabby", 699],
+    ["tamara", 699],
+    ["cash", 550],
+    ["cashier", 550],
+  ],
+);
 
 /* --- the real workbook ----------------------------------------------------- */
 
@@ -221,7 +238,10 @@ for (const item of freeText) {
 
 // Structured offers whose deadline is ambiguous also stay unpublished.
 const datedOffers = parsed.items.filter(
-  (item) => item.pricingScope === "offer" && item.exactPrice !== null,
+  (item) =>
+    item.pricingScope === "offer" &&
+    item.exactPrice !== null &&
+    !item.rawSourceData.bundle_component_codes,
 );
 assert.ok(datedOffers.length, "numeric offers are read");
 for (const item of datedOffers) {
@@ -236,12 +256,29 @@ assert.ok(
 // Resolving the reading is what makes them live.
 const resolved = parsePriceWorkbook(workbook.sheets, { offerDateReading: "day_first" });
 const liveOffers = resolved.items.filter(
-  (item) => item.pricingScope === "offer" && item.exactPrice !== null,
+  (item) =>
+    item.pricingScope === "offer" &&
+    item.exactPrice !== null &&
+    !item.rawSourceData.bundle_component_codes,
 );
 assert.ok(liveOffers.length);
 assert.ok(
   liveOffers.every((item) => item.active && item.validTo === "2026-10-09"),
   "once a reading is chosen the offers carry that date",
+);
+
+const structuredPmpOffers = resolved.items.filter(
+  (item) => item.rawSourceData.bundle_component_codes === "109,583,110",
+);
+assert.equal(
+  structuredPmpOffers.length,
+  5,
+  "the PMP bundle has four SAR methods and one EGP price",
+);
+assert.ok(structuredPmpOffers.every((item) => item.active && !item.requiresReview));
+assert.ok(
+  structuredPmpOffers.every((item) => item.normalizedProductCode === ""),
+  "an invoice-level bundle must never match the PMP line by itself",
 );
 
 // The staff bonus sheet is a badge, never a selling price.

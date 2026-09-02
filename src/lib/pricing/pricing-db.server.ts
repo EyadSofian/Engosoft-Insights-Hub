@@ -1727,7 +1727,7 @@ export async function catalogDemand(query: AuditQuery): Promise<CatalogDemandRes
               count(DISTINCT ${orderIdentity})::int AS orders,
               COALESCE(sum(GREATEST(quantity, 0)), 0)::float AS units
          FROM invoice_price_audits
-         ${scoped("pricing_context <> 'package' AND trim(product_code) <> ''")}
+         ${scoped("pricing_context NOT IN ('package','offer_bundle') AND trim(product_code) <> ''")}
         GROUP BY upper(trim(product_code))`,
       values,
     ),
@@ -1736,7 +1736,7 @@ export async function catalogDemand(query: AuditQuery): Promise<CatalogDemandRes
               count(DISTINCT ${orderIdentity})::int AS orders,
               count(DISTINCT ${orderIdentity})::float AS units
          FROM invoice_price_audits
-         ${scoped("pricing_context = 'package' AND trim(pricing_context_name) <> ''")}
+         ${scoped("pricing_context IN ('package','offer_bundle') AND trim(pricing_context_name) <> ''")}
         GROUP BY lower(regexp_replace(trim(pricing_context_name), '\\s+', ' ', 'g'))`,
       values,
     ),

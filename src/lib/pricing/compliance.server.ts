@@ -51,6 +51,7 @@ import {
   resolveProductIdsByCode,
   resolveSaleOrderDates,
 } from "./payment-methods.server.ts";
+import { applyPublishedBundleOffer } from "./bundle-offers.ts";
 import { normalizeProductCode, productCodeFromDisplayName, text } from "./pricing-normalize.ts";
 import type {
   AuditableInvoiceLine,
@@ -145,6 +146,8 @@ export function toAuditableLines(rows: Raw[]): AuditableInvoiceLine[] {
         odooPricelistItemId: null,
         odooPricelistItemName: "",
         odooExpectedUnitPrice: null,
+        odooListUnitPrice: null,
+        odooDiscountPercent: null,
         // Kept off the type: the order reference is only needed to look up the
         // order date, which is written back onto `saleDate` below.
       };
@@ -174,6 +177,9 @@ function fingerprint(line: AuditableInvoiceLine, bookVersion: number): string {
         line.odooPricelistId,
         line.odooPricelistItemId,
         line.odooExpectedUnitPrice,
+        line.odooListUnitPrice,
+        line.odooDiscountPercent,
+        line.pricingContextItemId,
         bookVersion,
       ].join(""),
     )
@@ -223,6 +229,7 @@ const isoDay = (value: Date): string => value.toISOString().slice(0, 10);
 class BookResolver {
   private cache = new Map<string, PriceBook | null>();
   private rules = new Map<string, RuleIndex>();
+  private items = new Map<string, Awaited<ReturnType<typeof listPriceItems>>>();
 
   constructor(
     private readonly fallback: PriceBook | null,
@@ -241,10 +248,18 @@ class BookResolver {
   async indexFor(book: PriceBook): Promise<RuleIndex> {
     const existing = this.rules.get(book.id);
     if (existing) return existing;
-    const items = await listPriceItems(book.id);
+    const items = await this.itemsFor(book);
     const index = buildRuleIndex(items.map(itemToRule), this.mappings);
     this.rules.set(book.id, index);
     return index;
+  }
+
+  async itemsFor(book: PriceBook): Promise<Awaited<ReturnType<typeof listPriceItems>>> {
+    const existing = this.items.get(book.id);
+    if (existing) return existing;
+    const items = await listPriceItems(book.id);
+    this.items.set(book.id, items);
+    return items;
   }
 }
 
@@ -404,6 +419,8 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
       line.odooPricelistItemId = fact.pricelistItemId;
       line.odooPricelistItemName = fact.pricelistItemName;
       line.odooExpectedUnitPrice = fact.expectedUnitPrice;
+      line.odooListUnitPrice = fact.priceUnit;
+      line.odooDiscountPercent = fact.discount;
     }
   }
   const linesMissingQuantity = lines.filter((line) => line.quantity <= 0).length;
@@ -508,8 +525,27 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
   let skipped = 0;
 
   for (const [, invoiceLines] of byInvoice) {
-    const allocated = allocateInvoiceDiscounts(invoiceLines, book.taxInclusive);
-    for (const line of allocated) {
+    const firstLine = invoiceLines[0];
+    const invoiceBook =
+      (await resolver.bookFor(firstLine?.saleDate || firstLine?.invoiceDate || "")) ?? book;
+    const payment: PaymentRead = stored.get(firstLine?.invoiceNumber || "")
+      ? {
+          method: stored.get(firstLine.invoiceNumber)!.method,
+          methods: stored.get(firstLine.invoiceNumber)!.methods,
+          raw: stored.get(firstLine.invoiceNumber)!.raw,
+          breakdown: stored.get(firstLine.invoiceNumber)!.breakdown,
+          source: stored.get(firstLine.invoiceNumber)!.source as PaymentRead["source"],
+        }
+      : { method: "unknown", methods: [], raw: [], breakdown: [], source: "none" };
+    const allocated = allocateInvoiceDiscounts(invoiceLines, invoiceBook.taxInclusive);
+    const invoiceItems = await resolver.itemsFor(invoiceBook);
+    const contextualized = applyPublishedBundleOffer(
+      allocated,
+      payment,
+      invoiceItems,
+      invoiceBook.taxInclusive,
+    );
+    for (const line of contextualized) {
       const on = line.saleDate || line.invoiceDate;
       const lineBook = (await resolver.bookFor(on)) ?? book;
       const mark = fingerprint(line, lineBook.version);
@@ -518,16 +554,6 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
         continue;
       }
       const index = await resolver.indexFor(lineBook);
-      const payment: PaymentRead = stored.get(line.invoiceNumber)
-        ? {
-            method: stored.get(line.invoiceNumber)!.method,
-            methods: stored.get(line.invoiceNumber)!.methods,
-            raw: stored.get(line.invoiceNumber)!.raw,
-            breakdown: stored.get(line.invoiceNumber)!.breakdown,
-            source: stored.get(line.invoiceNumber)!.source as PaymentRead["source"],
-          }
-        : { method: "unknown", methods: [], raw: [], breakdown: [], source: "none" };
-
       const audit = auditLine(
         line,
         payment,
