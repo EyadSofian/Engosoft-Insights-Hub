@@ -31,6 +31,12 @@ export type PriceMethodScope = PaymentMethod | "any";
  */
 export type PricingScope = "individual" | "bundle" | "level" | "offer" | "incentive";
 
+/** The commercial context Odoo says the invoice line was sold in. */
+export type PricingContext = "individual" | "package" | "unknown";
+
+/** The authority used for the final per-line comparison. */
+export type AuditPriceSource = "price_book" | "odoo_package";
+
 export type PriceBookStatus = "draft" | "published" | "archived";
 
 export type PriceSourceType = "xlsx" | "google_sheet" | "manual";
@@ -38,6 +44,8 @@ export type PriceSourceType = "xlsx" | "google_sheet" | "manual";
 export type ComplianceStatus =
   /** Inside the published band for the invoice's own payment method. */
   | "compliant"
+  /** Inside the component price Odoo recorded for a package sale. */
+  | "compliant_package"
   /** Below list, but matches a published offer that was live on the sale date. */
   | "compliant_offer"
   /** Below the published floor. The only status that counts as a breach. */
@@ -52,6 +60,8 @@ export type ComplianceStatus =
   | "mixed_payment_review"
   /** Matches an offer, but the sale happened outside the offer window. */
   | "expired_offer"
+  /** Odoo confirms a package sale but its component price cannot be read safely. */
+  | "package_price_unresolved"
   /** Credit note, bonus line, or otherwise not a sale to judge. */
   | "excluded";
 
@@ -67,6 +77,7 @@ export const REVIEW_STATUSES: ReadonlySet<ComplianceStatus> = new Set<Compliance
 
 export const PASS_STATUSES: ReadonlySet<ComplianceStatus> = new Set<ComplianceStatus>([
   "compliant",
+  "compliant_package",
   "compliant_offer",
   "above_list",
 ]);
@@ -158,7 +169,8 @@ export interface PriceRule {
   onHold: boolean;
 }
 
-export type MatchType = "odoo_product_id" | "exact_code" | "manual" | "alias" | "none";
+export type MatchType =
+  "odoo_pricelist" | "odoo_product_id" | "exact_code" | "manual" | "alias" | "none";
 
 export interface ProductMapping {
   priceItemId: string;
@@ -194,6 +206,19 @@ export interface AuditableInvoiceLine {
   totalInCurrency: number;
   /** Share of an invoice-level discount line allocated to this line. */
   allocatedDiscount: number;
+  /** Odoo's sale-line chain; package prices are contextual, not course-list prices. */
+  pricingContext: PricingContext;
+  pricingContextName: string;
+  odooPricingChecked: boolean;
+  odooSaleOrderLineId: number | null;
+  odooSaleOrderId: number | null;
+  odooSaleOrderName: string;
+  odooPricelistId: number | null;
+  odooPricelistName: string;
+  odooPricelistItemId: number | null;
+  odooPricelistItemName: string;
+  /** Tax-exclusive unit price agreed on the linked Odoo sale order line. */
+  odooExpectedUnitPrice: number | null;
 }
 
 export interface PaymentRead {
@@ -238,6 +263,14 @@ export interface InvoicePriceAudit {
   company: string;
   productCode: string;
   productName: string;
+  priceSource: AuditPriceSource;
+  pricingContext: PricingContext;
+  pricingContextName: string;
+  odooSaleOrderName: string;
+  odooPricelistId: number | null;
+  odooPricelistName: string;
+  odooPricelistItemId: number | null;
+  odooPricelistItemName: string;
 }
 
 export const DELIVERY_TYPES: DeliveryType[] = [
@@ -263,6 +296,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
 
 export const COMPLIANCE_STATUSES: ComplianceStatus[] = [
   "compliant",
+  "compliant_package",
   "compliant_offer",
   "below_minimum",
   "above_list",
@@ -270,5 +304,6 @@ export const COMPLIANCE_STATUSES: ComplianceStatus[] = [
   "unknown_payment_method",
   "mixed_payment_review",
   "expired_offer",
+  "package_price_unresolved",
   "excluded",
 ];

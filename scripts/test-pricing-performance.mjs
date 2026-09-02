@@ -222,6 +222,108 @@ assert.equal(result.diagnostics.invoicesRequested, INVOICES);
   assert.equal(offline.odooCalls, 0);
 }
 
+/* --- package lineage follows invoice -> sale line -> pricelist -------------- */
+
+{
+  const odoo = {
+    configured: () => true,
+    metadata: async (model) => {
+      if (model === "account.move.line") {
+        return Object.fromEntries(
+          [
+            "id",
+            "move_id",
+            "product_id",
+            "quantity",
+            "price_unit",
+            "discount",
+            "price_subtotal",
+            "price_total",
+            "sale_line_ids",
+          ].map((field) => [field, { type: field === "sale_line_ids" ? "many2many" : "float" }]),
+        );
+      }
+      if (model === "sale.order.line") {
+        return Object.fromEntries(
+          [
+            "id",
+            "order_id",
+            "product_id",
+            "product_uom_qty",
+            "price_unit",
+            "discount",
+            "price_subtotal",
+            "pricelist_item_id",
+          ].map((field) => [field, { type: "many2one" }]),
+        );
+      }
+      if (model === "product.pricelist.item") {
+        return {
+          id: { type: "integer" },
+          compute_price: { type: "selection" },
+          fixed_price: { type: "float" },
+        };
+      }
+      return {
+        id: { type: "integer" },
+        name: { type: "char" },
+        pricelist_id: { type: "many2one" },
+      };
+    },
+    searchRead: async (model) => {
+      if (model === "account.move.line") {
+        return [
+          {
+            id: 42,
+            move_id: [4, "INV/PKG/1"],
+            product_id: [77, "[CFM] Course"],
+            quantity: 2,
+            price_unit: 250,
+            discount: 0,
+            price_subtotal: 500,
+            price_total: 575,
+            sale_line_ids: [501],
+          },
+        ];
+      }
+      if (model === "sale.order.line") {
+        return [
+          {
+            id: 501,
+            order_id: [701, "SO/PKG/1"],
+            product_id: [77, "[CFM] Course"],
+            product_uom_qty: 2,
+            price_unit: 250,
+            discount: 0,
+            price_subtotal: 500,
+            pricelist_item_id: [801, "CFM package component"],
+          },
+        ];
+      }
+      if (model === "product.pricelist.item") {
+        return [{ id: 801, compute_price: "fixed", fixed_price: 275 }];
+      }
+      return [{ id: 701, name: "SO/PKG/1", pricelist_id: [901, "BIM Package"] }];
+    },
+  };
+
+  const result = await readInvoiceLineFacts(
+    [{ invoiceLineId: "42", invoiceNumber: "INV/PKG/1" }],
+    odoo,
+  );
+  const fact = result.facts.get("42");
+  assert.equal(fact.pricingContext, "package");
+  assert.equal(fact.pricelistId, 901);
+  assert.equal(fact.pricelistName, "BIM Package");
+  assert.equal(fact.saleOrderName, "SO/PKG/1");
+  assert.equal(
+    fact.expectedUnitPrice,
+    275,
+    "the fixed Odoo rule outranks a manual sale-line price",
+  );
+  assert.equal(fact.odooPricingChecked, true);
+}
+
 /* --- roll-ups stay linear -------------------------------------------------- */
 
 {

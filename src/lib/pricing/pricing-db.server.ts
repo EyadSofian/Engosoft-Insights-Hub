@@ -28,6 +28,7 @@ import type {
   PriceMethodScope,
   PriceRule,
   PriceSourceType,
+  PricingContext,
   PricingScope,
   ProductMapping,
 } from "./pricing-types.ts";
@@ -182,6 +183,14 @@ CREATE TABLE IF NOT EXISTS invoice_price_audits (
   company text NOT NULL DEFAULT '',
   product_code text NOT NULL DEFAULT '',
   product_name text NOT NULL DEFAULT '',
+  price_source text NOT NULL DEFAULT 'price_book',
+  pricing_context text NOT NULL DEFAULT 'unknown',
+  pricing_context_name text NOT NULL DEFAULT '',
+  sale_order_name text NOT NULL DEFAULT '',
+  odoo_pricelist_id integer,
+  odoo_pricelist_name text NOT NULL DEFAULT '',
+  odoo_pricelist_item_id integer,
+  odoo_pricelist_item_name text NOT NULL DEFAULT '',
   -- Fingerprint of the invoice line as audited, so unchanged lines are skipped.
   line_fingerprint text NOT NULL DEFAULT ''
 );
@@ -215,9 +224,43 @@ CREATE TABLE IF NOT EXISTS invoice_line_facts (
   discount numeric(9,4) NOT NULL DEFAULT 0,
   price_subtotal numeric(14,2) NOT NULL DEFAULT 0,
   price_total numeric(14,2) NOT NULL DEFAULT 0,
+  sale_order_line_id integer,
+  sale_order_id integer,
+  sale_order_name text NOT NULL DEFAULT '',
+  pricelist_id integer,
+  pricelist_name text NOT NULL DEFAULT '',
+  pricelist_item_id integer,
+  pricelist_item_name text NOT NULL DEFAULT '',
+  expected_unit_price numeric(14,4),
+  pricing_context text NOT NULL DEFAULT 'unknown',
+  pricing_context_name text NOT NULL DEFAULT '',
+  odoo_pricing_checked boolean NOT NULL DEFAULT false,
   read_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS invoice_line_facts_invoice_idx ON invoice_line_facts (invoice_number);
+
+-- Existing deployments receive the Odoo package lineage without a destructive
+-- migration. IF NOT EXISTS keeps startup idempotent across Railway restarts.
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS price_source text NOT NULL DEFAULT 'price_book';
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS pricing_context text NOT NULL DEFAULT 'unknown';
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS pricing_context_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS sale_order_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS odoo_pricelist_id integer;
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS odoo_pricelist_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS odoo_pricelist_item_id integer;
+ALTER TABLE invoice_price_audits ADD COLUMN IF NOT EXISTS odoo_pricelist_item_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS sale_order_line_id integer;
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS sale_order_id integer;
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS sale_order_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricelist_id integer;
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricelist_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricelist_item_id integer;
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricelist_item_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS expected_unit_price numeric(14,4);
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricing_context text NOT NULL DEFAULT 'unknown';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricing_context_name text NOT NULL DEFAULT '';
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS odoo_pricing_checked boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS invoice_audits_context_idx ON invoice_price_audits (pricing_context, compliance_status);
 
 CREATE TABLE IF NOT EXISTS price_payment_aliases (
   alias text PRIMARY KEY,
@@ -1230,6 +1273,17 @@ export interface StoredLineFact {
   discount: number;
   priceSubtotal: number;
   priceTotal: number;
+  saleOrderLineId: number | null;
+  saleOrderId: number | null;
+  saleOrderName: string;
+  pricelistId: number | null;
+  pricelistName: string;
+  pricelistItemId: number | null;
+  pricelistItemName: string;
+  expectedUnitPrice: number | null;
+  pricingContext: PricingContext;
+  pricingContextName: string;
+  odooPricingChecked: boolean;
 }
 
 /**
@@ -1261,6 +1315,17 @@ export async function readStoredLineFacts(
         discount: Number(row.discount ?? 0),
         priceSubtotal: Number(row.price_subtotal ?? 0),
         priceTotal: Number(row.price_total ?? 0),
+        saleOrderLineId: num(row.sale_order_line_id),
+        saleOrderId: num(row.sale_order_id),
+        saleOrderName: str(row.sale_order_name),
+        pricelistId: num(row.pricelist_id),
+        pricelistName: str(row.pricelist_name),
+        pricelistItemId: num(row.pricelist_item_id),
+        pricelistItemName: str(row.pricelist_item_name),
+        expectedUnitPrice: num(row.expected_unit_price),
+        pricingContext: (str(row.pricing_context) || "unknown") as PricingContext,
+        pricingContextName: str(row.pricing_context_name),
+        odooPricingChecked: row.odoo_pricing_checked === true,
       });
     }
   }
@@ -1277,7 +1342,7 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
       const chunk = facts.slice(start, start + 400);
       const values: unknown[] = [];
       const tuples = chunk.map((fact, index) => {
-        const offset = index * 9;
+        const offset = index * 20;
         values.push(
           fact.invoiceLineId,
           fact.invoiceNumber,
@@ -1288,13 +1353,27 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
           fact.discount,
           fact.priceSubtotal,
           fact.priceTotal,
+          fact.saleOrderLineId,
+          fact.saleOrderId,
+          fact.saleOrderName,
+          fact.pricelistId,
+          fact.pricelistName,
+          fact.pricelistItemId,
+          fact.pricelistItemName,
+          fact.expectedUnitPrice,
+          fact.pricingContext,
+          fact.pricingContextName,
+          fact.odooPricingChecked,
         );
-        return `($${offset + 1},$${offset + 2},$${offset + 3},$${offset + 4},$${offset + 5},$${offset + 6},$${offset + 7},$${offset + 8},$${offset + 9})`;
+        return `(${Array.from({ length: 20 }, (_, column) => `$${offset + column + 1}`).join(",")})`;
       });
       await client.query(
         `INSERT INTO invoice_line_facts
            (invoice_line_id, invoice_number, odoo_product_id, product_code, quantity,
-            price_unit, discount, price_subtotal, price_total)
+            price_unit, discount, price_subtotal, price_total, sale_order_line_id,
+            sale_order_id, sale_order_name, pricelist_id, pricelist_name, pricelist_item_id,
+            pricelist_item_name, expected_unit_price, pricing_context, pricing_context_name,
+            odoo_pricing_checked)
          VALUES ${tuples.join(",")}
          ON CONFLICT (invoice_line_id) DO UPDATE SET
            invoice_number = EXCLUDED.invoice_number,
@@ -1305,6 +1384,17 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
            discount = EXCLUDED.discount,
            price_subtotal = EXCLUDED.price_subtotal,
            price_total = EXCLUDED.price_total,
+           sale_order_line_id = EXCLUDED.sale_order_line_id,
+           sale_order_id = EXCLUDED.sale_order_id,
+           sale_order_name = EXCLUDED.sale_order_name,
+           pricelist_id = EXCLUDED.pricelist_id,
+           pricelist_name = EXCLUDED.pricelist_name,
+           pricelist_item_id = EXCLUDED.pricelist_item_id,
+           pricelist_item_name = EXCLUDED.pricelist_item_name,
+           expected_unit_price = EXCLUDED.expected_unit_price,
+           pricing_context = EXCLUDED.pricing_context,
+           pricing_context_name = EXCLUDED.pricing_context_name,
+           odoo_pricing_checked = EXCLUDED.odoo_pricing_checked,
            read_at = now()`,
         values,
       );
@@ -1334,7 +1424,7 @@ export async function writeAudits(
 ): Promise<number> {
   await ensurePricingSchema();
   if (!audits.length) return 0;
-  const columns = 29;
+  const columns = 37;
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
@@ -1371,11 +1461,19 @@ export async function writeAudits(
           audit.company,
           audit.productCode,
           audit.productName,
+          audit.priceSource,
+          audit.pricingContext,
+          audit.pricingContextName,
+          audit.odooSaleOrderName,
+          audit.odooPricelistId,
+          audit.odooPricelistName,
+          audit.odooPricelistItemId,
+          audit.odooPricelistItemName,
           audit.lineFingerprint,
           audit.auditedAt,
         );
         const p = Array.from({ length: columns }, (_, column) => `$${offset + column + 1}`);
-        return `(${p[0]},${p[1]},${p[2]}::uuid,${p[3]},${p[4]}::uuid,${p[5]},${p[6]},${p[7]},${p[8]},${p[9]},${p[10]},${p[11]},${p[12]},${p[13]},${p[14]},${p[15]},${p[16]},${p[17]},${p[18]},${p[19]}::date,${p[20]}::date,${p[21]}::date,${p[22]},${p[23]},${p[24]},${p[25]},${p[26]},${p[27]},${p[28]}::timestamptz)`;
+        return `(${p[0]},${p[1]},${p[2]}::uuid,${p[3]},${p[4]}::uuid,${p[5]},${p[6]},${p[7]},${p[8]},${p[9]},${p[10]},${p[11]},${p[12]},${p[13]},${p[14]},${p[15]},${p[16]},${p[17]},${p[18]},${p[19]}::date,${p[20]}::date,${p[21]}::date,${p[22]},${p[23]},${p[24]},${p[25]},${p[26]},${p[27]},${p[28]},${p[29]},${p[30]},${p[31]},${p[32]},${p[33]},${p[34]},${p[35]},${p[36]}::timestamptz)`;
       });
       await client.query(
         `INSERT INTO invoice_price_audits
@@ -1384,7 +1482,9 @@ export async function writeAudits(
            allowed_minimum, allowed_maximum, compliance_status, severity, variance_amount,
            variance_percent, leakage_amount, match_type, reason, sale_date, invoice_date,
            payment_date, salesperson, sales_team, company, product_code, product_name,
-           line_fingerprint, audited_at)
+           price_source, pricing_context, pricing_context_name, sale_order_name,
+           odoo_pricelist_id, odoo_pricelist_name, odoo_pricelist_item_id,
+           odoo_pricelist_item_name, line_fingerprint, audited_at)
          VALUES ${tuples.join(",")}
          ON CONFLICT (invoice_line_id) DO UPDATE SET
            invoice_number = EXCLUDED.invoice_number,
@@ -1413,6 +1513,14 @@ export async function writeAudits(
            company = EXCLUDED.company,
            product_code = EXCLUDED.product_code,
            product_name = EXCLUDED.product_name,
+           price_source = EXCLUDED.price_source,
+           pricing_context = EXCLUDED.pricing_context,
+           pricing_context_name = EXCLUDED.pricing_context_name,
+           sale_order_name = EXCLUDED.sale_order_name,
+           odoo_pricelist_id = EXCLUDED.odoo_pricelist_id,
+           odoo_pricelist_name = EXCLUDED.odoo_pricelist_name,
+           odoo_pricelist_item_id = EXCLUDED.odoo_pricelist_item_id,
+           odoo_pricelist_item_name = EXCLUDED.odoo_pricelist_item_name,
            line_fingerprint = EXCLUDED.line_fingerprint,
            audited_at = EXCLUDED.audited_at`,
         values,
@@ -1442,9 +1550,47 @@ export interface AuditQuery {
   status?: string;
   severity?: string;
   search?: string;
+  /** One of AUDIT_SORTS; anything else falls back to the severity order. */
+  sort?: string;
+  sortDir?: "asc" | "desc";
   limit?: number;
   offset?: number;
 }
+
+/**
+ * The orders a reader may ask for, as fixed SQL fragments.
+ *
+ * The key arrives from a query string, so it selects a fragment from this map
+ * and is never interpolated: an unknown key falls back to the default order
+ * rather than reaching the statement.
+ */
+const AUDIT_SORTS: Record<string, { asc: string; desc: string }> = {
+  // Severity is stored as a word, so "worst first" is spelled out rather than
+  // left to the alphabet: descending priority means critical before warning.
+  priority: {
+    asc: "severity DESC, leakage_amount ASC",
+    desc: "severity ASC, leakage_amount DESC",
+  },
+  leakage: { asc: "leakage_amount ASC", desc: "leakage_amount DESC" },
+  gap: { asc: "variance_amount ASC", desc: "variance_amount DESC" },
+  price: { asc: "actual_unit_price ASC", desc: "actual_unit_price DESC" },
+  date: {
+    asc: "payment_date ASC NULLS LAST, invoice_date ASC NULLS LAST",
+    desc: "payment_date DESC NULLS LAST, invoice_date DESC NULLS LAST",
+  },
+  salesperson: { asc: "salesperson ASC", desc: "salesperson DESC" },
+  course: { asc: "product_name ASC", desc: "product_name DESC" },
+  invoice: { asc: "invoice_number ASC", desc: "invoice_number DESC" },
+};
+
+export const auditSortKeys = Object.keys(AUDIT_SORTS);
+
+const auditOrderBy = (query: AuditQuery): string => {
+  const spec = AUDIT_SORTS[query.sort ?? ""];
+  if (!spec) return "severity ASC, leakage_amount DESC, payment_date DESC NULLS LAST";
+  // invoice_line_id breaks ties so paging can never repeat or skip a row.
+  return `${query.sortDir === "asc" ? spec.asc : spec.desc}, invoice_line_id ASC`;
+};
 
 function auditWhere(query: AuditQuery): { clause: string; values: unknown[] } {
   const where: string[] = [];
@@ -1490,7 +1636,7 @@ export async function queryAudits(
   const [rows, total] = await Promise.all([
     getPool().query(
       `SELECT * FROM invoice_price_audits ${clause}
-        ORDER BY severity ASC, leakage_amount DESC, payment_date DESC NULLS LAST
+        ORDER BY ${auditOrderBy(query)}
         LIMIT ${limit} OFFSET ${offset}`,
       values,
     ),
@@ -1529,6 +1675,14 @@ export async function queryAudits(
       company: str(row.company),
       productCode: str(row.product_code),
       productName: str(row.product_name),
+      priceSource: (str(row.price_source) || "price_book") as InvoicePriceAudit["priceSource"],
+      pricingContext: (str(row.pricing_context) || "unknown") as PricingContext,
+      pricingContextName: str(row.pricing_context_name),
+      odooSaleOrderName: str(row.sale_order_name),
+      odooPricelistId: num(row.odoo_pricelist_id),
+      odooPricelistName: str(row.odoo_pricelist_name),
+      odooPricelistItemId: num(row.odoo_pricelist_item_id),
+      odooPricelistItemName: str(row.odoo_pricelist_item_name),
     })),
     total: Number(total.rows[0]?.count ?? 0),
   };
@@ -1553,10 +1707,13 @@ export async function aggregateAudits(query: AuditQuery): Promise<{
     getPool().query(
       `SELECT
          count(*)::int AS audited,
-         count(*) FILTER (WHERE compliance_status <> 'excluded')::int AS eligible,
-         count(*) FILTER (WHERE compliance_status NOT IN ('excluded','unmatched_product'))::int AS matched,
-         count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_offer','above_list','below_minimum'))::int AS judged,
-         count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_offer','above_list'))::int AS compliant,
+         count(*) FILTER (WHERE compliance_status NOT IN ('excluded','package_price_unresolved'))::int AS eligible,
+         count(*) FILTER (WHERE compliance_status NOT IN ('excluded','package_price_unresolved','unmatched_product'))::int AS matched,
+         count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_package','compliant_offer','above_list','below_minimum'))::int AS judged,
+         count(*) FILTER (WHERE compliance_status IN ('compliant','compliant_package','compliant_offer','above_list'))::int AS compliant,
+         count(*) FILTER (WHERE compliance_status = 'compliant_package')::int AS compliant_package,
+         count(*) FILTER (WHERE pricing_context = 'package')::int AS package_lines,
+         count(*) FILTER (WHERE compliance_status = 'package_price_unresolved')::int AS unresolved_package,
          count(*) FILTER (WHERE compliance_status = 'below_minimum')::int AS below_minimum,
          count(*) FILTER (WHERE compliance_status = 'unmatched_product')::int AS unmatched,
          count(*) FILTER (WHERE compliance_status = 'unknown_payment_method')::int AS unknown_payment,

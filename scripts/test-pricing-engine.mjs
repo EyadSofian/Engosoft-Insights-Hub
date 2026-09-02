@@ -61,6 +61,17 @@ const line = (patch = {}) => ({
   untaxedTotal: 500,
   totalInCurrency: 500,
   allocatedDiscount: 0,
+  pricingContext: "individual",
+  pricingContextName: "",
+  odooPricingChecked: true,
+  odooSaleOrderLineId: null,
+  odooSaleOrderId: null,
+  odooSaleOrderName: "",
+  odooPricelistId: null,
+  odooPricelistName: "",
+  odooPricelistItemId: null,
+  odooPricelistItemName: "",
+  odooExpectedUnitPrice: null,
   ...patch,
 });
 
@@ -352,6 +363,76 @@ assert.equal(actualUnitPrice(line({ untaxedTotal: 400, totalInCurrency: 460 }), 
 }
 
 /* --- packages -------------------------------------------------------------- */
+
+// The same course can be worth 600 alone and 250 as one component of a package.
+// Odoo's linked sale line is the authority for the package component, so the
+// standalone price must not manufacture a critical finding.
+{
+  const verdict = judge(
+    [rule({ minimumPrice: 600, maximumPrice: 600 })],
+    line({
+      pricingContext: "package",
+      pricingContextName: "BIM Complete Package",
+      odooPricelistId: 17,
+      odooPricelistName: "BIM Complete Package",
+      odooExpectedUnitPrice: 250,
+      untaxedTotal: 250,
+      totalInCurrency: 287.5,
+    }),
+  );
+  assert.equal(verdict.status, "compliant_package");
+  assert.equal(verdict.allowedMinimum, 250);
+  assert.equal(verdict.leakageAmount, 0);
+  assert.equal(verdict.matchType, "odoo_pricelist");
+}
+
+// A genuine reduction below the package component price is still a finding.
+{
+  const verdict = judge(
+    [rule({ minimumPrice: 600 })],
+    line({
+      pricingContext: "package",
+      odooPricelistName: "BIM Complete Package",
+      odooExpectedUnitPrice: 250,
+      untaxedTotal: 200,
+      totalInCurrency: 230,
+    }),
+  );
+  assert.equal(verdict.status, "below_minimum");
+  assert.equal(verdict.allowedMinimum, 250);
+  assert.equal(verdict.varianceAmount, 50);
+}
+
+// Missing package lineage is neutral, never a guessed standalone breach.
+{
+  const unresolved = judge(
+    [rule({ minimumPrice: 600 })],
+    line({
+      pricingContext: "package",
+      pricingContextName: "BIM Complete Package",
+      odooExpectedUnitPrice: null,
+      untaxedTotal: 200,
+      totalInCurrency: 230,
+    }),
+  );
+  assert.equal(unresolved.status, "package_price_unresolved");
+  assert.equal(unresolved.severity, "none");
+  assert.equal(unresolved.leakageAmount, 0);
+}
+
+// For an older invoice with no sale-line link, the existence of a package rule
+// is enough to pause the accusation until Odoo resolves the context.
+{
+  const verdict = judge(
+    [
+      rule({ pricingScope: "individual", minimumPrice: 600 }),
+      rule({ pricingScope: "bundle", minimumPrice: 1500, exactPrice: 1500 }),
+    ],
+    line({ pricingContext: "unknown", totalInCurrency: 250 }),
+  );
+  assert.equal(verdict.status, "package_price_unresolved");
+  assert.equal(verdict.severity, "none");
+}
 
 // A package with its own code is compared against the package price directly,
 // not spread across the courses inside it.

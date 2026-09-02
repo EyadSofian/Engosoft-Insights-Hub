@@ -6,9 +6,10 @@
 //   * Invoice facts come from the accounting rows already in PostgreSQL. This
 //     module never re-reads invoices from Odoo and never changes how revenue is
 //     calculated — it only reads what the accounting pipeline already stored.
-//   * Odoo is touched for two things the accounting snapshot does not carry —
-//     the settled payment instrument and the product id behind a code — and both
-//     are read in batches and cached in PostgreSQL, so a line is looked up once.
+//   * Odoo is touched for facts the accounting snapshot does not carry — the
+//     settled payment instrument, quantity/product id, and the sale-line /
+//     pricelist lineage that distinguishes a package component from a standalone
+//     course. All are read in batches and cached, so a line is looked up once.
 //   * A line is re-judged only when its own numbers changed, or the price book
 //     that judged it did.
 //   * Pages read `invoice_price_audits`. Opening the tab runs no audit at all.
@@ -132,6 +133,17 @@ export function toAuditableLines(rows: Raw[]): AuditableInvoiceLine[] {
         untaxedTotal: number(str(row, ["Untaxed Total", "الإجمالي دون الضريبة"])),
         totalInCurrency: number(str(row, ["Total in Currency", "الإجمالي بالعملة"])),
         allocatedDiscount: 0,
+        pricingContext: "unknown",
+        pricingContextName: "",
+        odooPricingChecked: false,
+        odooSaleOrderLineId: null,
+        odooSaleOrderId: null,
+        odooSaleOrderName: "",
+        odooPricelistId: null,
+        odooPricelistName: "",
+        odooPricelistItemId: null,
+        odooPricelistItemName: "",
+        odooExpectedUnitPrice: null,
         // Kept off the type: the order reference is only needed to look up the
         // order date, which is written back onto `saleDate` below.
       };
@@ -155,6 +167,12 @@ function fingerprint(line: AuditableInvoiceLine, bookVersion: number): string {
         line.paymentDate,
         line.salesperson,
         line.allocatedDiscount,
+        line.pricingContext,
+        line.pricingContextName,
+        line.odooSaleOrderLineId,
+        line.odooPricelistId,
+        line.odooPricelistItemId,
+        line.odooExpectedUnitPrice,
         bookVersion,
       ].join(""),
     )
@@ -324,10 +342,15 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
   // read from `account.move.line` by id — once per line, then cached.
   let lineFactsRead = 0;
   let lineFactsRejected = 0;
-  const needsFacts = lines.filter((line) => line.quantity <= 0);
+  // Every line needs the Odoo sale-line lineage once, even when the accounting
+  // export already carries quantity. That lineage is what distinguishes a
+  // standalone course from the same course sold as one component of a package.
+  const needsFacts = lines;
   if (needsFacts.length) {
     const cached = await readStoredLineFacts(needsFacts.map((line) => line.invoiceLineId));
-    const missing = needsFacts.filter((line) => !cached.has(line.invoiceLineId));
+    const missing = needsFacts.filter(
+      (line) => options.force || !cached.get(line.invoiceLineId)?.odooPricingChecked,
+    );
 
     if (missing.length && !options.offline && odooConfigured()) {
       try {
@@ -364,6 +387,17 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
       // Prefer the invoice line's own amounts when the export rounded them.
       if (!line.untaxedTotal && fact.priceSubtotal) line.untaxedTotal = fact.priceSubtotal;
       if (!line.totalInCurrency && fact.priceTotal) line.totalInCurrency = fact.priceTotal;
+      line.pricingContext = fact.pricingContext;
+      line.pricingContextName = fact.pricingContextName;
+      line.odooPricingChecked = fact.odooPricingChecked;
+      line.odooSaleOrderLineId = fact.saleOrderLineId;
+      line.odooSaleOrderId = fact.saleOrderId;
+      line.odooSaleOrderName = fact.saleOrderName;
+      line.odooPricelistId = fact.pricelistId;
+      line.odooPricelistName = fact.pricelistName;
+      line.odooPricelistItemId = fact.pricelistItemId;
+      line.odooPricelistItemName = fact.pricelistItemName;
+      line.odooExpectedUnitPrice = fact.expectedUnitPrice;
     }
   }
   const linesMissingQuantity = lines.filter((line) => line.quantity <= 0).length;

@@ -382,6 +382,76 @@ export function judgeLine(
     );
   }
 
+  // A package component has its own commercial price on the Odoo sale order.
+  // Comparing it with the standalone course floor is a category error: a
+  // 250-SAR component inside a 2,500-SAR package is not a 350-SAR discount on a
+  // 600-SAR standalone course. Odoo is authoritative here because it preserves
+  // both the selected pricelist and the sale line that produced the invoice.
+  if (line.pricingContext === "package") {
+    const packagePrice = line.odooExpectedUnitPrice;
+    const packageActual = actualUnitPrice(line, false);
+    if (packageActual === null || packagePrice === null || packagePrice <= 0) {
+      return empty(
+        "package_price_unresolved",
+        `Odoo identifies this as a package component${line.pricingContextName ? ` (${line.pricingContextName})` : ""}, but its agreed component price could not be read safely. It is not treated as a breach.`,
+        "odoo_pricelist",
+        packageActual ?? price,
+        "none",
+      );
+    }
+
+    const tolerance = 0.01;
+    const varianceAmount = money(packagePrice - packageActual);
+    const variancePercent = packagePrice > 0 ? varianceAmount / packagePrice : null;
+    const source = line.odooPricelistName || line.pricingContextName || "Odoo package pricelist";
+
+    if (packageActual > packagePrice + tolerance) {
+      return {
+        status: "above_list",
+        severity: "informational",
+        reason: `Package component sold at ${packageActual} ${line.currency}, above its Odoo-agreed ${packagePrice} price from ${source}. Not a loss; shown for information.`,
+        allowedMinimum: packagePrice,
+        allowedMaximum: packagePrice,
+        priceItemId: "",
+        matchType: "odoo_pricelist",
+        varianceAmount,
+        variancePercent,
+        leakageAmount: 0,
+        actualUnitPrice: packageActual,
+      };
+    }
+
+    if (packageActual + tolerance >= packagePrice) {
+      return {
+        status: "compliant_package",
+        severity: "none",
+        reason: `Package component sold at its Odoo-agreed price of ${packagePrice} ${line.currency} from ${source}; the standalone course price does not apply.`,
+        allowedMinimum: packagePrice,
+        allowedMaximum: packagePrice,
+        priceItemId: "",
+        matchType: "odoo_pricelist",
+        varianceAmount: 0,
+        variancePercent: 0,
+        leakageAmount: 0,
+        actualUnitPrice: packageActual,
+      };
+    }
+
+    return {
+      status: "below_minimum",
+      severity: severityFor("below_minimum", variancePercent, criticalShare),
+      reason: `Package component sold at ${packageActual} ${line.currency}, below its Odoo-agreed ${packagePrice} price from ${source}. Short by ${varianceAmount} per unit.`,
+      allowedMinimum: packagePrice,
+      allowedMaximum: packagePrice,
+      priceItemId: "",
+      matchType: "odoo_pricelist",
+      varianceAmount,
+      variancePercent,
+      leakageAmount: money(varianceAmount * line.quantity),
+      actualUnitPrice: packageActual,
+    };
+  }
+
   const matched = matchRules(index, line);
   if (!matched.rules.length) {
     return empty(
@@ -497,6 +567,28 @@ export function judgeLine(
       };
     }
 
+    // Older invoices can lack the sale-line link even though the published book
+    // confirms this product participates in packages. Do not accuse the seller
+    // using the standalone floor until Odoo resolves which context was sold.
+    const packageCouldApply = sameCurrency.some(
+      (rule) => rule.pricingScope === "bundle" || rule.pricingScope === "level",
+    );
+    if (line.pricingContext === "unknown" && packageCouldApply) {
+      return {
+        status: "package_price_unresolved",
+        reason:
+          "This course also belongs to a package, but Odoo did not provide the linked sale-line price. The standalone floor is therefore not used to call it a breach.",
+        allowedMinimum: null,
+        allowedMaximum: null,
+        priceItemId: "",
+        matchType: matched.matchType,
+        varianceAmount: 0,
+        variancePercent: null,
+        leakageAmount: 0,
+        actualUnitPrice: price,
+      };
+    }
+
     // Below the floor. An offer is the one thing that can explain it.
     const methodOffers = rulesForMethod(offerRules, method);
     const live = methodOffers.filter(
@@ -605,6 +697,14 @@ export function auditLine(
     company: line.company,
     productCode: line.productCode,
     productName: line.productName,
+    priceSource: line.pricingContext === "package" ? "odoo_package" : "price_book",
+    pricingContext: line.pricingContext,
+    pricingContextName: line.pricingContextName,
+    odooSaleOrderName: line.odooSaleOrderName,
+    odooPricelistId: line.odooPricelistId,
+    odooPricelistName: line.odooPricelistName,
+    odooPricelistItemId: line.odooPricelistItemId,
+    odooPricelistItemName: line.odooPricelistItemName,
   };
 }
 
@@ -625,6 +725,8 @@ export interface ComplianceTotals {
   unknownPaymentLines: number;
   needsReviewLines: number;
   aboveListLines: number;
+  packageLines: number;
+  unresolvedPackageLines: number;
   excludedLines: number;
   byStatus: Record<string, number>;
   byCurrencyLeakage: Record<string, number>;
@@ -650,6 +752,8 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
   let unknownPayment = 0;
   let needsReview = 0;
   let aboveList = 0;
+  let packageLines = 0;
+  let unresolvedPackageLines = 0;
   let excludedLines = 0;
 
   for (const audit of audits) {
@@ -658,10 +762,15 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
       excludedLines++;
       continue;
     }
+    if (audit.complianceStatus === "package_price_unresolved") {
+      unresolvedPackageLines++;
+      continue;
+    }
     eligible++;
     if (audit.complianceStatus !== "unmatched_product") matched++;
     if (
       audit.complianceStatus === "compliant" ||
+      audit.complianceStatus === "compliant_package" ||
       audit.complianceStatus === "compliant_offer" ||
       audit.complianceStatus === "above_list" ||
       audit.complianceStatus === "below_minimum"
@@ -670,11 +779,13 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
     }
     if (
       audit.complianceStatus === "compliant" ||
+      audit.complianceStatus === "compliant_package" ||
       audit.complianceStatus === "compliant_offer" ||
       audit.complianceStatus === "above_list"
     ) {
       compliant++;
     }
+    if (audit.pricingContext === "package") packageLines++;
     if (audit.complianceStatus === "above_list") aboveList++;
     if (audit.complianceStatus === "below_minimum") {
       belowMinimum++;
@@ -701,6 +812,8 @@ export function summarize(audits: InvoicePriceAudit[]): ComplianceTotals {
     unknownPaymentLines: unknownPayment,
     needsReviewLines: needsReview,
     aboveListLines: aboveList,
+    packageLines,
+    unresolvedPackageLines,
     excludedLines,
     byStatus,
     byCurrencyLeakage: Object.fromEntries(

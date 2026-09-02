@@ -43,38 +43,40 @@ npm run start        # serves .output/server/index.mjs on $PORT
 
 Copy `.env.example` to `.env`:
 
-| Variable                       | Required       | Purpose                                                                                                   |
-| ------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------- |
-| `SHEET_ID`                     | No             | Google Sheet id. Falls back to the Engosoft sheet.                                                        |
-| `DATABASE_URL`                 | Production     | PostgreSQL connection injected into the Railway app service.                                              |
-| `DASHBOARD_INGEST_SECRET`      | Production     | Shared bearer secret for n8n `POST /api/ingest/dataset`.                                                  |
-| `ODOO_LOGIN`                   | Live data      | Odoo user the API key belongs to. Without it Products is unavailable and CRM/Lost use the sheet fallback. |
-| `ODOO_API_KEY`                 | Live data      | Odoo API key, used in place of the password. Never logged or returned in a response.                      |
-| `ODOO_URL` / `ODOO_DB`         | No             | Default to `https://engosoft.com` and `EngoSoft`.                                                         |
-| `ODOO_COMPANY_IDS`             | No             | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                                                |
-| `ODOO_START_DATE`              | No             | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                                   |
-| `OPENAI_API_KEY`               | No             | Enables free-form AI answers. Without it the built-in exact-figure answers still work.                    |
-| `TIKTOK_APP_ID`                | For TikTok     | Developer app ID used to resolve authorised account names.                                                |
-| `TIKTOK_APP_SECRET`            | For TikTok     | Developer app secret. Server-only; never returned or logged.                                              |
-| `TIKTOK_ACCESS_TOKEN`          | For TikTok     | Long-term Marketing API access token.                                                                     |
-| `TIKTOK_ADVERTISER_IDS`        | For TikTok     | Comma-separated advertiser account IDs.                                                                   |
-| `TIKTOK_START_DATE`            | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
-| `GOOGLE_ADS_CLIENT_ID`         | For Google Ads | OAuth desktop/web client ID. Server-only.                                                                 |
-| `GOOGLE_ADS_CLIENT_SECRET`     | For Google Ads | OAuth client secret. Server-only; never returned or logged.                                               |
-| `GOOGLE_ADS_REFRESH_TOKEN`     | For Google Ads | OAuth refresh token authorised for the Google Ads scope.                                                  |
-| `GOOGLE_ADS_DEVELOPER_TOKEN`   | For Google Ads | Developer token from the linked manager account's API Center.                                             |
-| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | For Google Ads | Manager account ID used in the `login-customer-id` header.                                                |
-| `GOOGLE_ADS_CUSTOMER_IDS`      | For Google Ads | Comma-separated client account IDs to report.                                                             |
-| `GOOGLE_ADS_START_DATE`        | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
-| `GOOGLE_ADS_END_DATE`          | No             | Optional fixed report end date; defaults to today.                                                        |
-| `META_LIVE_STATUS_URL`         | No             | Fast n8n official-campaign-status cache endpoint.                                                         |
-| `META_LIVE_STATUS_REFRESH_URL` | No             | n8n refresh endpoint used only when the shared status snapshot is old.                                    |
-| `TELEGRAM_BOT_TOKEN`           | No             | Enables the daily report. Never logged or returned in a response.                                         |
-| `TELEGRAM_CHAT_ID`             | No             | Optional fallback recipient, always included alongside `/start` subscribers.                              |
-| `TELEGRAM_SUBSCRIBERS_FILE`    | No             | Where the subscriber list is stored. Point at a mounted volume on Railway.                                |
-| `REPORT_CRON`                  | No             | Cron expression in Africa/Cairo. Default `0 9 * * *`.                                                     |
-| `REPORT_LANG`                  | No             | `ar` (default) or `en`.                                                                                   |
-| `PORT`                         | No             | Set by Railway automatically.                                                                             |
+| Variable                         | Required       | Purpose                                                                                                   |
+| -------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
+| `SHEET_ID`                       | No             | Google Sheet id. Falls back to the Engosoft sheet.                                                        |
+| `DATABASE_URL`                   | Production     | PostgreSQL connection injected into the Railway app service.                                              |
+| `DASHBOARD_INGEST_SECRET`        | Production     | Shared bearer secret for n8n `POST /api/ingest/dataset`.                                                  |
+| `ODOO_LOGIN`                     | Live data      | Odoo user the API key belongs to. Without it Products is unavailable and CRM/Lost use the sheet fallback. |
+| `ODOO_API_KEY`                   | Live data      | Odoo API key, used in place of the password. Never logged or returned in a response.                      |
+| `ODOO_URL` / `ODOO_DB`           | No             | Default to `https://engosoft.com` and `EngoSoft`.                                                         |
+| `ODOO_COMPANY_IDS`               | No             | Companies to report on. Default `2,3,4` (Egypt, KSA, UAE).                                                |
+| `ODOO_START_DATE`                | No             | Earliest Odoo date read by Products and CRM/Lost. Default `2026-01-01`.                                   |
+| `ODOO_PACKAGE_PRICELIST_IDS`     | No             | Exact Odoo pricelist ids that represent packages when their names do not identify them.                   |
+| `ODOO_PACKAGE_PRICELIST_PATTERN` | No             | Optional regex used to recognize package pricelist and rule names.                                        |
+| `OPENAI_API_KEY`                 | No             | Enables free-form AI answers. Without it the built-in exact-figure answers still work.                    |
+| `TIKTOK_APP_ID`                  | For TikTok     | Developer app ID used to resolve authorised account names.                                                |
+| `TIKTOK_APP_SECRET`              | For TikTok     | Developer app secret. Server-only; never returned or logged.                                              |
+| `TIKTOK_ACCESS_TOKEN`            | For TikTok     | Long-term Marketing API access token.                                                                     |
+| `TIKTOK_ADVERTISER_IDS`          | For TikTok     | Comma-separated advertiser account IDs.                                                                   |
+| `TIKTOK_START_DATE`              | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
+| `GOOGLE_ADS_CLIENT_ID`           | For Google Ads | OAuth desktop/web client ID. Server-only.                                                                 |
+| `GOOGLE_ADS_CLIENT_SECRET`       | For Google Ads | OAuth client secret. Server-only; never returned or logged.                                               |
+| `GOOGLE_ADS_REFRESH_TOKEN`       | For Google Ads | OAuth refresh token authorised for the Google Ads scope.                                                  |
+| `GOOGLE_ADS_DEVELOPER_TOKEN`     | For Google Ads | Developer token from the linked manager account's API Center.                                             |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID`   | For Google Ads | Manager account ID used in the `login-customer-id` header.                                                |
+| `GOOGLE_ADS_CUSTOMER_IDS`        | For Google Ads | Comma-separated client account IDs to report.                                                             |
+| `GOOGLE_ADS_START_DATE`          | No             | Historical start date; defaults to Jan 1 of the current year.                                             |
+| `GOOGLE_ADS_END_DATE`            | No             | Optional fixed report end date; defaults to today.                                                        |
+| `META_LIVE_STATUS_URL`           | No             | Fast n8n official-campaign-status cache endpoint.                                                         |
+| `META_LIVE_STATUS_REFRESH_URL`   | No             | n8n refresh endpoint used only when the shared status snapshot is old.                                    |
+| `TELEGRAM_BOT_TOKEN`             | No             | Enables the daily report. Never logged or returned in a response.                                         |
+| `TELEGRAM_CHAT_ID`               | No             | Optional fallback recipient, always included alongside `/start` subscribers.                              |
+| `TELEGRAM_SUBSCRIBERS_FILE`      | No             | Where the subscriber list is stored. Point at a mounted volume on Railway.                                |
+| `REPORT_CRON`                    | No             | Cron expression in Africa/Cairo. Default `0 9 * * *`.                                                     |
+| `REPORT_LANG`                    | No             | `ar` (default) or `en`.                                                                                   |
+| `PORT`                           | No             | Set by Railway automatically.                                                                             |
 
 The sheet must be shared as **anyone with the link can view**. The app only ever reads it.
 

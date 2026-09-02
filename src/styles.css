@@ -39,6 +39,14 @@
   --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
+  /* An approved offer is neither a pass nor a problem, and a discount taken
+     inside the seller's own allowance is neither either. Both used to borrow
+     the success or warning colour and read as verdicts they are not. */
+  --color-offer: var(--offer);
+  --color-offer-soft: var(--offer-soft);
+  --color-calm: var(--calm);
+  --color-calm-soft: var(--calm-soft);
+  --color-ink: var(--ink);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -73,26 +81,34 @@
   --radius-2xl: 24px;
   --radius-3xl: 28px;
 
-  --font-sans: "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui,
-    -apple-system, "Segoe UI", sans-serif;
+  --font-sans:
+    "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
 }
 
 :root {
   color-scheme: light;
 
   --navy: #001e3c;
+  /* The navigation ink. Six pricing components hard-coded #10262d for this;
+     it is a token now so a theme change cannot leave half of them behind. */
+  --ink: #0f2430;
+  --ink-soft: #1b3644;
 
-  --bg: #f4f6fa;
-  --bg-subtle: #eef1f7;
+  /* A warm off-white, not paper white. A dense financial table read on a
+     bright screen for an hour is materially easier on a warm ground, and it
+     stops --surface white from disappearing into the page behind it. */
+  --bg: #f6f5f2;
+  --bg-subtle: #efede7;
   --surface: #ffffff;
-  --surface-2: #f2f5f9;
-  --surface-3: #e8edf4;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --surface-2: #f1efea;
+  --surface-3: #e7e4dc;
+  --border: #e4e1da;
+  --border-strong: #c9c4b8;
 
-  --text: #0b1f38;
-  --text-muted: #5a6b81;
-  --text-subtle: #8494a8;
+  --text: #17202a;
+  --text-muted: #5c6672;
+  --text-subtle: #8a939e;
   --text-inverse: #ffffff;
 
   --brand: #1656a0;
@@ -105,11 +121,20 @@
   --accent-ink: #a75f00;
 
   --success: #2f7a2f;
-  --success-soft: #e8f5e9;
+  --success-soft: #e9f3e7;
   --warning: #b26a00;
-  --warning-soft: #fff4e5;
+  --warning-soft: #fdf1e0;
   --danger: #b3261e;
-  --danger-soft: #fdecea;
+  --danger-soft: #fcebe8;
+  /* A published offer the seller is entitled to quote. Deliberately a fixed
+     teal rather than green: it is not a compliance pass, it is a different
+     price book rule. */
+  --offer: #0f7d75;
+  --offer-soft: #e2f2f0;
+  /* A discount taken inside the seller's own allowance — nothing to act on,
+     but not a clean full-price sale either. */
+  --calm: #40607d;
+  --calm-soft: #e9eef3;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -138,6 +163,18 @@
 
   --sidebar-w: 248px;
 
+  /* --- app chrome ------------------------------------------------------
+     The auto-hide controller writes only these two. `--chrome-nav-inset` is
+     the room the fixed navigation rail takes from the content; it is 0 on a
+     phone and while the rail is hidden. `--dur-chrome` is the single knob
+     reduced-motion flips to zero, so no component has to know about it. */
+  --chrome-nav-inset: 0px;
+  --dur-chrome: 200ms;
+  --ease-chrome: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Height the sticky local tab bar parks under once the global header is
+     away. Read by `scroll-padding-top` so an anchor never lands beneath it. */
+  --chrome-tabbar-h: 48px;
+
   /* Height of the fixed mobile nav bar, safe area included. Anything that has
      to clear it reads this instead of hard-coding a padding that drifts. */
   --mobile-nav-h: calc(64px + env(safe-area-inset-bottom));
@@ -151,16 +188,27 @@
   }
 }
 
+/* The rail only exists from `lg`; below that the inset must stay 0 whatever
+   the controller last wrote, so a phone never reserves 248px of nothing. */
+@media (max-width: 1023px) {
+  :root {
+    --chrome-nav-inset: 0px !important;
+  }
+}
+
 .dark {
   color-scheme: dark;
 
-  --bg: #070f1c;
-  --bg-subtle: #0a1626;
-  --surface: #0f1c2f;
-  --surface-2: #16263c;
-  --surface-3: #1e3149;
-  --border: #1f3149;
-  --border-strong: #2c4362;
+  --ink: #0b1a22;
+  --ink-soft: #142c38;
+
+  --bg: #0b1119;
+  --bg-subtle: #0f1723;
+  --surface: #141c28;
+  --surface-2: #1b2532;
+  --surface-3: #24303f;
+  --border: #23303f;
+  --border-strong: #33445a;
 
   --text: #e8eef7;
   --text-muted: #94a6bd;
@@ -182,6 +230,10 @@
   --warning-soft: #2a1f10;
   --danger: #f0645c;
   --danger-soft: #2c1414;
+  --offer: #3fc2b6;
+  --offer-soft: #0f2926;
+  --calm: #7fa4c6;
+  --calm-soft: #16222e;
 
   --chart-1: #4c8dff;
   --chart-2: #ffa733;
@@ -207,8 +259,9 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    /* An in-page anchor must not land under the sticky header. */
-    scroll-padding-top: 96px;
+    /* An in-page anchor must not land under the sticky header, nor under the
+       local tab bar that stays behind once the header is away. */
+    scroll-padding-top: calc(var(--chrome-tabbar-h) + 56px);
   }
 
   html,
@@ -234,7 +287,6 @@
     touch-action: manipulation;
   }
 
-
   /* Nothing in a data view is allowed to widen the page. Long unbroken tokens
      — campaign keys, URLs, Odoo references — are the usual culprit. */
   main :is(h1, h2, h3, h4, p, td, th, dd, dt, li) {
@@ -259,7 +311,10 @@
     line-height: 1.75;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     line-height: 1.3;
     font-weight: 600;
     letter-spacing: -0.011em;
@@ -278,11 +333,25 @@
     background: color-mix(in oklab, var(--brand) 24%, transparent);
   }
 
-  /* Figures must never jitter as values update. */
+  /* Figures must never jitter as values update — and a KPI outside a table is
+     just as much a figure as one inside it, so the whole app opts in and the
+     few places that want proportional digits (running prose) opt back out. */
+  body {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
   .num,
   table :is(td, th) {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
+    unicode-bidi: isolate;
+  }
+
+  /* A Latin course name, product code or invoice number inside an Arabic
+     sentence. `bdi` already isolates; this stops it inheriting the Arabic
+     line-height loosening and keeps it on one run. */
+  bdi {
     unicode-bidi: isolate;
   }
 
@@ -332,6 +401,12 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+
+    /* The chrome still hides and shows — it just arrives instead of sliding.
+       Zeroing the token means no component needs its own media query. */
+    :root {
+      --dur-chrome: 0ms;
     }
   }
 }
@@ -393,8 +468,12 @@
 }
 
 @keyframes engo-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes engo-scale-in {
@@ -420,13 +499,21 @@
 }
 
 @keyframes engo-shimmer {
-  100% { transform: translateX(100%); }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes engo-pulse-ring {
-  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 45%, transparent); }
-  70% { box-shadow: 0 0 0 12px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @utility animate-fade-up {
@@ -474,17 +561,14 @@
   }
 }
 
-/* A phone on its side has roughly 360px of height. A 150px control bar that
-   stays pinned would leave almost nothing for the report, so below `lg` on a
-   short viewport the bar scrolls away with the page and the nav slims down;
-   both are one scroll-to-top away. Declared outside `@layer base` on purpose —
-   it has to outrank the `sticky` and `min-h` utilities on those elements. */
+/* A phone on its side has roughly 360px of height, so the bottom nav slims
+   down to give the report the room. The control bar used to be un-pinned here
+   as well; it no longer needs to be, because it now hides itself on the first
+   downward scroll and comes back on the first upward one. Declared outside
+   `@layer base` on purpose — it has to outrank the `min-h` utilities. */
 @media (max-height: 520px) and (max-width: 1023px) {
   :root {
     --mobile-nav-h: calc(52px + env(safe-area-inset-bottom));
-  }
-  .app-topbar {
-    position: static;
   }
   .app-mobile-nav {
     min-height: 52px;
@@ -562,6 +646,48 @@
   @media (width >= 40rem) {
     margin-inline: 0;
     padding-inline: 0;
+  }
+}
+
+/* --- app chrome ---------------------------------------------------------- */
+
+/* The rail and the header both animate on transform only; nothing in this
+   block can trigger a layout pass, which is what keeps a 200-row table from
+   shivering while the chrome moves. */
+@utility chrome-slide {
+  transition:
+    transform var(--dur-chrome) var(--ease-chrome),
+    opacity var(--dur-chrome) var(--ease-chrome);
+  will-change: transform;
+}
+
+/* The content column. Only its inline padding moves, and only for the same
+   200ms — the alternative (animating the rail's width) relayouts every row. */
+@utility chrome-inset {
+  padding-inline-start: var(--chrome-nav-inset);
+  transition: padding-inline-start var(--dur-chrome) var(--ease-chrome);
+}
+
+/* A control strip that has to stay legible over scrolling data. The old
+   `glass` blur put a live, moving copy of the table behind the figures in the
+   bar; an opaque surface with one hairline reads faster and costs no paint. */
+@utility chrome-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Invisible until reached. Sits on the inline edge the rail slid out to, so
+   a pointer thrown at the screen edge — or a Tab press — brings it back. */
+@utility chrome-edge-trigger {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 14px;
+  z-index: 34;
+  background: transparent;
+  &:focus-visible {
+    background: color-mix(in oklab, var(--brand) 35%, transparent);
+    outline-offset: -2px;
   }
 }
 

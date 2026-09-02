@@ -26,7 +26,7 @@ import {
   type M2O,
 } from "../odoo.server.ts";
 import { combinePaymentMethods, normalizePaymentMethod, text } from "./pricing-normalize.ts";
-import type { PaymentMethod, PaymentRead } from "./pricing-types.ts";
+import type { PaymentMethod, PaymentRead, PricingContext } from "./pricing-types.ts";
 import { DEFAULT_PAYMENT_ALIASES } from "./pricing-normalize.ts";
 
 interface OdooField {
@@ -438,16 +438,83 @@ export interface InvoiceLineFact {
   discount: number;
   priceSubtotal: number;
   priceTotal: number;
+  saleOrderLineId: number | null;
+  saleOrderId: number | null;
+  saleOrderName: string;
+  pricelistId: number | null;
+  pricelistName: string;
+  pricelistItemId: number | null;
+  pricelistItemName: string;
+  expectedUnitPrice: number | null;
+  pricingContext: PricingContext;
+  pricingContextName: string;
+  odooPricingChecked: boolean;
 }
 
+const packagePricelistIds = (): Set<number> =>
+  new Set(
+    (process.env.ODOO_PACKAGE_PRICELIST_IDS ?? "")
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isInteger(value) && value > 0),
+  );
+
+const packageNamePattern = (): RegExp => {
+  const configured = process.env.ODOO_PACKAGE_PRICELIST_PATTERN?.trim();
+  if (configured) {
+    try {
+      return new RegExp(configured, "i");
+    } catch {
+      // Fall back to the safe built-in vocabulary when an env regex is invalid.
+    }
+  }
+  return /\b(package|bundle|pack)\b|باقة|حزمة/i;
+};
+
+const relationIds = (value: unknown): number[] => {
+  if (!Array.isArray(value)) return [];
+  if (value.length === 2 && typeof value[0] === "number" && typeof value[1] === "string") {
+    return [Number(value[0])].filter((id) => id > 0);
+  }
+  return value
+    .map((entry) => (Array.isArray(entry) ? m2oId(entry as M2O) : Number(entry)))
+    .filter((id) => Number.isInteger(id) && id > 0);
+};
+
+const packageHintFields = (fields: Record<string, OdooField>): string[] =>
+  Object.entries(fields)
+    .filter(
+      ([name, field]) =>
+        /(^|_)(package|bundle|pack)(_|$)/i.test(name) &&
+        ["many2one", "many2many", "one2many", "char", "selection", "boolean"].includes(
+          field.type ?? "",
+        ),
+    )
+    .map(([name]) => name)
+    .slice(0, 8);
+
+const hasPackageHint = (row: Record<string, unknown>, fields: string[]): string => {
+  for (const field of fields) {
+    const value = row[field];
+    if (value === true || m2oId(value as M2O) > 0 || relationIds(value).length > 0) {
+      return text(m2oName(value as M2O)) || field;
+    }
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+};
+
 /**
- * Read quantity, product and price straight off the invoice lines.
+ * Read quantity and product from the invoice, then follow its sales lineage.
  *
  * The stored accounting snapshot is an export built for revenue reporting, and
  * it carries neither a quantity nor a product code — which are exactly the two
  * fields a per-unit price comparison needs. Rather than assume a quantity of one
  * (a three-seat invoice would then read as one very expensive seat), they are
- * read from `account.move.line` by id, in batches, and cached.
+ * read from `account.move.line` by id, in batches, and cached. Where the Sales
+ * module exposes `sale_line_ids`, the same batch follows the line to
+ * `sale.order.line`, its applied pricelist item and the order's pricelist. That
+ * is the evidence that a low-looking course price is really a package component.
  *
  * Every row is validated before it is trusted: the line's own move name has to
  * equal the invoice number already stored against that line. A stored id that
@@ -482,6 +549,7 @@ export async function readInvoiceLineFacts(
     "discount",
     "price_subtotal",
     "price_total",
+    "sale_line_ids",
   ].filter((field) => !!meta[field]);
   if (!wanted.includes("quantity")) return { facts, odooCalls, rejected };
 
@@ -494,8 +562,10 @@ export async function readInvoiceLineFacts(
     discount?: number;
     price_subtotal?: number;
     price_total?: number;
+    sale_line_ids?: unknown;
   }
 
+  const acceptedRows: LineRow[] = [];
   const ids = [...expected.keys()].map(Number);
   for (const batch of chunks(ids, 500)) {
     const rows = await odoo.searchRead<LineRow>(
@@ -514,6 +584,7 @@ export async function readInvoiceLineFacts(
         rejected++;
         continue;
       }
+      acceptedRows.push(row);
       facts.set(key, {
         invoiceLineId: key,
         invoiceNumber: moveName || invoiceNumber,
@@ -524,8 +595,188 @@ export async function readInvoiceLineFacts(
         discount: Number(row.discount ?? 0) || 0,
         priceSubtotal: Number(row.price_subtotal ?? 0) || 0,
         priceTotal: Number(row.price_total ?? 0) || 0,
+        saleOrderLineId: null,
+        saleOrderId: null,
+        saleOrderName: "",
+        pricelistId: null,
+        pricelistName: "",
+        pricelistItemId: null,
+        pricelistItemName: "",
+        expectedUnitPrice: null,
+        pricingContext: "unknown",
+        pricingContextName: "",
+        odooPricingChecked: true,
       });
     }
+  }
+
+  if (!meta.sale_line_ids) return { facts, odooCalls, rejected };
+
+  const saleLineIds = [...new Set(acceptedRows.flatMap((row) => relationIds(row.sale_line_ids)))];
+  if (!saleLineIds.length) return { facts, odooCalls, rejected };
+
+  const [saleLineMeta, orderMeta, priceItemMeta] = await Promise.all([
+    odoo.metadata("sale.order.line"),
+    odoo.metadata("sale.order"),
+    odoo.metadata("product.pricelist.item"),
+  ]);
+  odooCalls += 3;
+  if (!saleLineMeta.id || !saleLineMeta.order_id) return { facts, odooCalls, rejected };
+
+  const saleHintFields = packageHintFields(saleLineMeta);
+  const orderHintFields = packageHintFields(orderMeta);
+  const saleLineFields = [
+    "id",
+    "order_id",
+    "product_id",
+    "product_uom_qty",
+    "price_unit",
+    "discount",
+    "price_subtotal",
+    "pricelist_item_id",
+    ...saleHintFields,
+  ].filter((field) => !!saleLineMeta[field]);
+
+  interface SaleLineRow extends Record<string, unknown> {
+    id: number;
+    order_id?: M2O;
+    product_id?: M2O;
+    product_uom_qty?: number;
+    price_unit?: number;
+    discount?: number;
+    price_subtotal?: number;
+    pricelist_item_id?: M2O;
+  }
+  const saleLines: SaleLineRow[] = [];
+  for (const batch of chunks(saleLineIds, 500)) {
+    saleLines.push(
+      ...(await odoo.searchRead<SaleLineRow>(
+        "sale.order.line",
+        [["id", "in", batch]],
+        saleLineFields,
+        { context: { active_test: false } },
+      )),
+    );
+    odooCalls++;
+  }
+  const saleLineById = new Map(saleLines.map((row) => [row.id, row]));
+
+  interface PricelistItemRow {
+    id: number;
+    compute_price?: string | false;
+    fixed_price?: number;
+  }
+  const pricelistItems = new Map<number, PricelistItemRow>();
+  const pricelistItemIds = [
+    ...new Set(saleLines.map((row) => m2oId(row.pricelist_item_id)).filter(Boolean)),
+  ];
+  if (priceItemMeta.id && priceItemMeta.compute_price && pricelistItemIds.length) {
+    const priceItemFields = ["id", "compute_price", "fixed_price"].filter(
+      (field) => !!priceItemMeta[field],
+    );
+    for (const batch of chunks(pricelistItemIds, 500)) {
+      const rows = await odoo.searchRead<PricelistItemRow>(
+        "product.pricelist.item",
+        [["id", "in", batch]],
+        priceItemFields,
+        { context: { active_test: false } },
+      );
+      odooCalls++;
+      for (const row of rows) pricelistItems.set(row.id, row);
+    }
+  }
+
+  const orderIds = [...new Set(saleLines.map((row) => m2oId(row.order_id)).filter(Boolean))];
+  const orderFields = ["id", "name", "pricelist_id", ...orderHintFields].filter(
+    (field) => !!orderMeta[field],
+  );
+  interface OrderRow extends Record<string, unknown> {
+    id: number;
+    name?: string | false;
+    pricelist_id?: M2O;
+  }
+  const orders: OrderRow[] = [];
+  if (orderMeta.id && orderIds.length) {
+    for (const batch of chunks(orderIds, 500)) {
+      orders.push(
+        ...(await odoo.searchRead<OrderRow>("sale.order", [["id", "in", batch]], orderFields, {
+          context: { active_test: false },
+        })),
+      );
+      odooCalls++;
+    }
+  }
+  const orderById = new Map(orders.map((row) => [row.id, row]));
+  const configuredPackageIds = packagePricelistIds();
+  const packagePattern = packageNamePattern();
+
+  for (const invoiceRow of acceptedRows) {
+    const fact = facts.get(String(invoiceRow.id));
+    if (!fact) continue;
+    const linked = relationIds(invoiceRow.sale_line_ids)
+      .map((id) => saleLineById.get(id))
+      .filter((row): row is SaleLineRow => !!row);
+    const invoiceProductId = m2oId(invoiceRow.product_id);
+    const saleLine =
+      linked.find((row) => invoiceProductId > 0 && m2oId(row.product_id) === invoiceProductId) ??
+      linked[0];
+    if (!saleLine) continue;
+
+    const orderId = m2oId(saleLine.order_id);
+    const order = orderById.get(orderId);
+    const pricelistId = m2oId(order?.pricelist_id);
+    const pricelistName = text(m2oName(order?.pricelist_id));
+    const pricelistItemId = m2oId(saleLine.pricelist_item_id);
+    const pricelistItemName = text(m2oName(saleLine.pricelist_item_id));
+    const saleHint = hasPackageHint(saleLine, saleHintFields);
+    const orderHint = order ? hasPackageHint(order, orderHintFields) : "";
+    const contextName = saleHint || orderHint || pricelistName || pricelistItemName;
+    const isPackage =
+      configuredPackageIds.has(pricelistId) ||
+      packagePattern.test(`${pricelistName} ${pricelistItemName} ${saleHint} ${orderHint}`);
+
+    const orderedQuantity = Number(saleLine.product_uom_qty ?? 0) || 0;
+    const subtotal = Number(saleLine.price_subtotal ?? 0);
+    const rawUnit = Number(saleLine.price_unit ?? 0) || 0;
+    const saleDiscount = Number(saleLine.discount ?? 0) || 0;
+    const discountedRawUnit = rawUnit * (1 - saleDiscount / 100);
+    const saleLineEffective =
+      orderedQuantity > 0 && Number.isFinite(subtotal)
+        ? subtotal / orderedQuantity
+        : discountedRawUnit > 0
+          ? discountedRawUnit
+          : null;
+    const appliedRule = pricelistItems.get(pricelistItemId);
+    const fixedRulePrice =
+      appliedRule?.compute_price === "fixed" && Number(appliedRule.fixed_price ?? 0) > 0
+        ? Number(appliedRule.fixed_price)
+        : null;
+    // Odoo's fixed rule is the official number, while invoice subtotals are tax
+    // exclusive. Infer only the tax-inclusion factor from the sale line, without
+    // carrying its editable unit price or discount into the official baseline.
+    const taxFactor =
+      saleLineEffective !== null && discountedRawUnit > 0
+        ? saleLineEffective / discountedRawUnit
+        : 1;
+    const safeTaxFactor = taxFactor > 0.5 && taxFactor < 1.5 ? taxFactor : 1;
+    const expectedUnitPrice =
+      fixedRulePrice !== null ? fixedRulePrice * safeTaxFactor : saleLineEffective;
+
+    Object.assign(fact, {
+      saleOrderLineId: saleLine.id,
+      saleOrderId: orderId || null,
+      saleOrderName: text(order?.name) || text(m2oName(saleLine.order_id)),
+      pricelistId: pricelistId || null,
+      pricelistName,
+      pricelistItemId: pricelistItemId || null,
+      pricelistItemName,
+      expectedUnitPrice:
+        expectedUnitPrice !== null && Number.isFinite(expectedUnitPrice)
+          ? Math.round(expectedUnitPrice * 10_000) / 10_000
+          : null,
+      pricingContext: (isPackage ? "package" : "individual") as PricingContext,
+      pricingContextName: contextName,
+    });
   }
   return { facts, odooCalls, rejected };
 }

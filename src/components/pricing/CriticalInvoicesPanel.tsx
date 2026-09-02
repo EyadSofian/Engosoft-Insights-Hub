@@ -1,19 +1,20 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ExternalLink, FileSearch, UserRound } from "lucide-react";
-import { Card, Pill, Skeleton } from "@/components/ui-bits";
-import { fmtNum, useI18n } from "@/lib/i18n";
-import { InvoiceDialog } from "./PriceComplianceTab";
-import {
-  auditReasonLabel,
-  fmtMoney,
-  type AuditRow,
-  type OdooInvoiceVerification,
-} from "./pricing-ui";
+import { ExternalLink, TriangleAlert } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { InvoiceDetailPanel } from "./InvoiceDetailPanel";
+import { fmtMoney, type AuditRow, type OdooInvoiceVerification } from "./pricing-ui";
 
-function invoiceDate(row: AuditRow): string {
-  return row.paymentDate || row.invoiceDate || row.saleDate || "";
-}
+const invoiceDate = (row: AuditRow): string =>
+  row.paymentDate || row.invoiceDate || row.saleDate || "";
 
+/**
+ * The handful of invoices worth interrupting the price list for.
+ *
+ * The rows arrive already ordered by severity and then by the size of the gap,
+ * so the first six unique invoices are the six conversations to have today.
+ * Deliberately a short list and not a second table — the full set is one tab
+ * away, and repeating it here would only push the price list off the screen.
+ */
 export function CriticalInvoicesPanel({
   rows,
   total,
@@ -28,6 +29,7 @@ export function CriticalInvoicesPanel({
   const [openInvoice, setOpenInvoice] = useState("");
   const [openingOdoo, setOpeningOdoo] = useState("");
   const [openError, setOpenError] = useState("");
+
   const invoices = useMemo(() => {
     const unique = new Map<string, { row: AuditRow; count: number }>();
     for (const row of rows) {
@@ -74,120 +76,123 @@ export function CriticalInvoicesPanel({
     }
   };
 
+  if (!loading && !invoices.length) return null;
+
   return (
-    <Card className="overflow-hidden border-danger/25 p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-danger/15 bg-danger-soft/35 px-4 py-3.5 sm:px-5">
-        <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-danger text-white shadow-sm">
-            <AlertTriangle size={17} aria-hidden="true" />
-          </span>
-          <div>
-            <h2 className="text-[14px] font-black text-text">
-              {ar ? "فواتير حرجة تحتاج تدخّلًا" : "Critical invoices requiring action"}
-            </h2>
-            <p className="mt-0.5 text-[10px] text-text-muted">
-              {ar
-                ? "بيع تحت الحد الأدنى المعتمد — راجع الموظف والفاتورة مباشرة."
-                : "Sales below the approved floor — review the owner and invoice."}
-            </p>
-          </div>
-        </div>
-        <Pill tone="danger">
-          {fmtNum(total)} {ar ? "مخالفة" : "breaches"}
-        </Pill>
+    <section
+      className="overflow-hidden rounded-xl border bg-surface"
+      style={{ borderColor: "color-mix(in oklab, var(--danger) 28%, transparent)" }}
+      aria-labelledby="critical-invoices-heading"
+    >
+      <div
+        className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b px-3.5 py-2.5 sm:px-4"
+        style={{
+          background: "var(--danger-soft)",
+          borderColor: "color-mix(in oklab, var(--danger) 18%, transparent)",
+        }}
+      >
+        <h2
+          id="critical-invoices-heading"
+          className="flex items-center gap-2 text-[13px] font-bold text-text"
+        >
+          <TriangleAlert size={16} style={{ color: "var(--danger)" }} aria-hidden="true" />
+          {ar ? "فواتير تحتاج تدخّلًا اليوم" : "Invoices needing action today"}
+        </h2>
+        <p className="text-[11px] text-text-muted">
+          {ar
+            ? `أكبر ${invoices.length} حالة بيع تحت الحد الأدنى من ${total} بندًا مخالفًا`
+            : `The ${invoices.length} worst of ${total} lines sold below the floor`}
+        </p>
       </div>
 
       {loading ? (
-        <div className="space-y-2 p-3">
+        <div className="divide-y divide-border">
           {Array.from({ length: 3 }, (_, index) => (
-            <Skeleton key={index} className="h-28 rounded-2xl" />
+            <div key={index} className="h-[52px]" />
           ))}
         </div>
-      ) : invoices.length ? (
-        <div className="space-y-2 p-3">
+      ) : (
+        <ul className="divide-y divide-border">
           {invoices.map(({ row, count }) => (
-            <article
+            <li
               key={row.invoiceNumber}
-              className="relative grid gap-3 overflow-hidden rounded-2xl border border-danger/20 bg-surface px-4 py-3 shadow-sm lg:grid-cols-[minmax(180px,0.9fr)_minmax(240px,1.35fr)_minmax(240px,1.1fr)_auto] lg:items-center"
+              className="grid gap-x-4 gap-y-1.5 px-3.5 py-2.5 sm:px-4 lg:grid-cols-[minmax(140px,0.85fr)_minmax(200px,1.3fr)_minmax(190px,1fr)_auto] lg:items-center"
             >
-              <span className="absolute inset-y-0 start-0 w-1 bg-danger" aria-hidden="true" />
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-danger">
-                  <UserRound size={12} aria-hidden="true" />
-                  {ar ? "مسؤول الفاتورة" : "Invoice owner"}
+                <div className="truncate text-[12.5px] font-semibold text-text">
+                  <bdi>{row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}</bdi>
                 </div>
-                <h3 className="mt-1 truncate text-[13px] font-black text-text">
-                  {row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}
-                </h3>
-                <div className="mt-1">
-                  <Pill tone="danger">
-                    {fmtNum(count)} {ar ? "بند مخالف" : "breached lines"}
-                  </Pill>
+                <div className="num text-[10.5px] text-text-subtle">
+                  <bdi>{row.invoiceNumber}</bdi> · <bdi>{invoiceDate(row) || "—"}</bdi>
                 </div>
               </div>
 
-              <div className="min-w-0 rounded-xl bg-danger-soft/35 px-3 py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <strong className="truncate text-[11px] text-text">{row.invoiceNumber}</strong>
-                  <span className="shrink-0 text-[9px] tabular-nums text-text-subtle">
-                    {invoiceDate(row) || "—"}
+              <div className="min-w-0 text-[12px]">
+                <span className="truncate text-text">
+                  <bdi>{row.productName}</bdi>
+                </span>
+                {count > 1 && (
+                  <span className="num text-text-subtle">
+                    {" "}
+                    · {ar ? `و${count - 1} بندًا آخر` : `+${count - 1} more`}
                   </span>
-                </div>
-                <div className="mt-1 truncate text-[10px] text-text-muted">
-                  {row.productName}
-                  {count > 1
-                    ? ` · ${ar ? `و${fmtNum(count - 1)} بنود أخرى` : `+${count - 1} more`}`
-                    : ""}
-                </div>
+                )}
               </div>
 
-              <div className="min-w-0">
-                <div className="text-[11px] font-black tabular-nums text-danger">
-                  {ar ? "سعر البيع" : "Sold"} {fmtMoney(row.actualUnitPrice, row.currency, lang)}
-                  <span className="mx-1.5 text-text-subtle">←</span>
-                  {ar ? "الحد الأدنى" : "floor"} {fmtMoney(row.allowedMinimum, row.currency, lang)}
-                </div>
-                <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-text-muted">
-                  {auditReasonLabel(row, lang)}
-                </p>
+              <div className="num min-w-0 text-[12px]">
+                <span className="font-semibold" style={{ color: "var(--danger)" }}>
+                  {fmtMoney(row.actualUnitPrice, row.currency, lang)}
+                </span>
+                <span className="mx-1.5 text-text-subtle" aria-hidden="true">
+                  ↓
+                </span>
+                <span className="text-text-muted">
+                  {ar ? "الحد " : "floor "}
+                  {fmtMoney(row.allowedMinimum, row.currency, lang)}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 lg:min-w-[230px]">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setOpenInvoice(row.invoiceNumber)}
-                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface text-[10px] font-bold text-text hover:bg-surface-2"
+                  className="inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-border px-2.5 text-[11.5px] font-semibold text-text transition-colors hover:bg-surface-2"
                 >
-                  <FileSearch size={13} aria-hidden="true" />
-                  {ar ? "عرض التفاصيل" : "Details"}
+                  {ar ? "التفاصيل" : "Details"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void openInOdoo(row.invoiceNumber)}
                   disabled={openingOdoo === row.invoiceNumber}
-                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-[#10262d] px-2 text-[10px] font-bold text-white disabled:opacity-55"
+                  className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-semibold text-white transition-opacity disabled:opacity-55"
+                  style={{ background: "var(--ink)" }}
                 >
-                  <ExternalLink size={13} aria-hidden="true" />
+                  <ExternalLink size={12} aria-hidden="true" />
                   {openingOdoo === row.invoiceNumber
                     ? ar
-                      ? "جاري الفتح…"
+                      ? "جارٍ الفتح…"
                       : "Opening…"
                     : ar
-                      ? "تحقق وافتح في أودو"
-                      : "Verify & open in Odoo"}
+                      ? "فتح في أودو"
+                      : "Open in Odoo"}
                 </button>
               </div>
-            </article>
+            </li>
           ))}
-        </div>
-      ) : (
-        <div className="px-5 py-5 text-center text-[11px] text-success">
-          {ar ? "لا توجد فواتير حرجة في الفترة الحالية." : "No critical invoices in this period."}
-        </div>
+        </ul>
       )}
 
-      {!!openError && <div className="px-5 pb-3 text-[10px] text-danger">{openError}</div>}
-      {!!openInvoice && <InvoiceDialog movement={openInvoice} onClose={() => setOpenInvoice("")} />}
-    </Card>
+      {!!openError && (
+        <p
+          className="border-t border-border px-4 py-2 text-[11px]"
+          style={{ color: "var(--danger)" }}
+        >
+          {openError}
+        </p>
+      )}
+      {!!openInvoice && (
+        <InvoiceDetailPanel movement={openInvoice} onClose={() => setOpenInvoice("")} />
+      )}
+    </section>
   );
 }

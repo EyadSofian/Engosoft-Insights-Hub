@@ -1,17 +1,22 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BadgePercent,
   BellRing,
   ClipboardCheck,
   Compass,
+  Handshake,
   ListChecks,
-  Search,
+  ScanSearch,
   Settings2,
+  ShieldCheck,
+  TrendingDown,
+  TriangleAlert,
   UsersRound,
-  type LucideIcon,
+  Wallet,
 } from "lucide-react";
-import { Notice, Skeleton } from "@/components/ui-bits";
+import { Notice } from "@/components/ui-bits";
 import { PriceAdvisorTab } from "@/components/pricing/PriceAdvisorTab";
 import { PriceAlertsTab, type ExceptionsResponse } from "@/components/pricing/PriceAlertsTab";
 import { CriticalInvoicesPanel } from "@/components/pricing/CriticalInvoicesPanel";
@@ -25,11 +30,19 @@ import { PriceCourseSummaryTab } from "@/components/pricing/PriceCourseSummaryTa
 import { PriceComplianceInfo } from "@/components/pricing/PriceComplianceInfo";
 import { PriceManageTab } from "@/components/pricing/PriceManageTab";
 import {
+  PricingKpiStrip,
+  PricingPageHeader,
+  PricingTabBar,
+  type PricingKpi,
+  type PricingTab,
+} from "@/components/pricing/PricingChrome";
+import {
   emptySearchFilters,
   type CatalogResponse,
   type SearchFilters,
 } from "@/components/pricing/PriceSearchTab";
 import { PriceTeamTab } from "@/components/pricing/PriceTeamTab";
+import { activeOffers, isNegotiable, summarizeBreaches } from "@/components/pricing/course-pricing";
 import {
   ADMIN_CODE_KEY,
   fmtMoney,
@@ -78,6 +91,26 @@ async function getJson<T>(url: string): Promise<T> {
     throw new Error(detail || `Request failed: ${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+const DAY = 86_400_000;
+const isoDay = (value: Date): string => value.toISOString().slice(0, 10);
+
+/**
+ * The window of the same length immediately before the one on screen.
+ *
+ * A delta is only honest against an equal span, so a 12-day window is compared
+ * with the 12 days before it rather than with "last month". Returns null when
+ * the period is open-ended, and the KPI strip then shows no comparison at all
+ * rather than an invented one.
+ */
+function previousWindowOf(from: string, to: string): { from: string; to: string } | null {
+  if (!from || !to) return null;
+  const start = new Date(`${from}T00:00:00Z`).getTime();
+  const end = new Date(`${to}T00:00:00Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  const span = end - start + DAY;
+  return { from: isoDay(new Date(start - span)), to: isoDay(new Date(start - DAY)) };
 }
 
 function PricingPage() {
@@ -193,8 +226,54 @@ function PricingPage() {
       ),
   });
 
+  /**
+   * The period's totals, read without the table's own status filter.
+   *
+   * The strip is the page's headline, so pressing "below the floor" must not
+   * rewrite the headline into "0% compliant" — which is what happens when the
+   * KPIs and the filtered table share one request. The table keeps its filters;
+   * the strip keeps the period.
+   */
+  const periodParams = {
+    from: complianceFilters.from,
+    to: complianceFilters.to,
+    dateBasis: complianceFilters.dateBasis,
+    currency: complianceFilters.currency,
+    paymentMethod: complianceFilters.paymentMethod,
+    salesperson: complianceFilters.salesperson,
+    salesTeam: complianceFilters.salesTeam,
+  };
+
+  const snapshot = useQuery({
+    queryKey: ["pricing-snapshot", periodParams],
+    staleTime: 60_000,
+    queryFn: () =>
+      getJson<ComplianceResponse>(`/api/pricing/compliance${query({ ...periodParams, rows: 0 })}`),
+  });
+
+  const previousWindow = useMemo(
+    () => previousWindowOf(complianceFilters.from, complianceFilters.to),
+    [complianceFilters.from, complianceFilters.to],
+  );
+
+  const previousSnapshot = useQuery({
+    queryKey: ["pricing-snapshot-previous", periodParams, previousWindow],
+    enabled: Boolean(previousWindow),
+    staleTime: 5 * 60_000,
+    queryFn: () =>
+      getJson<ComplianceResponse>(
+        `/api/pricing/compliance${query({
+          ...periodParams,
+          from: previousWindow?.from,
+          to: previousWindow?.to,
+          rows: 0,
+        })}`,
+      ),
+  });
+
   const compliance = useQuery({
     queryKey: ["pricing-compliance", complianceFilters, tab === "invoices"],
+    enabled: tab === "invoices",
     staleTime: 60_000,
     queryFn: () =>
       getJson<ComplianceResponse>(
@@ -209,26 +288,39 @@ function PricingPage() {
           status: complianceFilters.status,
           severity: complianceFilters.severity,
           q: complianceFilters.q,
-          rows: tab === "invoices" ? undefined : 0,
+          sort: complianceFilters.sort,
+          dir: complianceFilters.dir,
           limit: 50,
           offset: complianceFilters.offset,
         })}`,
       ),
   });
 
-  const criticalInvoices = useQuery({
-    queryKey: ["pricing-critical-invoices", complianceFilters.from, complianceFilters.to],
-    enabled: tab === "prices",
+  /**
+   * Every line sold below the floor in this period.
+   *
+   * The price list needs a breach count per course and the detail panel needs
+   * the offending lines themselves, so both read one paged request rather than
+   * one request per course. 500 is the endpoint's ceiling; past it the count on
+   * a row is a floor, which the row says.
+   */
+  const breachRows = useQuery({
+    queryKey: [
+      "pricing-breach-rows",
+      complianceFilters.from,
+      complianceFilters.to,
+      complianceFilters.dateBasis,
+    ],
+    enabled: tab === "prices" || tab === "team",
     staleTime: 60_000,
     queryFn: () =>
       getJson<ComplianceResponse>(
         `/api/pricing/compliance${query({
           from: complianceFilters.from,
           to: complianceFilters.to,
-          dateBasis: "payment",
+          dateBasis: complianceFilters.dateBasis,
           status: "below_minimum",
-          severity: "critical",
-          limit: 18,
+          limit: 500,
           offset: 0,
         })}`,
       ),
@@ -261,8 +353,10 @@ function PricingPage() {
     void fullCatalog.refetch();
     void filteredCatalog.refetch();
     void facets.refetch();
+    void snapshot.refetch();
+    void previousSnapshot.refetch();
     void compliance.refetch();
-    void criticalInvoices.refetch();
+    void breachRows.refetch();
     void exceptions.refetch();
   };
 
@@ -283,8 +377,10 @@ function PricingPage() {
           ? `تم تحليل ${run?.auditedLines ?? 0} بند جديد أو متغيّر من ${run?.candidateLines ?? 0}، وتم تخطي ${run?.skippedUnchanged ?? 0} بند لم يتغيّر.`
           : `Audited ${run?.auditedLines ?? 0} new or changed lines out of ${run?.candidateLines ?? 0}; ${run?.skippedUnchanged ?? 0} were unchanged and skipped.`,
       );
+      void snapshot.refetch();
+      void previousSnapshot.refetch();
       void compliance.refetch();
-      void criticalInvoices.refetch();
+      void breachRows.refetch();
       void exceptions.refetch();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The audit run failed.");
@@ -324,7 +420,38 @@ function PricingPage() {
   };
 
   const openSalesperson = (salesperson: string) => {
-    setComplianceFilters({ ...emptyComplianceFilters, salesperson, offset: 0 });
+    setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, salesperson, offset: 0 });
+    setTab("invoices");
+  };
+
+  /** Every invoice for one course — not only the breaching ones. */
+  const openInvoicesFor = (productCode: string) => {
+    setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, q: productCode, offset: 0 });
+    setTab("invoices");
+  };
+
+  const showBreaches = () => {
+    setComplianceFilters({
+      ...emptyComplianceFilters,
+      ...periodParams,
+      status: "below_minimum",
+      offset: 0,
+    });
+    setTab("invoices");
+  };
+
+  const showAllInvoices = () => {
+    setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, offset: 0 });
+    setTab("invoices");
+  };
+
+  const showNeedsReview = () => {
+    setComplianceFilters({
+      ...emptyComplianceFilters,
+      ...periodParams,
+      severity: "needs_review",
+      offset: 0,
+    });
     setTab("invoices");
   };
 
@@ -334,91 +461,153 @@ function PricingPage() {
     setTab("prices");
   };
 
-  const entries = fullCatalog.data?.entries ?? [];
-  const today = new Date().toISOString().slice(0, 10);
-  const activeOfferCourses = new Set(
-    entries
-      .filter((entry) =>
-        entry.prices.some(
-          (price) =>
-            price.active &&
-            price.scope === "offer" &&
-            (!price.validFrom || price.validFrom <= today) &&
-            (!price.validTo || price.validTo >= today),
-        ),
-      )
-      .map((entry) => `${entry.code}:${entry.deliveryType}:${entry.subcategory}`),
-  ).size;
-  const leakage = (compliance.data?.byCurrency ?? [])
+  const entries = useMemo(() => fullCatalog.data?.entries ?? [], [fullCatalog.data]);
+
+  const catalogCounts = useMemo(() => {
+    const offerKeys = new Set<string>();
+    let negotiable = 0;
+    for (const entry of entries) {
+      if (activeOffers(entry).length) {
+        offerKeys.add(`${entry.code}:${entry.deliveryType}:${entry.subcategory}`);
+      }
+      if (isNegotiable(entry)) negotiable += 1;
+    }
+    return { offers: offerKeys.size, negotiable };
+  }, [entries]);
+
+  const breachMap = useMemo(
+    () => summarizeBreaches(breachRows.data?.rows ?? []),
+    [breachRows.data],
+  );
+
+  const kpis = snapshot.data?.kpis;
+  const previousKpis = previousSnapshot.data?.kpis;
+  const kpiLoading = snapshot.isLoading && !snapshot.data;
+
+  const leakage = (snapshot.data?.byCurrency ?? [])
     .filter((entry) => entry.leakage > 0)
     .map((entry) => fmtMoney(entry.leakage, entry.currency, lang))
     .join(" + ");
-  const complianceRate = compliance.data?.kpis.complianceRate;
+
+  const complianceRate = kpis?.complianceRate;
   const complianceTone =
     complianceRate == null
-      ? undefined
+      ? "neutral"
       : complianceRate < 0.8
         ? ("danger" as const)
         : complianceRate < 0.95
           ? ("warning" as const)
           : ("success" as const);
 
-  const metrics: {
-    label: string;
-    value: string;
-    sub?: string;
-    info?: ReactNode;
-    tone?: "danger" | "warning" | "success";
-  }[] = [
+  const rateDelta =
+    complianceRate != null && previousKpis?.complianceRate != null
+      ? (complianceRate - previousKpis.complianceRate) * 100
+      : undefined;
+
+  const kpiItems: PricingKpi[] = [
     {
-      label: ar ? "الالتزام بالأسعار" : "Price compliance",
+      id: "compliance",
+      label: ar ? "نسبة الالتزام" : "Compliance",
       value: complianceRate == null ? "—" : fmtPct(complianceRate * 100, 0),
-      sub: compliance.data
+      question: kpis
         ? ar
-          ? `${fmtNum(compliance.data.kpis.compliantLines)} بند ملتزم من أصل ${fmtNum(compliance.data.kpis.judgedLines)} تم الحكم عليها`
-          : `${fmtNum(compliance.data.kpis.compliantLines)} of ${fmtNum(compliance.data.kpis.judgedLines)} judged lines compliant`
+          ? `${fmtNum(kpis.compliantLines)} بند ملتزم من ${fmtNum(kpis.judgedLines)}`
+          : `${fmtNum(kpis.compliantLines)} of ${fmtNum(kpis.judgedLines)} judged lines`
         : undefined,
+      tone: complianceTone,
+      delta: rateDelta,
+      Icon: ShieldCheck,
+      onSelect: showAllInvoices,
+      selectHint: ar ? "افتح كل الفواتير المحللة" : "Open all audited invoices",
       info: (
         <PriceComplianceInfo
           from={complianceFilters.from}
           to={complianceFilters.to}
           dateBasis={complianceFilters.dateBasis}
-          kpis={compliance.data?.kpis}
+          kpis={kpis}
         />
       ),
-      tone: complianceTone,
     },
     {
-      label: ar ? "تحت الحد الأدنى" : "Below the floor",
-      value: compliance.data ? fmtNum(compliance.data.kpis.belowMinimumLines) : "—",
-      tone: "danger",
+      id: "below",
+      label: ar ? "مبيعات أقل من الحد" : "Sold below the floor",
+      value: kpis ? fmtNum(kpis.belowMinimumLines) : "—",
+      question: ar ? "بنود بيع تحت الحد الأدنى المعتمد" : "Lines sold under the approved floor",
+      tone: kpis?.belowMinimumLines ? "danger" : "neutral",
+      delta:
+        kpis && previousKpis ? kpis.belowMinimumLines - previousKpis.belowMinimumLines : undefined,
+      deltaInvert: true,
+      Icon: TrendingDown,
+      onSelect: showBreaches,
+      selectHint: ar ? "افتح الفواتير المخالفة" : "Open the breaching invoices",
     },
     {
-      label: ar ? "قيمة الفارق" : "Price gap",
+      id: "leakage",
+      label: ar ? "قيمة التجاوز" : "Value given away",
       value: leakage || "—",
-      tone: "danger",
+      question: ar ? "الفرق بين ما حُصّل والحد الأدنى" : "Collected minus the approved floor",
+      tone: leakage ? "danger" : "neutral",
+      Icon: Wallet,
+      onSelect: showBreaches,
+      selectHint: ar ? "افتح الفواتير المخالفة" : "Open the breaching invoices",
     },
     {
+      id: "review",
       label: ar ? "تحتاج مراجعة" : "Needs review",
-      value: compliance.data ? fmtNum(compliance.data.kpis.needsReviewLines) : "—",
-      tone: "warning",
+      value: kpis ? fmtNum(kpis.needsReviewLines) : "—",
+      question: ar
+        ? "دفع غير معروف أو مختلط أو عرض منتهٍ"
+        : "Unknown, mixed or expired-offer lines",
+      tone: kpis?.needsReviewLines ? "warning" : "neutral",
+      delta:
+        kpis && previousKpis ? kpis.needsReviewLines - previousKpis.needsReviewLines : undefined,
+      deltaInvert: true,
+      Icon: TriangleAlert,
+      onSelect: showNeedsReview,
+      selectHint: ar ? "افتح البنود التي تحتاج مراجعة" : "Open the lines needing review",
     },
     {
-      label: ar ? "دورات منشورة" : "Published courses",
-      value: fullCatalog.data ? fmtNum(entries.length) : "—",
+      id: "negotiable",
+      label: ar ? "دورات قابلة للتفاوض" : "Negotiable courses",
+      value: fullCatalog.data ? fmtNum(catalogCounts.negotiable) : "—",
+      question: ar ? "بينها مساحة خصم مسموحة" : "Priced as a range, not a fixed number",
+      Icon: Handshake,
+      onSelect: () => {
+        setSearchFilters(emptySearchFilters);
+        setTab("prices");
+      },
+      selectHint: ar ? "افتح قائمة الأسعار" : "Open the price list",
     },
     {
+      id: "offers",
       label: ar ? "عروض سارية" : "Live offers",
-      value: fullCatalog.data ? fmtNum(activeOfferCourses) : "—",
+      value: fullCatalog.data ? fmtNum(catalogCounts.offers) : "—",
+      question: ar ? "دورات عليها عرض نافذ اليوم" : "Courses with an offer in force today",
+      Icon: BadgePercent,
+      onSelect: () => {
+        setSearchFilters({ ...emptySearchFilters, liveOffers: true });
+        setTab("prices");
+      },
+      selectHint: ar ? "اعرض هذه الدورات" : "Show these courses",
     },
   ];
 
-  const tabDefinitions: { value: Tab; label: string; Icon: LucideIcon; admin?: boolean }[] = [
+  const lastRun = snapshot.data?.freshness.lastRunAt ?? "";
+  const basisLabel = ar
+    ? { payment: "حسب تاريخ الدفع", sale: "حسب تاريخ البيع", invoice: "حسب تاريخ الفاتورة" }[
+        complianceFilters.dateBasis
+      ]
+    : { payment: "by payment date", sale: "by sale date", invoice: "by invoice date" }[
+        complianceFilters.dateBasis
+      ];
+
+  const tabDefinitions: PricingTab<Tab>[] = [
     { value: "prices", label: ar ? "قائمة الأسعار" : "Price list", Icon: ListChecks },
     {
       value: "invoices",
       label: ar ? "الفواتير والالتزام" : "Invoices & compliance",
       Icon: ClipboardCheck,
+      badge: kpis?.belowMinimumLines || undefined,
     },
     { value: "team", label: ar ? "أداء الفريق" : "Team performance", Icon: UsersRound },
     { value: "advisor", label: ar ? "اقتراح السعر" : "Price advisor", Icon: Compass },
@@ -432,97 +621,73 @@ function PricingPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <section className="overflow-hidden rounded-[22px] border border-[#1c3942] bg-[#10262d] shadow-sm">
-        <div className="grid gap-5 px-5 py-5 text-white lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-7">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-              {ar ? "ENGOSOFT · رقابة المبيعات" : "ENGOSOFT · SALES CONTROL"}
+    <div className="space-y-3.5">
+      <PricingPageHeader
+        title={ar ? "الأسعار والالتزام" : "Pricing & compliance"}
+        description={
+          ar
+            ? "السعر المعتمد، الفواتير الفعلية، وأداء الفريق في مكان واحد."
+            : "Approved prices, the invoices that were actually raised, and how the team sold."
+        }
+        period={
+          <>
+            <div>
+              <bdi className="num">
+                {complianceFilters.from || "—"} → {complianceFilters.to || "—"}
+              </bdi>{" "}
+              · {basisLabel}
             </div>
-            <h1 className="mt-2 text-[23px] font-black tracking-tight sm:text-[27px]">
-              {ar ? "لوحة الأسعار والالتزام البيعي" : "Pricing & sales compliance"}
-            </h1>
-            <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-white/62">
-              {ar
-                ? "السعر المعتمد، الفواتير الفعلية، أداء الفريق، وقرار البيع في مكان واحد."
-                : "Approved pricing, actual invoices, team behavior and the sales decision in one place."}
-            </p>
-          </div>
-          <form onSubmit={searchPrices} className="relative" role="search">
-            <Search
-              size={16}
-              className="pointer-events-none absolute inset-y-0 start-3 my-auto text-white/45"
+            <div className="mt-0.5">
+              {lastRun
+                ? `${ar ? "آخر تحليل" : "Last audit"} ${lastRun.slice(0, 16).replace("T", " ")}`
+                : ar
+                  ? "لم يُشغَّل التحليل بعد"
+                  : "The audit has not run yet"}
+              {fullCatalog.data ? ` · ${fmtNum(entries.length)} ${ar ? "دورة" : "courses"}` : ""}
+            </div>
+          </>
+        }
+        searchValue={quickSearch}
+        onSearchValue={setQuickSearch}
+        onSearchSubmit={searchPrices}
+        action={
+          <button
+            type="button"
+            onClick={() => void recalculate()}
+            disabled={!canWrite || busy === "recalculate"}
+            title={
+              canWrite
+                ? undefined
+                : ar
+                  ? "إعادة التحليل تحتاج صلاحية مدير"
+                  : "Re-running the audit needs manager access"
+            }
+            className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <ScanSearch
+              size={15}
+              className={busy === "recalculate" ? "animate-pulse" : ""}
               aria-hidden="true"
             />
-            <input
-              value={quickSearch}
-              onChange={(event) => setQuickSearch(event.target.value)}
-              placeholder={ar ? "ابحث باسم الدورة أو الكود" : "Search course name or code"}
-              aria-label={ar ? "بحث في الأسعار" : "Search prices"}
-              className="min-h-12 w-full rounded-xl border border-white/15 bg-white/7 ps-10 pe-3 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-white/35 focus:bg-white/10"
-            />
-          </form>
-        </div>
+            {busy === "recalculate"
+              ? ar
+                ? "جارٍ التحليل…"
+                : "Auditing…"
+              : ar
+                ? "إعادة تحليل الفواتير"
+                : "Re-run the audit"}
+          </button>
+        }
+      />
 
-        <div className="grid grid-cols-2 border-t border-white/10 bg-surface sm:grid-cols-3 xl:grid-cols-6">
-          {metrics.map((metric, index) => (
-            <div
-              key={metric.label}
-              className={`min-h-[82px] px-4 py-3 ${index ? "border-s border-border" : ""} ${index > 1 ? "border-t border-border sm:border-t-0" : ""} ${index > 2 ? "sm:border-t sm:border-border xl:border-t-0" : ""}`}
-            >
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
-                <span>{metric.label}</span>
-                {metric.info}
-              </div>
-              {compliance.isLoading && index < 4 ? (
-                <Skeleton className="mt-2 h-7 w-20 rounded-lg" />
-              ) : (
-                <div
-                  className={`mt-1 text-[21px] font-black tabular-nums ${
-                    metric.tone === "danger"
-                      ? "text-danger"
-                      : metric.tone === "warning"
-                        ? "text-warning"
-                        : metric.tone === "success"
-                          ? "text-success"
-                          : "text-text"
-                  }`}
-                >
-                  {metric.value}
-                </div>
-              )}
-              {!!metric.sub && (
-                <div className="mt-0.5 text-[9px] text-text-subtle">{metric.sub}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      <PricingKpiStrip items={kpiItems} loading={kpiLoading} />
 
-      <nav
-        className="hscroll rounded-2xl border border-border bg-surface px-2 shadow-sm"
-        aria-label={ar ? "أقسام لوحة الأسعار" : "Pricing dashboard sections"}
-      >
-        <div className="flex min-w-max items-stretch">
-          {tabDefinitions.map(({ value, label, Icon, admin }) => (
-            <button
-              type="button"
-              key={value}
-              onClick={() => setTab(value)}
-              className={`relative inline-flex min-h-14 items-center gap-2 px-4 text-[12px] font-bold transition ${
-                admin ? "ms-2 border-s border-border" : ""
-              } ${tab === value ? "text-text" : "text-text-muted hover:text-text"}`}
-              aria-current={tab === value ? "page" : undefined}
-            >
-              <Icon size={15} className={tab === value ? "text-brand" : "text-text-subtle"} />
-              {label}
-              {tab === value && (
-                <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-brand" />
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <PricingTabBar
+        tabs={tabDefinitions}
+        value={tab}
+        onChange={setTab}
+        label={ar ? "أقسام لوحة الأسعار" : "Pricing dashboard sections"}
+      />
 
       {!!error && <Notice tone="danger">{error}</Notice>}
       {!!message && <Notice tone="info">{message}</Notice>}
@@ -530,9 +695,9 @@ function PricingPage() {
       {tab === "prices" && (
         <>
           <CriticalInvoicesPanel
-            rows={criticalInvoices.data?.rows ?? []}
-            total={criticalInvoices.data?.total ?? 0}
-            loading={criticalInvoices.isLoading}
+            rows={breachRows.data?.rows ?? []}
+            total={breachRows.data?.total ?? 0}
+            loading={breachRows.isLoading}
           />
           <PriceCourseSummaryTab
             filters={searchFilters}
@@ -544,6 +709,10 @@ function PricingPage() {
             onRetry={() =>
               void (hasCatalogFilters ? filteredCatalog.refetch() : fullCatalog.refetch())
             }
+            breaches={breachMap}
+            breachRows={breachRows.data?.rows ?? []}
+            canWrite={canWrite}
+            onOpenInvoicesFor={openInvoicesFor}
           />
         </>
       )}
@@ -554,20 +723,22 @@ function PricingPage() {
           filters={complianceFilters}
           onFilters={setComplianceFilters}
           loading={compliance.isLoading}
+          error={compliance.error instanceof Error ? compliance.error.message : undefined}
+          onRetry={() => void compliance.refetch()}
           facets={{ currencies: ["SAR", "EGP"] }}
           onRecalculate={() => void recalculate()}
           recalculating={busy === "recalculate"}
           canWrite={canWrite}
-          showOverview={false}
-          showTeamBreakdown={false}
         />
       )}
 
       {tab === "team" && (
         <PriceTeamTab
-          data={compliance.data}
+          data={snapshot.data}
+          previous={previousSnapshot.data?.bySalesperson}
+          breachRows={breachRows.data?.rows ?? []}
           catalog={entries}
-          loading={compliance.isLoading || fullCatalog.isLoading}
+          loading={snapshot.isLoading || breachRows.isLoading}
           onOpenSalesperson={openSalesperson}
           onSendDigest={() => void sendDigest()}
           sending={busy === "digest"}
@@ -575,7 +746,7 @@ function PricingPage() {
         />
       )}
 
-      {tab === "advisor" && <PriceAdvisorTab entries={entries} />}
+      {tab === "advisor" && <PriceAdvisorTab entries={entries} loading={fullCatalog.isLoading} />}
 
       {tab === "manage" && (
         <PriceManageTab

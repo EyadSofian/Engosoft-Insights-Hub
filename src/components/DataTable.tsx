@@ -36,6 +36,13 @@ export interface Col<T> {
   label?: string;
   /** Native tooltip on the header cell. */
   headerTitle?: string;
+  /**
+   * Sortable by the server, using `key` as the sort name.
+   *
+   * Client sorting needs `sortValue`; a server-paged table has no local copy of
+   * the other pages to sort, so it asks the server instead.
+   */
+  sortable?: boolean;
 }
 
 export function DataTable<T>({
@@ -57,6 +64,10 @@ export function DataTable<T>({
   groupLabels,
   columnChooser = false,
   emptyState,
+  serverSort,
+  serverPage,
+  loading,
+  rowKey,
 }: {
   rows: T[];
   cols: Col<T>[];
@@ -79,6 +90,21 @@ export function DataTable<T>({
   groupLabels?: Record<string, string>;
   columnChooser?: boolean;
   emptyState?: ReactNode;
+  /**
+   * Hands sorting to the caller.
+   *
+   * A table showing one server page of a much larger result set cannot sort
+   * honestly on its own — reordering the fifty rows in hand would look like a
+   * sort of the whole set and quietly answer a different question. In this mode
+   * the header reports the intent and the rows arrive already ordered.
+   */
+  serverSort?: { key: string; dir: 1 | -1; onChange: (key: string, dir: 1 | -1) => void };
+  /** Paging done by the caller: `rows` is the page, `total` the whole set. */
+  serverPage?: { offset: number; total: number; size: number; onOffset: (offset: number) => void };
+  /** Skeleton rows while the page is in flight, so the header never jumps. */
+  loading?: boolean;
+  /** Stable row identity. Falls back to the row's index within the page. */
+  rowKey?: (r: T) => string;
 }) {
   const { t, lang } = useI18n();
   // Controlled when the caller passes `search`, so a sibling layout can share
@@ -86,8 +112,10 @@ export function DataTable<T>({
   const [ownQ, setOwnQ] = useState("");
   const q = search ?? ownQ;
   const setQ = onSearchChange ?? setOwnQ;
-  const [sortKey, setSortKey] = useState<string | null>(initialSort?.key ?? null);
-  const [sortDir, setSortDir] = useState<1 | -1>(initialSort?.dir ?? -1);
+  const [ownSortKey, setOwnSortKey] = useState<string | null>(initialSort?.key ?? null);
+  const [ownSortDir, setOwnSortDir] = useState<1 | -1>(initialSort?.dir ?? -1);
+  const sortKey = serverSort ? serverSort.key : ownSortKey;
+  const sortDir = serverSort ? serverSort.dir : ownSortDir;
   const [page, setPage] = useState(0);
 
   // A column set changes when the table switches grain, and the old hidden set
@@ -114,7 +142,7 @@ export function DataTable<T>({
       const nq = q.trim().toLowerCase();
       out = out.filter((r) => searchable(r).toLowerCase().includes(nq));
     }
-    if (sortKey) {
+    if (sortKey && !serverSort) {
       const col = cols.find((c) => c.key === sortKey);
       if (col?.sortValue) {
         const get = col.sortValue;
@@ -127,7 +155,7 @@ export function DataTable<T>({
       }
     }
     return out;
-  }, [rows, q, sortKey, sortDir, searchable, cols, lang]);
+  }, [rows, q, sortKey, sortDir, searchable, cols, lang, serverSort]);
 
   // Any change to the result set should bring the reader back to page 1.
   useEffect(() => {
@@ -136,15 +164,23 @@ export function DataTable<T>({
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
-  const visible = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  // In server mode the rows in hand are already the page.
+  const visible = serverPage
+    ? filtered
+    : filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const rowTotal = serverPage ? serverPage.total : filtered.length;
+
+  const sortableBy = (c: Col<T>) => (serverSort ? Boolean(c.sortable) : Boolean(c.sortValue));
 
   const toggleSort = (c: Col<T>) => {
-    if (!c.sortValue) return;
-    if (sortKey === c.key) setSortDir((d) => (d === 1 ? -1 : 1));
-    else {
-      setSortKey(c.key);
-      setSortDir(-1);
+    if (!sortableBy(c)) return;
+    const next: 1 | -1 = sortKey === c.key && sortDir === -1 ? 1 : -1;
+    if (serverSort) {
+      serverSort.onChange(c.key, next);
+      return;
     }
+    setOwnSortKey(c.key);
+    setOwnSortDir(sortKey === c.key ? next : -1);
   };
 
   // Contiguous runs of the same group, so the band sits exactly over its columns.
@@ -179,7 +215,7 @@ export function DataTable<T>({
         {toolbar}
         <div className="ms-auto flex items-center gap-2">
           <span className="text-xs text-text-muted num whitespace-nowrap">
-            {filtered.length.toLocaleString("en-US")} {t("rows")}
+            {rowTotal.toLocaleString("en-US")} {t("rows")}
           </span>
 
           {columnChooser && (
@@ -317,7 +353,7 @@ export function DataTable<T>({
                     scope="col"
                     title={c.headerTitle}
                     className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
-                      c.sortValue ? "cursor-pointer hover:text-text" : ""
+                      sortableBy(c) ? "cursor-pointer hover:text-text" : ""
                     } ${
                       c.align === "center"
                         ? "text-center"
@@ -343,7 +379,7 @@ export function DataTable<T>({
                       }`}
                     >
                       {c.header}
-                      {c.sortValue &&
+                      {sortableBy(c) &&
                         (sorted ? (
                           sortDir === 1 ? (
                             <ArrowUp size={12} />
@@ -360,53 +396,96 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {visible.map((r, i) => (
-              <tr
-                key={i}
-                onClick={() => onRowClick?.(r)}
-                // A clickable row has to be reachable without a mouse, otherwise
-                // the drill-down simply does not exist for keyboard users.
-                tabIndex={onRowClick ? 0 : undefined}
-                role={onRowClick ? "button" : undefined}
-                onKeyDown={
-                  onRowClick
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onRowClick(r);
+            {loading &&
+              Array.from({ length: 8 }, (_, i) => (
+                <tr key={`skeleton-${i}`} aria-hidden="true">
+                  {visibleCols.map((c) => (
+                    <td key={c.key} className="border-b border-border px-3 py-3">
+                      <span
+                        className="block h-3.5 w-full rounded"
+                        style={{ background: "var(--surface-2)" }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            {!loading &&
+              visible.map((r, i) => (
+                <tr
+                  key={rowKey ? rowKey(r) : i}
+                  onClick={() => onRowClick?.(r)}
+                  // A clickable row has to be reachable without a mouse, otherwise
+                  // the drill-down simply does not exist for keyboard users.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? "button" : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onRowClick(r);
+                          }
                         }
-                      }
-                    : undefined
-                }
-                className={`group ${onRowClick ? "cursor-pointer" : ""}`}
-              >
-                {visibleCols.map((c) => (
-                  <td
-                    key={c.key}
-                    className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
-                      i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
-                    } group-hover:bg-brand-soft ${
-                      c.align === "center"
-                        ? "text-center num whitespace-nowrap"
-                        : c.align === "right"
-                          ? "text-end num whitespace-nowrap"
-                          : ""
-                    } ${c.sticky ? "sticky-col font-medium" : ""}`}
-                    style={{ minWidth: c.minWidth }}
-                  >
-                    {c.render(r)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+                      : undefined
+                  }
+                  className={`group ${onRowClick ? "cursor-pointer" : ""}`}
+                >
+                  {visibleCols.map((c) => (
+                    <td
+                      key={c.key}
+                      className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
+                        i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
+                      } group-hover:bg-brand-soft ${
+                        c.align === "center"
+                          ? "text-center num whitespace-nowrap"
+                          : c.align === "right"
+                            ? "text-end num whitespace-nowrap"
+                            : ""
+                      } ${c.sticky ? "sticky-col font-medium" : ""}`}
+                      style={{ minWidth: c.minWidth }}
+                    >
+                      {c.render(r)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
           </tbody>
         </table>
 
-        {visible.length === 0 &&
+        {!loading &&
+          visible.length === 0 &&
           (emptyState ?? <EmptyState label={q ? t("no_results") : t("no_data")} compact />)}
       </div>
 
-      {pageCount > 1 && (
+      {serverPage && serverPage.total > serverPage.size && (
+        <div className="flex items-center justify-between gap-3 border-t border-border p-3">
+          <button
+            disabled={serverPage.offset <= 0}
+            onClick={() => serverPage.onOffset(Math.max(0, serverPage.offset - serverPage.size))}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs transition-colors hover:bg-surface-2 active:scale-[0.98] disabled:cursor-default disabled:opacity-40 sm:min-h-9 sm:rounded-lg"
+          >
+            <ChevronLeft size={14} className="rtl:rotate-180" />
+            {lang === "ar" ? "السابق" : "Prev"}
+          </button>
+          <span className="num text-xs text-text-muted">
+            {Math.min(serverPage.offset + 1, serverPage.total).toLocaleString("en-US")}–
+            {Math.min(serverPage.offset + serverPage.size, serverPage.total).toLocaleString(
+              "en-US",
+            )}{" "}
+            {t("of")} {serverPage.total.toLocaleString("en-US")}
+          </span>
+          <button
+            disabled={serverPage.offset + serverPage.size >= serverPage.total}
+            onClick={() => serverPage.onOffset(serverPage.offset + serverPage.size)}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs transition-colors hover:bg-surface-2 active:scale-[0.98] disabled:cursor-default disabled:opacity-40 sm:min-h-9 sm:rounded-lg"
+          >
+            {lang === "ar" ? "التالي" : "Next"}
+            <ChevronRight size={14} className="rtl:rotate-180" />
+          </button>
+        </div>
+      )}
+
+      {!serverPage && pageCount > 1 && (
         <div className="flex items-center justify-between gap-3 p-3 border-t border-border">
           <button
             disabled={safePage === 0}

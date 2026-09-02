@@ -127,6 +127,14 @@ export interface AuditRow {
   company: string;
   productCode: string;
   productName: string;
+  priceSource: string;
+  pricingContext: string;
+  pricingContextName: string;
+  odooSaleOrderName: string;
+  odooPricelistId: number | null;
+  odooPricelistName: string;
+  odooPricelistItemId: number | null;
+  odooPricelistItemName: string;
 }
 
 export interface OdooInvoiceVerification {
@@ -151,6 +159,7 @@ const pick = (entry: Bilingual | undefined, lang: Lang, fallback: string): strin
 
 const STATUS: Record<string, Bilingual> = {
   compliant: { ar: "ملتزم", en: "Compliant" },
+  compliant_package: { ar: "سعر باقة معتمد", en: "Approved package price" },
   compliant_offer: { ar: "ملتزم بعرض ساري", en: "Within a live offer" },
   below_minimum: { ar: "تحت الحد الأدنى", en: "Below the floor" },
   above_list: { ar: "أعلى من السعر الرسمي", en: "Above list" },
@@ -158,6 +167,10 @@ const STATUS: Record<string, Bilingual> = {
   unknown_payment_method: { ar: "طريقة دفع غير معروفة", en: "Unknown payment method" },
   mixed_payment_review: { ar: "دفع مختلط — يحتاج مراجعة", en: "Mixed payment — review" },
   expired_offer: { ar: "عرض منتهي", en: "Expired offer" },
+  package_price_unresolved: {
+    ar: "بند باقة — الربط غير مكتمل",
+    en: "Package item — link incomplete",
+  },
   excluded: { ar: "مستثنى", en: "Excluded" },
 };
 
@@ -200,6 +213,7 @@ const SCOPE: Record<string, Bilingual> = {
 };
 
 const MATCH: Record<string, Bilingual> = {
+  odoo_pricelist: { ar: "سعر الباقة من Odoo", en: "Odoo package price" },
   odoo_product_id: { ar: "مطابقة بمعرّف أودو", en: "Matched by Odoo product id" },
   exact_code: { ar: "مطابقة بالكود", en: "Matched by exact code" },
   manual: { ar: "ربط يدوي معتمد", en: "Approved manual link" },
@@ -225,11 +239,15 @@ export function auditReasonLabel(row: AuditRow, lang: Lang): string {
   const gap = fmtMoney(row.varianceAmount, row.currency, lang);
   switch (row.complianceStatus) {
     case "below_minimum":
-      return `تم البيع بسعر ${actual}، أقل من الحد الأدنى ${minimum} بفارق ${gap} لكل وحدة.`;
+      return row.priceSource === "odoo_package"
+        ? `تم البيع بسعر ${actual}، أقل من سعر الكورس داخل الباقة على Odoo وهو ${minimum}، بفارق ${gap} لكل وحدة.`
+        : `تم البيع بسعر ${actual}، أقل من الحد الأدنى ${minimum} بفارق ${gap} لكل وحدة.`;
     case "compliant":
       return row.allowedMaximum !== null && row.allowedMaximum !== row.allowedMinimum
         ? `سعر البيع ${actual} داخل النطاق المعتمد من ${minimum} إلى ${maximum}.`
         : `سعر البيع ${actual} مطابق للسعر المعتمد.`;
+    case "compliant_package":
+      return `سعر البيع ${actual} مطابق لسعر هذا الكورس داخل الباقة على Odoo، وليس سعره كدورة منفردة.`;
     case "compliant_offer":
       return `سعر البيع ${actual} مطابق لعرض ساري وقت البيع.`;
     case "above_list":
@@ -242,6 +260,8 @@ export function auditReasonLabel(row: AuditRow, lang: Lang): string {
       return "الفاتورة مدفوعة بأكثر من طريقة وتحتاج إلى مراجعة بشرية.";
     case "expired_offer":
       return "السعر يطابق عرضًا انتهت صلاحيته قبل تاريخ البيع.";
+    case "package_price_unresolved":
+      return "هذا الكورس قد يكون جزءًا من باقة؛ لم يُستخدم سعر الدورة المنفردة لإصدار مخالفة حتى يكتمل ربط بند البيع في Odoo.";
     case "excluded":
       return "هذا البند مستثنى من حكم الالتزام السعري.";
     default:
@@ -256,9 +276,10 @@ export type Tone = "neutral" | "brand" | "success" | "warning" | "danger";
 /** Colour a verdict by what it asks somebody to do, not by how bad it sounds. */
 export const statusTone = (value: string): Tone => {
   if (value === "below_minimum") return "danger";
-  if (value === "compliant" || value === "compliant_offer") return "success";
+  if (value === "compliant" || value === "compliant_package" || value === "compliant_offer")
+    return "success";
   if (value === "above_list") return "brand";
-  if (value === "excluded") return "neutral";
+  if (value === "excluded" || value === "package_price_unresolved") return "neutral";
   return "warning";
 };
 
@@ -276,16 +297,24 @@ export const severityTone = (value: string): Tone => {
  * The price book publishes SAR and EGP; showing either converted to dollars
  * would hide the number a seller is actually held to.
  */
+/**
+ * Money, in the same numerals as every other figure on the page.
+ *
+ * `ar-EG` renders Arabic-Indic digits (٢٬٢٢٠) while `fmtNum`, `fmtPct` and
+ * `fmtDate` all force Latin ones, so a table of prices mixed the two systems
+ * inside one row and tabular alignment could not hold. `-u-nu-latn` is the same
+ * request `fmtDate` already makes: Arabic language, Latin digits.
+ */
 export function fmtMoney(value: number | null | undefined, currency: string, lang: Lang): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   try {
-    return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    return new Intl.NumberFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", {
       style: "currency",
       currency: currency || "SAR",
       maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
     }).format(value);
   } catch {
-    return `${value.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} ${currency}`;
+    return `${value.toLocaleString(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US")} ${currency}`;
   }
 }
 

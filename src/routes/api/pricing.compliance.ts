@@ -37,6 +37,9 @@ export const Route = createFileRoute("/api/pricing/compliance")({
             matchedLines: totals.matched ?? 0,
             judgedLines: totals.judged ?? 0,
             compliantLines: totals.compliant ?? 0,
+            packageLines: totals.package_lines ?? 0,
+            compliantPackageLines: totals.compliant_package ?? 0,
+            unresolvedPackageLines: totals.unresolved_package ?? 0,
             coverage: ratio(totals.matched, totals.eligible),
             // A verdict needs both a matched rule and a known payment method.
             // Unknown/mixed payment rows remain visible under “needs review”

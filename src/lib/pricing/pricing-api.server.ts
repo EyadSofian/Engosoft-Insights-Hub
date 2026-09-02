@@ -124,6 +124,8 @@ export function auditQuery(request: Request) {
     status: clean("status"),
     severity: clean("severity"),
     search: clean("q"),
+    sort: clean("sort"),
+    sortDir: params.get("dir") === "asc" ? ("asc" as const) : ("desc" as const),
     limit: Math.min(Math.max(Number(params.get("limit")) || 50, 1), 500),
     offset: Math.max(Number(params.get("offset")) || 0, 0),
   };

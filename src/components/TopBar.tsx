@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,8 @@ import {
   Leaf,
   MoreHorizontal,
   Moon,
+  Pin,
+  PinOff,
   RefreshCw,
   SlidersHorizontal,
   Sun,
@@ -23,6 +25,7 @@ import {
 } from "@/lib/filter-store";
 import { approvedReportingEnd, DEFAULT_DATE_PRESET } from "@/lib/reporting-window";
 import { useModalGuard } from "@/lib/ui-store";
+import { chromeStore, useChrome } from "@/lib/chrome-store";
 import type { AcquisitionChannel, CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "@/lib/constants";
 import { acquisitionChannel } from "@/lib/acquisition-channel";
@@ -115,6 +118,10 @@ export function TopBar({ title }: { title?: string }) {
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const chrome = useChrome();
+  const compact = chrome.header !== "full";
+  const hidden = chrome.header === "hidden" && !chrome.pinned;
+  const { barRef, reserved } = useReservedHeight(!compact, hidden);
 
   const { data } = useFiltersData();
   const activeCount = activeDimensionCount(filters);
@@ -145,8 +152,23 @@ export function TopBar({ title }: { title?: string }) {
 
   return (
     <>
-      <header className="app-topbar sticky top-0 z-30 glass border-b border-border pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]">
-        <div className="py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
+      {/* The bar is fixed, not sticky, and the flow keeps a constant reserve
+          below it. Sticky would put the bar in flow, so shedding the second
+          row on scroll would shorten the document under the reader — the exact
+          content jump this redesign exists to remove. */}
+      <header
+        ref={barRef}
+        data-app-chrome=""
+        className="app-topbar chrome-slide chrome-bar fixed top-0 z-30 pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]"
+        style={{
+          insetInlineStart: "var(--chrome-nav-inset)",
+          insetInlineEnd: 0,
+          transition:
+            "transform var(--dur-chrome) var(--ease-chrome), inset-inline-start var(--dur-chrome) var(--ease-chrome)",
+          transform: hidden ? "translateY(-100%)" : "translateY(0)",
+        }}
+      >
+        <div className={`flex items-center gap-2 sm:gap-3 ${compact ? "py-1.5" : "py-2 sm:py-3"}`}>
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's PageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
@@ -204,6 +226,8 @@ export function TopBar({ title }: { title?: string }) {
               <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
             </button>
 
+            <ChromePinButton />
+
             <button
               onClick={toggleTheme}
               className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
@@ -226,12 +250,16 @@ export function TopBar({ title }: { title?: string }) {
           </div>
         </div>
 
-        {/* Period and platform stay visible on every screen — the most-used controls.
-            The date control is now a single button that opens a preset + calendar
-            picker, so custom ranges no longer hide inside the filter sheet.
+        {/* Period and platform are the most-used controls, so they stay on the
+            bar whenever it is whole. Scrolling down trades them for content and
+            one scroll back up returns them; the active period is still named on
+            the date button itself, which survives into the compact bar.
             On a phone the platform strip runs to the screen edge on purpose: the
             item clipped by the edge is what tells the reader it scrolls. */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex sm:pb-2.5">
+        <div
+          hidden={compact}
+          className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex sm:pb-2.5"
+        >
           <div className="shrink-0">
             <DateFilter latest={latest} />
           </div>
@@ -252,7 +280,7 @@ export function TopBar({ title }: { title?: string }) {
           </div>
         </div>
 
-        {filters.channel === "organic" && (
+        {filters.channel === "organic" && !compact && (
           <div
             role="status"
             className="mb-2 flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-xs leading-relaxed text-text sm:mb-2.5"
@@ -268,9 +296,107 @@ export function TopBar({ title }: { title?: string }) {
         <DataHealthBar data={data} />
       </header>
 
+      {/* The reserve. Measured while the bar is whole and then held, so the
+          page's own layout never learns that the bar shrank or left. */}
+      <div aria-hidden="true" style={{ height: reserved }} />
+
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} data={data} />
     </>
   );
+}
+
+/**
+ * The same pin control the rail carries, repeated on the bar.
+ *
+ * A reader who wants the chrome to stop moving usually decides that while it
+ * is in the act of moving — at which point the rail's copy of this button is
+ * halfway off the screen. Shown from `lg` up only: below that there is no rail
+ * to pin.
+ */
+function ChromePinButton() {
+  const { lang } = useI18n();
+  const chrome = useChrome();
+  const label = chrome.pinned
+    ? lang === "ar"
+      ? "إلغاء تثبيت الهيدر والتنقل (⌘/Ctrl + B)"
+      : "Unpin the bar and navigation (⌘/Ctrl + B)"
+    : lang === "ar"
+      ? "تثبيت الهيدر والتنقل ومنع إخفائهما (⌘/Ctrl + B)"
+      : "Pin the bar and navigation open (⌘/Ctrl + B)";
+
+  return (
+    <button
+      type="button"
+      onClick={() => chromeStore.togglePinned()}
+      aria-pressed={chrome.pinned}
+      aria-label={label}
+      title={label}
+      className={`hidden h-10 w-10 items-center justify-center rounded-lg border transition-colors active:scale-[0.97] cursor-pointer lg:inline-flex ${
+        chrome.pinned
+          ? "border-brand bg-brand-soft text-brand"
+          : "border-border bg-surface text-text-muted hover:bg-surface-2"
+      }`}
+    >
+      {chrome.pinned ? <Pin size={16} /> : <PinOff size={16} />}
+    </button>
+  );
+}
+
+/**
+ * Keeps the space a fixed bar would have occupied.
+ *
+ * The height is captured only while the bar is showing everything it can, so a
+ * compact bar — or one that has slid away entirely — leaves the reserve where
+ * the full bar put it. `useLayoutEffect` and a ResizeObserver rather than a
+ * constant, because the bar grows a row when a data source is degraded and
+ * another when the organic scope note applies.
+ */
+function useReservedHeight(measure: boolean, hidden: boolean) {
+  const barRef = useRef<HTMLElement>(null);
+  const [reserved, setReserved] = useState(0);
+  const measuring = useRef(measure);
+  const away = useRef(hidden);
+  measuring.current = measure;
+  away.current = hidden;
+
+  // How much of the viewport the bar is actually covering right now. Anything
+  // that wants to park itself directly under the bar — the section tabs, a
+  // page's own tab strip — reads this instead of guessing a pixel value that
+  // would be wrong in the other language, on a phone, or with a degraded-data
+  // strip on screen.
+  const publish = (element: HTMLElement) => {
+    document.documentElement.style.setProperty(
+      "--chrome-header-h",
+      away.current ? "0px" : `${element.offsetHeight}px`,
+    );
+  };
+
+  useLayoutEffect(() => {
+    const element = barRef.current;
+    if (!element) return;
+    const sync = () => {
+      if (measuring.current) setReserved(element.offsetHeight);
+      publish(element);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--chrome-header-h");
+    };
+  }, []);
+
+  // Re-measure the moment the bar is whole again: the reader may have resized
+  // the window, or switched language, while it was compact.
+  useLayoutEffect(() => {
+    const element = barRef.current;
+    if (!element) return;
+    if (measure) setReserved(element.offsetHeight);
+    publish(element);
+  }, [measure, hidden]);
+
+  return { barRef, reserved };
 }
 
 /**
