@@ -1694,6 +1694,63 @@ export async function queryAudits(
   };
 }
 
+export interface CatalogDemandRow {
+  key: string;
+  orders: number;
+  units: number;
+}
+
+export interface CatalogDemandResult {
+  courses: CatalogDemandRow[];
+  packages: CatalogDemandRow[];
+}
+
+/**
+ * Demand for the price catalogue, measured from stored invoice audits.
+ *
+ * A package invoice produces one line per course component in Odoo. Counting
+ * those rows would make a seven-course package look like seven package sales,
+ * so package demand is distinct by sale order (invoice fallback). Package
+ * components are excluded from course demand for the same reason.
+ */
+export async function catalogDemand(query: AuditQuery): Promise<CatalogDemandResult> {
+  await ensurePricingSchema();
+  const { clause, values } = auditWhere(query);
+  const scoped = (condition: string) =>
+    clause ? `${clause} AND ${condition}` : `WHERE ${condition}`;
+  const orderIdentity =
+    "COALESCE(NULLIF(sale_order_name, ''), NULLIF(invoice_number, ''), invoice_line_id)";
+
+  const [courses, packages] = await Promise.all([
+    getPool().query(
+      `SELECT upper(trim(product_code)) AS key,
+              count(DISTINCT ${orderIdentity})::int AS orders,
+              COALESCE(sum(GREATEST(quantity, 0)), 0)::float AS units
+         FROM invoice_price_audits
+         ${scoped("pricing_context <> 'package' AND trim(product_code) <> ''")}
+        GROUP BY upper(trim(product_code))`,
+      values,
+    ),
+    getPool().query(
+      `SELECT lower(regexp_replace(trim(pricing_context_name), '\\s+', ' ', 'g')) AS key,
+              count(DISTINCT ${orderIdentity})::int AS orders,
+              count(DISTINCT ${orderIdentity})::float AS units
+         FROM invoice_price_audits
+         ${scoped("pricing_context = 'package' AND trim(pricing_context_name) <> ''")}
+        GROUP BY lower(regexp_replace(trim(pricing_context_name), '\\s+', ' ', 'g'))`,
+      values,
+    ),
+  ]);
+
+  const rows = (input: { rows: Record<string, unknown>[] }): CatalogDemandRow[] =>
+    input.rows.map((row) => ({
+      key: str(row.key),
+      orders: Number(row.orders ?? 0),
+      units: Number(row.units ?? 0),
+    }));
+  return { courses: rows(courses), packages: rows(packages) };
+}
+
 /**
  * Aggregate in PostgreSQL rather than shipping rows to the server to count.
  *

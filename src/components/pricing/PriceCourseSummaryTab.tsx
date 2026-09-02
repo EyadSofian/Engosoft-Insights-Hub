@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
-import { Filter, X } from "lucide-react";
+import { Filter, TrendingUp, X } from "lucide-react";
 import { EmptyState, ErrorState, Notice, Skeleton } from "@/components/ui-bits";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { fmtNum, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, useI18n } from "@/lib/i18n";
+import { compareDemand } from "@/lib/pricing/catalog-demand";
 import { CourseCompactRow, CourseListRow } from "./CourseListRow";
 import { CourseDetailPanel } from "./CourseDetailPanel";
+import { OdooPackageList } from "./OdooPackageList";
 import {
   activeOffers,
   entryKey,
   hasIndividual,
-  hasPackage,
   inForceSince,
   type CourseBreachSummary,
   type PriceMode,
@@ -65,11 +66,11 @@ const matchesKind = (
   kind: ContentKind,
   breaches: Map<string, CourseBreachSummary>,
 ) => {
-  if (kind === "all") return true;
-  if (kind === "package") return hasPackage(entry);
+  if (kind === "all" || kind === "course") return hasIndividual(entry);
+  if (kind === "package") return false;
   if (kind === "offer") return activeOffers(entry).length > 0;
   if (kind === "breached") return (breaches.get(entry.rawCode)?.breaches ?? 0) > 0;
-  return hasIndividual(entry);
+  return false;
 };
 
 /**
@@ -110,11 +111,29 @@ export function PriceCourseSummaryTab({
   const ar = lang === "ar";
   const isMobile = useIsMobile();
   const [kind, setKind] = useState<ContentKind>("all");
+  const [demandOnly, setDemandOnly] = useState(true);
   const [openKey, setOpenKey] = useState("");
 
   const visible = useMemo(
-    () => (data?.entries ?? []).filter((entry) => matchesKind(entry, kind, breaches)),
-    [data?.entries, kind, breaches],
+    () =>
+      (data?.entries ?? [])
+        .filter((entry) => matchesKind(entry, kind, breaches))
+        .filter((entry) => !demandOnly || (entry.demand?.orders ?? 0) > 0)
+        .sort((a, b) =>
+          compareDemand(
+            { name: a.courseName, demand: a.demand },
+            { name: b.courseName, demand: b.demand },
+          ),
+        ),
+    [data?.entries, kind, breaches, demandOnly],
+  );
+
+  const visiblePackages = useMemo(
+    () =>
+      kind === "all" || kind === "package"
+        ? (data?.packages ?? []).filter((item) => !demandOnly || (item.demand?.orders ?? 0) > 0)
+        : [],
+    [data?.packages, kind, demandOnly],
   );
 
   const grouped = useMemo(() => {
@@ -123,7 +142,9 @@ export function PriceCourseSummaryTab({
       const key = entry.specialization || "Others";
       groups.set(key, [...(groups.get(key) ?? []), entry]);
     }
-    return [...groups.entries()];
+    const demandOf = (entries: CatalogEntry[]) =>
+      entries.reduce((sum, entry) => sum + (entry.demand?.orders ?? 0), 0);
+    return [...groups.entries()].sort(([, a], [, b]) => demandOf(b) - demandOf(a));
   }, [visible]);
 
   const openEntry = useMemo(
@@ -240,6 +261,34 @@ export function PriceCourseSummaryTab({
               </select>
             </label>
           )}
+
+          <div
+            className="flex shrink-0 items-center rounded-lg bg-surface-2 p-0.5"
+            role="group"
+            aria-label={ar ? "نطاق عرض قائمة الأسعار" : "Price-list scope"}
+          >
+            <button
+              type="button"
+              aria-pressed={demandOnly}
+              onClick={() => setDemandOnly(true)}
+              className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
+                demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
+              }`}
+            >
+              <TrendingUp size={11} aria-hidden="true" />
+              {ar ? "عليها إقبال" : "In demand"}
+            </button>
+            <button
+              type="button"
+              aria-pressed={!demandOnly}
+              onClick={() => setDemandOnly(false)}
+              className={`min-h-7 cursor-pointer rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
+                !demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
+              }`}
+            >
+              {ar ? "كل الأسعار" : "All prices"}
+            </button>
+          </div>
         </div>
 
         {!!activeFilters.length && (
@@ -268,6 +317,31 @@ export function PriceCourseSummaryTab({
         </Notice>
       )}
 
+      {!loading && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/15 bg-brand-soft/55 px-3 py-2 text-[11px] text-text-muted sm:px-4">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-brand">
+            <TrendingUp size={14} aria-hidden="true" />
+            {ar ? "مرتبة حسب الإقبال الحقيقي" : "Sorted by actual demand"}
+          </span>
+          <span>
+            {ar
+              ? "من مبيعات الفترة المختارة؛ بيع الباقة يُحسب مرة واحدة مهما كان عدد دوراتها."
+              : "From sales in the selected period; one package order counts once, regardless of its course count."}
+            {data?.demandPeriod?.from && data.demandPeriod.to
+              ? ` · ${fmtDate(data.demandPeriod.from, lang)} – ${fmtDate(data.demandPeriod.to, lang)}`
+              : ""}
+          </span>
+        </div>
+      )}
+
+      {!!data?.packagesError && (kind === "all" || kind === "package") && (
+        <Notice tone="warning">
+          {ar
+            ? "تعذر تحديث الباقات من Odoo الآن؛ ما زالت أسعار الدورات ظاهرة كالمعتاد."
+            : data.packagesError}
+        </Notice>
+      )}
+
       {/* --- list ---------------------------------------------------------- */}
       {loading && (
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -284,22 +358,36 @@ export function PriceCourseSummaryTab({
         </div>
       )}
 
-      {!loading && !visible.length && !data?.error && (
+      {!loading && !visible.length && !visiblePackages.length && !data?.error && (
         <div className="rounded-xl border border-border bg-surface">
           <EmptyState
-            label={ar ? "لا توجد دورات مطابقة" : "No matching courses"}
+            label={
+              ar
+                ? kind === "package"
+                  ? "لا توجد باقات مطابقة"
+                  : "لا توجد دورات مطابقة"
+                : kind === "package"
+                  ? "No matching packages"
+                  : "No matching courses"
+            }
             hint={
               activeFilters.length
                 ? ar
                   ? "امسح أحد الفلاتر بالأعلى أو ابحث بكود الدورة."
                   : "Clear one of the filters above, or search by course code."
                 : ar
-                  ? "اختر تخصصًا من الشريط بالأعلى للبدء."
-                  : "Pick a specialization from the strip above to start."
+                  ? demandOnly
+                    ? "لا توجد مبيعات مطابقة في هذه الفترة؛ اختر «كل الأسعار» لعرض القائمة كاملة."
+                    : "اختر تخصصًا من الشريط بالأعلى للبدء."
+                  : demandOnly
+                    ? "No matching sales in this period; choose All prices for the full catalogue."
+                    : "Pick a specialization from the strip above to start."
             }
           />
         </div>
       )}
+
+      {!loading && visiblePackages.length > 0 && <OdooPackageList packages={visiblePackages} />}
 
       {!loading &&
         grouped.map(([specialization, entries]) => (
@@ -312,7 +400,9 @@ export function PriceCourseSummaryTab({
                 {specializationLabel(specialization, ar)}
               </h2>
               <span className="num text-[10.5px] text-text-subtle">
-                {fmtNum(entries.length)} {ar ? (kind === "package" ? "باقة" : "دورة") : "results"}
+                {fmtNum(entries.length)} {ar ? "دورة" : "courses"} ·{" "}
+                {fmtNum(entries.reduce((sum, entry) => sum + (entry.demand?.orders ?? 0), 0))}{" "}
+                {ar ? "مبيعات" : "sales"}
               </span>
             </div>
 
@@ -324,7 +414,7 @@ export function PriceCourseSummaryTab({
                 ar ? "النطاق نقدًا" : "Cash range",
                 ar ? "النطاق بالتقسيط" : "Instalment range",
                 ar ? "مصر" : "Egypt",
-                ar ? "الحالة" : "Status",
+                ar ? "الإقبال والحالة" : "Demand & status",
               ].map((heading) => (
                 <span
                   key={heading}
@@ -336,8 +426,7 @@ export function PriceCourseSummaryTab({
             </div>
 
             {entries.map((entry) => {
-              const mode: PriceMode =
-                kind === "package" || !hasIndividual(entry) ? "package" : "course";
+              const mode: PriceMode = "course";
               const rowProps = {
                 entry,
                 mode,
@@ -367,7 +456,7 @@ export function PriceCourseSummaryTab({
       {openEntry && (
         <CourseDetailPanel
           entry={openEntry}
-          mode={kind === "package" || !hasIndividual(openEntry) ? "package" : "course"}
+          mode="course"
           book={book}
           breachRows={breachRows.filter((row) => row.productCode === openEntry.rawCode)}
           canWrite={canWrite}

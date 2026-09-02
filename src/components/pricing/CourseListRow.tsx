@@ -1,4 +1,11 @@
-import { Banknote, BadgePercent, ChevronLeft, OctagonMinus, WalletCards } from "lucide-react";
+import {
+  Banknote,
+  BadgePercent,
+  ChevronLeft,
+  OctagonMinus,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
 import { Pill } from "@/components/ui-bits";
 import { fmtDate, fmtNum, useI18n } from "@/lib/i18n";
 import { PriceRangeTrack, type TrackMarker } from "./PriceRangeTrack";
@@ -45,6 +52,7 @@ export function CourseListRow(props: CourseRowProps) {
   const instalment = instalmentBand(entry, mode);
   const egypt = egyptBand(entry, mode);
   const offers = activeOffers(entry);
+  const demand = entry.demand?.orders ?? 0;
   const title =
     mode === "package"
       ? `${ar ? "باقة" : "Package"} ${packageLabel(bundleNameOf(entry) || entry.courseName)}`
@@ -129,6 +137,12 @@ export function CourseListRow(props: CourseRowProps) {
       {/* 4 — status and the way in */}
       <div className="flex items-center justify-between gap-2 xl:justify-end">
         <div className="flex flex-wrap items-center gap-1.5">
+          {demand > 0 && (
+            <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-bold text-brand">
+              <TrendingUp size={11} aria-hidden="true" />
+              {fmtNum(demand)} {ar ? "مبيعات" : "sales"}
+            </span>
+          )}
           {!!offers.length && (
             <span
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold"
@@ -146,8 +160,10 @@ export function CourseListRow(props: CourseRowProps) {
               {fmtNum(breaches.breaches)} {ar ? "مخالفة" : "breaches"}
             </span>
           )}
-          {!offers.length && !breaches?.breaches && !entry.onHold && (
-            <span className="text-[10.5px] text-text-subtle">{ar ? "لا ملاحظات" : "Clean"}</span>
+          {!demand && !offers.length && !breaches?.breaches && !entry.onHold && (
+            <span className="text-[10.5px] text-text-subtle">
+              {ar ? "لا مبيعات في الفترة" : "No sales in period"}
+            </span>
           )}
         </div>
 
@@ -207,6 +223,7 @@ export function CourseCompactRow(props: CourseRowProps) {
   const cash = cashBand(entry, mode);
   const instalment = instalmentBand(entry, mode);
   const offers = activeOffers(entry);
+  const demand = entry.demand?.orders ?? 0;
   const title =
     mode === "package"
       ? `${ar ? "باقة" : "Package"} ${packageLabel(bundleNameOf(entry) || entry.courseName)}`
@@ -270,6 +287,12 @@ export function CourseCompactRow(props: CourseRowProps) {
       </dl>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {demand > 0 && (
+          <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand">
+            <TrendingUp size={10} aria-hidden="true" />
+            {fmtNum(demand)} {ar ? "مبيعات" : "sales"}
+          </span>
+        )}
         {!!offers.length && (
           <span
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold"
@@ -285,6 +308,11 @@ export function CourseCompactRow(props: CourseRowProps) {
             style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
           >
             {fmtNum(breaches.breaches)} {ar ? "مخالفة" : "breaches"}
+          </span>
+        )}
+        {!demand && !offers.length && !breaches?.breaches && (
+          <span className="text-[10px] text-text-subtle">
+            {ar ? "لا مبيعات في الفترة" : "No sales in period"}
           </span>
         )}
       </div>

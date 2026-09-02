@@ -950,6 +950,7 @@ export interface CatalogEntry {
   odooProductId: number | null;
   onHold: boolean;
   requiresReview: boolean;
+  demand?: { orders: number; units: number };
   /** One row per currency and payment method the course is priced in. */
   prices: {
     id: string;
@@ -998,6 +999,7 @@ export function groupCatalog(items: Awaited<ReturnType<typeof listPriceItems>>):
       odooProductId: item.odooProductId,
       onHold: false,
       requiresReview: false,
+      demand: { orders: 0, units: 0 },
       prices: [],
     };
     entry.onHold = entry.onHold || item.onHold;

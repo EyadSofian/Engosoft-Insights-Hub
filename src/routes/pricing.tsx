@@ -163,6 +163,12 @@ function PricingPage() {
   const setTab = (next: Tab) =>
     void navigate({ search: { tab: next === "prices" ? undefined : next } });
 
+  const catalogPeriod = {
+    from: complianceFilters.from,
+    to: complianceFilters.to,
+    dateBasis: complianceFilters.dateBasis,
+  };
+
   const hasCatalogFilters = useMemo(
     () =>
       Boolean(searchFilters.q) ||
@@ -177,13 +183,14 @@ function PricingPage() {
   );
 
   const fullCatalog = useQuery({
-    queryKey: ["pricing-catalog-full"],
+    queryKey: ["pricing-catalog-full", catalogPeriod],
     staleTime: 5 * 60_000,
-    queryFn: () => getJson<CatalogResponse>(`/api/pricing/catalog${query({ limit: 1000 })}`),
+    queryFn: () =>
+      getJson<CatalogResponse>(`/api/pricing/catalog${query({ ...catalogPeriod, limit: 1000 })}`),
   });
 
   const filteredCatalog = useQuery({
-    queryKey: ["pricing-catalog-filtered", searchFilters],
+    queryKey: ["pricing-catalog-filtered", searchFilters, catalogPeriod],
     enabled: tab === "prices" && hasCatalogFilters,
     staleTime: 60_000,
     queryFn: () =>
@@ -197,6 +204,7 @@ function PricingPage() {
           currency: searchFilters.currency,
           country: searchFilters.country,
           liveOffers: searchFilters.liveOffers ? 1 : undefined,
+          ...catalogPeriod,
           limit: 1000,
         })}`,
       ),

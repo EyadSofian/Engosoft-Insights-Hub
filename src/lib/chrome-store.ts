@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { chromeScrollDecision, CHROME_TOP_ZONE } from "./chrome-policy";
 import { uiStore } from "./ui-store";
 
 /**
@@ -39,17 +40,6 @@ export interface ChromeState {
  * than the page.
  */
 const PIN_KEY = "engo_chrome_pinned";
-
-/** Below this the page is "at the top" and the chrome is always whole. */
-const TOP_ZONE = 64;
-/** Nothing hides before the reader has actually committed to scrolling. */
-const HIDE_AFTER = 180;
-/**
- * Accumulated travel in one direction before the chrome reacts. Trackpad
- * scrolling reverses sign constantly; without this the header flickers on
- * every rubber-band and every one-pixel correction.
- */
-const HYSTERESIS = 28;
 
 let state: ChromeState = { header: "full", navHidden: false, peeking: false, pinned: false };
 const listeners = new Set<() => void>();
@@ -96,38 +86,21 @@ const frozen = () => state.pinned || focusInChrome || uiStore.isOpen() || popper
 
 /* --- the scroll loop ---------------------------------------------------- */
 
-let lastY = 0;
-let travel = 0;
 let ticking = false;
 let started = false;
 
 function evaluate() {
   ticking = false;
-  const y = window.scrollY;
-  const delta = y - lastY;
-  lastY = y;
+  const decision = chromeScrollDecision(window.scrollY);
 
-  if (y <= TOP_ZONE) {
-    travel = 0;
+  if (decision === "reveal") {
     set({ header: "full", navHidden: false });
     return;
   }
 
   if (frozen()) return;
-
-  // Reset the accumulator whenever the direction flips, so travel always
-  // measures one continuous gesture rather than a net displacement.
-  if ((delta > 0 && travel < 0) || (delta < 0 && travel > 0)) travel = 0;
-  travel += delta;
-
-  if (travel > HYSTERESIS && y > HIDE_AFTER) {
-    travel = 0;
+  if (decision === "hide") {
     set({ header: "hidden", navHidden: true, peeking: false });
-  } else if (travel < -HYSTERESIS) {
-    travel = 0;
-    // Coming back up reveals the compact bar first: the reader asked for
-    // orientation, not for the whole control surface back.
-    set({ header: "compact", navHidden: false });
   }
 }
 
@@ -146,8 +119,6 @@ function onScroll() {
 function onVisibility() {
   if (document.visibilityState !== "visible") return;
   ticking = false;
-  lastY = window.scrollY;
-  travel = 0;
 }
 
 function onFocusIn(event: FocusEvent) {
@@ -186,7 +157,6 @@ function onPointerDown() {
 function start() {
   if (started || typeof window === "undefined") return;
   started = true;
-  lastY = window.scrollY;
   window.addEventListener("scroll", onScroll, { passive: true });
   document.addEventListener("focusin", onFocusIn);
   document.addEventListener("focusout", onFocusOut);
@@ -210,8 +180,7 @@ function stop() {
 }
 
 function reveal() {
-  travel = 0;
-  set({ header: window.scrollY <= TOP_ZONE ? "full" : "compact", navHidden: false });
+  set({ header: window.scrollY <= CHROME_TOP_ZONE ? "full" : "compact", navHidden: false });
 }
 
 export const chromeStore = {
@@ -235,12 +204,11 @@ export const chromeStore = {
     } catch {
       // Private mode: the choice simply does not survive the session.
     }
-    travel = 0;
     set(
       pinned
         ? {
             pinned,
-            header: window.scrollY <= TOP_ZONE ? "full" : "compact",
+            header: window.scrollY <= CHROME_TOP_ZONE ? "full" : "compact",
             navHidden: false,
             peeking: false,
           }

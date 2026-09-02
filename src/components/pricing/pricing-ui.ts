@@ -55,6 +55,14 @@ export interface CatalogPrice {
   note: string;
 }
 
+/** Actual demand measured from audited Odoo-linked sales in the selected period. */
+export interface CatalogDemand {
+  /** Distinct sale orders (falling back to invoices when an order is unavailable). */
+  orders: number;
+  /** Course seats sold; packages use one unit per distinct order. */
+  units: number;
+}
+
 export interface CatalogEntry {
   code: string;
   rawCode: string;
@@ -66,7 +74,26 @@ export interface CatalogEntry {
   odooProductId: number | null;
   onHold: boolean;
   requiresReview: boolean;
+  demand: CatalogDemand;
   prices: CatalogPrice[];
+}
+
+/** A real package from Engosoft's custom Odoo `training.package` module. */
+export interface TrainingPackageEntry {
+  id: number;
+  name: string;
+  active: boolean;
+  specialization: string;
+  companyId: number | null;
+  companyName: string;
+  currency: string;
+  listPrice: number | null;
+  finalPrice: number | null;
+  courseCount: number;
+  recordedCourseCount: number;
+  attendanceCourseCount: number;
+  updatedAt: string;
+  demand: CatalogDemand;
 }
 
 export interface PriceItem {

@@ -53,7 +53,8 @@
     "test:price-versioning": "node --experimental-strip-types scripts/test-price-versioning.mjs",
     "test:pricing-security": "node --experimental-strip-types scripts/test-pricing-security.mjs",
     "test:pricing-performance": "node --experimental-strip-types scripts/test-pricing-performance.mjs",
-    "test:pricing": "npm run test:price-book-parser && npm run test:pricing-engine && npm run test:price-versioning && npm run test:pricing-security && npm run test:pricing-performance",
+    "test:pricing-catalog": "node --experimental-strip-types scripts/test-pricing-catalog.mjs",
+    "test:pricing": "npm run test:price-book-parser && npm run test:pricing-engine && npm run test:price-versioning && npm run test:pricing-security && npm run test:pricing-performance && npm run test:pricing-catalog",
     "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs"
   },
   "dependencies": {

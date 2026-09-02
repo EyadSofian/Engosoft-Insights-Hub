@@ -24,12 +24,20 @@ import {
   type CatalogEntry,
   type CatalogPrice,
   type PriceBookSummary,
+  type TrainingPackageEntry,
 } from "./pricing-ui";
 
 export interface CatalogResponse {
   configured: boolean;
   book: PriceBookSummary | null;
   entries: CatalogEntry[];
+  packages: TrainingPackageEntry[];
+  packagesError?: string;
+  demandPeriod?: {
+    from?: string;
+    to?: string;
+    dateBasis: "payment" | "sale" | "invoice";
+  };
   total: number;
   truncated?: boolean;
   auth: AuthState;
