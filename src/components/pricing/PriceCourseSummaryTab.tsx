@@ -12,6 +12,7 @@ import {
   entryKey,
   hasIndividual,
   inForceSince,
+  isNegotiable,
   type CourseBreachSummary,
   type PriceMode,
 } from "./course-pricing";
@@ -59,16 +60,17 @@ const packageLabel = (value: string, ar: boolean) => {
     .replace(/Offline/gi, "حضوري");
 };
 
-type ContentKind = "all" | "course" | "package" | "offer" | "breached";
+export type CatalogContentKind = "all" | "course" | "package" | "offer" | "negotiable" | "breached";
 
 const matchesKind = (
   entry: CatalogEntry,
-  kind: ContentKind,
+  kind: CatalogContentKind,
   breaches: Map<string, CourseBreachSummary>,
 ) => {
   if (kind === "all" || kind === "course") return hasIndividual(entry);
   if (kind === "package") return false;
   if (kind === "offer") return activeOffers(entry).length > 0;
+  if (kind === "negotiable") return isNegotiable(entry);
   if (kind === "breached") return (breaches.get(entry.rawCode)?.breaches ?? 0) > 0;
   return false;
 };
@@ -84,6 +86,10 @@ const matchesKind = (
 export function PriceCourseSummaryTab({
   filters,
   onFilters,
+  kind,
+  onKind,
+  demandOnly,
+  onDemandOnly,
   data,
   facets,
   loading,
@@ -96,6 +102,10 @@ export function PriceCourseSummaryTab({
 }: {
   filters: SearchFilters;
   onFilters: (next: SearchFilters) => void;
+  kind: CatalogContentKind;
+  onKind: (next: CatalogContentKind) => void;
+  demandOnly: boolean;
+  onDemandOnly: (next: boolean) => void;
   data?: CatalogResponse;
   facets?: FacetResponse;
   loading: boolean;
@@ -110,8 +120,6 @@ export function PriceCourseSummaryTab({
   const { lang } = useI18n();
   const ar = lang === "ar";
   const isMobile = useIsMobile();
-  const [kind, setKind] = useState<ContentKind>("all");
-  const [demandOnly, setDemandOnly] = useState(true);
   const [openKey, setOpenKey] = useState("");
 
   const visible = useMemo(
@@ -159,11 +167,12 @@ export function PriceCourseSummaryTab({
   const book: PriceBookSummary | null = data?.book ?? null;
   const bookEffectiveFrom = book?.effectiveFrom ?? "";
 
-  const kindTabs: { value: ContentKind; label: string }[] = [
+  const kindTabs: { value: CatalogContentKind; label: string }[] = [
     { value: "all", label: ar ? "الكل" : "All" },
     { value: "course", label: ar ? "الدورات" : "Courses" },
     { value: "package", label: ar ? "الباقات" : "Packages" },
     { value: "offer", label: ar ? "عروض سارية" : "Live offers" },
+    { value: "negotiable", label: ar ? "قابلة للتفاوض" : "Negotiable" },
     { value: "breached", label: ar ? "عليها مخالفات" : "With breaches" },
   ];
 
@@ -230,7 +239,7 @@ export function PriceCourseSummaryTab({
                   type="button"
                   key={item.value}
                   aria-pressed={kind === item.value}
-                  onClick={() => setKind(item.value)}
+                  onClick={() => onKind(item.value)}
                   className={`min-h-8 cursor-pointer rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
                     kind === item.value
                       ? "bg-brand-soft text-brand ring-1 ring-brand/25"
@@ -270,7 +279,7 @@ export function PriceCourseSummaryTab({
             <button
               type="button"
               aria-pressed={demandOnly}
-              onClick={() => setDemandOnly(true)}
+              onClick={() => onDemandOnly(true)}
               className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
                 demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
               }`}
@@ -281,7 +290,7 @@ export function PriceCourseSummaryTab({
             <button
               type="button"
               aria-pressed={!demandOnly}
-              onClick={() => setDemandOnly(false)}
+              onClick={() => onDemandOnly(false)}
               className={`min-h-7 cursor-pointer rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
                 !demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
               }`}

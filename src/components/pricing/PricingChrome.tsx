@@ -1,5 +1,13 @@
 import { useLayoutEffect, useRef, type FormEvent, type ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight, Minus, Search, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  Minus,
+  Search,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
 
@@ -91,6 +99,8 @@ export interface PricingKpi {
   /** Applying this KPI's own filter is the point of pressing it. */
   onSelect?: () => void;
   selectHint?: string;
+  /** Plain-language confirmation shown above the filtered results. */
+  resultDescription?: string;
   Icon?: LucideIcon;
 }
 
@@ -101,7 +111,16 @@ export interface PricingKpi {
  * six numbers that are meant to be compared. Dividers do the same grouping job
  * and cost one pixel each.
  */
-export function PricingKpiStrip({ items, loading }: { items: PricingKpi[]; loading?: boolean }) {
+export function PricingKpiStrip({
+  items,
+  loading,
+  activeId,
+}: {
+  items: PricingKpi[];
+  loading?: boolean;
+  /** The KPI whose drill-down is currently shown below the strip. */
+  activeId?: string;
+}) {
   const { lang } = useI18n();
   const ar = lang === "ar";
 
@@ -114,20 +133,31 @@ export function PricingKpiStrip({ items, loading }: { items: PricingKpi[]; loadi
     >
       <div className="grid min-w-[640px] grid-cols-3 lg:min-w-0 lg:grid-cols-6">
         {items.map((item, index) => {
+          const active = item.id === activeId;
           return (
             <div
               key={item.id}
-              className={`group relative min-w-0 px-3.5 py-3 text-start transition-colors ${
+              className={`group relative min-w-0 px-3.5 py-3 text-start transition-[background-color,box-shadow] ${
                 index ? "border-s border-border" : ""
               } ${index > 2 ? "border-t border-border lg:border-t-0" : ""} ${
-                item.onSelect ? "hover:bg-surface-2 focus-within:bg-surface-2" : ""
+                item.onSelect && !active ? "hover:bg-surface-2 focus-within:bg-surface-2" : ""
               }`}
+              style={
+                active
+                  ? {
+                      background:
+                        "linear-gradient(180deg, color-mix(in oklab, var(--brand) 10%, var(--surface)), var(--surface))",
+                      boxShadow: "inset 0 -3px 0 var(--brand)",
+                    }
+                  : undefined
+              }
             >
               {item.onSelect && (
                 <button
                   type="button"
                   onClick={item.onSelect}
                   title={item.selectHint}
+                  aria-pressed={active}
                   aria-label={
                     item.selectHint
                       ? `${item.label}: ${item.value}. ${item.selectHint}`
@@ -151,6 +181,19 @@ export function PricingKpiStrip({ items, loading }: { items: PricingKpi[]; loadi
                   {item.info && (
                     <span className="pointer-events-auto relative z-10 inline-flex">
                       {item.info}
+                    </span>
+                  )}
+                  {item.onSelect && (
+                    <span
+                      aria-hidden="true"
+                      className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                        active
+                          ? "bg-brand text-white"
+                          : "bg-surface-2 text-text-subtle group-hover:bg-brand-soft group-hover:text-brand"
+                      }`}
+                    >
+                      {active ? (ar ? "مفتوح" : "Open") : ar ? "عرض" : "View"}
+                      <ChevronDown size={9} strokeWidth={2.6} />
                     </span>
                   )}
                 </div>
@@ -189,6 +232,65 @@ export function PricingKpiStrip({ items, loading }: { items: PricingKpi[]; loadi
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * A compact hand-off between a KPI and the data it filtered.
+ *
+ * Without this confirmation the route changes correctly, but the reader only
+ * sees that "something lower on the page" changed. This sentence closes that
+ * gap and gives them one obvious way back to the unfiltered view.
+ */
+export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onClear: () => void }) {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+  const Icon = item.Icon;
+
+  return (
+    <section
+      role="region"
+      aria-label={ar ? `النتائج الحالية: ${item.label}` : `Current results: ${item.label}`}
+      className="relative overflow-hidden rounded-xl border border-brand/25 bg-[linear-gradient(110deg,var(--brand-soft),var(--surface)_64%)] px-3.5 py-2.5"
+    >
+      <span className="sr-only" aria-live="polite">
+        {ar ? `تعرض الآن ${item.label}` : `Now showing ${item.label}`}
+      </span>
+      <span className="absolute inset-y-0 start-0 w-1 bg-brand" aria-hidden="true" />
+      <div className="flex items-center gap-3">
+        {Icon && (
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-white shadow-sm">
+            <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
+          </span>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-brand">
+              {ar ? "تعرض الآن" : "Showing now"}
+            </span>
+            <strong className="text-[12.5px] text-text">{item.label}</strong>
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
+            {item.resultDescription ?? item.question}
+          </p>
+        </div>
+
+        <span className="num hidden shrink-0 rounded-lg bg-surface px-2.5 py-1 text-[13px] font-bold text-brand shadow-sm ring-1 ring-border sm:inline-flex">
+          {item.value}
+        </span>
+
+        <button
+          type="button"
+          onClick={onClear}
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[11.5px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+        >
+          <X size={13} aria-hidden="true" />
+          <span className="hidden sm:inline">{ar ? "إلغاء التحديد" : "Clear selection"}</span>
+          <span className="sm:hidden">{ar ? "إلغاء" : "Clear"}</span>
+        </button>
+      </div>
+    </section>
   );
 }
 

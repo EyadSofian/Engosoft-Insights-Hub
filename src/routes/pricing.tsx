@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BadgePercent,
@@ -26,10 +26,14 @@ import {
   type ComplianceFilters,
   type ComplianceResponse,
 } from "@/components/pricing/PriceComplianceTab";
-import { PriceCourseSummaryTab } from "@/components/pricing/PriceCourseSummaryTab";
+import {
+  PriceCourseSummaryTab,
+  type CatalogContentKind,
+} from "@/components/pricing/PriceCourseSummaryTab";
 import { PriceComplianceInfo } from "@/components/pricing/PriceComplianceInfo";
 import { PriceManageTab } from "@/components/pricing/PriceManageTab";
 import {
+  PricingDrilldownBar,
   PricingKpiStrip,
   PricingPageHeader,
   PricingTabBar,
@@ -131,6 +135,14 @@ function PricingPage() {
   const [busy, setBusy] = useState<"" | "recalculate" | "digest">("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [catalogKind, setCatalogKind] = useState<CatalogContentKind>("all");
+  const [catalogDemandOnly, setCatalogDemandOnly] = useState(true);
+  const [kpiDrilldown, setKpiDrilldown] = useState<{
+    id: string;
+    request: number;
+    targetTab: Tab;
+  } | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -141,6 +153,30 @@ function PricingPage() {
   }, []);
 
   useEffect(() => setQuickSearch(searchFilters.q), [searchFilters.q]);
+
+  // A KPI is a shortcut into another data view. Once that view has rendered,
+  // take the reader to it and move programmatic focus as one coherent action.
+  // Keeping a request counter means pressing the same KPI again still works.
+  useEffect(() => {
+    if (!kpiDrilldown || tab !== kpiDrilldown.targetTab) return;
+    let scrollTimer = 0;
+    let focusTimer = 0;
+    scrollTimer = window.setTimeout(() => {
+      const target = resultsRef.current;
+      if (!target) return;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 8);
+      window.scrollTo({ top, behavior: reducedMotion ? "auto" : "smooth" });
+      focusTimer = window.setTimeout(
+        () => target.focus({ preventScroll: true }),
+        reducedMotion ? 0 : 420,
+      );
+    }, 48);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(focusTimer);
+    };
+  }, [kpiDrilldown, tab]);
 
   // The period shown in the global top bar is the period the pricing audit uses.
   // Keeping a second silent date window here would make a correct percentage
@@ -162,6 +198,18 @@ function PricingPage() {
 
   const setTab = (next: Tab) =>
     void navigate({ search: { tab: next === "prices" ? undefined : next } });
+
+  const selectKpi = (id: string, targetTab: Tab) =>
+    setKpiDrilldown((current) => ({
+      id,
+      targetTab,
+      request: (current?.request ?? 0) + 1,
+    }));
+
+  const changeTab = (next: Tab) => {
+    setKpiDrilldown(null);
+    setTab(next);
+  };
 
   const catalogPeriod = {
     from: complianceFilters.from,
@@ -428,32 +476,39 @@ function PricingPage() {
   };
 
   const openSalesperson = (salesperson: string) => {
+    setKpiDrilldown(null);
     setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, salesperson, offset: 0 });
     setTab("invoices");
   };
 
   /** Every invoice for one course — not only the breaching ones. */
   const openInvoicesFor = (productCode: string) => {
+    setKpiDrilldown(null);
     setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, q: productCode, offset: 0 });
     setTab("invoices");
   };
 
-  const showBreaches = () => {
+  const showBreaches = (source: "below" | "leakage") => {
+    selectKpi(source, "invoices");
     setComplianceFilters({
       ...emptyComplianceFilters,
       ...periodParams,
       status: "below_minimum",
+      sort: source === "leakage" ? "gap" : "priority",
+      dir: "desc",
       offset: 0,
     });
     setTab("invoices");
   };
 
   const showAllInvoices = () => {
+    selectKpi("compliance", "invoices");
     setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, offset: 0 });
     setTab("invoices");
   };
 
   const showNeedsReview = () => {
+    selectKpi("review", "invoices");
     setComplianceFilters({
       ...emptyComplianceFilters,
       ...periodParams,
@@ -465,6 +520,9 @@ function PricingPage() {
 
   const searchPrices = (event: FormEvent) => {
     event.preventDefault();
+    setKpiDrilldown(null);
+    setCatalogKind("all");
+    setCatalogDemandOnly(false);
     setSearchFilters({ ...emptySearchFilters, q: quickSearch.trim() });
     setTab("prices");
   };
@@ -527,6 +585,9 @@ function PricingPage() {
       Icon: ShieldCheck,
       onSelect: showAllInvoices,
       selectHint: ar ? "افتح كل الفواتير المحللة" : "Open all audited invoices",
+      resultDescription: ar
+        ? "كل بنود الفواتير التي حللها النظام خلال الفترة المختارة."
+        : "Every invoice line audited during the selected period.",
       info: (
         <PriceComplianceInfo
           from={complianceFilters.from}
@@ -546,8 +607,11 @@ function PricingPage() {
         kpis && previousKpis ? kpis.belowMinimumLines - previousKpis.belowMinimumLines : undefined,
       deltaInvert: true,
       Icon: TrendingDown,
-      onSelect: showBreaches,
+      onSelect: () => showBreaches("below"),
       selectHint: ar ? "افتح الفواتير المخالفة" : "Open the breaching invoices",
+      resultDescription: ar
+        ? "الفواتير مفلترة الآن على البنود المباعة تحت الحد الأدنى المعتمد."
+        : "Invoices are now filtered to lines sold below the approved floor.",
     },
     {
       id: "leakage",
@@ -556,8 +620,11 @@ function PricingPage() {
       question: ar ? "الفرق بين ما حُصّل والحد الأدنى" : "Collected minus the approved floor",
       tone: leakage ? "danger" : "neutral",
       Icon: Wallet,
-      onSelect: showBreaches,
+      onSelect: () => showBreaches("leakage"),
       selectHint: ar ? "افتح الفواتير المخالفة" : "Open the breaching invoices",
+      resultDescription: ar
+        ? "الفواتير التي كوّنت قيمة التجاوز، مرتبة لتبدأ بالأكثر تأثيرًا."
+        : "Invoices behind this value, ordered with the largest impact first.",
     },
     {
       id: "review",
@@ -573,6 +640,9 @@ function PricingPage() {
       Icon: TriangleAlert,
       onSelect: showNeedsReview,
       selectHint: ar ? "افتح البنود التي تحتاج مراجعة" : "Open the lines needing review",
+      resultDescription: ar
+        ? "بنود لا يمكن إصدار حكم نهائي عليها قبل مراجعة بيانات الدفع أو العرض."
+        : "Lines that need payment or offer data reviewed before a final verdict.",
     },
     {
       id: "negotiable",
@@ -581,10 +651,16 @@ function PricingPage() {
       question: ar ? "بينها مساحة خصم مسموحة" : "Priced as a range, not a fixed number",
       Icon: Handshake,
       onSelect: () => {
+        selectKpi("negotiable", "prices");
+        setCatalogKind("negotiable");
+        setCatalogDemandOnly(false);
         setSearchFilters(emptySearchFilters);
         setTab("prices");
       },
       selectHint: ar ? "افتح قائمة الأسعار" : "Open the price list",
+      resultDescription: ar
+        ? "القائمة مفلترة الآن على الدورات التي تسمح قواعدها بهامش تفاوض."
+        : "The list is now filtered to courses whose rules allow a negotiation range.",
     },
     {
       id: "offers",
@@ -593,12 +669,31 @@ function PricingPage() {
       question: ar ? "دورات عليها عرض نافذ اليوم" : "Courses with an offer in force today",
       Icon: BadgePercent,
       onSelect: () => {
+        selectKpi("offers", "prices");
+        setCatalogKind("offer");
+        setCatalogDemandOnly(false);
         setSearchFilters({ ...emptySearchFilters, liveOffers: true });
         setTab("prices");
       },
       selectHint: ar ? "اعرض هذه الدورات" : "Show these courses",
+      resultDescription: ar
+        ? "قائمة الأسعار مفلترة الآن على الدورات التي لها عرض ساري اليوم."
+        : "The price list is now filtered to courses with a live offer today.",
     },
   ];
+
+  const activeKpi = kpiDrilldown ? kpiItems.find((item) => item.id === kpiDrilldown.id) : undefined;
+
+  const clearKpiDrilldown = () => {
+    if (tab === "invoices") {
+      setComplianceFilters({ ...emptyComplianceFilters, ...periodParams, offset: 0 });
+    } else if (tab === "prices") {
+      setSearchFilters(emptySearchFilters);
+      setCatalogKind("all");
+      setCatalogDemandOnly(true);
+    }
+    setKpiDrilldown(null);
+  };
 
   const lastRun = snapshot.data?.freshness.lastRunAt ?? "";
   const basisLabel = ar
@@ -688,14 +783,22 @@ function PricingPage() {
         }
       />
 
-      <PricingKpiStrip items={kpiItems} loading={kpiLoading} />
+      <PricingKpiStrip items={kpiItems} loading={kpiLoading} activeId={kpiDrilldown?.id} />
 
+      <div
+        ref={resultsRef}
+        tabIndex={-1}
+        aria-label={ar ? "نتائج المؤشر المختار" : "Selected indicator results"}
+        className="scroll-mt-1 outline-none"
+      />
       <PricingTabBar
         tabs={tabDefinitions}
         value={tab}
-        onChange={setTab}
+        onChange={changeTab}
         label={ar ? "أقسام لوحة الأسعار" : "Pricing dashboard sections"}
       />
+
+      {activeKpi && <PricingDrilldownBar item={activeKpi} onClear={clearKpiDrilldown} />}
 
       {!!error && <Notice tone="danger">{error}</Notice>}
       {!!message && <Notice tone="info">{message}</Notice>}
@@ -709,7 +812,20 @@ function PricingPage() {
           />
           <PriceCourseSummaryTab
             filters={searchFilters}
-            onFilters={setSearchFilters}
+            onFilters={(next) => {
+              setKpiDrilldown(null);
+              setSearchFilters(next);
+            }}
+            kind={catalogKind}
+            onKind={(next) => {
+              setKpiDrilldown(null);
+              setCatalogKind(next);
+            }}
+            demandOnly={catalogDemandOnly}
+            onDemandOnly={(next) => {
+              setKpiDrilldown(null);
+              setCatalogDemandOnly(next);
+            }}
             data={catalogData}
             facets={facets.data}
             loading={catalogLoading}
@@ -729,7 +845,10 @@ function PricingPage() {
         <PriceComplianceTab
           data={compliance.data}
           filters={complianceFilters}
-          onFilters={setComplianceFilters}
+          onFilters={(next) => {
+            setKpiDrilldown(null);
+            setComplianceFilters(next);
+          }}
           loading={compliance.isLoading}
           error={compliance.error instanceof Error ? compliance.error.message : undefined}
           onRetry={() => void compliance.refetch()}
