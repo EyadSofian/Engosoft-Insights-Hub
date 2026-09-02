@@ -421,8 +421,6 @@ export function PriceCourseSummaryTab({
         </div>
       )}
 
-      {!loading && visiblePackages.length > 0 && <OdooPackageList packages={visiblePackages} />}
-
       {!loading &&
         grouped.map(([specialization, entries]) => (
           <section
@@ -502,6 +500,8 @@ export function PriceCourseSummaryTab({
             })}
           </section>
         ))}
+
+      {!loading && visiblePackages.length > 0 && <OdooPackageList packages={visiblePackages} />}
 
       {!!data?.truncated && (
         <Notice tone="info">
