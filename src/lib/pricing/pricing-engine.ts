@@ -388,8 +388,17 @@ export function judgeLine(
   // 600-SAR standalone course. Odoo is authoritative here because it preserves
   // both the selected pricelist and the sale line that produced the invoice.
   if (line.pricingContext === "package") {
-    const packagePrice = line.odooExpectedUnitPrice;
-    const packageActual = actualUnitPrice(line, false);
+    const packagePriceExTax = line.odooExpectedUnitPrice;
+    const packageActual = actualUnitPrice(line, options.taxInclusive);
+    const lineTaxFactor =
+      line.untaxedTotal > 0 && line.totalInCurrency > 0
+        ? line.totalInCurrency / line.untaxedTotal
+        : 1;
+    const safeTaxFactor = lineTaxFactor > 0.5 && lineTaxFactor < 1.5 ? lineTaxFactor : 1;
+    const packagePrice =
+      packagePriceExTax === null
+        ? null
+        : money(packagePriceExTax * (options.taxInclusive ? safeTaxFactor : 1));
     if (packageActual === null || packagePrice === null || packagePrice <= 0) {
       return empty(
         "package_price_unresolved",
@@ -403,7 +412,7 @@ export function judgeLine(
     const tolerance = 0.01;
     const varianceAmount = money(packagePrice - packageActual);
     const variancePercent = packagePrice > 0 ? varianceAmount / packagePrice : null;
-    const source = line.odooPricelistName || line.pricingContextName || "Odoo package pricelist";
+    const source = line.pricingContextName || line.odooPricelistName || "Odoo package pricelist";
 
     if (packageActual > packagePrice + tolerance) {
       return {

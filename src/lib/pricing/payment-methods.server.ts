@@ -449,7 +449,16 @@ export interface InvoiceLineFact {
   pricingContext: PricingContext;
   pricingContextName: string;
   odooPricingChecked: boolean;
+  pricingLineageVersion: number;
 }
+
+/**
+ * Bump when the Odoo lineage reader learns a new authoritative pricing path.
+ *
+ * Stored facts from older readers are refreshed once on the next audit instead
+ * of preserving a now-known false classification forever.
+ */
+export const PRICING_LINEAGE_VERSION = 2;
 
 const packagePricelistIds = (): Set<number> =>
   new Set(
@@ -606,6 +615,7 @@ export async function readInvoiceLineFacts(
         pricingContext: "unknown",
         pricingContextName: "",
         odooPricingChecked: true,
+        pricingLineageVersion: PRICING_LINEAGE_VERSION,
       });
     }
   }
@@ -629,6 +639,7 @@ export async function readInvoiceLineFacts(
     "id",
     "order_id",
     "product_id",
+    "event_id",
     "product_uom_qty",
     "price_unit",
     "discount",
@@ -641,6 +652,7 @@ export async function readInvoiceLineFacts(
     id: number;
     order_id?: M2O;
     product_id?: M2O;
+    event_id?: M2O;
     product_uom_qty?: number;
     price_unit?: number;
     discount?: number;
@@ -707,6 +719,116 @@ export async function readInvoiceLineFacts(
     }
   }
   const orderById = new Map(orders.map((row) => [row.id, row]));
+
+  // Engosoft's `courses_packages` module does not put the package on the sale
+  // order or its pricelist. Instead, every package registration points to an
+  // `event.event` where `is_package_event` is true, and that event points to a
+  // `training.package.group`, which in turn identifies `training.package`.
+  // Following those real relations avoids interpreting a package allocation as
+  // an illegal discount against the standalone course price.
+  const trainingPackageBySaleLineId = new Map<
+    number,
+    { packageId: number; packageName: string; groupId: number; groupName: string }
+  >();
+  if (saleLineMeta.event_id) {
+    try {
+      const eventIds = [
+        ...new Set(saleLines.map((row) => m2oId(row.event_id)).filter((id) => id > 0)),
+      ];
+      if (eventIds.length) {
+        const eventMeta = await odoo.metadata("event.event");
+        odooCalls++;
+        if (eventMeta.id && eventMeta.is_package_event) {
+          interface EventRow {
+            id: number;
+            is_package_event?: boolean;
+            related_group_id?: M2O;
+          }
+          const eventFields = ["id", "is_package_event", "related_group_id"].filter(
+            (field) => !!eventMeta[field],
+          );
+          const packageEvents: EventRow[] = [];
+          for (const batch of chunks(eventIds, 500)) {
+            packageEvents.push(
+              ...(await odoo.searchRead<EventRow>(
+                "event.event",
+                [["id", "in", batch]],
+                eventFields,
+                { context: { active_test: false } },
+              )),
+            );
+            odooCalls++;
+          }
+
+          const packageEventById = new Map(
+            packageEvents
+              .filter((row) => row.is_package_event === true)
+              .map((row) => [row.id, row]),
+          );
+          const groupIds = [
+            ...new Set(
+              [...packageEventById.values()]
+                .map((row) => m2oId(row.related_group_id))
+                .filter((id) => id > 0),
+            ),
+          ];
+          const groupById = new Map<
+            number,
+            { packageId: number; packageName: string; groupName: string }
+          >();
+
+          if (groupIds.length) {
+            const groupMeta = await odoo.metadata("training.package.group");
+            odooCalls++;
+            if (groupMeta.id && groupMeta.package_id) {
+              interface PackageGroupRow {
+                id: number;
+                name?: string | false;
+                display_name?: string | false;
+                package_id?: M2O;
+              }
+              const groupFields = ["id", "name", "display_name", "package_id"].filter(
+                (field) => !!groupMeta[field],
+              );
+              for (const batch of chunks(groupIds, 500)) {
+                const rows = await odoo.searchRead<PackageGroupRow>(
+                  "training.package.group",
+                  [["id", "in", batch]],
+                  groupFields,
+                  { context: { active_test: false } },
+                );
+                odooCalls++;
+                for (const row of rows) {
+                  groupById.set(row.id, {
+                    packageId: m2oId(row.package_id),
+                    packageName: text(m2oName(row.package_id)),
+                    groupName: text(row.display_name) || text(row.name),
+                  });
+                }
+              }
+            }
+          }
+
+          for (const saleLine of saleLines) {
+            const packageEvent = packageEventById.get(m2oId(saleLine.event_id));
+            if (!packageEvent) continue;
+            const groupId = m2oId(packageEvent.related_group_id);
+            const group = groupById.get(groupId);
+            trainingPackageBySaleLineId.set(saleLine.id, {
+              packageId: group?.packageId ?? 0,
+              packageName: group?.packageName ?? "",
+              groupId,
+              groupName: group?.groupName || text(m2oName(packageEvent.related_group_id)),
+            });
+          }
+        }
+      }
+    } catch {
+      // This module is custom to Engosoft and may not exist in another Odoo
+      // database. The existing sale-line/pricelist lineage remains available.
+    }
+  }
+
   const configuredPackageIds = packagePricelistIds();
   const packagePattern = packageNamePattern();
 
@@ -730,8 +852,16 @@ export async function readInvoiceLineFacts(
     const pricelistItemName = text(m2oName(saleLine.pricelist_item_id));
     const saleHint = hasPackageHint(saleLine, saleHintFields);
     const orderHint = order ? hasPackageHint(order, orderHintFields) : "";
-    const contextName = saleHint || orderHint || pricelistName || pricelistItemName;
+    const trainingPackage = trainingPackageBySaleLineId.get(saleLine.id);
+    const contextName =
+      trainingPackage?.packageName ||
+      trainingPackage?.groupName ||
+      saleHint ||
+      orderHint ||
+      pricelistName ||
+      pricelistItemName;
     const isPackage =
+      !!trainingPackage ||
       configuredPackageIds.has(pricelistId) ||
       packagePattern.test(`${pricelistName} ${pricelistItemName} ${saleHint} ${orderHint}`);
 
@@ -759,8 +889,27 @@ export async function readInvoiceLineFacts(
         ? saleLineEffective / discountedRawUnit
         : 1;
     const safeTaxFactor = taxFactor > 0.5 && taxFactor < 1.5 ? taxFactor : 1;
-    const expectedUnitPrice =
-      fixedRulePrice !== null ? fixedRulePrice * safeTaxFactor : saleLineEffective;
+    // For a real training package Odoo distributes the package total over the
+    // component sale lines (usually as a shared discount). In Engosoft KSA that
+    // sale-line allocation is tax-inclusive while the audit contract stores an
+    // expected tax-exclusive unit price, so use the posted invoice line's own
+    // tax ratio to put both sides on the same basis. The standalone pricelist
+    // item's fixed price is intentionally *not* the package price.
+    const invoiceSubtotal = Number(invoiceRow.price_subtotal ?? 0) || 0;
+    const invoiceTotal = Number(invoiceRow.price_total ?? 0) || 0;
+    const invoiceTaxExclusiveFactor =
+      invoiceSubtotal > 0 && invoiceTotal > 0 ? invoiceSubtotal / invoiceTotal : 1;
+    const safeInvoiceTaxFactor =
+      invoiceTaxExclusiveFactor > 0.5 && invoiceTaxExclusiveFactor <= 1.01
+        ? invoiceTaxExclusiveFactor
+        : 1;
+    const expectedUnitPrice = trainingPackage
+      ? saleLineEffective === null
+        ? null
+        : saleLineEffective * safeInvoiceTaxFactor
+      : fixedRulePrice !== null
+        ? fixedRulePrice * safeTaxFactor
+        : saleLineEffective;
 
     Object.assign(fact, {
       saleOrderLineId: saleLine.id,
@@ -776,6 +925,7 @@ export async function readInvoiceLineFacts(
           : null,
       pricingContext: (isPackage ? "package" : "individual") as PricingContext,
       pricingContextName: contextName,
+      pricingLineageVersion: PRICING_LINEAGE_VERSION,
     });
   }
   return { facts, odooCalls, rejected };

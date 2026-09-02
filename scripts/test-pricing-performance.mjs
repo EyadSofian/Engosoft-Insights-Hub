@@ -324,6 +324,155 @@ assert.equal(result.diagnostics.invoicesRequested, INVOICES);
   assert.equal(fact.odooPricingChecked, true);
 }
 
+/* --- Engosoft training events identify the real package ------------------- */
+
+{
+  const fieldMap = (names) => Object.fromEntries(names.map((name) => [name, { type: "float" }]));
+  const odoo = {
+    configured: () => true,
+    metadata: async (model) => {
+      if (model === "account.move.line") {
+        return fieldMap([
+          "id",
+          "move_id",
+          "product_id",
+          "quantity",
+          "price_unit",
+          "discount",
+          "price_subtotal",
+          "price_total",
+          "sale_line_ids",
+        ]);
+      }
+      if (model === "sale.order.line") {
+        return fieldMap([
+          "id",
+          "order_id",
+          "product_id",
+          "event_id",
+          "product_uom_qty",
+          "price_unit",
+          "discount",
+          "price_subtotal",
+          "pricelist_item_id",
+        ]);
+      }
+      if (model === "product.pricelist.item") {
+        return fieldMap(["id", "compute_price", "fixed_price"]);
+      }
+      if (model === "sale.order") return fieldMap(["id", "name", "pricelist_id"]);
+      if (model === "event.event") {
+        return fieldMap(["id", "is_package_event", "related_group_id"]);
+      }
+      if (model === "training.package.group") {
+        return fieldMap(["id", "name", "display_name", "package_id"]);
+      }
+      return {};
+    },
+    searchRead: async (model) => {
+      if (model === "account.move.line") {
+        return [
+          {
+            id: 228612,
+            move_id: [63108, "INVNT/2026/002294"],
+            product_id: [2078, "[911] SketchUp"],
+            quantity: 1,
+            price_unit: 351.47,
+            discount: 0,
+            price_subtotal: 305.63,
+            price_total: 351.47,
+            sale_line_ids: [57703],
+          },
+          {
+            id: 228616,
+            move_id: [63108, "INVNT/2026/002294"],
+            product_id: [1317, "[1] 3ds Max"],
+            quantity: 1,
+            price_unit: 327.16,
+            discount: 0,
+            price_subtotal: 284.49,
+            price_total: 327.16,
+            sale_line_ids: [57707],
+          },
+        ];
+      }
+      if (model === "sale.order.line") {
+        return [
+          {
+            id: 57703,
+            order_id: [19323, "S19279"],
+            product_id: [2078, "[911] SketchUp"],
+            event_id: [1437, "(E05712) SketchUp"],
+            product_uom_qty: 1,
+            price_unit: 940,
+            discount: 62.61,
+            price_subtotal: 351.47,
+            pricelist_item_id: [6775, "SketchUp standalone price"],
+          },
+          {
+            id: 57707,
+            order_id: [19323, "S19279"],
+            product_id: [1317, "[1] 3ds Max"],
+            event_id: [1445, "(E05720) 3ds Max"],
+            product_uom_qty: 1,
+            price_unit: 875,
+            discount: 62.61,
+            price_subtotal: 327.16,
+            pricelist_item_id: [6779, "3ds Max standalone price"],
+          },
+        ];
+      }
+      if (model === "product.pricelist.item") {
+        return [
+          { id: 6775, compute_price: "fixed", fixed_price: 940 },
+          { id: 6779, compute_price: "fixed", fixed_price: 875 },
+        ];
+      }
+      if (model === "sale.order") {
+        return [{ id: 19323, name: "S19279", pricelist_id: [9, "KSA Price List (SAR)"] }];
+      }
+      if (model === "event.event") {
+        return [
+          { id: 1437, is_package_event: true, related_group_id: [61, "Evening Group"] },
+          { id: 1445, is_package_event: true, related_group_id: [61, "Evening Group"] },
+        ];
+      }
+      if (model === "training.package.group") {
+        return [
+          {
+            id: 61,
+            name: "Evening Group September 2026",
+            display_name: "Evening Group September 2026",
+            package_id: [5, "Interior Design Professional Track"],
+          },
+        ];
+      }
+      return [];
+    },
+  };
+
+  const result = await readInvoiceLineFacts(
+    [
+      { invoiceLineId: "228612", invoiceNumber: "INVNT/2026/002294" },
+      { invoiceLineId: "228616", invoiceNumber: "INVNT/2026/002294" },
+    ],
+    odoo,
+  );
+  const sketchup = result.facts.get("228612");
+  const max = result.facts.get("228616");
+  assert.equal(sketchup.pricingContext, "package");
+  assert.equal(max.pricingContext, "package");
+  assert.equal(sketchup.pricingContextName, "Interior Design Professional Track");
+  assert.equal(sketchup.pricelistName, "KSA Price List (SAR)");
+  assert.equal(
+    sketchup.expectedUnitPrice,
+    305.63,
+    "the tax-normalized Odoo package allocation outranks the standalone fixed course price",
+  );
+  assert.equal(max.expectedUnitPrice, 284.49);
+  assert.equal(sketchup.pricingLineageVersion, 2);
+}
+
 /* --- roll-ups stay linear -------------------------------------------------- */
 
 {

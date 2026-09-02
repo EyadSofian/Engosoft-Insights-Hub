@@ -45,6 +45,7 @@ import {
   type RuleIndex,
 } from "./pricing-engine.ts";
 import {
+  PRICING_LINEAGE_VERSION,
   readInvoiceLineFacts,
   readPaymentMethods,
   resolveProductIdsByCode,
@@ -348,9 +349,14 @@ export async function runPriceAudit(options: AuditRunOptions = {}): Promise<Audi
   const needsFacts = lines;
   if (needsFacts.length) {
     const cached = await readStoredLineFacts(needsFacts.map((line) => line.invoiceLineId));
-    const missing = needsFacts.filter(
-      (line) => options.force || !cached.get(line.invoiceLineId)?.odooPricingChecked,
-    );
+    const missing = needsFacts.filter((line) => {
+      const fact = cached.get(line.invoiceLineId);
+      return (
+        options.force ||
+        !fact?.odooPricingChecked ||
+        fact.pricingLineageVersion !== PRICING_LINEAGE_VERSION
+      );
+    });
 
     if (missing.length && !options.offline && odooConfigured()) {
       try {

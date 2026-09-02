@@ -208,7 +208,15 @@ export function InvoiceDetailPanel({
                     value={fmtMoney(line.actualUnitPrice, line.currency, lang)}
                   />
                   <DetailStat
-                    label={ar ? "الحد الأدنى" : "Floor"}
+                    label={
+                      line.pricingContext === "package"
+                        ? ar
+                          ? "سعر الباقة الموزّع"
+                          : "Package allocation"
+                        : ar
+                          ? "الحد الأدنى"
+                          : "Floor"
+                    }
                     value={fmtMoney(line.allowedMinimum, line.currency, lang)}
                   />
                   <DetailStat
@@ -236,10 +244,10 @@ export function InvoiceDetailPanel({
                     <span className="font-semibold text-success">
                       {ar ? "مرجع السعر: باقة على Odoo" : "Price source: Odoo package"}
                     </span>
-                    {(line.odooPricelistName || line.pricingContextName) && (
+                    {(line.pricingContextName || line.odooPricelistName) && (
                       <span>
                         {" "}
-                        · <bdi>{line.odooPricelistName || line.pricingContextName}</bdi>
+                        · <bdi>{line.pricingContextName || line.odooPricelistName}</bdi>
                       </span>
                     )}
                     {line.odooSaleOrderName && (

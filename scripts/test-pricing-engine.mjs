@@ -381,7 +381,7 @@ assert.equal(actualUnitPrice(line({ untaxedTotal: 400, totalInCurrency: 460 }), 
     }),
   );
   assert.equal(verdict.status, "compliant_package");
-  assert.equal(verdict.allowedMinimum, 250);
+  assert.equal(verdict.allowedMinimum, 287.5);
   assert.equal(verdict.leakageAmount, 0);
   assert.equal(verdict.matchType, "odoo_pricelist");
 }
@@ -399,8 +399,8 @@ assert.equal(actualUnitPrice(line({ untaxedTotal: 400, totalInCurrency: 460 }), 
     }),
   );
   assert.equal(verdict.status, "below_minimum");
-  assert.equal(verdict.allowedMinimum, 250);
-  assert.equal(verdict.varianceAmount, 50);
+  assert.equal(verdict.allowedMinimum, 287.5);
+  assert.equal(verdict.varianceAmount, 57.5);
 }
 
 // Missing package lineage is neutral, never a guessed standalone breach.

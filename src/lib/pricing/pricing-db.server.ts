@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS invoice_line_facts (
   pricing_context text NOT NULL DEFAULT 'unknown',
   pricing_context_name text NOT NULL DEFAULT '',
   odoo_pricing_checked boolean NOT NULL DEFAULT false,
+  pricing_lineage_version integer NOT NULL DEFAULT 0,
   read_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS invoice_line_facts_invoice_idx ON invoice_line_facts (invoice_number);
@@ -260,6 +261,7 @@ ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS expected_unit_price nume
 ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricing_context text NOT NULL DEFAULT 'unknown';
 ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricing_context_name text NOT NULL DEFAULT '';
 ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS odoo_pricing_checked boolean NOT NULL DEFAULT false;
+ALTER TABLE invoice_line_facts ADD COLUMN IF NOT EXISTS pricing_lineage_version integer NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS invoice_audits_context_idx ON invoice_price_audits (pricing_context, compliance_status);
 
 CREATE TABLE IF NOT EXISTS price_payment_aliases (
@@ -1284,6 +1286,7 @@ export interface StoredLineFact {
   pricingContext: PricingContext;
   pricingContextName: string;
   odooPricingChecked: boolean;
+  pricingLineageVersion: number;
 }
 
 /**
@@ -1326,6 +1329,7 @@ export async function readStoredLineFacts(
         pricingContext: (str(row.pricing_context) || "unknown") as PricingContext,
         pricingContextName: str(row.pricing_context_name),
         odooPricingChecked: row.odoo_pricing_checked === true,
+        pricingLineageVersion: Number(row.pricing_lineage_version ?? 0) || 0,
       });
     }
   }
@@ -1342,7 +1346,7 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
       const chunk = facts.slice(start, start + 400);
       const values: unknown[] = [];
       const tuples = chunk.map((fact, index) => {
-        const offset = index * 20;
+        const offset = index * 21;
         values.push(
           fact.invoiceLineId,
           fact.invoiceNumber,
@@ -1364,8 +1368,9 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
           fact.pricingContext,
           fact.pricingContextName,
           fact.odooPricingChecked,
+          fact.pricingLineageVersion,
         );
-        return `(${Array.from({ length: 20 }, (_, column) => `$${offset + column + 1}`).join(",")})`;
+        return `(${Array.from({ length: 21 }, (_, column) => `$${offset + column + 1}`).join(",")})`;
       });
       await client.query(
         `INSERT INTO invoice_line_facts
@@ -1373,7 +1378,7 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
             price_unit, discount, price_subtotal, price_total, sale_order_line_id,
             sale_order_id, sale_order_name, pricelist_id, pricelist_name, pricelist_item_id,
             pricelist_item_name, expected_unit_price, pricing_context, pricing_context_name,
-            odoo_pricing_checked)
+            odoo_pricing_checked, pricing_lineage_version)
          VALUES ${tuples.join(",")}
          ON CONFLICT (invoice_line_id) DO UPDATE SET
            invoice_number = EXCLUDED.invoice_number,
@@ -1395,6 +1400,7 @@ export async function writeLineFacts(facts: StoredLineFact[]): Promise<number> {
            pricing_context = EXCLUDED.pricing_context,
            pricing_context_name = EXCLUDED.pricing_context_name,
            odoo_pricing_checked = EXCLUDED.odoo_pricing_checked,
+           pricing_lineage_version = EXCLUDED.pricing_lineage_version,
            read_at = now()`,
         values,
       );
