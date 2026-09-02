@@ -129,7 +129,12 @@ export function PriceCourseSummaryTab({
     () =>
       (data?.entries ?? [])
         .filter((entry) => matchesKind(entry, kind, breaches))
-        .filter((entry) => !demandOnly || (entry.demand?.orders ?? 0) > 0)
+        .filter(
+          (entry) =>
+            !demandOnly ||
+            (entry.demand?.orders ?? 0) > 0 ||
+            courseDisplayPriority(entry.courseName, entry.subcategory) < 5,
+        )
         .sort((a, b) =>
           compareDemand(
             { name: a.courseName, demand: a.demand },
@@ -348,12 +353,14 @@ export function PriceCourseSummaryTab({
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/15 bg-brand-soft/55 px-3 py-2 text-[11px] text-text-muted sm:px-4">
           <span className="inline-flex items-center gap-1.5 font-semibold text-brand">
             <TrendingUp size={14} aria-hidden="true" />
-            {ar ? "مرتبة حسب الإقبال الحقيقي" : "Sorted by actual demand"}
+            {ar
+              ? "الأولوية الإدارية أولًا، ثم الإقبال الحقيقي"
+              : "Management priority first, then actual demand"}
           </span>
           <span>
             {ar
-              ? "من مبيعات الفترة المختارة؛ بيع الباقة يُحسب مرة واحدة مهما كان عدد دوراتها."
-              : "From sales in the selected period; one package order counts once, regardless of its course count."}
+              ? "CFM ثم PMP ثم Automotive ثم Electrical ثم CMRP مثبتة بالأعلى؛ وبعدها مبيعات الفترة المختارة."
+              : "CFM, PMP, Automotive, Electrical and CMRP stay pinned; the rest follows sales in the selected period."}
             {data?.demandPeriod?.from && data.demandPeriod.to
               ? ` · ${fmtDate(data.demandPeriod.from, lang)} – ${fmtDate(data.demandPeriod.to, lang)}`
               : ""}
