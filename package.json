@@ -21,6 +21,7 @@
     "test:display-currency": "node --experimental-strip-types scripts/test-display-currency.mjs",
     "test:course-lead-alerts": "node --experimental-strip-types scripts/test-course-lead-alerts.mjs",
     "test:sales-targets": "node --experimental-strip-types scripts/test-sales-targets.mjs",
+    "test:target-units": "node --experimental-strip-types scripts/test-target-units.mjs",
     "test:course-insight": "node --experimental-strip-types scripts/test-course-insight.mjs",
     "test:archived-won": "node --experimental-strip-types scripts/test-archived-won.mjs",
     "test:course-taxonomy": "node --experimental-strip-types scripts/test-course-taxonomy.mjs",

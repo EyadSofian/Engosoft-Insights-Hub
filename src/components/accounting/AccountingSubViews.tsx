@@ -45,7 +45,7 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n, type Lang } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import {
@@ -71,6 +71,12 @@ import type {
   AgentTarget,
 } from "@/lib/agent-analytics.server";
 import type { CallsHubCall, CallsHubEmployeeCalls } from "@/lib/calls-hub.server";
+import {
+  buildTargetUnitRollup,
+  type TargetLeaderRollup,
+  type TargetUnitMember,
+  type TargetUnitRollup,
+} from "@/lib/target-units";
 
 const QUALITY_REVIEW_THRESHOLD = 85;
 
@@ -306,6 +312,7 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
 export function AccountingAgentsView() {
   const { lang } = useI18n();
   const filters = useFilters();
+  const [section, setSection] = useState<"units" | "employees">("units");
   const [display, setDisplay] = useState<"cards" | "table">("cards");
   const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls">("revenue");
   const [search, setSearch] = useState("");
@@ -377,6 +384,21 @@ export function AccountingAgentsView() {
           : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
     );
   const selectedAgent = data.agents.find((row) => row.key === selectedAgentKey) ?? null;
+  const targetUnitRollup = buildTargetUnitRollup(
+    data.agents
+      .filter(
+        (row): row is AgentRow & { target: AgentTarget & { target: number } } =>
+          row.target?.target !== null && row.target?.target !== undefined,
+      )
+      .map((row) => ({
+        key: row.key,
+        employeeId: row.target.employeeId,
+        name: row.name,
+        target: row.target.target,
+        paidRevenue: row.paidRevenue,
+        orderRevenue: row.orderRevenue,
+      })),
+  );
 
   const selectMonth = (month: string) => {
     if (!month) return;
@@ -533,6 +555,51 @@ export function AccountingAgentsView() {
           icon={<CircleGauge size={18} />}
         />
       </div>
+
+      <Card padded={false} className="p-2">
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label={lang === "ar" ? "أقسام أداء الموظفين" : "Employee performance sections"}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === "units"}
+            onClick={() => setSection("units")}
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors ${
+              section === "units"
+                ? "bg-brand text-white shadow-sm"
+                : "text-text-muted hover:bg-surface-muted hover:text-text"
+            }`}
+          >
+            <ChartNoAxesCombined size={18} />
+            {lang === "ar" ? "تحقيق الوحدات والتيمات" : "Units & team targets"}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === "employees"}
+            onClick={() => setSection("employees")}
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors ${
+              section === "employees"
+                ? "bg-brand text-white shadow-sm"
+                : "text-text-muted hover:bg-surface-muted hover:text-text"
+            }`}
+          >
+            <Users size={18} />
+            {lang === "ar" ? "تفاصيل الموظفين" : "Employee details"}
+          </button>
+        </div>
+      </Card>
+
+      {section === "units" ? (
+        <TargetUnitsDashboard
+          rollup={targetUnitRollup}
+          months={data.months}
+          selectedMonth={selectedMonth}
+          lang={lang}
+          onSelectMonth={selectMonth}
+          onSelectEmployee={(key) => setSelectedAgentKey(key)}
+        />
+      ) : (
+        <>
 
       <Card>
         <SectionTitle
@@ -728,6 +795,8 @@ export function AccountingAgentsView() {
           }}
         />
       )}
+        </>
+      )}
 
       <AgentPerformanceSheet
         row={selectedAgent}
@@ -747,6 +816,311 @@ export function AccountingAgentsView() {
           }
         }}
       />
+    </div>
+  );
+}
+
+function TargetUnitsDashboard({
+  rollup,
+  months,
+  selectedMonth,
+  lang,
+  onSelectMonth,
+  onSelectEmployee,
+}: {
+  rollup: ReturnType<typeof buildTargetUnitRollup>;
+  months: string[];
+  selectedMonth: string;
+  lang: Lang;
+  onSelectMonth: (month: string) => void;
+  onSelectEmployee: (key: string) => void;
+}) {
+  const periodLabel = selectedMonth
+    ? monthLabel(selectedMonth, lang)
+    : lang === "ar"
+      ? "الفترة المختارة"
+      : "Selected period";
+
+  return (
+    <section className="space-y-4" aria-labelledby="target-units-title">
+      <Card padded={false} className="overflow-hidden">
+        <div className="grid gap-5 bg-[linear-gradient(135deg,#0b456a_0%,#062f46_100%)] px-5 py-5 text-white lg:grid-cols-[1fr_auto] lg:items-center lg:px-7">
+          <div>
+            <p className="text-xs font-bold text-white/65">
+              {lang === "ar" ? "متابعة التارجت من تحصيل Odoo" : "Odoo collections target tracking"}
+            </p>
+            <h2 id="target-units-title" className="mt-1 text-xl font-black sm:text-2xl">
+              {lang === "ar" ? "أداء الوحدات والتيمات" : "Units and team performance"}
+            </h2>
+            <p className="mt-1 max-w-2xl text-xs leading-6 text-white/70">
+              {lang === "ar"
+                ? `الأرقام محسوبة من التحصيل المدفوع خلال ${periodLabel}. افتح أي تيم لعرض مساهمة كل موظف.`
+                : `Figures use paid collections during ${periodLabel}. Open a team to see every employee's contribution.`}
+            </p>
+          </div>
+          <label className="block min-w-[210px]">
+            <span className="mb-1.5 block text-xs font-bold text-white/70">
+              {lang === "ar" ? "شهر التارجت" : "Target month"}
+            </span>
+            <select
+              value={selectedMonth}
+              onChange={(event) => onSelectMonth(event.target.value)}
+              className="min-h-11 w-full cursor-pointer rounded-xl border border-white/20 bg-white px-3 text-sm font-semibold text-text outline-none focus:ring-2 focus:ring-white/40"
+            >
+              <option value="">{lang === "ar" ? "الفترة الحالية" : "Current date range"}</option>
+              {[...months].reverse().map((month) => (
+                <option key={month} value={month}>
+                  {monthLabel(month, lang)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:grid-cols-4 rtl:divide-x-reverse">
+          <TargetHeadlineMetric label={lang === "ar" ? "إجمالي التارجت" : "Total target"} value={fmtUSDFull(rollup.target)} />
+          <TargetHeadlineMetric label={lang === "ar" ? "المحقق بالتحصيل" : "Paid achievement"} value={fmtUSDFull(rollup.paidRevenue)} accent />
+          <TargetHeadlineMetric label={lang === "ar" ? "نسبة التحقيق" : "Achievement"} value={fmtPct(rollup.achievement, 1)} />
+          <TargetHeadlineMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(rollup.remaining)} />
+        </div>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {rollup.units.map((unit, index) => (
+          <TargetUnitCard
+            key={unit.key}
+            unit={unit}
+            lang={lang}
+            index={index}
+            onSelectEmployee={onSelectEmployee}
+          />
+        ))}
+      </div>
+
+      {rollup.standalone.length > 0 && (
+        <Card>
+          <SectionTitle
+            hint={
+              lang === "ar"
+                ? "أفراد بتارجت مستقل، وغير محسوبين داخل وحدتي بهاء أو أسماء."
+                : "Independent targets, outside Bahaa and Asmaa's unit totals."
+            }
+          >
+            {lang === "ar" ? "التارجتات الفردية" : "Standalone targets"}
+          </SectionTitle>
+          <div className="grid gap-3 md:grid-cols-2">
+            {rollup.standalone.map((member) => (
+              <TargetMemberCard
+                key={member.employeeId}
+                member={member}
+                lang={lang}
+                onSelect={() => onSelectEmployee(member.key)}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {rollup.unassigned.length > 0 && (
+        <Notice tone="warning" title={lang === "ar" ? "تارجتات تحتاج توزيعًا" : "Targets need an org assignment"}>
+          {lang === "ar"
+            ? `${fmtNum(rollup.unassigned.length)} موظف لهم تارجت منشور لكنهم غير موجودين في تقسيم الوحدات الحالي. لم يتم حذفهم من الإجمالي.`
+            : `${fmtNum(rollup.unassigned.length)} published targets are not mapped to the current unit layout. They remain included in the total.`}
+        </Notice>
+      )}
+    </section>
+  );
+}
+
+function TargetHeadlineMetric({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="min-w-0 px-3 py-4 text-center sm:px-5">
+      <p className="text-[10px] font-bold text-text-muted sm:text-xs">{label}</p>
+      <p className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TargetUnitCard({
+  unit,
+  lang,
+  index,
+  onSelectEmployee,
+}: {
+  unit: TargetUnitRollup;
+  lang: Lang;
+  index: number;
+  onSelectEmployee: (key: string) => void;
+}) {
+  const unitName = lang === "ar" ? unit.nameAr : unit.nameEn;
+  const accent = index % 2 === 0 ? "bg-brand" : "bg-[#d88724]";
+
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <div className="relative overflow-hidden px-5 py-5">
+        <div className={`absolute inset-y-0 start-0 w-1.5 ${accent}`} />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-text-subtle">
+              {lang === "ar" ? "وحدة مبيعات" : "Sales unit"}
+            </p>
+            <h3 className="mt-1 text-xl font-black text-text">{unitName}</h3>
+            <p className="mt-1 text-xs text-text-muted">
+              {fmtNum(unit.leaders.length)} {lang === "ar" ? "تيم" : "teams"} ·{" "}
+              {fmtNum(unit.leaders.reduce((sum, leader) => sum + leader.members.length, 0))}{" "}
+              {lang === "ar" ? "موظف" : "employees"}
+            </p>
+          </div>
+          <div className="text-end">
+            <p className="text-xs font-semibold text-text-muted">{lang === "ar" ? "نسبة التحقيق" : "Achievement"}</p>
+            <p className="mt-0.5 text-3xl font-black text-brand">{fmtPct(unit.achievement, 1)}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-surface-muted p-3">
+          <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(unit.target)} />
+          <TargetCompactMetric label={lang === "ar" ? "المحقق" : "Achieved"} value={fmtUSDFull(unit.paidRevenue)} strong />
+          <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(unit.remaining)} />
+        </div>
+        <TargetProgress value={unit.achievement} className="mt-4" />
+      </div>
+
+      <div className="space-y-2 border-t border-border bg-surface-muted/45 p-3 sm:p-4">
+        {unit.leaders.map((leader) => (
+          <TargetLeaderCard
+            key={leader.key}
+            leader={leader}
+            lang={lang}
+            onSelectEmployee={onSelectEmployee}
+          />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function TargetLeaderCard({
+  leader,
+  lang,
+  onSelectEmployee,
+}: {
+  leader: TargetLeaderRollup;
+  lang: Lang;
+  onSelectEmployee: (key: string) => void;
+}) {
+  return (
+    <details className="group rounded-2xl border border-border bg-surface shadow-[0_1px_0_rgba(15,35,60,.03)]">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:content-none">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+          <Users size={17} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-black text-text">{lang === "ar" ? leader.nameAr : leader.nameEn}</p>
+          <p className="mt-0.5 text-[10px] text-text-muted">
+            {fmtNum(leader.members.length)} {lang === "ar" ? "موظف" : "employees"} ·{" "}
+            {lang === "ar" ? "تارجت" : "target"} {fmtUSDFull(leader.target)}
+          </p>
+        </div>
+        <div className="shrink-0 text-end">
+          <p className="text-sm font-black text-brand">{fmtPct(leader.achievement, 1)}</p>
+          <p className="text-[9px] text-text-subtle">{fmtUSDFull(leader.paidRevenue)}</p>
+        </div>
+        <ChevronDown size={17} className="shrink-0 text-text-subtle transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border px-3 py-3">
+        <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-surface-muted p-2.5">
+          <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(leader.target)} />
+          <TargetCompactMetric label={lang === "ar" ? "التحصيل" : "Paid"} value={fmtUSDFull(leader.paidRevenue)} strong />
+          <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(leader.remaining)} />
+        </div>
+        <div className="space-y-1.5">
+          {leader.members.map((member) => (
+            <button
+              key={member.employeeId}
+              type="button"
+              onClick={() => onSelectEmployee(member.key)}
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-start transition-colors hover:border-brand/20 hover:bg-brand-soft"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-bold text-text">{member.name}</span>
+                <span className="mt-0.5 block text-[9px] text-text-subtle">
+                  {lang === "ar" ? "افتح أداء الموظف" : "Open employee performance"}
+                </span>
+              </span>
+              <span className="text-end">
+                <span className="block text-xs font-black text-text">{fmtUSDFull(member.paidRevenue)}</span>
+                <span className="block text-[9px] text-text-subtle">/ {fmtUSDFull(member.target)}</span>
+              </span>
+              <Pill tone={member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"}>
+                {fmtPct(member.achievement, 1)}
+              </Pill>
+            </button>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function TargetMemberCard({
+  member,
+  lang,
+  onSelect,
+}: {
+  member: TargetUnitMember;
+  lang: Lang;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="rounded-2xl border border-border bg-surface p-4 text-start transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-text">{member.name}</p>
+          <p className="mt-1 text-[10px] text-text-muted">{lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}</p>
+        </div>
+        <Pill tone={member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"}>
+          {fmtPct(member.achievement, 1)}
+        </Pill>
+      </div>
+      <TargetProgress value={member.achievement} className="mt-4" />
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(member.target)} />
+        <TargetCompactMetric label={lang === "ar" ? "المحقق" : "Achieved"} value={fmtUSDFull(member.paidRevenue)} strong />
+        <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(member.remaining)} />
+      </div>
+    </button>
+  );
+}
+
+function TargetCompactMetric({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-[9px] font-semibold text-text-subtle">{label}</p>
+      <p className={`mt-0.5 truncate text-xs font-black sm:text-sm ${strong ? "text-brand" : "text-text"}`}>{value}</p>
+    </div>
+  );
+}
+
+function TargetProgress({ value, className = "" }: { value: number; className?: string }) {
+  const width = Math.max(0, Math.min(100, value));
+  const color = value >= 100 ? "bg-success" : value >= 60 ? "bg-warning" : "bg-brand";
+  return (
+    <div className={`h-2 overflow-hidden rounded-full bg-surface-muted ${className}`} aria-label={`${fmtPct(value, 1)}`}>
+      <div className={`h-full rounded-full transition-[width] duration-500 ${color}`} style={{ width: `${width}%` }} />
     </div>
   );
 }
