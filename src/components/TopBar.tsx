@@ -7,8 +7,8 @@ import {
   Check,
   Languages,
   Leaf,
-  MoreHorizontal,
   Moon,
+  MoreHorizontal,
   Pin,
   PinOff,
   RefreshCw,
@@ -308,8 +308,8 @@ export function TopBar({ title }: { title?: string }) {
 /**
  * The same pin control the rail carries, repeated on the bar.
  *
- * A reader who wants the chrome to stop moving usually decides that while it
- * is in the act of moving — at which point the rail's copy of this button is
+ * A reader who wants the chrome to stop moving usually decides that while it is
+ * in the act of moving — at which point the rail's copy of this button is
  * halfway off the screen. Shown from `lg` up only: below that there is no rail
  * to pin.
  */
@@ -318,8 +318,8 @@ function ChromePinButton() {
   const chrome = useChrome();
   const label = chrome.pinned
     ? lang === "ar"
-      ? "إلغاء تثبيت الهيدر والتنقل (⌘/Ctrl + B)"
-      : "Unpin the bar and navigation (⌘/Ctrl + B)"
+      ? "إلغاء التثبيت والسماح بالإخفاء عند التمرير (⌘/Ctrl + B)"
+      : "Unpin and allow hiding on scroll (⌘/Ctrl + B)"
     : lang === "ar"
       ? "تثبيت الهيدر والتنقل ومنع إخفائهما (⌘/Ctrl + B)"
       : "Pin the bar and navigation open (⌘/Ctrl + B)";
@@ -331,7 +331,7 @@ function ChromePinButton() {
       aria-pressed={chrome.pinned}
       aria-label={label}
       title={label}
-      className={`hidden h-10 w-10 items-center justify-center rounded-lg border transition-colors active:scale-[0.97] cursor-pointer lg:inline-flex ${
+      className={`hidden h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition-colors active:scale-[0.97] lg:inline-flex ${
         chrome.pinned
           ? "border-brand bg-brand-soft text-brand"
           : "border-border bg-surface text-text-muted hover:bg-surface-2"
@@ -642,7 +642,7 @@ function FilterSheet({
 
   if (!open || typeof document === "undefined") return null;
 
-  // Portal out of the sticky z-30 header, otherwise the sheet can't stack above
+  // Portal out of the fixed z-30 header, otherwise the sheet can't stack above
   // the fixed bottom nav and the FAB.
   return createPortal(
     <div

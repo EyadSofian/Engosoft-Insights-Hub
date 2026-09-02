@@ -25,12 +25,19 @@ export interface ChromeState {
   header: HeaderMode;
   /** True when the desktop rail has slid off the inline edge. */
   navHidden: boolean;
-  /** The reader has pinned the chrome open; nothing auto-hides. */
-  pinned: boolean;
   /** The rail is temporarily out because of the edge trigger or focus. */
   peeking: boolean;
+  /** The reader has switched auto-hide off; nothing moves on scroll. */
+  pinned: boolean;
 }
 
+/**
+ * Where the reader's auto-hide choice lives between visits.
+ *
+ * Someone who works in this dashboard all day and dislikes moving chrome should
+ * have to say so exactly once, so the preference outlives the session rather
+ * than the page.
+ */
 const PIN_KEY = "engo_chrome_pinned";
 
 /** Below this the page is "at the top" and the chrome is always whole. */
@@ -44,7 +51,7 @@ const HIDE_AFTER = 180;
  */
 const HYSTERESIS = 28;
 
-let state: ChromeState = { header: "full", navHidden: false, pinned: false, peeking: false };
+let state: ChromeState = { header: "full", navHidden: false, peeking: false, pinned: false };
 const listeners = new Set<() => void>();
 
 const emit = () => {
@@ -56,8 +63,8 @@ function set(next: Partial<ChromeState>) {
   if (
     merged.header === state.header &&
     merged.navHidden === state.navHidden &&
-    merged.pinned === state.pinned &&
-    merged.peeking === state.peeking
+    merged.peeking === state.peeking &&
+    merged.pinned === state.pinned
   ) {
     return;
   }
@@ -75,6 +82,7 @@ function set(next: Partial<ChromeState>) {
 ------------------------------------------------------------------------- */
 
 let focusInChrome = false;
+let keyboardNavigation = false;
 
 function popperOpen(): boolean {
   if (typeof document === "undefined") return false;
@@ -93,9 +101,7 @@ let travel = 0;
 let ticking = false;
 let started = false;
 
-let ticks = 0;
 function evaluate() {
-  ticks += 1;
   ticking = false;
   const y = window.scrollY;
   const delta = y - lastY;
@@ -147,7 +153,7 @@ function onVisibility() {
 function onFocusIn(event: FocusEvent) {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-  const inside = target.closest("[data-app-chrome]") !== null;
+  const inside = keyboardNavigation && target.closest("[data-app-chrome]") !== null;
   if (inside === focusInChrome) return;
   focusInChrome = inside;
   // Reaching the chrome with the keyboard must show it, not merely stop it
@@ -156,12 +162,36 @@ function onFocusIn(event: FocusEvent) {
     set({ header: state.header === "hidden" ? "compact" : state.header, navHidden: false });
 }
 
+function onFocusOut() {
+  requestAnimationFrame(() => {
+    const active = document.activeElement;
+    focusInChrome =
+      keyboardNavigation &&
+      active instanceof HTMLElement &&
+      active.closest("[data-app-chrome]") !== null;
+  });
+}
+
+function onKeyDown(event: KeyboardEvent) {
+  if (event.key === "Tab") keyboardNavigation = true;
+}
+
+function onPointerDown() {
+  // A mouse/touch click may leave a toolbar button focused while the reader
+  // scrolls. Only keyboard focus should hold the chrome open.
+  keyboardNavigation = false;
+  focusInChrome = false;
+}
+
 function start() {
   if (started || typeof window === "undefined") return;
   started = true;
   lastY = window.scrollY;
   window.addEventListener("scroll", onScroll, { passive: true });
   document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("focusout", onFocusOut);
+  document.addEventListener("keydown", onKeyDown);
+  document.addEventListener("pointerdown", onPointerDown, { passive: true });
   document.addEventListener("visibilitychange", onVisibility);
   // A route change resets the reader's context; the chrome comes back with it.
   window.addEventListener("engosoft:chrome-reveal", reveal);
@@ -172,6 +202,9 @@ function stop() {
   started = false;
   window.removeEventListener("scroll", onScroll);
   document.removeEventListener("focusin", onFocusIn);
+  document.removeEventListener("focusout", onFocusOut);
+  document.removeEventListener("keydown", onKeyDown);
+  document.removeEventListener("pointerdown", onPointerDown);
   document.removeEventListener("visibilitychange", onVisibility);
   window.removeEventListener("engosoft:chrome-reveal", reveal);
 }
@@ -179,14 +212,6 @@ function stop() {
 function reveal() {
   travel = 0;
   set({ header: window.scrollY <= TOP_ZONE ? "full" : "compact", navHidden: false });
-}
-
-function readPinned(): boolean {
-  try {
-    return window.localStorage.getItem(PIN_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 export const chromeStore = {
@@ -208,36 +233,35 @@ export const chromeStore = {
     try {
       window.localStorage.setItem(PIN_KEY, pinned ? "1" : "0");
     } catch {
-      // Private mode; the preference simply does not survive the session.
+      // Private mode: the choice simply does not survive the session.
     }
     travel = 0;
     set(
       pinned
-        ? { pinned, header: window.scrollY <= TOP_ZONE ? "full" : "compact", navHidden: false }
+        ? {
+            pinned,
+            header: window.scrollY <= TOP_ZONE ? "full" : "compact",
+            navHidden: false,
+            peeking: false,
+          }
         : { pinned },
     );
   },
   togglePinned() {
     chromeStore.setPinned(!state.pinned);
   },
-  debug: () => ({
-    ticks,
-    started,
-    listeners: listeners.size,
-    lastY,
-    travel,
-    frozen: frozen(),
-    modal: uiStore.isOpen(),
-    focusInChrome,
-  }),
-  debugTick: () => {
-    ticking = false;
-    evaluate();
-  },
-  /** Called once on mount to adopt the stored preference. */
+  /** Adopts the stored choice once the client is running. */
   hydrate() {
-    const pinned = readPinned();
-    if (pinned !== state.pinned) set({ pinned });
+    let stored = false;
+    try {
+      stored = window.localStorage.getItem(PIN_KEY) === "1";
+    } catch {
+      stored = false;
+    }
+    // Only ever turns the preference *on* during hydration: the server rendered
+    // an unpinned shell, and writing `false` here would be a no-op that still
+    // costs a render on every mount.
+    if (stored && !state.pinned) chromeStore.setPinned(true);
   },
 };
 
@@ -246,13 +270,9 @@ export const chromeStore = {
 const serverState: ChromeState = {
   header: "full",
   navHidden: false,
-  pinned: false,
   peeking: false,
+  pinned: false,
 };
-
-// __QA_DEBUG__
-if (typeof window !== "undefined")
-  (window as unknown as Record<string, unknown>).__chrome = chromeStore;
 
 export function useChrome(): ChromeState {
   return useSyncExternalStore(chromeStore.subscribe, chromeStore.get, () => serverState);
@@ -271,6 +291,9 @@ export function useAutoHideChrome() {
     chromeStore.hydrate();
   }, []);
 
+  // ⌘/Ctrl + B, the shortcut every editor and every side-panel app already
+  // uses for this. Chrome and Safari leave it unbound on a page, so taking it
+  // costs the reader nothing they had.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;

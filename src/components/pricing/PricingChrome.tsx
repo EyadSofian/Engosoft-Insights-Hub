@@ -114,65 +114,77 @@ export function PricingKpiStrip({ items, loading }: { items: PricingKpi[]; loadi
     >
       <div className="grid min-w-[640px] grid-cols-3 lg:min-w-0 lg:grid-cols-6">
         {items.map((item, index) => {
-          const Wrapper = item.onSelect ? "button" : "div";
           return (
-            <Wrapper
+            <div
               key={item.id}
-              {...(item.onSelect
-                ? {
-                    type: "button" as const,
-                    onClick: item.onSelect,
-                    title: item.selectHint,
-                    "aria-label": item.selectHint
-                      ? `${item.label}: ${item.value}. ${item.selectHint}`
-                      : undefined,
-                  }
-                : {})}
-              className={`min-w-0 px-3.5 py-3 text-start transition-colors ${
+              className={`group relative min-w-0 px-3.5 py-3 text-start transition-colors ${
                 index ? "border-s border-border" : ""
               } ${index > 2 ? "border-t border-border lg:border-t-0" : ""} ${
-                item.onSelect ? "cursor-pointer hover:bg-surface-2" : ""
+                item.onSelect ? "hover:bg-surface-2 focus-within:bg-surface-2" : ""
               }`}
             >
-              <div className="flex min-h-4 items-center gap-1.5">
-                {item.Icon && (
-                  <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
-                )}
-                <span className="truncate text-[10.5px] font-semibold text-text-muted">
-                  {item.label}
-                </span>
-                {item.info}
-              </div>
+              {item.onSelect && (
+                <button
+                  type="button"
+                  onClick={item.onSelect}
+                  title={item.selectHint}
+                  aria-label={
+                    item.selectHint
+                      ? `${item.label}: ${item.value}. ${item.selectHint}`
+                      : `${item.label}: ${item.value}`
+                  }
+                  className="absolute inset-0 z-0 cursor-pointer rounded-[inherit]"
+                />
+              )}
 
-              {loading ? (
-                <Skeleton className="mt-2 h-6 w-16 rounded-md" />
-              ) : (
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  {/* Leakage arrives as one figure per currency ("1,200 SAR +
-                      1,780 EGP"). Clipping it would hide money, so the type
-                      steps down instead and the figure stays whole. */}
-                  <span
-                    className={`num min-w-0 font-bold leading-tight tracking-tight ${
-                      item.value.length > 20
-                        ? "text-[12.5px]"
-                        : item.value.length > 13
-                          ? "text-[15px]"
-                          : "text-[19px]"
-                    }`}
-                    style={{ color: toneColor(item.tone) }}
-                  >
-                    {item.value}
+              {/* The text sits above the full-cell button without receiving
+                  pointer events. The optional info popover opts back in, so it
+                  remains a sibling control instead of invalid nested buttons. */}
+              <div className={`relative z-[1] ${item.onSelect ? "pointer-events-none" : ""}`}>
+                <div className="flex min-h-4 items-center gap-1.5">
+                  {item.Icon && (
+                    <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
+                  )}
+                  <span className="truncate text-[10.5px] font-semibold text-text-muted">
+                    {item.label}
                   </span>
-                  <KpiDelta value={item.delta} invert={item.deltaInvert} />
+                  {item.info && (
+                    <span className="pointer-events-auto relative z-10 inline-flex">
+                      {item.info}
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {item.question && (
-                <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-text-subtle">
-                  {item.question}
-                </p>
-              )}
-            </Wrapper>
+                {loading ? (
+                  <Skeleton className="mt-2 h-6 w-16 rounded-md" />
+                ) : (
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    {/* Leakage arrives as one figure per currency ("1,200 SAR +
+                        1,780 EGP"). Clipping it would hide money, so the type
+                        steps down instead and the figure stays whole. */}
+                    <span
+                      className={`num min-w-0 font-bold leading-tight tracking-tight ${
+                        item.value.length > 20
+                          ? "text-[12.5px]"
+                          : item.value.length > 13
+                            ? "text-[15px]"
+                            : "text-[19px]"
+                      }`}
+                      style={{ color: toneColor(item.tone) }}
+                    >
+                      {item.value}
+                    </span>
+                    <KpiDelta value={item.delta} invert={item.deltaInvert} />
+                  </div>
+                )}
+
+                {item.question && (
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-text-subtle">
+                    {item.question}
+                  </p>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>

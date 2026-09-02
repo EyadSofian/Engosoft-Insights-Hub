@@ -8,7 +8,7 @@ import { SectionTabs } from "./SectionTabs";
 import { TopBar } from "./TopBar";
 
 /**
- * The application frame: fixed navigation rail, sticky control bar, scrolling
+ * The application frame: fixed navigation rail, auto-hiding control bar, scrolling
  * content, mobile bottom nav. Mounted ONCE in __root around the router Outlet,
  * so the rail and top bar (and their filter state) persist across navigation
  * and only the page content swaps. Each page supplies its own PageHeader, so
@@ -57,8 +57,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 /**
  * A hit strip on the edge the rail retreated to. Hovering it — or reaching it
  * with Tab — brings the rail back for as long as the pointer stays; clicking
- * pins it. It is a real button, not a bare div, so the affordance exists for a
- * keyboard too.
+ * pins it open for good. It is a real button, not a bare div, so the affordance
+ * exists for a keyboard too.
  */
 function NavEdgeTrigger() {
   const { lang } = useI18n();

@@ -63,7 +63,7 @@ export function SectionTabs() {
       // A section with a single report has nothing to switch between, so on a
       // phone the row is 70px of pure chrome — the bottom nav already says
       // which section is open. It stays from `sm` up, where it costs nothing.
-      className="sticky z-20 border-b border-border bg-surface lg:hidden"
+      className="chrome-bar sticky z-20 lg:hidden"
       style={{
         top: "var(--chrome-header-h, 0px)",
         transition: "top var(--dur-chrome) var(--ease-chrome)",

@@ -53,10 +53,9 @@ export function Sidebar() {
     <aside
       data-app-chrome=""
       inert={out ? true : undefined}
-      className="chrome-slide fixed top-0 z-35 hidden h-dvh flex-col gap-1 overflow-y-auto scrollbar-none px-3 py-5 lg:flex"
+      className="chrome-slide chrome-sidebar fixed top-0 z-35 hidden h-dvh flex-col gap-1 overflow-y-auto scrollbar-none px-3 py-5 lg:flex"
       style={{
         width: "var(--sidebar-w)",
-        background: "var(--ink)",
         insetInlineStart: 0,
         // It leaves towards the edge it lives on, which is the right-hand edge
         // under RTL — hence a signed offset rather than a fixed direction.
@@ -150,19 +149,21 @@ export function Sidebar() {
 }
 
 /**
- * Turns the auto-hide off and back on. The preference is the reader's, so it is
- * stated in words in the tooltip rather than left to a pin glyph, and the
- * keyboard shortcut is named where somebody can actually find it.
+ * Turns the auto-hide off and back on, and remembers the answer.
+ *
+ * The preference is the reader's, so it is stated in words in the tooltip
+ * rather than left to a pin glyph, and the keyboard shortcut is named where
+ * somebody can actually find it.
  */
 function PinToggle() {
   const { lang } = useI18n();
   const chrome = useChrome();
   const label = chrome.pinned
     ? lang === "ar"
-      ? "إلغاء تثبيت التنقل (⌘/Ctrl + B)"
-      : "Unpin navigation (⌘/Ctrl + B)"
+      ? "إلغاء التثبيت والسماح بالإخفاء عند التمرير (⌘/Ctrl + B)"
+      : "Unpin and allow hiding on scroll (⌘/Ctrl + B)"
     : lang === "ar"
-      ? "تثبيت التنقل ومنع إخفاءه (⌘/Ctrl + B)"
+      ? "تثبيت التنقل ومنع إخفائه عند التمرير (⌘/Ctrl + B)"
       : "Pin navigation open (⌘/Ctrl + B)";
 
   return (
@@ -172,7 +173,7 @@ function PinToggle() {
       aria-pressed={chrome.pinned}
       aria-label={label}
       title={label}
-      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
+      className={`grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition-colors ${
         chrome.pinned
           ? "border-white/25 bg-white/[0.12] text-white"
           : "border-white/10 text-white/50 hover:bg-white/[0.08] hover:text-white"
@@ -255,9 +256,8 @@ export function MobileNav() {
       </Drawer>
 
       <nav
-        className="app-mobile-nav fixed inset-x-0 bottom-0 z-50 flex min-h-[64px] items-stretch justify-around gap-1 border-t border-white/10 pt-1.5 shadow-[0_-10px_28px_rgba(0,18,40,0.18)] lg:hidden"
+        className="app-mobile-nav glass-navy fixed inset-x-0 bottom-0 z-50 flex min-h-[64px] items-stretch justify-around gap-1 border-t border-white/10 pt-1.5 shadow-[0_-10px_28px_rgba(0,18,40,0.18)] lg:hidden"
         style={{
-          background: "var(--ink)",
           paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))",
           paddingInlineStart: "max(0.375rem, env(safe-area-inset-left))",
           paddingInlineEnd: "max(0.375rem, env(safe-area-inset-right))",

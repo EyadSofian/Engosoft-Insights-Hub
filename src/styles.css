@@ -90,25 +90,21 @@
   color-scheme: light;
 
   --navy: #001e3c;
-  /* The navigation ink. Six pricing components hard-coded #10262d for this;
-     it is a token now so a theme change cannot leave half of them behind. */
-  --ink: #0f2430;
-  --ink-soft: #1b3644;
+  --ink: #001e3c;
+  --ink-soft: #0b3158;
 
-  /* A warm off-white, not paper white. A dense financial table read on a
-     bright screen for an hour is materially easier on a warm ground, and it
-     stops --surface white from disappearing into the page behind it. */
-  --bg: #f6f5f2;
-  --bg-subtle: #efede7;
+  /* Engosoft's original blue-and-white canvas. */
+  --bg: #f4f6fa;
+  --bg-subtle: #eef1f7;
   --surface: #ffffff;
-  --surface-2: #f1efea;
-  --surface-3: #e7e4dc;
-  --border: #e4e1da;
-  --border-strong: #c9c4b8;
+  --surface-2: #f2f5f9;
+  --surface-3: #e8edf4;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
 
-  --text: #17202a;
-  --text-muted: #5c6672;
-  --text-subtle: #8a939e;
+  --text: #0b1f38;
+  --text-muted: #5a6b81;
+  --text-subtle: #8494a8;
   --text-inverse: #ffffff;
 
   --brand: #1656a0;
@@ -116,16 +112,16 @@
   --brand-soft: #e8f0fa;
   --electric: #0050dc;
 
-  --accent: #ff9100;
-  --accent-soft: #fff3e2;
-  --accent-ink: #a75f00;
+  --accent: #0050dc;
+  --accent-soft: #e8f0fa;
+  --accent-ink: #124a8c;
 
   --success: #2f7a2f;
-  --success-soft: #e9f3e7;
+  --success-soft: #e8f5e9;
   --warning: #b26a00;
-  --warning-soft: #fdf1e0;
+  --warning-soft: #fff4e5;
   --danger: #b3261e;
-  --danger-soft: #fcebe8;
+  --danger-soft: #fdecea;
   /* A published offer the seller is entitled to quote. Deliberately a fixed
      teal rather than green: it is not a compliance pass, it is a different
      price book rule. */
@@ -154,6 +150,13 @@
   --shadow-md: 0 4px 12px -2px rgba(11, 31, 56, 0.09), 0 2px 6px -2px rgba(11, 31, 56, 0.05);
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
   --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
+
+  --glass-surface: rgba(255, 255, 255, 0.76);
+  --glass-border: rgba(22, 86, 160, 0.16);
+  --glass-nav: rgba(0, 30, 60, 0.88);
+  --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
+  --page-glow-primary: rgba(0, 80, 220, 0.1);
+  --page-glow-secondary: rgba(22, 86, 160, 0.07);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -199,16 +202,16 @@
 .dark {
   color-scheme: dark;
 
-  --ink: #0b1a22;
-  --ink-soft: #142c38;
+  --ink: #061426;
+  --ink-soft: #0c2949;
 
-  --bg: #0b1119;
-  --bg-subtle: #0f1723;
-  --surface: #141c28;
-  --surface-2: #1b2532;
-  --surface-3: #24303f;
-  --border: #23303f;
-  --border-strong: #33445a;
+  --bg: #070f1c;
+  --bg-subtle: #0a1626;
+  --surface: #0f1c2f;
+  --surface-2: #16263c;
+  --surface-3: #1e3149;
+  --border: #1f3149;
+  --border-strong: #2c4362;
 
   --text: #e8eef7;
   --text-muted: #94a6bd;
@@ -220,9 +223,9 @@
   --brand-soft: #14263f;
   --electric: #4c8dff;
 
-  --accent: #ffa733;
-  --accent-soft: #2e1f0c;
-  --accent-ink: #ffc178;
+  --accent: #4c8dff;
+  --accent-soft: #14263f;
+  --accent-ink: #91b8ff;
 
   --success: #4ea75c;
   --success-soft: #12241a;
@@ -250,6 +253,13 @@
   --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 14px 36px -10px rgba(0, 0, 0, 0.65);
   --shadow-xl: 0 26px 60px -14px rgba(0, 0, 0, 0.7);
+
+  --glass-surface: rgba(15, 28, 47, 0.72);
+  --glass-border: rgba(76, 141, 255, 0.2);
+  --glass-nav: rgba(6, 20, 38, 0.82);
+  --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
+  --page-glow-primary: rgba(59, 130, 246, 0.14);
+  --page-glow-secondary: rgba(0, 80, 220, 0.08);
 }
 
 @layer base {
@@ -270,7 +280,11 @@
   }
 
   body {
-    background-color: var(--bg);
+    background:
+      radial-gradient(circle at 88% -8%, var(--page-glow-primary), transparent 34rem),
+      radial-gradient(circle at 4% 44%, var(--page-glow-secondary), transparent 30rem),
+      var(--bg);
+    background-attachment: fixed;
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 15px;
@@ -428,18 +442,19 @@
 }
 
 @utility glass {
-  background: color-mix(in oklab, var(--surface) 82%, transparent);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid color-mix(in oklab, var(--text) 8%, transparent);
-  box-shadow: var(--shadow-lg);
+  background: var(--glass-surface);
+  backdrop-filter: blur(22px) saturate(155%);
+  -webkit-backdrop-filter: blur(22px) saturate(155%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 @utility glass-navy {
-  background: color-mix(in oklab, var(--navy) 86%, transparent);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--glass-nav);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-shadow);
 }
 
 @utility scrollbar-thin {
@@ -668,12 +683,23 @@
   transition: padding-inline-start var(--dur-chrome) var(--ease-chrome);
 }
 
-/* A control strip that has to stay legible over scrolling data. The old
-   `glass` blur put a live, moving copy of the table behind the figures in the
-   bar; an opaque surface with one hairline reads faster and costs no paint. */
+/* The global controls use a restrained glass layer. The alpha stays high so
+   dense figures remain legible while the blue page glow can still show
+   through at the edges. */
 @utility chrome-bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--glass-surface);
+  backdrop-filter: blur(22px) saturate(155%);
+  -webkit-backdrop-filter: blur(22px) saturate(155%);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+@utility chrome-sidebar {
+  background: var(--glass-nav);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 12px 0 38px -24px rgba(0, 30, 60, 0.72);
 }
 
 /* Invisible until reached. Sits on the inline edge the rail slid out to, so
