@@ -300,6 +300,16 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
       target: 3000,
       note: "",
     },
+    {
+      employeeId: "597",
+      name: "Mohamed Ehab Fathy",
+      aliases: ["محمد إيهاب فتحي", "mohamed.ehab@engosoft.com"],
+      teamLeader: "Asmaa Fathy",
+      supervisor: "Asmaa Fathy",
+      branch: "Egypt",
+      target: null,
+      note: "أضيف إلى فريق المبيعات من سبتمبر 2026؛ لا يوجد له تارجت أغسطس منشور",
+    },
 
     // Website salespeople listed separately in the workbook. The report calls
     // employee 381 “Direct Website”; Odoo's linked user is Amira.
