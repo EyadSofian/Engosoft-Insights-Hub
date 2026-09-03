@@ -27,8 +27,11 @@ const ISSUER = "engosoft-workspace";
 
 export interface Actor {
   /** How the caller proved themselves. */
-  via: "sso" | "admin-code";
-  /** Workspace user id, or `"admin-code"` when the shared code was used. */
+  via: "sso" | "admin-code" | "service";
+  /**
+   * Workspace user id, `"admin-code"` when the shared code was used, or
+   * `"service"` for a trusted server-to-server caller that acts for nobody.
+   */
   id: string;
   name: string;
   email: string;
@@ -50,6 +53,10 @@ export function adminCodeConfigured(): boolean {
 
 export function writesEnabled(): boolean {
   return ssoConfigured() || adminCodeConfigured();
+}
+
+export function serviceAuthConfigured(): boolean {
+  return env("INTERNAL_API_SECRET").length > 0;
 }
 
 /** Constant-time compare that does not leak length through an early return. */
@@ -210,6 +217,42 @@ export function authorizeWrite(request: Request): GuardResult {
   }
 
   return { ok: false, status: 401, error: "Unauthorized." };
+}
+
+/**
+ * Decide whether this request may read on behalf of another Engosoft service.
+ *
+ * Not a user credential. It authenticates the *caller process* — the workspace
+ * asking, from its own server, for the price a seller should quote — so it
+ * carries no identity and grants nothing a person could be held to. The calling
+ * app is responsible for deciding which of its users may ask; this only decides
+ * that the app itself is who it says it is.
+ *
+ * Fails closed: with `INTERNAL_API_SECRET` unset there is no service caller, and
+ * a deployment that has not opted in cannot be read this way. The refusal never
+ * says which of the two it was.
+ */
+export function authorizeService(request: Request): GuardResult {
+  const expected = env("INTERNAL_API_SECRET");
+  if (!expected) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Service access is not enabled on this deployment.",
+    };
+  }
+
+  const supplied =
+    request.headers.get("x-service-secret")?.trim() ||
+    (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!supplied || !secretMatches(supplied, expected)) {
+    return { ok: false, status: 401, error: "Unauthorized." };
+  }
+
+  return {
+    ok: true,
+    actor: { via: "service", id: "service", name: "Service", email: "", role: "service" },
+  };
 }
 
 export const SSO_SESSION_COOKIE = SESSION_COOKIE;

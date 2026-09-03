@@ -12,41 +12,18 @@ import {
 import { EmptyState, Skeleton } from "@/components/ui-bits";
 import { useI18n } from "@/lib/i18n";
 import { PriceRangeTrack } from "./PriceRangeTrack";
-import { activeOffers, bandFor, entryKey as keyOf, today, type PriceBand } from "./course-pricing";
+import { entryKey as keyOf, today } from "./course-pricing";
+import {
+  buildAdvice,
+  currencyFor,
+  parseAsked,
+  type CustomerState,
+  type Market,
+  type PaymentChoice,
+  type ReasonCode,
+  type Verdict,
+} from "@/lib/pricing/price-advice";
 import { deliveryLabel, fmtMoney, type CatalogEntry } from "./pricing-ui";
-
-type PaymentChoice = "instalment" | "cash";
-type Market = "sa" | "eg";
-type CustomerState = "standard" | "discount" | "approved_floor";
-
-const CASH = ["cash", "cashier"];
-const INSTALMENT = ["tabby", "tamara"];
-const EGYPT = ["any", "cash", "cashier"];
-
-const round25 = (value: number) => Math.round(value / 25) * 25;
-
-const bandOf = (entry: CatalogEntry, market: Market, payment: PaymentChoice) =>
-  market === "eg"
-    ? bandFor(entry, EGYPT, "EGP")
-    : bandFor(entry, payment === "cash" ? CASH : INSTALMENT, "SAR");
-
-/**
- * Where inside the published band this sale should start.
- *
- * Unchanged from the original advisor: open at the ceiling, step down once by a
- * third of the band when the customer pushes back, and stop at the floor. The
- * numbers themselves are the price book's; nothing here invents a price.
- */
-function suggest(band: PriceBand, state: CustomerState): number {
-  const floor = band.floor ?? band.ceiling ?? 0;
-  const ceiling = band.ceiling ?? band.floor ?? 0;
-  if (state === "standard") return ceiling;
-  if (state === "approved_floor") return floor;
-  const step = Math.max(25, round25((ceiling - floor) / 3));
-  return Math.max(floor, round25(ceiling - step));
-}
-
-type Verdict = "safe" | "needs_approval" | "not_allowed" | "above_list";
 
 const VERDICTS: Record<Verdict, { ar: string; en: string; color: string; soft: string }> = {
   safe: {
@@ -120,47 +97,41 @@ export function PriceAdvisorTab({
   }, [options, courseQuery]);
 
   const selected = options.find((entry) => keyOf(entry) === courseKey) ?? null;
-  const band = selected ? bandOf(selected, market, payment) : undefined;
-  const currency = market === "eg" ? "EGP" : "SAR";
+  const parsedAsked = parseAsked(asked);
+  const askedValue = parsedAsked.ok ? parsedAsked.value : null;
 
-  // The route not chosen, so the effect of the payment method is visible rather
-  // than asserted. Egypt publishes one price for every method, so it has none.
-  const otherBand =
-    selected && market === "sa"
-      ? bandOf(selected, "sa", payment === "cash" ? "instalment" : "cash")
-      : undefined;
-
-  const offers = useMemo(
+  /**
+   * The whole answer, from the module that also answers `/api/prices/advice`.
+   *
+   * Reading the band, the suggestion and the verdict off one object instead of
+   * recomputing each here is what keeps this screen, that endpoint and the audit
+   * all quoting the same number for the same sale. The alternate route it
+   * carries is the one not chosen, so the effect of the payment method is
+   * visible rather than asserted; Egypt publishes one price for every method and
+   * so has none.
+   */
+  const advice = useMemo(
     () =>
       selected
-        ? activeOffers(selected).filter(
-            (price) =>
-              price.currency === currency &&
-              (market === "eg"
-                ? true
-                : price.paymentMethod === "any" ||
-                  (payment === "cash" ? CASH : INSTALMENT).includes(price.paymentMethod)),
-          )
-        : [],
-    [selected, currency, market, payment],
+        ? buildAdvice(selected, {
+            market,
+            payment,
+            state: customerState,
+            asked: askedValue,
+          })
+        : null,
+    [selected, market, payment, customerState, askedValue],
   );
 
-  const suggested = band ? suggest(band, customerState) : null;
+  const band = advice?.band ?? undefined;
+  const currency = advice?.currency ?? currencyFor(market);
+  const otherBand = advice?.alternate?.band;
+  const offers = advice?.offers ?? [];
+  const suggested = advice?.suggested ?? null;
   const floor = band?.floor ?? null;
   const ceiling = band?.ceiling ?? null;
-
-  const askedValue = asked.trim() ? Number(asked.replace(/[^\d.]/g, "")) : null;
-  const priceInQuestion =
-    askedValue !== null && Number.isFinite(askedValue) ? askedValue : suggested;
-
-  const verdict: Verdict | null = useMemo(() => {
-    if (priceInQuestion === null || !band) return null;
-    if (floor !== null && priceInQuestion < floor) return "not_allowed";
-    if (ceiling !== null && priceInQuestion > ceiling) return "above_list";
-    if (band.requiresReview) return "needs_approval";
-    if (customerState === "approved_floor") return "needs_approval";
-    return "safe";
-  }, [priceInQuestion, band, floor, ceiling, customerState]);
+  const priceInQuestion = advice?.priceInQuestion ?? null;
+  const verdict = advice?.verdict ?? null;
 
   const copyPrice = async () => {
     if (priceInQuestion === null) return;
@@ -173,39 +144,35 @@ export function PriceAdvisorTab({
     }
   };
 
-  const reasons: string[] = [];
-  if (band && ceiling !== null && floor !== null) {
-    reasons.push(
-      ar
-        ? `السعر الرسمي المنشور لهذه الطريقة ${fmtMoney(ceiling, currency, lang)}.`
-        : `The published list price for this route is ${fmtMoney(ceiling, currency, lang)}.`,
-    );
-    if (band.fixed) {
-      reasons.push(
-        ar
+  // *Which* reasons apply is part of the rule and comes back with the advice, so
+  // a consuming app cannot explain the same number differently. The sentences
+  // are this screen's own, because it writes them in its own two languages.
+  const sentenceFor = (reason: ReasonCode): string => {
+    switch (reason) {
+      case "list_price":
+        return ar
+          ? `السعر الرسمي المنشور لهذه الطريقة ${fmtMoney(ceiling, currency, lang)}.`
+          : `The published list price for this route is ${fmtMoney(ceiling, currency, lang)}.`;
+      case "fixed_price":
+        return ar
           ? "هذه الدورة منشورة بسعر ثابت، ولا تقبل التفاوض."
-          : "This course is published at a fixed price and is not negotiable.",
-      );
-    } else if (customerState === "discount") {
-      reasons.push(
-        ar
+          : "This course is published at a fixed price and is not negotiable.";
+      case "stepped_down_for_discount":
+        return ar
           ? `طلب العميل خصمًا، فنزلنا خطوة واحدة داخل النطاق المسموح إلى ${fmtMoney(suggested ?? 0, currency, lang)}.`
-          : `The customer asked for a discount, so the price steps down once inside the allowed band to ${fmtMoney(suggested ?? 0, currency, lang)}.`,
-      );
-    } else if (customerState === "approved_floor") {
-      reasons.push(
-        ar
+          : `The customer asked for a discount, so the price steps down once inside the allowed band to ${fmtMoney(suggested ?? 0, currency, lang)}.`;
+      case "approved_exception_floor":
+        return ar
           ? "الحالة مسجَّلة كاستثناء معتمد، فالاقتراح هو الحد الأدنى نفسه."
-          : "This is recorded as an approved exception, so the suggestion is the floor itself.",
-      );
-    } else {
-      reasons.push(
-        ar
+          : "This is recorded as an approved exception, so the suggestion is the floor itself.";
+      case "opens_at_list":
+        return ar
           ? "لا يوجد اعتراض على السعر، فالبيع يبدأ من السعر الرسمي."
-          : "There is no price objection, so the sale opens at the list price.",
-      );
+          : "There is no price objection, so the sale opens at the list price.";
     }
-  }
+  };
+
+  const reasons = (advice?.reasons ?? []).map(sentenceFor);
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">

@@ -66,6 +66,7 @@ import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
+import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricingBooksRouteImport } from './routes/api/pricing.books'
 import { Route as ApiPricingCatalogRouteImport } from './routes/api/pricing.catalog'
 import { Route as ApiPricingChangelogRouteImport } from './routes/api/pricing.changelog'
@@ -371,6 +372,11 @@ const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   path: '/api/ingest/dataset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPricesAdviceRoute = ApiPricesAdviceRouteImport.update({
+  id: '/api/prices/advice',
+  path: '/api/prices/advice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPricingBooksRoute = ApiPricingBooksRouteImport.update({
   id: '/api/pricing/books',
   path: '/api/pricing/books',
@@ -522,6 +528,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
   '/api/pricing/catalog': typeof ApiPricingCatalogRoute
   '/api/pricing/changelog': typeof ApiPricingChangelogRoute
@@ -599,6 +606,7 @@ export interface FileRoutesByTo {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
   '/api/pricing/catalog': typeof ApiPricingCatalogRoute
   '/api/pricing/changelog': typeof ApiPricingChangelogRoute
@@ -677,6 +685,7 @@ export interface FileRoutesById {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
   '/api/pricing/catalog': typeof ApiPricingCatalogRoute
   '/api/pricing/changelog': typeof ApiPricingChangelogRoute
@@ -756,6 +765,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/prices/advice'
     | '/api/pricing/books'
     | '/api/pricing/catalog'
     | '/api/pricing/changelog'
@@ -833,6 +843,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/prices/advice'
     | '/api/pricing/books'
     | '/api/pricing/catalog'
     | '/api/pricing/changelog'
@@ -910,6 +921,7 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/prices/advice'
     | '/api/pricing/books'
     | '/api/pricing/catalog'
     | '/api/pricing/changelog'
@@ -988,6 +1000,7 @@ export interface RootRouteChildren {
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
+  ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricingBooksRoute: typeof ApiPricingBooksRoute
   ApiPricingCatalogRoute: typeof ApiPricingCatalogRoute
   ApiPricingChangelogRoute: typeof ApiPricingChangelogRoute
@@ -1409,6 +1422,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestDatasetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/prices/advice': {
+      id: '/api/prices/advice'
+      path: '/api/prices/advice'
+      fullPath: '/api/prices/advice'
+      preLoaderRoute: typeof ApiPricesAdviceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pricing/books': {
       id: '/api/pricing/books'
       path: '/api/pricing/books'
@@ -1596,6 +1616,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
+  ApiPricesAdviceRoute: ApiPricesAdviceRoute,
   ApiPricingBooksRoute: ApiPricingBooksRoute,
   ApiPricingCatalogRoute: ApiPricingCatalogRoute,
   ApiPricingChangelogRoute: ApiPricingChangelogRoute,

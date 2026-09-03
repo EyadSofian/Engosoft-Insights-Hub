@@ -28,6 +28,7 @@
     "test:acquisition-channel": "node --experimental-strip-types scripts/test-acquisition-channel.mjs",
     "test:sales-report": "node --experimental-strip-types scripts/test-sales-report.mjs",
     "test:admin-auth": "node --experimental-strip-types scripts/test-admin-auth.mjs",
+    "test:price-advice": "node --experimental-strip-types scripts/test-price-advice.mjs",
     "test:target-overrides": "node --experimental-strip-types scripts/test-target-overrides.mjs",
     "test:integration-person": "node --experimental-strip-types scripts/test-integration-person.mjs",
     "test:employee-score": "node --experimental-strip-types scripts/test-employee-performance-score.mjs",

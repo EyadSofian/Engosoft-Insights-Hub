@@ -3,35 +3,45 @@ import type { AuditRow, CatalogEntry, CatalogPrice } from "./pricing-ui";
 /**
  * Reading a course's published prices into the shape the list row draws.
  *
- * Every function here is a projection of what the API already returned. None of
- * them decides a price, a floor or a verdict — those come from the pricing
- * engine on the server, and duplicating any of that judgement in the browser is
- * how a screen ends up disagreeing with the audit it is reporting on.
+ * Every function *defined* here is a projection of what the API already
+ * returned. None of them decides a price, a floor or a verdict — those live in
+ * `@/lib/pricing/price-advice`, the one module the server calls to answer
+ * `/api/prices/advice` and these pages call to draw the same numbers. The
+ * re-exports below are that module, kept under this name so a component asks
+ * for a band where it always did.
+ *
+ * `bandFor` used to be defined here, which made the browser a second author of
+ * the floor the audit judges against — exactly the duplication the paragraph
+ * above forbids.
  */
 
-export type PriceMode = "course" | "package";
+export {
+  activeOffers,
+  bandFor,
+  bandForRoute,
+  cashBand,
+  egyptBand,
+  entryKey,
+  instalmentBand,
+  isNegotiable,
+  suggest,
+  today,
+  verdictFor,
+  CASH_METHODS,
+  EGYPT_METHODS,
+  INSTALMENT_METHODS,
+} from "@/lib/pricing/price-advice";
 
-export interface PriceBand {
-  floor: number | null;
-  ceiling: number | null;
-  currency: string;
-  /** A single published number rather than a range. */
-  fixed: boolean;
-  requiresReview: boolean;
-}
-
-const CASH_METHODS = ["cash", "cashier"];
-const INSTALMENT_METHODS = ["tabby", "tamara"];
-/** The workbook's Egyptian column is published without a method split. */
-const EGYPT_METHODS = ["any", "cash", "cashier"];
-
-export const today = (): string => new Date().toISOString().slice(0, 10);
-
-const liveOn = (price: CatalogPrice, day: string) =>
-  (!price.validFrom || price.validFrom <= day) && (!price.validTo || price.validTo >= day);
-
-export const activeOffers = (entry: CatalogEntry, day = today()): CatalogPrice[] =>
-  entry.prices.filter((price) => price.active && price.scope === "offer" && liveOn(price, day));
+export type {
+  Advice,
+  CustomerState,
+  Market,
+  PaymentChoice,
+  PriceBand,
+  PriceMode,
+  ReasonCode,
+  Verdict,
+} from "@/lib/pricing/price-advice";
 
 export const hasPackage = (entry: CatalogEntry): boolean =>
   entry.prices.some(
@@ -49,68 +59,6 @@ export const bundleNameOf = (entry: CatalogEntry): string =>
 
 export const incentiveRules = (entry: CatalogEntry): CatalogPrice[] =>
   entry.prices.filter((price) => price.active && price.scope === "incentive");
-
-/**
- * The band a seller may quote for one payment route.
- *
- * Several rules can apply to the same route — one per instrument, sometimes one
- * per country. The floor is the lowest floor any of them publishes and the
- * ceiling the highest ceiling, which is exactly the range a sale is judged
- * against; narrowing it here would invent breaches the audit does not see.
- */
-export function bandFor(
-  entry: CatalogEntry,
-  methods: string[],
-  currency: string,
-  mode: PriceMode = "course",
-): PriceBand | undefined {
-  const scopes = mode === "package" ? ["bundle", "level"] : ["individual"];
-  const rules = entry.prices.filter(
-    (price) =>
-      price.active &&
-      price.currency === currency &&
-      scopes.includes(price.scope) &&
-      (methods.includes(price.paymentMethod) ||
-        (price.paymentMethod === "any" && methods.includes("any"))),
-  );
-  if (!rules.length) return undefined;
-
-  const floors = rules
-    .map((price) => price.minimum ?? price.exact ?? price.maximum)
-    .filter((value): value is number => value !== null);
-  const ceilings = rules
-    .map((price) => price.maximum ?? price.exact ?? price.minimum)
-    .filter((value): value is number => value !== null);
-  if (!floors.length || !ceilings.length) return undefined;
-
-  const floor = Math.min(...floors);
-  const ceiling = Math.max(...ceilings);
-  return {
-    floor,
-    ceiling,
-    currency,
-    fixed: floor === ceiling,
-    requiresReview: rules.some((price) => price.requiresReview),
-  };
-}
-
-export const cashBand = (entry: CatalogEntry, mode?: PriceMode) =>
-  bandFor(entry, CASH_METHODS, "SAR", mode);
-export const instalmentBand = (entry: CatalogEntry, mode?: PriceMode) =>
-  bandFor(entry, INSTALMENT_METHODS, "SAR", mode);
-export const egyptBand = (entry: CatalogEntry, mode?: PriceMode) =>
-  bandFor(entry, EGYPT_METHODS, "EGP", mode);
-
-/** A course somebody can negotiate on at all: its band has room in it. */
-export const isNegotiable = (entry: CatalogEntry): boolean => {
-  const cash = cashBand(entry);
-  const instalment = instalmentBand(entry);
-  return Boolean((cash && !cash.fixed) || (instalment && !instalment.fixed));
-};
-
-/** Stable identity for a catalog entry across renders and lookups. */
-export const entryKey = (entry: CatalogEntry): string =>
-  `${entry.code}:${entry.deliveryType}:${entry.subcategory}:${entry.level}`;
 
 /**
  * How each course actually sold in the period, taken from the audit rows the
