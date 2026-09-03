@@ -175,10 +175,14 @@ function chatStatusLabel(
 export function UncalledLeadsDialog({
   scope,
   employee,
+  employeeLabel,
   onOpenChange,
 }: {
   scope: UncalledScope | null;
+  /** The owner to filter on — the raw Odoo spelling the lead rows carry. */
   employee?: string;
+  /** The same person as the tab writes them. Defaults to `employee`. */
+  employeeLabel?: string;
   onOpenChange: (open: boolean) => void;
 }) {
   const { lang } = useI18n();
@@ -231,7 +235,7 @@ export function UncalledLeadsDialog({
                   : lang === "ar"
                     ? "ليدز لم يتواصل معها الموظف المسؤول"
                     : "Leads the assigned owner never contacted"}
-                {employee ? ` — ${employee}` : ""}
+                {employee ? ` — ${employeeLabel || employee}` : ""}
               </DialogTitle>
               <DialogDescription className="text-xs leading-relaxed text-text-muted">
                 {scope === "none"

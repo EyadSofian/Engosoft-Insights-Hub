@@ -568,6 +568,13 @@ export interface CourseAgg extends PerfRow {
 export interface TeamAgg {
   key: string;
   name: string;
+  /**
+   * A person's name as the employee tab writes it: Odoo HR's spelling, cut to
+   * three parts. Absent on teams, and on people Odoo does not recognise as
+   * staff. `name` stays the raw source spelling every join and drill-down key
+   * is built from — render `displayName ?? name`, never send it to an API.
+   */
+  displayName?: string;
   parent?: string;
   crmLeads: number;
   won: number;

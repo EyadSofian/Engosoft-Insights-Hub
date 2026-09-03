@@ -526,6 +526,17 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize));
         const safePage = Math.min(page, totalPages);
         const pageRows = ordered.slice((safePage - 1) * pageSize, safePage * pageSize);
+        // Owner and caller are colleagues, and this list is read beside the
+        // employee cards — so they are written the same way there: Odoo HR's
+        // name, three parts. Only the page in hand is rewritten; the filtering
+        // above ran on the raw spelling the lead itself carries.
+        const { getEmployeeDirectory } = await import("@/lib/employee-directory.server");
+        const directory = await getEmployeeDirectory();
+        const named = pageRows.map((row) => ({
+          ...row,
+          salesperson: directory.displayNameFor(row.salesperson),
+          calledBy: row.calledBy.map((agent) => directory.displayNameFor(agent)),
+        }));
         // A missing alternate number on a lead already proven contacted cannot
         // change the action list. Only incomplete evidence on a still-uncontacted
         // lead keeps the sync in a warming state.
@@ -577,7 +588,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           },
           months: summarizeUncalledMonths(monthFacts, { lostAvailable }),
           leads: {
-            rows: pageRows,
+            rows: named,
             total: ordered.length,
             /** Before the status filter — the number the tile itself shows. */
             unfilteredTotal: rows.length,

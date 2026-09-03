@@ -319,7 +319,10 @@ export function AccountingAgentsView() {
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
   const [editingTargets, setEditingTargets] = useState(false);
   const [uncalledScope, setUncalledScope] = useState<UncalledScope | null>(null);
-  const [uncalledEmployee, setUncalledEmployee] = useState<string | null>(null);
+  const [uncalledEmployee, setUncalledEmployee] = useState<{
+    name: string;
+    displayName: string;
+  } | null>(null);
   const [autoOpenedUncalled, setAutoOpenedUncalled] = useState(false);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
   useEffect(() => {
@@ -331,7 +334,10 @@ export function AccountingAgentsView() {
     if (!requested) return;
     const normalized = requested.toLocaleLowerCase("en");
     const match = data.agents.find(
-      (row) => row.key.toLocaleLowerCase("en") === normalized || row.name.toLocaleLowerCase("en") === normalized,
+      (row) =>
+        row.key.toLocaleLowerCase("en") === normalized ||
+        row.name.toLocaleLowerCase("en") === normalized ||
+        row.displayName.toLocaleLowerCase("en") === normalized,
     );
     if (match) setSelectedAgentKey(match.key);
   }, [data]);
@@ -368,7 +374,7 @@ export function AccountingAgentsView() {
   const visibleAgents = data.agents
     .filter((row) =>
       normalizedSearch
-        ? `${row.name} ${row.team}`
+        ? `${row.displayName} ${row.name} ${row.team}`
             .toLocaleLowerCase(lang === "ar" ? "ar" : "en")
             .includes(normalizedSearch)
         : true,
@@ -393,7 +399,7 @@ export function AccountingAgentsView() {
       .map((row) => ({
         key: row.key,
         employeeId: row.target.employeeId,
-        name: row.name,
+        name: row.displayName,
         target: row.target.target,
         paidRevenue: row.paidRevenue,
         orderRevenue: row.orderRevenue,
@@ -790,7 +796,7 @@ export function AccountingAgentsView() {
           rows={visibleAgents}
           onSelect={(row) => setSelectedAgentKey(row.key)}
           onOpenUncalled={(row) => {
-            setUncalledEmployee(row.name);
+            setUncalledEmployee({ name: row.name, displayName: row.displayName });
             setUncalledScope("owner");
           }}
         />
@@ -808,7 +814,8 @@ export function AccountingAgentsView() {
 
       <UncalledLeadsDialog
         scope={uncalledScope}
-        employee={uncalledEmployee ?? undefined}
+        employee={uncalledEmployee?.name}
+        employeeLabel={uncalledEmployee?.displayName}
         onOpenChange={(next) => {
           if (!next) {
             setUncalledScope(null);
@@ -1453,8 +1460,8 @@ function EmployeeEvidenceDialog({
             <DialogTitle>{titles[kind][lang]}</DialogTitle>
             <DialogDescription className="text-xs text-text-muted">
               {lang === "ar"
-                ? `السجلات الخاصة بـ ${row.name} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
-                : `Only ${row.name}'s records for the selected period. Each evidence view contains one source and one purpose.`}
+                ? `السجلات الخاصة بـ ${row.displayName} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
+                : `Only ${row.displayName}'s records for the selected period. Each evidence view contains one source and one purpose.`}
             </DialogDescription>
           </DialogHeader>
           <div className="p-4 sm:p-5">
@@ -1516,7 +1523,7 @@ function AgentCards({
           key={row.key}
           onClick={() => onSelect(row)}
           className="card w-full overflow-hidden p-4 text-start transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35 sm:p-5"
-          aria-label={lang === "ar" ? `فتح تحليل ${row.name}` : `Open ${row.name} analysis`}
+          aria-label={lang === "ar" ? `فتح تحليل ${row.displayName}` : `Open ${row.displayName} analysis`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1525,8 +1532,8 @@ function AgentCards({
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-text" title={row.name}>
-                    {row.name}
+                  <h3 className="truncate text-sm font-semibold text-text" title={row.displayName}>
+                    {row.displayName}
                   </h3>
                   <p className="mt-0.5 truncate text-[11px] text-text-muted" title={row.team}>
                     {row.team}
@@ -1757,7 +1764,7 @@ function AgentTable({
                     className="text-start font-semibold text-text outline-none focus-visible:text-brand"
                     onClick={() => onSelect(row)}
                   >
-                    {row.name}
+                    {row.displayName}
                   </button>
                   <div
                     className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted"
@@ -1810,8 +1817,8 @@ function AgentTable({
                       className="group inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/25 px-2 py-1 font-semibold text-brand hover:border-brand/45 hover:bg-brand-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
                       aria-label={
                         lang === "ar"
-                          ? `عرض ليدز ${row.name} التي لم يتواصل معها`
-                          : `Show leads ${row.name} did not contact`
+                          ? `عرض ليدز ${row.displayName} التي لم يتواصل معها`
+                          : `Show leads ${row.displayName} did not contact`
                       }
                     >
                       <bdi dir="ltr" className="num">
@@ -1997,7 +2004,7 @@ function AgentPerformanceSheet({
               <span>{row.team}</span>
             </div>
             <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">
-              {row.name}
+              {row.displayName}
             </SheetTitle>
             <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
               {lang === "ar"
@@ -2076,7 +2083,7 @@ function AgentPerformanceSheet({
                   value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
                   hint={lang === "ar" ? "يشمل ليدز تابعها زميل آخر" : "Includes leads handled by a colleague"}
                   onDrill={row.ownerCalledDistributedLeads === null ? undefined : () => setUncalledScope("owner")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتواصل معها` : `Show the leads ${row.name} never contacted`}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها` : `Show the leads ${row.displayName} never contacted`}
                 />
                 <MiniMetric label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
                 <MiniMetric
@@ -2084,7 +2091,7 @@ function AgentPerformanceSheet({
                   value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
                   hint={lang === "ar" ? "لا مكالمة ولا رسالة أو رد من موظف" : "No employee call, message, or reply"}
                   onDrill={row.uncalledDistributedLeads === null ? undefined : () => setUncalledScope("none")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.name} التي لم يتواصل معها أحد` : `Show ${row.name}'s leads that nobody contacted`}
+                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها أحد` : `Show ${row.displayName}'s leads that nobody contacted`}
                 />
                 <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
                 <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
@@ -2584,6 +2591,7 @@ function AgentPerformanceSheet({
         <UncalledLeadsDialog
           scope={uncalledScope}
           employee={row.name}
+          employeeLabel={row.displayName}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setUncalledScope(null);
           }}

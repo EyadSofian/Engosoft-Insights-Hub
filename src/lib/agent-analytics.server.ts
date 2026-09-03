@@ -36,12 +36,23 @@ import {
   type AgentPerformanceScore,
 } from "./employee-performance-score";
 import { callCanCoverLead, leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
+import { getEmployeeDirectory } from "./employee-directory.server.ts";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
 export interface AgentAnalyticsRow {
   key: string;
+  /**
+   * The spelling this person arrives under. It is the identity every join,
+   * target lookup and evidence drill-down is keyed on, so it is never rewritten.
+   */
   name: string;
+  /**
+   * What the screen writes instead: Odoo HR's legal name cut to three parts, so
+   * a roster drawn from Odoo, Yeastar and Chatwoot reads at one length. Falls
+   * back to `name` when Odoo has no employee record for this person, or is down.
+   */
+  displayName: string;
   team: string;
   paidRevenue: number;
   invoices: number;
@@ -523,6 +534,9 @@ const blankCourseProfile = (lostDataAvailable = true): AgentCourseProfile => ({
 const blank = (key: string, name: string): MutableAgent => ({
   key,
   name,
+  // Replaced from the Odoo roster once every source has been merged; until
+  // then a row is safe to render, it just carries its source spelling.
+  displayName: name,
   team: "—",
   teams: new Set(),
   paidRevenue: 0,
@@ -1454,7 +1468,7 @@ function buildTargetCoverage(
     unmatched: unmatched.sort((left, right) => (right.target ?? 0) - (left.target ?? 0)),
     untargeted: agents
       .filter((row) => !row.target && row.paidRevenue !== 0)
-      .map((row) => ({ name: row.name, paidRevenue: row.paidRevenue }))
+      .map((row) => ({ name: row.displayName || row.name, paidRevenue: row.paidRevenue }))
       .sort((left, right) => right.paidRevenue - left.paidRevenue),
     duplicates,
   };
@@ -1516,6 +1530,10 @@ export async function buildAgentAnalytics(
   // page pay every upstream latency one after another.
   const callsSnapshotPromise = getCallsHubSummary(integrationFrom, integrationTo);
   const leadCallsPromise = getCallsHubLeadCalls(integrationFrom, integrationTo).catch(() => null);
+  // Odoo's roster decides only what each row is called, so it joins the same
+  // parallel batch and never blocks a figure. It resolves itself when Odoo is
+  // unreachable, handing back a directory that passes every name through.
+  const directoryPromise = getEmployeeDirectory();
   const chatwootPromise = chatwootConfigured()
     ? getChatwootAgentSnapshot(integrationFrom, integrationTo)
     : Promise.resolve(null);
@@ -1608,8 +1626,18 @@ export async function buildAgentAnalytics(
     chatwootStatus.error = error instanceof Error ? error.message : String(error);
   }
 
+  const directory = await directoryPromise;
+  for (const row of map.values()) row.displayName = directory.displayNameFor(row.name);
+
   const selectedAgents = [...map.values()].filter((row) => {
-    if (!normalizedEquals(row.name, filters.salesperson)) return false;
+    // Either spelling selects the person: the filter list still offers the raw
+    // Odoo user name, while a link built from what the tab shows carries the
+    // three-part one.
+    if (
+      !normalizedEquals(row.name, filters.salesperson) &&
+      !normalizedEquals(row.displayName, filters.salesperson)
+    )
+      return false;
     if (
       filters.salesTeam &&
       ![...row.teams].some((team) => normalizedEquals(team, filters.salesTeam))

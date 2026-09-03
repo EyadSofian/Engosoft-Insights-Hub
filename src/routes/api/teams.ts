@@ -13,7 +13,14 @@ export const Route = createFileRoute("/api/teams")({
         const { buildAgentAnalytics } = await import("@/lib/agent-analytics.server");
         const agentAnalytics = await buildAgentAnalytics(data, filters, teams);
 
+        // The same roster the agent cards use, so a person is spelled one way
+        // whether the eye lands on their card, their team row, or the
+        // leaderboard. Cached, so this costs no second call to Odoo. Only
+        // people are renamed: a sales team is not a person and has no HR record.
+        const { getEmployeeDirectory } = await import("@/lib/employee-directory.server");
+        const directory = await getEmployeeDirectory();
         const people = teams.flatMap((t) => t.people ?? []);
+        for (const person of people) person.displayName = directory.displayNameFor(person.name);
         const MIN_LEADS = 20;
         const leaderboard = [...people]
           .filter((p) => p.crmLeads >= MIN_LEADS)

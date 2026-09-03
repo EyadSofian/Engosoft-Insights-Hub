@@ -142,8 +142,11 @@ function Teams() {
                           (team.people ?? []).map((p) => (
                             <tr key={team.key + p.key} className="group">
                               <Cell sticky>
-                                <span className="ps-6 text-text-muted truncate block max-w-[170px]" title={p.name}>
-                                  {p.name}
+                                <span
+                                  className="ps-6 text-text-muted truncate block max-w-[170px]"
+                                  title={p.displayName ?? p.name}
+                                >
+                                  {p.displayName ?? p.name}
                                 </span>
                               </Cell>
                               <Cell align muted>
@@ -214,8 +217,8 @@ function PeopleList({ rows, tone }: { rows: TeamAgg[]; tone: "success" | "danger
           <span className="flex items-center gap-2.5 min-w-0">
             <span className="num text-[11px] text-text-subtle w-4 shrink-0">{i + 1}</span>
             <span className="min-w-0">
-              <span className="block text-[13px] truncate" title={p.name}>
-                {p.name}
+              <span className="block text-[13px] truncate" title={p.displayName ?? p.name}>
+                {p.displayName ?? p.name}
               </span>
               <span className="block text-[11px] text-text-muted">
                 {p.parent} · {fmtNum(p.crmLeads)} {lang === "ar" ? "عميل" : "leads"}
