@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/prices/catalog")({
       GET: async ({ request }) => {
         const { json } = await import("@/lib/pricing/pricing-api.server");
         const { authorizeService } = await import("@/lib/admin-auth.server");
-        const { bandForRoute, activeOffers, entryKey, isNegotiable } =
+        const { bandForRoute, activeOffers, entryKey, isNegotiable, methodsFor, currencyFor } =
           await import("@/lib/pricing/price-advice");
         const { currentPublishedBook, queryPriceItems, pricingDatabaseConfigured } =
           await import("@/lib/pricing/pricing-db.server");
@@ -107,7 +107,8 @@ export const Route = createFileRoute("/api/prices/catalog")({
                   eg: bandForRoute(entry, "eg", "cash", "package") ?? null,
                 };
             const mode = hasCourseBand ? "course" : "package";
-            const offers = activeOffers(entry).map((price) => ({
+            const live = activeOffers(entry);
+            const offers = live.map((price) => ({
               id: price.id,
               currency: price.currency,
               paymentMethod: price.paymentMethod,
@@ -118,6 +119,44 @@ export const Route = createFileRoute("/api/prices/catalog")({
               validTo: price.validTo,
               note: price.note,
             }));
+
+            /**
+             * The same offers, bucketed by the route they apply to.
+             *
+             * A course whose only published price is an offer has no band on any
+             * route, and a list that only knows about bands draws it as a row of
+             * dashes — "no price" for something being actively sold. Bucketed
+             * here rather than in the reader, because which methods a route
+             * covers is `methodsFor`, and that answer already lives in the rule.
+             */
+            const forRoute = (market: "sa" | "eg", payment: "cash" | "instalment") => {
+              const currency = currencyFor(market);
+              const methods = methodsFor(market, payment);
+              const seen = new Set<string>();
+              return (
+                offers
+                  .filter(
+                    (offer) =>
+                      offer.currency === currency &&
+                      (market === "eg" ||
+                        offer.paymentMethod === "any" ||
+                        methods.includes(offer.paymentMethod)),
+                  )
+                  // Two instruments publishing the same figure are one offer to a
+                  // seller; the rows are genuinely two rules, the price is one.
+                  .filter((offer) => {
+                    const key = `${offer.exact}|${offer.minimum}|${offer.maximum}|${offer.validTo}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                  })
+              );
+            };
+            const offersByRoute = {
+              sa_cash: forRoute("sa", "cash"),
+              sa_instalment: forRoute("sa", "instalment"),
+              eg: forRoute("eg", "cash"),
+            };
 
             return {
               key: entryKey(entry),
@@ -134,6 +173,7 @@ export const Route = createFileRoute("/api/prices/catalog")({
               mode,
               routes,
               offers,
+              offersByRoute,
               /** Nothing published on any route: the row a manager needs to see. */
               unpriced: !Object.values(routes).some(Boolean) && offers.length === 0,
             };
