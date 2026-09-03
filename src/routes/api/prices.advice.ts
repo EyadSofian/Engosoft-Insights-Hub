@@ -50,7 +50,13 @@ export const Route = createFileRoute("/api/prices/advice")({
         const stateParam = params.get("state");
         const state =
           stateParam === "discount" || stateParam === "approved_floor" ? stateParam : "standard";
-        const mode = params.get("mode") === "package" ? "package" : "course";
+        // Left unset, the scope is worked out rather than assumed. A bundle
+        // publishes no individual price, so answering it in course scope always
+        // returns "nothing published" — a wrong answer to a question the caller
+        // did not ask. An explicit mode is still obeyed exactly.
+        const requestedMode = params.get("mode");
+        const mode =
+          requestedMode === "package" ? "package" : requestedMode === "course" ? "course" : null;
 
         // An unparseable `asked` is refused rather than quietly read as zero,
         // which would judge a quote nobody made.
@@ -129,10 +135,21 @@ export const Route = createFileRoute("/api/prices/advice")({
 
           // One course means one answer. Several means the caller has to say
           // which, and gets the shortlist to say it with.
-          const advice =
-            entries.length === 1
-              ? buildAdvice(entries[0], { market, payment, state, asked, mode })
-              : null;
+          const adviceFor = (entryMode: "course" | "package") =>
+            buildAdvice(entries[0], { market, payment, state, asked, mode: entryMode });
+
+          let advice = null;
+          if (entries.length === 1) {
+            if (mode) advice = adviceFor(mode);
+            else {
+              const asCourse = adviceFor("course");
+              const asPackage = asCourse.band ? null : adviceFor("package");
+              // Falls back to the course reading when neither scope publishes
+              // anything, so "no price on this route" stays the answer rather
+              // than becoming "no package price" for something that is not one.
+              advice = asCourse.band ? asCourse : asPackage?.band ? asPackage : asCourse;
+            }
+          }
 
           return json({
             ok: true,

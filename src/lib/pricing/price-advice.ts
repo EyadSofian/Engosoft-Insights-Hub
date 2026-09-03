@@ -270,6 +270,8 @@ export interface Advice {
   market: Market;
   payment: PaymentChoice;
   customerState: CustomerState;
+  /** Which published scope this band came from: the course, or its bundle. */
+  mode: PriceMode;
   currency: string;
   band: PriceBand | null;
   /** What to open at, from the book and the customer's state. */
@@ -346,6 +348,7 @@ export function buildAdvice(entry: PricedEntry, request: AdviceRequest): Advice 
     market,
     payment,
     customerState: state,
+    mode,
     currency,
     band: band ?? null,
     suggested,

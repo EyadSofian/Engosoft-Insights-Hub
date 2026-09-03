@@ -280,6 +280,45 @@ for (const market of ["sa", "eg"]) {
   }
 }
 
+/* --- course scope vs bundle scope ------------------------------------------- */
+// A bundle publishes no individual price. Reading it in course scope is not a
+// cheaper answer, it is no answer — which is why the endpoint works the scope
+// out rather than assuming "course".
+
+{
+  const bundle = entry(
+    [rule({ id: "b", scope: "bundle", paymentMethod: "cash", minimum: 4000, maximum: 5000 })],
+    { code: "PMP-BUNDLE", courseName: "PMP + Exam Simulator + PRIMAVERA" },
+  );
+  const asCourse = buildAdvice(bundle, {
+    market: "sa",
+    payment: "cash",
+    state: "standard",
+    day: DAY,
+  });
+  assert.equal(asCourse.band, null, "a bundle has no individual price");
+  assert.equal(asCourse.mode, "course");
+
+  const asPackage = buildAdvice(bundle, {
+    market: "sa",
+    payment: "cash",
+    state: "standard",
+    mode: "package",
+    day: DAY,
+  });
+  assert.equal(asPackage.band.floor, 4000);
+  assert.equal(asPackage.band.ceiling, 5000);
+  assert.equal(asPackage.mode, "package", "the answer says which scope it came from");
+}
+
+// The reverse holds too: a plain course has no bundle price, so the fallback
+// cannot invent one.
+assert.equal(
+  buildAdvice(full, { market: "sa", payment: "cash", state: "standard", mode: "package", day: DAY })
+    .band,
+  null,
+);
+
 /* --- the number the customer named ----------------------------------------- */
 // `Number("")` is 0, so a lenient read of a typo quotes zero and reports it as a
 // breach. Nothing typed is "no number"; something typed that holds no number is
