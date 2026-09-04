@@ -37,6 +37,8 @@
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write .",
     "test:snapshot-freshness": "node --experimental-strip-types scripts/test-snapshot-freshness.mjs",
     "test:dashboard-db": "node --experimental-strip-types scripts/test-dashboard-db.mjs",
@@ -61,6 +63,7 @@
     "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs"
   },
   "dependencies": {
+    "@botpress/webchat": "^5.5.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -121,6 +124,9 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "^2.7.6",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/luxon": "^3.7.5",
     "@types/node": "^22.16.5",
     "@types/papaparse": "^5.5.2",
     "@types/pg": "^8.21.0",
@@ -133,10 +139,12 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "jsdom": "^30.0.1",
     "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^3.2.7"
   }
 }

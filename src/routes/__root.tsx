@@ -12,7 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "@/lib/i18n";
-import { FloatingChat } from "@/components/FloatingChat";
+import { NexusRoot } from "@/components/engo-nexus/NexusRoot";
 import { AppShell } from "@/components/AppShell";
 import { CampaignRiskPopup } from "@/components/CampaignRiskPopup";
 
@@ -146,8 +146,10 @@ function RootComponent() {
           <Outlet />
         </AppShell>
         <CampaignRiskPopup />
-        {/* Mounted once, so the conversation survives navigation. */}
-        <FloatingChat />
+        {/* ENGO Nexus — the one assistant. Mounted once, so the conversation
+            survives navigation. It replaced the previous FloatingChat, which
+            still exists in the tree for rollback but is no longer mounted. */}
+        <NexusRoot />
       </I18nProvider>
     </QueryClientProvider>
   );

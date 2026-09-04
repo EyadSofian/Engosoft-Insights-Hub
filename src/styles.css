@@ -739,3 +739,92 @@
   background: var(--surface);
   z-index: 1;
 }
+
+/* --- ENGO Nexus ---------------------------------------------------------
+   The assistant's own motion and prose rules. Kept here rather than inline so
+   the launcher's animation respects the same reduced-motion contract as the
+   rest of the dashboard, in one place.
+------------------------------------------------------------------------- */
+
+@keyframes nexus-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes nexus-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A slow 4px drift, not a bounce: the launcher sits in a manager's peripheral
+   vision all day, and anything more insistent becomes an irritation. */
+.nexus-float {
+  animation: nexus-float 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-float {
+    animation: none;
+  }
+}
+
+/* Markdown inside a chat bubble. Deliberately tighter than page prose — the
+   agent writes structured diagnostic answers with headings and lists, and page
+   spacing would make a four-point answer scroll off screen. */
+.nexus-prose > :first-child {
+  margin-top: 0;
+}
+.nexus-prose > :last-child {
+  margin-bottom: 0;
+}
+.nexus-prose p {
+  margin: 0.4rem 0;
+}
+.nexus-prose ul,
+.nexus-prose ol {
+  margin: 0.4rem 0;
+  padding-inline-start: 1.15rem;
+}
+.nexus-prose ul {
+  list-style: disc;
+}
+.nexus-prose ol {
+  list-style: decimal;
+}
+.nexus-prose li {
+  margin: 0.15rem 0;
+}
+.nexus-prose h1,
+.nexus-prose h2,
+.nexus-prose h3,
+.nexus-prose h4 {
+  margin: 0.7rem 0 0.3rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+.nexus-prose strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.nexus-prose hr {
+  margin: 0.6rem 0;
+  border-color: var(--border);
+}
+.nexus-prose th,
+.nexus-prose td {
+  padding: 0.25rem 0.5rem;
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+}
