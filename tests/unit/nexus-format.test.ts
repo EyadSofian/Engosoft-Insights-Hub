@@ -139,6 +139,17 @@ describe("nexus-format — float noise in prose", () => {
     ).toContain("**7,009.36**");
   });
 
+  it("keeps a grouped integer part intact", () => {
+    // Regression: an earlier regex matched from the `0` after the comma and
+    // rendered `7,009.358714766733` as `7,9.36` — a wrong number produced by
+    // the guard itself. Caught by an end-to-end run against the live bot.
+    expect(normalizeFloatNoise("الإيرادات 7,009.358714766733 دولار")).toBe(
+      "الإيرادات 7,009.36 دولار",
+    );
+    expect(normalizeFloatNoise("1,234,567.891234567")).toBe("1,234,567.89");
+    expect(normalizeFloatNoise("$138,187.35635592628")).toBe("$138,187.36");
+  });
+
   it("rounds every long decimal in a sentence", () => {
     expect(normalizeFloatNoise("cpl 6.990175660156239 and roas 3.916969874680598")).toBe(
       "cpl 6.99 and roas 3.92",

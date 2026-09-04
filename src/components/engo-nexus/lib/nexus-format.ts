@@ -220,8 +220,13 @@ export function formatDate(value: unknown, lang: "ar" | "en" = "en"): string {
  * It is presentation, not interpretation. The root cause is bot-side — the
  * agent should format money before writing it — and this is the display-layer
  * guard that keeps it from reaching a manager either way.
+ *
+ * The integer part deliberately allows thousands separators. An earlier version
+ * matched `\d+` only, so `7,009.358714766733` matched from the `0` onward and
+ * rendered as `7,9.36` — a wrong number, produced by the very guard meant to
+ * prevent wrong numbers. Caught by an end-to-end run against the live bot.
  */
-const FLOAT_NOISE = /(\d+)\.(\d{6,})/g;
+const FLOAT_NOISE = /(\d[\d,]*)\.(\d{6,})/g;
 
 export function normalizeFloatNoise(text: string): string {
   if (!text) return text;
@@ -233,7 +238,7 @@ export function normalizeFloatNoise(text: string): string {
       index % 2 === 1
         ? segment
         : segment.replace(FLOAT_NOISE, (match, whole: string, fraction: string) => {
-            const value = Number(`${whole}.${fraction}`);
+            const value = Number(`${whole.replace(/,/g, "")}.${fraction}`);
             if (!Number.isFinite(value)) return match;
             return formatNumber(value, 2);
           }),
