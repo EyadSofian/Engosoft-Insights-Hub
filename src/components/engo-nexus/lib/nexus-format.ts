@@ -228,6 +228,18 @@ export function formatDate(value: unknown, lang: "ar" | "en" = "en"): string {
  */
 const FLOAT_NOISE = /(\d[\d,]*)\.(\d{6,})/g;
 
+/**
+ * Escape sequences the model wrote as literal characters rather than newlines.
+ *
+ * Observed live in a PMP pricing answer: the text ended with a literal
+ * `\n\n` before "المصدر: PriceEngo", which markdown renders as the two
+ * characters, not a paragraph break. Nothing in the bot emits this — the model
+ * typed it — so it is cleaned at the point of display.
+ */
+const LITERAL_ESCAPE = /\\n/g;
+/** Three or more blank lines, and trailing spaces that survive them. */
+const BLANK_RUN = /[ \t]*\n(?:[ \t]*\n){2,}/g;
+
 export function normalizeFloatNoise(text: string): string {
   if (!text) return text;
   // Code spans are left exactly as written: a long decimal inside backticks is
@@ -237,11 +249,14 @@ export function normalizeFloatNoise(text: string): string {
     .map((segment, index) =>
       index % 2 === 1
         ? segment
-        : segment.replace(FLOAT_NOISE, (match, whole: string, fraction: string) => {
-            const value = Number(`${whole.replace(/,/g, "")}.${fraction}`);
-            if (!Number.isFinite(value)) return match;
-            return formatNumber(value, 2);
-          }),
+        : segment
+            .replace(LITERAL_ESCAPE, "\n")
+            .replace(BLANK_RUN, "\n\n")
+            .replace(FLOAT_NOISE, (match, whole: string, fraction: string) => {
+              const value = Number(`${whole.replace(/,/g, "")}.${fraction}`);
+              if (!Number.isFinite(value)) return match;
+              return formatNumber(value, 2);
+            }),
     )
     .join("");
 }

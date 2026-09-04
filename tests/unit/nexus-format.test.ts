@@ -191,3 +191,33 @@ describe("nexus-format — float noise in prose", () => {
     expect(() => normalizeFloatNoise("`unclosed 1.1234567")).not.toThrow();
   });
 });
+
+describe("normalizeFloatNoise — model-written escape sequences", () => {
+  it("turns a literal \\n the model typed into a real break", () => {
+    // Observed live in a PMP pricing answer, before "المصدر: PriceEngo".
+    const live = "سعر **PMP + Exam** هو **600 SAR**.\\n\\nالمصدر: PriceEngo";
+    const out = normalizeFloatNoise(live);
+    expect(out).not.toContain("\\n");
+    expect(out).toBe("سعر **PMP + Exam** هو **600 SAR**.\n\nالمصدر: PriceEngo");
+  });
+
+  it("collapses the stray blank runs that came with it", () => {
+    expect(normalizeFloatNoise("a.\n   \n\n   \nb")).toBe("a.\n\nb");
+  });
+
+  it("keeps an ordinary paragraph break exactly as it is", () => {
+    expect(normalizeFloatNoise("one\n\ntwo")).toBe("one\n\ntwo");
+    expect(normalizeFloatNoise("one\ntwo")).toBe("one\ntwo");
+  });
+
+  it("leaves an escape sequence inside a code span alone", () => {
+    // There it is a literal being discussed, not a formatting mistake.
+    expect(normalizeFloatNoise("use `\\n` to break")).toBe("use `\\n` to break");
+  });
+
+  it("still normalises float noise alongside the new cleanup", () => {
+    expect(normalizeFloatNoise("الإيراد 7,009.358714766733\\n\\nالمصدر: Hub")).toBe(
+      "الإيراد 7,009.36\n\nالمصدر: Hub",
+    );
+  });
+});
