@@ -405,8 +405,11 @@ export interface CourseVariantPerformance {
   rawProductNames: string[];
   productCode: string;
   displayName: string;
-  quantity: number;
+  /** Null when no invoice line carried a quantity — never a misleading 0. */
+  quantity: number | null;
   salesOrders: number;
+  /** Invoices CONTAINING this product. Does not sum across variants: one
+   *  invoice with three product lines is one invoice in three variants. */
   invoices: number;
   revenue: number;
   /** Share of the family's collected revenue, 0-1. */
@@ -434,13 +437,27 @@ export interface CampaignProductMix {
     productCode: string;
     invoices: number;
     salesOrders: number;
-    quantity: number;
+    quantity: number | null;
     revenue: number;
   }>;
 }
 
-const productKey = (product: string, code: string): string =>
-  code ? `code:${code}` : `name:${normalizeName(product)}`;
+/**
+ * Odoo puts the product code at the front of the name: "[109] Management -
+ * PMP - Event". The dedicated `productCode` column is empty on these rows, so
+ * without this every variant came back `resolutionStatus: "raw"` and nothing
+ * could ever be crosswalked to the catalog.
+ */
+export const bracketCode = (value: string): string =>
+  /^\s*\[([^\]]+)\]/.exec(value ?? "")?.[1]?.trim() ?? "";
+
+const codeOf = (product: string, code: string): string =>
+  (code || "").trim() || bracketCode(product);
+
+const productKey = (product: string, code: string): string => {
+  const resolved = codeOf(product, code);
+  return resolved ? `code:${resolved}` : `name:${normalizeName(product)}`;
+};
 
 /**
  * Group a course family's paid invoices and sales orders by sold product.
@@ -460,6 +477,8 @@ export function buildCourseVariants(
     names: Set<string>;
     code: string;
     quantity: number;
+    /** False when no row carried a quantity at all — 0 would be a lie. */
+    hasQuantity: boolean;
     invoiceRefs: Set<string>;
     orderRefs: Set<string>;
     revenue: number;
@@ -467,6 +486,7 @@ export function buildCourseVariants(
   };
   const byProduct = new Map<string, Acc>();
   const at = (product: string, code: string): Acc => {
+    const resolvedCode = codeOf(product, code);
     const key = productKey(product, code);
     let value = byProduct.get(key);
     if (!value) {
@@ -474,6 +494,7 @@ export function buildCourseVariants(
         names: new Set(),
         code,
         quantity: 0,
+        hasQuantity: false,
         invoiceRefs: new Set(),
         orderRefs: new Set(),
         revenue: 0,
@@ -482,7 +503,7 @@ export function buildCourseVariants(
       byProduct.set(key, value);
     }
     if (product) value.names.add(product);
-    if (!value.code && code) value.code = code;
+    if (!value.code && resolvedCode) value.code = resolvedCode;
     return value;
   };
 
@@ -491,7 +512,10 @@ export function buildCourseVariants(
     if (!row.product && !row.productCode) continue;
     const acc = at(row.product, row.productCode);
     acc.revenue += row.usdPaid;
-    acc.quantity += row.quantity;
+    if (typeof row.quantity === "number" && Number.isFinite(row.quantity)) {
+      acc.quantity += row.quantity;
+      if (row.quantity !== 0) acc.hasQuantity = true;
+    }
     if (row.movement && !row.isCreditNote) acc.invoiceRefs.add(row.movement);
     if (row.campaignName) acc.campaigns.add(row.campaignName);
   }
@@ -511,7 +535,7 @@ export function buildCourseVariants(
       rawProductNames: [...acc.names].sort(),
       productCode: acc.code,
       displayName: [...acc.names].sort()[0] ?? acc.code,
-      quantity: acc.quantity,
+      quantity: acc.hasQuantity ? acc.quantity : null,
       salesOrders: acc.orderRefs.size,
       invoices: acc.invoiceRefs.size,
       revenue: acc.revenue,
@@ -538,6 +562,7 @@ export function buildCampaignProductMix(data: FilteredData, detail: string): Cam
     invoiceRefs: Set<string>;
     orderRefs: Set<string>;
     quantity: number;
+    hasQuantity: boolean;
     revenue: number;
   };
   type CampaignAcc = {
@@ -566,12 +591,16 @@ export function buildCampaignProductMix(data: FilteredData, detail: string): Cam
         invoiceRefs: new Set(),
         orderRefs: new Set(),
         quantity: 0,
+        hasQuantity: false,
         revenue: 0,
       };
       campaign.products.set(key, value);
     }
     if (!value.product && product) value.product = product;
-    if (!value.code && code) value.code = code;
+    if (!value.code) {
+      const resolved = codeOf(product, code);
+      if (resolved) value.code = resolved;
+    }
     return value;
   };
 
@@ -585,7 +614,10 @@ export function buildCampaignProductMix(data: FilteredData, detail: string): Cam
       row.productCode,
     );
     product.revenue += row.usdPaid;
-    product.quantity += row.quantity;
+    if (typeof row.quantity === "number" && Number.isFinite(row.quantity)) {
+      product.quantity += row.quantity;
+      if (row.quantity !== 0) product.hasQuantity = true;
+    }
     if (row.movement && !row.isCreditNote) product.invoiceRefs.add(row.movement);
   }
 
@@ -608,7 +640,7 @@ export function buildCampaignProductMix(data: FilteredData, detail: string): Cam
           productCode: product.code,
           invoices: product.invoiceRefs.size,
           salesOrders: product.orderRefs.size,
-          quantity: product.quantity,
+          quantity: product.hasQuantity ? product.quantity : null,
           revenue: product.revenue,
         }))
         .sort((a, b) => b.revenue - a.revenue),

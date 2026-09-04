@@ -311,3 +311,81 @@ describe("campaign × product mix — answering 'الحملة دي باعت إي
     expect(mix.map((m) => m.campaignName)).toEqual(["Big", "Small"]);
   });
 });
+
+describe("product codes live in the name, not the code column", () => {
+  it("extracts the bracketed Odoo code", async () => {
+    const { bracketCode } = await import("@/lib/course-intelligence.server");
+    expect(bracketCode("[109] Management - PMP - Event")).toBe("109");
+    expect(bracketCode("PMP + Exam")).toBe("");
+    expect(bracketCode("")).toBe("");
+  });
+
+  it("marks a variant coded when the code is only in the name", () => {
+    // Live, every PMP variant came back "raw" because productCode was empty
+    // and the code sat inside "[109] Management - PMP - Event" — so nothing
+    // could ever be crosswalked to the catalog.
+    const variants = buildCourseVariants(
+      data([
+        accounting({
+          movement: "INV/1",
+          product: "[109] Management - PMP - Event",
+          productCode: "",
+          usdPaid: 100,
+        }),
+      ]),
+      "PMP",
+    );
+    expect(variants[0]!.productCode).toBe("109");
+    expect(variants[0]!.resolutionStatus).toBe("coded");
+  });
+
+  it("folds two spellings sharing a bracketed code into one variant", () => {
+    const variants = buildCourseVariants(
+      data([
+        accounting({ movement: "I1", product: "[109] PMP Event", usdPaid: 10 }),
+        accounting({
+          movement: "I2",
+          product: "[109] Management - PMP - Event",
+          usdPaid: 10,
+        }),
+      ]),
+      "PMP",
+    );
+    expect(variants).toHaveLength(1);
+    expect(variants[0]!.rawProductNames).toHaveLength(2);
+  });
+});
+
+describe("quantity is null when nothing recorded one", () => {
+  it("does not report 0 sold for a missing quantity", () => {
+    // Live, every variant showed "quantity 0", which reads as "none sold"
+    // rather than "not recorded".
+    const variants = buildCourseVariants(
+      data([
+        accounting({
+          movement: "INV/1",
+          product: "PMP + Exam",
+          quantity: 0,
+          usdPaid: 500,
+        }),
+      ]),
+      "PMP",
+    );
+    expect(variants[0]!.quantity).toBeNull();
+  });
+
+  it("reports a real quantity when one is recorded", () => {
+    const variants = buildCourseVariants(
+      data([
+        accounting({
+          movement: "INV/1",
+          product: "PMP + Exam",
+          quantity: 3,
+          usdPaid: 500,
+        }),
+      ]),
+      "PMP",
+    );
+    expect(variants[0]!.quantity).toBe(3);
+  });
+});
