@@ -75,3 +75,60 @@ describe("the employee performance page describes what it holds", () => {
     expect(asked).toMatch(/موظف/);
   });
 });
+
+describe("employee rows carry performance and nothing personal", () => {
+  /**
+   * "Who is behind quota?" needs names and numbers. It must never need, or
+   * accidentally carry, a phone number.
+   */
+  const FORBIDDEN = [
+    "phone",
+    "mobile",
+    "email",
+    "recordingUrl",
+    "transcript",
+    "address",
+    "nationalId",
+    "employeeId",
+  ];
+
+  it("allow-lists performance fields only", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const route = readFileSync(
+      join(import.meta.dirname, "..", "..", "src", "routes", "api", "agent-insights.ts"),
+      "utf8",
+    );
+    const block = route.slice(
+      route.indexOf("const PERFORMANCE_FIELDS"),
+      route.indexOf("MAX_PERFORMANCE_ROWS"),
+    );
+    for (const field of FORBIDDEN) {
+      expect(block, field).not.toContain(`"${field}"`);
+    }
+    for (const field of ["target", "achievementPaid", "name"]) {
+      expect(block, field).toContain(`"${field}"`);
+    }
+  });
+
+  it("caps how many rows can leave", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const route = readFileSync(
+      join(import.meta.dirname, "..", "..", "src", "routes", "api", "agent-insights.ts"),
+      "utf8",
+    );
+    expect(route).toMatch(/MAX_PERFORMANCE_ROWS = \d+/);
+    expect(route).toMatch(/slice\(0, MAX_PERFORMANCE_ROWS\)/);
+  });
+
+  it("projects only the collections a ranking question needs", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const route = readFileSync(
+      join(import.meta.dirname, "..", "..", "src", "routes", "api", "agent-insights.ts"),
+      "utf8",
+    );
+    expect(route).toMatch(/\["agents", "teams", "leaderboard", "needsAttention"\]/);
+  });
+});

@@ -227,9 +227,69 @@ function stripRows(data: Record<string, unknown>): Record<string, unknown> {
   for (const [key, value] of Object.entries(data)) {
     if (Array.isArray(value)) {
       out[`${key}Count`] = value.length;
+      const projected = performanceRows(key, value);
+      if (projected.length > 0) out[key] = projected;
       continue;
     }
     out[key] = value;
   }
   return out;
+}
+
+/**
+ * Performance figures per person or team, and nothing else about them.
+ *
+ * "Who is behind quota?" and "who should sell PMP?" cannot be answered from
+ * totals, and dropping every row meant the agent had to say it could not tell —
+ * with a target board on screen in front of the person asking.
+ *
+ * This is an ALLOW-list, which is the safe direction: a field the source adds
+ * tomorrow is absent until someone decides it belongs. A deny-list is what rots
+ * dangerously, because a new phone-number column would ship by default.
+ * Contact details, call recordings, transcripts and identifiers are not here
+ * and must not be added — a manager needs the numbers, not the person's phone.
+ */
+const PERFORMANCE_FIELDS = [
+  "name",
+  "team",
+  "teamLeader",
+  "unit",
+  "target",
+  "paidRevenue",
+  "revenue",
+  "achievementPaid",
+  "achievement",
+  "remaining",
+  "cleanLeads",
+  "leads",
+  "won",
+  "lost",
+  "invoices",
+  "salesOrders",
+  "conversionRate",
+  "outboundCalls",
+  "answeredCalls",
+  "answerRate",
+  "topCourse",
+  "topCourseRevenue",
+] as const;
+
+/** How many rows a ranking answer can possibly need. */
+const MAX_PERFORMANCE_ROWS = 60;
+
+function performanceRows(key: string, rows: unknown[]): Array<Record<string, unknown>> {
+  if (!["agents", "teams", "leaderboard", "needsAttention"].includes(key)) return [];
+  return rows.slice(0, MAX_PERFORMANCE_ROWS).flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const field of PERFORMANCE_FIELDS) {
+      const value = row[field];
+      if (typeof value === "number" && Number.isFinite(value)) out[field] = value;
+      else if (typeof value === "string" && value.length > 0 && value.length < 120) {
+        out[field] = value;
+      }
+    }
+    return Object.keys(out).length > 1 ? [out] : [];
+  });
 }
