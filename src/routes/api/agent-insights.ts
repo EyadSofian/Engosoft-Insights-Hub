@@ -276,6 +276,8 @@ const PERFORMANCE_FIELDS = [
 
 /** How many rows a ranking answer can possibly need. */
 const MAX_PERFORMANCE_ROWS = 60;
+/** Enough to say what someone sells; not their whole history. */
+const MAX_COURSES_PER_PERSON = 8;
 
 function performanceRows(key: string, rows: unknown[]): Array<Record<string, unknown>> {
   if (!["agents", "teams", "leaderboard", "needsAttention"].includes(key)) return [];
@@ -283,12 +285,66 @@ function performanceRows(key: string, rows: unknown[]): Array<Record<string, unk
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
     const row = entry as Record<string, unknown>;
     const out: Record<string, unknown> = {};
-    for (const field of PERFORMANCE_FIELDS) {
-      const value = row[field];
-      if (typeof value === "number" && Number.isFinite(value)) out[field] = value;
+    const put = (name: string, value: unknown) => {
+      if (typeof value === "number" && Number.isFinite(value)) out[name] = value;
       else if (typeof value === "string" && value.length > 0 && value.length < 120) {
-        out[field] = value;
+        out[name] = value;
       }
+    };
+    for (const field of PERFORMANCE_FIELDS) put(field, row[field]);
+
+    /**
+     * The quota, the score and the course mix live one level down.
+     *
+     * A flat scan skipped all three because each is an object, so the agent saw
+     * a person's revenue and had no idea what they were supposed to hit. These
+     * are the fields a manager asks about by name — "مين بعيد عن تارجته",
+     * "مين أنسب واحد يبيع PMP" — so they are lifted explicitly.
+     */
+    const quota = row.target;
+    if (quota && typeof quota === "object" && !Array.isArray(quota)) {
+      const q = quota as Record<string, unknown>;
+      put("target", q.target);
+      put("achievementPaid", q.achievementPaid);
+      put("teamLeader", q.teamLeader);
+      put("branch", q.branch);
+    }
+    const score = row.performanceScore;
+    if (score && typeof score === "object" && !Array.isArray(score)) {
+      const sc = score as Record<string, unknown>;
+      put("performanceScore", sc.overall);
+      put("targetAttainment", sc.targetAttainment);
+      put("salesExecution", sc.salesExecution);
+    }
+    /**
+     * Which courses this person actually sells, ranked by collected revenue.
+     *
+     * This is what answers "who should sell PMP" with evidence rather than a
+     * guess. Capped, and carrying no lead-level detail.
+     */
+    const profile = row.courseProfile;
+    const courses =
+      profile && typeof profile === "object" && !Array.isArray(profile)
+        ? (profile as Record<string, unknown>).courses
+        : null;
+    if (Array.isArray(courses) && courses.length > 0) {
+      out.courses = courses.slice(0, MAX_COURSES_PER_PERSON).flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const c = entry as Record<string, unknown>;
+        const label = typeof c.label === "string" ? c.label : null;
+        if (!label) return [];
+        return [
+          {
+            label,
+            leads: typeof c.leads === "number" ? c.leads : null,
+            won: typeof c.won === "number" ? c.won : null,
+            paidRevenue: typeof c.paidRevenue === "number" ? c.paidRevenue : null,
+            conversionRate: typeof c.conversionRate === "number" ? c.conversionRate : null,
+            /** "insufficient" means too few deals to rank on. Say so. */
+            sampleStatus: typeof c.sampleStatus === "string" ? c.sampleStatus : null,
+          },
+        ];
+      });
     }
     return Object.keys(out).length > 1 ? [out] : [];
   });
