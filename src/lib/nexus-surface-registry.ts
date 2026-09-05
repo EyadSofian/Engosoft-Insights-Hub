@@ -408,17 +408,87 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
   {
     id: "teams",
     route: "/teams",
-    title: q("الفرق", "Teams"),
+    title: q("أداء الموظفين", "Employee Performance"),
     description: q(
-      "أداء فرق المبيعات والمندوبين: الليدز، التحويل، والإيراد.",
-      "Sales team and rep performance: leads, conversion and revenue.",
+      "أداء الموظفين وفرق المبيعات: التارجت الشهري، المحقق بالتحصيل، نسبة التحقيق، الليدز والتحويل — لكل وحدة وفريق وموظف.",
+      "Employee and sales-team performance: monthly target, collected achievement, achievement rate, leads and conversion — per unit, team and person.",
     ),
-    tabs: [],
-    sections: [{ id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["teams.revenue"] }],
-    elements: commonElements("teams"),
+    /**
+     * The units-and-teams target board is a tab, and it was not listed.
+     *
+     * A manager pointed at "إجمالي التارجت $162,000" on this page and the agent
+     * said it had no target data. The figure was in /api/teams the whole time,
+     * nested under `targets`, which nothing had declared — so neither the
+     * flattener nor this registry knew the tab existed.
+     */
+    tabs: [
+      {
+        id: "targets",
+        title: q("أداء الوحدات والتيمات", "Units and team performance"),
+        summary: q(
+          "متابعة التارجت من تحصيل Odoo: إجمالي التارجت، المحقق بالتحصيل، نسبة التحقيق والمتبقي — للوحدة والفريق والموظف.",
+          "Target tracking from Odoo collections: total target, collected achievement, achievement rate and remaining — by unit, team and person.",
+        ),
+        sections: ["targets"],
+      },
+      {
+        id: "agents",
+        title: q("أداء كل موظف", "Per-employee performance"),
+        summary: q(
+          "بطاقة كل موظف: التارجت، المحقق، الليدز، المكالمات، والكورسات اللي باعها.",
+          "One card per employee: target, achieved, leads, calls and the courses they sold.",
+        ),
+        sections: ["kpis"],
+      },
+    ],
+    sections: [
+      { id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["teams.revenue"] },
+      {
+        id: "targets",
+        title: q("التارجت", "Targets"),
+        elements: ["teams.target", "teams.achievement"],
+      },
+    ],
+    elements: [
+      ...commonElements("teams"),
+      {
+        id: "teams.target",
+        type: "kpi" as const,
+        title: q("إجمالي التارجت", "Total target"),
+        meaning: q(
+          "التارجت الشهري المنشور لكل الموظفين المطابقين، بالدولار.",
+          "The published monthly quota across all matched employees, in USD.",
+        ),
+        sourceCapability: "teams",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("التارجت كام الشهر ده؟", "What is this month's target?"),
+          q("فاضل كام على التارجت؟", "How much is left against target?"),
+        ],
+      },
+      {
+        id: "teams.achievement",
+        type: "kpi" as const,
+        title: q("نسبة التحقيق", "Achievement rate"),
+        meaning: q(
+          "المحقق بالتحصيل ÷ التارجت. التحصيل من Odoo، مش الفواتير المفتوحة.",
+          "Collected achievement over target. Collection is from Odoo, not open invoices.",
+        ),
+        sourceCapability: "teams",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("نسبة التحقيق كام؟", "What is the achievement rate?"),
+          q("مين لسه بعيد عن تارجته؟", "Who is furthest from quota?"),
+        ],
+      },
+    ],
     suggestedQuestions: [
       q("مين أحسن فريق؟", "Which team performs best?"),
-      q("مين محتاج دعم؟", "Who needs support?"),
+      q("التارجت عامل إيه الشهر ده؟", "How are we tracking against target?"),
+      q("مين لسه بعيد عن تارجته؟", "Who is furthest from their quota?"),
+      q("مين أنسب موظف يبيع كورس PMP؟", "Who is best placed to sell PMP?"),
     ],
   },
   {

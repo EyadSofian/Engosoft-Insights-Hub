@@ -60,7 +60,8 @@
     "test:pricing-performance": "node --experimental-strip-types scripts/test-pricing-performance.mjs",
     "test:pricing-catalog": "node --experimental-strip-types scripts/test-pricing-catalog.mjs",
     "test:pricing": "npm run test:price-book-parser && npm run test:pricing-engine && npm run test:price-versioning && npm run test:pricing-security && npm run test:pricing-performance && npm run test:pricing-catalog",
-    "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs"
+    "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs",
+    "audit:agent-coverage": "tsx scripts/audit-agent-coverage.mjs"
   },
   "dependencies": {
     "@botpress/webchat": "^5.5.1",

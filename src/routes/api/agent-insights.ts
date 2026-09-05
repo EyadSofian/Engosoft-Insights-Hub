@@ -176,11 +176,22 @@ function flatSummary(
   paths: readonly string[],
 ): Record<string, number | string> {
   const out: Record<string, number | string> = {};
-  const take = (source: unknown) => {
+  /**
+   * `prefix` disambiguates keys two groups both use.
+   *
+   * health.crmExclusions and health.lostExclusions both carry `accepted`,
+   * `candidates` and `unassigned`. Flattened bare, the second silently
+   * overwrote the first and the agent read lost-lead counts as CRM counts — a
+   * wrong number, not a missing one, which is the worse failure. A bare key is
+   * still used when it is free, so every path that already worked keeps the
+   * name it had.
+   */
+  const take = (source: unknown, prefix = "") => {
     if (!source || typeof source !== "object" || Array.isArray(source)) return;
     for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
-      if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
-      else if (typeof value === "string" && value.length < 120) out[key] = value;
+      const name = key in out && prefix ? `${prefix}.${key}` : key;
+      if (typeof value === "number" && Number.isFinite(value)) out[name] = value;
+      else if (typeof value === "string" && value.length < 120) out[name] = value;
     }
   };
   take(data.totals);
@@ -193,7 +204,8 @@ function flatSummary(
       node =
         node && typeof node === "object" ? (node as Record<string, unknown>)[segment] : undefined;
     }
-    take(node);
+    // The leaf segment names the group when the bare key is already taken.
+    take(node, path.split(".").at(-1) ?? path);
   }
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === "number" && Number.isFinite(value) && !(key in out)) {
