@@ -146,7 +146,7 @@ export const Route = createFileRoute("/api/agent-insights")({
          * handed a nested object goes looking somewhere else, so the scalars
          * that answer "how did this surface do" are lifted to the top.
          */
-        const summary = flatSummary(body);
+        const summary = flatSummary(body, surface.summaryPaths ?? []);
 
         return json({
           status: "OK",
@@ -171,7 +171,10 @@ export const Route = createFileRoute("/api/agent-insights")({
  * Anything else scalar at the top level is included too. Nested objects and
  * row arrays stay in `data` for a caller that needs them.
  */
-function flatSummary(data: Record<string, unknown>): Record<string, number | string> {
+function flatSummary(
+  data: Record<string, unknown>,
+  paths: readonly string[],
+): Record<string, number | string> {
   const out: Record<string, number | string> = {};
   const take = (source: unknown) => {
     if (!source || typeof source !== "object" || Array.isArray(source)) return;
@@ -182,6 +185,16 @@ function flatSummary(data: Record<string, unknown>): Record<string, number | str
   };
   take(data.totals);
   take(data.summary);
+  // Surfaces that keep their headline figures elsewhere say where in the
+  // registry — Weekend under portfolio.weekend, Media Plan under plan.
+  for (const path of paths) {
+    let node: unknown = data;
+    for (const segment of path.split(".")) {
+      node =
+        node && typeof node === "object" ? (node as Record<string, unknown>)[segment] : undefined;
+    }
+    take(node);
+  }
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === "number" && Number.isFinite(value) && !(key in out)) {
       out[key] = value;

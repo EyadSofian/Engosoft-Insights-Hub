@@ -101,6 +101,13 @@ describe("the registry describes reality", () => {
     expect(missing).toEqual([]);
   });
 
+  it("says where a surface keeps its figures when they are not in totals", () => {
+    // Weekend and Media Plan returned a payload with no quotable numbers,
+    // because theirs sit under portfolio.weekend and plan.
+    expect(surfaceById("weekend")!.summaryPaths).toContain("portfolio.weekend");
+    expect(surfaceById("media_plan")!.summaryPaths).toContain("plan");
+  });
+
   it("names no forbidden endpoint as a readable source", () => {
     // A mutation reached by a misread sentence is not a risk worth carrying.
     for (const surface of INSIGHTS_SURFACES) {

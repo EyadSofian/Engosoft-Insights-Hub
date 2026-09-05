@@ -39,6 +39,15 @@ export interface InsightsSurface {
   /** True when the surface can expose personal data and needs care. */
   sensitive: boolean;
   status: SurfaceStatus;
+  /**
+   * Where this surface keeps its headline figures, as dot paths.
+   *
+   * `totals` and `summary` are the dashboard's two conventions and are always
+   * tried. A surface that keeps them elsewhere says so here — Weekend nests
+   * them under `portfolio.weekend`, Media Plan under `plan` — and without that
+   * the agent received a payload with no numbers it could quote.
+   */
+  summaryPaths?: string[];
   /** Why, when the status is not CONNECTED. */
   note?: string;
 }
@@ -168,6 +177,7 @@ export const INSIGHTS_SURFACES: InsightsSurface[] = [
     entities: [],
     sensitive: false,
     status: "CONNECTED",
+    summaryPaths: ["portfolio.weekend", "portfolio.comparison", "window"],
   },
   {
     id: "yoy",
@@ -201,6 +211,7 @@ export const INSIGHTS_SURFACES: InsightsSurface[] = [
     entities: ["campaign", "media_buyer"],
     sensitive: false,
     status: "CONNECTED",
+    summaryPaths: ["plan", "window", "actual"],
   },
   {
     id: "social_media",
