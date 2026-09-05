@@ -390,5 +390,43 @@ export function quickActionsFor(
  * in the user's own bubble would be noise — they did not type it.
  */
 export function stripContext(text: string): string {
-  return text.replace(/^\[dashboard context:[^\]]*\]\s*\n?/, "");
+  return text.replace(/^\[dashboard context:[^\]]*\]\s*\n?/, "").replace(SELECTION_FRAME_RE, "");
+}
+
+/**
+ * The frame that carries a selected item's internal id without showing it.
+ *
+ * Production: the user tapped "PMP + CAPM Recorded + Exam — ONLINE" and their
+ * own bubble read "8b2a6699-8558-43b9-b846-72d68db6f162". The button displayed
+ * the label and sent the value, and for a native Botpress choice block the
+ * value is a productId.
+ *
+ * Sending the label alone would fix the transcript and lose the identity — the
+ * agent would have to re-resolve a product it had already resolved, by fuzzy
+ * name match, which is the exact step that gives a wrong-variant price. So the
+ * id travels the way the dashboard context already travels: prepended to the
+ * text for the agent, stripped from the bubble for the reader.
+ */
+const SELECTION_FRAME_RE = /^\[selection:[^\]]*\]\s*\n?/;
+
+/**
+ * One canonical selection message: readable for the human, exact for the agent.
+ *
+ * `internalValue` is omitted from the frame when it is the label itself —
+ * a plain quick reply like "أيوه" needs no identity frame.
+ */
+export function selectionMessage(input: {
+  displayLabel: string;
+  internalValue?: string | null;
+}): string {
+  const label = input.displayLabel.trim();
+  const value = input.internalValue?.trim();
+  if (!value || value === label) return label;
+  return `[selection: id=${value}]\n${label}`;
+}
+
+/** The internal id a selection message carries, if any. */
+export function selectionValueOf(text: string): string | null {
+  const match = /^\[selection: id=([^\]]*)\]/.exec(text.trim());
+  return match ? match[1]?.trim() || null : null;
 }

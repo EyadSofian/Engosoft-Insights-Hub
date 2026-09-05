@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { selectionMessage } from "../lib/nexus-context";
 import type { CourseSelectorMessage } from "../lib/nexus-message-schema";
 
 /**
@@ -38,14 +39,24 @@ export function CourseSelector({
           ]
             .filter(Boolean)
             .join(" · ");
-          // The reply names the product the way a person would, and includes the
-          // code so the agent can resolve it without a second round trip.
-          const reply = candidate.externalCode
+          /**
+           * The reply names the product the way a person would.
+           *
+           * The code is kept in the visible text because it is a public
+           * catalog code people actually use, and the productId rides the same
+           * hidden selection frame the quick replies use — one contract for
+           * both surfaces, so a product can never be resolved twice by name.
+           */
+          const label = candidate.externalCode
             ? `${candidate.name} (${candidate.deliveryMode ?? ""}) — ${ar ? "كود" : "code"} ${candidate.externalCode}`.replace(
                 /\(\)\s*/,
                 "",
               )
             : `${candidate.name}${candidate.deliveryMode ? ` (${candidate.deliveryMode})` : ""}`;
+          const reply = selectionMessage({
+            displayLabel: label,
+            internalValue: candidate.productId,
+          });
           return (
             <button
               key={candidate.productId}

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { BlockMessage } from "@botpress/webchat";
 import { NexusMessageRenderer } from "@/components/engo-nexus/NexusMessageRenderer";
+import { selectionValueOf, stripContext } from "@/components/engo-nexus/lib/nexus-context";
 
 afterEach(cleanup);
 
@@ -284,7 +285,17 @@ describe("renderer — quick replies are buttons, not markdown", () => {
     const replies = screen.getAllByTestId("nexus-quick-reply");
     expect(replies).toHaveLength(2);
     fireEvent.click(replies[1]!);
-    expect(onSend).toHaveBeenCalledWith("last_month");
+    /**
+     * The label reaches the transcript; the value rides a stripped frame.
+     *
+     * This used to assert `onSend` was called with "last_month" — the value
+     * verbatim. That is the behaviour that put a productId in a user's own
+     * bubble in production, so the assertion moved with the contract. See
+     * tests/component/nexus-selection.test.tsx for the full contract.
+     */
+    const sent = onSend.mock.calls[0]![0] as string;
+    expect(stripContext(sent)).toBe("Last month");
+    expect(selectionValueOf(sent)).toBe("last_month");
   });
 
   it("renders a typed quick_replies payload too", () => {
