@@ -1,0 +1,171 @@
+import { createFileRoute } from "@tanstack/react-router";
+
+/**
+ * One read-only door onto every analytical surface the dashboard shows.
+ *
+ * WHY THIS EXISTS. ENGO Nexus could reach seven of the sixteen visible
+ * surfaces. Asked "الويبسايت باع بكام؟" it said it did not have the data, while
+ * /website was displaying the figure. An unwired capability and a genuine data
+ * gap look identical to a user, and only one of them is honest.
+ *
+ * WHAT IT IS NOT. Not a generic HTTP proxy: the agent names a SURFACE and an
+ * OPERATION from a closed vocabulary, and this file maps that to the
+ * dashboard's own endpoint. The model never sees or constructs a URL, and it
+ * cannot reach anything the registry does not list — mutations included.
+ *
+ * WHAT IT DOES NOT DO. It does not compute. Every figure comes from the same
+ * handler the page calls, so the agent and the screen cannot disagree.
+ */
+export const Route = createFileRoute("/api/agent-insights")({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const { surfaceById, AGENT_FORBIDDEN_ENDPOINTS } =
+          await import("@/lib/agent-insights-registry");
+        const { json } = await import("@/lib/api.server");
+
+        const url = new URL(request.url);
+        const surfaceId = (url.searchParams.get("surface") ?? "").trim();
+        const operation = (url.searchParams.get("operation") ?? "summary").trim();
+
+        const surface = surfaceById(surfaceId);
+        if (!surface) {
+          return Response.json(
+            {
+              status: "UNKNOWN_ENTITY",
+              error: `Unknown surface "${surfaceId}".`,
+              // The vocabulary, so a wrong guess is self-correcting.
+              surfaces: (await import("@/lib/agent-insights-registry")).AGENT_READABLE_SURFACES.map(
+                (s) => ({
+                  id: s.id,
+                  operations: s.operations,
+                  views: s.views,
+                }),
+              ),
+            },
+            { status: 400 },
+          );
+        }
+        if (surface.status === "NOT_APPLICABLE") {
+          return json({
+            status: "NOT_APPLICABLE",
+            surface: surface.id,
+            reason: surface.note ?? "This surface carries no analytics.",
+          });
+        }
+        if (!surface.operations.includes(operation as never)) {
+          return json({
+            status: "INVALID_FILTER",
+            surface: surface.id,
+            reason: `"${operation}" is not available here. Supported: ${surface.operations.join(", ")}.`,
+          });
+        }
+
+        /**
+         * The endpoint is chosen HERE, from the registry — never by the caller.
+         * Anything on the forbidden list is unreachable by construction.
+         */
+        const endpoint = surface.endpoints[0]!;
+        if (AGENT_FORBIDDEN_ENDPOINTS.includes(endpoint)) {
+          return json({
+            status: "PERMISSION_DENIED",
+            surface: surface.id,
+            reason: "This surface is not readable by the agent.",
+          });
+        }
+
+        // Forward the dashboard's own global filters, unchanged.
+        const forward = new URLSearchParams();
+        for (const key of [
+          "from",
+          "to",
+          "company",
+          "platform",
+          "account",
+          "campaign",
+          "campaignKey",
+          "course",
+          "source",
+          "salesTeam",
+          "salesperson",
+          "channel",
+          "mainCategory",
+          "range",
+          "month",
+        ]) {
+          const value = url.searchParams.get(key);
+          if (value) forward.set(key, value);
+        }
+
+        const target = new URL(endpoint, url.origin);
+        target.search = forward.toString();
+
+        const started = Date.now();
+        let upstream: Response;
+        try {
+          upstream = await fetch(target, { headers: { accept: "application/json" } });
+        } catch (error) {
+          return json({
+            status: "UPSTREAM_ERROR",
+            surface: surface.id,
+            operation,
+            reason: `The dashboard source for ${surface.id} could not be reached: ${
+              error instanceof Error ? error.message : String(error)
+            }. This is a source failure, not an absence of data.`,
+          });
+        }
+        if (!upstream.ok) {
+          return json({
+            status: "UPSTREAM_ERROR",
+            surface: surface.id,
+            operation,
+            reason: `The dashboard source for ${surface.id} returned HTTP ${upstream.status}.`,
+          });
+        }
+
+        const data = (await upstream.json()) as Record<string, unknown>;
+
+        /**
+         * Aggregates only.
+         *
+         * Several of these surfaces carry customer phone numbers, emails and
+         * named employees in their row payloads. The dashboard shows them to a
+         * signed-in operator; an agent answering a question does not need them,
+         * so the row arrays are dropped for sensitive surfaces and the totals
+         * kept.
+         */
+        const body = surface.sensitive ? stripRows(data) : data;
+
+        return json({
+          status: "OK",
+          surface: surface.id,
+          operation,
+          view: url.searchParams.get("view") ?? null,
+          appliedFilters: Object.fromEntries(forward),
+          source: "insights_hub",
+          durationMs: Date.now() - started,
+          data: body,
+        });
+      },
+    },
+  },
+});
+
+/**
+ * Drop row-level collections, keep every aggregate.
+ *
+ * Deliberately blunt: an allow-list of "safe" columns rots the moment a source
+ * adds one, and the cost of being wrong here is a customer's phone number in a
+ * chat transcript.
+ */
+function stripRows(data: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) {
+      out[`${key}Count`] = value.length;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}

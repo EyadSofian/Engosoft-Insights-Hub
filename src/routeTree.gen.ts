@@ -34,6 +34,7 @@ import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiAgentCourseIntelligenceRouteImport } from './routes/api/agent-course-intelligence'
 import { Route as ApiAgentCourseInvoicesRouteImport } from './routes/api/agent-course-invoices'
+import { Route as ApiAgentInsightsRouteImport } from './routes/api/agent-insights'
 import { Route as ApiCampaignRiskRouteImport } from './routes/api/campaign-risk'
 import { Route as ApiCampaignsRouteImport } from './routes/api/campaigns'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -212,6 +213,11 @@ const ApiAgentCourseIntelligenceRoute =
 const ApiAgentCourseInvoicesRoute = ApiAgentCourseInvoicesRouteImport.update({
   id: '/api/agent-course-invoices',
   path: '/api/agent-course-invoices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentInsightsRoute = ApiAgentInsightsRouteImport.update({
+  id: '/api/agent-insights',
+  path: '/api/agent-insights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCampaignRiskRoute = ApiCampaignRiskRouteImport.update({
@@ -509,6 +515,7 @@ export interface FileRoutesByFullPath {
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/agent-insights': typeof ApiAgentInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -589,6 +596,7 @@ export interface FileRoutesByTo {
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/agent-insights': typeof ApiAgentInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -670,6 +678,7 @@ export interface FileRoutesById {
   '/api/ads': typeof ApiAdsRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
   '/api/agent-course-invoices': typeof ApiAgentCourseInvoicesRoute
+  '/api/agent-insights': typeof ApiAgentInsightsRoute
   '/api/campaign-risk': typeof ApiCampaignRiskRoute
   '/api/campaigns': typeof ApiCampaignsRoute
   '/api/chat': typeof ApiChatRoute
@@ -752,6 +761,7 @@ export interface FileRouteTypes {
     | '/api/ads'
     | '/api/agent-course-intelligence'
     | '/api/agent-course-invoices'
+    | '/api/agent-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -832,6 +842,7 @@ export interface FileRouteTypes {
     | '/api/ads'
     | '/api/agent-course-intelligence'
     | '/api/agent-course-invoices'
+    | '/api/agent-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -912,6 +923,7 @@ export interface FileRouteTypes {
     | '/api/ads'
     | '/api/agent-course-intelligence'
     | '/api/agent-course-invoices'
+    | '/api/agent-insights'
     | '/api/campaign-risk'
     | '/api/campaigns'
     | '/api/chat'
@@ -993,6 +1005,7 @@ export interface RootRouteChildren {
   ApiAdsRoute: typeof ApiAdsRoute
   ApiAgentCourseIntelligenceRoute: typeof ApiAgentCourseIntelligenceRoute
   ApiAgentCourseInvoicesRoute: typeof ApiAgentCourseInvoicesRoute
+  ApiAgentInsightsRoute: typeof ApiAgentInsightsRoute
   ApiCampaignRiskRoute: typeof ApiCampaignRiskRoute
   ApiCampaignsRoute: typeof ApiCampaignsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -1223,6 +1236,13 @@ declare module '@tanstack/react-router' {
       path: '/api/agent-course-invoices'
       fullPath: '/api/agent-course-invoices'
       preLoaderRoute: typeof ApiAgentCourseInvoicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-insights': {
+      id: '/api/agent-insights'
+      path: '/api/agent-insights'
+      fullPath: '/api/agent-insights'
+      preLoaderRoute: typeof ApiAgentInsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/campaign-risk': {
@@ -1625,6 +1645,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdsRoute: ApiAdsRoute,
   ApiAgentCourseIntelligenceRoute: ApiAgentCourseIntelligenceRoute,
   ApiAgentCourseInvoicesRoute: ApiAgentCourseInvoicesRoute,
+  ApiAgentInsightsRoute: ApiAgentInsightsRoute,
   ApiCampaignRiskRoute: ApiCampaignRiskRoute,
   ApiCampaignsRoute: ApiCampaignsRoute,
   ApiChatRoute: ApiChatRoute,

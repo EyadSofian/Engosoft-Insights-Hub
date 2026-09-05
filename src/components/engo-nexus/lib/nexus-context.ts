@@ -34,6 +34,19 @@ export type NexusPageType =
   | "media_buyers"
   | "website"
   | "yoy"
+  /**
+   * Added after an audit found five visible routes resolving to "other".
+   *
+   * Nexus could not tell which page the user was standing on for Pricing,
+   * Weekend, Media Plan, Social Media or Organic — so "حلل الصفحة دي" had
+   * nothing to resolve against. Every navigation route now has a type, and a
+   * test fails the build if a new one does not.
+   */
+  | "pricing"
+  | "weekend"
+  | "media_plan"
+  | "social_media"
+  | "organic"
   | "guide"
   | "other";
 
@@ -43,6 +56,15 @@ export interface NexusPageContext {
   language: "ar" | "en";
   /** Only filters that are actually set — an empty object when none are. */
   filters: Partial<Record<string, string>>;
+  /**
+   * The internal view the page is showing.
+   *
+   * Four pages switch analytical views without changing the pathname —
+   * Website (owner/campaigns/operations), Accounting
+   * (summary/months/profitability), Courses (campaigns/alerts/all) and Lost
+   * (team/course). Without this, "حلل التاب دي" has nothing to resolve.
+   */
+  view?: string;
   entityType?: "campaign" | "adset" | "ad" | "course" | "team" | "salesperson" | "source";
   entityId?: string;
   entityName?: string;
@@ -68,7 +90,13 @@ export function pageTypeFor(path: string): NexusPageType {
     "media-buyers": "media_buyers",
     website: "website",
     yoy: "yoy",
+    pricing: "pricing",
+    weekend: "weekend",
+    "media-plan": "media_plan",
+    "social-media": "social_media",
+    organic: "organic",
     guide: "guide",
+    // Legacy bookmarks that redirect into Accounting.
     "full-invoiced": "accounting",
   };
   return map[first] ?? "other";
