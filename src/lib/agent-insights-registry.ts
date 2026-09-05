@@ -116,7 +116,8 @@ export const INSIGHTS_SURFACES: InsightsSurface[] = [
     routes: ["/pricing"],
     section: "sales",
     views: [],
-    endpoints: ["/api/pricing.catalog", "/api/prices.advice"],
+    // The file is pricing.catalog.ts; TanStack serves it at /api/pricing/catalog.
+    endpoints: ["/api/pricing/catalog"],
     operations: ["summary", "search"],
     entities: ["product"],
     sensitive: false,

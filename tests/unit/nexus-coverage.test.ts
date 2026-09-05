@@ -82,6 +82,25 @@ describe("the registry describes reality", () => {
     expect(surfaceById("lost")!.views).toEqual(["team", "course"]);
   });
 
+  it("names only endpoints that exist as route files", () => {
+    // The pricing entry pointed at "/api/pricing.catalog", which is the file
+    // name, not the served path — the surface returned UPSTREAM_ERROR while
+    // the page worked fine.
+    const dir = join(import.meta.dirname, "..", "..", "src", "routes", "api");
+    const served = new Set<string>();
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
+      const match = /createFileRoute\("([^"]+)"\)/.exec(readFileSync(join(dir, file), "utf8"));
+      if (match) served.add(match[1]!);
+    }
+    const missing: string[] = [];
+    for (const surface of INSIGHTS_SURFACES) {
+      for (const endpoint of surface.endpoints) {
+        if (!served.has(endpoint)) missing.push(`${surface.id} -> ${endpoint}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it("names no forbidden endpoint as a readable source", () => {
     // A mutation reached by a misread sentence is not a risk worth carrying.
     for (const surface of INSIGHTS_SURFACES) {
