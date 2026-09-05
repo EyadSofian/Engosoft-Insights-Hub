@@ -136,10 +136,23 @@ export const Route = createFileRoute("/api/agent-insights")({
          */
         const body = surface.sensitive ? stripRows(data) : data;
 
+        /**
+         * The headline figures, hoisted flat.
+         *
+         * Live: /website showed "مبيعات الموقع $1,926.57" while Nexus answered
+         * with the company-wide $8,210.94 and said the website filter returned
+         * zero rows. The figure was in the payload the whole time, at
+         * `totals.sales` — two levels down, beside forty other keys. A model
+         * handed a nested object goes looking somewhere else, so the scalars
+         * that answer "how did this surface do" are lifted to the top.
+         */
+        const summary = flatSummary(body);
+
         return json({
           status: "OK",
           surface: surface.id,
           operation,
+          summary,
           view: url.searchParams.get("view") ?? null,
           appliedFilters: Object.fromEntries(forward),
           source: "insights_hub",
@@ -150,6 +163,32 @@ export const Route = createFileRoute("/api/agent-insights")({
     },
   },
 });
+
+/**
+ * The scalar figures a surface leads with.
+ *
+ * `totals` is the dashboard's own convention for them; `summary` is the other.
+ * Anything else scalar at the top level is included too. Nested objects and
+ * row arrays stay in `data` for a caller that needs them.
+ */
+function flatSummary(data: Record<string, unknown>): Record<string, number | string> {
+  const out: Record<string, number | string> = {};
+  const take = (source: unknown) => {
+    if (!source || typeof source !== "object" || Array.isArray(source)) return;
+    for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+      if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+      else if (typeof value === "string" && value.length < 120) out[key] = value;
+    }
+  };
+  take(data.totals);
+  take(data.summary);
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === "number" && Number.isFinite(value) && !(key in out)) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
 
 /**
  * Drop row-level collections, keep every aggregate.
