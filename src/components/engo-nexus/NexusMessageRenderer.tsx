@@ -10,6 +10,7 @@ import { TableMessage } from "./messages/TableMessage";
 import { AlertMessage, ErrorBubble } from "./messages/AlertMessage";
 import { QuickReplies } from "./messages/QuickReplies";
 import { ProgressMessage } from "./messages/ProgressMessage";
+import { CourseAnalysis } from "./messages/CourseAnalysis";
 
 /**
  * One deterministic switch from a Botpress block to a component.
@@ -69,6 +70,11 @@ export function NexusMessageRenderer({
               disabled={disabled}
             />
           );
+        case "course_analysis":
+          return (
+            <CourseAnalysis message={parsed} lang={lang} onSend={onSend} disabled={disabled} />
+          );
+
         case "kpi_card":
           return <KpiCard message={parsed} lang={lang} />;
         case "kpi_group":

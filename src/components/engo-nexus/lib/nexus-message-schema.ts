@@ -45,7 +45,63 @@ export type NexusMessageType =
   | "table"
   | "alert"
   | "progress"
-  | "error";
+  | "error"
+  | "course_analysis";
+
+/**
+ * One campaign, as the analysis carries it.
+ *
+ * Numbers arrive as numbers and are formatted at the edge, so the card can
+ * align, sort and colour them. `verdict` is the backend's judgement — the
+ * frontend never decides what a good campaign is.
+ */
+export interface NexusCampaign {
+  /** Internal. Sent back with a follow-up; never rendered. */
+  key: string;
+  name: string;
+  platform: string | null;
+  spend: number | null;
+  leads: number | null;
+  won: number | null;
+  lost: number | null;
+  revenue: number | null;
+  invoices: number | null;
+  orders: number | null;
+  roas: number | null;
+  verdict: "good" | "watch" | "weak" | null;
+}
+
+/** One sold product variant. Never carries a ROAS — see the tool that builds it. */
+export interface NexusProductVariant {
+  /** Internal canonical id when the catalog crosswalk resolved one. */
+  productId: string | null;
+  displayName: string;
+  productCode: string | null;
+  invoices: number | null;
+  orders: number | null;
+  quantity: number | null;
+  revenue: number | null;
+  revenueShare: number | null;
+}
+
+export interface NexusRecommendation {
+  summary: string;
+  reasons: string[];
+  risk: string | null;
+  confidence: "high" | "medium" | "low" | null;
+}
+
+export interface CourseAnalysisMessage {
+  type: "course_analysis";
+  course: string;
+  period: { from: string; to: string; label: string } | null;
+  summary: NexusMetric[];
+  campaigns: NexusCampaign[];
+  products: NexusProductVariant[];
+  recommendation: NexusRecommendation | null;
+  actions: Array<{ label: string; value: string }>;
+  sources: NexusSource[];
+}
 
 /** Where a figure came from. Rendered as a badge — never invented client-side. */
 export type NexusSource = "insights_hub" | "price_engo" | "engosoft_knowledge";
@@ -202,7 +258,8 @@ export type NexusMessage =
   | TableMessage
   | AlertMessage
   | ProgressMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | CourseAnalysisMessage;
 
 // --- Parsing ----------------------------------------------------------------
 
@@ -287,8 +344,83 @@ const level = (value: unknown): "HIGH" | "MEDIUM" | "LOW" | null =>
  * as "fall back to plain text". A bot that starts sending a new message type
  * degrades to readable text rather than to a blank bubble or a thrown error.
  */
+const VERDICTS = new Set(["good", "watch", "weak"]);
+const CONFIDENCES = new Set(["high", "medium", "low"]);
+
+const confidenceOf = (value: unknown): "high" | "medium" | "low" | null =>
+  typeof value === "string" && CONFIDENCES.has(value.toLowerCase())
+    ? (value.toLowerCase() as "high" | "medium" | "low")
+    : null;
+
+function parseCampaign(value: unknown): NexusCampaign | null {
+  if (!isObject(value)) return null;
+  const name = str(value.name);
+  if (!name) return null;
+  return {
+    key: str(value.key) ?? str(value.campaignKey) ?? name,
+    name,
+    platform: str(value.platform),
+    spend: num(value.spend),
+    leads: num(value.leads) ?? num(value.crmLeads),
+    won: num(value.won),
+    lost: num(value.lost),
+    revenue: num(value.revenue),
+    invoices: num(value.invoices),
+    orders: num(value.orders) ?? num(value.salesOrders),
+    roas: num(value.roas),
+    verdict:
+      typeof value.verdict === "string" && VERDICTS.has(value.verdict)
+        ? (value.verdict as "good" | "watch" | "weak")
+        : null,
+  };
+}
+
+function parseVariant(value: unknown): NexusProductVariant | null {
+  if (!isObject(value)) return null;
+  const displayName = str(value.displayName) ?? str(value.name);
+  if (!displayName) return null;
+  return {
+    productId: str(value.productId) ?? str(value.canonicalProductId),
+    displayName,
+    productCode: str(value.productCode),
+    invoices: num(value.invoices),
+    orders: num(value.orders) ?? num(value.salesOrders),
+    quantity: num(value.quantity),
+    revenue: num(value.revenue),
+    revenueShare: num(value.revenueShare),
+  };
+}
+
+const KNOWN_TYPES = new Set<string>([
+  "text",
+  "quick_replies",
+  "kpi_card",
+  "kpi_group",
+  "comparison_card",
+  "price_card",
+  "course_selector",
+  "decision_card",
+  "chart",
+  "table",
+  "alert",
+  "progress",
+  "error",
+  "course_analysis",
+]);
+
 export function parseNexusMessage(name: unknown, data: unknown): NexusMessage | null {
-  const type = typeof name === "string" ? name : isObject(data) ? str(data.type) : null;
+  /**
+   * The block's `name` when it is a type we know, otherwise the payload's own
+   * `type`.
+   *
+   * Botpress names a custom-component block after the registered component
+   * ("CourseAnalysisComponent"), not after the payload type. Trusting `name`
+   * blindly meant a perfectly valid `course_analysis` payload fell through to
+   * plain text — the cards never rendered.
+   */
+  const named = typeof name === "string" ? name : null;
+  const declared = isObject(data) ? str(data.type) : null;
+  const type = named && KNOWN_TYPES.has(named) ? named : (declared ?? named);
   if (!type) return null;
   const d = isObject(data) ? data : {};
   const sources = parseSources(d.sources);
@@ -313,6 +445,66 @@ export function parseNexusMessage(name: unknown, data: unknown): NexusMessage | 
       return options.length > 0
         ? { type: "quick_replies", text: str(d.text) ?? undefined, options }
         : null;
+    }
+
+    case "course_analysis": {
+      const course = str(d.course);
+      if (!course) return null;
+      const period = isObject(d.period)
+        ? {
+            from: str(d.period.from) ?? "",
+            to: str(d.period.to) ?? "",
+            label: str(d.period.label) ?? "",
+          }
+        : null;
+      const campaigns = Array.isArray(d.campaigns)
+        ? d.campaigns.map(parseCampaign).filter((c): c is NexusCampaign => c !== null)
+        : [];
+      const products = Array.isArray(d.products)
+        ? d.products.map(parseVariant).filter((p): p is NexusProductVariant => p !== null)
+        : [];
+      const recommendation = isObject(d.recommendation)
+        ? (() => {
+            const summary = str(d.recommendation.summary);
+            if (!summary) return null;
+            return {
+              summary,
+              reasons: Array.isArray(d.recommendation.reasons)
+                ? d.recommendation.reasons.map((r) => str(r)).filter((r): r is string => Boolean(r))
+                : [],
+              risk: str(d.recommendation.risk),
+              confidence: confidenceOf(d.recommendation.confidence),
+            };
+          })()
+        : null;
+      const actions = Array.isArray(d.actions)
+        ? d.actions
+            .map((action) => {
+              if (!isObject(action)) return null;
+              const label = str(action.label);
+              const value = str(action.value) ?? label;
+              return label && value ? { label, value } : null;
+            })
+            .filter((a): a is { label: string; value: string } => a !== null)
+            .slice(0, 4)
+        : [];
+      // A payload with no campaigns, no products and no recommendation carries
+      // nothing a card could show; fall through to text rather than render an
+      // empty shell.
+      if (campaigns.length === 0 && products.length === 0 && !recommendation) {
+        return null;
+      }
+      return {
+        type: "course_analysis",
+        course,
+        period,
+        summary: parseMetrics(d.summary),
+        campaigns,
+        products,
+        recommendation,
+        actions,
+        sources,
+      };
     }
 
     case "kpi_card": {

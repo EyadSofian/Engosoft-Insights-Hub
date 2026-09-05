@@ -282,8 +282,7 @@
   body {
     background:
       radial-gradient(circle at 88% -8%, var(--page-glow-primary), transparent 34rem),
-      radial-gradient(circle at 4% 44%, var(--page-glow-secondary), transparent 30rem),
-      var(--bg);
+      radial-gradient(circle at 4% 44%, var(--page-glow-secondary), transparent 30rem), var(--bg);
     background-attachment: fixed;
     color: var(--text);
     font-family: var(--font-sans);
@@ -367,6 +366,18 @@
      line-height loosening and keeps it on one run. */
   bdi {
     unicode-bidi: isolate;
+  }
+
+  /* Campaign and product names in the rich analysis cards.
+   *
+   * "PMP-1/7/26-sayed" carries digits and slashes, which the bidi algorithm
+   * reorders against the surrounding Arabic paragraph — the name rendered
+   * scrambled and could not be matched against the dashboard. `isolate` plus an
+   * explicit direction pins the whole run left-to-right whatever surrounds it. */
+  .nexus-ltr {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: start;
   }
 
   /* Latin numerals inside Arabic copy still read left-to-right.
