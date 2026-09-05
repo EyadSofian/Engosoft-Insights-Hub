@@ -8,7 +8,7 @@ import { Mascot } from "./Mascot";
 import { NexusHeader, type NexusStatus } from "./NexusHeader";
 import { NexusWelcome } from "./NexusWelcome";
 import { NexusComposer } from "./NexusComposer";
-import { NexusMessageRenderer } from "./NexusMessageRenderer";
+import { NexusMessageRenderer, hasRenderableContent } from "./NexusMessageRenderer";
 import { ProgressMessage } from "./messages/ProgressMessage";
 import { progressLabels } from "./lib/nexus-progress";
 import { ErrorBubble } from "./messages/AlertMessage";
@@ -245,6 +245,16 @@ export function NexusPanel() {
 
           {messages.map((message) => {
             const outgoing = !!myUserId && message.authorId === myUserId;
+            /**
+             * Decided before the row is drawn.
+             *
+             * The mascot used to render beside a null renderer result, which is
+             * the "assistant replied with nothing" users reported. A message
+             * still streaming keeps its row so the reader sees it arriving.
+             */
+            if (!outgoing && message.status !== "processing" && !hasRenderableContent(message)) {
+              return null;
+            }
             return (
               <div
                 key={message.id}

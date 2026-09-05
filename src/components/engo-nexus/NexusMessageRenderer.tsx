@@ -169,3 +169,59 @@ export function NexusMessageRenderer({
 
   return null;
 }
+
+/**
+ * Will this message put anything on screen?
+ *
+ * THE BLANK AVATAR BUG. The panel drew the mascot, the bubble and the renderer
+ * for every incoming message, and the renderer returns null for a block it does
+ * not know — so an unsupported or empty block produced a mascot sitting beside
+ * nothing. Users reported "the assistant replied but there is no answer".
+ *
+ * Renderability is decided HERE, before the row is drawn. A message with no
+ * user-facing content is omitted entirely rather than rendered as an empty
+ * bubble; a message that carries text always renders, whatever its block type.
+ */
+export function hasRenderableContent(message: BlockMessage): boolean {
+  const block = message.block as Record<string, unknown> & { type?: string };
+  if (!block?.type) return false;
+
+  switch (block.type) {
+    case "text":
+    case "markdown":
+      return typeof block.text === "string" && block.text.trim().length > 0;
+    case "image":
+    case "audio":
+    case "video":
+    case "file":
+      return typeof block.url === "string" && block.url.length > 0;
+    case "location":
+      return true;
+    case "choice":
+    case "dropdown":
+      return (
+        (Array.isArray(block.options) && block.options.length > 0) ||
+        (typeof block.text === "string" && block.text.trim().length > 0)
+      );
+    case "card":
+    case "carousel":
+      return true;
+    case "bloc":
+      return Array.isArray(block.items) && block.items.length > 0;
+    case "custom": {
+      // A known payload renders; an unknown one renders only if it carries text.
+      if (parseNexusMessage(block.name, block.data) !== null) return true;
+      const data = block.data;
+      return (
+        typeof data === "object" &&
+        data !== null &&
+        "text" in data &&
+        typeof (data as { text: unknown }).text === "string" &&
+        (data as { text: string }).text.trim().length > 0
+      );
+    }
+    default:
+      // Unknown block type: render it only if it happens to carry text.
+      return typeof block.text === "string" && block.text.trim().length > 0;
+  }
+}
