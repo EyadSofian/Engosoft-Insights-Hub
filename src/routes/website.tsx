@@ -30,6 +30,7 @@ import {
 } from "@/components/ui-bits";
 import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CampaignObjective, Platform } from "@/lib/types";
 
@@ -194,6 +195,14 @@ const fmtAmount = (value: number) =>
 function Website() {
   const { t, lang } = useI18n();
   const [websiteTab, setWebsiteTab] = useState<"owner" | "campaigns" | "operations">("owner");
+
+  /**
+   * Tell Nexus which Website view is open.
+   *
+   * The route stays /website while the user switches between owner, campaigns
+   * and operations, so without this "اشرح التاب دي" has nothing to resolve.
+   */
+  useRegisterNexusView("website", { tab: websiteTab });
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/website");
   const copy =
     lang === "ar"

@@ -65,6 +65,10 @@ export interface NexusPageContext {
    * (team/course). Without this, "حلل التاب دي" has nothing to resolve.
    */
   view?: string;
+  /** The section in view, when the page declares one. */
+  section?: string;
+  /** The element the user last interacted with — the referent for "الرقم ده". */
+  focusedElementId?: string;
   entityType?: "campaign" | "adset" | "ad" | "course" | "team" | "salesperson" | "source";
   entityId?: string;
   entityName?: string;
@@ -163,8 +167,21 @@ export function buildPageContext(input: {
   path: string;
   language: "ar" | "en";
   filters: GlobalFilters;
+  /**
+   * What the page itself declared: the open tab, the section in view, the
+   * element the user last touched, the entity they selected.
+   *
+   * A pathname cannot carry any of it, and it is what "التاب دي" and "الرقم
+   * ده" actually refer to.
+   */
+  view?: {
+    tab?: string | null;
+    section?: string | null;
+    focusedElementId?: string | null;
+    selectedEntity?: { type: string; id?: string; name?: string } | null;
+  };
 }): NexusPageContext {
-  const { path, language, filters } = input;
+  const { path, language, filters, view } = input;
   const sent: Partial<Record<string, string>> = {};
   for (const key of SENT_FILTERS) {
     const value = filters[key];
@@ -176,6 +193,16 @@ export function buildPageContext(input: {
     pageType: pageTypeFor(path),
     language,
     filters: sent,
+    ...(view?.tab ? { view: view.tab } : {}),
+    ...(view?.section ? { section: view.section } : {}),
+    ...(view?.focusedElementId ? { focusedElementId: view.focusedElementId } : {}),
+    ...(view?.selectedEntity?.name
+      ? {
+          entityType: view.selectedEntity.type as NexusPageContext["entityType"],
+          entityName: view.selectedEntity.name,
+          entityId: view.selectedEntity.id,
+        }
+      : {}),
     ...entityFor(filters),
     market: filters.company,
     period:

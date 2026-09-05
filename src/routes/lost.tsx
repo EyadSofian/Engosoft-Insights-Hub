@@ -16,6 +16,7 @@ import {
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
 import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/lost")({ component: Lost });
 
@@ -54,6 +55,9 @@ interface Resp {
 function Lost() {
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
+
+  /** Tell Nexus which view is open — the route does not change with the tab. */
+  useRegisterNexusView("lost", { tab: matrixView });
   const [shareView, setShareView] = useState<ShareView>("reason");
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
 

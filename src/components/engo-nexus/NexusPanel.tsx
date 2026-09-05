@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { useActiveConversation, useConversations, useUser } from "@botpress/webchat";
@@ -14,6 +14,7 @@ import { progressLabels } from "./lib/nexus-progress";
 import { ErrorBubble } from "./messages/AlertMessage";
 import { buildPageContext, contextPreamble, pageTypeFor, stripContext } from "./lib/nexus-context";
 import { nexusStore, useNexusUi, rememberPanelOpened } from "./state/nexus-store";
+import { getNexusView, subscribeNexusView } from "./state/nexus-view-context";
 
 /**
  * The chat panel. Everything above this file is presentation; this is where the
@@ -95,9 +96,23 @@ export function NexusPanel() {
   const busy = generating && !waitingSuppressed;
   const connected = status === "connected";
 
+  /**
+   * The page's own declaration of what is on screen.
+   *
+   * Subscribed rather than read once: switching a tab or clicking a KPI must
+   * change what "التاب دي" and "الرقم ده" refer to on the very next message.
+   */
+  const view = useSyncExternalStore(subscribeNexusView, getNexusView, getNexusView);
+
   const pageContext = useMemo(
-    () => buildPageContext({ path: location.pathname, language: ar ? "ar" : "en", filters }),
-    [location.pathname, ar, filters],
+    () =>
+      buildPageContext({
+        path: location.pathname,
+        language: ar ? "ar" : "en",
+        filters,
+        view,
+      }),
+    [location.pathname, ar, filters, view],
   );
 
   /**

@@ -37,6 +37,7 @@ import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/courses")({ component: Courses });
 
@@ -493,6 +494,9 @@ function Courses() {
 function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
   const { lang } = useI18n();
   const [view, setView] = useState<"campaigns" | "alerts" | "all">("campaigns");
+
+  /** Tell Nexus which view is open — the route does not change with the tab. */
+  useRegisterNexusView("courses", { tab: view });
   const rows =
     view === "alerts"
       ? report.rows.filter((row) => row.status !== "stable")

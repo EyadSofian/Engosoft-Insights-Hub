@@ -45,6 +45,7 @@ import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
 import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
 import { useFiltersData } from "@/components/TopBar";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/accounting")({ component: Accounting });
 
@@ -118,6 +119,9 @@ function Accounting() {
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
   const [view, setView] = useState<"summary" | "months" | "profitability">("summary");
+
+  /** Tell Nexus which view is open — the route does not change with the tab. */
+  useRegisterNexusView("accounting", { tab: view });
   const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
