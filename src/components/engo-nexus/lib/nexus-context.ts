@@ -221,6 +221,17 @@ export function buildPageContext(input: {
  */
 export function contextPreamble(context: NexusPageContext): string {
   const parts: string[] = [`page=${context.pageType}`];
+  /**
+   * The tab, section and focused element travel too.
+   *
+   * They were added to the context object but never emitted here, so "اشرحلي
+   * التاب دي" reached the agent with nothing but `page=website` and was
+   * answered by describing all three tabs generically. The frame is the only
+   * thing the agent sees; a field that is not in it does not exist.
+   */
+  if (context.view) parts.push(`tab=${context.view}`);
+  if (context.section) parts.push(`section=${context.section}`);
+  if (context.focusedElementId) parts.push(`element=${context.focusedElementId}`);
   if (context.entityType && context.entityName) {
     parts.push(`${context.entityType}="${context.entityName}"`);
   }

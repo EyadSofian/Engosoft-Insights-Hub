@@ -217,3 +217,37 @@ describe("tabbed pages actually register themselves", () => {
     expect(unregistered.sort()).toEqual([]);
   });
 });
+
+describe("the context frame carries what the page declared", () => {
+  it("emits the tab, section and focused element", async () => {
+    const { contextPreamble } = await import("@/components/engo-nexus/lib/nexus-context");
+    // These were on the context object but never in the frame the agent sees,
+    // so "اشرحلي التاب دي" arrived with only page=website.
+    const frame = contextPreamble(
+      buildPageContext({
+        path: "/website",
+        language: "ar",
+        filters: {} as never,
+        view: {
+          tab: "campaigns",
+          section: "kpis",
+          focusedElementId: "website.sales",
+        },
+      }),
+    );
+    expect(frame).toContain("page=website");
+    expect(frame).toContain("tab=campaigns");
+    expect(frame).toContain("section=kpis");
+    expect(frame).toContain("element=website.sales");
+  });
+
+  it("omits them when the page declared nothing", async () => {
+    const { contextPreamble } = await import("@/components/engo-nexus/lib/nexus-context");
+    const frame = contextPreamble(
+      buildPageContext({ path: "/leads", language: "ar", filters: {} as never }),
+    );
+    expect(frame).toContain("page=leads");
+    expect(frame).not.toContain("tab=");
+    expect(frame).not.toContain("element=");
+  });
+});
