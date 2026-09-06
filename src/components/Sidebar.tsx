@@ -40,13 +40,13 @@ export function Sidebar() {
         opacity: out ? 0 : 1,
       }}
     >
-      <div className="mb-6 flex items-center gap-2">
-        <Link to="/" className="group flex min-w-0 flex-1 items-center gap-3 px-1">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-white shadow-xs transition-transform duration-200 group-hover:scale-105">
+      <div className="mb-5 flex items-center gap-2">
+        <Link to="/" className="group flex min-w-0 flex-1 items-center gap-2.5 px-1">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-border bg-white shadow-xs transition-transform duration-200 group-hover:scale-105">
             <img src={logoImg} alt="" className="h-7 w-7 object-contain" />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[15px] font-semibold tracking-tight text-nav-text">
+            <div className="truncate text-[15px] font-bold tracking-tight text-nav-text">
               ENGOSOFT
             </div>
             <div className="truncate text-[11px] text-nav-text-muted">{t("app_sub")}</div>
@@ -70,32 +70,34 @@ export function Sidebar() {
 
           return (
             <div key={section.id}>
+              {/* The active section is a filled soft-blue pill with a solid
+                  icon tile inside it. A 3px edge rail was too quiet to find at
+                  a glance in a list of seven, and the reader's own position is
+                  the one thing a rail must never make them hunt for. */}
               <Link
                 to={section.defaultTo}
                 aria-current={active && !hasChildren ? "page" : undefined}
-                className={`relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 ${
+                className={`group relative flex min-h-11 items-center gap-3 rounded-2xl px-2.5 text-[13.5px] font-semibold transition-colors duration-150 ${
                   active ? "" : "hover:bg-nav-hover"
                 }`}
                 style={
                   active
-                    ? { background: "var(--nav-active-bg)", color: "var(--nav-active-text)" }
+                    ? { background: "var(--sky-surface)", color: "var(--sky-ink)" }
                     : { color: "var(--nav-text)" }
                 }
               >
-                <Icon
-                  size={19}
-                  strokeWidth={active ? 2.2 : 1.8}
-                  className="shrink-0"
+                <span
+                  className="grid size-8 shrink-0 place-items-center rounded-xl transition-colors"
+                  style={
+                    active
+                      ? { background: "var(--sky-strong)", color: "#fff" }
+                      : { background: "var(--surface-2)", color: "var(--nav-text-muted)" }
+                  }
                   aria-hidden="true"
-                />
+                >
+                  <Icon size={17} strokeWidth={active ? 2.4 : 1.9} />
+                </span>
                 <span className="truncate">{section.label[lang]}</span>
-                {active && (
-                  <span
-                    className="absolute inset-y-1.5 w-[3px] rounded-full"
-                    style={{ background: "var(--nav-active-text)", insetInlineStart: 0 }}
-                    aria-hidden="true"
-                  />
-                )}
               </Link>
             </div>
           );
@@ -105,7 +107,7 @@ export function Sidebar() {
       <div className="mt-auto space-y-3 px-1 pt-6">
         <Link
           to="/guide"
-          className="flex min-h-10 items-center gap-2.5 rounded-lg border border-nav-border px-3 text-[12px] font-semibold text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text"
+          className="flex min-h-10 items-center gap-2.5 rounded-xl bg-surface-2 px-3 text-[12px] font-semibold text-nav-text-muted transition-colors hover:bg-surface-3 hover:text-nav-text"
         >
           <BookOpen size={16} />
           <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>

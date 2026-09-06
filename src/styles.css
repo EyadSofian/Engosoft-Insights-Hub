@@ -63,6 +63,49 @@
   --color-nav-active-bg: var(--nav-active-bg);
   --color-nav-active-text: var(--nav-active-text);
 
+  /* --- tonal families ---------------------------------------------------
+     Six colour families, each complete: a pastel `surface` a whole card can
+     sit on, a `border` from the same family, an `ink` that is legible on that
+     surface, and a `strong` for the icon chip, the sparkline and the figure.
+
+     A KPI card takes ALL FOUR. The previous design put the family colour on a
+     32px icon and left the card white, which meant five cards that were
+     supposed to say five different things were, at a glance, one grey block. */
+  --color-mint-surface: var(--mint-surface);
+  --color-mint-border: var(--mint-border);
+  --color-mint-ink: var(--mint-ink);
+  --color-mint-strong: var(--mint-strong);
+
+  --color-rose-surface: var(--rose-surface);
+  --color-rose-border: var(--rose-border);
+  --color-rose-ink: var(--rose-ink);
+  --color-rose-strong: var(--rose-strong);
+
+  --color-sky-surface: var(--sky-surface);
+  --color-sky-border: var(--sky-border);
+  --color-sky-ink: var(--sky-ink);
+  --color-sky-strong: var(--sky-strong);
+
+  --color-violet-surface: var(--violet-surface);
+  --color-violet-border: var(--violet-border);
+  --color-violet-ink: var(--violet-ink);
+  --color-violet-strong: var(--violet-strong);
+
+  --color-amber-surface: var(--amber-surface);
+  --color-amber-border: var(--amber-border);
+  --color-amber-ink: var(--amber-ink);
+  --color-amber-strong: var(--amber-strong);
+
+  --color-cyan-surface: var(--cyan-surface);
+  --color-cyan-border: var(--cyan-border);
+  --color-cyan-ink: var(--cyan-ink);
+  --color-cyan-strong: var(--cyan-strong);
+
+  --color-slate-surface: var(--slate-surface);
+  --color-slate-border: var(--slate-border);
+  --color-slate-ink: var(--slate-ink);
+  --color-slate-strong: var(--slate-strong);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -108,35 +151,76 @@
   --ink: #001e3c;
   --ink-soft: #0b3158;
 
-  /* Engosoft's original blue-and-white canvas. */
-  --bg: #f4f6fa;
-  --bg-subtle: #eef1f7;
+  /* A cool, quiet canvas. Panels are white and sit ON it; KPI cards are
+     coloured and sit on it too, so the page reads as three depths rather than
+     one continuous sheet of white. */
+  --bg: #f4f7fb;
+  --bg-subtle: #eef3f9;
   --surface: #ffffff;
-  --surface-2: #f2f5f9;
-  --surface-3: #e8edf4;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --surface-2: #f4f7fb;
+  --surface-3: #e8eff8;
+  --border: #dfe7f1;
+  --border-strong: #c5d3e4;
 
-  --text: #0b1f38;
-  --text-muted: #5a6b81;
-  --text-subtle: #8494a8;
+  /* --- tonal families, light -------------------------------------------
+     Each `surface` is light enough for --text to stay legible on it, and each
+     `ink` is the family's own dark tone for the figure itself. `strong` is the
+     saturated version: icon chips, sparklines, progress fills. */
+  --mint-surface: #e8f7f0;
+  --mint-border: #bfe9d8;
+  --mint-ink: #0d6b48;
+  --mint-strong: #159a67;
+
+  --rose-surface: #fff0f1;
+  --rose-border: #ffd0d4;
+  --rose-ink: #a92f3b;
+  --rose-strong: #e04452;
+
+  --sky-surface: #eaf3ff;
+  --sky-border: #c5ddfb;
+  --sky-ink: #1a56a8;
+  --sky-strong: #2d78df;
+
+  --violet-surface: #f1edff;
+  --violet-border: #d9cffb;
+  --violet-ink: #56409f;
+  --violet-strong: #7659e8;
+
+  --amber-surface: #fff4e6;
+  --amber-border: #ffdfba;
+  --amber-ink: #a85e12;
+  --amber-strong: #e98623;
+
+  --cyan-surface: #e6f7f9;
+  --cyan-border: #bce8ed;
+  --cyan-ink: #056d77;
+  --cyan-strong: #0797a4;
+
+  --slate-surface: #f2f5fa;
+  --slate-border: #dde5f0;
+  --slate-ink: #3d4d63;
+  --slate-strong: #66758a;
+
+  --text: #0b1f3a;
+  --text-muted: #66758a;
+  --text-subtle: #8b99ac;
   --text-inverse: #ffffff;
 
-  --brand: #1656a0;
-  --brand-hover: #124a8c;
-  --brand-soft: #e8f0fa;
-  --electric: #0050dc;
+  --brand: #1469e8;
+  --brand-hover: #1059c8;
+  --brand-soft: #edf5ff;
+  --electric: #1469e8;
 
-  --accent: #0050dc;
-  --accent-soft: #e8f0fa;
-  --accent-ink: #124a8c;
+  --accent: #1469e8;
+  --accent-soft: #edf5ff;
+  --accent-ink: #1a56a8;
 
-  --success: #2f7a2f;
-  --success-soft: #e8f5e9;
-  --warning: #b26a00;
-  --warning-soft: #fff4e5;
-  --danger: #b3261e;
-  --danger-soft: #fdecea;
+  --success: #159a67;
+  --success-soft: #e8f7f0;
+  --warning: #e98623;
+  --warning-soft: #fff4e6;
+  --danger: #e04452;
+  --danger-soft: #fff0f1;
   /* A published offer the seller is entitled to quote. Deliberately a fixed
      teal rather than green: it is not a compliance pass, it is a different
      price book rule. */
@@ -147,9 +231,9 @@
   --calm: #40607d;
   --calm-soft: #e9eef3;
   /* Neutral analytical accent — a stage in a funnel, a segment, a count that
-     is neither good nor bad news. */
-  --violet: #6d4aca;
-  --violet-soft: #efeafc;
+     is neither good nor bad news. Aliases onto the violet family. */
+  --violet: var(--violet-strong);
+  --violet-soft: var(--violet-surface);
 
   /* --- navigation rail --------------------------------------------------
      Light theme keeps the rail on the page's own surface. It used to be a
@@ -168,17 +252,17 @@
      therefore rose, not the danger red it used to sit on top of. --chart-muted
      is reserved for buckets that carry no category of their own (unclassified,
      "other") so a data gap never looks like a real segment. */
-  --chart-1: #0050dc;
-  --chart-2: #ff9100;
-  --chart-3: #00a3a3;
-  --chart-4: #7c4dff;
-  --chart-5: #d6336c;
-  --chart-6: #3aa655;
-  --chart-muted: #94a3b8;
+  --chart-1: #2d78df;
+  --chart-2: #e98623;
+  --chart-3: #0797a4;
+  --chart-4: #7659e8;
+  --chart-5: #e04452;
+  --chart-6: #159a67;
+  --chart-muted: #a3b1c4;
 
-  --shadow-xs: 0 1px 2px rgba(11, 31, 56, 0.05);
-  --shadow-sm: 0 1px 3px rgba(11, 31, 56, 0.07), 0 1px 2px rgba(11, 31, 56, 0.04);
-  --shadow-md: 0 4px 12px -2px rgba(11, 31, 56, 0.09), 0 2px 6px -2px rgba(11, 31, 56, 0.05);
+  --shadow-xs: 0 1px 2px rgba(11, 31, 58, 0.04);
+  --shadow-sm: 0 2px 6px -1px rgba(11, 31, 58, 0.06), 0 1px 2px rgba(11, 31, 58, 0.03);
+  --shadow-md: 0 10px 24px -8px rgba(11, 31, 58, 0.14), 0 3px 8px -3px rgba(11, 31, 58, 0.06);
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
   --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
 
@@ -186,8 +270,8 @@
   --glass-border: rgba(22, 86, 160, 0.16);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  --page-glow-primary: rgba(0, 80, 220, 0.045);
-  --page-glow-secondary: rgba(22, 86, 160, 0.03);
+  --page-glow-primary: transparent;
+  --page-glow-secondary: transparent;
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -264,18 +348,57 @@
   --accent-soft: #14263f;
   --accent-ink: #91b8ff;
 
-  --success: #4ea75c;
-  --success-soft: #12241a;
-  --warning: #d9903b;
-  --warning-soft: #2a1f10;
-  --danger: #f0645c;
-  --danger-soft: #2c1414;
+  --success: #34c58c;
+  --success-soft: #0e2a20;
+  --warning: #f0a44c;
+  --warning-soft: #2e2011;
+  --danger: #ff6b78;
+  --danger-soft: #2f1418;
   --offer: #3fc2b6;
   --offer-soft: #0f2926;
   --calm: #7fa4c6;
   --calm-soft: #16222e;
-  --violet: #a78bfa;
-  --violet-soft: #1e1a35;
+
+  /* The families again. In the dark theme `surface` is a deep tint of the same
+     hue rather than a pastel, `ink` becomes the light readable tone, and
+     `strong` brightens so an icon chip still reads against it. */
+  --mint-surface: #0e2a20;
+  --mint-border: #1c4c39;
+  --mint-ink: #6fdcb0;
+  --mint-strong: #34c58c;
+
+  --rose-surface: #2f1418;
+  --rose-border: #57262d;
+  --rose-ink: #ff97a1;
+  --rose-strong: #ff6b78;
+
+  --sky-surface: #10243d;
+  --sky-border: #1f4471;
+  --sky-ink: #85b8ff;
+  --sky-strong: #4d94ff;
+
+  --violet-surface: #1d1836;
+  --violet-border: #362c62;
+  --violet-ink: #b7a3ff;
+  --violet-strong: #9a80ff;
+
+  --amber-surface: #2e2011;
+  --amber-border: #573c1c;
+  --amber-ink: #ffc078;
+  --amber-strong: #f0a44c;
+
+  --cyan-surface: #082a2e;
+  --cyan-border: #14515a;
+  --cyan-ink: #5fd6e2;
+  --cyan-strong: #2bb8c6;
+
+  --slate-surface: #16263c;
+  --slate-border: #24384f;
+  --slate-ink: #a7b8cd;
+  --slate-strong: #8296ae;
+
+  --violet: var(--violet-strong);
+  --violet-soft: var(--violet-surface);
 
   --nav-surface: #0b1728;
   --nav-border: #1f3149;
@@ -285,15 +408,15 @@
   --nav-active-bg: #14263f;
   --nav-active-text: #7fb2ff;
 
-  --chart-1: #4c8dff;
-  --chart-2: #ffa733;
-  --chart-3: #2fd4c8;
-  --chart-4: #a78bfa;
-  /* was #f0645c — byte-identical to --danger in this theme, so every fifth
-     category rendered in the error colour. */
-  --chart-5: #f472a0;
-  --chart-6: #56cc74;
-  --chart-muted: #6b7f96;
+  --chart-1: #4d94ff;
+  --chart-2: #f0a44c;
+  --chart-3: #2bb8c6;
+  --chart-4: #9a80ff;
+  /* Deliberately not --danger: an identical value made every fifth category
+     render in the error colour. */
+  --chart-5: #ff8fa0;
+  --chart-6: #34c58c;
+  --chart-muted: #7085a0;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
@@ -305,8 +428,8 @@
   --glass-border: rgba(76, 141, 255, 0.2);
   --glass-nav: rgba(6, 20, 38, 0.82);
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
-  --page-glow-primary: rgba(59, 130, 246, 0.14);
-  --page-glow-secondary: rgba(0, 80, 220, 0.08);
+  --page-glow-primary: transparent;
+  --page-glow-secondary: transparent;
 }
 
 @layer base {
@@ -327,10 +450,9 @@
   }
 
   body {
-    background:
-      radial-gradient(circle at 88% -8%, var(--page-glow-primary), transparent 34rem),
-      radial-gradient(circle at 4% 44%, var(--page-glow-secondary), transparent 30rem), var(--bg);
-    background-attachment: fixed;
+    /* Flat. The two fixed radial washes tinted every white panel on the page
+       and made a dense report look permanently slightly out of focus. */
+    background: var(--bg);
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 15px;
@@ -488,8 +610,38 @@
 @utility card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   box-shadow: var(--shadow-xs);
+}
+
+/* --- tonal surfaces -------------------------------------------------------
+   A block that carries a colour family end to end: pastel ground, matching
+   hairline, family radius. Set --tone-surface/--tone-border on the element (or
+   any ancestor) and everything inside can read --tone-ink and --tone-strong.
+
+   This is the whole point of the redesign: a KPI card is not a white card with
+   a coloured icon, it is a coloured card. */
+@utility tone-surface {
+  background: var(--tone-surface, var(--surface));
+  border: 1px solid var(--tone-border, var(--border));
+  border-radius: 18px;
+  color: var(--tone-ink, var(--text));
+}
+
+/* Lifts 2px and deepens its shadow. Nothing else moves. */
+@utility lift {
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+    }
+  }
 }
 
 @utility card-hover {

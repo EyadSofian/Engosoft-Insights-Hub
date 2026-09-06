@@ -6,7 +6,6 @@ import {
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
-  CircleDollarSign,
   Crown,
   DollarSign,
   Info,
@@ -44,14 +43,17 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import {
+  AlertBar,
   DashboardPageHeader,
   DashboardPanel,
   DataHealthSummary,
   ExecutiveSummary,
+  InfoDot,
   InsightCard,
   InsightRow,
   KpiRow,
   SecondaryMetrics,
+  SupportingFacts,
   SyncStatus,
   type DataHealthIssue,
 } from "@/components/dashboard-bits";
@@ -375,71 +377,53 @@ function TodaysInsights({
       </InsightRow>
 
       {/* The two supporting readings the cockpit also carried. They are facts,
-          not calls to action, so they sit under the insights as a quiet strip
-          rather than taking a card each. */}
-      <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
-        <SupportingFact
-          icon={<Crown size={15} />}
-          label={lang === "ar" ? "أفضل حملة" : "Best campaign"}
-          value={campaign?.name ?? "—"}
-          detail={
-            campaign
+          not calls to action, so they share one divided strip rather than
+          taking a near-empty card each. */}
+      <SupportingFacts
+        items={[
+          {
+            key: "campaign",
+            tone: "mint",
+            icon: <Crown size={16} />,
+            label: lang === "ar" ? "أفضل حملة" : "Best campaign",
+            value: campaign?.name ?? "—",
+            detail: campaign
               ? `${fmtRoas(campaign.roas)} · ${fmtUSD(campaign.revenue)} ${lang === "ar" ? "إيراد" : "revenue"}`
               : lang === "ar"
                 ? "لا توجد حملة مؤهلة في الفترة"
-                : "No eligible campaign in this period"
-          }
-        />
-        <SupportingFact
-          icon={<UserRoundCheck size={15} />}
-          label={lang === "ar" ? "أفضل موظف حسب جودة المكالمات" : "Top employee by call quality"}
-          value={
-            workforceLoading
+                : "No eligible campaign in this period",
+          },
+          {
+            key: "employee",
+            tone: "violet",
+            icon: <UserRoundCheck size={16} />,
+            label: lang === "ar" ? "أفضل موظف" : "Top employee",
+            value: workforceLoading
               ? lang === "ar"
                 ? "جارٍ الحساب…"
                 : "Calculating…"
-              : (employee?.name ?? "—")
-          }
-          detail={
-            employee
-              ? `${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة محلّلة" : "analyzed calls"} · ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting reply"}`
+              : (employee?.name ?? "—"),
+            detail: employee
+              ? `${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"}`
               : lang === "ar"
-                ? "لا توجد مكالمات محلّلة في الفترة"
-                : "No analyzed calls in this period"
-          }
-        />
-      </div>
+                ? "لا توجد مكالمات محلّلة"
+                : "No analyzed calls",
+          },
+          {
+            key: "course",
+            tone: "amber",
+            icon: <BookOpenCheck size={16} />,
+            label: lang === "ar" ? "أهم دورة" : "Top course",
+            value: course?.course ?? "—",
+            detail: course
+              ? `${fmtUSD(course.revenue)} · ${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إيراد الدورات" : "of course revenue"}`
+              : lang === "ar"
+                ? "لا توجد مبيعات دورات مصنفة"
+                : "No classified course sales",
+          },
+        ]}
+      />
     </section>
-  );
-}
-
-function SupportingFact({
-  icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="card flex min-w-0 items-start gap-3 p-3.5">
-      <span
-        className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-muted"
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <div className="text-[11px] font-semibold text-text-muted">{label}</div>
-        <div className="mt-0.5 truncate text-[13.5px] font-semibold text-text" title={value}>
-          {value}
-        </div>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{detail}</p>
-      </div>
-    </div>
   );
 }
 
@@ -449,7 +433,6 @@ function Overview() {
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
   const workforce = useApi<AgentAnalyticsResult>("/api/teams");
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
-  const [revenueGrain, setRevenueGrain] = useState<TrendGrain>("week");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
   const business = useMemo(
     () => (data ? businessSignals(data, workforce.data, lang) : null),
@@ -482,14 +465,10 @@ function Overview() {
 
   // The same bands the ROAS pill uses everywhere else, so the KPI tint and the
   // table cell can never disagree about whether a return is healthy.
-  const roasTone =
-    T.roas === null || !isFinite(T.roas)
-      ? "neutral"
-      : T.roas >= 2
-        ? "success"
-        : T.roas >= 1
-          ? "warning"
-          : "danger";
+  // A ratio's family is amber by convention, and drops to rose only when the
+  // return is genuinely below cost. Keeping it mint whenever it was healthy
+  // put two mint cards in a five-card row and cost the row a distinct colour.
+  const roasTone = T.roas !== null && isFinite(T.roas) && T.roas < 1 ? "rose" : "amber";
 
   const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
   const syncLabel = data.syncedAt
@@ -567,14 +546,24 @@ function Overview() {
     });
   }
 
-  const spendTrend = moneyTrend(data.trend, spendGrain, "spend");
-  const revenueTrend = moneyTrend(data.trend, revenueGrain, "revenue");
   const sarRate = fxRatesFromFilters(filters).SAR;
-  const displayPoints = (points: MoneyPoint[]) =>
-    points.map((point) => ({
-      ...point,
-      value: usdToDisplayCurrency(point.value, displayCurrency, sarRate) ?? 0,
-    }));
+  // One series set for one chart. Both metrics already share a grain and a
+  // display currency, so they are converted together rather than each card
+  // converting its own copy.
+  const money = (n: number) => formatDisplayMoney(n, displayCurrency, lang);
+  const combinedTrend = moneyTrend(data.trend, spendGrain, "spend").map((point, index) => ({
+    date: point.date,
+    spend: usdToDisplayCurrency(point.value, displayCurrency, sarRate) ?? 0,
+    revenue:
+      usdToDisplayCurrency(
+        moneyTrend(data.trend, spendGrain, "revenue")[index]?.value ?? 0,
+        displayCurrency,
+        sarRate,
+      ) ?? 0,
+  }));
+  const totalSpendShown = combinedTrend.reduce((sum, row) => sum + row.spend, 0);
+  const totalRevenueShown = combinedTrend.reduce((sum, row) => sum + row.revenue, 0);
+
   const mobileAlertCount = [
     data.fetchErrors.length > 0,
     data.staleTabs?.length > 0,
@@ -604,22 +593,15 @@ function Overview() {
           stage, the Lost source — is stated in the data-health card at the
           foot of the page, and the global bar already flags a failed pull. */}
       {health.platformsWithoutSpendTab?.length > 0 && (
-        <Notice tone="danger" title={t("missing_spend_tab")} icon={<AlertTriangle size={16} />}>
+        <AlertBar title={t("missing_spend_tab")}>
           {health.platformsWithoutSpendTab
             .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
             .join(" · ")}
           {" — "}
           {t("missing_spend_tab_note")}
-        </Notice>
+        </AlertBar>
       )}
 
-      <ExecutiveSummary title={t("exec_summary")}>
-        {lang === "ar" ? data.summary.ar : data.summary.en}
-      </ExecutiveSummary>
-
-      {/* The five figures an executive asks for first. Everything else the
-          response carries is a click away in the row below, rather than
-          competing with these for the same glance. */}
       <KpiRow columns={5}>
         <Link
           to="/campaigns"
@@ -637,18 +619,13 @@ function Overview() {
             value={fmtUSD(T.revenue)}
             delta={deltas.revenue}
             hero
-            icon={<TrendingUp size={15} />}
+            tone="mint"
+            icon={<TrendingUp size={16} />}
             spark={revenueSpark}
-            subWrap
             sub={
-              <span>
-                {lang === "ar"
-                  ? `محصَّل بتاريخ الدفع · منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
-                  : `Collected, by payment date · ${fmtUSD(T.attributedRevenue)} campaign-linked`}
-                <span className="mt-1 block font-semibold text-brand group-hover:underline">
-                  {lang === "ar" ? "اضغط لعرض الحملات ←" : "Open the contributing campaigns →"}
-                </span>
-              </span>
+              lang === "ar"
+                ? `منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
+                : `${fmtUSD(T.attributedRevenue)} campaign-linked`
             }
           />
         </Link>
@@ -659,8 +636,8 @@ function Overview() {
           value={fmtUSD(T.spend)}
           delta={deltas.spend}
           deltaInvert
-          tone="danger"
-          icon={<DollarSign size={15} />}
+          tone="rose"
+          icon={<DollarSign size={16} />}
           spark={spendSpark}
           sub={[
             `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
@@ -681,11 +658,10 @@ function Overview() {
           label={t("crm_leads")}
           value={fmtNum(T.totalLeads)}
           delta={deltas.totalLeads}
-          tone="brand"
-          icon={<Users size={15} />}
+          tone="sky"
+          icon={<Users size={16} />}
           spark={leadsSpark}
-          subWrap
-          sub={`CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}`}
+          sub={`CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`}
         />
 
         <KpiCard
@@ -694,7 +670,7 @@ function Overview() {
           value={fmtNum(T.won)}
           delta={deltas.won}
           tone="violet"
-          icon={<Award size={15} />}
+          icon={<Award size={16} />}
           spark={wonSpark}
           sub={`${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`}
         />
@@ -705,91 +681,19 @@ function Overview() {
           value={fmtRoas(T.roas)}
           delta={deltas.roas}
           tone={roasTone}
-          icon={<Target size={15} />}
-          sub={
-            lang === "ar"
-              ? `الإيراد المحصّل من Accounting ÷ الإنفاق · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`
-              : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`
+          icon={<Target size={16} />}
+          sub={`${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`}
+          info={
+            <InfoDot
+              text={
+                lang === "ar"
+                  ? "الإيراد المحصّل من Accounting ÷ الإنفاق الإعلاني."
+                  : "Collected Accounting revenue ÷ ad spend."
+              }
+            />
           }
         />
       </KpiRow>
-
-      <SecondaryMetrics
-        label={lang === "ar" ? "مؤشرات الكفاءة والمتابعة" : "Efficiency and follow-up metrics"}
-        count={7}
-      >
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-4">
-          <KpiCard
-            index={0}
-            label={t("lost_count")}
-            value={fmtNum(T.lost)}
-            delta={deltas.lost}
-            deltaInvert
-            tone="danger"
-            icon={<TrendingDown size={15} />}
-            sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
-          />
-          <KpiCard
-            index={1}
-            label={t("conversion_rate")}
-            value={fmtPct(T.conversionRate, 2)}
-            delta={deltas.conversionRate}
-            tone="violet"
-            icon={<Percent size={15} />}
-            sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`}
-          />
-          <KpiCard
-            index={2}
-            label={t("lost_rate")}
-            value={fmtPct(T.lostRate, 2)}
-            delta={deltas.lostRate}
-            deltaInvert
-            tone="danger"
-            icon={<Percent size={15} />}
-            sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`}
-          />
-          <KpiCard
-            index={3}
-            label={t("avg_close_time")}
-            value={T.avgCloseDays === null ? "—" : T.avgCloseDays.toFixed(1)}
-            icon={<Timer size={15} />}
-            sub={
-              T.closeSample
-                ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}`
-                : undefined
-            }
-          />
-          <KpiCard
-            index={4}
-            label={t("acos")}
-            value={fmtPct(T.acos, 1)}
-            delta={deltas.acos}
-            deltaInvert
-            tone="warning"
-            icon={<Percent size={15} />}
-            sub={
-              lang === "ar"
-                ? "الإنفاق ÷ الإيراد المحصّل من Accounting"
-                : "Spend ÷ collected Accounting revenue"
-            }
-          />
-          <KpiCard
-            index={5}
-            label={t("cpl")}
-            value={fmtUSDFull(T.cpl)}
-            delta={deltas.cpl}
-            deltaInvert
-            tone="warning"
-            icon={<DollarSign size={15} />}
-            sub={
-              lang === "ar"
-                ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية`
-                : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`
-            }
-          />
-          <CpaCard totals={T} />
-        </div>
-      </SecondaryMetrics>
 
       <TodaysInsights signals={business!} workforceLoading={workforce.isLoading} lang={lang} />
 
@@ -801,95 +705,85 @@ function Overview() {
         </Notice>
       )}
 
-      {T.nonLeadSpend > 0 && (
-        <Notice tone="warning" title={t("non_lead_spend")} icon={<Info size={16} />}>
-          {lang === "ar"
-            ? `${fmtUSDFull(T.nonLeadSpend)} أُنفقت على حسابات زيارات أو حسابات بلا اسم. المبلغ داخل إجمالي الإنفاق وكل معادلات الكفاءة طبقاً لتعريف الإدارة.`
-            : `${fmtUSDFull(T.nonLeadSpend)} ran on traffic or unnamed accounts. It remains included in total spend and every efficiency formula by the approved management definition.`}
-        </Notice>
-      )}
-
-      <section>
-        <SectionTitle
-          action={
-            <DisplayCurrencyToggle
-              value={displayCurrency}
-              onChange={setDisplayCurrency}
-              sarRate={sarRate}
-              lang={lang}
-            />
-          }
+      {/* One chart, two series, at two-thirds width — with the funnel beside
+          it. Spend and collection are the same question asked twice, and
+          plotting them apart in two equal cards made the reader hold one shape
+          in their head to compare it with the other. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <DashboardPanel
+          className="lg:col-span-2"
+          tone="mint"
+          icon={<TrendingUp size={16} />}
+          title={lang === "ar" ? "حركة الصرف والتحصيل" : "Spend and collection"}
           hint={
             lang === "ar"
-              ? `الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع. كل شارت له اختيار يومي أو أسبوعي مستقل. عملة العرض: ${displayCurrency === "SAR" ? "الريال السعودي" : "الدولار"}.`
-              : `Spend follows ad date and collection follows Payment Date. Each chart has its own daily or weekly grain. Display currency: ${displayCurrency}.`
+              ? "الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع."
+              : "Spend follows ad date; collection follows Payment Date."
           }
-        >
-          {lang === "ar" ? "حركة الصرف والتحصيل" : "Spend and collection movement"}
-        </SectionTitle>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <MoneyTrendCard
-            title={lang === "ar" ? "معدل الصرف" : "Spend trend"}
-            note={lang === "ar" ? "إجمالي إنفاق المنصات" : "Total platform spend"}
-            points={displayPoints(spendTrend)}
-            grain={spendGrain}
-            onGrainChange={setSpendGrain}
-            color="var(--chart-1)"
-            icon={<CircleDollarSign size={17} />}
-            currency={displayCurrency}
-            lang={lang}
-          />
-          <MoneyTrendCard
-            title={lang === "ar" ? "معدل التحصيل" : "Collection trend"}
-            note={
-              lang === "ar"
-                ? "التحصيل الفعلي حسب Payment Date"
-                : "Actual collection by Payment Date"
-            }
-            points={displayPoints(revenueTrend)}
-            grain={revenueGrain}
-            onGrainChange={setRevenueGrain}
-            color="var(--chart-2)"
-            icon={<TrendingUp size={17} />}
-            currency={displayCurrency}
-            lang={lang}
-          />
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <SectionTitle
-            action={
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <GrainToggle value={spendGrain} onChange={setSpendGrain} lang={lang} />
               <DisplayCurrencyToggle
                 value={displayCurrency}
                 onChange={setDisplayCurrency}
                 sarRate={sarRate}
                 lang={lang}
               />
-            }
-            hint={
-              lang === "ar"
-                ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف. متوسط سعر البيع = التحصيل ÷ الفواتير المدفوعة."
-                : "Contribution = course revenue ÷ classified course revenue. Average sale price = collection ÷ paid invoices."
-            }
-          >
-            <span className="inline-flex items-center gap-2">
-              <BookOpenCheck size={17} className="text-brand" />
-              {lang === "ar"
-                ? "مساهمة الدورات ومتوسط سعر البيع"
-                : "Course contribution and average sale price"}
+            </div>
+          }
+          footer={
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: "var(--mint-strong)" }}
+                  aria-hidden="true"
+                />
+                {lang === "ar" ? "التحصيل" : "Collection"}
+                <b className="num text-text">{money(totalRevenueShown)}</b>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: "var(--rose-strong)" }}
+                  aria-hidden="true"
+                />
+                {lang === "ar" ? "الصرف" : "Spend"}
+                <b className="num text-text">{money(totalSpendShown)}</b>
+              </span>
             </span>
-          </SectionTitle>
-          <CourseContributionChart
-            rows={data.courseSales}
-            currency={displayCurrency}
-            sarRate={sarRate}
-            lang={lang}
+          }
+        >
+          <MultiLineChart
+            data={combinedTrend}
+            height={300}
+            format={money}
+            series={[
+              {
+                key: "revenue",
+                name: lang === "ar" ? "التحصيل" : "Collection",
+                color: "var(--mint-strong)",
+              },
+              {
+                key: "spend",
+                name: lang === "ar" ? "الصرف" : "Spend",
+                color: "var(--rose-strong)",
+              },
+            ]}
           />
-        </Card>
-        <Card>
-          <SectionTitle>{t("funnel")}</SectionTitle>
+        </DashboardPanel>
+
+        <DashboardPanel
+          tone="sky"
+          icon={<Users size={16} />}
+          title={t("funnel")}
+          hint={lang === "ar" ? "من الظهور إلى الصفقة المغلقة" : "From impression to closed deal"}
+          footer={
+            lang === "ar"
+              ? "عدد العملاء في النظام قد يتجاوز ما تُبلغ عنه المنصات، لأن بعضهم يأتي من واتساب والترشيحات."
+              : "CRM leads can exceed platform-reported leads: some arrive from WhatsApp and referrals."
+          }
+        >
           <FunnelBars
             steps={data.funnel.map((s) => ({
               label: FUNNEL_LABELS[s.key]?.[lang] ?? s.key,
@@ -897,12 +791,32 @@ function Overview() {
               display: s.value === null ? "—" : fmtCompact(s.value),
             }))}
           />
-          <p className="text-[11px] text-text-muted mt-3 leading-relaxed">
-            {lang === "ar"
-              ? "عدد العملاء في النظام قد يتجاوز ما تُبلغ عنه المنصات، لأن بعضهم يأتي من واتساب والترشيحات ومصادر أخرى لا ترتبط بإنفاق إعلاني."
-              : "CRM leads can exceed platform-reported leads because some arrive from WhatsApp, referrals and other sources without matching ad spend."}
-          </p>
-        </Card>
+        </DashboardPanel>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <DashboardPanel
+          className="lg:col-span-2"
+          tone="amber"
+          icon={<BookOpenCheck size={16} />}
+          title={
+            lang === "ar"
+              ? "مساهمة الدورات ومتوسط سعر البيع"
+              : "Course contribution and average sale price"
+          }
+          hint={
+            lang === "ar"
+              ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف."
+              : "Contribution = course revenue ÷ classified course revenue."
+          }
+        >
+          <CourseContributionChart
+            rows={data.courseSales}
+            currency={displayCurrency}
+            sarRate={sarRate}
+            lang={lang}
+          />
+        </DashboardPanel>
       </div>
 
       <CampaignActivityPanel activity={data.activity} />
@@ -1065,69 +979,109 @@ function Overview() {
         </div>
       </Card>
 
+      {T.nonLeadSpend > 0 && (
+        <Notice tone="warning" title={t("non_lead_spend")} icon={<Info size={16} />}>
+          {lang === "ar"
+            ? `${fmtUSDFull(T.nonLeadSpend)} أُنفقت على حسابات زيارات أو حسابات بلا اسم. المبلغ داخل إجمالي الإنفاق وكل معادلات الكفاءة طبقاً لتعريف الإدارة.`
+            : `${fmtUSDFull(T.nonLeadSpend)} ran on traffic or unnamed accounts. It remains included in total spend and every efficiency formula by the approved management definition.`}
+        </Notice>
+      )}
+
+      <SecondaryMetrics
+        label={lang === "ar" ? "مؤشرات الكفاءة والمتابعة" : "Efficiency and follow-up metrics"}
+        count={7}
+      >
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-4">
+          <KpiCard
+            index={0}
+            label={t("lost_count")}
+            value={fmtNum(T.lost)}
+            delta={deltas.lost}
+            deltaInvert
+            compact
+            tone="rose"
+            icon={<TrendingDown size={14} />}
+            sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
+          />
+          <KpiCard
+            index={1}
+            label={t("conversion_rate")}
+            value={fmtPct(T.conversionRate, 2)}
+            delta={deltas.conversionRate}
+            compact
+            tone="violet"
+            icon={<Percent size={14} />}
+            sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`}
+          />
+          <KpiCard
+            index={2}
+            label={t("lost_rate")}
+            value={fmtPct(T.lostRate, 2)}
+            delta={deltas.lostRate}
+            deltaInvert
+            compact
+            tone="rose"
+            icon={<Percent size={14} />}
+            sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`}
+          />
+          <KpiCard
+            index={3}
+            label={t("avg_close_time")}
+            value={T.avgCloseDays === null ? "—" : T.avgCloseDays.toFixed(1)}
+            compact
+            tone="slate"
+            icon={<Timer size={14} />}
+            sub={
+              T.closeSample
+                ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}`
+                : undefined
+            }
+          />
+          <KpiCard
+            index={4}
+            label={t("acos")}
+            value={fmtPct(T.acos, 1)}
+            delta={deltas.acos}
+            deltaInvert
+            compact
+            tone="amber"
+            icon={<Percent size={14} />}
+            sub={
+              lang === "ar"
+                ? "الإنفاق ÷ الإيراد المحصّل من Accounting"
+                : "Spend ÷ collected Accounting revenue"
+            }
+          />
+          <KpiCard
+            index={5}
+            label={t("cpl")}
+            value={fmtUSDFull(T.cpl)}
+            delta={deltas.cpl}
+            deltaInvert
+            compact
+            tone="amber"
+            icon={<DollarSign size={14} />}
+            sub={
+              lang === "ar"
+                ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية`
+                : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`
+            }
+          />
+          <CpaCard totals={T} />
+        </div>
+      </SecondaryMetrics>
+
+      {/* The generated read of the period. It is worth reading and it is not
+          worth five KPIs of screen: it now sits after the analysis it
+          describes, where somebody who wants the prose can find it. */}
+      <ExecutiveSummary title={t("exec_summary")}>
+        {lang === "ar" ? data.summary.ar : data.summary.en}
+      </ExecutiveSummary>
+
       <TelegramPanel />
 
       <DataHealthSummary issues={healthIssues} syncedLabel={syncLabel} />
     </div>
-  );
-}
-
-function MoneyTrendCard({
-  title,
-  note,
-  points,
-  grain,
-  onGrainChange,
-  color,
-  icon,
-  currency,
-  lang,
-}: {
-  title: string;
-  note: string;
-  points: MoneyPoint[];
-  grain: TrendGrain;
-  onGrainChange: (grain: TrendGrain) => void;
-  color: string;
-  icon: React.ReactNode;
-  currency: DisplayCurrency;
-  lang: "ar" | "en";
-}) {
-  const average = points.length
-    ? points.reduce((sum, point) => sum + point.value, 0) / points.length
-    : null;
-  return (
-    <Card className="overflow-hidden">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span
-            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-            style={{ color, background: `color-mix(in oklab, ${color} 13%, var(--surface))` }}
-          >
-            {icon}
-          </span>
-          <div>
-            <h3 className="text-sm font-semibold text-text">{title}</h3>
-            <p className="mt-0.5 text-[10.5px] text-text-muted">{note}</p>
-          </div>
-        </div>
-        <GrainToggle value={grain} onChange={onGrainChange} lang={lang} />
-      </div>
-      <div className="mb-1 flex items-baseline justify-between gap-3 rounded-xl bg-surface-2/70 px-3 py-2">
-        <span className="text-[10.5px] text-text-muted">
-          {lang === "ar" ? `متوسط ${grain === "day" ? "يومي" : "أسبوعي"}` : `Average per ${grain}`}
-        </span>
-        <strong className="num text-sm text-text">
-          {formatDisplayMoney(average, currency, lang)}
-        </strong>
-      </div>
-      <MultiLineChart
-        data={points}
-        series={[{ key: "value", name: title, color }]}
-        height={270}
-        format={(value) => formatDisplayMoney(value, currency, lang)}
-      />
-    </Card>
   );
 }
 

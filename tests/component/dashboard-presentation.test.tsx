@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   DashboardPageHeader,
   DataHealthSummary,
@@ -93,7 +93,7 @@ describe("the page header states the window, and stays quiet when it cannot", ()
   });
 });
 
-describe("data health says what changed about the numbers, and hides only the machinery", () => {
+describe("data health says what changed, on a chip that opens the detail", () => {
   const failure: DataHealthIssue = {
     tone: "danger",
     message: "1 source did not load.",
@@ -101,21 +101,38 @@ describe("data health says what changed about the numbers, and hides only the ma
     technical: "Archived Lost: direct Odoo is not configured or could not be reached",
   };
 
-  it("states the problem and its effect on the figures in the open", () => {
+  /**
+   * The card became a chip and a drawer. The contract did not change: the
+   * severity is legible without opening anything, the effect on the figures is
+   * always available in words, and only the connector's own text is folded
+   * away behind a second disclosure.
+   */
+  const openSheet = (issues: DataHealthIssue[]) => {
+    const view = wrap(<DataHealthSummary issues={issues} />);
+    fireEvent.click(screen.getByRole("button"));
+    return view;
+  };
+
+  it("states the severity on the chip, before anything is opened", () => {
     wrap(<DataHealthSummary issues={[failure]} />);
-    expect(screen.getByText("1 source did not load.")).toBeInTheDocument();
+    expect(screen.getByRole("button").textContent).toMatch(/exclude some sources/i);
+  });
+
+  it("keeps the connector's own error text off the chip", () => {
+    wrap(<DataHealthSummary issues={[failure]} />);
+    expect(screen.getByRole("button").textContent).not.toContain("Odoo");
+  });
+
+  it("states the problem and its effect on the figures once opened", async () => {
+    openSheet([failure]);
+    expect(await screen.findByText("1 source did not load.")).toBeInTheDocument();
     expect(screen.getByText("The figures shown exclude it.")).toBeInTheDocument();
   });
 
-  it("keeps the connector's own error text out of the summary line", () => {
-    wrap(<DataHealthSummary issues={[failure]} />);
-    const summary = screen.getByText(/do not include every source/i);
-    expect(summary.textContent).not.toContain("Odoo");
-  });
-
-  it("still carries the technical text, behind a disclosure", () => {
-    const { container } = wrap(<DataHealthSummary issues={[failure]} />);
-    const details = container.querySelector("details");
+  it("still carries the technical text, behind a second disclosure", async () => {
+    const { baseElement } = openSheet([failure]);
+    await screen.findByText("1 source did not load.");
+    const details = baseElement.querySelector("details");
     expect(details).not.toBeNull();
     expect(details!.open).toBe(false);
     expect(details!.textContent).toContain("Archived Lost");
@@ -127,12 +144,12 @@ describe("data health says what changed about the numbers, and hides only the ma
         issues={[{ tone: "info", message: "Revenue is invoices actually paid." }]}
       />,
     );
-    expect(screen.getByText(/All sources connected/i)).toBeInTheDocument();
+    expect(screen.getByRole("button").textContent).toMatch(/All sources connected/i);
   });
 
   it("reports a clean bill when there is nothing to report", () => {
     wrap(<DataHealthSummary issues={[]} />);
-    expect(screen.getByText(/All sources are connected and healthy/i)).toBeInTheDocument();
+    expect(screen.getByRole("button").textContent).toMatch(/All sources connected/i);
   });
 });
 

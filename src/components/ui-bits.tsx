@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, Minus, Inbox } from "lucide-react";
 import { fmtDelta, fmtRoas, useI18n } from "@/lib/i18n";
+import { toneOf, toneVars, type AnyTone } from "@/lib/dashboard-tone";
 
 /* --- surfaces ------------------------------------------------------------ */
 
@@ -132,28 +133,19 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * Semantic tint for a metric card. The icon chip takes the colour; the card
- * itself stays on the ordinary surface, because a wall of five saturated
- * cards is exactly as unreadable as a wall of five grey ones.
- */
-export type KpiTone = "neutral" | "brand" | "success" | "warning" | "danger" | "violet";
-
-const KPI_TONE: Record<KpiTone, { fg: string; bg: string }> = {
-  neutral: { fg: "var(--text-subtle)", bg: "var(--surface-2)" },
-  brand: { fg: "var(--brand)", bg: "var(--brand-soft)" },
-  success: { fg: "var(--success)", bg: "var(--success-soft)" },
-  warning: { fg: "var(--warning)", bg: "var(--warning-soft)" },
-  danger: { fg: "var(--danger)", bg: "var(--danger-soft)" },
-  violet: { fg: "var(--violet)", bg: "var(--violet-soft)" },
-};
-
-/**
- * A single headline figure.
+ * A single headline figure, as a coloured card.
  *
- * `spark` draws only when the caller hands over a real series from the same
- * response the value came from — there is no synthesised trend and no
- * placeholder curve, so an empty sparkline slot means the API did not return
- * a series, not that the metric was flat.
+ * The whole card takes its family: pastel ground, matching hairline, the
+ * figure in the family's ink, a solid icon chip in the family's strong tone,
+ * and — when the caller hands over a real series — a filled sparkline in the
+ * same colour. That is deliberate and it is the point: a row of five KPIs has
+ * to read as five different things from across a desk, and five white cards
+ * with five small coloured icons read as one grey block.
+ *
+ * `spark` draws only from a genuine series out of the same response the value
+ * came from. Two points minimum, no synthesised curve, no placeholder: an
+ * empty sparkline slot means the API returned no series, not that the metric
+ * was flat.
  */
 export function KpiCard({
   label,
@@ -162,22 +154,26 @@ export function KpiCard({
   delta,
   deltaInvert,
   hero = false,
-  tone = "neutral",
+  tone,
   icon,
   index = 0,
   subWrap = false,
   valueWrap = false,
   info,
   spark,
+  compact = false,
+  loading = false,
+  onClick,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   delta?: number;
   deltaInvert?: boolean;
+  /** Emphasis for the page's single most important figure. */
   hero?: boolean;
-  /** Colours the icon chip and the sparkline. Default is deliberately neutral. */
-  tone?: KpiTone;
+  /** Colour family. Defaults to slate — a figure with no story of its own. */
+  tone?: AnyTone;
   icon?: ReactNode;
   index?: number;
   /** Allow explanatory KPI source text to wrap instead of silently truncating. */
@@ -188,99 +184,129 @@ export function KpiCard({
   info?: ReactNode;
   /** A real time series for this metric. Anything shorter than two points is ignored. */
   spark?: number[];
+  /** Shorter card for a secondary row. */
+  compact?: boolean;
+  loading?: boolean;
+  onClick?: () => void;
 }) {
-  const palette = KPI_TONE[tone];
+  const t = toneOf(tone);
+
+  if (loading) {
+    return (
+      <div
+        className={`tone-surface @container relative overflow-hidden ${
+          compact ? "min-h-[104px]" : "min-h-[142px] sm:min-h-[156px]"
+        }`}
+        style={toneVars(tone)}
+        aria-busy="true"
+      >
+        <div className="space-y-3 p-4 sm:p-5">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-7 w-28" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+    );
+  }
+
+  const Tag = onClick ? "button" : "div";
+
   return (
-    <div
-      // A container, so the figure can size itself against the card it is in
-      // rather than the viewport. In a four-up grid inside a half-width panel
-      // a viewport-relative clamp produced a 28px "$15,234" in a 110px card,
-      // and the card ellipsed it to "$15…" — a truncated currency figure is
-      // the one thing a finance dashboard must never render.
-      className="card stagger @container relative min-h-[132px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
+    <Tag
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`tone-surface stagger @container relative overflow-hidden text-start ${
+        onClick ? "lift w-full cursor-pointer" : ""
+      } ${compact ? "min-h-[98px] p-3.5" : "min-h-[136px] p-4 sm:min-h-[148px] sm:px-4.5 sm:py-4"} ${
+        hero ? "ring-1 ring-inset" : ""
+      }`}
       style={
         {
+          ...toneVars(tone),
           "--i": index,
-          ...(hero
-            ? {
-                background: "var(--accent-soft)",
-                borderColor: "color-mix(in oklab, var(--accent) 35%, transparent)",
-              }
-            : {}),
+          ...(hero ? { boxShadow: "var(--shadow-sm)" } : {}),
         } as React.CSSProperties
       }
     >
-      <div className="flex min-h-8 items-start justify-between gap-3">
+      {/* A wash of the family's strong tone bleeding in from the trailing
+          corner. It is what makes the card read as coloured at a glance and at
+          a distance, without lifting the pastel enough to hurt the figure. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-8 h-28 w-28 rounded-full opacity-[0.13]"
+        style={{ background: "var(--tone-strong)", insetInlineEnd: "-1.5rem", filter: "blur(4px)" }}
+      />
+
+      <div className="relative flex items-start justify-between gap-3">
         <span className="inline-flex min-w-0 items-start gap-1.5">
-          <span className="line-clamp-2 text-[11px] font-semibold leading-[1.45] text-text-muted sm:text-xs">
+          <span
+            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-1 text-[10.5px]" : "line-clamp-2 text-[11.5px] sm:text-xs"}`}
+            style={{ color: "var(--tone-ink)", opacity: 0.78 }}
+          >
             {label}
           </span>
           {info}
         </span>
         {icon && (
           <span
-            className="grid size-8 shrink-0 place-items-center rounded-xl"
-            style={
-              hero
-                ? {
-                    color: "var(--accent-ink)",
-                    background: "color-mix(in oklab, var(--accent) 12%, transparent)",
-                  }
-                : { color: palette.fg, background: palette.bg }
-            }
+            className={`grid shrink-0 place-items-center rounded-xl text-white shadow-sm ${
+              compact ? "size-7" : "size-9"
+            }`}
+            style={{ background: "var(--tone-strong)" }}
           >
             {icon}
           </span>
         )}
       </div>
 
-      <div className="mt-2.5 flex items-end justify-between gap-3 sm:mt-3">
-        <div
-          className={`num max-w-full min-w-0 font-semibold tracking-[-0.025em] ${
-            valueWrap
-              ? "overflow-visible whitespace-normal text-[clamp(0.95rem,13cqi,1.55rem)] leading-[1.2]"
-              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.95rem,15cqi,1.75rem)] leading-none"
-          }`}
-          style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
-        >
-          {value}
-        </div>
-        {/* The figure always wins the width it needs. On a narrow card the
-            sparkline's 64px was enough to push "$37.4K" into an ellipsis, and
-            a shape is worth less than the number it describes. */}
-        <span className="hidden @[10rem]:block">
-          <Sparkline points={spark} color={hero ? "var(--accent)" : palette.fg} />
-        </span>
+      <div
+        className={`num relative max-w-full min-w-0 font-bold tracking-[-0.03em] ${
+          compact ? "mt-1.5" : "mt-2.5"
+        } ${
+          valueWrap
+            ? "overflow-visible whitespace-normal text-[clamp(1rem,13cqi,1.6rem)] leading-[1.15]"
+            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,16cqi,1.95rem)] leading-none"
+        }`}
+        style={{ color: "var(--tone-ink)" }}
+      >
+        {value}
       </div>
 
-      <div className="mt-3 flex min-h-[32px] items-start gap-2">
-        <DeltaBadge value={delta} invert={deltaInvert} />
-        {sub != null && (
-          <span
-            className={`min-w-0 text-[10.5px] leading-[1.55] text-text-muted sm:text-[11px] ${
-              subWrap ? "leading-relaxed" : "line-clamp-2"
-            }`}
-          >
-            {sub}
-          </span>
-        )}
+      <div
+        className={`relative flex items-end justify-between gap-2 ${compact ? "mt-1.5" : "mt-2.5 min-h-[30px]"}`}
+      >
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <DeltaBadge value={delta} invert={deltaInvert} />
+          {sub != null && (
+            <span
+              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-1 text-[10px]" : "text-[10.5px] sm:text-[11px]"} ${
+                subWrap ? "leading-relaxed" : "line-clamp-2"
+              }`}
+              style={{ color: "var(--tone-ink)", opacity: 0.68 }}
+            >
+              {sub}
+            </span>
+          )}
+        </span>
+        {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
       </div>
-    </div>
+    </Tag>
   );
 }
 
 /**
  * The shape of a metric over the selected period — nothing more.
  *
- * Renders nothing at all unless there are at least two finite points to plot,
- * and it is `aria-hidden` because the figure and its delta beside it already
- * carry the same information in text.
+ * Draws only with at least two finite points, and is `aria-hidden` because the
+ * figure and its delta beside it already carry the same information in text.
+ * Filled rather than a bare stroke: at 64x26 a 1.75px line disappears against
+ * a pastel ground, and the fill is what makes the card read as having a shape.
  */
 export function Sparkline({
   points,
   color = "var(--chart-1)",
-  width = 64,
-  height = 22,
+  width = 68,
+  height = 26,
 }: {
   points?: number[];
   color?: string;
@@ -294,28 +320,27 @@ export function Sparkline({
   const max = Math.max(...clean);
   const span = max - min || 1;
   const step = width / (clean.length - 1);
-  const d = clean
-    .map(
-      (n, i) =>
-        `${i === 0 ? "M" : "L"}${(i * step).toFixed(2)},${(height - ((n - min) / span) * height).toFixed(2)}`,
-    )
-    .join(" ");
+  const at = (n: number, i: number) =>
+    `${(i * step).toFixed(2)},${(height - 2 - ((n - min) / span) * (height - 4)).toFixed(2)}`;
+  const line = clean.map((n, i) => `${i === 0 ? "M" : "L"}${at(n, i)}`).join(" ");
+  const area = `${line} L${width},${height} L0,${height} Z`;
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       width={width}
       height={height}
-      className="shrink-0 overflow-visible"
+      className="hidden shrink-0 @[10rem]:block"
       preserveAspectRatio="none"
       aria-hidden="true"
       focusable="false"
     >
+      <path d={area} fill={color} opacity={0.16} />
       <path
-        d={d}
+        d={line}
         fill="none"
         stroke={color}
-        strokeWidth={1.75}
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
