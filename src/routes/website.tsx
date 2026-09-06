@@ -23,11 +23,12 @@ import {
   Card,
   ErrorState,
   KpiCard,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
@@ -193,6 +194,7 @@ const fmtAmount = (value: number) =>
   value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 function Website() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [websiteTab, setWebsiteTab] = useState<"owner" | "campaigns" | "operations">("owner");
 
@@ -602,7 +604,12 @@ function Website() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={t("website")} subtitle={copy.subtitle} />
+      <DashboardPageHeader
+        icon={<Globe2 size={20} />}
+        title={t("website")}
+        subtitle={copy.subtitle}
+        period={reportingPeriod}
+      />
 
       {isLoading || !data ? (
         <>

@@ -11,7 +11,7 @@ import { TopBar } from "./TopBar";
  * The application frame: fixed navigation rail, auto-hiding control bar, scrolling
  * content, mobile bottom nav. Mounted ONCE in __root around the router Outlet,
  * so the rail and top bar (and their filter state) persist across navigation
- * and only the page content swaps. Each page supplies its own PageHeader, so
+ * and only the page content swaps. Each page supplies its own DashboardPageHeader,
  * the top bar carries controls only — no title is passed here.
  *
  * The rail is `fixed` rather than a flex sibling. As a sibling it could only be

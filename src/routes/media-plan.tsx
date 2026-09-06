@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   ArrowUpRight,
   BadgeDollarSign,
+  CalendarRange,
   CopyPlus,
   Gauge,
   Info,
@@ -19,12 +20,14 @@ import { MediaPlanEditor } from "@/components/media-plan/MediaPlanEditor";
 import {
   Card,
   ErrorState,
+  KpiCard,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader, DashboardPanel, KpiRow } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { MonthlyMediaPlan } from "@/lib/media-plan";
 import { useApi } from "@/lib/use-api";
@@ -138,6 +141,7 @@ function courseState(row: CourseRow, phase: PlanPhase) {
 }
 
 function MediaPlanPage() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const [month, setMonth] = useState("2026-09");
   const [editor, setEditor] = useState<"edit" | "create" | null>(null);
@@ -150,13 +154,15 @@ function MediaPlanPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
+        <DashboardPageHeader
+          icon={<CalendarRange size={20} />}
           title={lang === "ar" ? "خطة الميديا الشهرية" : "Monthly media plan"}
           subtitle={
             lang === "ar"
               ? "لوحة واحدة تربط التارجت بالصرف والليدز الفعلية لكل دورة ومسؤول."
               : "One planning board linking every course target and owner to actual spend and leads."
           }
+          period={reportingPeriod}
         />
         <div className="flex flex-wrap gap-2">
           {!!data && (
@@ -191,108 +197,110 @@ function MediaPlanPage() {
         <MediaPlanSkeleton />
       ) : (
         <>
-          <section className="relative overflow-hidden rounded-[28px] border border-[#173b61] bg-[#071a31] p-5 text-white shadow-[0_18px_55px_rgba(4,20,38,0.18)] sm:p-7">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-25"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)",
-                backgroundSize: "34px 34px",
-                maskImage: "linear-gradient(to left, black, transparent 70%)",
-              }}
-            />
-            <div className="pointer-events-none absolute -bottom-20 -left-16 size-64 rounded-full bg-[#f5ad24]/20 blur-3xl" />
-
-            <div className="relative z-10 flex flex-wrap items-start justify-between gap-5">
-              <div>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Pill tone={data.plan.status === "draft" ? "warning" : "success"}>
-                    {data.plan.status === "draft"
-                      ? lang === "ar"
-                        ? "مسودة تحتاج اعتماد"
-                        : "Draft - approval needed"
-                      : lang === "ar"
-                        ? "خطة معتمدة"
-                        : "Approved plan"}
-                  </Pill>
-                  {data.edited && (
-                    <Pill tone="brand">
-                      {lang === "ar" ? "معدلة من الداشبورد" : "Dashboard edited"}
-                    </Pill>
-                  )}
-                  <span className="text-xs text-white/55">
-                    {data.window.from} - {data.window.to}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-bold tracking-tight sm:text-4xl">
-                  {monthName(data.plan.month, lang)}
-                </h2>
-                <p className="mt-2 max-w-2xl text-xs leading-relaxed text-white/65 sm:text-sm">
-                  {data.plan.status === "draft" && data.plan.basisMonth
-                    ? lang === "ar"
-                      ? `الأرقام منسوخة بوضوح من خطة ${monthName(data.plan.basisMonth, lang)} كخط أساس، مع CPL Benchmarks من خطة يوليو، لحين اعتماد أرقام الشهر النهائية.`
-                      : `Targets are visibly copied from ${monthName(data.plan.basisMonth, lang)} as a baseline, with July CPL benchmarks, until this month is approved.`
-                    : lang === "ar"
-                      ? "الخطة المعتمدة للشهر مع مقارنة التنفيذ الفعلي."
-                      : "Approved monthly targets compared with actual delivery."}
-                </p>
-              </div>
-
-              <label className="block min-w-52 text-xs font-semibold text-white/60">
+          {/* The plan's own identity — which month, whether it is approved,
+              and the window it covers. It used to be a full-bleed navy panel
+              carrying a 34px grid, a blur and six white-on-navy tiles; the
+              same facts now sit on the page's surface so the figures beneath
+              read on the same scale as every other report. */}
+          <DashboardPanel
+            title={monthName(data.plan.month, lang)}
+            hint={
+              data.plan.status === "draft" && data.plan.basisMonth
+                ? lang === "ar"
+                  ? `الأرقام منسوخة بوضوح من خطة ${monthName(data.plan.basisMonth, lang)} كخط أساس، مع CPL Benchmarks من خطة يوليو، لحين اعتماد أرقام الشهر النهائية.`
+                  : `Targets are visibly copied from ${monthName(data.plan.basisMonth, lang)} as a baseline, with July CPL benchmarks, until this month is approved.`
+                : lang === "ar"
+                  ? "الخطة المعتمدة للشهر مع مقارنة التنفيذ الفعلي."
+                  : "Approved monthly targets compared with actual delivery."
+            }
+            action={
+              <label className="block min-w-44 text-[11px] font-semibold text-text-muted">
                 {lang === "ar" ? "شهر الخطة" : "Plan month"}
                 <select
                   value={month}
                   onChange={(event) => setMonth(event.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white outline-none ring-[#f5ad24] focus:ring-2"
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   {data.availableMonths.map((value) => (
-                    <option key={value} value={value} className="text-black">
+                    <option key={value} value={value}>
                       {monthName(value, lang)}
                     </option>
                   ))}
                 </select>
               </label>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={data.plan.status === "draft" ? "warning" : "success"}>
+                {data.plan.status === "draft"
+                  ? lang === "ar"
+                    ? "مسودة تحتاج اعتماد"
+                    : "Draft - approval needed"
+                  : lang === "ar"
+                    ? "خطة معتمدة"
+                    : "Approved plan"}
+              </Pill>
+              {data.edited && (
+                <Pill tone="brand">
+                  {lang === "ar" ? "معدلة من الداشبورد" : "Dashboard edited"}
+                </Pill>
+              )}
+              <span className="num text-xs text-text-muted">
+                {data.window.from} - {data.window.to}
+              </span>
             </div>
+          </DashboardPanel>
 
-            <div className="relative z-10 mt-7 grid grid-cols-2 gap-2.5 lg:grid-cols-4 xl:grid-cols-6">
-              <HeroMetric
-                label={lang === "ar" ? "تارجت الشهر" : "Monthly lead target"}
-                value={fmtNum(data.plan.leadTarget)}
-                sub={lang === "ar" ? "Paid + Organic/Webinar" : "Paid + Organic/Webinar"}
-                icon={<Target size={17} />}
-              />
-              <HeroMetric
-                label={lang === "ar" ? "تارجت Paid" : "Paid lead target"}
-                value={fmtNum(data.plan.paidLeadTarget)}
-                sub={ratioPct(data.actual.paidLeadAchievement)}
-                icon={<Users size={17} />}
-              />
-              <HeroMetric
-                label={lang === "ar" ? "ميزانية الليدز" : "Lead-gen budget"}
-                value={fmtUSDFull(data.plan.leadGenerationBudgetUsd)}
-                sub={`${fmtUSDFull(data.actual.targetedSpend)} ${lang === "ar" ? "مصروف" : "spent"}`}
-                icon={<WalletCards size={17} />}
-              />
-              <HeroMetric
-                label={lang === "ar" ? "CPL المستهدف" : "Target CPL"}
-                value={fmtUSDFull(data.plan.targetCpl)}
-                sub={`${lang === "ar" ? "الفعلي" : "actual"} ${fmtUSDFull(data.actual.targetedCpl)}`}
-                icon={<Gauge size={17} />}
-              />
-              <HeroMetric
-                label={lang === "ar" ? "تارجت المبيعات" : "Sales target"}
-                value={fmtUSDFull(data.plan.salesTargetUsd)}
-                sub={ratioPct(data.actual.salesAchievement)}
-                icon={<Landmark size={17} />}
-              />
-              <HeroMetric
-                label={lang === "ar" ? "إجمالي ميزانية التسويق" : "Total marketing budget"}
-                value={fmtUSDFull(data.plan.totalMarketingBudgetUsd)}
-                sub={`+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`}
-                icon={<BadgeDollarSign size={17} />}
-              />
-            </div>
-          </section>
+          <KpiRow columns={6}>
+            <KpiCard
+              index={0}
+              label={lang === "ar" ? "تارجت الشهر" : "Monthly lead target"}
+              value={fmtNum(data.plan.leadTarget)}
+              tone="brand"
+              icon={<Target size={15} />}
+              sub="Paid + Organic/Webinar"
+            />
+            <KpiCard
+              index={1}
+              label={lang === "ar" ? "تارجت Paid" : "Paid lead target"}
+              value={fmtNum(data.plan.paidLeadTarget)}
+              tone="violet"
+              icon={<Users size={15} />}
+              sub={ratioPct(data.actual.paidLeadAchievement)}
+            />
+            <KpiCard
+              index={2}
+              label={lang === "ar" ? "ميزانية الليدز" : "Lead-gen budget"}
+              value={fmtUSDFull(data.plan.leadGenerationBudgetUsd)}
+              tone="warning"
+              icon={<WalletCards size={15} />}
+              sub={`${fmtUSDFull(data.actual.targetedSpend)} ${lang === "ar" ? "مصروف" : "spent"}`}
+            />
+            <KpiCard
+              index={3}
+              label={lang === "ar" ? "CPL المستهدف" : "Target CPL"}
+              value={fmtUSDFull(data.plan.targetCpl)}
+              tone="warning"
+              icon={<Gauge size={15} />}
+              sub={`${lang === "ar" ? "الفعلي" : "actual"} ${fmtUSDFull(data.actual.targetedCpl)}`}
+            />
+            <KpiCard
+              index={4}
+              label={lang === "ar" ? "تارجت المبيعات" : "Sales target"}
+              value={fmtUSDFull(data.plan.salesTargetUsd)}
+              hero
+              icon={<Landmark size={15} />}
+              sub={ratioPct(data.actual.salesAchievement)}
+            />
+            <KpiCard
+              index={5}
+              label={lang === "ar" ? "إجمالي ميزانية التسويق" : "Total marketing budget"}
+              value={fmtUSDFull(data.plan.totalMarketingBudgetUsd)}
+              tone="neutral"
+              icon={<BadgeDollarSign size={15} />}
+              sub={`+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`}
+            />
+          </KpiRow>
 
           {data.plan.status === "draft" && (
             <Notice tone="warning" icon={<TriangleAlert size={16} />}>
@@ -501,29 +509,6 @@ function MediaPlanPage() {
           />
         </>
       )}
-    </div>
-  );
-}
-
-function HeroMetric({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 backdrop-blur-sm sm:p-4">
-      <div className="flex items-start justify-between gap-2 text-[11px] text-white/55">
-        <span className="leading-snug">{label}</span>
-        <span className="text-[#f5ad24]">{icon}</span>
-      </div>
-      <div className="num mt-2 text-lg font-bold tracking-tight sm:text-xl">{value}</div>
-      <div className="mt-1 text-[10px] text-white/45">{sub}</div>
     </div>
   );
 }

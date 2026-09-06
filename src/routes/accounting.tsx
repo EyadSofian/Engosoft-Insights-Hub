@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Info,
   ListChecks,
+  Receipt,
   ReceiptText,
   RotateCcw,
   ShieldCheck,
@@ -33,11 +34,12 @@ import {
   ErrorState,
   KpiCard,
   Notice,
-  PageHeader,
   Segmented,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { DEFAULT_FX_RATES } from "@/lib/fx-rates";
@@ -115,6 +117,7 @@ interface AccountingResponse {
 }
 
 function Accounting() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
@@ -315,13 +318,15 @@ function Accounting() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<Receipt size={20} />}
         title={t("accounting")}
         subtitle={
           lang === "ar"
             ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
             : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
         }
+        period={reportingPeriod}
       />
 
       <Card className="border-brand/20 bg-surface">

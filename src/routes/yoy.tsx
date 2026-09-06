@@ -1,15 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarOff } from "lucide-react";
+import { CalendarOff, CalendarRange } from "lucide-react";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
-import {
-  Card,
-  ErrorState,
-  EmptyState,
-  PageHeader,
-  SectionTitle,
-  Skeleton,
-} from "@/components/ui-bits";
+import { Card, ErrorState, EmptyState, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
 
 export const Route = createFileRoute("/yoy")({ component: Yoy });
@@ -39,6 +34,7 @@ const MONTHS = {
 };
 
 function Yoy() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   // Year-over-year is a property of the whole sheet, not of the active window,
   // so this endpoint deliberately ignores the global filters.
@@ -56,13 +52,15 @@ function Yoy() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<CalendarRange size={20} />}
         title={t("yoy")}
         subtitle={
           data
             ? `${data.currentYear} ${lang === "ar" ? "مقابل" : "vs"} ${data.previousYear}`
             : undefined
         }
+        period={reportingPeriod}
       />
 
       {isLoading || !data ? (

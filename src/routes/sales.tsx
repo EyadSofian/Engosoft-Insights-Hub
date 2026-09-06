@@ -6,6 +6,7 @@ import {
   HeartHandshake,
   Info,
   Megaphone,
+  Receipt,
   ReceiptText,
   ShoppingCart,
   Trophy,
@@ -20,11 +21,12 @@ import {
   FunnelBars,
   KpiCard,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtRoas, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { Platform } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -105,6 +107,7 @@ function rate(value: number, total: number) {
 }
 
 function SalesReport() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<SalesResponse>("/api/sales");
 
@@ -246,13 +249,15 @@ function SalesReport() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<Receipt size={20} />}
         title={ar ? "تقرير المبيعات والفانل" : "Sales funnel report"}
         subtitle={
           ar
             ? "من دخول الليد إلى الاهتمام والكوتيشن والبيع، ثم ربط النتيجة بالمصدر والحملة والفاتورة المدفوعة."
             : "From lead entry to interest, quotation and sale, tied back to source, campaign and paid invoice."
         }
+        period={reportingPeriod}
       />
       <FilterSummary />
 

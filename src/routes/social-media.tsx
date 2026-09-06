@@ -7,6 +7,7 @@ import {
   DollarSign,
   Inbox,
   MessageCircleMore,
+  MessagesSquare,
   MousePointerClick,
   Radio,
   UserRoundCheck,
@@ -17,11 +18,12 @@ import {
   ErrorState,
   KpiCard,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader, InsightCard, InsightRow, KpiRow } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
@@ -73,6 +75,7 @@ function duration(seconds: number | null, lang: "ar" | "en") {
 }
 
 function SocialMedia() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const ads = useApi<AdsResponse>("/api/ads");
   const organic = useApi<OrganicResponse>("/api/organic");
@@ -94,6 +97,39 @@ function SocialMedia() {
     [workforce.data?.agents],
   );
   const sources = useMemo(() => organic.data?.sources.slice(0, 8) ?? [], [organic.data?.sources]);
+
+  // The page's headline figures, summed from the two responses it already
+  // loads. Reach, clicks and click-through are what the ad platforms actually
+  // report; there is no engagement or follower metric in either source, so
+  // none is shown — an invented number here would be indistinguishable from a
+  // measured one.
+  const reach = useMemo(() => {
+    const channels = ads.data?.byPlatform ?? [];
+    const impressions = channels.reduce((sum, c) => sum + c.impressions, 0);
+    const clicks = channels.reduce((sum, c) => sum + c.clicksAll, 0);
+    const paidResults = channels.reduce(
+      (sum, c) => (c.platformLeads === null ? sum : sum + c.platformLeads),
+      0,
+    );
+    const best = [...channels].sort((a, b) => b.impressions - a.impressions)[0] ?? null;
+    return {
+      impressions,
+      clicks,
+      paidResults,
+      ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+      best,
+    };
+  }, [ads.data?.byPlatform]);
+
+  const organicTotals = useMemo(() => {
+    const rows = organic.data?.sources ?? [];
+    return {
+      leads: rows.reduce((sum, r) => sum + r.leads, 0),
+      won: rows.reduce((sum, r) => sum + r.won, 0),
+      revenue: rows.reduce((sum, r) => sum + r.revenue, 0),
+      top: [...rows].sort((a, b) => b.leads - a.leads)[0] ?? null,
+    };
+  }, [organic.data?.sources]);
 
   if (ads.error || organic.error) {
     const message = ((ads.error || organic.error) as Error).message;
@@ -119,37 +155,159 @@ function SocialMedia() {
   }
 
   const chat = workforce.data;
+  const awaitingReply = moderators.reduce((sum, agent) => sum + (agent.chatAwaitingReply ?? 0), 0);
+  const openConversations = moderators.reduce(
+    (sum, agent) => sum + (agent.chatOpenConversations ?? 0),
+    0,
+  );
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<MessagesSquare size={20} />}
         title={lang === "ar" ? "السوشيال ميديا والموديريشن" : "Social media & moderation"}
         subtitle={
           lang === "ar"
             ? "مكان واحد لأداء القنوات المدفوعة، مصادر التواصل غير المدفوعة، وسرعة متابعة محادثات Chatwoot."
             : "One workspace for paid channels, non-paid communication sources and Chatwoot follow-up speed."
         }
+        period={reportingPeriod}
       />
 
-      <Card className="overflow-hidden border-s-4 border-s-brand bg-[linear-gradient(110deg,var(--surface),var(--brand-soft))]">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="max-w-3xl">
-            <div className="mb-1.5 flex items-center gap-2 text-sm font-bold text-brand">
-              <Radio size={18} />
-              {lang === "ar" ? "Social Command Center" : "Social Command Center"}
-            </div>
-            <p className="text-sm leading-7 text-text-muted">
-              {lang === "ar"
-                ? "نتيجة الإعلان موجودة في جزء القنوات، ونتيجة الناس التي وصلت من واتساب أو السوشيال بدون صرف موجودة في الأورجانيك، أما جودة الرد فتأتي مباشرة من Chatwoot."
-                : "Paid channel outcomes, non-paid social/WhatsApp acquisition and Chatwoot response quality are kept separate and clearly sourced."}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Pill tone="brand">Odoo</Pill>
-            <Pill tone="brand">Ad platforms</Pill>
-            <Pill tone={chat?.chatwoot.ok ? "success" : "warning"}>Chatwoot</Pill>
-          </div>
-        </div>
-      </Card>
+      {/* The page's five figures, all of them reported by the sources this page
+          already loads. There is no engagement or follower count in either
+          response, so none is shown: an invented figure alongside measured
+          ones is worse than a missing one. */}
+      <KpiRow columns={5}>
+        <KpiCard
+          index={0}
+          label={lang === "ar" ? "الظهور" : "Reach"}
+          value={fmtNum(reach.impressions)}
+          tone="brand"
+          icon={<Radio size={15} />}
+          sub={
+            lang === "ar"
+              ? "إجمالي مرات الظهور التي أبلغت عنها المنصات"
+              : "Total impressions reported by the ad platforms"
+          }
+        />
+        <KpiCard
+          index={1}
+          label={lang === "ar" ? "النقرات" : "Clicks"}
+          value={fmtNum(reach.clicks)}
+          tone="violet"
+          icon={<MousePointerClick size={15} />}
+          sub={
+            reach.best
+              ? `${lang === "ar" ? "أعلى منصة" : "Top platform"}: ${PLATFORM_LABEL[reach.best.platform] ?? reach.best.platform}`
+              : undefined
+          }
+        />
+        <KpiCard
+          index={2}
+          label={lang === "ar" ? "نسبة النقر" : "Click-through rate"}
+          value={fmtPct(reach.ctr, 2)}
+          tone="warning"
+          icon={<BadgeCheck size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(reach.clicks)} نقرة ÷ ${fmtNum(reach.impressions)} ظهور`
+              : `${fmtNum(reach.clicks)} clicks ÷ ${fmtNum(reach.impressions)} impressions`
+          }
+        />
+        <KpiCard
+          index={3}
+          label={lang === "ar" ? "العملاء من المصادر غير المدفوعة" : "Leads from non-paid sources"}
+          value={fmtNum(organicTotals.leads)}
+          tone="success"
+          icon={<Users size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(organicTotals.won)} صفقة مغلقة`
+              : `${fmtNum(organicTotals.won)} closed`
+          }
+        />
+        <KpiCard
+          index={4}
+          label={lang === "ar" ? "إيراد المصادر غير المدفوعة" : "Non-paid revenue"}
+          value={fmtUSDFull(organicTotals.revenue)}
+          tone="success"
+          icon={<DollarSign size={15} />}
+          sub={
+            lang === "ar"
+              ? "لا يُنسب لهذه المصادر أي إنفاق إعلاني"
+              : "No ad spend is attributed to these sources"
+          }
+        />
+      </KpiRow>
+
+      <InsightRow>
+        <InsightCard
+          index={0}
+          kind="best"
+          eyebrow={lang === "ar" ? "أفضل منصة" : "Top platform"}
+          title={
+            reach.best
+              ? `${PLATFORM_LABEL[reach.best.platform] ?? reach.best.platform}`
+              : lang === "ar"
+                ? "لا توجد منصة بها ظهور في الفترة"
+                : "No platform recorded reach this period"
+          }
+          value={reach.best ? fmtNum(reach.best.impressions) : undefined}
+          detail={
+            reach.best
+              ? lang === "ar"
+                ? `${fmtNum(reach.best.clicksAll)} نقرة · ${fmtPct(reach.best.ctrAll, 2)} نسبة نقر`
+                : `${fmtNum(reach.best.clicksAll)} clicks · ${fmtPct(reach.best.ctrAll, 2)} CTR`
+              : undefined
+          }
+        />
+        <InsightCard
+          index={1}
+          kind="note"
+          eyebrow={lang === "ar" ? "أكبر مصدر غير مدفوع" : "Largest non-paid source"}
+          title={
+            organicTotals.top
+              ? organicTotals.top.name
+              : lang === "ar"
+                ? "لا توجد مصادر غير مدفوعة في الفترة"
+                : "No non-paid sources this period"
+          }
+          value={organicTotals.top ? fmtNum(organicTotals.top.leads) : undefined}
+          detail={
+            organicTotals.top
+              ? lang === "ar"
+                ? `${fmtNum(organicTotals.top.won)} صفقة · ${fmtUSDFull(organicTotals.top.revenue)} إيراد`
+                : `${fmtNum(organicTotals.top.won)} won · ${fmtUSDFull(organicTotals.top.revenue)} revenue`
+              : undefined
+          }
+          to="/organic"
+          actionLabel={lang === "ar" ? "افتح الأورجانيك ←" : "Open Organic →"}
+        />
+        <InsightCard
+          index={2}
+          kind={awaitingReply > 0 ? "attention" : "opportunity"}
+          eyebrow={lang === "ar" ? "سرعة الرد" : "Response speed"}
+          title={
+            awaitingReply > 0
+              ? lang === "ar"
+                ? "عملاء ما زالوا ينتظرون رداً"
+                : "Customers still waiting for a reply"
+              : lang === "ar"
+                ? "لا يوجد عميل ينتظر رداً الآن"
+                : "Nobody is waiting for a reply right now"
+          }
+          value={awaitingReply > 0 ? fmtNum(awaitingReply) : undefined}
+          detail={
+            chat?.chatwoot.ok === false
+              ? lang === "ar"
+                ? "مصدر المحادثات غير متاح حالياً، فهذه القراءة قد تكون ناقصة."
+                : "The conversation source is unavailable, so this reading may be incomplete."
+              : lang === "ar"
+                ? `${fmtNum(openConversations)} محادثة مفتوحة الآن عبر ${fmtNum(moderators.length)} موظف`
+                : `${fmtNum(openConversations)} conversations open now across ${fmtNum(moderators.length)} people`
+          }
+        />
+      </InsightRow>
 
       <section>
         <SectionTitle

@@ -17,15 +17,9 @@ import {
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { DataTable, type Col } from "@/components/DataTable";
-import {
-  Card,
-  ErrorState,
-  KpiCard,
-  PageHeader,
-  Pill,
-  SectionTitle,
-  Skeleton,
-} from "@/components/ui-bits";
+import { Card, ErrorState, KpiCard, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { setAcquisitionFilter, useFilters } from "@/lib/filter-store";
 import { fmtCompact, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { hasReportableLost } from "@/lib/lost-authority";
@@ -140,6 +134,7 @@ function InsightCard({
 }
 
 function Organic() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const filters = useFilters();
 
@@ -521,13 +516,15 @@ function Organic() {
   return (
     <div className="space-y-5 sm:space-y-7">
       <div>
-        <PageHeader
+        <DashboardPageHeader
+          icon={<Leaf size={20} />}
           title={lang === "ar" ? "أورجانيك" : "Organic"}
           subtitle={
             lang === "ar"
               ? "كل مصادر Odoo غير المدفوعة: من أين تأتي الفرص، وما الذي يتحول إلى بيع فعلي."
               : "Every non-paid Odoo source: where opportunities originate and what turns into paid sales."
           }
+          period={reportingPeriod}
         />
         <FilterSummary />
       </div>

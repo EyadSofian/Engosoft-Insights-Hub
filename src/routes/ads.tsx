@@ -26,11 +26,12 @@ import {
   EmptyState,
   ErrorState,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { MultiLineChart, ScatterPlot } from "@/components/charts";
 import { CompareBars } from "@/components/ads/CompareBars";
 import { MetricCard, Unavailable } from "@/components/ads/MetricCard";
@@ -108,6 +109,7 @@ interface CampaignSpendSection {
 }
 
 function Ads() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
@@ -150,13 +152,15 @@ function Ads() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
+        <DashboardPageHeader
+          icon={<BarChart3 size={20} />}
           title={t("ads_tech")}
           subtitle={
             lang === "ar"
               ? "الإنفاق والعملاء والتحصيل في مكان واحد. كل رقم عليه علامة استفهام بتقول جاي منين وبيتحسب إزاي، واللي مش متاح بيظهر شرطة مش صفر."
               : "Spend, leads and collections in one place. Every figure carries an info button explaining where it comes from, and anything unmeasurable renders as a dash, never a zero."
           }
+          period={reportingPeriod}
         />
         <MetricsGlossaryButton className="mt-0.5" />
       </div>

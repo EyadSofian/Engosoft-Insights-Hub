@@ -27,10 +27,11 @@ import {
   ErrorState,
   KpiCard,
   Notice,
-  PageHeader,
   Pill,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
 import { useFilters } from "@/lib/filter-store";
@@ -104,6 +105,7 @@ interface CoursesResponse {
 }
 
 function Courses() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const filters = useFilters();
   const organicScope = filters.channel === "organic";
@@ -276,7 +278,8 @@ function Courses() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<GraduationCap size={20} />}
         title={lang === "ar" ? "الدورات" : "Courses"}
         subtitle={
           organicScope
@@ -287,6 +290,7 @@ function Courses() {
               ? "كل دورة في صف واحد، وتحتها الحملات الشغالة والقديمة ومقارنة شهر بشهر."
               : "One row per course, with current campaigns, campaign history and month-to-month comparison."
         }
+        period={reportingPeriod}
       />
 
       <FilterSummary />

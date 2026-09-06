@@ -170,7 +170,7 @@ export function TopBar({ title }: { title?: string }) {
       >
         <div className={`flex items-center gap-2 sm:gap-3 ${compact ? "py-1.5" : "py-2 sm:py-3"}`}>
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
-              The page title itself lives in each page's PageHeader, so the bar
+              The page title itself lives in each page's DashboardPageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
           <div className="flex shrink-0 items-center gap-2 min-w-0">
             <span className="lg:hidden shrink-0 font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">

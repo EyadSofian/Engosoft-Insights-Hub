@@ -15,11 +15,13 @@ import {
   BarList,
   Card,
   ErrorState,
-  PageHeader,
+  KpiCard,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { AdSetOriginBadge } from "@/components/metric-bits";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { AdSetOrigin, DataHealth, Grouped, Totals } from "@/lib/types";
@@ -128,6 +130,7 @@ const rate = (numerator: number, denominator: number) =>
   denominator > 0 ? (numerator / denominator) * 100 : null;
 
 function Leads() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<WorkspaceTab>("overview");
   const [breakdown, setBreakdown] = useState<BreakdownKey>("course");
@@ -238,13 +241,15 @@ function Leads() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<Users size={20} />}
         title={lang === "ar" ? "CRM — إدارة العملاء" : "CRM — Customer management"}
         subtitle={
           lang === "ar"
             ? "البيع الحقيقي من الفواتير، وحالة الـCRM ظاهرة منفصلة، والمكالمات من PBX."
             : "Paid invoices define sales; CRM stages and PBX calls remain visible as separate signals."
         }
+        period={reportingPeriod}
       />
 
       {isLoading || !data ? (
@@ -254,7 +259,7 @@ function Leads() {
         </>
       ) : (
         <>
-          <CrmCommandBar data={data} />
+          <CrmHeadline data={data} />
 
           <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface p-1 shadow-sm sm:w-fit">
             {tabOptions.map((option) => (
@@ -262,7 +267,7 @@ function Leads() {
                 key={option.key}
                 type="button"
                 onClick={() => setTab(option.key)}
-                className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${tab === option.key ? "bg-navy text-white" : "text-text-muted hover:bg-surface-2 hover:text-text"}`}
+                className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${tab === option.key ? "bg-brand text-white" : "text-text-muted hover:bg-surface-2 hover:text-text"}`}
               >
                 {option[lang]}
               </button>
@@ -371,77 +376,61 @@ function Leads() {
   );
 }
 
-function CrmCommandBar({ data }: { data: Resp }) {
+/**
+ * The CRM's five headline figures.
+ *
+ * Same five numbers the navy "control room" carried, on the shared KPI card so
+ * this page's first row matches every other report's. The dark slab it
+ * replaces was the only element on the page that did not scroll like a card
+ * and could not be read at a glance beside the tabs under it.
+ */
+function CrmHeadline({ data }: { data: Resp }) {
   const { lang } = useI18n();
   const invoiceConversion = rate(data.totals.orders, data.totals.totalLeads);
-  const metrics = [
-    {
-      icon: Users,
-      label: lang === "ar" ? "كل العملاء" : "All leads",
-      value: fmtNum(data.totals.totalLeads),
-      note: lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost",
-    },
-    {
-      icon: BadgeDollarSign,
-      label: lang === "ar" ? "صفقات مدفوعة" : "Paid deals",
-      value: fmtNum(data.totals.orders),
-      note: lang === "ar" ? "عدد الفواتير المميزة" : "Distinct paid invoices",
-    },
-    {
-      icon: CircleCheckBig,
-      label: lang === "ar" ? "تحويل حقيقي" : "Paid conversion",
-      value: fmtPct(invoiceConversion, 1),
-      note: lang === "ar" ? "الفواتير ÷ كل الليدز" : "Invoices ÷ all leads",
-    },
-    {
-      icon: Clock3,
-      label: lang === "ar" ? "قيد المتابعة" : "Follow-up",
-      value: fmtNum(data.pipeline.followUp),
-      note: lang === "ar" ? "من غير Won وبيانات قديمة" : "Excludes Won and junk",
-    },
-    {
-      icon: TrendingDown,
-      label: "Closed Lost",
-      value: fmtNum(data.totals.lost),
-      note: fmtPct(data.totals.lostRate, 1),
-    },
-  ];
 
   return (
-    <section className="relative overflow-hidden rounded-[28px] bg-navy px-4 py-5 text-white shadow-[0_20px_50px_rgba(4,31,59,0.16)] sm:px-6">
-      <div className="pointer-events-none absolute -end-12 -top-20 size-56 rounded-full border-[38px] border-white/[0.035]" />
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
-            CRM CONTROL ROOM
-          </p>
-          <h2 className="mt-1 text-xl font-semibold sm:text-2xl">
-            {fmtNum(data.totals.totalLeads)} {lang === "ar" ? "ليد أنتجوا" : "leads produced"}{" "}
-            <span className="text-electric">{fmtNum(data.totals.orders)}</span>{" "}
-            {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}
-          </h2>
-        </div>
-        <Pill tone="success">{lang === "ar" ? "المصدر: Accounting" : "Source: Accounting"}</Pill>
-      </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {metrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <div
-              key={metric.label}
-              className="rounded-2xl border border-white/10 bg-white/[0.055] p-3 backdrop-blur-sm"
-            >
-              <div className="flex items-center gap-2 text-[11px] text-white/55">
-                <Icon size={14} />
-                <span>{metric.label}</span>
-              </div>
-              <div className="num mt-2 text-2xl font-semibold tracking-tight">{metric.value}</div>
-              <div className="mt-1 text-[10px] text-white/45">{metric.note}</div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+    <KpiRow columns={5}>
+      <KpiCard
+        index={0}
+        label={lang === "ar" ? "إجمالي العملاء المحتملين" : "All leads"}
+        value={fmtNum(data.totals.totalLeads)}
+        tone="brand"
+        icon={<Users size={15} />}
+        sub={lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost"}
+      />
+      <KpiCard
+        index={1}
+        label={lang === "ar" ? "صفقات مدفوعة" : "Paid deals"}
+        value={fmtNum(data.totals.orders)}
+        hero
+        icon={<BadgeDollarSign size={15} />}
+        sub={lang === "ar" ? "عدد الفواتير المميزة" : "Distinct paid invoices"}
+      />
+      <KpiCard
+        index={2}
+        label={lang === "ar" ? "التحويل الحقيقي" : "Paid conversion"}
+        value={fmtPct(invoiceConversion, 1)}
+        tone="success"
+        icon={<CircleCheckBig size={15} />}
+        sub={lang === "ar" ? "الفواتير ÷ كل الليدز" : "Invoices ÷ all leads"}
+      />
+      <KpiCard
+        index={3}
+        label={lang === "ar" ? "قيد المتابعة" : "Follow-up"}
+        value={fmtNum(data.pipeline.followUp)}
+        tone="violet"
+        icon={<Clock3 size={15} />}
+        sub={lang === "ar" ? "من غير Won وبيانات قديمة" : "Excludes Won and junk"}
+      />
+      <KpiCard
+        index={4}
+        label={lang === "ar" ? "صفقات ضائعة" : "Closed Lost"}
+        value={fmtNum(data.totals.lost)}
+        tone="danger"
+        icon={<TrendingDown size={15} />}
+        sub={fmtPct(data.totals.lostRate, 1)}
+      />
+    </KpiRow>
   );
 }
 

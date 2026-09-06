@@ -14,15 +14,9 @@ import {
 } from "lucide-react";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { DataTable, type Col } from "@/components/DataTable";
-import {
-  Card,
-  ErrorState,
-  KpiCard,
-  PageHeader,
-  Pill,
-  SectionTitle,
-  Skeleton,
-} from "@/components/ui-bits";
+import { Card, ErrorState, KpiCard, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import { buildQuery, filterStore, useFilters } from "@/lib/filter-store";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
@@ -169,6 +163,7 @@ function Change({
 }
 
 function WeekendPerformance() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const filters = useFilters();
   const query = buildQuery(filters);
@@ -228,13 +223,15 @@ function WeekendPerformance() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<CalendarClock size={20} />}
         title={lang === "ar" ? "أداء الحملات خلال الويك إند" : "Weekend campaign performance"}
         subtitle={
           lang === "ar"
             ? "تحليل آخر 8 أسابيع مكتملة: الويك إند الجمعة والسبت مقابل أيام العمل من الأحد إلى الخميس، لكل منصة."
             : "The last 8 complete weeks: Friday–Saturday weekend versus Sunday–Thursday workdays, per platform."
         }
+        period={reportingPeriod}
       />
 
       {isLoading || !data ? (

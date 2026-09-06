@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CalendarClock, Info } from "lucide-react";
+import { CalendarClock, Info, TrendingDown } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
@@ -8,11 +8,12 @@ import {
   Card,
   ErrorState,
   Notice,
-  PageHeader,
   SectionTitle,
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
 import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
@@ -53,6 +54,7 @@ interface Resp {
 }
 
 function Lost() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
 
@@ -135,13 +137,15 @@ function Lost() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<TrendingDown size={20} />}
         title={t("lost")}
         subtitle={
           lang === "ar"
             ? "تحليل جودة التسويق حسب تاريخ دخول الليد، وحركة الإغلاق ظاهرة لوحدها"
             : "Marketing quality by lead creation date, with closures reported separately"
         }
+        period={reportingPeriod}
       />
 
       {isLoading || !data ? (

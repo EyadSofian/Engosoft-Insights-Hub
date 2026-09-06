@@ -53,19 +53,6 @@ export function SectionTitle({
   );
 }
 
-export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="mb-3.5 sm:mb-5">
-      <h1 className="text-[19px] min-[420px]:text-[21px] sm:text-2xl font-semibold text-text text-balance">
-        {title}
-      </h1>
-      {subtitle && (
-        <p className="text-[12px] sm:text-sm text-text-muted mt-0.5 sm:mt-1">{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
 /* --- indicators ---------------------------------------------------------- */
 
 export function DeltaBadge({ value, invert = false }: { value?: number; invert?: boolean }) {

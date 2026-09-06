@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, UsersRound } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
-import { Card, ErrorState, PageHeader, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { CloseTime, CountPct } from "@/components/metric-bits";
 import { AccountingAgentsView } from "@/components/accounting/AccountingSubViews";
 import type { DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
@@ -24,6 +26,7 @@ const maybe = (n: Maybe, fmt: (v: number) => string) =>
   n === null || !isFinite(n) ? <span className="text-text-subtle">{EM}</span> : fmt(n);
 
 function Teams() {
+  const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/teams");
@@ -40,13 +43,15 @@ function Teams() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<UsersRound size={20} />}
         title={lang === "ar" ? "أداء الموظفين وفرق المبيعات" : "Employees and sales teams"}
         subtitle={
           lang === "ar"
             ? "التحصيل من الفواتير المدفوعة، والليدز من Odoo، والمكالمات وتقييم الجودة من Yeastar، والمحادثات من Chatwoot."
             : "Paid invoices supply collections, Odoo supplies leads, Yeastar supplies calls and quality scores, and Chatwoot supplies conversations."
         }
+        period={reportingPeriod}
       />
 
       {isLoading || !data ? (
@@ -117,7 +122,11 @@ function Teams() {
                         <tr onClick={() => toggle(team.key)} className="group cursor-pointer">
                           <Cell sticky>
                             <span className="inline-flex items-center gap-1.5 font-medium">
-                              {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} className="rtl:rotate-180" />}
+                              {isOpen ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} className="rtl:rotate-180" />
+                              )}
                               <span className="truncate max-w-[150px]" title={team.name}>
                                 {team.name}
                               </span>
@@ -213,7 +222,10 @@ function PeopleList({ rows, tone }: { rows: TeamAgg[]; tone: "success" | "danger
   return (
     <ol className="space-y-2">
       {rows.map((p, i) => (
-        <li key={`${p.parent ?? ""}:${p.key}:${i}`} className="flex items-center justify-between gap-3 py-1.5 border-b border-border/60 last:border-0">
+        <li
+          key={`${p.parent ?? ""}:${p.key}:${i}`}
+          className="flex items-center justify-between gap-3 py-1.5 border-b border-border/60 last:border-0"
+        >
           <span className="flex items-center gap-2.5 min-w-0">
             <span className="num text-[11px] text-text-subtle w-4 shrink-0">{i + 1}</span>
             <span className="min-w-0">

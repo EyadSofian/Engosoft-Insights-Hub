@@ -1,15 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BadgeDollarSign, ChartNoAxesCombined, Info, ReceiptText, Users } from "lucide-react";
+import {
+  BadgeDollarSign,
+  ChartNoAxesCombined,
+  Info,
+  ReceiptText,
+  UserRoundSearch,
+  Users,
+} from "lucide-react";
 import {
   Card,
   ErrorState,
   KpiCard,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
@@ -68,6 +76,7 @@ function metricWinner(
 }
 
 function MediaBuyers() {
+  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Response>("/api/media-buyers");
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -91,13 +100,15 @@ function MediaBuyers() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<UserRoundSearch size={20} />}
         title={lang === "ar" ? "تقييم الميديا بايرز" : "Media buyer evaluation"}
         subtitle={
           lang === "ar"
             ? "مقارنة شفافة بين سيد وشاذلي من الصرف حتى الفاتورة، بدون درجة مخفية أو حكم غير قابل للمراجعة."
             : "A transparent Sayed vs Shazly comparison from spend to paid invoice, with no opaque score."
         }
+        period={reportingPeriod}
       />
       <FilterSummary />
 

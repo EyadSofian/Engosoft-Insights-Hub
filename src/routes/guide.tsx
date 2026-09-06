@@ -18,7 +18,8 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { PageHeader, Pill } from "@/components/ui-bits";
+import { Pill } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { useI18n } from "@/lib/i18n";
 import { NAVIGATION_SECTIONS } from "@/lib/navigation";
 
@@ -30,7 +31,8 @@ function GuidePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <DashboardPageHeader
+        icon={<BookOpen size={20} />}
         title={ar ? "دليل استخدام الداشبورد" : "Dashboard user guide"}
         subtitle={
           ar
