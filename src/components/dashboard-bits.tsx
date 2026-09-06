@@ -954,8 +954,13 @@ export function AlertBar({
         <AlertTriangle size={15} aria-hidden="true" style={{ color: t.strong }} />
         {title}
       </span>
+      {/* `flex-1` with a basis of zero beside a `shrink-0` title gave this a
+          column one word wide on a phone. It claims the full row below `sm`
+          and only shares the line once there is room for one. */}
       {children && (
-        <span className="min-w-0 flex-1 text-[11.5px] leading-snug opacity-80">{children}</span>
+        <span className="w-full min-w-0 text-[11.5px] leading-snug opacity-80 sm:w-auto sm:flex-1">
+          {children}
+        </span>
       )}
       {action}
     </div>

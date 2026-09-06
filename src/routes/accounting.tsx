@@ -465,7 +465,7 @@ function Accounting() {
                   index={1}
                   label={t("invoices")}
                   value={fmtNum(data.summary.invoices)}
-                  tone="brand"
+                  tone="sky"
                   icon={<Receipt size={15} />}
                 />
                 <KpiCard
@@ -480,14 +480,14 @@ function Accounting() {
                   index={3}
                   label={t("product_lines")}
                   value={fmtNum(data.summary.productLines)}
-                  tone="neutral"
+                  tone="cyan"
                   icon={<Layers size={15} />}
                 />
                 <KpiCard
                   index={4}
                   label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
                   value={fmtNum(data.summary.creditNotes)}
-                  tone={data.summary.creditNotes > 0 ? "rose" : "slate"}
+                  tone={data.summary.creditNotes > 0 ? "rose" : "amber"}
                   valueWrap
                   icon={<RotateCcw size={15} />}
                   sub={fmtUSDExact(data.summary.creditNoteUsd)}

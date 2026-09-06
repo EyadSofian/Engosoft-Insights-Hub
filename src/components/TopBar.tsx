@@ -168,7 +168,7 @@ export function TopBar({ title }: { title?: string }) {
           transform: hidden ? "translateY(-100%)" : "translateY(0)",
         }}
       >
-        <div className={`flex items-center gap-2 sm:gap-3 ${compact ? "py-1.5" : "py-2 sm:py-3"}`}>
+        <div className={`flex items-center gap-2 ${compact ? "py-1.5" : "py-2"}`}>
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's DashboardPageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
@@ -192,7 +192,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <Link
               to="/guide"
-              className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97]"
+              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
               aria-label={lang === "ar" ? "دليل الاستخدام" : "User guide"}
               title={lang === "ar" ? "دليل الاستخدام" : "User guide"}
             >
@@ -201,7 +201,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={() => setSheetOpen(true)}
-              className="relative inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 text-sm transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:min-w-0 sm:rounded-lg sm:px-3 cursor-pointer"
+              className="relative inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-9 sm:min-w-0 sm:px-3"
               aria-label={t("filters")}
             >
               <SlidersHorizontal size={16} />
@@ -219,7 +219,7 @@ export function TopBar({ title }: { title?: string }) {
             <button
               onClick={doRefresh}
               disabled={refreshing}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10 sm:rounded-lg cursor-pointer disabled:opacity-60"
+              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] disabled:opacity-60 sm:h-9 sm:w-9"
               aria-label={t("refresh")}
               title={t("refresh")}
             >
@@ -230,7 +230,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={toggleTheme}
-              className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
+              className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
               aria-label={t("theme")}
               title={t("theme")}
             >
@@ -239,7 +239,7 @@ export function TopBar({ title }: { title?: string }) {
 
             <button
               onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="hidden sm:inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-sm font-medium transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
+              className="hidden h-9 cursor-pointer items-center justify-center gap-1 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
               aria-label="Toggle language"
             >
               <Languages size={16} />
@@ -258,7 +258,7 @@ export function TopBar({ title }: { title?: string }) {
             item clipped by the edge is what tells the reader it scrolls. */}
         <div
           hidden={compact}
-          className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex sm:pb-2.5"
+          className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex"
         >
           <div className="shrink-0">
             <DateFilter latest={latest} />
@@ -331,7 +331,7 @@ function ChromePinButton() {
       aria-pressed={chrome.pinned}
       aria-label={label}
       title={label}
-      className={`hidden h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition-colors active:scale-[0.97] lg:inline-flex ${
+      className={`hidden h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors active:scale-[0.97] lg:inline-flex ${
         chrome.pinned
           ? "border-brand bg-brand-soft text-brand"
           : "border-border bg-surface text-text-muted hover:bg-surface-2"
@@ -569,7 +569,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
   // sizes. It now gives up width before anything else on the bar does.
   return (
     <span
-      className="hidden md:inline-flex min-w-0 shrink items-center gap-1.5 text-[11px] px-2.5 h-10 rounded-lg bg-surface-2 border border-border whitespace-nowrap max-w-[34vw] xl:max-w-none"
+      className="hidden h-9 min-w-0 max-w-[34vw] shrink items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-2.5 text-[11px] md:inline-flex xl:max-w-none"
       title={tooltip}
     >
       <span

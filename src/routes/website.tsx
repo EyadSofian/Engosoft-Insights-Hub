@@ -838,7 +838,7 @@ function Website() {
                 icon={<CircleX size={18} />}
               />
               <KpiCard
-                tone="sky"
+                tone="cyan"
                 index={3}
                 label={t("open_leads")}
                 value={fmtNum(data.totals.open)}
@@ -847,7 +847,7 @@ function Website() {
                 icon={<CircleDot size={18} />}
               />
               <KpiCard
-                tone="sky"
+                tone="amber"
                 index={4}
                 label={t("not_contacted")}
                 value={fmtNum(data.totals.notContacted)}
