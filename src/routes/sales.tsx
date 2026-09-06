@@ -269,12 +269,14 @@ function SalesReport() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <KpiCard
+          tone="sky"
           index={0}
           label={ar ? "الليدز الداخلة" : "Leads entered"}
           value={fmtNum(data.funnel.leads)}
           icon={<Users size={16} />}
         />
         <KpiCard
+          tone="violet"
           index={1}
           label={ar ? "مهتم أو أبعد" : "Interested+"}
           value={fmtNum(data.funnel.interested)}
@@ -282,6 +284,7 @@ function SalesReport() {
           icon={<HeartHandshake size={16} />}
         />
         <KpiCard
+          tone="violet"
           index={2}
           label={ar ? "كوتيشن أو أبعد" : "Quotation+"}
           value={fmtNum(data.funnel.quotations)}
@@ -289,6 +292,7 @@ function SalesReport() {
           icon={<FileText size={16} />}
         />
         <KpiCard
+          tone="violet"
           index={3}
           label="Won"
           value={fmtNum(data.funnel.won)}
@@ -296,6 +300,7 @@ function SalesReport() {
           icon={<Trophy size={16} />}
         />
         <KpiCard
+          tone="mint"
           index={4}
           label={ar ? "أوامر بيع" : "Sales orders"}
           value={fmtNum(data.funnel.salesOrders)}
@@ -303,6 +308,7 @@ function SalesReport() {
           icon={<ShoppingCart size={16} />}
         />
         <KpiCard
+          tone="mint"
           index={5}
           label={ar ? "فواتير مدفوعة" : "Paid invoices"}
           value={fmtNum(data.funnel.invoices)}
@@ -310,6 +316,7 @@ function SalesReport() {
           icon={<ReceiptText size={16} />}
         />
         <KpiCard
+          tone="mint"
           index={6}
           label={ar ? "الإيراد المحصّل" : "Paid revenue"}
           value={fmtUSDFull(data.totals.revenue)}

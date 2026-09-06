@@ -258,7 +258,7 @@ function Campaigns() {
         role="tablist"
         aria-label={lang === "ar" ? "أقسام صفحة الحملات" : "Campaign workspace"}
         /* Scrolls with full labels on a phone, equal 3-up from `sm`. */
-        className="hscroll flex gap-1 rounded-2xl border border-border bg-surface p-1 shadow-sm sm:grid sm:grid-cols-3"
+        className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:grid sm:grid-cols-3"
       >
         {(
           [
@@ -296,19 +296,25 @@ function Campaigns() {
               role="tab"
               aria-selected={active}
               onClick={() => setWorkspaceTab(tab.key)}
-              className={`shrink-0 rounded-xl px-3 py-2.5 text-start transition-all sm:min-w-0 sm:shrink sm:px-3 ${
-                active
-                  ? "bg-brand text-white shadow-sm"
-                  : "text-text-muted hover:bg-surface-2 hover:text-text"
+              className={`shrink-0 rounded-xl px-3 py-2 text-start transition-colors sm:min-w-0 sm:shrink sm:px-3 ${
+                active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
               }`}
             >
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold sm:text-sm">
-                <Icon size={15} className="shrink-0" />
+              <span className="flex items-center gap-2 text-[12.5px] font-bold sm:text-[13.5px]">
+                <span
+                  className="grid size-6 shrink-0 place-items-center rounded-lg transition-colors"
+                  style={
+                    active
+                      ? { background: "var(--sky-strong)", color: "#fff" }
+                      : { background: "var(--surface-3)", color: "var(--text-subtle)" }
+                  }
+                  aria-hidden="true"
+                >
+                  <Icon size={13} />
+                </span>
                 <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
               </span>
-              <span
-                className={`mt-1 hidden truncate text-[10px] sm:block ${active ? "text-white/75" : "text-text-subtle"}`}
-              >
+              <span className="mt-0.5 hidden truncate ps-8 text-[10.5px] text-text-subtle sm:block">
                 {tab.description}
               </span>
             </button>

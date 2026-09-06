@@ -429,32 +429,38 @@ function SocialMedia() {
           <>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
               <KpiCard
+                tone="cyan"
                 label={lang === "ar" ? "المحادثات" : "Conversations"}
                 value={fmtNum(chat.summary.chatConversations)}
                 icon={<MessageCircleMore size={16} />}
               />
               <KpiCard
+                tone="mint"
                 label={lang === "ar" ? "تم حلها" : "Resolved"}
                 value={fmtNum(chat.summary.chatResolved)}
                 icon={<BadgeCheck size={16} />}
               />
               <KpiCard
+                tone="rose"
                 label={lang === "ar" ? "تنتظر رد" : "Awaiting reply"}
                 value={fmtNum(chat.summary.chatAwaitingReply)}
                 icon={<Clock3 size={16} />}
                 hero={(chat.summary.chatAwaitingReply ?? 0) > 0}
               />
               <KpiCard
+                tone="cyan"
                 label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open now"}
                 value={fmtNum(chat.summary.chatOpenConversations)}
                 icon={<Inbox size={16} />}
               />
               <KpiCard
+                tone="rose"
                 label={lang === "ar" ? "بدون موظف" : "Unassigned"}
                 value={fmtNum(chat.chatwoot.unassignedConversations)}
                 icon={<Users size={16} />}
               />
               <KpiCard
+                tone="amber"
                 label={lang === "ar" ? "أول رد" : "First response"}
                 value={duration(chat.summary.chatAverageFirstResponseSeconds, lang)}
                 icon={<MousePointerClick size={16} />}

@@ -217,17 +217,30 @@ export function KpiCard({
       onClick={onClick}
       className={`tone-surface stagger @container relative overflow-hidden text-start ${
         onClick ? "lift w-full cursor-pointer" : ""
-      } ${compact ? "min-h-[98px] p-3.5" : "min-h-[136px] p-4 sm:min-h-[148px] sm:px-4.5 sm:py-4"} ${
-        hero ? "ring-1 ring-inset" : ""
-      }`}
+      } ${compact ? "min-h-[98px] p-3.5" : "min-h-[136px] p-4 sm:min-h-[148px] sm:px-4.5 sm:py-4"}`}
       style={
         {
           ...toneVars(tone),
           "--i": index,
-          ...(hero ? { boxShadow: "var(--shadow-sm)" } : {}),
+          ...(hero
+            ? {
+                boxShadow: "var(--shadow-sm)",
+                borderColor: "var(--tone-strong)",
+              }
+            : {}),
         } as React.CSSProperties
       }
     >
+      {/* The page's primary figure gets a solid rule in its own family along
+          the top edge. `hero` used to change only the shadow, which at a
+          glance was no emphasis at all. */}
+      {hero && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-1"
+          style={{ background: "var(--tone-strong)" }}
+        />
+      )}
       {/* A wash of the family's strong tone bleeding in from the trailing
           corner. It is what makes the card read as coloured at a glance and at
           a distance, without lifting the pastel enough to hurt the figure. */}
@@ -551,7 +564,7 @@ export function Segmented<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex w-max items-center gap-0.5 rounded-xl border border-border bg-surface-2 p-0.5 sm:rounded-lg"
+      className="inline-flex w-max items-center gap-0.5 rounded-xl border border-border bg-surface-2 p-1"
       role="tablist"
     >
       {options.map((o) => {
@@ -562,10 +575,9 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`min-h-11 min-w-11 rounded-[9px] font-medium transition-colors active:scale-[0.97] sm:min-h-0 sm:min-w-0 sm:rounded-[7px] cursor-pointer whitespace-nowrap ${
-              size === "md" ? "px-3 py-1.5 text-[13px]" : "px-3 py-1 text-xs"
-            } ${active ? "text-white shadow-sm" : "text-text-muted hover:text-text"}`}
-            style={active ? { background: "var(--brand)" } : undefined}
+            className={`min-h-11 min-w-11 cursor-pointer whitespace-nowrap rounded-lg font-semibold transition-colors active:scale-[0.97] sm:min-h-0 sm:min-w-0 ${
+              size === "md" ? "px-3.5 py-1.5 text-[13px]" : "px-3 py-1.5 text-xs"
+            } ${active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
           >
             {o.label}
           </button>

@@ -158,6 +158,7 @@ function MediaBuyers() {
           }
         />
         <KpiCard
+          tone="mint"
           index={1}
           label={lang === "ar" ? "الإيراد المرتبط" : "Attributed revenue"}
           value={fmtUSDFull(totals.revenue)}
@@ -316,18 +317,21 @@ function MediaBuyers() {
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <KpiCard
+                tone="rose"
                 index={buyerIndex * 4}
                 label={lang === "ar" ? "الإنفاق" : "Spend"}
                 value={fmtUSDFull(buyer.spend)}
                 icon={<BadgeDollarSign size={15} />}
               />
               <KpiCard
+                tone="sky"
                 index={buyerIndex * 4 + 1}
                 label={lang === "ar" ? "ليدز المنصة" : "Platform leads"}
                 value={buyer.platformLeads === null ? "—" : fmtNum(buyer.platformLeads)}
                 icon={<Users size={15} />}
               />
               <KpiCard
+                tone="violet"
                 index={buyerIndex * 4 + 2}
                 label={lang === "ar" ? "الفواتير" : "Invoices"}
                 value={fmtNum(buyer.invoices)}
@@ -335,6 +339,7 @@ function MediaBuyers() {
                 icon={<ReceiptText size={15} />}
               />
               <KpiCard
+                tone="mint"
                 index={buyerIndex * 4 + 3}
                 label={lang === "ar" ? "الإيراد" : "Revenue"}
                 value={fmtUSDFull(buyer.revenue)}

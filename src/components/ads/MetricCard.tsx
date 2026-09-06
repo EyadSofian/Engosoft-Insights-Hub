@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { MetricInfo } from "./MetricInfo";
 import { VERDICT_STYLE, type Verdict } from "./verdict";
+import { toneVars, type AnyTone } from "@/lib/dashboard-tone";
 
 const EM = "—";
 
@@ -48,6 +49,37 @@ export function Unavailable({ reason, compact = false }: { reason?: string; comp
   );
 }
 
+/**
+ * The family each advertising metric belongs to.
+ *
+ * Same convention as the rest of the dashboard — money out is rose, money in
+ * is mint, volume is sky, a closed deal is violet, a ratio is amber — so the
+ * campaigns page reads on the same colour scale as every other report rather
+ * than as a page of white cards next to pages of coloured ones.
+ */
+const METRIC_TONE: Partial<Record<MetricKey, AnyTone>> = {
+  spend: "rose",
+  cpm: "rose",
+  cpc: "rose",
+  cpl: "amber",
+  cpa: "amber",
+  roas: "amber",
+  acos: "amber",
+  ctrAll: "amber",
+  ctrLink: "amber",
+  conversionRate: "amber",
+  lostRate: "amber",
+  revenue: "mint",
+  attributedRevenue: "mint",
+  revenuePerLead: "mint",
+  impressions: "sky",
+  clicks: "sky",
+  platformLeads: "sky",
+  crmLeads: "sky",
+  won: "violet",
+  lost: "rose",
+};
+
 export function MetricCard({
   metric,
   value,
@@ -59,6 +91,7 @@ export function MetricCard({
   icon,
   index = 0,
   hero = false,
+  tone,
   note,
   onClick,
 }: {
@@ -71,41 +104,41 @@ export function MetricCard({
   icon?: ReactNode;
   index?: number;
   hero?: boolean;
+  /** Overrides the family this metric normally takes. */
+  tone?: AnyTone;
   note?: string;
   onClick?: () => void;
 }) {
   const { lang } = useI18n();
   const copy = METRICS[metric][lang];
   const unavailable = !!unavailableReason;
+  const family = tone ?? METRIC_TONE[metric] ?? "slate";
 
   return (
     <div
-      className="card stagger p-3.5 sm:p-4 flex flex-col gap-1.5 relative"
-      style={
-        {
-          "--i": index,
-          ...(hero
-            ? {
-                background: "var(--accent-soft)",
-                borderColor: "color-mix(in oklab, var(--accent) 35%, transparent)",
-              }
-            : {}),
-        } as React.CSSProperties
-      }
+      className="tone-surface stagger @container relative flex flex-col overflow-hidden p-4"
+      style={{ ...toneVars(family), "--i": index } as React.CSSProperties}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-1.5">
-        <span className="flex items-center gap-1.5 min-w-0">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-8 h-24 w-24 rounded-full opacity-[0.13]"
+        style={{ background: "var(--tone-strong)", insetInlineEnd: "-1.25rem" }}
+      />
+
+      <div className="relative flex items-start justify-between gap-1.5">
+        <span className="flex min-w-0 items-center gap-2">
           {icon && (
             <span
-              className="text-text-subtle shrink-0"
-              style={hero ? { color: "var(--accent-ink)" } : undefined}
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-white"
+              style={{ background: "var(--tone-strong)" }}
             >
               {icon}
             </span>
           )}
           <span
-            className="text-[11.5px] font-medium text-text-muted leading-snug line-clamp-2"
+            className="line-clamp-2 text-[11.5px] font-semibold leading-snug"
+            style={{ color: "var(--tone-ink)", opacity: 0.78 }}
             title={copy.label}
           >
             {copy.label}
@@ -115,24 +148,24 @@ export function MetricCard({
       </div>
 
       <div
-        className="num font-semibold leading-none text-[21px] sm:text-[25px] mt-0.5"
-        style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
+        className="num relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,16cqi,1.6rem)] font-bold leading-none tracking-[-0.03em]"
+        style={{ color: "var(--tone-ink)" }}
       >
         {unavailable ? <Unavailable reason={unavailableReason} /> : value}
       </div>
 
-      <p className="text-[10.5px] text-text-subtle leading-snug mt-auto pt-1" dir="auto">
-        {unavailable ? unavailableReason : copy.formula}
-      </p>
-
-      {(verdict || sub) && (
-        <div className="flex items-center gap-2 flex-wrap min-h-[18px]">
-          {verdict && verdictLabel && !unavailable && (
-            <VerdictChip verdict={verdict} label={verdictLabel} />
-          )}
-          {sub != null && <span className="text-[10.5px] text-text-muted truncate">{sub}</span>}
-        </div>
-      )}
+      <div className="relative mt-2 flex min-h-[20px] flex-wrap items-center gap-x-2 gap-y-1">
+        {verdict && verdictLabel && !unavailable && (
+          <VerdictChip verdict={verdict} label={verdictLabel} />
+        )}
+        <span
+          className="line-clamp-2 min-w-0 text-[10.5px] leading-snug"
+          style={{ color: "var(--tone-ink)", opacity: 0.68 }}
+          dir="auto"
+        >
+          {sub ?? (unavailable ? unavailableReason : copy.formula)}
+        </span>
+      </div>
     </div>
   );
 }

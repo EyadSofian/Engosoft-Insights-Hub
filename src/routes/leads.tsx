@@ -261,13 +261,13 @@ function Leads() {
         <>
           <CrmHeadline data={data} />
 
-          <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface p-1 shadow-sm sm:w-fit">
+          <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:w-fit">
             {tabOptions.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 onClick={() => setTab(option.key)}
-                className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${tab === option.key ? "bg-brand text-white" : "text-text-muted hover:bg-surface-2 hover:text-text"}`}
+                className={`shrink-0 rounded-xl px-4 py-2 text-[13.5px] font-bold transition-colors ${tab === option.key ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
               >
                 {option[lang]}
               </button>
@@ -399,6 +399,7 @@ function CrmHeadline({ data }: { data: Resp }) {
         sub={lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost"}
       />
       <KpiCard
+        tone="violet"
         index={1}
         label={lang === "ar" ? "صفقات مدفوعة" : "Paid deals"}
         value={fmtNum(data.totals.orders)}

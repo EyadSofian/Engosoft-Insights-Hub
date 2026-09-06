@@ -285,6 +285,7 @@ function MediaPlanPage() {
               sub={`${lang === "ar" ? "الفعلي" : "actual"} ${fmtUSDFull(data.actual.targetedCpl)}`}
             />
             <KpiCard
+              tone="mint"
               index={4}
               label={lang === "ar" ? "تارجت المبيعات" : "Sales target"}
               value={fmtUSDFull(data.plan.salesTargetUsd)}

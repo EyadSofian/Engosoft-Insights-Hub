@@ -242,6 +242,7 @@ function WeekendPerformance() {
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <KpiCard
+              tone="rose"
               label={lang === "ar" ? "متوسط الصرف اليومي" : "Average daily spend"}
               value={fmtUSD(data.portfolio.weekend.avgDailySpend)}
               sub={
@@ -253,6 +254,7 @@ function WeekendPerformance() {
               index={0}
             />
             <KpiCard
+              tone="sky"
               label={t("crm_leads")}
               value={fmtNum(data.portfolio.weekend.leads)}
               sub={`${fmtNum(data.portfolio.weekend.leadsPerDay)} ${lang === "ar" ? "ليد/يوم" : "leads/day"}`}
@@ -260,6 +262,7 @@ function WeekendPerformance() {
               index={1}
             />
             <KpiCard
+              tone="amber"
               label={t("cpl")}
               value={fmtUSDFull(data.portfolio.weekend.cpl)}
               delta={data.portfolio.cplDelta ?? undefined}
@@ -269,6 +272,7 @@ function WeekendPerformance() {
               index={2}
             />
             <KpiCard
+              tone="amber"
               label={lang === "ar" ? "نسبة المبيعات (Won)" : "Sales rate (Won)"}
               value={fmtPct(data.portfolio.weekend.salesRate, 1)}
               sub={`${fmtNum(data.portfolio.weekend.won)} ${lang === "ar" ? "صفقة من نفس الليدز" : "won from the same leads"}`}
@@ -276,6 +280,7 @@ function WeekendPerformance() {
               index={3}
             />
             <KpiCard
+              tone="amber"
               label={t("lost_rate")}
               value={fmtPct(data.portfolio.weekend.lostRate, 1)}
               sub={`${fmtNum(data.portfolio.weekend.lost)} ${lang === "ar" ? "ليد Lost مؤكد" : "confirmed Lost leads"}`}

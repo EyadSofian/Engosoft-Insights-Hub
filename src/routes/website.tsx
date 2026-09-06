@@ -811,6 +811,7 @@ function Website() {
           <div className={websiteTab === "owner" ? "space-y-5" : "hidden"}>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <KpiCard
+                tone="sky"
                 index={0}
                 label={t("website_leads")}
                 value={fmtNum(data.totals.leads)}
@@ -819,6 +820,7 @@ function Website() {
                 icon={<Globe2 size={18} />}
               />
               <KpiCard
+                tone="violet"
                 index={1}
                 label={t("won")}
                 value={fmtNum(data.totals.won)}
@@ -827,6 +829,7 @@ function Website() {
                 icon={<CircleCheckBig size={18} />}
               />
               <KpiCard
+                tone="rose"
                 index={2}
                 label={t("lost_count")}
                 value={fmtNum(data.totals.lost)}
@@ -835,6 +838,7 @@ function Website() {
                 icon={<CircleX size={18} />}
               />
               <KpiCard
+                tone="sky"
                 index={3}
                 label={t("open_leads")}
                 value={fmtNum(data.totals.open)}
@@ -843,6 +847,7 @@ function Website() {
                 icon={<CircleDot size={18} />}
               />
               <KpiCard
+                tone="sky"
                 index={4}
                 label={t("not_contacted")}
                 value={fmtNum(data.totals.notContacted)}
@@ -851,6 +856,7 @@ function Website() {
                 icon={<Clock3 size={18} />}
               />
               <KpiCard
+                tone="mint"
                 index={5}
                 hero
                 label={t("website_sales")}

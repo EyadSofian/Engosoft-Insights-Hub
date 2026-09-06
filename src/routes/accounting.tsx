@@ -452,6 +452,7 @@ function Accounting() {
             <>
               <KpiRow columns={5}>
                 <KpiCard
+                  tone="mint"
                   index={0}
                   label={t("revenue")}
                   value={fmtUSDExact(data.summary.paidUsd)}
@@ -486,7 +487,7 @@ function Accounting() {
                   index={4}
                   label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
                   value={fmtNum(data.summary.creditNotes)}
-                  tone={data.summary.creditNotes > 0 ? "warning" : "neutral"}
+                  tone={data.summary.creditNotes > 0 ? "rose" : "slate"}
                   valueWrap
                   icon={<RotateCcw size={15} />}
                   sub={fmtUSDExact(data.summary.creditNoteUsd)}

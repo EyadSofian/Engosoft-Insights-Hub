@@ -634,6 +634,7 @@ function Organic() {
 
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <KpiCard
+              tone="mint"
               index={0}
               label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
               value={fmtNum(data.totals.orders)}
@@ -641,6 +642,7 @@ function Organic() {
               icon={<ReceiptText size={18} />}
             />
             <KpiCard
+              tone="amber"
               index={1}
               label={lang === "ar" ? "متوسط الفاتورة" : "Average invoice"}
               value={fmtUSD(data.totals.avgOrder)}
@@ -648,6 +650,7 @@ function Organic() {
               icon={<HandCoins size={18} />}
             />
             <KpiCard
+              tone="mint"
               index={2}
               label={lang === "ar" ? "الإيراد لكل ليد" : "Revenue per lead"}
               value={fmtUSD(data.totals.revenuePerLead)}
@@ -655,6 +658,7 @@ function Organic() {
               icon={<BadgeDollarSign size={18} />}
             />
             <KpiCard
+              tone="rose"
               index={3}
               label="Lost"
               value={lostAvailable ? fmtNum(data.totals.lost) : "—"}

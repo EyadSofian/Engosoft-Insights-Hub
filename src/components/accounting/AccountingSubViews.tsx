@@ -203,22 +203,26 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
+          tone="mint"
           index={0}
           label={lang === "ar" ? "تحصيل آخر شهر" : "Latest month collections"}
           value={fmtUSDExact(latest?.revenue ?? null)}
           hero
         />
         <KpiCard
+          tone="violet"
           index={1}
           label={lang === "ar" ? "فواتير آخر شهر" : "Latest month invoices"}
           value={fmtNum(latest?.invoices ?? 0)}
         />
         <KpiCard
+          tone="amber"
           index={2}
           label={lang === "ar" ? "النمو الشهري" : "Month-over-month growth"}
           value={fmtPct(latest?.growthPct ?? null, 1)}
         />
         <KpiCard
+          tone="rose"
           index={3}
           label={lang === "ar" ? "إلغاءات آخر شهر" : "Latest month cancellations"}
           value={fmtUSDExact(latest?.creditNoteUsd ?? null)}
@@ -467,6 +471,7 @@ export function AccountingAgentsView() {
       />
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 xl:gap-4">
         <KpiCard
+          tone="sky"
           index={0}
           label={lang === "ar" ? "الموظفون" : "Active employees"}
           value={fmtNum(data.summary.agents)}
@@ -478,6 +483,7 @@ export function AccountingAgentsView() {
           icon={<Users size={18} />}
         />
         <KpiCard
+          tone="mint"
           index={1}
           label={lang === "ar" ? "التحصيل" : "Paid collections"}
           value={fmtUSDFull(data.summary.paidRevenue)}
@@ -486,6 +492,7 @@ export function AccountingAgentsView() {
           hero
         />
         <KpiCard
+          tone="amber"
           index={2}
           label={lang === "ar" ? "التارجت" : "Target for period"}
           // Prorated, so half a month shows half the quota. An em dash means no
@@ -501,6 +508,7 @@ export function AccountingAgentsView() {
           icon={<Target size={18} />}
         />
         <KpiCard
+          tone="sky"
           index={3}
           label={lang === "ar" ? "الليدز الجديدة" : "Leads created in period"}
           value={fmtNum(data.summary.cleanLeads)}
@@ -509,6 +517,7 @@ export function AccountingAgentsView() {
           info={<EmployeeMetricInfo metric="cohortWon" />}
         />
         <KpiCard
+          tone="violet"
           index={4}
           label={lang === "ar" ? "الصفقات الرابحة" : "Won closures during period"}
           value={fmtNum(data.summary.periodClosedWon)}
@@ -521,6 +530,7 @@ export function AccountingAgentsView() {
           info={<EmployeeMetricInfo metric="periodClosures" />}
         />
         <KpiCard
+          tone="cyan"
           index={5}
           label={lang === "ar" ? "المكالمات" : "Total calls"}
           value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
@@ -534,6 +544,7 @@ export function AccountingAgentsView() {
           icon={<PhoneCall size={18} />}
         />
         <KpiCard
+          tone="cyan"
           index={6}
           label={lang === "ar" ? "وقت المكالمات" : "Call hours"}
           value={<CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />}
@@ -546,6 +557,7 @@ export function AccountingAgentsView() {
           icon={<Clock3 size={18} />}
         />
         <KpiCard
+          tone="amber"
           index={7}
           label={lang === "ar" ? "تقييم الجودة" : "Average quality"}
           value={fmtQuality(data.summary.averageQualityScore)}
@@ -3633,22 +3645,26 @@ export function AccountingProfitabilityView() {
       </Notice>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
+          tone="mint"
           index={0}
           label={lang === "ar" ? "صافي الربح" : "Net profit"}
           value={localMoney(p.netProfit, p.currency)}
           hero
         />
         <KpiCard
+          tone="mint"
           index={1}
           label={lang === "ar" ? "الدخل" : "Income"}
           value={localMoney(p.income, p.currency)}
         />
         <KpiCard
+          tone="rose"
           index={2}
           label={lang === "ar" ? "المصروفات" : "Expenses"}
           value={localMoney(p.expenses, p.currency)}
         />
         <KpiCard
+          tone="mint"
           index={3}
           label={lang === "ar" ? "إجمالي الربح" : "Gross profit"}
           value={localMoney(p.grossProfit, p.currency)}

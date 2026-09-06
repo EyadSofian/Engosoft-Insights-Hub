@@ -320,6 +320,7 @@ function Courses() {
         <>
           <KpiRow columns={5}>
             <KpiCard
+              tone="mint"
               index={0}
               hero
               icon={<GraduationCap size={16} />}
