@@ -42,7 +42,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             inline padding also clears the notch when the phone is on its side. */}
         <main
           id="main-content"
-          className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] flex-1 py-4 sm:py-5 pb-[calc(var(--mobile-nav-h)+1.5rem)] lg:pb-8 max-w-[1600px] w-full mx-auto overflow-x-clip"
+          // The bottom reserve clears two fixed elements: the mobile nav bar
+          // with its safe area, and — from `lg`, where there is no nav bar —
+          // the assistant launcher parked in the opposite corner. Without the
+          // second, the last card on every page sat under a 56px button.
+          className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] flex-1 py-4 sm:py-5 pb-[calc(var(--mobile-nav-h)+1.5rem)] lg:pb-[calc(var(--nexus-launcher-clearance)+1rem)] max-w-[1600px] w-full mx-auto overflow-x-clip"
         >
           {children}
         </main>

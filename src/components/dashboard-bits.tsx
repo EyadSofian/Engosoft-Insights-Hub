@@ -55,7 +55,12 @@ export function DashboardPageHeader({
   return (
     <header className="mb-4 sm:mb-5">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2.5">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
+        {/* `flex-1` alone let this collapse: with `flex-wrap` on the row and a
+            `shrink-0` chip group beside it, a basis of 0 meant the heading
+            gave up all its width rather than pushing the chips onto their own
+            line — the page title rendered as one letter per line on a phone.
+            Claiming the full row below `sm` makes the chips wrap instead. */}
+        <div className="flex w-full min-w-0 items-start gap-3 sm:w-auto sm:flex-1">
           {icon && (
             <span
               className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl sm:size-11"

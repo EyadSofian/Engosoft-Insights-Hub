@@ -197,7 +197,7 @@ export function KpiCard({
       // a viewport-relative clamp produced a 28px "$15,234" in a 110px card,
       // and the card ellipsed it to "$15…" — a truncated currency figure is
       // the one thing a finance dashboard must never render.
-      className="card stagger relative min-h-[132px] overflow-hidden p-3.5 [container-type:inline-size] min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
+      className="card stagger @container relative min-h-[132px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
       style={
         {
           "--i": index,
@@ -245,7 +245,12 @@ export function KpiCard({
         >
           {value}
         </div>
-        <Sparkline points={spark} color={hero ? "var(--accent)" : palette.fg} />
+        {/* The figure always wins the width it needs. On a narrow card the
+            sparkline's 64px was enough to push "$37.4K" into an ellipsis, and
+            a shape is worth less than the number it describes. */}
+        <span className="hidden @[10rem]:block">
+          <Sparkline points={spark} color={hero ? "var(--accent)" : palette.fg} />
+        </span>
       </div>
 
       <div className="mt-3 flex min-h-[32px] items-start gap-2">

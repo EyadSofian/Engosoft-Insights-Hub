@@ -212,6 +212,12 @@
   /* Height of the fixed mobile nav bar, safe area included. Anything that has
      to clear it reads this instead of hard-coding a padding that drifts. */
   --mobile-nav-h: calc(64px + env(safe-area-inset-bottom));
+
+  /* Room the assistant launcher takes out of the bottom of the content column
+     on desktop: its own 56px plus the 24px it sits above the viewport edge.
+     Declared once so the launcher can be resized without hunting for the
+     padding that was guessed to match it. */
+  --nexus-launcher-clearance: calc(3.5rem + 1.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* Between lg and xl the 248px rail plus a dense table is a tight fit; the rail
