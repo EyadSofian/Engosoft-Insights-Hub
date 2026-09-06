@@ -192,7 +192,12 @@ export function KpiCard({
   const palette = KPI_TONE[tone];
   return (
     <div
-      className="card stagger relative min-h-[132px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
+      // A container, so the figure can size itself against the card it is in
+      // rather than the viewport. In a four-up grid inside a half-width panel
+      // a viewport-relative clamp produced a 28px "$15,234" in a 110px card,
+      // and the card ellipsed it to "$15…" — a truncated currency figure is
+      // the one thing a finance dashboard must never render.
+      className="card stagger relative min-h-[132px] overflow-hidden p-3.5 [container-type:inline-size] min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
       style={
         {
           "--i": index,
@@ -233,8 +238,8 @@ export function KpiCard({
         <div
           className={`num max-w-full min-w-0 font-semibold tracking-[-0.025em] ${
             valueWrap
-              ? "overflow-visible whitespace-normal text-[clamp(1rem,3.4vw,1.55rem)] leading-[1.2]"
-              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] leading-none"
+              ? "overflow-visible whitespace-normal text-[clamp(0.95rem,13cqi,1.55rem)] leading-[1.2]"
+              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.95rem,15cqi,1.75rem)] leading-none"
           }`}
           style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
         >

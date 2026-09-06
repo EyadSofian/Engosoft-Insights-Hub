@@ -16,7 +16,13 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader } from "@/components/dashboard-bits";
+import {
+  DashboardPageHeader,
+  DataHealthSummary,
+  InsightCard,
+  InsightRow,
+  KpiRow,
+} from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
@@ -98,6 +104,29 @@ function MediaBuyers() {
     revenue: metricWinner(data.buyers, "revenue"),
   };
 
+  // Page-level totals: plain sums over the buyers the response returned. The
+  // blended ROAS divides the summed revenue by the summed spend rather than
+  // averaging the two buyers' ratios, which would weight a small account the
+  // same as a large one.
+  const sum = (pick: (buyer: Buyer) => number) =>
+    data.buyers.reduce((total, buyer) => total + pick(buyer), 0);
+  const totals = {
+    spend: sum((b) => b.spend),
+    revenue: sum((b) => b.revenue),
+    crmLeads: sum((b) => b.crmLeads),
+    won: sum((b) => b.won),
+    invoices: sum((b) => b.invoices),
+    campaigns: sum((b) => b.campaigns),
+    get roas() {
+      return this.spend > 0 ? this.revenue / this.spend : null;
+    },
+  };
+  const totalCampaigns = data.coverage.assignedCampaigns + data.coverage.unassignedCampaigns;
+  const coveragePct =
+    totalCampaigns > 0 ? (data.coverage.assignedCampaigns / totalCampaigns) * 100 : null;
+  const bestBuyer = data.buyers.find((buyer) => buyer.id === wins.roas) ?? null;
+  const cheapestBuyer = data.buyers.find((buyer) => buyer.id === wins.cpl) ?? null;
+
   return (
     <div className="space-y-5">
       <DashboardPageHeader
@@ -112,11 +141,144 @@ function MediaBuyers() {
       />
       <FilterSummary />
 
-      <Notice tone="info" icon={<Info size={16} />}>
-        {lang === "ar"
-          ? "التعيين من اسم الحملة: SAYED = سيد، وSH ككلمة مستقلة = شاذلي. الحملات غير المعلّمة لا تُنسب لأي موظف وتظهر في فحص التغطية أدناه."
-          : "Ownership comes from campaign names: SAYED maps to Sayed and standalone SH maps to Shazly. Untagged campaigns remain unassigned and are audited below."}
-      </Notice>
+      {/* What the two buyers add up to. Every figure is a sum over the buyers
+          the response returned — nothing is recomputed and no buyer is
+          re-scored; the per-buyer comparison below is unchanged. */}
+      <KpiRow columns={5}>
+        <KpiCard
+          index={0}
+          label={lang === "ar" ? "الإنفاق المُدار" : "Managed spend"}
+          value={fmtUSDFull(totals.spend)}
+          tone="danger"
+          icon={<BadgeDollarSign size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(totals.campaigns)} حملة منسوبة`
+              : `${fmtNum(totals.campaigns)} attributed campaigns`
+          }
+        />
+        <KpiCard
+          index={1}
+          label={lang === "ar" ? "الإيراد المرتبط" : "Attributed revenue"}
+          value={fmtUSDFull(totals.revenue)}
+          hero
+          icon={<ChartNoAxesCombined size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(totals.invoices)} فاتورة`
+              : `${fmtNum(totals.invoices)} invoices`
+          }
+        />
+        <KpiCard
+          index={2}
+          label={lang === "ar" ? "متوسط ROAS" : "Blended ROAS"}
+          value={totals.roas === null ? "—" : `${totals.roas.toFixed(2)}×`}
+          tone={
+            totals.roas === null
+              ? "neutral"
+              : totals.roas >= 2
+                ? "success"
+                : totals.roas >= 1
+                  ? "warning"
+                  : "danger"
+          }
+          icon={<ChartNoAxesCombined size={15} />}
+          sub={
+            lang === "ar"
+              ? "الإيراد المرتبط ÷ الإنفاق المُدار"
+              : "Attributed revenue ÷ managed spend"
+          }
+        />
+        <KpiCard
+          index={3}
+          label={lang === "ar" ? "العملاء المحتملون" : "Leads"}
+          value={fmtNum(totals.crmLeads)}
+          tone="brand"
+          icon={<Users size={15} />}
+          sub={lang === "ar" ? `${fmtNum(totals.won)} صفقة مغلقة` : `${fmtNum(totals.won)} closed`}
+        />
+        <KpiCard
+          index={4}
+          label={lang === "ar" ? "تغطية النسبة" : "Attribution coverage"}
+          value={fmtPct(coveragePct, 1)}
+          tone={coveragePct !== null && coveragePct < 80 ? "warning" : "success"}
+          icon={<UserRoundSearch size={15} />}
+          sub={
+            lang === "ar"
+              ? `${fmtNum(data.coverage.unassignedCampaigns)} حملة بلا مسؤول`
+              : `${fmtNum(data.coverage.unassignedCampaigns)} campaigns unassigned`
+          }
+        />
+      </KpiRow>
+
+      <InsightRow>
+        <InsightCard
+          index={0}
+          kind="best"
+          eyebrow={lang === "ar" ? "أفضل ميديا باير" : "Top media buyer"}
+          title={
+            bestBuyer
+              ? bestBuyer.name
+              : lang === "ar"
+                ? "لا يوجد ميديا باير مؤهل"
+                : "No eligible media buyer"
+          }
+          value={bestBuyer?.roas != null ? `${bestBuyer.roas.toFixed(2)}×` : undefined}
+          detail={
+            bestBuyer
+              ? lang === "ar"
+                ? `${fmtUSDFull(bestBuyer.revenue)} إيراد من ${fmtUSDFull(bestBuyer.spend)} إنفاق عبر ${fmtNum(bestBuyer.campaigns)} حملة`
+                : `${fmtUSDFull(bestBuyer.revenue)} from ${fmtUSDFull(bestBuyer.spend)} of spend across ${fmtNum(bestBuyer.campaigns)} campaigns`
+              : undefined
+          }
+        />
+        <InsightCard
+          index={1}
+          kind={data.coverage.unassignedSpend > 0 ? "attention" : "opportunity"}
+          eyebrow={lang === "ar" ? "صرف بلا مسؤول" : "Spend without an owner"}
+          title={
+            data.coverage.unassignedSpend > 0
+              ? lang === "ar"
+                ? "جزء من الإنفاق غير منسوب لأي ميديا باير"
+                : "Part of the spend is not attributed to any buyer"
+              : lang === "ar"
+                ? "كل الإنفاق منسوب لمسؤول"
+                : "All spend has an owner"
+          }
+          value={
+            data.coverage.unassignedSpend > 0
+              ? fmtUSDFull(data.coverage.unassignedSpend)
+              : undefined
+          }
+          detail={
+            data.coverage.unassignedSpend > 0
+              ? lang === "ar"
+                ? `${fmtNum(data.coverage.unassignedCampaigns)} حملة لا تحمل علامة مسؤول في اسمها، فلا تدخل في المقارنة أدناه.`
+                : `${fmtNum(data.coverage.unassignedCampaigns)} campaigns carry no owner tag in their name, so they are outside the comparison below.`
+              : undefined
+          }
+        />
+        <InsightCard
+          index={2}
+          kind="note"
+          eyebrow={lang === "ar" ? "أقل تكلفة لكل عميل" : "Best cost per lead"}
+          title={
+            cheapestBuyer
+              ? cheapestBuyer.name
+              : lang === "ar"
+                ? "لا توجد تكلفة قابلة للقياس"
+                : "No measurable cost per lead"
+          }
+          value={cheapestBuyer?.cpl != null ? fmtUSDFull(cheapestBuyer.cpl) : undefined}
+          detail={
+            cheapestBuyer
+              ? lang === "ar"
+                ? `${fmtNum(cheapestBuyer.crmLeads)} عميل في أودو من ${fmtUSDFull(cheapestBuyer.spend)} إنفاق`
+                : `${fmtNum(cheapestBuyer.crmLeads)} Odoo leads from ${fmtUSDFull(cheapestBuyer.spend)} of spend`
+              : undefined
+          }
+        />
+      </InsightRow>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {data.buyers.map((buyer, buyerIndex) => (
@@ -224,6 +386,28 @@ function MediaBuyers() {
           />
         </div>
       </Card>
+
+      <DataHealthSummary
+        issues={[
+          {
+            tone: data.coverage.unassignedCampaigns > 0 ? "warning" : "info",
+            message:
+              lang === "ar"
+                ? "نسبة الحملات للميديا بايرز تُقرأ من اسم الحملة نفسه."
+                : "Campaign ownership is read from the campaign name itself.",
+            impact:
+              data.coverage.unassignedCampaigns > 0
+                ? lang === "ar"
+                  ? `${fmtNum(data.coverage.unassignedCampaigns)} حملة و${fmtUSDFull(data.coverage.unassignedSpend)} إنفاق خارج المقارنة أدناه.`
+                  : `${fmtNum(data.coverage.unassignedCampaigns)} campaigns and ${fmtUSDFull(data.coverage.unassignedSpend)} of spend sit outside the comparison below.`
+                : undefined,
+            technical:
+              lang === "ar"
+                ? `SAYED = سيد، وSH ككلمة مستقلة = شاذلي. أسماء ملتبسة: ${fmtNum(data.coverage.ambiguousCampaigns)} · إنفاق ملتبس: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`
+                : `SAYED maps to Sayed and standalone SH maps to Shazly. Ambiguous names: ${fmtNum(data.coverage.ambiguousCampaigns)} · ambiguous spend: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`,
+          },
+        ]}
+      />
 
       {data.buyers.map((buyer) => (
         <Card key={`${buyer.id}-campaigns`} padded={false} className="overflow-hidden">
