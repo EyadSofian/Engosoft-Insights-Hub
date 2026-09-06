@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   GraduationCap,
   Info,
+  Layers,
   ListChecks,
   Receipt,
   ReceiptText,
@@ -38,7 +39,7 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
@@ -323,14 +324,39 @@ function Accounting() {
         title={t("accounting")}
         subtitle={
           lang === "ar"
-            ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
-            : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}.${filters.from && filters.to ? ` ${filters.from} → ${filters.to}` : ""}`
+            ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
+            : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
         }
         period={reportingPeriod}
       />
 
-      <Card className="border-brand/20 bg-surface">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
+      {/* The reporting basis and the company scope are settings, not findings.
+          They belong to the report and must stay reachable, but they were
+          taking the first screen ahead of every figure, so they now open on
+          demand with their current values named on the closed summary. */}
+      <details className="group card overflow-hidden">
+        <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">
+          <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-text">
+            <CalendarDays size={16} className="text-brand" />
+            {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
+          </span>
+          <span className="text-[11.5px] text-text-muted">
+            {dateBasis === "invoice"
+              ? lang === "ar"
+                ? "تاريخ الفاتورة"
+                : "Invoice Date"
+              : lang === "ar"
+                ? "تاريخ الدفع"
+                : "Payment Date"}
+            {" · "}
+            {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
+          </span>
+          <ChevronDown
+            size={16}
+            className="ms-auto shrink-0 text-text-muted transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="grid gap-4 border-t border-border p-3.5 sm:p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
           <div>
             <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
               <CalendarDays size={15} className="text-brand" />
@@ -391,7 +417,7 @@ function Accounting() {
             </div>
           </div>
         </div>
-      </Card>
+      </details>
 
       <div className="hscroll bleed-x [--bleed:0.875rem] sm:[--bleed:0px] pb-1">
         <Segmented
@@ -424,143 +450,167 @@ function Accounting() {
         <>
           {view === "summary" && (
             <>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setExportOpen(true)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                >
-                  <Download size={17} />
-                  {lang === "ar" ? "تصدير الحسابات كاملة" : "Export all Accounting"}
-                </button>
-              </div>
-
-              <Card>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="max-w-2xl">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-text">
-                      <BadgeDollarSign size={18} className="text-brand" />
-                      {lang === "ar"
-                        ? "أسعار تحويل الحسابات إلى الدولار"
-                        : "Accounting USD conversion rates"}
-                    </div>
-                    <p className="mt-1.5 hidden text-xs leading-relaxed text-text-muted sm:block">
-                      {lang === "ar"
-                        ? "الحساب يتم من Total in Currency: الجنيه ÷ سعر الجنيه، والريال ÷ سعر الريال. التعديل يعيد حساب كل مؤشرات الحسابات والتصدير فورًا ويُحفظ على هذا الجهاز."
-                        : "Calculated from Total in Currency: EGP ÷ EGP rate and SAR ÷ SAR rate. Applying a change refreshes every Accounting KPI and export and saves it on this device."}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[520px]">
-                    <label className="text-[11px] font-medium text-text-muted sm:text-xs">
-                      <span className="mb-1.5 block">
-                        {lang === "ar" ? "1 دولار = جنيه مصري" : "1 USD = EGP"}
-                      </span>
-                      <input
-                        type="number"
-                        min="0.000001"
-                        step="0.0001"
-                        inputMode="decimal"
-                        value={fxEgpInput}
-                        onChange={(event) => setFxEgpInput(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
-                      />
-                    </label>
-                    <label className="text-[11px] font-medium text-text-muted sm:text-xs">
-                      <span className="mb-1.5 block">
-                        {lang === "ar" ? "1 دولار = ريال سعودي" : "1 USD = SAR"}
-                      </span>
-                      <input
-                        type="number"
-                        min="0.000001"
-                        step="0.0001"
-                        inputMode="decimal"
-                        value={fxSarInput}
-                        onChange={(event) => setFxSarInput(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
-                      />
-                    </label>
-                    <div className="col-span-2 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={applyFxRates}
-                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-brand px-3 py-2 text-[12px] font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
-                      >
-                        {lang === "ar" ? "تطبيق وإعادة الحساب" : "Apply and recalculate"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={resetFxRates}
-                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[12px] font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
-                      >
-                        <RotateCcw size={15} />
-                        {lang === "ar" ? "استرجاع 50.5 و3.7453" : "Restore 50.5 and 3.7453"}
-                      </button>
-                      <span className="w-full text-[10.5px] text-text-muted sm:w-auto sm:text-xs">
-                        {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD ={" "}
-                        {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
-                      </span>
-                    </div>
-                    {fxError && <p className="text-xs text-danger sm:col-span-2">{fxError}</p>}
-                  </div>
-                </div>
-              </Card>
-
-              <details className="group card overflow-hidden sm:hidden">
-                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 font-semibold text-brand [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Info size={17} className="shrink-0" />
-                    <span>{t("data_notes")}</span>
-                  </span>
-                  <ChevronDown
-                    size={18}
-                    className="shrink-0 transition-transform group-open:rotate-180"
-                  />
-                </summary>
-                <p className="border-t border-border px-3.5 py-3 text-xs leading-6 text-text-muted">
-                  {lang === "ar"
-                    ? "الفاتورة المدفوعة تُسجّل حسب تاريخ الدفع، وإشعار الخصم يُسجّل بالسالب في تاريخ الإلغاء. الإيراد بالدولار محسوب من إجمالي المبلغ بالعملة، ولا تدخل أوامر البيع في حسابه."
-                    : "Paid invoices follow Payment Date; credit notes are negative in their reversal month. USD revenue is calculated from Total in Currency; sales orders are excluded."}
-                </p>
-              </details>
-
-              <Notice
-                className="hidden sm:flex"
-                tone="info"
-                title={t("data_notes")}
-                icon={<Info size={16} />}
-              >
-                {lang === "ar"
-                  ? "المصدر المالي المعتمد: الفواتير المدفوعة وإشعارات الخصم من تحليل الفواتير. الفاتورة الموجبة حسب Payment Date، والإلغاء بالسالب حسب Reversal/Invoice Date؛ ولا تدخل أوامر البيع المؤكدة في الإيراد."
-                  : "Accounting authority: paid invoices plus credit notes. Positive invoices follow Payment Date; cancellations are negative on Reversal/Invoice Date. Sales orders are excluded from revenue."}
-              </Notice>
-
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <KpiRow columns={5}>
                 <KpiCard
                   index={0}
                   label={t("revenue")}
                   value={fmtUSDExact(data.summary.paidUsd)}
                   sub={lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date"}
                   hero
+                  valueWrap
+                  icon={<BadgeDollarSign size={15} />}
                 />
-                <KpiCard index={1} label={t("invoices")} value={fmtNum(data.summary.invoices)} />
+                <KpiCard
+                  index={1}
+                  label={t("invoices")}
+                  value={fmtNum(data.summary.invoices)}
+                  tone="brand"
+                  icon={<Receipt size={15} />}
+                />
                 <KpiCard
                   index={2}
-                  label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
-                  value={fmtNum(data.summary.creditNotes)}
-                  sub={fmtUSDExact(data.summary.creditNoteUsd)}
+                  label={t("avg_invoice")}
+                  value={fmtUSDExact(data.summary.averageInvoice)}
+                  tone="violet"
+                  valueWrap
+                  icon={<Calculator size={15} />}
                 />
                 <KpiCard
                   index={3}
                   label={t("product_lines")}
                   value={fmtNum(data.summary.productLines)}
+                  tone="neutral"
+                  icon={<Layers size={15} />}
                 />
                 <KpiCard
                   index={4}
-                  label={t("avg_invoice")}
-                  value={fmtUSDExact(data.summary.averageInvoice)}
+                  label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
+                  value={fmtNum(data.summary.creditNotes)}
+                  tone={data.summary.creditNotes > 0 ? "warning" : "neutral"}
+                  valueWrap
+                  icon={<RotateCcw size={15} />}
+                  sub={fmtUSDExact(data.summary.creditNoteUsd)}
                 />
-              </div>
+              </KpiRow>
+
+              <details className="group card overflow-hidden">
+                <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">
+                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-text">
+                    <BadgeDollarSign size={16} className="text-brand" />
+                    {lang === "ar" ? "أسعار التحويل والتصدير" : "Conversion rates and export"}
+                  </span>
+                  <span className="num text-[11.5px] text-text-muted">
+                    1 USD = {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
+                  </span>
+                  <span className="ms-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setExportOpen(true);
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      <Download size={15} />
+                      {lang === "ar" ? "تصدير الحسابات كاملة" : "Export all Accounting"}
+                    </button>
+                    <ChevronDown
+                      size={16}
+                      className="shrink-0 text-text-muted transition-transform group-open:rotate-180"
+                    />
+                  </span>
+                </summary>
+                <div className="border-t border-border p-3.5 sm:p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                        <BadgeDollarSign size={18} className="text-brand" />
+                        {lang === "ar"
+                          ? "أسعار تحويل الحسابات إلى الدولار"
+                          : "Accounting USD conversion rates"}
+                      </div>
+                      <p className="mt-1.5 hidden text-xs leading-relaxed text-text-muted sm:block">
+                        {lang === "ar"
+                          ? "الحساب يتم من Total in Currency: الجنيه ÷ سعر الجنيه، والريال ÷ سعر الريال. التعديل يعيد حساب كل مؤشرات الحسابات والتصدير فورًا ويُحفظ على هذا الجهاز."
+                          : "Calculated from Total in Currency: EGP ÷ EGP rate and SAR ÷ SAR rate. Applying a change refreshes every Accounting KPI and export and saves it on this device."}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[520px]">
+                      <label className="text-[11px] font-medium text-text-muted sm:text-xs">
+                        <span className="mb-1.5 block">
+                          {lang === "ar" ? "1 دولار = جنيه مصري" : "1 USD = EGP"}
+                        </span>
+                        <input
+                          type="number"
+                          min="0.000001"
+                          step="0.0001"
+                          inputMode="decimal"
+                          value={fxEgpInput}
+                          onChange={(event) => setFxEgpInput(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
+                        />
+                      </label>
+                      <label className="text-[11px] font-medium text-text-muted sm:text-xs">
+                        <span className="mb-1.5 block">
+                          {lang === "ar" ? "1 دولار = ريال سعودي" : "1 USD = SAR"}
+                        </span>
+                        <input
+                          type="number"
+                          min="0.000001"
+                          step="0.0001"
+                          inputMode="decimal"
+                          value={fxSarInput}
+                          onChange={(event) => setFxSarInput(event.target.value)}
+                          className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
+                        />
+                      </label>
+                      <div className="col-span-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={applyFxRates}
+                          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-brand px-3 py-2 text-[12px] font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
+                        >
+                          {lang === "ar" ? "تطبيق وإعادة الحساب" : "Apply and recalculate"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetFxRates}
+                          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[12px] font-medium text-text transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
+                        >
+                          <RotateCcw size={15} />
+                          {lang === "ar" ? "استرجاع 50.5 و3.7453" : "Restore 50.5 and 3.7453"}
+                        </button>
+                        <span className="w-full text-[10.5px] text-text-muted sm:w-auto sm:text-xs">
+                          {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD ={" "}
+                          {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
+                        </span>
+                      </div>
+                      {fxError && <p className="text-xs text-danger sm:col-span-2">{fxError}</p>}
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <DataHealthSummary
+                issues={[
+                  {
+                    tone: "info",
+                    message:
+                      lang === "ar"
+                        ? "الإيراد هنا هو الفواتير المدفوعة فعلياً، وليس ما تم إصداره."
+                        : "Revenue here is invoices actually paid, not invoices issued.",
+                    impact:
+                      lang === "ar"
+                        ? "الإلغاءات تظهر بالسالب في شهر الإلغاء، وأوامر البيع المؤكدة لا تدخل في الإيراد."
+                        : "Cancellations appear as negatives in their reversal month, and confirmed sales orders are excluded.",
+                    technical:
+                      lang === "ar"
+                        ? "الفاتورة الموجبة حسب Payment Date، والإلغاء بالسالب حسب Reversal/Invoice Date. الإيراد بالدولار محسوب من Total in Currency."
+                        : "Positive invoices follow Payment Date; cancellations are negative on Reversal/Invoice Date. USD revenue is derived from Total in Currency.",
+                  },
+                ]}
+              />
 
               <Card>
                 <SectionTitle>{t("by_day")}</SectionTitle>

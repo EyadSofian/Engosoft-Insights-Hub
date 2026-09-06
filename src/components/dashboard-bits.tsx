@@ -434,17 +434,24 @@ export function DataHealthSummary({
 }) {
   const { lang } = useI18n();
   const technical = issues.filter((issue) => issue.technical);
+  // An informational note about how a figure is defined is not a problem with
+  // it. Only a warning or a failure may turn the headline amber or red —
+  // otherwise every page would permanently claim its data needed review.
   const worst: "danger" | "warning" | "ok" = issues.some((i) => i.tone === "danger")
     ? "danger"
-    : issues.length
+    : issues.some((i) => i.tone === "warning")
       ? "warning"
       : "ok";
 
   const headline =
     worst === "ok"
-      ? lang === "ar"
-        ? "كل المصادر متصلة وتعمل بشكل طبيعي"
-        : "All sources are connected and healthy"
+      ? issues.length
+        ? lang === "ar"
+          ? "كل المصادر متصلة — مع ملاحظات على تعريف الأرقام"
+          : "All sources connected — with notes on how the figures are defined"
+        : lang === "ar"
+          ? "كل المصادر متصلة وتعمل بشكل طبيعي"
+          : "All sources are connected and healthy"
       : worst === "danger"
         ? lang === "ar"
           ? "الأرقام لا تشمل كل المصادر"
