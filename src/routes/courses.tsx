@@ -30,7 +30,7 @@ import {
   Pill,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
@@ -318,49 +318,83 @@ function Courses() {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <KpiRow columns={5}>
             <KpiCard
               index={0}
               hero
+              icon={<GraduationCap size={16} />}
+              label={lang === "ar" ? "المحصل من الدورات" : "Course revenue"}
+              value={fmtUSD(linked.revenue)}
+            />
+            <KpiCard
+              index={1}
+              tone="danger"
               icon={<BadgeDollarSign size={16} />}
               label={lang === "ar" ? "إنفاق الدورات" : "Course ad spend"}
               value={fmtUSD(linked.spend)}
             />
             <KpiCard
-              index={1}
+              index={2}
+              tone="brand"
               icon={<Users size={16} />}
               label={lang === "ar" ? "ليدز الدورات" : "Course leads"}
               value={fmtNum(linked.leads)}
             />
             <KpiCard
-              index={2}
+              index={3}
+              tone="violet"
               icon={<ShoppingCart size={16} />}
               label={lang === "ar" ? "أوامر البيع المرتبطة" : "Linked sales orders"}
               value={fmtNum(linked.salesOrders)}
             />
             <KpiCard
-              index={3}
+              index={4}
+              tone="success"
               icon={<ReceiptText size={16} />}
               label={lang === "ar" ? "الفواتير المرتبطة" : "Linked paid invoices"}
               value={fmtNum(linked.invoices)}
             />
-            <KpiCard
-              index={4}
-              icon={<GraduationCap size={16} />}
-              label={lang === "ar" ? "المحصل من الدورات" : "Course revenue"}
-              value={fmtUSD(linked.revenue)}
-            />
-          </div>
+          </KpiRow>
 
-          <Notice icon={<Info size={17} />}>
-            {organicScope
-              ? lang === "ar"
-                ? "فلتر أورجانيك شغال على مصادر Odoo غير المدفوعة فقط. كل صف يمثل دورة، ولما تضغط عليها هتظهر أسماء حملات الأورجانيك المسجلة في Odoo ومصادرها وليدزها ومبيعاتها. الإنفاق يظل صفر لأنه مش إعلان مدفوع."
-                : "Organic is scoped to non-paid Odoo sources only. Each row is a course; select it to see its recorded Organic campaign names, sources, leads and sales. Spend stays zero because this is not paid advertising."
-              : lang === "ar"
-                ? "مصروف الدورة بيتربط من اسم الإعلان أولًا، ثم اسم مجموعة الإعلانات، ثم اسم الحملة، ولو الاسم مش واضح بنرجع للدورة الغالبة في ليدز الحملة. كل كارت تحت بيقولك مصدر الربط. الليدز من CRM، وأوامر البيع من Full Invoiced Orders، والفواتير والإيراد من الفواتير المدفوعة."
-                : "Course spend is attributed from the ad name first, then ad-set name, campaign name, and finally the campaign's dominant CRM course. Every campaign card shows its attribution source. Leads come from CRM, sales orders from Full Invoiced Orders, and invoices/revenue from Paid Invoices."}
-          </Notice>
+          {/* The attribution chain is what makes a course figure trustworthy or
+              not, so it stays on the page — but as a data-health statement
+              with its mechanics folded away, not as a five-line paragraph
+              between the figures and the table they explain. */}
+          <DataHealthSummary
+            issues={[
+              organicScope
+                ? {
+                    tone: "info",
+                    message:
+                      lang === "ar"
+                        ? "هذه القراءة تشمل المصادر غير المدفوعة فقط."
+                        : "This reading covers non-paid sources only.",
+                    impact:
+                      lang === "ar"
+                        ? "الإنفاق يظل صفراً لأن هذه ليست إعلانات مدفوعة."
+                        : "Spend stays at zero because this is not paid advertising.",
+                    technical:
+                      lang === "ar"
+                        ? "النطاق مقصور على مصادر Odoo غير المدفوعة؛ كل صف دورة، وفتحه يعرض حملات الأورجانيك المسجلة ومصادرها وليدزها ومبيعاتها."
+                        : "Scoped to non-paid Odoo sources; each row is a course, and opening it lists its recorded Organic campaigns, sources, leads and sales.",
+                  }
+                : {
+                    tone: "info",
+                    message:
+                      lang === "ar"
+                        ? "إنفاق كل دورة مستنتَج من أسماء الحملات، وليس مسجّلاً على الدورة."
+                        : "Each course's ad spend is inferred from campaign names, not recorded against the course.",
+                    impact:
+                      lang === "ar"
+                        ? "كل بطاقة حملة تذكر مصدر الربط الذي اعتُمد عليها."
+                        : "Every campaign card states the attribution source it relied on.",
+                    technical:
+                      lang === "ar"
+                        ? "الترتيب: اسم الإعلان، ثم اسم مجموعة الإعلانات، ثم اسم الحملة، وأخيراً الدورة الغالبة في ليدز الحملة. الليدز من CRM، وأوامر البيع من Full Invoiced Orders، والفواتير والإيراد من الفواتير المدفوعة."
+                        : "Order: ad name, then ad-set name, then campaign name, then the campaign's dominant CRM course. Leads come from CRM, sales orders from Full Invoiced Orders, invoices and revenue from Paid Invoices.",
+                  },
+            ]}
+          />
 
           <div className="md:hidden">
             <div className="mb-3 flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-brand">
