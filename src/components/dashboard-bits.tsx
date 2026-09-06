@@ -10,6 +10,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { TONE, type Tone } from "@/lib/dashboard-tone";
 import { Card } from "./ui-bits";
 
 /* -------------------------------------------------------------------------
@@ -20,55 +21,6 @@ import { Card } from "./ui-bits";
    them. Anything that decides *what* a number means stays in the page or in
    lib/, so the same figure can be reformatted without a calculation moving.
 ------------------------------------------------------------------------- */
-
-/**
- * Semantic tone. `neutral` is the default and deliberately the commonest —
- * a colour on a dashboard should mean something, and if every card is tinted
- * then none of them are saying anything.
- */
-export type Tone = "neutral" | "brand" | "success" | "warning" | "danger" | "violet";
-
-interface ToneStyle {
-  /** Full-strength colour: text, icon strokes, bar fills. */
-  fg: string;
-  /** Pastel wash for an icon chip or a whole semantic card. */
-  bg: string;
-  /** Border when the tone owns the card. */
-  border: string;
-}
-
-export const TONE: Record<Tone, ToneStyle> = {
-  neutral: {
-    fg: "var(--text-muted)",
-    bg: "var(--surface-2)",
-    border: "var(--border)",
-  },
-  brand: {
-    fg: "var(--brand)",
-    bg: "var(--brand-soft)",
-    border: "color-mix(in oklab, var(--brand) 22%, transparent)",
-  },
-  success: {
-    fg: "var(--success)",
-    bg: "var(--success-soft)",
-    border: "color-mix(in oklab, var(--success) 22%, transparent)",
-  },
-  warning: {
-    fg: "var(--warning)",
-    bg: "var(--warning-soft)",
-    border: "color-mix(in oklab, var(--warning) 22%, transparent)",
-  },
-  danger: {
-    fg: "var(--danger)",
-    bg: "var(--danger-soft)",
-    border: "color-mix(in oklab, var(--danger) 22%, transparent)",
-  },
-  violet: {
-    fg: "var(--violet)",
-    bg: "var(--violet-soft)",
-    border: "color-mix(in oklab, var(--violet) 22%, transparent)",
-  },
-};
 
 /* --- page header --------------------------------------------------------- */
 
@@ -596,10 +548,28 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
         </div>
       </details>
 
-      <Card className="hidden sm:block">
-        <h2 className="mb-2 text-[15px] font-semibold text-text">{title}</h2>
-        <p className="text-[13px] leading-relaxed text-text-muted sm:text-sm">{children}</p>
-      </Card>
+      {/* The generated summary can run to a dozen lines. It is worth reading,
+          but not worth pushing the five headline figures below the fold to
+          reach, so on desktop it opens clamped to four lines and expands in
+          place. The text itself is untouched — this is a height, not an edit. */}
+      <details className="group card hidden overflow-hidden sm:block">
+        <summary className="flex cursor-pointer list-none items-start gap-3 p-3.5 sm:p-5 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-text">{title}</span>
+            <span className="mt-1.5 line-clamp-4 block text-[13px] leading-relaxed text-text-muted group-open:hidden sm:text-sm">
+              {children}
+            </span>
+          </span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-brand">
+            <span className="group-open:hidden">{lang === "ar" ? "اقرأ الكل" : "Read all"}</span>
+            <span className="hidden group-open:inline">{lang === "ar" ? "طيّ" : "Collapse"}</span>
+            <ChevronDownGlyph />
+          </span>
+        </summary>
+        <p className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-text-muted sm:px-5 sm:pb-5 sm:text-sm">
+          {children}
+        </p>
+      </details>
     </>
   );
 }

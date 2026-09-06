@@ -190,13 +190,18 @@ function businessSignals(
 
   let risk: BusinessSignals["risk"];
   if (data.fetchErrors.length || data.staleTabs.length) {
-    const sources = [...data.fetchErrors, ...data.staleTabs].join(" · ");
+    // This card used to print the raw connector errors — "Archived Lost
+    // unavailable: direct Odoo is not configured or could not be reached" —
+    // into an executive summary. The count and the consequence are what a
+    // reader here can act on; the connector names are stated in full in the
+    // data-health card at the foot of the page.
+    const affected = data.fetchErrors.length + data.staleTabs.length;
     risk = {
-      title: lang === "ar" ? "حداثة الداتا" : "Data freshness",
+      title: lang === "ar" ? "بيانات تحتاج مراجعة" : "Data needs review",
       detail:
         lang === "ar"
-          ? `مصادر تحتاج مراجعة: ${sources}`
-          : `Sources requiring attention: ${sources}`,
+          ? `${affected} من المصادر لم تُحدَّث بعد. راجع بطاقة صحة البيانات أسفل الصفحة قبل اتخاذ قرار مالي.`
+          : `${affected} source${affected === 1 ? "" : "s"} have not refreshed. Check the data-health card at the foot of the page before making a budget call.`,
     };
   } else if (data.leak) {
     risk = {

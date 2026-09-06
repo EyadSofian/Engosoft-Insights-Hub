@@ -472,14 +472,21 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
   if (!failed.length && !stale.length) return null;
 
   const danger = failed.length > 0;
-  const tabName = (entry: string) => entry.split(":")[0];
+  const count = danger ? failed.length : stale.length;
+
+  // What the reader can act on: how many sources are affected, and what that
+  // does to the figures. The source names themselves are internal worksheet
+  // and connector identifiers — they stay, but in the tooltip, where an admin
+  // can find them and a sales manager is not asked to decode them.
   const text = danger
     ? lang === "ar"
-      ? `تعذّر تحميل: ${failed.map(tabName).join("، ")} — الأرقام المعروضة لا تشمل هذه المصادر.`
-      : `Failed to load: ${failed.map(tabName).join(", ")} — the numbers shown exclude these sources.`
+      ? `${count} من المصادر لم تُحدَّث بعد — الأرقام المعروضة لا تشملها.`
+      : `${count} source${count === 1 ? "" : "s"} did not load — the figures shown exclude them.`
     : lang === "ar"
-      ? `معروض من آخر نسخة سليمة: ${stale.join("، ")} — قد تنقص أحدث الصفوف.`
-      : `Served from the last good copy: ${stale.join(", ")} — the newest rows may be missing.`;
+      ? `يتم عرض آخر نسخة ناجحة لـ ${count} من المصادر — قد تنقص أحدث الصفوف.`
+      : `Showing the last good copy for ${count} source${count === 1 ? "" : "s"} — the newest rows may be missing.`;
+
+  const detail = (danger ? failed : stale).join(" · ");
 
   return (
     <div
@@ -493,7 +500,7 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
       role="status"
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "currentColor" }} />
-      <span className="truncate" title={text}>
+      <span className="truncate" title={`${text}\n\n${detail}`}>
         {text}
       </span>
     </div>
@@ -574,8 +581,8 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
         {fmtDateTime(data.fetchedAt, lang)}
       </span>
       {level !== "ok" && lagging && (
-        <span className="num truncate" style={{ color }} title={tooltip}>
-          · {lagging.label} {fmtAge(ageH(lagging.syncedAt))}
+        <span className="num shrink-0" style={{ color }} title={tooltip}>
+          · {lang === "ar" ? "أقدم مصدر" : "oldest source"} {fmtAge(ageH(lagging.syncedAt))}
         </span>
       )}
     </span>
