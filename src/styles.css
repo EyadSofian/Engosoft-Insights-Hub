@@ -47,6 +47,21 @@
   --color-calm: var(--calm);
   --color-calm-soft: var(--calm-soft);
   --color-ink: var(--ink);
+  /* A neutral analytical accent. Qualified leads, segmentation buckets and
+     "informational" insights are none of pass/warn/fail, and painting them in
+     one of those three made every dashboard read as a verdict. */
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+
+  /* The navigation rail. Light in the light theme, navy in the dark one, so no
+     component has to know which theme is on to pick a readable foreground. */
+  --color-nav-surface: var(--nav-surface);
+  --color-nav-border: var(--nav-border);
+  --color-nav-text: var(--nav-text);
+  --color-nav-text-muted: var(--nav-text-muted);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-active-bg: var(--nav-active-bg);
+  --color-nav-active-text: var(--nav-active-text);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -131,6 +146,22 @@
      but not a clean full-price sale either. */
   --calm: #40607d;
   --calm-soft: #e9eef3;
+  /* Neutral analytical accent — a stage in a funnel, a segment, a count that
+     is neither good nor bad news. */
+  --violet: #6d4aca;
+  --violet-soft: #efeafc;
+
+  /* --- navigation rail --------------------------------------------------
+     Light theme keeps the rail on the page's own surface. It used to be a
+     navy slab, which made the one persistently darkest region of a light
+     dashboard the part carrying no data. */
+  --nav-surface: #ffffff;
+  --nav-border: #e2e8f0;
+  --nav-text: #0b1f38;
+  --nav-text-muted: #5a6b81;
+  --nav-hover: #f2f5f9;
+  --nav-active-bg: #e8f0fa;
+  --nav-active-text: #1656a0;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -155,8 +186,8 @@
   --glass-border: rgba(22, 86, 160, 0.16);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  --page-glow-primary: rgba(0, 80, 220, 0.1);
-  --page-glow-secondary: rgba(22, 86, 160, 0.07);
+  --page-glow-primary: rgba(0, 80, 220, 0.045);
+  --page-glow-secondary: rgba(22, 86, 160, 0.03);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -237,6 +268,16 @@
   --offer-soft: #0f2926;
   --calm: #7fa4c6;
   --calm-soft: #16222e;
+  --violet: #a78bfa;
+  --violet-soft: #1e1a35;
+
+  --nav-surface: #0b1728;
+  --nav-border: #1f3149;
+  --nav-text: #e8eef7;
+  --nav-text-muted: #94a6bd;
+  --nav-hover: #16263c;
+  --nav-active-bg: #14263f;
+  --nav-active-text: #7fb2ff;
 
   --chart-1: #4c8dff;
   --chart-2: #ffa733;
@@ -698,19 +739,21 @@
    dense figures remain legible while the blue page glow can still show
    through at the edges. */
 @utility chrome-bar {
-  background: var(--glass-surface);
-  backdrop-filter: blur(22px) saturate(155%);
-  -webkit-backdrop-filter: blur(22px) saturate(155%);
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(11, 31, 56, 0.04);
 }
 
+/* The rail reads as part of the page, not as a separate dark application.
+   It takes the same surface family the cards do and separates itself with one
+   hairline instead of a glass slab, so the darkest thing on a light screen is
+   never the strip that carries no data. */
 @utility chrome-sidebar {
-  background: var(--glass-nav);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  border-inline-end: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 12px 0 38px -24px rgba(0, 30, 60, 0.72);
+  background: var(--nav-surface);
+  border-inline-end: 1px solid var(--nav-border);
+  box-shadow: none;
 }
 
 /* Invisible until reached. Sits on the inline edge the rail slid out to, so

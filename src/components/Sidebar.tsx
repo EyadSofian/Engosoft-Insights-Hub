@@ -4,34 +4,9 @@ import { BookOpen, MoreHorizontal, Pin, PinOff, Sparkles } from "lucide-react";
 import { chromeStore, useChrome } from "@/lib/chrome-store";
 import { useI18n } from "@/lib/i18n";
 import { useModalGuard } from "@/lib/ui-store";
-import {
-  NAVIGATION_SECTIONS,
-  pathMatchesRoute,
-  sectionIsActive,
-  type NavigationItem,
-} from "@/lib/navigation";
+import { NAVIGATION_SECTIONS, sectionIsActive } from "@/lib/navigation";
 import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import logoImg from "@/assets/engosoft-logo.png";
-
-function ChildLink({ item, pathname }: { item: NavigationItem; pathname: string }) {
-  const { t } = useI18n();
-  const active = pathMatchesRoute(pathname, item.to);
-  const Icon = item.icon;
-
-  return (
-    <Link
-      to={item.to}
-      aria-current={active ? "page" : undefined}
-      className={`relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium transition-colors duration-150 ${
-        active ? "text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
-      }`}
-      style={active ? { background: "var(--brand)" } : undefined}
-    >
-      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" aria-hidden="true" />
-      <span className="truncate">{t(item.key)}</span>
-    </Link>
-  );
-}
 
 /**
  * The desktop navigation rail.
@@ -67,26 +42,30 @@ export function Sidebar() {
     >
       <div className="mb-6 flex items-center gap-2">
         <Link to="/" className="group flex min-w-0 flex-1 items-center gap-3 px-1">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white shadow-sm transition-transform duration-200 group-hover:scale-105">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-white shadow-xs transition-transform duration-200 group-hover:scale-105">
             <img src={logoImg} alt="" className="h-7 w-7 object-contain" />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[15px] font-semibold tracking-tight text-white">
+            <div className="truncate text-[15px] font-semibold tracking-tight text-nav-text">
               ENGOSOFT
             </div>
-            <div className="truncate text-[11px] text-white/55">{t("app_sub")}</div>
+            <div className="truncate text-[11px] text-nav-text-muted">{t("app_sub")}</div>
           </div>
         </Link>
         <PinToggle />
       </div>
 
       <nav
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-1"
         aria-label={lang === "ar" ? "أقسام لوحة المعلومات" : "Dashboard sections"}
       >
         {NAVIGATION_SECTIONS.map((section) => {
           const active = sectionIsActive(section, pathname);
           const Icon = section.icon;
+          // A section that owns several reports lands on its default report and
+          // hands the rest to the sticky tab strip, which — unlike this rail —
+          // does not slide away on scroll. Only a single-report section can
+          // therefore claim `aria-current="page"` from here.
           const hasChildren = section.items.length > 1;
 
           return (
@@ -94,11 +73,14 @@ export function Sidebar() {
               <Link
                 to={section.defaultTo}
                 aria-current={active && !hasChildren ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 ${
-                  active
-                    ? "bg-white/[0.09] text-white"
-                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
+                className={`relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 ${
+                  active ? "" : "hover:bg-nav-hover"
                 }`}
+                style={
+                  active
+                    ? { background: "var(--nav-active-bg)", color: "var(--nav-active-text)" }
+                    : { color: "var(--nav-text)" }
+                }
               >
                 <Icon
                   size={19}
@@ -109,26 +91,12 @@ export function Sidebar() {
                 <span className="truncate">{section.label[lang]}</span>
                 {active && (
                   <span
-                    className="ms-auto h-1.5 w-1.5 shrink-0 rounded-full bg-electric"
+                    className="absolute inset-y-1.5 w-[3px] rounded-full"
+                    style={{ background: "var(--nav-active-text)", insetInlineStart: 0 }}
                     aria-hidden="true"
                   />
                 )}
               </Link>
-
-              {active && hasChildren && (
-                <div
-                  className="ms-[21px] mt-1 flex flex-col gap-0.5 border-s border-white/10 ps-2"
-                  aria-label={
-                    lang === "ar"
-                      ? `تقارير ${section.label[lang]}`
-                      : `${section.label[lang]} reports`
-                  }
-                >
-                  {section.items.map((item) => (
-                    <ChildLink key={item.to} item={item} pathname={pathname} />
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -137,12 +105,14 @@ export function Sidebar() {
       <div className="mt-auto space-y-3 px-1 pt-6">
         <Link
           to="/guide"
-          className="flex min-h-10 items-center gap-2.5 rounded-lg border border-white/10 px-3 text-[12px] font-semibold text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+          className="flex min-h-10 items-center gap-2.5 rounded-lg border border-nav-border px-3 text-[12px] font-semibold text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text"
         >
           <BookOpen size={16} />
           <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>
         </Link>
-        <div className="px-3 text-[11px] text-white/35">© {new Date().getFullYear()} Engosoft</div>
+        <div className="px-3 text-[11px] text-text-subtle">
+          © {new Date().getFullYear()} Engosoft
+        </div>
       </div>
     </aside>
   );
@@ -175,8 +145,8 @@ function PinToggle() {
       title={label}
       className={`grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition-colors ${
         chrome.pinned
-          ? "border-white/25 bg-white/[0.12] text-white"
-          : "border-white/10 text-white/50 hover:bg-white/[0.08] hover:text-white"
+          ? "border-brand bg-brand-soft text-brand"
+          : "border-nav-border text-nav-text-muted hover:bg-nav-hover hover:text-nav-text"
       }`}
     >
       {chrome.pinned ? <Pin size={15} /> : <PinOff size={15} />}

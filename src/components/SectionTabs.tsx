@@ -60,17 +60,20 @@ export function SectionTabs() {
       ref={ref}
       data-app-chrome=""
       aria-label={lang === "ar" ? `تقارير ${label}` : `${label} reports`}
-      // A section with a single report has nothing to switch between, so on a
-      // phone the row is 70px of pure chrome — the bottom nav already says
-      // which section is open. It stays from `sm` up, where it costs nothing.
-      className="chrome-bar sticky z-20 lg:hidden"
+      // Shown at every width, not only below `lg`. The rail auto-hides on the
+      // first downward scroll, and it was taking the section's sub-navigation
+      // with it — on a long report a desktop reader had no way back to a
+      // sibling tab without scrolling up. A section with a single report still
+      // renders nothing at all (see the guard above), so this costs a row only
+      // where there is genuinely something to switch between.
+      className="chrome-bar sticky z-20"
       style={{
         top: "var(--chrome-header-h, 0px)",
         transition: "top var(--dur-chrome) var(--ease-chrome)",
       }}
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
-        <div className="hidden shrink-0 items-center gap-2 pe-3 text-sm font-semibold text-text sm:flex">
+        <div className="hidden shrink-0 items-center gap-2 pe-3 text-sm font-semibold text-text sm:flex lg:hidden">
           <SectionIcon size={17} aria-hidden="true" />
           <span>{label}</span>
           <span className="h-5 w-px bg-border" aria-hidden="true" />
@@ -86,18 +89,14 @@ export function SectionTabs() {
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-11 shrink-0 items-center gap-2 px-2.5 text-[13px] transition-colors duration-150 focus-visible:rounded-md sm:min-h-12 sm:px-3 sm:text-sm font-medium ${
-                  active ? "text-brand" : "text-text-muted hover:text-text"
+                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium transition-colors duration-150 sm:px-3 sm:text-sm ${
+                  active
+                    ? "bg-brand-soft text-brand"
+                    : "text-text-muted hover:bg-surface-2 hover:text-text"
                 }`}
               >
                 <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
                 <span>{t(item.key)}</span>
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full transition-opacity duration-150 ${
-                    active ? "bg-brand opacity-100" : "opacity-0"
-                  }`}
-                />
               </Link>
             );
           })}

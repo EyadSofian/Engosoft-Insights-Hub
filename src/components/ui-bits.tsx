@@ -43,7 +43,9 @@ export function SectionTitle({
   return (
     <div className={`flex items-start justify-between gap-3 mb-3.5 sm:mb-4 ${className}`}>
       <div className="min-w-0">
-        <h2 className="text-[14px] sm:text-[15px] font-semibold text-text leading-snug sm:truncate">{children}</h2>
+        <h2 className="text-[14px] sm:text-[15px] font-semibold text-text leading-snug sm:truncate">
+          {children}
+        </h2>
         {hint && <p className="text-xs text-text-muted mt-0.5 leading-snug">{hint}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -57,7 +59,9 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
       <h1 className="text-[19px] min-[420px]:text-[21px] sm:text-2xl font-semibold text-text text-balance">
         {title}
       </h1>
-      {subtitle && <p className="text-[12px] sm:text-sm text-text-muted mt-0.5 sm:mt-1">{subtitle}</p>}
+      {subtitle && (
+        <p className="text-[12px] sm:text-sm text-text-muted mt-0.5 sm:mt-1">{subtitle}</p>
+      )}
     </div>
   );
 }
@@ -140,6 +144,30 @@ export function Pill({
 
 /* --- KPI ----------------------------------------------------------------- */
 
+/**
+ * Semantic tint for a metric card. The icon chip takes the colour; the card
+ * itself stays on the ordinary surface, because a wall of five saturated
+ * cards is exactly as unreadable as a wall of five grey ones.
+ */
+export type KpiTone = "neutral" | "brand" | "success" | "warning" | "danger" | "violet";
+
+const KPI_TONE: Record<KpiTone, { fg: string; bg: string }> = {
+  neutral: { fg: "var(--text-subtle)", bg: "var(--surface-2)" },
+  brand: { fg: "var(--brand)", bg: "var(--brand-soft)" },
+  success: { fg: "var(--success)", bg: "var(--success-soft)" },
+  warning: { fg: "var(--warning)", bg: "var(--warning-soft)" },
+  danger: { fg: "var(--danger)", bg: "var(--danger-soft)" },
+  violet: { fg: "var(--violet)", bg: "var(--violet-soft)" },
+};
+
+/**
+ * A single headline figure.
+ *
+ * `spark` draws only when the caller hands over a real series from the same
+ * response the value came from — there is no synthesised trend and no
+ * placeholder curve, so an empty sparkline slot means the API did not return
+ * a series, not that the metric was flat.
+ */
 export function KpiCard({
   label,
   value,
@@ -147,11 +175,13 @@ export function KpiCard({
   delta,
   deltaInvert,
   hero = false,
+  tone = "neutral",
   icon,
   index = 0,
   subWrap = false,
   valueWrap = false,
   info,
+  spark,
 }: {
   label: string;
   value: ReactNode;
@@ -159,6 +189,8 @@ export function KpiCard({
   delta?: number;
   deltaInvert?: boolean;
   hero?: boolean;
+  /** Colours the icon chip and the sparkline. Default is deliberately neutral. */
+  tone?: KpiTone;
   icon?: ReactNode;
   index?: number;
   /** Allow explanatory KPI source text to wrap instead of silently truncating. */
@@ -167,10 +199,13 @@ export function KpiCard({
   valueWrap?: boolean;
   /** Optional "where does this number come from?" control, shown by the label. */
   info?: ReactNode;
+  /** A real time series for this metric. Anything shorter than two points is ignored. */
+  spark?: number[];
 }) {
+  const palette = KPI_TONE[tone];
   return (
     <div
-      className="card stagger relative min-h-[128px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[144px] sm:p-5"
+      className="card stagger relative min-h-[132px] overflow-hidden p-3.5 min-[420px]:p-4 sm:min-h-[148px] sm:p-5"
       style={
         {
           "--i": index,
@@ -192,11 +227,14 @@ export function KpiCard({
         </span>
         {icon && (
           <span
-            className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-text-subtle"
+            className="grid size-8 shrink-0 place-items-center rounded-xl"
             style={
               hero
-                ? { color: "var(--accent-ink)", background: "color-mix(in oklab, var(--accent) 12%, transparent)" }
-                : undefined
+                ? {
+                    color: "var(--accent-ink)",
+                    background: "color-mix(in oklab, var(--accent) 12%, transparent)",
+                  }
+                : { color: palette.fg, background: palette.bg }
             }
           >
             {icon}
@@ -204,15 +242,18 @@ export function KpiCard({
         )}
       </div>
 
-      <div
-        className={`num mt-2.5 max-w-full font-semibold tracking-[-0.025em] sm:mt-3 ${
-          valueWrap
-            ? "overflow-visible whitespace-normal text-[clamp(1rem,3.4vw,1.55rem)] leading-[1.2]"
-            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] leading-none"
-        }`}
-        style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
-      >
-        {value}
+      <div className="mt-2.5 flex items-end justify-between gap-3 sm:mt-3">
+        <div
+          className={`num max-w-full min-w-0 font-semibold tracking-[-0.025em] ${
+            valueWrap
+              ? "overflow-visible whitespace-normal text-[clamp(1rem,3.4vw,1.55rem)] leading-[1.2]"
+              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,4.8vw,1.75rem)] leading-none"
+          }`}
+          style={{ color: hero ? "var(--accent-ink)" : "var(--text)" }}
+        >
+          {value}
+        </div>
+        <Sparkline points={spark} color={hero ? "var(--accent)" : palette.fg} />
       </div>
 
       <div className="mt-3 flex min-h-[32px] items-start gap-2">
@@ -228,6 +269,61 @@ export function KpiCard({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The shape of a metric over the selected period — nothing more.
+ *
+ * Renders nothing at all unless there are at least two finite points to plot,
+ * and it is `aria-hidden` because the figure and its delta beside it already
+ * carry the same information in text.
+ */
+export function Sparkline({
+  points,
+  color = "var(--chart-1)",
+  width = 64,
+  height = 22,
+}: {
+  points?: number[];
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
+  const clean = (points ?? []).filter((n) => typeof n === "number" && isFinite(n));
+  if (clean.length < 2) return null;
+
+  const min = Math.min(...clean);
+  const max = Math.max(...clean);
+  const span = max - min || 1;
+  const step = width / (clean.length - 1);
+  const d = clean
+    .map(
+      (n, i) =>
+        `${i === 0 ? "M" : "L"}${(i * step).toFixed(2)},${(height - ((n - min) / span) * height).toFixed(2)}`,
+    )
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      className="shrink-0 overflow-visible"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
   );
 }
 

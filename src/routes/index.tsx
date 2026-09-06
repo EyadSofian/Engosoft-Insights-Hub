@@ -1,18 +1,17 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Award,
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
-  ChevronDown,
   CircleDollarSign,
   Crown,
   DollarSign,
   Info,
+  Lightbulb,
   Percent,
-  ShieldAlert,
   Target,
   TrendingDown,
   TrendingUp,
@@ -22,7 +21,16 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
-import { fmtCompact, fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import {
+  fmtCompact,
+  fmtDateTime,
+  fmtNum,
+  fmtPct,
+  fmtRoas,
+  fmtUSD,
+  fmtUSDFull,
+  useI18n,
+} from "@/lib/i18n";
 import {
   Card,
   EmptyState,
@@ -31,11 +39,22 @@ import {
   KpiCard,
   KpiSkeletonGrid,
   Notice,
-  PageHeader,
   Pill,
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
+import {
+  DashboardPageHeader,
+  DashboardPanel,
+  DataHealthSummary,
+  ExecutiveSummary,
+  InsightCard,
+  InsightRow,
+  KpiRow,
+  SecondaryMetrics,
+  SyncStatus,
+  type DataHealthIssue,
+} from "@/components/dashboard-bits";
 import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bits";
 import { TelegramPanel } from "@/components/TelegramPanel";
 import { HBarChart, MultiLineChart } from "@/components/charts";
@@ -274,7 +293,16 @@ function businessSignals(
   };
 }
 
-function BusinessDecisionCockpit({
+/**
+ * "What you need to know today" — the three readings of the period a manager
+ * is expected to act on.
+ *
+ * Every value comes from `businessSignals`, which is unchanged: this is the
+ * same best-result / risk / recommended-decision triple the navy cockpit
+ * carried, laid out as three light semantic cards instead of a dark slab that
+ * owned a fifth of the first screen.
+ */
+function TodaysInsights({
   signals,
   workforceLoading,
   lang,
@@ -283,46 +311,83 @@ function BusinessDecisionCockpit({
   workforceLoading: boolean;
   lang: "ar" | "en";
 }) {
-  const employee = signals.bestEmployee;
+  const course = signals.topCourse;
   const campaign = signals.bestCampaign;
+  const employee = signals.bestEmployee;
 
   return (
-    <section className="rounded-2xl border border-border bg-navy p-3.5 text-white shadow-[0_18px_50px_rgba(0,28,60,0.14)] sm:p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-base font-bold">
-            <BrainCircuit size={20} className="text-electric" />
-            {lang === "ar" ? "غرفة القرار التنفيذي" : "Executive decision room"}
-          </div>
-          <p className="mt-1 text-xs leading-6 text-white/55">
-            {lang === "ar"
-              ? "ملخص قابل للتنفيذ من المبيعات والحملات والموظفين وجودة البيانات."
-              : "An actionable summary across sales, campaigns, people and data quality."}
-          </p>
-        </div>
-        <Pill tone="brand">{lang === "ar" ? "يتحدث مع الفلاتر" : "Filter-aware"}</Pill>
+    <section
+      aria-label={lang === "ar" ? "أهم ما تحتاج معرفته اليوم" : "What you need to know today"}
+    >
+      <div className="mb-2.5 flex items-center gap-2">
+        <Lightbulb size={16} className="text-warning" aria-hidden="true" />
+        <h2 className="text-[14px] font-semibold text-text sm:text-[15px]">
+          {lang === "ar" ? "أهم ما تحتاج معرفته اليوم" : "What you need to know today"}
+        </h2>
       </div>
 
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        <DecisionMetric
-          icon={<BookOpenCheck size={18} />}
-          label={lang === "ar" ? "أهم دورة" : "Top course"}
-          value={signals.topCourse?.course ?? "—"}
-          detail={
-            signals.topCourse
-              ? `${fmtUSD(signals.topCourse.revenue)} · ${
-                  signals.courseTargetShare !== null
-                    ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` (${lang === "ar" ? "جزئي" : "partial"})`}`
-                    : `${fmtPct(signals.topCourse.contribution, 1)} ${lang === "ar" ? "من إيراد الدورات" : "of course revenue"}`
-                }`
+      <InsightRow>
+        <InsightCard
+          index={0}
+          kind="best"
+          title={
+            course
+              ? lang === "ar"
+                ? `كورس ${course.course} حقق أعلى إيراد`
+                : `${course.course} produced the most revenue`
               : lang === "ar"
                 ? "لا توجد مبيعات دورات مصنفة"
                 : "No classified course sales"
           }
+          value={course ? fmtUSD(course.revenue) : undefined}
+          detail={
+            course
+              ? signals.courseTargetShare !== null
+                ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` · ${lang === "ar" ? "تارجت جزئي" : "partial target"}`}`
+                : `${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إجمالي إيراد الدورات" : "of total course revenue"}`
+              : undefined
+          }
+          to={course ? "/courses" : undefined}
+          actionLabel={lang === "ar" ? "افتح الكورسات ←" : "Open courses →"}
         />
-        <DecisionMetric
-          icon={<UserRoundCheck size={18} />}
-          label={lang === "ar" ? "أفضل موظف حسب PBX" : "Top employee by PBX"}
+
+        <InsightCard
+          index={1}
+          kind="attention"
+          title={signals.risk.title}
+          detail={signals.risk.detail}
+        />
+
+        <InsightCard
+          index={2}
+          kind="opportunity"
+          eyebrow={lang === "ar" ? "القرار المقترح" : "Recommended decision"}
+          title={signals.decision.title}
+          detail={signals.decision.detail}
+          to={signals.decision.href}
+          actionLabel={lang === "ar" ? "افتح التحليل ←" : "Open the analysis →"}
+        />
+      </InsightRow>
+
+      {/* The two supporting readings the cockpit also carried. They are facts,
+          not calls to action, so they sit under the insights as a quiet strip
+          rather than taking a card each. */}
+      <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+        <SupportingFact
+          icon={<Crown size={15} />}
+          label={lang === "ar" ? "أفضل حملة" : "Best campaign"}
+          value={campaign?.name ?? "—"}
+          detail={
+            campaign
+              ? `${fmtRoas(campaign.roas)} · ${fmtUSD(campaign.revenue)} ${lang === "ar" ? "إيراد" : "revenue"}`
+              : lang === "ar"
+                ? "لا توجد حملة مؤهلة في الفترة"
+                : "No eligible campaign in this period"
+          }
+        />
+        <SupportingFact
+          icon={<UserRoundCheck size={15} />}
+          label={lang === "ar" ? "أفضل موظف حسب جودة المكالمات" : "Top employee by call quality"}
           value={
             workforceLoading
               ? lang === "ar"
@@ -332,82 +397,43 @@ function BusinessDecisionCockpit({
           }
           detail={
             employee
-              ? `PBX ${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"} · Chatwoot: ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting"} · ${fmtNum(employee.chatOpenConversations)} ${lang === "ar" ? "محادثة مفتوحة الآن" : "open now"}`
+              ? `${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة محلّلة" : "analyzed calls"} · ${fmtNum(employee.chatAwaitingReply)} ${lang === "ar" ? "عميل ينتظر الرد" : "awaiting reply"}`
               : lang === "ar"
-                ? "لا توجد مكالمات PBX محللة في الفترة"
-                : "No analyzed PBX calls in this period"
+                ? "لا توجد مكالمات محلّلة في الفترة"
+                : "No analyzed calls in this period"
           }
         />
-        <DecisionMetric
-          icon={<Crown size={18} />}
-          label={lang === "ar" ? "أفضل حملة" : "Best campaign"}
-          value={campaign?.name ?? "—"}
-          detail={
-            campaign
-              ? `${fmtRoas(campaign.roas)} · ${fmtUSD(campaign.revenue)} ${lang === "ar" ? "إيراد" : "revenue"}`
-              : lang === "ar"
-                ? "لا توجد حملة مؤهلة"
-                : "No eligible campaign"
-          }
-        />
-        <DecisionMetric
-          icon={<ShieldAlert size={18} />}
-          label={lang === "ar" ? "أخطر نقطة الآن" : "Most urgent risk"}
-          value={signals.risk.title}
-          detail={signals.risk.detail}
-          warning
-        />
-      </div>
-
-      <div className="mt-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.07] p-3.5 sm:flex-row sm:items-center">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-electric text-navy">
-          <Target size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-electric">
-            {lang === "ar" ? "القرار المقترح" : "Recommended decision"}
-          </div>
-          <div className="mt-0.5 text-sm font-bold">{signals.decision.title}</div>
-          <p className="mt-1 text-[11.5px] leading-5 text-white/60">{signals.decision.detail}</p>
-        </div>
-        <a
-          href={signals.decision.href}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-white px-4 text-xs font-bold text-navy transition-transform hover:-translate-y-0.5"
-        >
-          {lang === "ar" ? "افتح التحليل" : "Open analysis"}
-        </a>
       </div>
     </section>
   );
 }
 
-function DecisionMetric({
+function SupportingFact({
   icon,
   label,
   value,
   detail,
-  warning = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   detail: string;
-  warning?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.055] p-3.5">
-      <div
-        className={`mb-3 flex items-center gap-2 text-[11px] font-semibold ${warning ? "text-amber-300" : "text-white/55"}`}
+    <div className="card flex min-w-0 items-start gap-3 p-3.5">
+      <span
+        className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-muted"
+        aria-hidden="true"
       >
         {icon}
-        {label}
+      </span>
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold text-text-muted">{label}</div>
+        <div className="mt-0.5 truncate text-[13.5px] font-semibold text-text" title={value}>
+          {value}
+        </div>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">{detail}</p>
       </div>
-      <div className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-white" title={value}>
-        {value}
-      </div>
-      <p className="mt-1.5 line-clamp-3 min-h-[3.4rem] text-[10.5px] leading-[1.15rem] text-white/50">
-        {detail}
-      </p>
     </div>
   );
 }
@@ -438,6 +464,104 @@ function Overview() {
   }
 
   const { totals: T, deltas, health } = data;
+
+  // Sparklines are drawn from the same daily series the trend charts use — the
+  // response's own numbers, never a curve invented to fill the slot. A metric
+  // the API does not return a series for simply has no sparkline.
+  const seriesOf = (metric: "spend" | "revenue" | "leads" | "won") =>
+    data.trend.length > 1 ? data.trend.map((row) => row[metric]) : undefined;
+  const revenueSpark = seriesOf("revenue");
+  const spendSpark = seriesOf("spend");
+  const leadsSpark = seriesOf("leads");
+  const wonSpark = seriesOf("won");
+
+  // The same bands the ROAS pill uses everywhere else, so the KPI tint and the
+  // table cell can never disagree about whether a return is healthy.
+  const roasTone =
+    T.roas === null || !isFinite(T.roas)
+      ? "neutral"
+      : T.roas >= 2
+        ? "success"
+        : T.roas >= 1
+          ? "warning"
+          : "danger";
+
+  const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
+  const syncLabel = data.syncedAt
+    ? `${lang === "ar" ? "آخر مزامنة" : "Last sync"} · ${fmtDateTime(data.syncedAt, lang)}`
+    : undefined;
+
+  // Everything the response knows about its own reliability, restated for a
+  // reader who does not work on the pipeline. The internal names stay — they
+  // are what an admin needs to fix it — but they live behind a disclosure.
+  const healthIssues: DataHealthIssue[] = [];
+  if (data.fetchErrors.length) {
+    healthIssues.push({
+      tone: "danger",
+      message:
+        lang === "ar"
+          ? `${data.fetchErrors.length} من المصادر لم تُحمَّل في هذه الجلسة.`
+          : `${data.fetchErrors.length} source(s) failed to load in this session.`,
+      impact:
+        lang === "ar"
+          ? "الأرقام المعروضة لا تشمل هذه المصادر."
+          : "The figures shown exclude those sources.",
+      technical: data.fetchErrors.join(" · "),
+    });
+  }
+  if (data.staleTabs?.length) {
+    healthIssues.push({
+      tone: "warning",
+      message:
+        lang === "ar"
+          ? "بعض المصادر لم تُحدَّث بعد، ويتم عرض آخر نسخة ناجحة."
+          : "Some sources have not refreshed; the last good copy is shown.",
+      impact: lang === "ar" ? "قد تنقص أحدث الصفوف." : "The newest rows may be missing.",
+      technical: data.staleTabs.join(" · "),
+    });
+  }
+  if (health.platformsWithoutSpendTab?.length) {
+    healthIssues.push({
+      tone: "danger",
+      message:
+        lang === "ar"
+          ? "توجد منصات جاءت منها عملاء بدون بيانات إنفاق مقابلة."
+          : "Some platforms produced leads with no matching spend data.",
+      impact:
+        lang === "ar"
+          ? "كل نسب الكفاءة تبدو أفضل من الواقع."
+          : "Every efficiency ratio reads better than reality.",
+      technical: health.platformsWithoutSpendTab
+        .map((row) => `${row.platform}: ${fmtNum(row.leads)} leads`)
+        .join(" · "),
+    });
+  }
+  if (health.excludedStages?.length) {
+    healthIssues.push({
+      tone: "warning",
+      message:
+        lang === "ar"
+          ? "صفوف مستبعدة من الحساب حسب سياسة المراحل المعتمدة."
+          : "Some rows are excluded from the calculation by the approved stage policy.",
+      technical: health.excludedStages
+        .map((row) => `${row.stage}: ${fmtNum(row.rows)}`)
+        .join(" · "),
+    });
+  }
+  if (T.lostArchived > 0) {
+    healthIssues.push({
+      tone: "info",
+      message:
+        lang === "ar"
+          ? "الصفقات الضائعة تأتي من مصدر واحد معتمد فقط."
+          : "Lost deals come from one approved source only.",
+      technical:
+        lang === "ar"
+          ? `Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? ` · ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز والصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
+          : `Lost Analysis: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? ` · ${fmtNum(T.archivedWon)} archived Won rows counted in total leads and wins, not in Lost` : ""}. CRM Stage=Lost rows are fully excluded.`,
+    });
+  }
+
   const spendTrend = moneyTrend(data.trend, spendGrain, "spend");
   const revenueTrend = moneyTrend(data.trend, revenueGrain, "revenue");
   const sarRate = fxRatesFromFilters(filters).SAR;
@@ -455,260 +579,43 @@ function Overview() {
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <div className="space-y-4 sm:space-y-5">
+      <DashboardPageHeader
+        icon={<BrainCircuit size={20} />}
         title={t("business_analytics")}
         subtitle={
           lang === "ar"
-            ? `غرفة القرار التنفيذي${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
-            : `Executive decision room${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`
+            ? "رؤية شاملة لأداء أعمالك عبر جميع القنوات"
+            : "A single read of business performance across every channel"
         }
+        period={period}
+        sync={<SyncStatus label={syncLabel} tone={healthIssues.length ? "warning" : "success"} />}
       />
 
-      {mobileAlertCount > 0 && (
-        <details className="group card overflow-hidden sm:hidden">
-          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
-            <span
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
-              style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
-            >
-              <AlertTriangle size={16} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold text-text">
-                {lang === "ar" ? "ملاحظات مهمة على البيانات" : "Important data notes"}
-              </span>
-              <span className="block text-[10.5px] text-text-muted">
-                {lang === "ar"
-                  ? "اضغط لعرض التفاصيل بدون تعطيل الأرقام"
-                  : "Tap to review without pushing the metrics down"}
-              </span>
-            </span>
-            <span className="num rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">
-              {mobileAlertCount}
-            </span>
-            <ChevronDown
-              size={16}
-              className="shrink-0 text-text-muted transition-transform group-open:rotate-180"
-            />
-          </summary>
-
-          <div className="max-h-[52dvh] space-y-2 overflow-y-auto border-t border-border p-2.5 text-[11.5px] leading-relaxed">
-            {data.fetchErrors.length > 0 && (
-              <div className="rounded-lg bg-danger-soft p-2.5 text-danger">
-                <strong className="block">
-                  {lang === "ar" ? "مصادر تعذّر تحميلها" : "Sources failed to load"}
-                </strong>
-                <span>{data.fetchErrors.join(" · ")}</span>
-              </div>
-            )}
-            {data.staleTabs?.length > 0 && (
-              <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
-                <strong className="block">
-                  {lang === "ar" ? "معروض من آخر نسخة سليمة" : "Using the last good copy"}
-                </strong>
-                <span>{data.staleTabs.join(" · ")}</span>
-              </div>
-            )}
-            {health.platformsWithoutSpendTab?.length > 0 && (
-              <div className="rounded-lg bg-danger-soft p-2.5 text-danger">
-                <strong className="block">{t("missing_spend_tab")}</strong>
-                <span>
-                  {health.platformsWithoutSpendTab
-                    .map((p) => `${p.platform}: ${fmtNum(p.leads)}`)
-                    .join(" · ")}
-                </span>
-              </div>
-            )}
-            {health.excludedStages?.length > 0 && (
-              <div className="rounded-lg bg-warning-soft p-2.5 text-warning">
-                <strong className="block">{t("excluded_stages")}</strong>
-                <span>
-                  {health.excludedStages.map((s) => `${s.stage}: ${fmtNum(s.rows)}`).join(" · ")}
-                </span>
-              </div>
-            )}
-            {T.lostArchived > 0 && (
-              <div className="rounded-lg bg-brand-soft p-2.5 text-brand">
-                <strong className="block">
-                  {lang === "ar" ? "مصدر الصفقات الضائعة" : "Lost-deal source"}
-                </strong>
-                <span>
-                  {lang === "ar"
-                    ? `${fmtNum(T.lostArchived)} من Lost Analysis فقط${T.archivedWon > 0 ? `، و${fmtNum(T.archivedWon)} مؤرشف Won محسوب صفقة رابحة داخل الإجمالي وليس Lost` : ""}.`
-                    : `${fmtNum(T.lostArchived)} from Lost Analysis only${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows counted as wins in total leads, not Lost` : ""}.`}
-                </span>
-              </div>
-            )}
-          </div>
-        </details>
+      {/* Only the one class of problem that changes what the figures MEAN is
+          allowed to interrupt the report: spend that exists in reality but not
+          in the workbook makes every efficiency ratio look better than it is.
+          Everything else — a tab served from the last good copy, an excluded
+          stage, the Lost source — is stated in the data-health card at the
+          foot of the page, and the global bar already flags a failed pull. */}
+      {health.platformsWithoutSpendTab?.length > 0 && (
+        <Notice tone="danger" title={t("missing_spend_tab")} icon={<AlertTriangle size={16} />}>
+          {health.platformsWithoutSpendTab
+            .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
+            .join(" · ")}
+          {" — "}
+          {t("missing_spend_tab_note")}
+        </Notice>
       )}
 
-      <div className="hidden space-y-3 sm:block">
-        {data.fetchErrors.length > 0 && (
-          <Notice
-            tone="danger"
-            title={lang === "ar" ? "تعذّر تحميل بعض التبويبات" : "Some tabs failed to load"}
-            icon={<AlertTriangle size={16} />}
-          >
-            {lang === "ar"
-              ? `الأرقام أدناه لا تشمل هذه المصادر: ${data.fetchErrors.join(" · ")}`
-              : `The numbers below exclude these sources: ${data.fetchErrors.join(" · ")}`}
-          </Notice>
-        )}
+      <ExecutiveSummary title={t("exec_summary")}>
+        {lang === "ar" ? data.summary.ar : data.summary.en}
+      </ExecutiveSummary>
 
-        {data.staleTabs?.length > 0 && (
-          <Notice
-            tone="warning"
-            title={
-              lang === "ar"
-                ? "تبويبات معروضة من آخر نسخة سليمة"
-                : "Tabs served from the last good copy"
-            }
-            icon={<AlertTriangle size={16} />}
-          >
-            {lang === "ar"
-              ? `تعذّر سحب نسخة حديثة من: ${data.staleTabs.join(" · ")}. تُعرض آخر نسخة ناجحة بدلاً من أصفار، وقد لا تشمل أحدث الصفوف.`
-              : `A fresh pull failed for: ${data.staleTabs.join(" · ")}. The last successful copy is shown instead of zeros, so the newest rows may be missing.`}
-          </Notice>
-        )}
-
-        {/* Spend that exists in reality but not in the workbook makes every
-          efficiency ratio look better than it is. That has to be stated on the
-          page, not buried in a health tab. */}
-        {health.platformsWithoutSpendTab?.length > 0 && (
-          <Notice tone="danger" title={t("missing_spend_tab")} icon={<AlertTriangle size={16} />}>
-            {health.platformsWithoutSpendTab
-              .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
-              .join(" · ")}
-            {" — "}
-            {t("missing_spend_tab_note")}
-          </Notice>
-        )}
-
-        {health.excludedStages?.length > 0 && (
-          <Notice tone="warning" title={t("excluded_stages")} icon={<AlertTriangle size={16} />}>
-            {health.excludedStages
-              .map((s) => `${s.stage}: ${fmtNum(s.rows)} ${lang === "ar" ? "صف" : "rows"}`)
-              .join(" · ")}
-            {" — "}
-            {t("excluded_stages_note")}
-          </Notice>
-        )}
-
-        {T.lostArchived > 0 && (
-          <Notice tone="info" icon={<Info size={16} />}>
-            {lang === "ar"
-              ? `مصدر Lost الوحيد هو تبويب Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? `، ومعها ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز وفي الصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
-              : `Lost Analysis is the only Lost source: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? `, plus ${fmtNum(T.archivedWon)} archived Won rows included in total leads but not in Lost` : ""}. CRM Stage=Lost rows are completely excluded.`}
-          </Notice>
-        )}
-      </div>
-
-      <BusinessDecisionCockpit
-        signals={business!}
-        workforceLoading={workforce.isLoading}
-        lang={lang}
-      />
-
-      <details className="group card overflow-hidden sm:hidden">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
-          <span className="text-[13px] font-semibold text-text">{t("exec_summary")}</span>
-          <span className="flex items-center gap-2 text-[10.5px] text-text-muted">
-            {lang === "ar" ? "اضغط للقراءة" : "Tap to read"}
-            <ChevronDown size={16} className="transition-transform group-open:rotate-180" />
-          </span>
-        </summary>
-        <div className="max-h-[58dvh] overflow-y-auto border-t border-border px-3.5 py-3">
-          <p className="text-[12px] leading-relaxed text-text-muted">
-            {lang === "ar" ? data.summary.ar : data.summary.en}
-          </p>
-        </div>
-      </details>
-
-      <Card className="hidden sm:block">
-        <SectionTitle>{t("exec_summary")}</SectionTitle>
-        <p className="text-[13px] sm:text-sm leading-relaxed text-text-muted">
-          {lang === "ar" ? data.summary.ar : data.summary.en}
-        </p>
-      </Card>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          index={0}
-          label={t("crm_leads")}
-          value={fmtNum(T.totalLeads)}
-          delta={deltas.totalLeads}
-          icon={<Users size={15} />}
-          subWrap
-          sub={`${lang === "ar" ? "CRM" : "CRM"} ${fmtNum(T.crmLeads)} + ${lang === "ar" ? "Lost" : "Lost"} ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}${filters.from && filters.to ? ` · ${filters.from} → ${filters.to}` : ""}`}
-        />
-        <KpiCard
-          index={1}
-          label={t("won")}
-          value={fmtNum(T.won)}
-          delta={deltas.won}
-          icon={<Award size={15} />}
-          sub={fmtPct(T.conversionRate, 1)}
-        />
-        <KpiCard
-          index={2}
-          label={t("lost_count")}
-          value={fmtNum(T.lost)}
-          delta={deltas.lost}
-          deltaInvert
-          icon={<TrendingDown size={15} />}
-          sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
-        />
-        <KpiCard
-          index={3}
-          label={t("conversion_rate")}
-          value={fmtPct(T.conversionRate, 2)}
-          delta={deltas.conversionRate}
-          icon={<Percent size={15} />}
-          sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`}
-        />
-
-        <KpiCard
-          index={4}
-          label={t("lost_rate")}
-          value={fmtPct(T.lostRate, 2)}
-          delta={deltas.lostRate}
-          deltaInvert
-          icon={<Percent size={15} />}
-          sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`}
-        />
-        <KpiCard
-          index={5}
-          label={t("avg_close_time")}
-          value={T.avgCloseDays === null ? "—" : T.avgCloseDays.toFixed(1)}
-          icon={<Timer size={15} />}
-          sub={
-            T.closeSample
-              ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}`
-              : undefined
-          }
-        />
-        <KpiCard
-          index={6}
-          label={t("spend")}
-          value={fmtUSD(T.spend)}
-          delta={deltas.spend}
-          deltaInvert
-          icon={<DollarSign size={15} />}
-          sub={[
-            `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
-            `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
-            T.spendTikTok > 0
-              ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
-              : "",
-            T.spendGoogle > 0
-              ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        />
+      {/* The five figures an executive asks for first. Everything else the
+          response carries is a click away in the row below, rather than
+          competing with these for the same glance. */}
+      <KpiRow columns={5}>
         <Link
           to="/campaigns"
           search={{ view: "attributedRevenue" }}
@@ -720,12 +627,13 @@ function Overview() {
           }
         >
           <KpiCard
-            index={7}
+            index={0}
             label={t("revenue")}
             value={fmtUSD(T.revenue)}
             delta={deltas.revenue}
             hero
             icon={<TrendingUp size={15} />}
+            spark={revenueSpark}
             subWrap
             sub={
               <span>
@@ -741,10 +649,57 @@ function Overview() {
         </Link>
 
         <KpiCard
-          index={8}
+          index={1}
+          label={t("spend")}
+          value={fmtUSD(T.spend)}
+          delta={deltas.spend}
+          deltaInvert
+          tone="danger"
+          icon={<DollarSign size={15} />}
+          spark={spendSpark}
+          sub={[
+            `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
+            `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
+            T.spendTikTok > 0
+              ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
+              : "",
+            T.spendGoogle > 0
+              ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        />
+
+        <KpiCard
+          index={2}
+          label={t("crm_leads")}
+          value={fmtNum(T.totalLeads)}
+          delta={deltas.totalLeads}
+          tone="brand"
+          icon={<Users size={15} />}
+          spark={leadsSpark}
+          subWrap
+          sub={`CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}${T.archivedWon > 0 ? ` + ${lang === "ar" ? "مؤرشف Won" : "archived Won"} ${fmtNum(T.archivedWon)}` : ""}`}
+        />
+
+        <KpiCard
+          index={3}
+          label={t("won")}
+          value={fmtNum(T.won)}
+          delta={deltas.won}
+          tone="violet"
+          icon={<Award size={15} />}
+          spark={wonSpark}
+          sub={`${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`}
+        />
+
+        <KpiCard
+          index={4}
           label={t("roas")}
           value={fmtRoas(T.roas)}
           delta={deltas.roas}
+          tone={roasTone}
           icon={<Target size={15} />}
           sub={
             lang === "ar"
@@ -752,34 +707,86 @@ function Overview() {
               : `Collected Accounting revenue ÷ spend · ${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`
           }
         />
-        <KpiCard
-          index={9}
-          label={t("acos")}
-          value={fmtPct(T.acos, 1)}
-          delta={deltas.acos}
-          deltaInvert
-          icon={<Percent size={15} />}
-          sub={
-            lang === "ar"
-              ? "الإنفاق ÷ الإيراد المحصّل من Accounting"
-              : "Spend ÷ collected Accounting revenue"
-          }
-        />
-        <KpiCard
-          index={10}
-          label={t("cpl")}
-          value={fmtUSDFull(T.cpl)}
-          delta={deltas.cpl}
-          deltaInvert
-          icon={<DollarSign size={15} />}
-          sub={
-            lang === "ar"
-              ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية`
-              : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`
-          }
-        />
-        <CpaCard totals={T} />
-      </div>
+      </KpiRow>
+
+      <SecondaryMetrics
+        label={lang === "ar" ? "مؤشرات الكفاءة والمتابعة" : "Efficiency and follow-up metrics"}
+        count={7}
+      >
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-4">
+          <KpiCard
+            index={0}
+            label={t("lost_count")}
+            value={fmtNum(T.lost)}
+            delta={deltas.lost}
+            deltaInvert
+            tone="danger"
+            icon={<TrendingDown size={15} />}
+            sub={`${lang === "ar" ? "من Lost Analysis فقط" : "Lost Analysis only"} · ${fmtPct(T.lostRate, 1)}`}
+          />
+          <KpiCard
+            index={1}
+            label={t("conversion_rate")}
+            value={fmtPct(T.conversionRate, 2)}
+            delta={deltas.conversionRate}
+            tone="violet"
+            icon={<Percent size={15} />}
+            sub={`${fmtNum(T.won)} / ${fmtNum(T.totalLeads)}`}
+          />
+          <KpiCard
+            index={2}
+            label={t("lost_rate")}
+            value={fmtPct(T.lostRate, 2)}
+            delta={deltas.lostRate}
+            deltaInvert
+            tone="danger"
+            icon={<Percent size={15} />}
+            sub={`${fmtNum(T.lost)} / ${fmtNum(T.totalLeads)}`}
+          />
+          <KpiCard
+            index={3}
+            label={t("avg_close_time")}
+            value={T.avgCloseDays === null ? "—" : T.avgCloseDays.toFixed(1)}
+            icon={<Timer size={15} />}
+            sub={
+              T.closeSample
+                ? `${t("based_on")} ${fmtNum(T.closeSample)} ${t("closed_leads")}`
+                : undefined
+            }
+          />
+          <KpiCard
+            index={4}
+            label={t("acos")}
+            value={fmtPct(T.acos, 1)}
+            delta={deltas.acos}
+            deltaInvert
+            tone="warning"
+            icon={<Percent size={15} />}
+            sub={
+              lang === "ar"
+                ? "الإنفاق ÷ الإيراد المحصّل من Accounting"
+                : "Spend ÷ collected Accounting revenue"
+            }
+          />
+          <KpiCard
+            index={5}
+            label={t("cpl")}
+            value={fmtUSDFull(T.cpl)}
+            delta={deltas.cpl}
+            deltaInvert
+            tone="warning"
+            icon={<DollarSign size={15} />}
+            sub={
+              lang === "ar"
+                ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} leads إعلانية`
+                : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ad leads`
+            }
+          />
+          <CpaCard totals={T} />
+        </div>
+      </SecondaryMetrics>
+
+      <TodaysInsights signals={business!} workforceLoading={workforce.isLoading} lang={lang} />
 
       {!data.prevComparable && data.prevRange && (
         <Notice tone="info" icon={<Info size={16} />}>
@@ -1054,6 +1061,8 @@ function Overview() {
       </Card>
 
       <TelegramPanel />
+
+      <DataHealthSummary issues={healthIssues} syncedLabel={syncLabel} />
     </div>
   );
 }
