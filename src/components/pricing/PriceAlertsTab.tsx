@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { Card, EmptyState, Notice, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { SourceErrorNotice } from "@/components/dashboard-bits";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
   fmtMoney,
@@ -181,7 +182,7 @@ export function PriceAlertsTab({
 
   return (
     <div className="space-y-4">
-      {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
+      <SourceErrorNotice error={data?.error} what={lang === "ar" ? "التنبيهات" : "the alerts"} />
       {!!error && <Notice tone="danger">{error}</Notice>}
       {!!note && <Notice tone="info">{note}</Notice>}
 

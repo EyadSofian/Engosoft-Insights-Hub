@@ -13,6 +13,7 @@ import {
   Tag,
 } from "lucide-react";
 import { Card, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
+import { SourceErrorNotice } from "@/components/dashboard-bits";
 import { useI18n } from "@/lib/i18n";
 import {
   bandText,
@@ -532,7 +533,10 @@ export function PriceSearchTab({
         )}
       </Card>
 
-      {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
+      <SourceErrorNotice
+        error={data?.error}
+        what={lang === "ar" ? "نتائج البحث" : "the search results"}
+      />
 
       {loading && (
         <div className="grid gap-3 lg:grid-cols-2">

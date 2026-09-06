@@ -765,7 +765,7 @@ function PricingPage() {
                   ? "إعادة التحليل تحتاج صلاحية مدير"
                   : "Re-running the audit needs manager access"
             }
-            className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3.5 text-[12.5px] font-semibold text-text transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <ScanSearch
               size={15}

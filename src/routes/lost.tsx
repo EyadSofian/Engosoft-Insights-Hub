@@ -12,7 +12,7 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
@@ -155,19 +155,53 @@ function Lost() {
         </>
       ) : (
         <>
+          {/* The reader is told exactly what is wrong with the figures — that
+              they are stopped, or that they are a stored copy — because both
+              change what the page means. What they are not told on the page
+              itself is which store the copy lives in: naming the database is
+              an instruction to nobody who reads this report. It stays one
+              disclosure away, for whoever can act on it. */}
           {!hasReportableLost(data.health.lostAuthority) && (
-            <Notice tone="danger" title={t("data_notes")} icon={<Info size={16} />}>
-              {lang === "ar"
-                ? "بيانات Archived Lost غير متاحة لا من Odoo ولا من آخر نسخة آمنة في PostgreSQL، لذلك أوقفنا أرقام Lost بدل ما نعرض صفر مضلل."
-                : "Archived Lost is unavailable from both Odoo and the safe PostgreSQL snapshot, so Lost figures are stopped instead of showing a misleading zero."}
-            </Notice>
+            <DataHealthSummary
+              issues={[
+                {
+                  tone: "danger",
+                  message:
+                    lang === "ar"
+                      ? "أرقام الخسائر متوقفة في هذه الفترة."
+                      : "Lost figures are stopped for this period.",
+                  impact:
+                    lang === "ar"
+                      ? "المصدر المعتمد للخسائر غير متاح، ونعرض توقفاً بدلاً من صفر مضلل."
+                      : "The approved Lost source is unavailable, so the report stops rather than showing a misleading zero.",
+                  technical:
+                    lang === "ar"
+                      ? "Archived Lost غير متاح من Odoo مباشرة ولا من آخر نسخة مخزّنة."
+                      : "Archived Lost is unavailable from Odoo directly and from the last stored snapshot.",
+                },
+              ]}
+            />
           )}
           {usesStoredLost(data.health.lostAuthority) && (
-            <Notice tone="warning" title={t("data_notes")} icon={<Info size={16} />}>
-              {lang === "ar"
-                ? "أرقام Lost المعروضة جاية من آخر نسخة ناجحة من Odoo Archived Lost محفوظة في PostgreSQL؛ المصدر المباشر متعذر مؤقتًا، لكن البيانات مش مفقودة ومش محسوبة صفر."
-                : "Lost figures come from the last successful Odoo Archived Lost snapshot stored in PostgreSQL. The direct source is temporarily unavailable, but the data is present and is not treated as zero."}
-            </Notice>
+            <DataHealthSummary
+              issues={[
+                {
+                  tone: "warning",
+                  message:
+                    lang === "ar"
+                      ? "أرقام الخسائر معروضة من آخر نسخة ناجحة."
+                      : "Lost figures are served from the last good copy.",
+                  impact:
+                    lang === "ar"
+                      ? "البيانات موجودة وغير محسوبة صفراً، لكن أحدث الصفوف قد تنقص."
+                      : "The data is present and is not counted as zero, but the newest rows may be missing.",
+                  technical:
+                    lang === "ar"
+                      ? "المصدر المباشر Odoo Archived Lost متعذر مؤقتاً؛ يتم استخدام النسخة المخزّنة."
+                      : "The direct Odoo Archived Lost source is temporarily unreachable; the stored snapshot is in use.",
+                },
+              ]}
+            />
           )}
 
           <Card padded={false} className="overflow-hidden">

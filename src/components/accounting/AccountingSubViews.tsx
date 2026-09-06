@@ -416,7 +416,7 @@ export function AccountingAgentsView() {
       <Notice tone="info" icon={<Info size={16} />}>
         {lang === "ar"
           ? `التحصيل والفواتير والليدز من Odoo حسب ${data.selected.dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}${data.selected.company ? ` لشركة ${data.selected.company}` : ""}. المكالمات من Yeastar.`
-          : `Collections use Odoo ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Leads and closures come from Odoo; Yeastar calls are stored in Railway PostgreSQL.`}
+          : `Collections use Odoo ${data.selected.dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}${data.selected.company ? ` for ${data.selected.company}` : ""}. Leads and closures come from Odoo; calls come from Yeastar.`}
       </Notice>
       {!data.callsHub.ok && (
         <Notice
@@ -438,8 +438,8 @@ export function AccountingAgentsView() {
           tone="warning"
           title={
             lang === "ar"
-              ? "مكالمات الفترة دي لسه ماوصلتش Railway"
-              : "Calls have not reached Railway for this period"
+              ? "لا توجد مكالمات مسجّلة في هذه الفترة"
+              : "No calls recorded for this period"
           }
         >
           {lang === "ar"
@@ -851,28 +851,31 @@ function TargetUnitsDashboard({
   return (
     <section className="space-y-4" aria-labelledby="target-units-title">
       <Card padded={false} className="overflow-hidden">
-        <div className="grid gap-5 bg-[linear-gradient(135deg,#0b456a_0%,#062f46_100%)] px-5 py-5 text-white lg:grid-cols-[1fr_auto] lg:items-center lg:px-7">
+        {/* Was a full-width dark gradient band. Nothing on it was a figure —
+            a label, a heading, a sentence and a month picker — so it was the
+            heaviest element on the page carrying the least information. */}
+        <div className="grid gap-5 border-b border-border bg-surface-2 px-5 py-5 lg:grid-cols-[1fr_auto] lg:items-center lg:px-7">
           <div>
-            <p className="text-xs font-bold text-white/65">
+            <p className="text-xs font-semibold text-text-muted">
               {lang === "ar" ? "متابعة التارجت من تحصيل Odoo" : "Odoo collections target tracking"}
             </p>
-            <h2 id="target-units-title" className="mt-1 text-xl font-black sm:text-2xl">
+            <h2 id="target-units-title" className="mt-1 text-xl font-bold text-text sm:text-2xl">
               {lang === "ar" ? "أداء الوحدات والتيمات" : "Units and team performance"}
             </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-6 text-white/70">
+            <p className="mt-1 max-w-2xl text-xs leading-6 text-text-muted">
               {lang === "ar"
                 ? `الأرقام محسوبة من التحصيل المدفوع خلال ${periodLabel}. افتح أي تيم لعرض مساهمة كل موظف.`
                 : `Figures use paid collections during ${periodLabel}. Open a team to see every employee's contribution.`}
             </p>
           </div>
           <label className="block min-w-[210px]">
-            <span className="mb-1.5 block text-xs font-bold text-white/70">
+            <span className="mb-1.5 block text-xs font-semibold text-text-muted">
               {lang === "ar" ? "شهر التارجت" : "Target month"}
             </span>
             <select
               value={selectedMonth}
               onChange={(event) => onSelectMonth(event.target.value)}
-              className="min-h-11 w-full cursor-pointer rounded-xl border border-white/20 bg-white px-3 text-sm font-semibold text-text outline-none focus:ring-2 focus:ring-white/40"
+              className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
             >
               <option value="">{lang === "ar" ? "الفترة الحالية" : "Current date range"}</option>
               {[...months].reverse().map((month) => (

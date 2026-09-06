@@ -127,7 +127,9 @@ export function InvoiceDetailPanel({
 
       {!!data?.error && !data.lines.length && (
         <Notice tone="warning">
-          {ar ? "تعذر تحميل بيانات الفاتورة كاملة. حاول مرة أخرى." : data.error}
+          {ar
+            ? "تعذر تحميل بيانات الفاتورة كاملة. حاول مرة أخرى."
+            : "Could not load the full invoice. Try again."}
         </Notice>
       )}
 

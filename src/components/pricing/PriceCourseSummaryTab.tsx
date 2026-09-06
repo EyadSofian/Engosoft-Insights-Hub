@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Filter, TrendingUp, X } from "lucide-react";
 import { EmptyState, ErrorState, Notice, Skeleton } from "@/components/ui-bits";
+import { SourceErrorNotice } from "@/components/dashboard-bits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fmtDate, fmtNum, useI18n } from "@/lib/i18n";
 import { compareDemand, courseDisplayPriority } from "@/lib/pricing/catalog-demand";
@@ -343,11 +344,7 @@ export function PriceCourseSummaryTab({
         )}
       </section>
 
-      {!!data?.error && (
-        <Notice tone="warning">
-          {ar ? "تعذر تحميل بيانات قائمة الأسعار من قاعدة البيانات." : data.error}
-        </Notice>
-      )}
+      <SourceErrorNotice error={data?.error} what={ar ? "قائمة الأسعار" : "the price list"} />
 
       {!loading && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/15 bg-brand-soft/55 px-3 py-2 text-[11px] text-text-muted sm:px-4">

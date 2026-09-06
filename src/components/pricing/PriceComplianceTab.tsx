@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
 import { EmptyState, ErrorState, Notice } from "@/components/ui-bits";
+import { SourceErrorNotice } from "@/components/dashboard-bits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { InvoiceDetailPanel } from "./InvoiceDetailPanel";
@@ -432,7 +433,10 @@ export function PriceComplianceTab({
 
   return (
     <div className="space-y-3">
-      {!!data?.error && <Notice tone="warning">{data.error}</Notice>}
+      <SourceErrorNotice
+        error={data?.error}
+        what={ar ? "مراقبة الالتزام" : "the compliance audit"}
+      />
 
       {!data?.freshness.lastRunAt && !loading && (
         <Notice tone="info" title={t("pb_never_audited")}>

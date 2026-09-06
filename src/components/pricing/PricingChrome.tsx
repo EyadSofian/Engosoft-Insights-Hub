@@ -44,26 +44,25 @@ export function PricingPageHeader({
   const ar = lang === "ar";
 
   return (
-    <section
-      className="overflow-hidden rounded-xl border border-border"
-      style={{ background: "var(--ink)" }}
-    >
+    // The bar keeps its shape — identity, period, search, one action — but sits
+    // on the page's own surface. It was the last dark band left in the light
+    // theme, and the KPI strip directly under it is white, so the two read as
+    // two different applications stacked on one screen.
+    <section className="overflow-hidden rounded-xl border border-border bg-surface">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5 sm:px-5">
         <div className="min-w-[200px] flex-1">
-          <h1 className="text-[17px] font-bold tracking-tight text-white sm:text-[19px]">
-            {title}
-          </h1>
-          <p className="mt-0.5 text-[11.5px] leading-snug text-white/60">{description}</p>
+          <h1 className="text-[17px] font-bold tracking-tight text-text sm:text-[19px]">{title}</h1>
+          <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{description}</p>
         </div>
 
         {period && (
-          <div className="text-[11px] leading-snug text-white/55 md:text-end">{period}</div>
+          <div className="text-[11px] leading-snug text-text-muted md:text-end">{period}</div>
         )}
 
         <form onSubmit={onSearchSubmit} className="relative w-full sm:w-[280px]" role="search">
           <Search
             size={15}
-            className="pointer-events-none absolute inset-y-0 start-3 my-auto text-white/45"
+            className="pointer-events-none absolute inset-y-0 start-3 my-auto text-text-subtle"
             aria-hidden="true"
           />
           <input
@@ -71,7 +70,7 @@ export function PricingPageHeader({
             onChange={(event) => onSearchValue(event.target.value)}
             placeholder={ar ? "ابحث باسم الدورة أو الكود" : "Search course name or code"}
             aria-label={ar ? "بحث في الأسعار" : "Search prices"}
-            className="min-h-10 w-full rounded-lg border border-white/15 bg-white/[0.07] ps-9 pe-3 text-[12.5px] text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/40 focus:bg-white/[0.12]"
+            className="min-h-10 w-full rounded-lg border border-border bg-surface-2 ps-9 pe-3 text-[12.5px] text-text outline-none transition-colors placeholder:text-text-subtle focus:border-brand focus:bg-surface"
           />
         </form>
 

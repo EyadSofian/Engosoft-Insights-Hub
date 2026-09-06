@@ -585,3 +585,73 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
     </>
   );
 }
+
+/* --- source errors -------------------------------------------------------- */
+
+/**
+ * A part of the page that could not load.
+ *
+ * The message a reader gets is always the same plain sentence, because the
+ * server's own error text is written for whoever maintains the connector: it
+ * names tables, hosts and drivers, and a sales manager reading "relation
+ * price_book_items does not exist" learns only that something is broken, which
+ * the sentence already told them.
+ *
+ * The raw text is not thrown away — it is rendered in development, where the
+ * person who can act on it is the person looking at the screen. In production
+ * it stays out of the page entirely.
+ */
+export function SourceErrorNotice({
+  error,
+  what,
+  onRetry,
+}: {
+  /** The server's own message. Never rendered to a production reader. */
+  error?: string | null;
+  /** What failed, in the reader's terms — "the price list", "this invoice". */
+  what?: string;
+  onRetry?: () => void;
+}) {
+  const { lang } = useI18n();
+  if (!error) return null;
+
+  const subject = what ?? (lang === "ar" ? "هذا الجزء من البيانات" : "this part of the report");
+
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-start gap-2.5 rounded-xl px-3 py-2.5 text-[13px] sm:px-4 sm:py-3"
+      style={{ background: TONE.warning.bg, color: TONE.warning.fg }}
+    >
+      <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <div className="min-w-0 flex-1 leading-relaxed">
+        <span>
+          {lang === "ar"
+            ? `تعذّر تحميل ${subject}. باقي الأرقام على الصفحة غير متأثرة.`
+            : `Could not load ${subject}. The rest of the figures on this page are unaffected.`}
+        </span>
+        {import.meta.env.DEV && (
+          <details className="mt-1.5">
+            <summary className="cursor-pointer text-[11px] font-medium opacity-80">
+              {lang === "ar"
+                ? "تفاصيل تقنية (تظهر في التطوير فقط)"
+                : "Technical details (dev only)"}
+            </summary>
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] opacity-90">
+              {error}
+            </pre>
+          </details>
+        )}
+      </div>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="shrink-0 rounded-lg border border-current/30 px-2.5 py-1 text-[11.5px] font-semibold"
+        >
+          {lang === "ar" ? "إعادة المحاولة" : "Try again"}
+        </button>
+      )}
+    </div>
+  );
+}
