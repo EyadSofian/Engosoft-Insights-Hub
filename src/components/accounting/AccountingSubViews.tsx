@@ -77,6 +77,10 @@ import {
   type TargetUnitMember,
   type TargetUnitRollup,
 } from "@/lib/target-units";
+import {
+  useRegisterNexusEntity,
+  useRegisterNexusView,
+} from "@/components/engo-nexus/state/nexus-view-context";
 
 const QUALITY_REVIEW_THRESHOLD = 85;
 
@@ -329,6 +333,35 @@ export function AccountingAgentsView() {
   } | null>(null);
   const [autoOpenedUncalled, setAutoOpenedUncalled] = useState(false);
   const { data, isLoading, error, refetch } = useApi<AgentsResponse>("/api/teams");
+
+  /**
+   * Tell ENGO Nexus which board is open and who is selected.
+   *
+   * The two sections here ARE the contract's two views of the teams surface —
+   * "units" is the target board, "employees" is the per-person board — so the
+   * ids are mapped rather than passed through, and "حلل التاب ده" resolves to
+   * the same thing the agent's contract calls it.
+   */
+  useRegisterNexusView("teams", { tab: section === "units" ? "targets" : "agents" });
+
+  /**
+   * The person whose card is open, so "الموظف ده" has a referent.
+   *
+   * Registered HERE, above the loading and error early-returns, because a hook
+   * below them runs on some renders and not others. The DISPLAY name travels as
+   * the label and the key as the id: the agent needs a stable identity to join
+   * on, and the reader must only ever see the name already on their screen.
+   */
+  const focusedAgent = data?.agents.find((row) => row.key === selectedAgentKey) ?? null;
+  useRegisterNexusEntity(
+    focusedAgent
+      ? {
+          type: "salesperson",
+          id: focusedAgent.key,
+          name: focusedAgent.displayName || focusedAgent.name,
+        }
+      : null,
+  );
   useEffect(() => {
     if (data && !data.callsHub.callsAvailable && sortBy === "calls") setSortBy("revenue");
   }, [data, sortBy]);

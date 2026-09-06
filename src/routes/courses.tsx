@@ -38,7 +38,10 @@ import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
-import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import {
+  useRegisterNexusEntity,
+  useRegisterNexusView,
+} from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/courses")({ component: Courses });
 
@@ -116,6 +119,11 @@ function Courses() {
 
   const courses = useMemo(() => data?.courses ?? [], [data?.courses]);
   const selectedCourse = courses.find((course) => course.key === selectedKey) ?? courses[0] ?? null;
+  useRegisterNexusEntity(
+    selectedCourse
+      ? { type: "course", id: selectedCourse.key, name: selectedCourse.name }
+      : null,
+  );
   const detailPath = selectedCourse
     ? `/api/courses?detail=${encodeURIComponent(selectedCourse.name)}`
     : "/api/courses";

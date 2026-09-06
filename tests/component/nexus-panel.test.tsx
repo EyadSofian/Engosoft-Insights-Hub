@@ -165,7 +165,7 @@ describe("panel — dashboard context travels with every message", () => {
     expect(sent.type).toBe("text");
     expect(sent.text).toContain("[dashboard context:");
     expect(sent.text).toContain("page=campaigns");
-    expect(sent.text).toContain('campaign="PMP-SA"');
+    expect(sent.text).toContain('entityLabel="PMP-SA"');
     expect(sent.text).toContain("period=2026-08-01..2026-08-31");
     expect(sent.text).toContain("حلل الصفحة دي");
   });

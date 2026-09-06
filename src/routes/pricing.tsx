@@ -55,6 +55,7 @@ import {
 } from "@/components/pricing/pricing-ui";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { useFilters } from "@/lib/filter-store";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 type Tab = "prices" | "invoices" | "team" | "advisor" | "manage" | "alerts";
 
@@ -118,6 +119,9 @@ function previousWindowOf(from: string, to: string): { from: string; to: string 
 }
 
 function PricingPage() {
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("pricing");
   const { lang } = useI18n();
   const ar = lang === "ar";
   const globalFilters = useFilters();

@@ -22,6 +22,7 @@ import { buildQuery, filterStore, useFilters } from "@/lib/filter-store";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { Maybe, Platform } from "@/lib/types";
 import type { WeekendDayKey, WeekendDecision } from "@/lib/weekend-analysis";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/weekend")({ component: WeekendPerformance });
 
@@ -164,6 +165,9 @@ function Change({
 
 function WeekendPerformance() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("weekend");
   const { t, lang } = useI18n();
   const filters = useFilters();
   const query = buildQuery(filters);

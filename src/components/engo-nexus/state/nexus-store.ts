@@ -12,7 +12,15 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { NEXUS_POPUP_KEY, PROACTIVE_SNOOZE_MS } from "../lib/nexus-config";
+import {
+  NEXUS_OPTOUT_KEY,
+  NEXUS_POPUP_KEY,
+  PROACTIVE_AFTER_OPEN_MS,
+  PROACTIVE_MAX_PER_SESSION,
+  PROACTIVE_MAX_PER_WEEK,
+  PROACTIVE_SNOOZE_MS,
+  PROACTIVE_SURFACE_SNOOZE_MS,
+} from "../lib/nexus-config";
 
 export interface NexusUiState {
   open: boolean;
@@ -73,10 +81,43 @@ export function useNexusUi(): NexusUiState {
 
 // --- Proactive popup memory --------------------------------------------------
 
+/**
+ * WHEN THE POPUP MAY APPEAR.
+ *
+ * The old rule was two lines: not within a week of a dismissal, and never to
+ * anyone who has ever opened the panel. The second one is why proactive help
+ * silently stopped working for every returning user — clicking the launcher
+ * once disabled every future page-specific offer permanently.
+ *
+ * The rules now, in the order they are checked:
+ *   - a global opt-out is absolute;
+ *   - a dismissal buys a week of silence;
+ *   - opening the panel buys a DAY, not a lifetime;
+ *   - a surface that has already offered waits a week before offering again,
+ *     tracked per surface so Courses does not consume Media Plan's one chance;
+ *   - at most three across all surfaces per rolling week;
+ *   - at most one per browser session, however long that session runs.
+ *
+ * Every threshold lives in nexus-config.ts, and `now` is injected so all of it
+ * is testable without waiting a week.
+ */
+
 interface PopupMemory {
   dismissedAt?: number;
   openedAt?: number;
+  /** Surface id → when it last offered. Separate from the global cap. */
+  shownSurfaces?: Record<string, number>;
+  /** Timestamps of recent showings, for the rolling weekly cap. */
+  shownAt?: number[];
 }
+
+/**
+ * Per-session, deliberately NOT persisted.
+ *
+ * "Stop appearing repeatedly in the same session" is about this tab right now;
+ * reloading the page is a new session and the weekly caps still apply.
+ */
+let shownThisSession = 0;
 
 function readMemory(): PopupMemory {
   if (typeof window === "undefined") return {};
@@ -98,33 +139,92 @@ function writeMemory(memory: PopupMemory): void {
   }
 }
 
-/**
- * Whether the proactive popup may appear.
- *
- * Two conditions, both about not being annoying: it never reappears within the
- * snooze window after a dismissal, and it never appears to someone who has
- * already opened the panel — they know it exists.
- */
-export function canShowProactive(now: number = Date.now()): boolean {
+/** The global switch. Absolute, and checked before anything else. */
+export function isProactiveOptedOut(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(NEXUS_OPTOUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setProactiveOptOut(off: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (off) window.localStorage.setItem(NEXUS_OPTOUT_KEY, "1");
+    else window.localStorage.removeItem(NEXUS_OPTOUT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Whether the proactive popup may appear on this surface, right now. */
+export function canShowProactive(
+  options: { surface?: string | null; now?: number } = {},
+): boolean {
+  const now = options.now ?? Date.now();
+  const surface = options.surface ?? null;
+
+  if (isProactiveOptedOut()) return false;
+  if (shownThisSession >= PROACTIVE_MAX_PER_SESSION) return false;
+
   const memory = readMemory();
-  if (memory.openedAt) return false;
   if (memory.dismissedAt && now - memory.dismissedAt < PROACTIVE_SNOOZE_MS) return false;
+  if (memory.openedAt && now - memory.openedAt < PROACTIVE_AFTER_OPEN_MS) return false;
+
+  if (surface) {
+    const lastOnSurface = memory.shownSurfaces?.[surface];
+    if (lastOnSurface && now - lastOnSurface < PROACTIVE_SURFACE_SNOOZE_MS) return false;
+  }
+
+  const recent = (memory.shownAt ?? []).filter((stamp) => now - stamp < WEEK_MS);
+  if (recent.length >= PROACTIVE_MAX_PER_WEEK) return false;
+
   return true;
+}
+
+/** Record that the popup actually appeared, on this surface. */
+export function rememberProactiveShown(surface: string | null, now: number = Date.now()): void {
+  shownThisSession += 1;
+  const memory = readMemory();
+  const shownAt = [...(memory.shownAt ?? []), now].filter((stamp) => now - stamp < WEEK_MS);
+  writeMemory({
+    ...memory,
+    shownAt,
+    shownSurfaces: surface ? { ...(memory.shownSurfaces ?? {}), [surface]: now } : memory.shownSurfaces,
+  });
 }
 
 export function rememberProactiveDismissed(now: number = Date.now()): void {
   writeMemory({ ...readMemory(), dismissedAt: now });
 }
 
+/** Opening the panel quiets the popup for a day. It does not disable it. */
 export function rememberPanelOpened(now: number = Date.now()): void {
   writeMemory({ ...readMemory(), openedAt: now });
 }
 
-/** Test-only: clears the popup memory. */
+/**
+ * Test-only: forget that the popup appeared in THIS session.
+ *
+ * Separate from clearing the stored memory, because the per-session cap and the
+ * per-surface week are different rules and a test needs to exercise one without
+ * erasing the other.
+ */
+export function resetProactiveSession(): void {
+  shownThisSession = 0;
+}
+
+/** Test-only: clears the popup memory and the session counter. */
 export function clearProactiveMemory(): void {
+  shownThisSession = 0;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(NEXUS_POPUP_KEY);
+    window.localStorage.removeItem(NEXUS_OPTOUT_KEY);
   } catch {
     /* ignore */
   }

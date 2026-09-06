@@ -78,6 +78,8 @@ import type {
   PerfRow,
   Totals,
 } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { NexusAware } from "@/components/engo-nexus/NexusAware";
 
 export const Route = createFileRoute("/")({ component: Overview });
 
@@ -428,6 +430,9 @@ function TodaysInsights({
 }
 
 function Overview() {
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("overview");
   const { t, lang } = useI18n();
   const filters = useFilters();
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
@@ -603,66 +608,72 @@ function Overview() {
       )}
 
       <KpiRow columns={5}>
-        <Link
-          to="/campaigns"
-          search={{ view: "attributedRevenue" }}
-          className="group block rounded-xl outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          aria-label={
-            lang === "ar"
-              ? `افتح الحملات المرتبطة بإيراد ${fmtUSD(T.attributedRevenue)}`
-              : `Open campaigns linked to ${fmtUSD(T.attributedRevenue)} of revenue`
-          }
-        >
-          <KpiCard
-            index={0}
-            label={t("revenue")}
-            value={fmtUSD(T.revenue)}
-            delta={deltas.revenue}
-            hero
-            tone="mint"
-            icon={<TrendingUp size={16} />}
-            spark={revenueSpark}
-            sub={
+        <NexusAware elementId="overview.revenue">
+          <Link
+            to="/campaigns"
+            search={{ view: "attributedRevenue" }}
+            className="group block rounded-xl outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            aria-label={
               lang === "ar"
-                ? `منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
-                : `${fmtUSD(T.attributedRevenue)} campaign-linked`
+                ? `افتح الحملات المرتبطة بإيراد ${fmtUSD(T.attributedRevenue)}`
+                : `Open campaigns linked to ${fmtUSD(T.attributedRevenue)} of revenue`
             }
+          >
+            <KpiCard
+              index={0}
+              label={t("revenue")}
+              value={fmtUSD(T.revenue)}
+              delta={deltas.revenue}
+              hero
+              tone="mint"
+              icon={<TrendingUp size={16} />}
+              spark={revenueSpark}
+              sub={
+                lang === "ar"
+                  ? `منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
+                  : `${fmtUSD(T.attributedRevenue)} campaign-linked`
+              }
+            />
+          </Link>
+        </NexusAware>
+
+        <NexusAware elementId="overview.spend">
+          <KpiCard
+            index={1}
+            label={t("spend")}
+            value={fmtUSD(T.spend)}
+            delta={deltas.spend}
+            deltaInvert
+            tone="rose"
+            icon={<DollarSign size={16} />}
+            spark={spendSpark}
+            sub={[
+              `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
+              `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
+              T.spendTikTok > 0
+                ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
+                : "",
+              T.spendGoogle > 0
+                ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           />
-        </Link>
+        </NexusAware>
 
-        <KpiCard
-          index={1}
-          label={t("spend")}
-          value={fmtUSD(T.spend)}
-          delta={deltas.spend}
-          deltaInvert
-          tone="rose"
-          icon={<DollarSign size={16} />}
-          spark={spendSpark}
-          sub={[
-            `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
-            `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
-            T.spendTikTok > 0
-              ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
-              : "",
-            T.spendGoogle > 0
-              ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        />
-
-        <KpiCard
-          index={2}
-          label={t("crm_leads")}
-          value={fmtNum(T.totalLeads)}
-          delta={deltas.totalLeads}
-          tone="sky"
-          icon={<Users size={16} />}
-          spark={leadsSpark}
-          sub={`CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`}
-        />
+        <NexusAware elementId="overview.leads">
+          <KpiCard
+            index={2}
+            label={t("crm_leads")}
+            value={fmtNum(T.totalLeads)}
+            delta={deltas.totalLeads}
+            tone="sky"
+            icon={<Users size={16} />}
+            spark={leadsSpark}
+            sub={`CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`}
+          />
+        </NexusAware>
 
         <KpiCard
           index={3}
@@ -675,24 +686,26 @@ function Overview() {
           sub={`${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`}
         />
 
-        <KpiCard
-          index={4}
-          label={t("roas")}
-          value={fmtRoas(T.roas)}
-          delta={deltas.roas}
-          tone={roasTone}
-          icon={<Target size={16} />}
-          sub={`${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`}
-          info={
-            <InfoDot
-              text={
-                lang === "ar"
-                  ? "الإيراد المحصّل من Accounting ÷ الإنفاق الإعلاني."
-                  : "Collected Accounting revenue ÷ ad spend."
-              }
-            />
-          }
-        />
+        <NexusAware elementId="overview.roas">
+          <KpiCard
+            index={4}
+            label={t("roas")}
+            value={fmtRoas(T.roas)}
+            delta={deltas.roas}
+            tone={roasTone}
+            icon={<Target size={16} />}
+            sub={`${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`}
+            info={
+              <InfoDot
+                text={
+                  lang === "ar"
+                    ? "الإيراد المحصّل من Accounting ÷ الإنفاق الإعلاني."
+                    : "Collected Accounting revenue ÷ ad spend."
+                }
+              />
+            }
+          />
+        </NexusAware>
       </KpiRow>
 
       <TodaysInsights signals={business!} workforceLoading={workforce.isLoading} lang={lang} />

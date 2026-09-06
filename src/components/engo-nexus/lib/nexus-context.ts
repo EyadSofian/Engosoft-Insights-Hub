@@ -1,4 +1,5 @@
 import type { GlobalFilters } from "@/lib/types";
+import { contextualQuestions } from "@/lib/nexus-surface-registry";
 
 /**
  * The page context ENGO Nexus receives with every message.
@@ -179,6 +180,8 @@ export function buildPageContext(input: {
     section?: string | null;
     focusedElementId?: string | null;
     selectedEntity?: { type: string; id?: string; name?: string } | null;
+    /** Page-local read parameters. Only the explicit allow-list below travels. */
+    parameters?: Record<string, string>;
   };
 }): NexusPageContext {
   const { path, language, filters, view } = input;
@@ -186,6 +189,13 @@ export function buildPageContext(input: {
   for (const key of SENT_FILTERS) {
     const value = filters[key];
     if (typeof value === "string" && value) sent[key] = value;
+  }
+  // The media-plan month is local page state rather than a global dashboard
+  // filter. Without it, changing the month on screen left Nexus reading the
+  // current month. Keep this allow-list deliberately narrow.
+  for (const key of ["month"] as const) {
+    const value = view?.parameters?.[key];
+    if (typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) sent[key] = value;
   }
 
   return {
@@ -213,156 +223,140 @@ export function buildPageContext(input: {
 }
 
 /**
- * A compact, human-readable context line prepended to the user's message.
+ * The frame version. Bumped when the frame's KEYS change, so an old client and
+ * a new agent can recognise each other rather than silently misreading.
+ */
+export const NEXUS_CONTEXT_VERSION = 2;
+
+/**
+ * The structured context frame prepended to the user's message.
  *
- * Prose rather than JSON on purpose: it costs fewer tokens, and it reads
- * correctly if it ever surfaces in a transcript a person reviews. It is marked
- * as context so the agent treats it as a frame, not as the question.
+ * WHAT IT IS. A bounded, versioned `key=value` list that the agent parses
+ * against an allow-list on its own side (the bot's src/lib/page-context.ts).
+ * Every value is quoted, so a campaign or a person's name with spaces arrives
+ * whole; no value may contain a bracket, because the frame ends at its first
+ * one and a value that could close it early is a value that could inject.
+ *
+ * WHAT IS DELIBERATELY NOT IN IT. No user identity, no email, no session token,
+ * no role and no permission claim. Two reasons, and both are absolute: the
+ * agent must never treat a browser-supplied role as authorisation, and anything
+ * put here ends up in a conversation transcript.
+ *
+ * `v2` adds the explicit `route`, `entityType` / `entityId` / `entityLabel`
+ * triple and the timestamp. `v1` packed the entity as a bare `course="X"`,
+ * which the agent still accepts.
  */
 export function contextPreamble(context: NexusPageContext): string {
-  const parts: string[] = [`page=${context.pageType}`];
+  const parts: string[] = [`v=${NEXUS_CONTEXT_VERSION}`, `page=${context.pageType}`];
+
+  /** Values are quoted and stripped of anything that could close the frame. */
+  const put = (key: string, value: string | undefined | null) => {
+    if (!value) return;
+    const clean = String(value)
+      .replace(/[\][\[{}<>\n\r"]/g, " ")
+      .trim()
+      .slice(0, 120);
+    if (!clean) return;
+    parts.push(`${key}="${clean}"`);
+  };
+
+  put("route", context.path);
   /**
    * The tab, section and focused element travel too.
    *
-   * They were added to the context object but never emitted here, so "اشرحلي
-   * التاب دي" reached the agent with nothing but `page=website` and was
-   * answered by describing all three tabs generically. The frame is the only
-   * thing the agent sees; a field that is not in it does not exist.
+   * They were added to the context object but never emitted, so "اشرحلي التاب
+   * دي" reached the agent with nothing but `page=website` and was answered by
+   * describing all three tabs generically. The frame is the only thing the
+   * agent sees; a field that is not in it does not exist.
    */
-  if (context.view) parts.push(`tab=${context.view}`);
-  if (context.section) parts.push(`section=${context.section}`);
-  if (context.focusedElementId) parts.push(`element=${context.focusedElementId}`);
+  put("tab", context.view);
+  put("section", context.section);
+  put("element", context.focusedElementId);
+
   if (context.entityType && context.entityName) {
-    parts.push(`${context.entityType}="${context.entityName}"`);
+    put("entityType", context.entityType);
+    put("entityLabel", context.entityName);
+    // The id travels so the agent never re-resolves an entity by fuzzy name.
+    // It is never rendered — the agent is told so, and its render guard
+    // enforces it.
+    put("entityId", context.entityId);
   }
+
   if (context.period?.from || context.period?.to) {
     parts.push(`period=${context.period.from ?? "?"}..${context.period.to ?? "?"}`);
   } else if (context.period?.range) {
-    parts.push(`period=${context.period.range}`);
+    put("period", context.period.range);
   }
+
   for (const [key, value] of Object.entries(context.filters)) {
     if (key === context.entityType) continue;
-    parts.push(`${key}=${value}`);
+    put(key, value);
   }
+
+  parts.push(`ts=${new Date().toISOString()}`);
   return `[dashboard context: ${parts.join(" ")}]`;
 }
 
 /**
- * Page-specific quick actions for the proactive popup and the welcome state.
- * These are prompts a user on THIS page plausibly wants; a generic list would
- * be ignored, which is the usual fate of a proactive assistant.
+ * The questions worth offering on this page — from ONE source.
+ *
+ * WHAT THIS REPLACES. There were two lists of suggestions: a hardcoded map here
+ * and `suggestedQuestions` in `nexus-surface-registry.ts`. Two lists drift, and
+ * this one had no entry at all for media plan, weekend, year-on-year, media
+ * buyers, social or organic — so the pages where a manager most needs a nudge
+ * fell through to the same three generic prompts.
+ *
+ * The registry is now the only source. It already declares what each surface
+ * means and which questions belong to it, and it is the same file the panel
+ * reads for element-level questions.
+ *
+ * WHAT THE SELECTION ADDS. A selected entity is substituted into the prompt, so
+ * standing on Courses with CFM selected offers "أرتبلك الموظفين اللي باعوا
+ * CFM؟" rather than a sentence about "the course". A generic offer is the usual
+ * reason a proactive assistant gets dismissed.
  */
 export function quickActionsFor(
   pageType: NexusPageType,
   lang: "ar" | "en",
+  options: { entityLabel?: string | null; elementId?: string | null } = {},
 ): Array<{ id: string; label: string; prompt: string }> {
-  const ar = lang === "ar";
-  const byPage: Partial<
-    Record<NexusPageType, Array<{ id: string; label: string; prompt: string }>>
-  > = {
-    campaigns: [
-      {
-        id: "analyse",
-        label: ar ? "حلل الحملات" : "Analyse campaigns",
-        prompt: ar
-          ? "حلل أداء الحملات في الفترة دي"
-          : "Analyse campaign performance for this period",
-      },
-      {
-        id: "roas",
-        label: ar ? "أعلى ROAS" : "Best ROAS",
-        prompt: ar ? "أنهي حملة عندها أعلى ROAS؟" : "Which campaign has the highest ROAS?",
-      },
-      {
-        id: "problem",
-        label: ar ? "فين المشكلة؟" : "Where is the problem?",
-        prompt: ar
-          ? "فين المشكلة في الحملات دلوقتي؟"
-          : "Where is the problem in the campaigns right now?",
-      },
-    ],
-    ads: [
-      {
-        id: "creative",
-        label: ar ? "الكرياتيف" : "Creative",
-        prompt: ar ? "في كرياتيف بايظ ولا لأ؟" : "Is any creative fatiguing?",
-      },
-      {
-        id: "cpl",
-        label: "CPL",
-        prompt: ar ? "CPL بتاع الإعلانات دي كويس؟" : "Is the CPL for these ads good?",
-      },
-    ],
-    sales: [
-      {
-        id: "team",
-        label: ar ? "أداء الفريق" : "Team performance",
-        prompt: ar ? "حلل أداء فريق المبيعات" : "Analyse the sales team's performance",
-      },
-      {
-        id: "conversion",
-        label: "Conversion",
-        prompt: ar ? "ليه الـ conversion قل؟" : "Why did conversion drop?",
-      },
-      {
-        id: "lost",
-        label: "Lost leads",
-        prompt: ar ? "إيه أسباب خسارة الليدات؟" : "What are the lead loss reasons?",
-      },
-    ],
-    teams: [
-      {
-        id: "team",
-        label: ar ? "أداء الفريق" : "Team performance",
-        prompt: ar ? "حلل أداء الفرق" : "Analyse team performance",
-      },
-      {
-        id: "followup",
-        label: ar ? "المتابعة" : "Follow-up",
-        prompt: ar ? "المتابعة كويسة ولا في مشكلة؟" : "Is follow-up coverage healthy?",
-      },
-    ],
-    lost: [
-      {
-        id: "reasons",
-        label: ar ? "أسباب الخسارة" : "Loss reasons",
-        prompt: ar ? "حلل أسباب خسارة الليدات" : "Analyse the lead loss reasons",
-      },
-    ],
-    courses: [
-      {
-        id: "analyse",
-        label: ar ? "حلل الكورس" : "Analyse course",
-        prompt: ar ? "حلل أداء الكورس ده" : "Analyse this course's performance",
-      },
-      {
-        id: "revenue",
-        label: ar ? "الإيرادات" : "Revenue",
-        prompt: ar ? "الكورس ده عمل كام إيراد؟" : "How much revenue did this course make?",
-      },
-      {
-        id: "price",
-        label: ar ? "السعر الحالي" : "Current price",
-        prompt: ar ? "السعر الحالي للكورس ده كام؟" : "What is this course's current price?",
-      },
-    ],
-    products: [
-      {
-        id: "price",
-        label: ar ? "أسعار الكورسات" : "Course prices",
-        prompt: ar ? "أسعار الكورسات الحالية إيه؟" : "What are the current course prices?",
-      },
-    ],
-    accounting: [
-      {
-        id: "revenue",
-        label: ar ? "الإيرادات" : "Revenue",
-        prompt: ar ? "كام الإيرادات الشهر ده؟" : "What is revenue this month?",
-      },
-    ],
+  /** Two page types are aliases of a surface rather than surfaces themselves. */
+  const SURFACE_ALIAS: Partial<Record<NexusPageType, string>> = {
+    sales: "accounting",
+    products: "accounting",
   };
+  const surfaceId = SURFACE_ALIAS[pageType] ?? pageType;
 
-  const general = [
+  /** An element the user is standing on beats the surface's general list. */
+  const questions = contextualQuestions(surfaceId, options.elementId ?? null, lang);
+
+  /**
+   * `{entity}` in a registry question is the selected thing, or the page's own
+   * generic noun when nothing is selected. A placeholder rather than a regex
+   * over Arabic pronouns: "قارنه" and "باعوه" carry the referent as a SUFFIX,
+   * and no substitution over those is going to stay correct.
+   */
+  const GENERIC: Partial<Record<string, { ar: string; en: string }>> = {
+    courses: { ar: "الكورس ده", en: "this course" },
+    campaigns: { ar: "الحملة دي", en: "this campaign" },
+    ads: { ar: "الإعلان ده", en: "this ad" },
+    teams: { ar: "الفريق ده", en: "this team" },
+    leads: { ar: "المصدر ده", en: "this source" },
+    media_plan: { ar: "الخطة دي", en: "this plan" },
+  };
+  const label =
+    options.entityLabel?.trim() || GENERIC[surfaceId]?.[lang] || (lang === "ar" ? "ده" : "this");
+
+  const actions = questions.slice(0, 4).map((question, index) => {
+    const prompt = question.replaceAll("{entity}", label);
+    return { id: `q${index + 1}`, label: shortLabel(prompt), prompt };
+  });
+
+  if (actions.length > 0) return actions;
+
+  /** Only reached by a surface with no questions at all — the guide page. */
+  const ar = lang === "ar";
+  return [
     {
       id: "performance",
       label: ar ? "حلل الأداء" : "Analyse performance",
@@ -379,8 +373,21 @@ export function quickActionsFor(
       prompt: ar ? "أسعار الكورسات الحالية إيه؟" : "What are the current course prices?",
     },
   ];
+}
 
-  return byPage[pageType] ?? general;
+/**
+ * A chip label from a prompt.
+ *
+ * A pill is a few words wide. The full question is still what gets SENT — this
+ * only decides what fits on the button.
+ */
+function shortLabel(prompt: string): string {
+  const cleaned = prompt
+    .replace(/^تحب\s+/, "")
+    .replace(/[؟?]\s*$/, "")
+    .trim();
+  const words = cleaned.split(/\s+/);
+  return words.length <= 4 ? cleaned : `${words.slice(0, 4).join(" ")}…`;
 }
 
 /**

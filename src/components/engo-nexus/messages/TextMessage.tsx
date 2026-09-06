@@ -1,10 +1,26 @@
-import { useMemo } from "react";
+import { Children, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { ComparisonCardMessage } from "../lib/nexus-message-schema";
 import { Metric } from "./KpiCard";
 import { SourceBadges } from "./SourceBadges";
 import { normalizeFloatNoise } from "../lib/nexus-format";
 import type { NexusSource } from "../lib/nexus-message-schema";
+
+const ARABIC = /[\u0600-\u06ff]/;
+const LATIN_OR_NUMBER = /[A-Za-z0-9]/;
+
+function directText(children: ReactNode): string {
+  return Children.toArray(children)
+    .filter(
+      (child): child is string | number => typeof child === "string" || typeof child === "number",
+    )
+    .join("");
+}
+
+function needsLtrIsolation(children: ReactNode): boolean {
+  const value = directText(children);
+  return LATIN_OR_NUMBER.test(value) && !ARABIC.test(value);
+}
 
 /**
  * Prose from ENGO Nexus.
@@ -41,6 +57,19 @@ export function TextMessage({
       <div className="nexus-prose text-sm leading-relaxed text-text">
         <ReactMarkdown
           components={{
+            p: ({ children }) => <p dir={lang === "ar" ? "rtl" : "ltr"}>{children}</p>,
+            li: ({ children }) => <li dir={lang === "ar" ? "rtl" : "ltr"}>{children}</li>,
+            strong: ({ children }) => (
+              <strong>
+                {needsLtrIsolation(children) ? (
+                  <bdi dir="ltr" className="nexus-ltr">
+                    {children}
+                  </bdi>
+                ) : (
+                  children
+                )}
+              </strong>
+            ),
             a: ({ href, children }) => (
               <a
                 href={href}
@@ -58,7 +87,12 @@ export function TextMessage({
               </div>
             ),
             code: ({ children }) => (
-              <code className="rounded bg-bg-subtle px-1 py-0.5 text-[11px]">{children}</code>
+              <code
+                dir={ARABIC.test(directText(children)) ? "rtl" : "ltr"}
+                className="rounded bg-bg-subtle px-1 py-0.5 text-[11px]"
+              >
+                {children}
+              </code>
             ),
           }}
         >

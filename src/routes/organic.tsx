@@ -25,6 +25,7 @@ import { fmtCompact, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i
 import { hasReportableLost } from "@/lib/lost-authority";
 import type { CourseAgg, DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/organic")({ component: Organic });
 
@@ -135,6 +136,9 @@ function InsightCard({
 
 function Organic() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("organic");
   const { lang } = useI18n();
   const filters = useFilters();
 

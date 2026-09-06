@@ -22,6 +22,8 @@ export interface NexusViewContext {
   section: string | null;
   focusedElementId: string | null;
   selectedEntity: { type: string; id?: string; name?: string } | null;
+  /** Page-local read parameters that are not global filters, e.g. plan month. */
+  parameters: Record<string, string>;
 }
 
 const EMPTY: NexusViewContext = {
@@ -30,6 +32,7 @@ const EMPTY: NexusViewContext = {
   section: null,
   focusedElementId: null,
   selectedEntity: null,
+  parameters: {},
 };
 
 let current: NexusViewContext = { ...EMPTY };
@@ -76,13 +79,19 @@ export function clearNexusView(): void {
  */
 export function useRegisterNexusView(
   surface: string,
-  options: { tab?: string | null; section?: string | null } = {},
+  options: {
+    tab?: string | null;
+    section?: string | null;
+    parameters?: Record<string, string>;
+  } = {},
 ): void {
-  const { tab = null, section = null } = options;
+  const { tab = null, section = null, parameters = {} } = options;
+  const parametersKey = JSON.stringify(parameters);
   useEffect(() => {
-    updateNexusView({ surface, tab, section });
+    const stableParameters = JSON.parse(parametersKey) as Record<string, string>;
+    updateNexusView({ surface, tab, section, parameters: stableParameters });
     return () => clearNexusView();
-  }, [surface, tab, section]);
+  }, [surface, tab, section, parametersKey]);
 }
 
 /** Declare the entity a page has selected — a course, a campaign, a team. */

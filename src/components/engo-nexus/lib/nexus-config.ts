@@ -41,8 +41,40 @@ export function nexusStorageKey(hostname?: string): string {
 /** Proactive popup state lives under its own key so dismissal survives reloads. */
 export const NEXUS_POPUP_KEY = `${NEXUS_STORAGE_PREFIX}:popup`;
 
-/** Milliseconds of idle time before the proactive popup may appear. */
+/**
+ * Dwell on ONE page before the popup may appear.
+ *
+ * Measured from arriving on a route, and reset by navigating away. Appearing on
+ * load interrupts someone mid-task, which is how a proactive assistant earns a
+ * permanent dismissal on its first showing.
+ */
 export const PROACTIVE_DELAY_MS = 25_000;
 
-/** Once dismissed, stay quiet for this long. */
+/** Once dismissed, stay quiet for a week. */
 export const PROACTIVE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * After the panel is opened, stay quiet for a day — NOT forever.
+ *
+ * The previous rule was "never show again to anyone who has ever opened the
+ * panel", which permanently disabled every future page-specific offer because
+ * someone once clicked the launcher. Knowing the assistant exists is a reason
+ * not to nag today, not a reason never to help again.
+ */
+export const PROACTIVE_AFTER_OPEN_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A surface that has already offered its help waits this long before offering
+ * again. Tracked per surface, so seeing it on Courses does not use up the one
+ * chance Media Plan had to be useful.
+ */
+export const PROACTIVE_SURFACE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Hard ceiling across all surfaces, per rolling week. */
+export const PROACTIVE_MAX_PER_WEEK = 3;
+
+/** And at most this many in one browser session, however long it runs. */
+export const PROACTIVE_MAX_PER_SESSION = 1;
+
+/** The user can switch proactive help off entirely, and it stays off. */
+export const NEXUS_OPTOUT_KEY = `${NEXUS_STORAGE_PREFIX}:proactive-off`;

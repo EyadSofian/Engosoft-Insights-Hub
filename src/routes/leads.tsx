@@ -25,6 +25,7 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { AdSetOriginBadge } from "@/components/metric-bits";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { AdSetOrigin, DataHealth, Grouped, Totals } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/leads")({ component: Leads });
 
@@ -133,6 +134,9 @@ function Leads() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<WorkspaceTab>("overview");
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("leads", { tab: tab });
   const [breakdown, setBreakdown] = useState<BreakdownKey>("course");
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/leads");
   const calls = useApi<CallsResp>("/api/crm-calls");

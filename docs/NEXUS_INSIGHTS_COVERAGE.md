@@ -3,9 +3,10 @@
 Every analytical surface a normal Insights Hub user can see, and the path ENGO
 Nexus uses to reach it.
 
-The machine-readable twin of this table is `src/lib/agent-insights-registry.ts`,
-and `tests/unit/nexus-coverage.test.ts` fails the build when a navigation route
-appears without an entry. This document explains; the registry decides.
+The source of truth for this table is `src/lib/agent-surface-contract.ts`.
+`agent-insights-registry.ts` is generated as a projection of that contract, and
+the manifest-driven contract/coverage tests fail when a navigation route appears
+without a declaration. This document explains; the contract decides.
 
 ## Census
 
@@ -30,25 +31,25 @@ below).
 
 ## The surfaces
 
-| Surface      | Route(s)                                                  | Section      | Internal views                 | Endpoint(s)                                           | Entities                     | PII | Status         |
-| ------------ | --------------------------------------------------------- | ------------ | ------------------------------ | ----------------------------------------------------- | ---------------------------- | --- | -------------- |
-| overview     | `/`                                                       | business     | —                              | `/api/overview`, `/api/teams`                         | —                            | no  | CONNECTED      |
-| campaigns    | `/campaigns`                                              | campaigns    | —                              | `/api/campaigns`, `/api/campaign-risk`                | campaign                     | no  | CONNECTED      |
-| ads          | `/ads`                                                    | campaigns    | —                              | `/api/ads`                                            | campaign, adset, ad          | no  | CONNECTED      |
-| website      | `/website`                                                | campaigns    | owner, campaigns, operations   | `/api/website`                                        | campaign, course, owner      | no  | CONNECTED      |
-| accounting   | `/accounting` (+ `/full-invoiced`, `/products`, `/sales`) | sales        | summary, months, profitability | `/api/accounting`, `/api/sales`, `/api/profitability` | course, product, salesperson | yes | CONNECTED      |
-| courses      | `/courses`                                                | sales        | campaigns, alerts, all         | `/api/agent-course-intelligence`, `/api/courses`      | course, campaign, product    | no  | CONNECTED      |
-| pricing      | `/pricing`                                                | sales        | —                              | `/api/pricing.catalog`                                | product                      | no  | **PARTIAL**    |
-| leads        | `/leads`                                                  | leads        | —                              | `/api/leads`, `/api/crm-calls`                        | source, course, salesperson  | yes | CONNECTED      |
-| lost         | `/lost`                                                   | leads        | team, course                   | `/api/lost`                                           | course, team, salesperson    | yes | CONNECTED      |
-| teams        | `/teams`                                                  | leads        | —                              | `/api/teams`                                          | team, salesperson            | yes | CONNECTED      |
-| weekend      | `/weekend`                                                | comparisons  | —                              | `/api/weekend`                                        | —                            | no  | CONNECTED      |
-| yoy          | `/yoy`                                                    | comparisons  | —                              | `/api/yoy`                                            | course                       | no  | CONNECTED      |
-| media_buyers | `/media-buyers`                                           | media-buyers | —                              | `/api/media-buyers`                                   | media buyer, campaign        | yes | CONNECTED      |
-| media_plan   | `/media-plan`                                             | media-buyers | —                              | `/api/media-plan`                                     | campaign, media buyer        | no  | CONNECTED      |
-| social_media | `/social-media`                                           | social       | —                              | `/api/ads`, `/api/organic`, `/api/teams`              | campaign, source             | no  | CONNECTED      |
-| organic      | `/organic`                                                | social       | —                              | `/api/organic`                                        | source, course               | no  | CONNECTED      |
-| guide        | `/guide`                                                  | support      | —                              | —                                                     | —                            | no  | NOT_APPLICABLE |
+| Surface      | Route(s)                                                  | Section      | Internal views                 | Endpoint(s)                                                                 | Entities                      | PII | Status         |
+| ------------ | --------------------------------------------------------- | ------------ | ------------------------------ | --------------------------------------------------------------------------- | ----------------------------- | --- | -------------- |
+| overview     | `/`                                                       | business     | —                              | `/api/overview`, `/api/teams`                                               | —                             | no  | CONNECTED      |
+| campaigns    | `/campaigns`                                              | campaigns    | —                              | `/api/campaigns`, `/api/campaign-risk`                                      | campaign                      | no  | CONNECTED      |
+| ads          | `/ads`                                                    | campaigns    | —                              | `/api/ads`                                                                  | campaign, adset, ad           | no  | CONNECTED      |
+| website      | `/website`                                                | campaigns    | owner, campaigns, operations   | `/api/website`                                                              | campaign, course, owner       | no  | CONNECTED      |
+| accounting   | `/accounting` (+ `/full-invoiced`, `/products`, `/sales`) | sales        | summary, months, profitability | `/api/accounting`, `/api/sales`, `/api/profitability`                       | course, product, salesperson  | yes | CONNECTED      |
+| courses      | `/courses`                                                | sales        | campaigns, alerts, all         | `/api/courses`, `/api/agent-course-intelligence`, `/api/course-lead-alerts` | course, campaign, product     | no  | CONNECTED      |
+| pricing      | `/pricing`                                                | sales        | —                              | `/api/pricing/catalog`                                                      | product                       | no  | **PARTIAL**    |
+| leads        | `/leads`                                                  | leads        | —                              | `/api/leads`, `/api/crm-calls`, `/api/uncalled-leads`                       | source, course, salesperson   | yes | CONNECTED      |
+| lost         | `/lost`                                                   | leads        | team, course                   | `/api/lost`                                                                 | course, team, salesperson     | yes | CONNECTED      |
+| teams        | `/teams`                                                  | leads        | —                              | `/api/teams`                                                                | team, salesperson             | yes | CONNECTED      |
+| weekend      | `/weekend`                                                | comparisons  | —                              | `/api/weekend`                                                              | —                             | no  | CONNECTED      |
+| yoy          | `/yoy`                                                    | comparisons  | —                              | `/api/yoy`                                                                  | course                        | no  | CONNECTED      |
+| media_buyers | `/media-buyers`                                           | media-buyers | —                              | `/api/media-buyers`                                                         | media buyer, campaign         | yes | CONNECTED      |
+| media_plan   | `/media-plan`                                             | media-buyers | —                              | `/api/media-plan`, `/api/media-plan-activity`                               | campaign, media buyer, course | no  | CONNECTED      |
+| social_media | `/social-media`                                           | social       | paid, organic                  | `/api/ads`, `/api/organic`, `/api/teams`                                    | campaign, source              | no  | CONNECTED      |
+| organic      | `/organic`                                                | social       | —                              | `/api/organic`                                                              | source, course                | no  | CONNECTED      |
+| guide        | `/guide`                                                  | support      | —                              | —                                                                           | —                             | no  | NOT_APPLICABLE |
 
 ### Why Pricing is PARTIAL
 
@@ -67,6 +68,7 @@ changing the URL, so the panel registers the active view:
 - **accounting** — summary · months · profitability
 - **courses** — campaigns · alerts · all
 - **lost** — team · course
+- **social media** — paid · organic
 
 `/media-plan` and `/pricing` also carry local state (`edit`/`create`,
 `recalculate`/`digest`), but those are **administrative dialogs**, not analytical
@@ -90,3 +92,8 @@ Explicit intent beats the current page. Standing on `/` and asking
 "الويبسايت باع بكام؟" queries **website**; standing on `/website` and asking
 "مبيعات CFM؟" queries **courses**. Page context resolves the deictic cases —
 "الصفحة دي", "التاب دي", "الرقم ده" — and nothing else.
+
+The frame also carries a small allow-list of page-local parameters. In
+particular, `/media-plan` registers the selected `YYYY-MM` month, so a request
+for “الميديا بلان دي” cannot silently fall back to the current month after the
+user changes the dashboard selector.

@@ -245,8 +245,16 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         ],
       },
     ],
+    /**
+     * `{entity}` is replaced by whatever the page has selected — so standing on
+     * Courses with CFM open offers "أرتبلك الموظفين اللي باعوا CFM؟" rather
+     * than a sentence about "the course". A generic offer is the usual reason a
+     * proactive assistant gets dismissed.
+     */
     suggestedQuestions: [
-      q("مين بيبيع أحسن؟", "Which course sells best?"),
+      q("تحب أقارن {entity} بالشهر اللي فات؟", "Compare {entity} with last month?"),
+      q("أرتبلك الموظفين اللي باعوا {entity}؟", "Rank the people who sold {entity}?"),
+      q("أجيب السعر والعروض الحالية؟", "Fetch the current price and offers?"),
       q("مين محتاج تدخل؟", "Which course needs attention?"),
     ],
   },
@@ -305,6 +313,7 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     suggestedQuestions: [
       q("الموقع باع بكام الشهر ده؟", "How much did the website sell this month?"),
       q("أنهي حملة جابت مبيعات؟", "Which campaign produced sales?"),
+      q("أكتر كورس اتباع من الموقع؟", "Which course sold most online?"),
     ],
   },
   {
@@ -321,6 +330,8 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
     elements: commonElements("campaigns"),
     suggestedQuestions: [
+      q("تحب أقارن الحملات على الإيراد والـROAS وجودة الـleads؟",
+        "Compare campaigns on revenue, ROAS and lead quality?"),
       q("أنهي حملة أحسن؟", "Which campaign is best?"),
       q("مين محتاج مراجعة؟", "Which needs review?"),
     ],
@@ -358,6 +369,7 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     suggestedQuestions: [
       q("إيراد الشهر ده كام؟", "What is this month's revenue?"),
       q("أنهي منتج أعلى ربحية؟", "Which product is most profitable?"),
+      q("قارن الشهر ده بالشهر اللي فات", "Compare this month with last month"),
     ],
   },
   {
@@ -374,6 +386,7 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     suggestedQuestions: [
       q("كام ليد الشهر ده؟", "How many leads this month?"),
       q("مين أحسن مصدر؟", "Which source is best?"),
+      q("في ليدز اتوزعت ومحدش كلمها؟", "Are there distributed leads nobody called?"),
     ],
   },
   {
@@ -403,6 +416,7 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     suggestedQuestions: [
       q("ليه بنخسر؟", "Why are we losing?"),
       q("أنهي كورس أعلى خسارة؟", "Which course loses most?"),
+      q("أنهي فريق أعلى نسبة خسارة؟", "Which team has the highest loss rate?"),
     ],
   },
   {
@@ -485,8 +499,9 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       },
     ],
     suggestedQuestions: [
+      q("تحب أرتب الفريق حسب تحقيق التارجت ولا حسب كورس معين؟",
+        "Rank the team by quota attainment, or by a particular course?"),
       q("مين أحسن فريق؟", "Which team performs best?"),
-      q("التارجت عامل إيه الشهر ده؟", "How are we tracking against target?"),
       q("مين لسه بعيد عن تارجته؟", "Who is furthest from their quota?"),
       q("مين أنسب موظف يبيع كورس PMP؟", "Who is best placed to sell PMP?"),
     ],
@@ -502,7 +517,11 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [{ id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["ads.spend"] }],
     elements: commonElements("ads"),
-    suggestedQuestions: [q("أنهي إعلان أحسن؟", "Which ad performs best?")],
+    suggestedQuestions: [
+      q("أنهي إعلان أحسن؟", "Which ad performs best?"),
+      q("في كرياتيف بايظ ولا لأ؟", "Is any creative fatiguing?"),
+      q("CPL الإعلانات دي كويس؟", "Is the CPL on these ads good?"),
+    ],
   },
   {
     id: "pricing",
@@ -515,7 +534,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: [],
-    suggestedQuestions: [q("سعر الكورس ده كام؟", "What does this course cost?")],
+    suggestedQuestions: [
+      q("سعر الكورس ده كام؟", "What does this course cost?"),
+      q("في عروض شغالة دلوقتي؟", "Are there any live offers right now?"),
+    ],
   },
   {
     id: "weekend",
@@ -528,7 +550,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: commonElements("weekend"),
-    suggestedQuestions: [q("الويك إند أحسن ولا لأ؟", "Is the weekend better?")],
+    suggestedQuestions: [
+      q("الويك إند أحسن ولا لأ؟", "Is the weekend better?"),
+      q("نزوّد ولا نقلّل صرف الويك إند؟", "Should we raise or cut weekend spend?"),
+    ],
   },
   {
     id: "yoy",
@@ -541,7 +566,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: commonElements("yoy"),
-    suggestedQuestions: [q("السنة دي أحسن؟", "Is this year better?")],
+    suggestedQuestions: [
+      q("السنة دي أحسن؟", "Is this year better?"),
+      q("أنهي كورس اتحسن أكتر سنة بسنة؟", "Which course improved most year on year?"),
+    ],
   },
   {
     id: "media_buyers",
@@ -554,7 +582,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: commonElements("media_buyers"),
-    suggestedQuestions: [q("مين أحسن ميديا باير؟", "Which media buyer performs best?")],
+    suggestedQuestions: [
+      q("مين أحسن ميديا باير؟", "Which media buyer performs best?"),
+      q("كام من الإنفاق مش متعيّن لحد؟", "How much spend is assigned to nobody?"),
+    ],
   },
   {
     id: "media_plan",
@@ -567,7 +598,12 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: [],
-    suggestedQuestions: [q("إحنا فين من الخطة؟", "How are we tracking against plan?")],
+    suggestedQuestions: [
+      q("تحب أشوف إحنا سابقين ولا متأخرين عن pacing الخطة؟",
+        "See whether we are ahead of or behind the plan's pacing?"),
+      q("إحنا فين من الخطة؟", "How are we tracking against plan?"),
+      q("أنهي كورس أبعد عن خطته؟", "Which course is furthest from its plan?"),
+    ],
   },
   {
     id: "social_media",
@@ -580,7 +616,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: commonElements("social_media"),
-    suggestedQuestions: [q("أنهي قناة أحسن؟", "Which channel performs best?")],
+    suggestedQuestions: [
+      q("أنهي قناة أحسن؟", "Which channel performs best?"),
+      q("قارن المدفوع بالأورجانيك", "Compare paid against organic"),
+    ],
   },
   {
     id: "organic",
@@ -593,7 +632,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     tabs: [],
     sections: [],
     elements: commonElements("organic"),
-    suggestedQuestions: [q("الأورجانيك جاب كام؟", "How much did organic bring?")],
+    suggestedQuestions: [
+      q("الأورجانيك جاب كام؟", "How much did organic bring?"),
+      q("مين أحسن مصدر أورجانيك؟", "Which organic source is best?"),
+    ],
   },
 ];
 

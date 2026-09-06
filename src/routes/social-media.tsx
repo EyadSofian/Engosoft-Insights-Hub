@@ -28,6 +28,7 @@ import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import type { Platform } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/social-media")({ component: SocialMedia });
 
@@ -76,6 +77,9 @@ function duration(seconds: number | null, lang: "ar" | "en") {
 
 function SocialMedia() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("social_media");
   const { lang } = useI18n();
   const ads = useApi<AdsResponse>("/api/ads");
   const organic = useApi<OrganicResponse>("/api/organic");

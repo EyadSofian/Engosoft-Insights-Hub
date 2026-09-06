@@ -28,6 +28,7 @@ import { FilterSummary } from "@/components/ads/FilterSummary";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import type { PerfRow, Platform } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/media-buyers")({ component: MediaBuyers });
 
@@ -83,6 +84,9 @@ function metricWinner(
 
 function MediaBuyers() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("media_buyers");
   const { lang } = useI18n();
   const { data, isLoading, error, refetch } = useApi<Response>("/api/media-buyers");
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;

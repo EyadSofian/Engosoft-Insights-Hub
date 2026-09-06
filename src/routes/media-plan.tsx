@@ -31,6 +31,7 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { MonthlyMediaPlan } from "@/lib/media-plan";
 import { useApi } from "@/lib/use-api";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/media-plan")({ component: MediaPlanPage });
 
@@ -144,6 +145,9 @@ function MediaPlanPage() {
   const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const [month, setMonth] = useState("2026-09");
+  // Month is local page state, so declare it explicitly. Nexus then reads the
+  // same plan the manager has selected instead of silently defaulting to now.
+  useRegisterNexusView("media_plan", { parameters: { month } });
   const [editor, setEditor] = useState<"edit" | "create" | null>(null);
   const { data, isLoading, error, refetch } = useApi<MediaPlanResponse>(
     `/api/media-plan?month=${month}`,

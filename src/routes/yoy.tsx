@@ -19,6 +19,7 @@ import {
 } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/yoy")({ component: Yoy });
 
@@ -67,6 +68,9 @@ function metricLabel(metric: string, lang: "ar" | "en"): string {
 
 function Yoy() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("yoy");
   const { t, lang } = useI18n();
   // Year-over-year is a property of the whole sheet, not of the active window,
   // so this endpoint deliberately ignores the global filters.

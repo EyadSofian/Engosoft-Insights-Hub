@@ -35,7 +35,7 @@ describe("renderer — text", () => {
       />,
     );
     expect(screen.getByTestId("nexus-text")).toHaveTextContent("Revenue is up");
-    expect(screen.getByText("Revenue").tagName).toBe("STRONG");
+    expect(screen.getByText("Revenue").closest("strong")?.tagName).toBe("STRONG");
   });
 
   it("drops images from markdown rather than loading remote content", () => {
@@ -58,6 +58,21 @@ describe("renderer — text", () => {
     const link = screen.getByRole("link", { name: "docs" });
     expect(link).toHaveAttribute("target", "_blank");
     expect(link.getAttribute("rel")).toContain("noreferrer");
+  });
+
+  it("keeps Arabic prose RTL while isolating Latin product names", () => {
+    const { container } = render(
+      <NexusMessageRenderer
+        message={nativeMessage({
+          type: "text",
+          text: "**PMP + Exam:** السعر 600.00 SAR",
+        })}
+        options={{ ...baseOptions, lang: "ar" }}
+      />,
+    );
+    expect(container.querySelector("p")).toHaveAttribute("dir", "rtl");
+    expect(screen.getByText("PMP + Exam:").tagName).toBe("BDI");
+    expect(screen.getByText("PMP + Exam:")).toHaveAttribute("dir", "ltr");
   });
 });
 

@@ -6,20 +6,27 @@
  * data — while /website was showing the figure. That is not a data gap, it is
  * an unwired capability, and the two are indistinguishable to a user.
  *
- * This registry is ARCHITECTURE METADATA, not business data. It records which
- * route a surface owns, which internal views it has, which endpoint answers it,
- * and whether an agent may read it. Tests assert that every visible navigation
- * route appears here, so a new page cannot ship without either coverage or an
- * explicit decision not to.
+ * THIS FILE IS NOW A PROJECTION, NOT A SOURCE. The authoritative declaration
+ * lives in `agent-surface-contract.ts`, which carries the per-view sources,
+ * required arguments, row projections and caveats the gateway actually needs.
+ * This module keeps the flatter shape the existing coverage tests and the
+ * older callers read, derived from that one contract — so a surface cannot be
+ * described two different ways in two files, which is how `endpoints[0]`
+ * survived: the registry listed three endpoints and the gateway used one, and
+ * nothing compared them.
  *
  * It contains no figures and performs no computation — the endpoints it names
  * are the dashboard's own, so the agent and the page cannot diverge.
  */
 
-export type SurfaceStatus =
-  "CONNECTED" | "PARTIAL" | "MISSING" | "NOT_AGENT_SAFE" | "NOT_APPLICABLE";
+import {
+  SURFACE_CONTRACTS,
+  AGENT_FORBIDDEN_ENDPOINTS as CONTRACT_FORBIDDEN,
+  type SurfaceContract,
+} from "./agent-surface-contract";
 
-export type SurfaceOperation = "summary" | "list" | "detail" | "compare" | "trend" | "search";
+export type { SurfaceStatus, SurfaceOperation } from "./agent-surface-contract";
+import type { SurfaceStatus, SurfaceOperation } from "./agent-surface-contract";
 
 export interface InsightsSurface {
   /** Stable id used by the agent tool. Never a URL. */
@@ -30,7 +37,14 @@ export interface InsightsSurface {
   section: string;
   /** Internal analytical views the page switches between, if any. */
   views: string[];
-  /** Dashboard endpoints that supply it. The agent never sees these. */
+  /**
+   * Every dashboard endpoint that supplies it — all of them, not the first.
+   *
+   * The gateway now reads the contract's per-view source list rather than this
+   * array. It stays here because the coverage audit and the route-file test
+   * both walk it, and because "which endpoints does this surface touch" is a
+   * question worth being able to ask in one line.
+   */
   endpoints: string[];
   /** What an agent may ask of it. */
   operations: SurfaceOperation[];
@@ -39,401 +53,34 @@ export interface InsightsSurface {
   /** True when the surface can expose personal data and needs care. */
   sensitive: boolean;
   status: SurfaceStatus;
-  /**
-   * Where this surface keeps its headline figures, as dot paths.
-   *
-   * `totals` and `summary` are the dashboard's two conventions and are always
-   * tried. A surface that keeps them elsewhere says so here — Weekend nests
-   * them under `portfolio.weekend`, Media Plan under `plan` — and without that
-   * the agent received a payload with no numbers it could quote.
-   */
+  /** Where this surface keeps its headline figures, as dot paths. */
   summaryPaths?: string[];
   /** Why, when the status is not CONNECTED. */
   note?: string;
 }
 
-export const INSIGHTS_SURFACES: InsightsSurface[] = [
-  {
-    id: "overview",
-    routes: ["/"],
-    section: "business",
-    views: [],
-    endpoints: ["/api/overview", "/api/teams"],
-    operations: ["summary", "trend"],
-    entities: [],
-    sensitive: false,
-    summaryPaths: [
-      "activity.best",
-      "activity.worst",
-      "best",
-      "bestCPL",
-      "chatwoot",
-      "deltas",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "leak",
-      "targets",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "campaigns",
-    routes: ["/campaigns"],
-    section: "campaigns",
-    views: [],
-    endpoints: ["/api/campaigns", "/api/campaign-risk"],
-    operations: ["summary", "list", "detail", "compare"],
-    entities: ["campaign"],
-    sensitive: false,
-    summaryPaths: [
-      "activity.best",
-      "activity.worst",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "ads",
-    routes: ["/ads"],
-    section: "campaigns",
-    views: [],
-    endpoints: ["/api/ads"],
-    operations: ["summary", "list", "detail"],
-    entities: ["campaign", "adset", "ad"],
-    sensitive: false,
-    summaryPaths: [
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "platformCoverageAll",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "website",
-    routes: ["/website"],
-    section: "campaigns",
-    views: ["owner", "campaigns", "operations"],
-    endpoints: ["/api/website"],
-    operations: ["summary", "list", "detail"],
-    entities: ["campaign", "course", "owner"],
-    sensitive: false,
-    summaryPaths: [
-      "detail",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "insights",
-      "insights.bestSellingCourse",
-      "insights.highestDemandUnsoldCourse",
-      "leadSources",
-      "reconciliation",
-      "salesDetail",
-      "sheetSalesAnalysis",
-      "websiteCampaignAttribution",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "accounting",
-    routes: ["/accounting", "/full-invoiced", "/products", "/sales"],
-    section: "sales",
-    views: ["summary", "months", "profitability"],
-    endpoints: ["/api/accounting", "/api/sales", "/api/profitability"],
-    operations: ["summary", "list", "trend"],
-    entities: ["course", "product", "salesperson"],
-    // Invoice rows carry customer names; aggregates only for the agent.
-    sensitive: true,
-    summaryPaths: [
-      "courses.summary",
-      "detail",
-      "funnel",
-      "fxRates",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "insights.bestConvertingCampaign",
-      "insights.bestConvertingSource",
-      "insights.bestSellingCampaign",
-      "insights.bestSellingSource",
-      "snapshot",
-      "source",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "courses",
-    routes: ["/courses"],
-    section: "sales",
-    views: ["campaigns", "alerts", "all"],
-    endpoints: ["/api/courses", "/api/agent-course-intelligence", "/api/course-lead-alerts"],
-    operations: ["summary", "list", "detail", "compare", "trend"],
-    entities: ["course", "campaign", "product"],
-    sensitive: false,
-    summaryPaths: [
-      "comparisonPeriod",
-      "freshness",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "pricing",
-    routes: ["/pricing"],
-    section: "sales",
-    views: [],
-    // The file is pricing.catalog.ts; TanStack serves it at /api/pricing/catalog.
-    endpoints: ["/api/pricing/catalog"],
-    operations: ["summary", "search"],
-    entities: ["product"],
-    sensitive: false,
-    status: "PARTIAL",
-    note: "Current sell price is PriceEngo's, not this page's. The agent quotes PriceEngo; this surface exposes the internal catalogue view only.",
-  },
-  {
-    id: "leads",
-    routes: ["/leads"],
-    section: "leads",
-    views: [],
-    endpoints: ["/api/leads", "/api/crm-calls", "/api/uncalled-leads"],
-    operations: ["summary", "list", "trend"],
-    entities: ["source", "course", "salesperson"],
-    // Lead rows carry phone and email — aggregates only.
-    sensitive: true,
-    summaryPaths: [
-      "detail",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "leads",
-      "pipeline",
-      "salesFunnel.funnel",
-      "salesFunnel.insights.bestConvertingCampaign",
-      "salesFunnel.insights.bestConvertingSource",
-      "salesFunnel.insights.bestSellingCampaign",
-      "salesFunnel.insights.bestSellingSource",
-      "salesFunnel.totals",
-      "summary.severity",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "lost",
-    routes: ["/lost"],
-    section: "leads",
-    views: ["team", "course"],
-    endpoints: ["/api/lost"],
-    operations: ["summary", "list"],
-    entities: ["course", "team", "salesperson"],
-    sensitive: true,
-    summaryPaths: [
-      "breakdown",
-      "breakdown.reasonByCourse",
-      "breakdown.reasonByTeam",
-      "closureMovement",
-      "detail",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "teams",
-    routes: ["/teams"],
-    section: "leads",
-    views: [],
-    endpoints: ["/api/teams"],
-    operations: ["summary", "list", "detail", "compare"],
-    entities: ["team", "salesperson"],
-    sensitive: true,
-    summaryPaths: [
-      "chatwoot",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "targets",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "weekend",
-    routes: ["/weekend"],
-    section: "comparisons",
-    views: [],
-    endpoints: ["/api/weekend"],
-    operations: ["summary", "compare"],
-    entities: [],
-    sensitive: false,
-    status: "CONNECTED",
-    summaryPaths: [
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "portfolio",
-      "portfolio.comparison",
-      "portfolio.weekend",
-      "window",
-    ],
-  },
-  {
-    id: "yoy",
-    routes: ["/yoy"],
-    section: "comparisons",
-    views: [],
-    endpoints: ["/api/yoy"],
-    operations: ["summary", "compare", "trend"],
-    entities: ["course"],
-    sensitive: false,
-    summaryPaths: [
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "media_buyers",
-    routes: ["/media-buyers"],
-    section: "media-buyers",
-    views: [],
-    endpoints: ["/api/media-buyers"],
-    operations: ["summary", "list", "compare"],
-    entities: ["media_buyer", "campaign"],
-    sensitive: true,
-    summaryPaths: [
-      "coverage",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "media_plan",
-    routes: ["/media-plan"],
-    section: "media-buyers",
-    views: [],
-    endpoints: ["/api/media-plan", "/api/media-plan-activity"],
-    operations: ["summary", "list"],
-    entities: ["campaign", "media_buyer"],
-    sensitive: false,
-    status: "CONNECTED",
-    summaryPaths: [
-      "actual",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "plan",
-      "window",
-    ],
-  },
-  {
-    id: "social_media",
-    routes: ["/social-media"],
-    section: "social",
-    views: [],
-    endpoints: ["/api/ads", "/api/organic", "/api/teams"],
-    operations: ["summary", "list"],
-    entities: ["campaign", "source"],
-    sensitive: false,
-    summaryPaths: [
-      "chatwoot",
-      "counts",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "insights.bestConversionCourse",
-      "insights.topLeadSource",
-      "insights.topRevenueCourse",
-      "insights.topRevenueSource",
-      "insights.topSalesperson",
-      "insights.topTeam",
-      "platformCoverageAll",
-      "targets",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "organic",
-    routes: ["/organic"],
-    section: "social",
-    views: [],
-    endpoints: ["/api/organic"],
-    operations: ["summary", "list"],
-    entities: ["source", "course"],
-    sensitive: false,
-    summaryPaths: [
-      "counts",
-      "health",
-      "health.accountingDirect",
-      "health.crmExclusions",
-      "health.lostExclusions",
-      "insights.bestConversionCourse",
-      "insights.topLeadSource",
-      "insights.topRevenueCourse",
-      "insights.topRevenueSource",
-      "insights.topSalesperson",
-      "insights.topTeam",
-    ],
-    status: "CONNECTED",
-  },
-  {
-    id: "guide",
-    routes: ["/guide"],
-    section: "support",
-    views: [],
-    endpoints: [],
-    operations: [],
-    entities: [],
-    sensitive: false,
-    status: "NOT_APPLICABLE",
-    note: "Documentation page. No analytics to retrieve.",
-  },
-];
+const project = (contract: SurfaceContract): InsightsSurface => ({
+  id: contract.id,
+  routes: [...contract.routes],
+  section: contract.section,
+  views: contract.views.map((view) => view.id),
+  endpoints: contract.sources.map((source) => source.endpoint),
+  operations: [...contract.operations],
+  entities: [...contract.entities],
+  sensitive: contract.sensitivity === "personal",
+  status: contract.status,
+  summaryPaths: [
+    ...new Set([
+      ...(contract.summaryPaths ?? []),
+      ...contract.sources.flatMap((source) => source.summaryPaths ?? []),
+    ]),
+  ].sort(),
+  ...(contract.note ? { note: contract.note } : {}),
+});
 
-/**
- * Endpoints an agent must never call.
- *
- * Everything that publishes, imports, recalculates, refreshes, ingests or
- * sends. Read intelligence is the whole of this phase; a mutation reached by a
- * misread sentence is not a risk worth carrying.
- */
-export const AGENT_FORBIDDEN_ENDPOINTS = [
-  "/api/pricing.publish",
-  "/api/pricing.recalculate",
-  "/api/pricing.import.preview",
-  "/api/refresh",
-  "/api/ingest.dataset",
-  "/api/telegram.send-daily",
-  "/api/telegram.send-course-alerts",
-  "/api/telegram.setup",
-  "/api/telegram.preview",
-  "/api/telegram.webhook",
-  "/api/chatwoot.webhook",
-  "/api/auth.sso",
-  "/api/accounting-export",
-  "/api/employee-call-recording",
-];
+export const INSIGHTS_SURFACES: InsightsSurface[] = SURFACE_CONTRACTS.map(project);
+
+export const AGENT_FORBIDDEN_ENDPOINTS: string[] = [...CONTRACT_FORBIDDEN];
 
 const BY_ROUTE = new Map<string, InsightsSurface>();
 for (const surface of INSIGHTS_SURFACES) {

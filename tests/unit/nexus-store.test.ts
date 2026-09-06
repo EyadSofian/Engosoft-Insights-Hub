@@ -3,22 +3,33 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   canShowProactive,
   clearProactiveMemory,
+  isProactiveOptedOut,
   nexusStore,
   rememberPanelOpened,
   rememberProactiveDismissed,
+  rememberProactiveShown,
+  resetProactiveSession as clearSession,
+  setProactiveOptOut,
 } from "@/components/engo-nexus/state/nexus-store";
 import {
   NEXUS_POPUP_KEY,
   NEXUS_STORAGE_PREFIX,
+  PROACTIVE_AFTER_OPEN_MS,
   PROACTIVE_SNOOZE_MS,
+  PROACTIVE_SURFACE_SNOOZE_MS,
   nexusStorageKey,
 } from "@/components/engo-nexus/lib/nexus-config";
 
 beforeEach(() => {
   window.localStorage.clear();
   nexusStore.reset();
+  // The per-session cap is module state, not storage — it has to be reset too.
+  clearSession();
 });
-afterEach(() => window.localStorage.clear());
+afterEach(() => {
+  window.localStorage.clear();
+  clearSession();
+});
 
 describe("nexus-store — panel state", () => {
   it("opens, closes and carries a pending prompt exactly once", () => {
@@ -75,14 +86,65 @@ describe("nexus-store — the proactive popup does not nag", () => {
   it("stays quiet for a week after a dismissal, then may show again", () => {
     const now = Date.UTC(2026, 8, 4);
     rememberProactiveDismissed(now);
-    expect(canShowProactive(now)).toBe(false);
-    expect(canShowProactive(now + PROACTIVE_SNOOZE_MS - 1)).toBe(false);
-    expect(canShowProactive(now + PROACTIVE_SNOOZE_MS + 1)).toBe(true);
+    expect(canShowProactive({ now })).toBe(false);
+    expect(canShowProactive({ now: now + PROACTIVE_SNOOZE_MS - 1 })).toBe(false);
+    expect(canShowProactive({ now: now + PROACTIVE_SNOOZE_MS + 1 })).toBe(true);
   });
 
-  it("never shows to someone who has already opened the panel", () => {
-    rememberPanelOpened(Date.UTC(2026, 8, 4));
-    expect(canShowProactive(Date.UTC(2030, 0, 1))).toBe(false);
+  it("quiets for a DAY after the panel is opened, not forever", () => {
+    /**
+     * The old rule was "never again to anyone who has ever opened the panel",
+     * which permanently disabled every future page-specific offer because
+     * someone once clicked the launcher. Knowing the assistant exists is a
+     * reason not to nag today, not a reason never to help again.
+     */
+    const now = Date.UTC(2026, 8, 4);
+    rememberPanelOpened(now);
+    expect(canShowProactive({ now })).toBe(false);
+    expect(canShowProactive({ now: now + PROACTIVE_AFTER_OPEN_MS - 1 })).toBe(false);
+    expect(canShowProactive({ now: now + PROACTIVE_AFTER_OPEN_MS + 1 })).toBe(true);
+  });
+
+  it("remembers surfaces separately, so one page does not use up another's chance", () => {
+    const now = Date.UTC(2026, 8, 4);
+    rememberProactiveShown("courses", now);
+    clearSession();
+    expect(canShowProactive({ surface: "courses", now: now + 1000 })).toBe(false);
+    expect(canShowProactive({ surface: "media_plan", now: now + 1000 })).toBe(true);
+    expect(
+      canShowProactive({ surface: "courses", now: now + PROACTIVE_SURFACE_SNOOZE_MS + 1 }),
+    ).toBe(true);
+  });
+
+  it("shows at most once per session, however long the session runs", () => {
+    const now = Date.UTC(2026, 8, 4);
+    expect(canShowProactive({ surface: "courses", now })).toBe(true);
+    rememberProactiveShown("courses", now);
+    // A different surface, a day later — still capped, because it is one session.
+    expect(canShowProactive({ surface: "leads", now: now + 86_400_000 })).toBe(false);
+  });
+
+  it("caps how often it may appear across a rolling week", () => {
+    const now = Date.UTC(2026, 8, 4);
+    for (const [index, surface] of ["a", "b", "c"].entries()) {
+      clearSession();
+      expect(canShowProactive({ surface, now: now + index }), surface).toBe(true);
+      rememberProactiveShown(surface, now + index);
+    }
+    clearSession();
+    expect(canShowProactive({ surface: "d", now: now + 10 })).toBe(false);
+    // Once the week rolls over, it may offer again.
+    expect(canShowProactive({ surface: "d", now: now + 8 * 24 * 60 * 60 * 1000 })).toBe(true);
+  });
+
+  it("honours a global opt-out, absolutely", () => {
+    expect(canShowProactive({ surface: "courses" })).toBe(true);
+    setProactiveOptOut(true);
+    expect(isProactiveOptedOut()).toBe(true);
+    expect(canShowProactive({ surface: "courses" })).toBe(false);
+    expect(canShowProactive({ surface: "leads", now: Date.UTC(2030, 0, 1) })).toBe(false);
+    setProactiveOptOut(false);
+    expect(canShowProactive({ surface: "courses" })).toBe(true);
   });
 
   it("survives a corrupt or unparsable stored value", () => {

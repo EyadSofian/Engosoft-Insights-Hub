@@ -150,6 +150,7 @@ describe("the view context tracks what the page declares", () => {
       section: null,
       focusedElementId: null,
       selectedEntity: null,
+      parameters: {},
     });
   });
 });
@@ -236,9 +237,10 @@ describe("the context frame carries what the page declared", () => {
       }),
     );
     expect(frame).toContain("page=website");
-    expect(frame).toContain("tab=campaigns");
-    expect(frame).toContain("section=kpis");
-    expect(frame).toContain("element=website.sales");
+    // v2 quotes every value, so a name containing a space arrives whole.
+    expect(frame).toContain('tab="campaigns"');
+    expect(frame).toContain('section="kpis"');
+    expect(frame).toContain('element="website.sales"');
   });
 
   it("omits them when the page declared nothing", async () => {

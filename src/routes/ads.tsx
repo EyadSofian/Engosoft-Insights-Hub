@@ -47,6 +47,7 @@ import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { ACQUISITION_CHANNEL_LABEL, PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import { acquisitionChannel } from "@/lib/acquisition-channel";
 import type { AcquisitionChannel, DataHealth, Maybe, PerfRow, Platform, Totals } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/ads")({ component: Ads });
 
@@ -113,6 +114,9 @@ function Ads() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("ads", { tab: grain });
   const [showAllKpis, setShowAllKpis] = useState(false);
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/ads?grain=${grain}`);
 

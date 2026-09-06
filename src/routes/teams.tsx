@@ -9,6 +9,7 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { CloseTime, CountPct } from "@/components/metric-bits";
 import { AccountingAgentsView } from "@/components/accounting/AccountingSubViews";
 import type { DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/teams")({ component: Teams });
 
@@ -27,6 +28,9 @@ const maybe = (n: Maybe, fmt: (v: number) => string) =>
 
 function Teams() {
   const reportingPeriod = useReportingPeriod();
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("teams");
   const { t, lang } = useI18n();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/teams");

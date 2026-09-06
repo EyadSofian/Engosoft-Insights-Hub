@@ -33,6 +33,7 @@ import { FilterSummary } from "@/components/ads/FilterSummary";
 import { PerfExplorer, type Grain } from "@/components/ads/PerfExplorer";
 import { ratioCell } from "@/components/ads/cells";
 import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 type CampaignsSearch = { view?: "attributedRevenue" };
 type CampaignWorkspaceTab = "decision" | "live" | "analysis";
@@ -89,6 +90,9 @@ function Campaigns() {
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
   const [workspaceTab, setWorkspaceTab] = useState<CampaignWorkspaceTab>("decision");
+  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
+  // have something to resolve against. Ids and state only — no figures.
+  useRegisterNexusView("campaigns", { tab: workspaceTab });
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;

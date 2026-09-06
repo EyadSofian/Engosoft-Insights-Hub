@@ -9,14 +9,24 @@ import { NexusHeader } from "@/components/engo-nexus/NexusHeader";
 import {
   canShowProactive,
   clearProactiveMemory,
+  isProactiveOptedOut,
   nexusStore,
+  resetProactiveSession,
 } from "@/components/engo-nexus/state/nexus-store";
-import { PROACTIVE_DELAY_MS } from "@/components/engo-nexus/lib/nexus-config";
+import {
+  PROACTIVE_AFTER_OPEN_MS,
+  PROACTIVE_DELAY_MS,
+} from "@/components/engo-nexus/lib/nexus-config";
+import { quickActionsFor } from "@/components/engo-nexus/lib/nexus-context";
 
 // The dashboard's providers, stubbed to the two values these components read.
 // Stubbing rather than wrapping keeps each test about the component under test.
 vi.mock("@/lib/i18n", () => ({ useI18n: () => ({ lang: "en", t: (k: string) => k, dir: "ltr" }) }));
-vi.mock("@tanstack/react-router", () => ({ useLocation: () => ({ pathname: "/campaigns" }) }));
+/** Mutable so a test can navigate; reset to /campaigns by each test that moves it. */
+const routerPath = { current: "/campaigns" };
+vi.mock("@tanstack/react-router", () => ({
+  useLocation: () => ({ pathname: routerPath.current }),
+}));
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -86,15 +96,31 @@ describe("proactive popup", () => {
     expect(screen.getByTestId("nexus-proactive")).toBeInTheDocument();
   });
 
-  it("offers actions for the page the user is on", () => {
+  it("offers actions for the page the user is on, from the surface registry", () => {
+    /**
+     * The suggestions used to live in a hardcoded map beside a second list in
+     * the surface registry, and the two had drifted. The registry is now the
+     * only source, so this asserts the CONNECTION rather than three frozen
+     * strings that go stale the moment a question is reworded.
+     */
     render(<NexusProactivePopup />);
     act(() => void vi.advanceTimersByTime(PROACTIVE_DELAY_MS + 10));
     const actions = screen.getAllByTestId("nexus-proactive-action");
-    expect(actions.map((a) => a.textContent)).toEqual([
-      "Analyse campaigns",
-      "Best ROAS",
-      "Where is the problem?",
-    ]);
+    expect(actions.length).toBeGreaterThan(0);
+    const expected = quickActionsFor("campaigns", "en").slice(0, 3);
+    expect(actions.map((a) => a.textContent)).toEqual(expected.map((a) => a.label));
+    // Each chip carries the full question as its title, so nothing is lost to
+    // the truncation that makes it fit.
+    expect(actions[0]!.getAttribute("title")).toBe(expected[0]!.prompt);
+  });
+
+  it("offers a way to turn proactive help off for good", () => {
+    render(<NexusProactivePopup />);
+    act(() => void vi.advanceTimersByTime(PROACTIVE_DELAY_MS + 10));
+    fireEvent.click(screen.getByTestId("nexus-proactive-optout"));
+    expect(screen.queryByTestId("nexus-proactive")).toBeNull();
+    expect(isProactiveOptedOut()).toBe(true);
+    expect(canShowProactive({ now: Date.UTC(2030, 0, 1) })).toBe(false);
   });
 
   it("dismisses, and remembers the dismissal across mounts", () => {
@@ -115,10 +141,40 @@ describe("proactive popup", () => {
     act(() => void vi.advanceTimersByTime(PROACTIVE_DELAY_MS + 10));
     fireEvent.click(screen.getAllByTestId("nexus-proactive-action")[0]!);
     expect(nexusStore.get().open).toBe(true);
-    expect(nexusStore.consumePendingPrompt()).toContain("Analyse campaign performance");
+    expect(nexusStore.consumePendingPrompt()).toBe(quickActionsFor("campaigns", "en")[0]!.prompt);
     expect(nexusStore.consumePendingPrompt()).toBeNull();
-    // Opening the panel also stops the popup returning later.
+    // Opening the panel quiets the popup for a day — not forever.
     expect(canShowProactive()).toBe(false);
+    // The per-session cap has also been spent by this showing, so it is cleared
+    // to isolate the rule under test: a day later, in a new session, the offer
+    // is allowed again. It used to be disabled permanently.
+    resetProactiveSession();
+    expect(
+      canShowProactive({ surface: "leads", now: Date.now() + PROACTIVE_AFTER_OPEN_MS + 1000 }),
+    ).toBe(true);
+  });
+
+  it("restarts its dwell timer when the route changes", async () => {
+    /**
+     * A single global timer fired on whichever page happened to be open when it
+     * elapsed — an offer about a page the user had already left. The timer is
+     * keyed on the pathname, so walking through four pages in twenty seconds
+     * triggers nothing.
+     */
+    const { rerender } = render(<NexusProactivePopup />);
+    act(() => void vi.advanceTimersByTime(PROACTIVE_DELAY_MS - 2000));
+    expect(screen.queryByTestId("nexus-proactive")).toBeNull();
+
+    // Navigate: the mocked router reports a new pathname.
+    routerPath.current = "/courses";
+    rerender(<NexusProactivePopup key="courses" />);
+    act(() => void vi.advanceTimersByTime(3000));
+    // The old timer's remaining 2s must NOT be enough.
+    expect(screen.queryByTestId("nexus-proactive")).toBeNull();
+
+    act(() => void vi.advanceTimersByTime(PROACTIVE_DELAY_MS));
+    expect(screen.getByTestId("nexus-proactive")).toBeInTheDocument();
+    routerPath.current = "/campaigns";
   });
 
   it("stays hidden while the panel is open", () => {
@@ -198,7 +254,11 @@ describe("welcome state", () => {
       "/engo-nexus/mascot.png",
     );
     const actions = screen.getAllByTestId("nexus-welcome-action");
-    expect(actions.map((a) => a.textContent)).toContain("Team performance");
+    // Page-aware suggestions come from the surface registry — /sales is an
+    // alias of the accounting surface, so those are the questions offered.
+    expect(actions.map((a) => a.textContent)).toEqual(
+      expect.arrayContaining(quickActionsFor("sales", "en").map((a) => a.label)),
+    );
     // Always-available actions are appended, never duplicated.
     expect(actions.map((a) => a.textContent)).toContain("Top 3 decisions");
     fireEvent.click(actions[0]!);
