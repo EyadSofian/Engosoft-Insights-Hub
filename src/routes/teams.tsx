@@ -68,7 +68,7 @@ function Teams() {
         <>
           <AccountingAgentsView />
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="card-grid md:grid-cols-2">
             <Card>
               <SectionTitle hint={lang === "ar" ? "٢٠ عميلاً فأكثر" : "20+ leads"}>
                 {lang === "ar" ? "الأفضل تحويلاً" : "Top converters"}

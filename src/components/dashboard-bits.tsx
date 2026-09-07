@@ -366,6 +366,8 @@ export function InsightCard({
   search,
   onClick,
   actionLabel,
+  ariaLabel,
+  testId,
   index = 0,
 }: {
   kind: InsightKind;
@@ -380,6 +382,9 @@ export function InsightCard({
   search?: Record<string, unknown>;
   onClick?: () => void;
   actionLabel?: string;
+  /** Spoken name, when the visible wording is not enough on its own. */
+  ariaLabel?: string;
+  testId?: string;
   index?: number;
 }) {
   const { lang } = useI18n();
@@ -406,7 +411,7 @@ export function InsightCard({
         </span>
         {interactive && (
           <span
-            className="shrink-0 opacity-45 transition-transform group-hover:translate-x-0 rtl:group-hover:-translate-x-0"
+            className="kpi-cue-arrow shrink-0 opacity-45"
             style={{ color: "var(--tone-ink)" }}
             aria-hidden="true"
           >
@@ -440,8 +445,10 @@ export function InsightCard({
         </p>
       )}
       {interactive && actionLabel && (
+        /* `mt-auto` pins the cue to the foot of the card, so a row of readings
+           lines up along the bottom however long each explanation runs. */
         <span
-          className="mt-2.5 inline-flex items-center gap-1 text-[11.5px] font-bold"
+          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[11.5px] font-bold"
           style={{ color: "var(--tone-strong)" }}
         >
           {actionLabel}
@@ -450,35 +457,65 @@ export function InsightCard({
     </>
   );
 
+  /* The reading and the KPI above it are the same kind of object — something a
+     reader can open — so they share `kpi-card`: the same padding, the same
+     hover border in the family's own tone, the same moving chevron and the same
+     focus ring. `h-full` is what keeps three readings of different lengths
+     level along the bottom of the row. */
   const shell =
-    "tone-surface stagger group relative block min-w-0 overflow-hidden p-4 text-start " +
+    "tone-surface stagger group relative flex h-full min-w-0 flex-col overflow-hidden pad-card text-start " +
     (interactive
-      ? "lift cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      ? "kpi-card lift cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       : "");
   const style = { ...toneVars(tone), "--i": index } as React.CSSProperties;
 
   if (to) {
     return (
-      <Link to={to} search={search as never} className={shell} style={style}>
+      <Link
+        to={to}
+        search={search as never}
+        className={shell}
+        style={style}
+        data-metric-trigger=""
+        data-testid={testId}
+      >
         {body}
       </Link>
     );
   }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`${shell} w-full`} style={style}>
+      <button
+        type="button"
+        onClick={onClick}
+        /* A reading that opens a panel says so to a screen reader as well as to
+           the eye, exactly as `KpiCard` does — the two are one affordance and a
+           reader should not have to learn them separately. */
+        aria-haspopup="dialog"
+        aria-label={ariaLabel}
+        data-metric-trigger=""
+        data-testid={testId}
+        className={`${shell} w-full`}
+        style={style}
+      >
         {body}
       </button>
     );
   }
   return (
-    <div className={shell} style={style}>
+    <div className={shell} style={style} data-testid={testId}>
       {body}
     </div>
   );
 }
 
-/** One to three insights across the width. */
+/**
+ * One to three readings across the width.
+ *
+ * Uses `--gap-card`, the same distance as two KPI cards, because these are
+ * peers of that row and not a new level of the page. The level break above them
+ * is `--gap-group`, and it is `PageSections` that draws it.
+ */
 export function InsightRow({
   children,
   className = "",
@@ -486,7 +523,10 @@ export function InsightRow({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={`grid gap-3 lg:grid-cols-3 ${className}`}>{children}</div>;
+  // Three across from `md`, not `lg`: between 768 and 1024 there is no
+  // navigation rail, so three readings clear the 205px a card needs — and a
+  // full-width reading at that size is a very wide box holding two short lines.
+  return <div className={`card-grid md:grid-cols-3 ${className}`}>{children}</div>;
 }
 
 /* --- panels -------------------------------------------------------------- */
@@ -1068,9 +1108,17 @@ export function AlertBar({
       className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border px-4 py-2.5"
       style={{ background: t.surface, borderColor: t.border, color: t.ink }}
     >
-      <span className="inline-flex shrink-0 items-center gap-2 text-[12.5px] font-bold">
-        <AlertTriangle size={15} aria-hidden="true" style={{ color: t.strong }} />
-        {title}
+      {/* The icon is the only thing that may not shrink. The title itself wraps:
+          `shrink-0` on the whole span pushed a 56-character English heading
+          straight off the right edge of a 390px screen. */}
+      <span className="inline-flex min-w-0 items-start gap-2 text-[12.5px] font-bold">
+        <AlertTriangle
+          size={15}
+          aria-hidden="true"
+          className="mt-[3px] shrink-0"
+          style={{ color: t.strong }}
+        />
+        <span className="min-w-0">{title}</span>
       </span>
       {/* `flex-1` with a basis of zero beside a `shrink-0` title gave this a
           column one word wide on a phone. It claims the full row below `sm`

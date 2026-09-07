@@ -603,7 +603,7 @@ function MediaPlanPage() {
             >
               {lang === "ar" ? "المطلوب مقابل المتحقق" : "Plan versus actual"}
             </SectionTitle>
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="card-grid lg:grid-cols-3">
               <ProgressRail
                 label={lang === "ar" ? "ليدز الحملات المدفوعة" : "Paid campaign leads"}
                 actual={fmtNum(data.actual.targetedLeads)}
@@ -681,7 +681,7 @@ function MediaPlanPage() {
             </div>
           </Card>
 
-          <div className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
+          <div className="card-grid xl:grid-cols-[1.25fr_.75fr]">
             <Card>
               <SectionTitle
                 hint={

@@ -30,10 +30,11 @@ vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ pathname: "/" }),
 }));
 
-const { MetricDetailSheet, MetricDetailTrigger } = await import("@/components/metric-detail");
-const { overviewEfficiencyMetrics, overviewMetrics } = await import(
-  "@/components/overview-metrics"
+const { InsightDetailTrigger, MetricDetailSheet, MetricDetailTrigger } = await import(
+  "@/components/metric-detail"
 );
+const { businessSignals, insightDetails, overviewEfficiencyMetrics, overviewMetrics } =
+  await import("@/components/overview-metrics");
 const { hasDetailBody } = await import("@/lib/metric-detail");
 const { I18nProvider } = await import("@/lib/i18n");
 const { filterStore } = await import("@/lib/filter-store");
@@ -329,5 +330,110 @@ describe("nothing is shown that the data did not carry", () => {
     wrap(<MetricDetailSheet detail={bare.revenue} open onClose={() => {}} />);
     const courses = await screen.findByTestId("metric-breakdown-courses");
     expect(courses.textContent).toMatch(/No classified course sales/i);
+  });
+});
+
+/* -------------------------------------------------------------------------
+   A READING IS A CLAIM, AND A CLAIM HAS TO OPEN
+
+   "CFM produced the most revenue" is the app running a sort and announcing the
+   winner. Stated on a card that does nothing, it asks the reader to trust a
+   ranking they cannot see. These tests hold the line that every reading behaves
+   exactly like a figure: it is a button, it says it opens a panel, the panel
+   carries the numbers that produced the verdict, and the keyboard comes back.
+------------------------------------------------------------------------- */
+
+const signals = businessSignals(data, workforce, "en");
+const insights = insightDetails(data, signals, workforce, "en");
+
+const openInsight = (detail: (typeof insights)["best"], title = "A reading") => {
+  const view = wrap(
+    <InsightDetailTrigger detail={detail} card={{ kind: "best", title, index: 0 }} />,
+  );
+  const card = screen.getByTestId(`insight-${detail.id}`);
+  fireEvent.click(card);
+  return { ...view, card };
+};
+
+describe("every reading of the period opens the figures behind it", () => {
+  it("renders each reading as a button, not a decorated div", () => {
+    for (const detail of Object.values(insights)) {
+      const view = wrap(
+        <InsightDetailTrigger detail={detail} card={{ kind: "best", title: "A reading" }} />,
+      );
+      expect(screen.getByTestId(`insight-${detail.id}`).tagName).toBe("BUTTON");
+      view.unmount();
+    }
+  });
+
+  it("advertises the panel to assistive tech, as the KPI cards do", () => {
+    openInsight(insights.best);
+    expect(screen.getByTestId(`insight-${insights.best.id}`)).toHaveAttribute(
+      "aria-haspopup",
+      "dialog",
+    );
+  });
+
+  it("names what pressing it will show, not just the verdict", () => {
+    wrap(
+      <InsightDetailTrigger
+        detail={insights.risk}
+        card={{ kind: "attention", title: "Data needs review" }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /open the figures behind this reading/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens a panel that explains the verdict rather than repeating it", async () => {
+    openInsight(insights.best);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTestId("metric-definition").textContent!.length).toBeGreaterThan(40);
+    expect(within(dialog).getByTestId("metric-supporting")).toBeInTheDocument();
+  });
+
+  it("states the window the verdict was reached over", async () => {
+    openInsight(insights.decision);
+    const header = await screen.findByTestId("metric-detail-header");
+    expect(header.textContent).toContain("1 – 11 August 2026");
+  });
+
+  it("closes on Escape and hands the keyboard back to the card", async () => {
+    const { card } = openInsight(insights.risk);
+    fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape", code: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(card));
+  });
+
+  it("arrives as a drawer with a reachable close on a phone", async () => {
+    window.innerWidth = 390;
+    openInsight(insights.best);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: /close/i })).toBeInTheDocument();
+  });
+
+  it("hands the reading's own element to Nexus", async () => {
+    openInsight(insights.best);
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByTestId(`metric-ask-nexus-${insights.best.id}`));
+    expect(getNexusView().focusedElementId).toBe(insights.best.id);
+    expect(nexusStore.get().open).toBe(true);
+  });
+
+  it("leaves no reading with an empty panel behind it", () => {
+    for (const detail of Object.values(insights)) {
+      expect(hasDetailBody(detail), `${detail.id} opens onto nothing`).toBe(true);
+      expect(detail.definition.length, `${detail.id} has no explanation`).toBeGreaterThan(30);
+    }
+  });
+
+  it("carries a route out of every reading, not a dead end", async () => {
+    for (const detail of Object.values(insights)) {
+      expect(detail.report?.to, `${detail.id} has nowhere to go`).toBeTruthy();
+    }
+    openInsight(insights.decision);
+    const link = await screen.findByTestId("metric-open-report");
+    expect(link.getAttribute("href")).toMatch(/^\//);
   });
 });

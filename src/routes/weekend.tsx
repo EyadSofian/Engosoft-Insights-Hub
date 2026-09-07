@@ -536,7 +536,7 @@ function WeekendPerformance() {
             >
               {lang === "ar" ? "قرار الميزانية لكل منصة" : "Budget decision by platform"}
             </SectionTitle>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="card-grid md:grid-cols-2 xl:grid-cols-4">
               {data.platforms.map((row) => (
                 <PlatformDecisionCard
                   key={row.platform}
@@ -549,7 +549,7 @@ function WeekendPerformance() {
             </div>
           </section>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="card-grid lg:grid-cols-2">
             <Card>
               <SectionTitle hint={lang === "ar" ? "الأقل أفضل" : "Lower is better"}>
                 {lang === "ar" ? "كفاءة الصرف — CPL" : "Spend efficiency — CPL"}
@@ -592,7 +592,7 @@ function WeekendPerformance() {
 
           <PlatformComparison data={data} lang={lang} />
 
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="card-grid xl:grid-cols-[1.2fr_0.8fr]">
             <Card>
               <SectionTitle
                 hint={
@@ -761,7 +761,7 @@ function PeriodComparison({ data, lang }: { data: WeekendResponse; lang: "ar" | 
       >
         {lang === "ar" ? "الويك إند مقابل أيام العمل" : "Weekend versus workdays"}
       </SectionTitle>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="card-grid lg:grid-cols-2">
         <PeriodCard
           title={lang === "ar" ? "الويك إند" : "Weekend"}
           daysLabel={lang === "ar" ? "الجمعة + السبت" : "Friday + Saturday"}
@@ -1214,12 +1214,12 @@ function WeekendSkeleton() {
   return (
     <div className="space-y-4">
       <Skeleton className="h-48" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="card-grid grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, index) => (
           <Skeleton key={index} className="h-28" />
         ))}
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="card-grid md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
           <Skeleton key={index} className="h-72" />
         ))}

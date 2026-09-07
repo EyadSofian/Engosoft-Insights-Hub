@@ -279,11 +279,11 @@ function Leads() {
 
             {tab === "overview" && (
               <div className="space-y-4">
-                <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr]">
+                <div className="card-grid xl:grid-cols-[0.9fr_1.4fr]">
                   <PipelineCard data={data} />
                   <QualityTable rows={data.salesFunnel.campaigns} />
                 </div>
-                <div id="calls" className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                <div id="calls" className="card-grid xl:grid-cols-[1.15fr_0.85fr]">
                   <CallsPanel state={calls} />
                   <SourceConversion rows={data.salesFunnel.sources} />
                 </div>

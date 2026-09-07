@@ -549,7 +549,7 @@ function Courses() {
 
       {isLoading || !data ? (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="card-grid grid-cols-2 lg:grid-cols-5">
             {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton key={index} className="h-[118px]" />
             ))}
@@ -1171,7 +1171,7 @@ function CourseDetailPanel({
     return (
       <section id="course-detail" className="space-y-3">
         <Skeleton className="h-[120px]" />
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="card-grid lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
             <Skeleton key={index} className="h-[260px]" />
           ))}
@@ -1278,7 +1278,7 @@ function CourseDetailPanel({
             count={drill.activeCampaigns.length}
           />
           {drill.activeCampaigns.length ? (
-            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="card-grid lg:grid-cols-2 xl:grid-cols-3">
               {drill.activeCampaigns.map((campaign) => (
                 <CampaignCard key={campaign.key} campaign={campaign} active />
               ))}
@@ -1322,7 +1322,7 @@ function CourseDetailPanel({
           count={drill.previousCampaignCount}
         />
         {drill.previousCampaigns.length ? (
-          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="card-grid lg:grid-cols-2 xl:grid-cols-3">
             {drill.previousCampaigns.map((campaign) => (
               <CampaignCard
                 key={campaign.key}
@@ -1384,7 +1384,7 @@ function CourseDetailPanel({
         </div>
 
         {compareA && compareB ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
+          <div className="mt-4 card-grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <MonthMetricCard
               label={lang === "ar" ? "الإنفاق" : "Spend"}
               first={compareA.spend}

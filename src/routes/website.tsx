@@ -953,7 +953,7 @@ function Website() {
               </p>
 
               {data.websiteCampaigns.length ? (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="card-grid md:grid-cols-2 xl:grid-cols-3">
                   {data.websiteCampaigns.map((campaign) => (
                     <article
                       key={campaign.key}
@@ -1138,7 +1138,7 @@ function Website() {
                 ))}
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="card-grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                 <section className="rounded-2xl border border-border bg-surface-2/35 p-3.5">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
@@ -1229,7 +1229,7 @@ function Website() {
 
             <Card>
               <SectionTitle>{copy.quickAnalysis}</SectionTitle>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="card-grid md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-lg border border-border bg-surface-2/40 p-3">
                   <div className="text-xs text-text-muted">{copy.bestSelling}</div>
                   <div className="mt-1 font-semibold text-text">
@@ -1315,7 +1315,7 @@ function Website() {
           </div>
 
           <div className={websiteTab === "operations" ? "space-y-5" : "hidden"}>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card-grid lg:grid-cols-2">
               <Card>
                 <SectionTitle>{t("website_pipeline")}</SectionTitle>
                 <BarList
@@ -1380,7 +1380,7 @@ function Website() {
               />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card-grid lg:grid-cols-2">
               <Card>
                 <SectionTitle hint={copy.soldHint}>{copy.soldCourses}</SectionTitle>
                 {data.soldCourses.length ? (

@@ -50,7 +50,144 @@ import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { ACQUISITION_CHANNEL_LABEL, PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import { acquisitionChannel } from "@/lib/acquisition-channel";
 import type { AcquisitionChannel, DataHealth, Maybe, PerfRow, Platform, Totals } from "@/lib/types";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+
+/**
+ * The three figures in the second row that the shared catalogue does not carry.
+ *
+ * `standardMetrics` describes the ten metrics every report shares. Reach, the
+ * lost rate and campaign-linked revenue are specific to this page, so their
+ * descriptions live here rather than being pushed into a catalogue that other
+ * surfaces would then have to ignore.
+ */
+function adsExtraMetrics(
+  totals: Totals,
+  rows: PerfRow[],
+  lang: "ar" | "en",
+): Record<"ctr" | "lostRate" | "attributedRevenue", MetricDetail> {
+  const A = lang === "ar";
+  const byCampaign = (
+    pick: (row: PerfRow) => number,
+    format: (n: number) => string,
+    tone: "violet" | "rose" | "mint",
+  ) => ({
+    id: "campaigns",
+    title: A ? "حسب الحملة" : "By campaign",
+    rows: topRows(
+      rows.map((row) => ({
+        key: row.key,
+        label: row.campaignName || row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtUSD(row.spend)} ${A ? "إنفاق" : "spend"}`,
+        tone,
+      })),
+    ),
+    moreTo: "/campaigns",
+    moreLabel: A ? "فتح تقرير الحملات" : "Open the campaigns report",
+    emptyLabel: A ? "لا توجد حملات في الفترة" : "No campaigns in this period",
+  });
+
+  return {
+    ctr: {
+      id: "ads.ctrAll",
+      title: A ? "نسبة النقر (الكل)" : "Click-through rate (all)",
+      value: fmtPct(totals.ctrAll, 2),
+      tone: "violet",
+      icon: <MousePointerClick size={16} />,
+      definition: A
+        ? "نسبة من رأى الإعلان ثم نقر عليه، بأي نوع نقرة أبلغت عنها المنصة."
+        : "The share of people who saw an ad and clicked it, counting every click type the platform reports.",
+      formula: `${fmtNum(totals.clicksAll)} ÷ ${fmtNum(totals.impressions)} = ${fmtPct(totals.ctrAll, 2)}`,
+      caveat: A
+        ? "النسبة موزونة: النقرات كلها ÷ مرات الظهور كلها، لا متوسط نِسَب الصفوف."
+        : "Weighted: total clicks ÷ total impressions, not an average of row percentages.",
+      supporting: [
+        {
+          key: "clicks",
+          label: A ? "البسط · النقرات" : "Numerator · clicks",
+          value: fmtNum(totals.clicksAll),
+        },
+        {
+          key: "impressions",
+          label: A ? "المقام · الظهور" : "Denominator · impressions",
+          value: fmtNum(totals.impressions),
+        },
+        { key: "cpc", label: "CPC", value: fmtUSDFull(totals.cpc) },
+        { key: "cpm", label: "CPM", value: fmtUSDFull(totals.cpm) },
+      ],
+      breakdowns: [byCampaign((row) => row.clicksAll, fmtNum, "violet")],
+      report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
+    },
+
+    lostRate: {
+      id: "ads.lostRate",
+      title: A ? "نسبة الخسارة" : "Lost rate",
+      value: fmtPct(totals.lostRate, 2),
+      tone: "rose",
+      icon: <Percent size={16} />,
+      deltaInvert: true,
+      definition: A
+        ? "نسبة العملاء المحتملين الذين انتهوا إلى خسارة، من إجمالي ليدز أودو في الفترة."
+        : "The share of leads that ended as lost, out of all Odoo leads in the period.",
+      formula: `${fmtNum(totals.lost)} ÷ ${fmtNum(totals.totalLeads)} = ${fmtPct(totals.lostRate, 2)}`,
+      supporting: [
+        {
+          key: "lost",
+          label: A ? "البسط · الخاسرة" : "Numerator · lost",
+          value: fmtNum(totals.lost),
+        },
+        {
+          key: "leads",
+          label: A ? "المقام · الليدز" : "Denominator · leads",
+          value: fmtNum(totals.totalLeads),
+        },
+        { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(totals.won) },
+        {
+          key: "conversion",
+          label: A ? "نسبة الإغلاق" : "Conversion",
+          value: fmtPct(totals.conversionRate, 2),
+        },
+      ],
+      breakdowns: [byCampaign((row) => row.lost, fmtNum, "rose")],
+      report: { to: "/lost", label: A ? "فتح تقرير الخسارة" : "Open the Lost report" },
+    },
+
+    attributedRevenue: {
+      id: "ads.attributedRevenue",
+      title: A ? "الإيراد المرتبط بالحملات" : "Campaign-linked revenue",
+      value: fmtUSD(totals.attributedRevenue),
+      tone: "mint",
+      icon: <CircleDollarSign size={16} />,
+      definition: A
+        ? "الجزء من التحصيل الذي يمكن نسبته إلى حملة أنفقت في هذه الفترة. باقي التحصيل حقيقي أيضًا، لكنه لا يحمل حملة."
+        : "The share of collection that can be traced to a campaign which spent in this window. The rest of the collection is just as real, but carries no campaign.",
+      formula: `${fmtUSD(totals.attributedRevenue)} ÷ ${fmtUSD(totals.revenue)} = ${fmtPct((totals.attributedRevenue / (totals.revenue || 1)) * 100, 1)}`,
+      supporting: [
+        {
+          key: "revenue",
+          label: A ? "كل التحصيل" : "All collection",
+          value: fmtUSD(totals.revenue),
+        },
+        {
+          key: "unlinked",
+          label: A ? "غير مرتبط بحملة" : "Not linked to a campaign",
+          value: fmtUSD(totals.revenue - totals.attributedRevenue),
+        },
+        { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(totals.spend) },
+        {
+          key: "attributedRoas",
+          label: A ? "عائد الجزء المرتبط" : "Linked return",
+          value:
+            totals.spend > 0 ? `${(totals.attributedRevenue / totals.spend).toFixed(2)}×` : "—",
+        },
+      ],
+      breakdowns: [byCampaign((row) => row.revenue, fmtUSD, "mint")],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+  };
+}
 
 export const Route = createFileRoute("/ads")({ component: Ads });
 
@@ -187,6 +324,8 @@ function Ads() {
         },
       })
     : null;
+
+  const extras = totals ? adsExtraMetrics(totals, data?.rows ?? [], lang) : null;
 
   const nothingAtAll =
     !!selectedCoverage &&
@@ -389,88 +528,108 @@ function Ads() {
                     : "Show the remaining metrics"}
               </button>
 
+              {/* The rest of the figures. `KpiRow` measures the content column
+                  instead of the viewport, so seven cards settle into balanced
+                  rows rather than being squeezed six across. Each one opens the
+                  same panel the headline figures do. */}
               {showAllKpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                  <MetricCard
-                    metric="ctrAll"
-                    index={0}
-                    icon={<MousePointerClick size={14} />}
-                    value={ratioCell(totals.ctrAll, totals.impressions, (v) => fmtPct(v, 2))}
-                    sub={
-                      lang === "ar"
-                        ? `${fmtNum(totals.clicksAll)} نقرة`
-                        : `${fmtNum(totals.clicksAll)} clicks`
-                    }
-                    note={
-                      lang === "ar"
-                        ? "النسبة موزونة: النقرات كلها ÷ مرات الظهور كلها، مش متوسط نِسَب الصفوف."
-                        : "Weighted: total clicks ÷ total impressions, not an average of row percentages."
-                    }
+                <KpiRow>
+                  <MetricCardDetailTrigger
+                    detail={extras!.ctr}
+                    card={{
+                      metric: "ctrAll",
+                      index: 0,
+                      icon: <MousePointerClick size={14} />,
+                      value: ratioCell(totals.ctrAll, totals.impressions, (v) => fmtPct(v, 2)),
+                      sub:
+                        lang === "ar"
+                          ? `${fmtNum(totals.clicksAll)} نقرة`
+                          : `${fmtNum(totals.clicksAll)} clicks`,
+                      note:
+                        lang === "ar"
+                          ? "النسبة موزونة: النقرات كلها ÷ مرات الظهور كلها، مش متوسط نِسَب الصفوف."
+                          : "Weighted: total clicks ÷ total impressions, not an average of row percentages.",
+                    }}
                   />
-                  <MetricCard
-                    metric="won"
-                    index={1}
-                    icon={<UserPlus size={14} />}
-                    value={fmtNum(totals.won)}
+                  <MetricCardDetailTrigger
+                    detail={metrics!.won}
+                    card={{
+                      metric: "won",
+                      index: 1,
+                      icon: <UserPlus size={14} />,
+                      value: fmtNum(totals.won),
+                    }}
                   />
-                  <MetricCard
-                    metric="lost"
-                    index={2}
-                    icon={<UserMinus size={14} />}
-                    value={fmtNum(totals.lost)}
+                  <MetricCardDetailTrigger
+                    detail={metrics!.lost}
+                    card={{
+                      metric: "lost",
+                      index: 2,
+                      icon: <UserMinus size={14} />,
+                      value: fmtNum(totals.lost),
+                    }}
                   />
-                  <MetricCard
-                    metric="lostRate"
-                    index={3}
-                    icon={<Percent size={14} />}
-                    value={ratioCell(totals.lostRate, totals.totalLeads, (v) => fmtPct(v, 2))}
+                  <MetricCardDetailTrigger
+                    detail={extras!.lostRate}
+                    card={{
+                      metric: "lostRate",
+                      index: 3,
+                      icon: <Percent size={14} />,
+                      value: ratioCell(totals.lostRate, totals.totalLeads, (v) => fmtPct(v, 2)),
+                    }}
                   />
-                  <MetricCard
-                    metric="cpa"
-                    index={4}
-                    icon={<BadgeDollarSign size={14} />}
-                    value={ratioCell(totals.cpa, spend, fmtUSDFull)}
-                    unavailableReason={unavailableReason}
-                    note={spendNote}
-                    sub={
-                      lang === "ar"
-                        ? `الأساس: ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}`
-                        : `Basis: ${filters.cpaBasis === "invoices" ? "invoice count" : "won deals"}`
-                    }
+                  <MetricCardDetailTrigger
+                    detail={metrics!.cpa}
+                    card={{
+                      metric: "cpa",
+                      index: 4,
+                      icon: <BadgeDollarSign size={14} />,
+                      value: ratioCell(totals.cpa, spend, fmtUSDFull),
+                      unavailableReason,
+                      note: spendNote,
+                      sub:
+                        lang === "ar"
+                          ? `الأساس: ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}`
+                          : `Basis: ${filters.cpaBasis === "invoices" ? "invoice count" : "won deals"}`,
+                    }}
                   />
-                  <MetricCard
-                    metric="acos"
-                    index={5}
-                    icon={<Percent size={14} />}
-                    value={ratioCell(totals.acos, spend, (v) => fmtPct(v, 1))}
-                    unavailableReason={unavailableReason}
-                    note={
-                      spendNote ??
-                      (lang === "ar"
-                        ? "المقام هنا هو كل التحصيل في الفترة، زي ROAS بالظبط."
-                        : "The denominator is all revenue collected in the window, exactly as in ROAS.")
-                    }
-                    verdict={(spend > 0 ? acosVerdict(totals.acos) : null) ?? undefined}
-                    verdictLabel={verdictWord(spend > 0 ? acosVerdict(totals.acos) : null, lang)}
+                  <MetricCardDetailTrigger
+                    detail={metrics!.acos}
+                    card={{
+                      metric: "acos",
+                      index: 5,
+                      icon: <Percent size={14} />,
+                      value: ratioCell(totals.acos, spend, (v) => fmtPct(v, 1)),
+                      unavailableReason,
+                      note:
+                        spendNote ??
+                        (lang === "ar"
+                          ? "المقام هنا هو كل التحصيل في الفترة، زي ROAS بالظبط."
+                          : "The denominator is all revenue collected in the window, exactly as in ROAS."),
+                      verdict: (spend > 0 ? acosVerdict(totals.acos) : null) ?? undefined,
+                      verdictLabel: verdictWord(spend > 0 ? acosVerdict(totals.acos) : null, lang),
+                    }}
                   />
-                  <MetricCard
-                    metric="attributedRevenue"
-                    index={6}
-                    icon={<CircleDollarSign size={14} />}
-                    value={fmtUSD(totals.attributedRevenue)}
-                    sub={
-                      lang === "ar"
-                        ? `${fmtPct((totals.attributedRevenue / (totals.revenue || 1)) * 100, 1)} من التحصيل`
-                        : `${fmtPct((totals.attributedRevenue / (totals.revenue || 1)) * 100, 1)} of collections`
-                    }
+                  <MetricCardDetailTrigger
+                    detail={extras!.attributedRevenue}
+                    card={{
+                      metric: "attributedRevenue",
+                      index: 6,
+                      icon: <CircleDollarSign size={14} />,
+                      value: fmtUSD(totals.attributedRevenue),
+                      sub:
+                        lang === "ar"
+                          ? `${fmtPct((totals.attributedRevenue / (totals.revenue || 1)) * 100, 1)} من التحصيل`
+                          : `${fmtPct((totals.attributedRevenue / (totals.revenue || 1)) * 100, 1)} of collections`,
+                    }}
                   />
-                </div>
+                </KpiRow>
               )}
 
               <CampaignPurposeSpend sections={data.spendSections ?? []} />
 
               {/* --- charts ------------------------------------------------ */}
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="card-grid lg:grid-cols-3">
                 <Card className="lg:col-span-2">
                   <SectionTitle
                     hint={
@@ -528,7 +687,7 @@ function Ads() {
                 </Card>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="card-grid lg:grid-cols-2">
                 <Card>
                   <SectionTitle
                     action={<GrainPill grain={grain} />}
@@ -659,7 +818,7 @@ function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }
       >
         {lang === "ar" ? "الصرف حسب غرض الحملة" : "Spend by campaign purpose"}
       </SectionTitle>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="card-grid lg:grid-cols-2">
         {sections.map((section) => {
           const website = section.purpose === "website";
           const color = website ? "var(--brand)" : "var(--warning)";
@@ -927,7 +1086,7 @@ function PlatformDetails({
 
       {open && (
         <div className="px-4 sm:px-5 pb-5 space-y-4 border-t border-border pt-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="card-grid md:grid-cols-2 xl:grid-cols-3">
             {blocks.map((b) => (
               <PlatformBlockCard key={b.platform} block={b} />
             ))}

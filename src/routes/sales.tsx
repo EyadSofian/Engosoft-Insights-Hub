@@ -27,7 +27,7 @@ import {
 } from "@/components/ui-bits";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { KpiRow } from "@/components/dashboard-bits";
-import { MetricDetailTrigger } from "@/components/metric-detail";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtRoas, fmtUSDFull, useI18n } from "@/lib/i18n";
@@ -102,6 +102,213 @@ interface SalesResponse {
     invoiceBasis: string;
     revenueBasis: string;
     dateBasis: "payment" | "invoice";
+  };
+}
+
+/**
+ * The three winners named beside the funnel, and the tables they were picked from.
+ *
+ * "Best-selling source" is the app running a sort and announcing the top row.
+ * Opening it shows that sort — the top five of the same list — plus the counts
+ * behind the headline, so the reader can see the second place and decide for
+ * themselves whether the gap is meaningful.
+ */
+function salesInsights(data: SalesResponse, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const rowFacts = (row: SalesAttributionRow | null) =>
+    row
+      ? [
+          { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(row.leads) },
+          { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(row.won) },
+          { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(row.invoices) },
+          { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDFull(row.revenue) },
+        ]
+      : undefined;
+
+  const sourceRanking = (
+    id: string,
+    title: string,
+    pick: (row: SalesAttributionRow) => number,
+    format: (n: number) => string,
+    tone: "mint" | "sky" | "violet",
+  ) => ({
+    id,
+    title,
+    hint: A ? "هذا هو الترتيب الذي اختار الصف أعلاه." : "The ranking that named the row above.",
+    rows: topRows(
+      data.sources.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.won)}/${fmtNum(row.leads)}`,
+        tone,
+      })),
+    ),
+    emptyLabel: A ? "لا توجد مصادر منسوبة في الفترة" : "No attributed sources in this period",
+  });
+
+  return {
+    bestSellingSource: {
+      id: "sales.bestSellingSource",
+      title: A ? "أفضل مصدر بيعًا" : "Best-selling source",
+      value: data.insights.bestSellingSource?.name ?? "—",
+      tone: "mint",
+      icon: <FileCheck2 size={16} />,
+      entity: data.insights.bestSellingSource
+        ? {
+            type: "source",
+            id: data.insights.bestSellingSource.key,
+            name: data.insights.bestSellingSource.name,
+          }
+        : null,
+      definition: A
+        ? "المصدر الذي نُسب إليه أكبر تحصيل في الفترة، محسوبًا من الفواتير المدفوعة."
+        : "The source credited with the most collection in the period, counted from paid invoices.",
+      formula: data.insights.bestSellingSource
+        ? A
+          ? `${fmtUSDFull(data.insights.bestSellingSource.revenue)} من إجمالي ${fmtUSDFull(data.totals.revenue)}.`
+          : `${fmtUSDFull(data.insights.bestSellingSource.revenue)} of ${fmtUSDFull(data.totals.revenue)}.`
+        : undefined,
+      supporting: rowFacts(data.insights.bestSellingSource),
+      breakdowns: [
+        sourceRanking(
+          "revenue",
+          A ? "الإيراد حسب المصدر" : "Revenue by source",
+          (row) => row.revenue,
+          fmtUSDFull,
+          "mint",
+        ),
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+
+    bestSellingCampaign: {
+      id: "sales.bestSellingCampaign",
+      title: A ? "أفضل حملة بيعًا" : "Best-selling campaign",
+      value: data.insights.bestSellingCampaign?.name ?? "—",
+      tone: "violet",
+      icon: <Megaphone size={16} />,
+      entity: data.insights.bestSellingCampaign
+        ? {
+            type: "campaign",
+            id: data.insights.bestSellingCampaign.key,
+            name: data.insights.bestSellingCampaign.name,
+          }
+        : null,
+      definition: A
+        ? "الحملة التي نُسب إليها أكبر تحصيل في الفترة. الإنفاق يظهر بجوارها لأن الإيراد وحده لا يقول إن كانت مربحة."
+        : "The campaign credited with the most collection in the period. Its spend sits beside it, because revenue alone does not say whether it paid for itself.",
+      supporting: data.insights.bestSellingCampaign
+        ? [
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSDFull(data.insights.bestSellingCampaign.revenue),
+            },
+            {
+              key: "spend",
+              label: A ? "الإنفاق" : "Spend",
+              value: fmtUSDFull(data.insights.bestSellingCampaign.spend),
+            },
+            {
+              key: "roas",
+              label: A ? "العائد" : "Return",
+              value:
+                data.insights.bestSellingCampaign.roas === null
+                  ? "—"
+                  : `${data.insights.bestSellingCampaign.roas.toFixed(2)}×`,
+            },
+            {
+              key: "won",
+              label: A ? "الصفقات" : "Won",
+              value: fmtNum(data.insights.bestSellingCampaign.won),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "campaigns",
+          title: A ? "الإيراد حسب الحملة" : "Revenue by campaign",
+          hint: A
+            ? "هذا هو الترتيب الذي اختار الحملة أعلاه."
+            : "The ranking that named the campaign above.",
+          rows: topRows(
+            data.campaigns.map((row) => ({
+              key: row.key,
+              label: row.name,
+              value: row.revenue,
+              display: fmtUSDFull(row.revenue),
+              meta: `${fmtUSDFull(row.spend)} ${A ? "إنفاق" : "spend"}`,
+              tone: "violet" as const,
+            })),
+          ),
+          moreTo: "/campaigns",
+          moreLabel: A ? "فتح تقرير الحملات" : "Open the campaigns report",
+          emptyLabel: A
+            ? "لا توجد حملات منسوبة في الفترة"
+            : "No attributed campaigns in this period",
+        },
+      ],
+      report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
+    },
+
+    bestConvertingSource: {
+      id: "sales.bestConvertingSource",
+      title: A ? "أفضل مصدر تحويلًا" : "Best-converting source",
+      value: data.insights.bestConvertingSource
+        ? fmtPct(data.insights.bestConvertingSource.leadToWonRate, 1)
+        : "—",
+      tone: "sky",
+      icon: <Trophy size={16} />,
+      entity: data.insights.bestConvertingSource
+        ? {
+            type: "source",
+            id: data.insights.bestConvertingSource.key,
+            name: data.insights.bestConvertingSource.name,
+          }
+        : null,
+      definition: A
+        ? "المصدر الذي أغلق أعلى نسبة من عملائه المحتملين. النسبة وحدها مضلّلة، فالبسط والمقام معها دائمًا."
+        : "The source that closed the highest share of its own leads. The rate alone misleads, so its numerator and denominator travel with it.",
+      formula: data.insights.bestConvertingSource
+        ? `${fmtNum(data.insights.bestConvertingSource.won)} ÷ ${fmtNum(data.insights.bestConvertingSource.leads)} = ${fmtPct(data.insights.bestConvertingSource.leadToWonRate, 1)}`
+        : undefined,
+      supporting: data.insights.bestConvertingSource
+        ? [
+            {
+              key: "won",
+              label: A ? "البسط · Won" : "Numerator · won",
+              value: fmtNum(data.insights.bestConvertingSource.won),
+            },
+            {
+              key: "leads",
+              label: A ? "المقام · الليدز" : "Denominator · leads",
+              value: fmtNum(data.insights.bestConvertingSource.leads),
+            },
+            {
+              key: "invoices",
+              label: A ? "الفواتير" : "Invoices",
+              value: fmtNum(data.insights.bestConvertingSource.invoices),
+            },
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSDFull(data.insights.bestConvertingSource.revenue),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        sourceRanking(
+          "conversion",
+          A ? "نسبة الإغلاق حسب المصدر" : "Conversion by source",
+          (row) => row.leadToWonRate ?? 0,
+          (n) => fmtPct(n, 1),
+          "sky",
+        ),
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
   };
 }
 
@@ -376,6 +583,7 @@ function SalesReport() {
   const ar = lang === "ar";
   // One description per figure, built from the response already on screen.
   const metrics = salesMetrics(data, lang);
+  const insights = salesInsights(data, lang);
   const sourceCols: Col<SalesAttributionRow>[] = [
     {
       key: "source",
@@ -555,7 +763,7 @@ function SalesReport() {
         />
       </KpiRow>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">
+      <div className="card-grid xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">
         <Card>
           <SectionTitle
             hint={
@@ -569,25 +777,62 @@ function SalesReport() {
           <FunnelBars steps={funnelSteps} />
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <InsightCard
-            icon={<FileCheck2 size={17} />}
-            title={ar ? "أفضل مصدر بيعًا" : "Best-selling source"}
-            row={data.insights.bestSellingSource}
-            ar={ar}
+        {/* The three winners. `card-grid` rather than a hand-written gap, so
+            these sit the same distance apart as any other pair of cards. */}
+        <div className="card-grid sm:grid-cols-2 xl:grid-cols-1">
+          <InsightDetailTrigger
+            detail={insights.bestSellingSource}
+            card={{
+              index: 0,
+              kind: "best",
+              eyebrow: ar ? "أفضل مصدر بيعًا" : "Best-selling source",
+              title:
+                data.insights.bestSellingSource?.name ??
+                (ar ? "لا توجد بيانات منسوبة" : "No attributed data"),
+              value: data.insights.bestSellingSource
+                ? fmtUSDFull(data.insights.bestSellingSource.revenue)
+                : undefined,
+              detail: data.insights.bestSellingSource
+                ? `${fmtNum(data.insights.bestSellingSource.leads)} ${ar ? "ليد" : "leads"} · ${fmtNum(data.insights.bestSellingSource.won)} Won · ${fmtNum(data.insights.bestSellingSource.invoices)} ${ar ? "فاتورة" : "invoices"}`
+                : undefined,
+              actionLabel: ar ? "ما ترتيب المصادر؟" : "How do the sources rank?",
+            }}
           />
-          <InsightCard
-            icon={<Megaphone size={17} />}
-            title={ar ? "أفضل حملة بيعًا" : "Best-selling campaign"}
-            row={data.insights.bestSellingCampaign}
-            ar={ar}
+          <InsightDetailTrigger
+            detail={insights.bestSellingCampaign}
+            card={{
+              index: 1,
+              kind: "note",
+              eyebrow: ar ? "أفضل حملة بيعًا" : "Best-selling campaign",
+              title:
+                data.insights.bestSellingCampaign?.name ??
+                (ar ? "لا توجد بيانات منسوبة" : "No attributed data"),
+              value: data.insights.bestSellingCampaign
+                ? fmtUSDFull(data.insights.bestSellingCampaign.revenue)
+                : undefined,
+              detail: data.insights.bestSellingCampaign
+                ? `${fmtNum(data.insights.bestSellingCampaign.leads)} ${ar ? "ليد" : "leads"} · ${fmtNum(data.insights.bestSellingCampaign.won)} Won · ${fmtNum(data.insights.bestSellingCampaign.invoices)} ${ar ? "فاتورة" : "invoices"}`
+                : undefined,
+              actionLabel: ar ? "مقابل كم إنفاق؟" : "Against how much spend?",
+            }}
           />
-          <InsightCard
-            icon={<Trophy size={17} />}
-            title={ar ? "أفضل مصدر تحويلاً" : "Best-converting source"}
-            row={data.insights.bestConvertingSource}
-            ar={ar}
-            conversion
+          <InsightDetailTrigger
+            detail={insights.bestConvertingSource}
+            card={{
+              index: 2,
+              kind: "opportunity",
+              eyebrow: ar ? "أفضل مصدر تحويلاً" : "Best-converting source",
+              title:
+                data.insights.bestConvertingSource?.name ??
+                (ar ? "لا توجد بيانات منسوبة" : "No attributed data"),
+              value: data.insights.bestConvertingSource
+                ? fmtPct(data.insights.bestConvertingSource.leadToWonRate, 1)
+                : undefined,
+              detail: data.insights.bestConvertingSource
+                ? `${fmtNum(data.insights.bestConvertingSource.won)} ${ar ? "من" : "of"} ${fmtNum(data.insights.bestConvertingSource.leads)} ${ar ? "ليد" : "leads"}`
+                : undefined,
+              actionLabel: ar ? "البسط والمقام؟" : "Out of how many?",
+            }}
           />
         </div>
       </div>
@@ -691,47 +936,4 @@ function countCol<T>(
     group,
     hideByDefault,
   };
-}
-
-function InsightCard({
-  title,
-  row,
-  icon,
-  ar,
-  conversion = false,
-}: {
-  title: string;
-  row: SalesAttributionRow | SalesCampaignRow | null;
-  icon: React.ReactNode;
-  ar: boolean;
-  conversion?: boolean;
-}) {
-  return (
-    <Card className="min-h-0" hoverable>
-      <div className="flex items-center gap-2 text-text-muted">
-        {icon}
-        <span className="text-xs font-medium">{title}</span>
-      </div>
-      {row ? (
-        <div className="mt-2.5">
-          <div className="flex items-start justify-between gap-2">
-            <strong className="min-w-0 truncate text-[15px] text-text" title={row.name}>
-              {row.name}
-            </strong>
-            <Pill tone="success">
-              {conversion ? fmtPct(row.leadToWonRate, 1) : fmtUSDFull(row.revenue)}
-            </Pill>
-          </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
-            {fmtNum(row.leads)} {ar ? "ليد" : "leads"} · {fmtNum(row.won)} Won ·{" "}
-            {fmtNum(row.invoices)} {ar ? "فاتورة" : "invoices"}
-          </p>
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-text-muted">
-          {ar ? "لا توجد بيانات منسوبة" : "No attributed data"}
-        </p>
-      )}
-    </Card>
-  );
 }

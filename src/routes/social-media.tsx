@@ -22,8 +22,8 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader, InsightCard, InsightRow, KpiRow } from "@/components/dashboard-bits";
-import { MetricDetailTrigger } from "@/components/metric-detail";
+import { DashboardPageHeader, InsightRow, KpiRow } from "@/components/dashboard-bits";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
@@ -333,6 +333,506 @@ function socialMetrics(
   };
 }
 
+/**
+ * The three readings of the period, and the figures each verdict rests on.
+ *
+ * A reading is a claim — "Meta reached the most people", "eleven customers are
+ * still waiting" — and a claim nobody can open is one the reader has to take on
+ * trust. Each of these carries the ranking, the counts and the people behind
+ * the sentence on the card, so the judgement can be checked.
+ */
+function socialInsights(
+  reach: { best: PaidChannel | null; impressions: number; clicks: number; ctr: number | null },
+  channels: PaidChannel[],
+  organicTotals: { leads: number; won: number; revenue: number; top: OrganicSource | null },
+  organicSources: OrganicSource[],
+  care: {
+    awaitingReply: number;
+    openConversations: number;
+    moderators: AgentAnalyticsResult["agents"];
+    ok: boolean;
+  },
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const best = reach.best;
+
+  return {
+    topPlatform: {
+      id: "social_media.topPlatform",
+      title: A ? "أفضل منصة ظهورًا" : "Top platform by reach",
+      value: best ? (PLATFORM_LABEL[best.platform] ?? best.platform) : "—",
+      tone: "mint",
+      icon: <Radio size={16} />,
+      entity: best ? { type: "platform", id: best.platform, name: best.platform } : null,
+      definition: A
+        ? "المنصة التي أبلغت عن أكبر عدد مرات ظهور في الفترة. الترتيب بالظهور وحده، لا بالنتائج."
+        : "The platform that reported the most impressions in the period. The ranking is by reach alone, not by results.",
+      formula: best
+        ? A
+          ? `${fmtNum(best.impressions)} ظهور من إجمالي ${fmtNum(reach.impressions)} في الفترة.`
+          : `${fmtNum(best.impressions)} impressions out of ${fmtNum(reach.impressions)} in the period.`
+        : undefined,
+      caveat: A
+        ? "الظهور لا يعني نتائج: راجع النقرات وتكلفة الليد قبل نقل ميزانية إلى هذه المنصة."
+        : "Reach is not results: check clicks and cost per lead before moving budget onto this platform.",
+      supporting: best
+        ? [
+            {
+              key: "impressions",
+              label: A ? "الظهور" : "Impressions",
+              value: fmtNum(best.impressions),
+            },
+            { key: "clicks", label: A ? "النقرات" : "Clicks", value: fmtNum(best.clicksAll) },
+            { key: "ctr", label: A ? "نسبة النقر" : "CTR", value: fmtPct(best.ctrAll, 2) },
+            {
+              key: "share",
+              label: A ? "حصتها من الظهور" : "Share of reach",
+              value: fmtPct(
+                reach.impressions > 0 ? (best.impressions / reach.impressions) * 100 : null,
+                1,
+              ),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "الظهور حسب المنصة" : "Impressions by platform",
+          hint: A
+            ? "هذا هو الترتيب الذي اختار المنصة أعلاه."
+            : "This is the ranking that named the platform above.",
+          rows: topRows(
+            channels.map((channel) => ({
+              key: channel.platform,
+              label: PLATFORM_LABEL[channel.platform] ?? channel.platform,
+              value: channel.impressions,
+              display: fmtNum(channel.impressions),
+              meta: `${fmtNum(channel.clicksAll)} ${A ? "نقرة" : "clicks"}`,
+              tone: "sky" as const,
+            })),
+          ),
+          emptyLabel: A ? "لا توجد منصة سجّلت ظهورًا" : "No platform recorded reach",
+        },
+      ],
+      report: { to: "/ads", label: A ? "فتح تقرير الإعلانات" : "Open the ads report" },
+    },
+
+    topOrganic: {
+      id: "social_media.topOrganic",
+      title: A ? "أكبر مصدر غير مدفوع" : "Largest non-paid source",
+      value: organicTotals.top ? organicTotals.top.name : "—",
+      tone: "cyan",
+      icon: <AtSign size={16} />,
+      entity: organicTotals.top
+        ? { type: "source", id: organicTotals.top.key, name: organicTotals.top.name }
+        : null,
+      definition: A
+        ? "المصدر غير المدفوع الذي جاء منه أكبر عدد عملاء محتملين في الفترة. لا يُنسب إليه أي إنفاق إعلاني."
+        : "The non-paid source that produced the most leads in the period. No ad spend is attributed to it.",
+      formula: organicTotals.top
+        ? A
+          ? `${fmtNum(organicTotals.top.leads)} ليد من إجمالي ${fmtNum(organicTotals.leads)} ليد غير مدفوع.`
+          : `${fmtNum(organicTotals.top.leads)} leads out of ${fmtNum(organicTotals.leads)} non-paid leads.`
+        : undefined,
+      supporting: organicTotals.top
+        ? [
+            { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(organicTotals.top.leads) },
+            { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(organicTotals.top.won) },
+            {
+              key: "conversion",
+              label: A ? "نسبة الإغلاق" : "Conversion",
+              value: fmtPct(organicTotals.top.conversionRate, 1),
+            },
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSDFull(organicTotals.top.revenue),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "الليدز حسب المصدر" : "Leads by source",
+          rows: topRows(
+            organicSources.map((source) => ({
+              key: source.key,
+              label: source.name,
+              value: source.leads,
+              display: fmtNum(source.leads),
+              meta: `${fmtNum(source.won)} ${A ? "صفقة" : "won"}`,
+              tone: "mint" as const,
+            })),
+          ),
+          moreTo: "/organic",
+          moreLabel: A ? "فتح تقرير الأورجانيك" : "Open the Organic report",
+          emptyLabel: A ? "لا توجد مصادر غير مدفوعة" : "No non-paid sources",
+        },
+      ],
+      report: { to: "/organic", label: A ? "فتح تقرير الأورجانيك" : "Open the Organic report" },
+    },
+
+    responseSpeed: {
+      id: "social_media.responseSpeed",
+      title: A ? "عملاء ينتظرون ردًا" : "Customers waiting for a reply",
+      value: fmtNum(care.awaitingReply),
+      tone: care.awaitingReply > 0 ? "rose" : "mint",
+      icon: <Clock3 size={16} />,
+      definition: A
+        ? "عدد المحادثات المفتوحة التي آخر رسالة فيها من العميل ولم يُرد عليها بعد، مجموعة من موظفي الموديريشن."
+        : "Open conversations whose last message came from the customer and has not been answered yet, summed across the moderation team.",
+      formula: A
+        ? `${fmtNum(care.awaitingReply)} تنتظر ردًا من إجمالي ${fmtNum(care.openConversations)} محادثة مفتوحة.`
+        : `${fmtNum(care.awaitingReply)} awaiting a reply out of ${fmtNum(care.openConversations)} open conversations.`,
+      caveat: care.ok
+        ? undefined
+        : A
+          ? "مصدر المحادثات غير متاح حاليًا، فهذه القراءة قد تكون ناقصة."
+          : "The conversation source is unavailable, so this reading may be incomplete.",
+      supporting: [
+        {
+          key: "open",
+          label: A ? "محادثات مفتوحة" : "Open conversations",
+          value: fmtNum(care.openConversations),
+        },
+        {
+          key: "people",
+          label: A ? "موظفو الموديريشن" : "Moderators",
+          value: fmtNum(care.moderators.length),
+        },
+        {
+          key: "share",
+          label: A ? "نسبة المنتظر" : "Share awaiting",
+          value: fmtPct(
+            care.openConversations > 0 ? (care.awaitingReply / care.openConversations) * 100 : null,
+            1,
+          ),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "moderators",
+          title: A ? "الانتظار حسب الموظف" : "Awaiting a reply, by person",
+          hint: A
+            ? "من عنده أكبر عدد محادثات لم يُرد عليها الآن."
+            : "Who is carrying the most unanswered conversations right now.",
+          rows: topRows(
+            care.moderators.map((agent) => ({
+              key: agent.key,
+              label: agent.displayName || agent.name,
+              value: agent.chatAwaitingReply ?? 0,
+              display: fmtNum(agent.chatAwaitingReply ?? 0),
+              meta: `${fmtNum(agent.chatOpenConversations ?? 0)} ${A ? "مفتوحة" : "open"}`,
+              tone: "rose" as const,
+            })),
+          ),
+          emptyLabel: A ? "لا أحد ينتظر ردًا الآن" : "Nobody is waiting for a reply",
+        },
+      ],
+      report: { to: "/teams", label: A ? "فتح تقرير الفرق" : "Open the teams report" },
+    },
+  };
+}
+
+/**
+ * The moderation figures, and what each one is counting.
+ *
+ * Six numbers that all come from the same Chatwoot snapshot and all mean
+ * different things: a conversation the team handled, one it closed, one still
+ * waiting on us, one still open, one nobody owns, and how long the first reply
+ * took. Written out because "Open now" and "Awaiting reply" look like the same
+ * figure on a card and are not — one is workload, the other is a queue of
+ * people who have already been kept waiting.
+ */
+function careMetrics(
+  /* Partial because the row renders while `/api/teams` is still in flight, and
+     an absent count has to read as "—" rather than as a zero the team could
+     act on. */
+  summary: Partial<AgentAnalyticsResult["summary"]>,
+  unassigned: number | null,
+  moderators: AgentAnalyticsResult["agents"],
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const byAgent = (
+    pick: (agent: AgentAnalyticsResult["agents"][number]) => number | null,
+    format: (n: number) => string,
+    tone: "cyan" | "mint" | "rose" | "amber",
+  ) =>
+    topRows(
+      moderators.map((agent) => ({
+        key: agent.key,
+        label: agent.displayName || agent.name,
+        value: pick(agent) ?? 0,
+        display: format(pick(agent) ?? 0),
+        meta: `${fmtNum(agent.chatConversations ?? 0)} ${A ? "محادثة" : "conversations"}`,
+        tone,
+      })),
+    );
+  const report: MetricDetail["report"] = {
+    to: "/teams",
+    label: A ? "فتح تقرير الفرق" : "Open the teams report",
+  };
+  const people = {
+    key: "people",
+    label: A ? "موظفو الموديريشن" : "Moderators",
+    value: fmtNum(moderators.length),
+  };
+
+  return {
+    conversations: {
+      id: "social_media.chatConversations",
+      title: A ? "المحادثات" : "Conversations",
+      value: fmtNum(summary.chatConversations),
+      tone: "cyan",
+      icon: <MessageCircleMore size={16} />,
+      definition: A
+        ? "كل محادثة Chatwoot لمسها فريق الموديريشن في الفترة، مفتوحة كانت أو مغلقة."
+        : "Every Chatwoot conversation the moderation team touched in the period, open or closed.",
+      supporting: [
+        { key: "resolved", label: A ? "تم حلها" : "Resolved", value: fmtNum(summary.chatResolved) },
+        {
+          key: "open",
+          label: A ? "مفتوحة الآن" : "Open now",
+          value: fmtNum(summary.chatOpenConversations),
+        },
+        {
+          key: "resolveRate",
+          label: A ? "نسبة الحل" : "Resolved share",
+          value: fmtPct(
+            (summary.chatConversations ?? 0) > 0
+              ? ((summary.chatResolved ?? 0) / (summary.chatConversations ?? 1)) * 100
+              : null,
+            1,
+          ),
+        },
+        people,
+      ],
+      breakdowns: [
+        {
+          id: "agents",
+          title: A ? "المحادثات حسب الموظف" : "Conversations by person",
+          rows: byAgent((agent) => agent.chatConversations, fmtNum, "cyan"),
+          emptyLabel: A ? "لا توجد محادثات في الفترة" : "No conversations in this period",
+        },
+      ],
+      report,
+    },
+
+    resolved: {
+      id: "social_media.chatResolved",
+      title: A ? "تم حلها" : "Resolved",
+      value: fmtNum(summary.chatResolved),
+      tone: "mint",
+      icon: <BadgeCheck size={16} />,
+      definition: A
+        ? "المحادثات التي أُغلقت بحالة «تم الحل» في الفترة."
+        : "Conversations closed as resolved during the period.",
+      formula: A
+        ? `${fmtNum(summary.chatResolved)} ÷ ${fmtNum(summary.chatConversations)} من المحادثات.`
+        : `${fmtNum(summary.chatResolved)} ÷ ${fmtNum(summary.chatConversations)} conversations.`,
+      supporting: [
+        {
+          key: "conversations",
+          label: A ? "إجمالي المحادثات" : "All conversations",
+          value: fmtNum(summary.chatConversations),
+        },
+        {
+          key: "rate",
+          label: A ? "نسبة الحل" : "Resolved share",
+          value: fmtPct(
+            (summary.chatConversations ?? 0) > 0
+              ? ((summary.chatResolved ?? 0) / (summary.chatConversations ?? 1)) * 100
+              : null,
+            1,
+          ),
+        },
+        {
+          key: "open",
+          label: A ? "ما زالت مفتوحة" : "Still open",
+          value: fmtNum(summary.chatOpenConversations),
+        },
+        people,
+      ],
+      breakdowns: [
+        {
+          id: "agents",
+          title: A ? "الحل حسب الموظف" : "Resolved by person",
+          rows: byAgent((agent) => agent.chatResolved, fmtNum, "mint"),
+          emptyLabel: A ? "لم تُحل أي محادثة في الفترة" : "Nothing was resolved in this period",
+        },
+      ],
+      report,
+    },
+
+    awaiting: {
+      id: "social_media.chatAwaitingReply",
+      title: A ? "تنتظر رد" : "Awaiting reply",
+      value: fmtNum(summary.chatAwaitingReply),
+      tone: "rose",
+      icon: <Clock3 size={16} />,
+      deltaInvert: true,
+      definition: A
+        ? "محادثات مفتوحة آخر رسالة فيها من العميل ولم يُرد عليها بعد. هذه ليست عبء العمل، بل طابور انتظار."
+        : "Open conversations whose last message came from the customer and is still unanswered. This is not workload, it is a queue of people already kept waiting.",
+      caveat: A
+        ? "الرقم لحظي: يقرأ حالة Chatwoot الآن، لا مجموع الفترة."
+        : "This is a live figure: it reads Chatwoot's state now, not a total for the period.",
+      supporting: [
+        {
+          key: "open",
+          label: A ? "مفتوحة الآن" : "Open now",
+          value: fmtNum(summary.chatOpenConversations),
+        },
+        {
+          key: "share",
+          label: A ? "نسبة المنتظر" : "Share awaiting",
+          value: fmtPct(
+            (summary.chatOpenConversations ?? 0) > 0
+              ? ((summary.chatAwaitingReply ?? 0) / (summary.chatOpenConversations ?? 1)) * 100
+              : null,
+            1,
+          ),
+        },
+        {
+          key: "unassigned",
+          label: A ? "بدون موظف" : "Unassigned",
+          value: fmtNum(unassigned),
+        },
+        people,
+      ],
+      breakdowns: [
+        {
+          id: "agents",
+          title: A ? "الانتظار حسب الموظف" : "Awaiting a reply, by person",
+          rows: byAgent((agent) => agent.chatAwaitingReply, fmtNum, "rose"),
+          emptyLabel: A ? "لا أحد ينتظر ردًا الآن" : "Nobody is waiting for a reply",
+        },
+      ],
+      report,
+    },
+
+    openNow: {
+      id: "social_media.chatOpenConversations",
+      title: A ? "محادثات مفتوحة الآن" : "Open now",
+      value: fmtNum(summary.chatOpenConversations),
+      tone: "cyan",
+      icon: <Inbox size={16} />,
+      definition: A
+        ? "كل محادثة لم تُغلق بعد. جزء منها ينتظر ردًا، وجزء ينتظر العميل."
+        : "Every conversation not yet closed. Some are waiting on us, the rest are waiting on the customer.",
+      supporting: [
+        {
+          key: "awaiting",
+          label: A ? "تنتظر ردنا" : "Waiting on us",
+          value: fmtNum(summary.chatAwaitingReply),
+        },
+        {
+          key: "unassigned",
+          label: A ? "بدون موظف" : "Unassigned",
+          value: fmtNum(unassigned),
+        },
+        {
+          key: "perPerson",
+          label: A ? "متوسط لكل موظف" : "Average per person",
+          value:
+            moderators.length > 0
+              ? ((summary.chatOpenConversations ?? 0) / moderators.length).toFixed(1)
+              : "—",
+        },
+        people,
+      ],
+      breakdowns: [
+        {
+          id: "agents",
+          title: A ? "المفتوح حسب الموظف" : "Open, by person",
+          rows: byAgent((agent) => agent.chatOpenConversations, fmtNum, "cyan"),
+          emptyLabel: A ? "لا توجد محادثات مفتوحة" : "Nothing is open",
+        },
+      ],
+      report,
+    },
+
+    unassigned: {
+      id: "social_media.chatUnassigned",
+      title: A ? "بدون موظف" : "Unassigned",
+      value: fmtNum(unassigned),
+      tone: "rose",
+      icon: <Users size={16} />,
+      deltaInvert: true,
+      definition: A
+        ? "محادثات مفتوحة لا يملكها أحد. لا تظهر في قائمة أي موظف، فلا أحد مسؤول عن الرد عليها."
+        : "Open conversations nobody owns. They appear on no one's list, so nobody is accountable for the reply.",
+      caveat: A
+        ? "الرقم لحظي ويأتي من لقطة Chatwoot، لا من مجموع الفترة."
+        : "A live figure from the Chatwoot snapshot, not a total for the period.",
+      supporting: [
+        {
+          key: "open",
+          label: A ? "مفتوحة الآن" : "Open now",
+          value: fmtNum(summary.chatOpenConversations),
+        },
+        {
+          key: "awaiting",
+          label: A ? "تنتظر رد" : "Awaiting reply",
+          value: fmtNum(summary.chatAwaitingReply),
+        },
+        people,
+      ],
+      report,
+    },
+
+    firstResponse: {
+      id: "social_media.chatFirstResponse",
+      title: A ? "أول رد" : "First response",
+      value: duration(summary.chatAverageFirstResponseSeconds ?? null, lang),
+      tone: "amber",
+      icon: <MousePointerClick size={16} />,
+      deltaInvert: true,
+      definition: A
+        ? "متوسط الوقت بين أول رسالة من العميل وأول رد من الفريق."
+        : "The average time between a customer's first message and the team's first reply.",
+      supporting: [
+        {
+          key: "conversations",
+          label: A ? "المحادثات" : "Conversations",
+          value: fmtNum(summary.chatConversations),
+        },
+        {
+          key: "awaiting",
+          label: A ? "تنتظر رد" : "Awaiting reply",
+          value: fmtNum(summary.chatAwaitingReply),
+        },
+        people,
+      ],
+      breakdowns: [
+        {
+          id: "agents",
+          title: A ? "أول رد حسب الموظف" : "First response, by person",
+          hint: A
+            ? "الأبطأ أولًا، لأن هذا هو الصف الذي يحتاج تدخّلًا."
+            : "Slowest first, because that is the row that needs attention.",
+          rows: topRows(
+            moderators
+              .filter((agent) => agent.chatAverageFirstResponseSeconds !== null)
+              .map((agent) => ({
+                key: agent.key,
+                label: agent.displayName || agent.name,
+                value: agent.chatAverageFirstResponseSeconds ?? 0,
+                display: duration(agent.chatAverageFirstResponseSeconds, lang),
+                meta: `${fmtNum(agent.chatConversations ?? 0)} ${A ? "محادثة" : "conversations"}`,
+                tone: "amber" as const,
+              })),
+          ),
+          emptyLabel: A ? "لا يوجد قياس لأول رد" : "No first-response measurement",
+        },
+      ],
+      report,
+    },
+  };
+}
+
 function SocialMedia() {
   const reportingPeriod = useReportingPeriod();
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
@@ -430,6 +930,25 @@ function SocialMedia() {
     (sum, agent) => sum + (agent.chatOpenConversations ?? 0),
     0,
   );
+  const care = careMetrics(
+    workforce.data?.summary ?? {},
+    workforce.data?.chatwoot.unassignedConversations ?? null,
+    moderators,
+    lang,
+  );
+  const insights = socialInsights(
+    reach,
+    ads.data.byPlatform,
+    organicTotals,
+    organic.data.sources,
+    {
+      awaitingReply,
+      openConversations,
+      moderators,
+      ok: chat?.chatwoot.ok !== false,
+    },
+    lang,
+  );
   return (
     <div className="page-sections">
       <DashboardPageHeader
@@ -501,71 +1020,71 @@ function SocialMedia() {
       </KpiRow>
 
       <InsightRow>
-        <InsightCard
-          index={0}
-          kind="best"
-          eyebrow={lang === "ar" ? "أفضل منصة" : "Top platform"}
-          title={
-            reach.best
+        <InsightDetailTrigger
+          detail={insights.topPlatform}
+          card={{
+            index: 0,
+            kind: "best",
+            eyebrow: lang === "ar" ? "أفضل منصة" : "Top platform",
+            title: reach.best
               ? `${PLATFORM_LABEL[reach.best.platform] ?? reach.best.platform}`
               : lang === "ar"
                 ? "لا توجد منصة بها ظهور في الفترة"
-                : "No platform recorded reach this period"
-          }
-          value={reach.best ? fmtNum(reach.best.impressions) : undefined}
-          detail={
-            reach.best
+                : "No platform recorded reach this period",
+            value: reach.best ? fmtNum(reach.best.impressions) : undefined,
+            detail: reach.best
               ? lang === "ar"
                 ? `${fmtNum(reach.best.clicksAll)} نقرة · ${fmtPct(reach.best.ctrAll, 2)} نسبة نقر`
                 : `${fmtNum(reach.best.clicksAll)} clicks · ${fmtPct(reach.best.ctrAll, 2)} CTR`
-              : undefined
-          }
+              : undefined,
+            actionLabel: lang === "ar" ? "لماذا هذه المنصة؟" : "Why this platform?",
+          }}
         />
-        <InsightCard
-          index={1}
-          kind="note"
-          eyebrow={lang === "ar" ? "أكبر مصدر غير مدفوع" : "Largest non-paid source"}
-          title={
-            organicTotals.top
+        <InsightDetailTrigger
+          detail={insights.topOrganic}
+          card={{
+            index: 1,
+            kind: "note",
+            eyebrow: lang === "ar" ? "أكبر مصدر غير مدفوع" : "Largest non-paid source",
+            title: organicTotals.top
               ? organicTotals.top.name
               : lang === "ar"
                 ? "لا توجد مصادر غير مدفوعة في الفترة"
-                : "No non-paid sources this period"
-          }
-          value={organicTotals.top ? fmtNum(organicTotals.top.leads) : undefined}
-          detail={
-            organicTotals.top
+                : "No non-paid sources this period",
+            value: organicTotals.top ? fmtNum(organicTotals.top.leads) : undefined,
+            detail: organicTotals.top
               ? lang === "ar"
                 ? `${fmtNum(organicTotals.top.won)} صفقة · ${fmtUSDFull(organicTotals.top.revenue)} إيراد`
                 : `${fmtNum(organicTotals.top.won)} won · ${fmtUSDFull(organicTotals.top.revenue)} revenue`
-              : undefined
-          }
-          to="/organic"
-          actionLabel={lang === "ar" ? "افتح الأورجانيك ←" : "Open Organic →"}
+              : undefined,
+            actionLabel: lang === "ar" ? "ما الذي جاء منه؟" : "What came from it?",
+          }}
         />
-        <InsightCard
-          index={2}
-          kind={awaitingReply > 0 ? "attention" : "opportunity"}
-          eyebrow={lang === "ar" ? "سرعة الرد" : "Response speed"}
-          title={
-            awaitingReply > 0
-              ? lang === "ar"
-                ? "عملاء ما زالوا ينتظرون رداً"
-                : "Customers still waiting for a reply"
-              : lang === "ar"
-                ? "لا يوجد عميل ينتظر رداً الآن"
-                : "Nobody is waiting for a reply right now"
-          }
-          value={awaitingReply > 0 ? fmtNum(awaitingReply) : undefined}
-          detail={
-            chat?.chatwoot.ok === false
-              ? lang === "ar"
-                ? "مصدر المحادثات غير متاح حالياً، فهذه القراءة قد تكون ناقصة."
-                : "The conversation source is unavailable, so this reading may be incomplete."
-              : lang === "ar"
-                ? `${fmtNum(openConversations)} محادثة مفتوحة الآن عبر ${fmtNum(moderators.length)} موظف`
-                : `${fmtNum(openConversations)} conversations open now across ${fmtNum(moderators.length)} people`
-          }
+        <InsightDetailTrigger
+          detail={insights.responseSpeed}
+          card={{
+            index: 2,
+            kind: awaitingReply > 0 ? "attention" : "opportunity",
+            eyebrow: lang === "ar" ? "سرعة الرد" : "Response speed",
+            title:
+              awaitingReply > 0
+                ? lang === "ar"
+                  ? "عملاء ما زالوا ينتظرون رداً"
+                  : "Customers still waiting for a reply"
+                : lang === "ar"
+                  ? "لا يوجد عميل ينتظر رداً الآن"
+                  : "Nobody is waiting for a reply right now",
+            value: awaitingReply > 0 ? fmtNum(awaitingReply) : undefined,
+            detail:
+              chat?.chatwoot.ok === false
+                ? lang === "ar"
+                  ? "مصدر المحادثات غير متاح حالياً، فهذه القراءة قد تكون ناقصة."
+                  : "The conversation source is unavailable, so this reading may be incomplete."
+                : lang === "ar"
+                  ? `${fmtNum(openConversations)} محادثة مفتوحة الآن عبر ${fmtNum(moderators.length)} موظف`
+                  : `${fmtNum(openConversations)} conversations open now across ${fmtNum(moderators.length)} people`,
+            actionLabel: lang === "ar" ? "من ينتظر؟" : "Who is waiting?",
+          }}
         />
       </InsightRow>
 
@@ -579,7 +1098,7 @@ function SocialMedia() {
         >
           {lang === "ar" ? "أداء القنوات الإعلانية" : "Paid channel performance"}
         </SectionTitle>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="card-grid md:grid-cols-2 xl:grid-cols-4">
           {ads.data.byPlatform.map((channel) => (
             <Card key={channel.platform} className="relative overflow-hidden" hoverable>
               <div className="absolute inset-x-0 top-0 h-1 bg-brand" />
@@ -687,45 +1206,20 @@ function SocialMedia() {
           </Notice>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-              <KpiCard
-                tone="cyan"
-                label={lang === "ar" ? "المحادثات" : "Conversations"}
-                value={fmtNum(chat.summary.chatConversations)}
-                icon={<MessageCircleMore size={16} />}
+            {/* Six figures, but never six across: `KpiRow` measures the content
+                column and settles on 3 + 3 rather than squeezing six cards past
+                the width a figure needs to stay on one line. */}
+            <KpiRow>
+              <MetricDetailTrigger detail={care.conversations} card={{ index: 0, compact: true }} />
+              <MetricDetailTrigger detail={care.resolved} card={{ index: 1, compact: true }} />
+              <MetricDetailTrigger
+                detail={care.awaiting}
+                card={{ index: 2, compact: true, hero: (chat.summary.chatAwaitingReply ?? 0) > 0 }}
               />
-              <KpiCard
-                tone="mint"
-                label={lang === "ar" ? "تم حلها" : "Resolved"}
-                value={fmtNum(chat.summary.chatResolved)}
-                icon={<BadgeCheck size={16} />}
-              />
-              <KpiCard
-                tone="rose"
-                label={lang === "ar" ? "تنتظر رد" : "Awaiting reply"}
-                value={fmtNum(chat.summary.chatAwaitingReply)}
-                icon={<Clock3 size={16} />}
-                hero={(chat.summary.chatAwaitingReply ?? 0) > 0}
-              />
-              <KpiCard
-                tone="cyan"
-                label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open now"}
-                value={fmtNum(chat.summary.chatOpenConversations)}
-                icon={<Inbox size={16} />}
-              />
-              <KpiCard
-                tone="rose"
-                label={lang === "ar" ? "بدون موظف" : "Unassigned"}
-                value={fmtNum(chat.chatwoot.unassignedConversations)}
-                icon={<Users size={16} />}
-              />
-              <KpiCard
-                tone="amber"
-                label={lang === "ar" ? "أول رد" : "First response"}
-                value={duration(chat.summary.chatAverageFirstResponseSeconds, lang)}
-                icon={<MousePointerClick size={16} />}
-              />
-            </div>
+              <MetricDetailTrigger detail={care.openNow} card={{ index: 3, compact: true }} />
+              <MetricDetailTrigger detail={care.unassigned} card={{ index: 4, compact: true }} />
+              <MetricDetailTrigger detail={care.firstResponse} card={{ index: 5, compact: true }} />
+            </KpiRow>
 
             <Card padded={false} className="mt-4 overflow-hidden">
               <div className="border-b border-border px-4 py-3">

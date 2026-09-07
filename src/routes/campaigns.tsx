@@ -25,7 +25,7 @@ import {
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
-import { MetricCardDetailTrigger, MetricDetailSheet } from "@/components/metric-detail";
+import { MetricCardDetailTrigger, MetricDrilldown } from "@/components/metric-detail";
 import { standardMetrics } from "@/components/standard-metrics";
 import type { MetricDetail } from "@/lib/metric-detail";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
@@ -181,7 +181,6 @@ function Campaigns() {
   const [grain, setGrain] = useState<Grain>("campaign");
   const [workspaceTab, setWorkspaceTab] = useState<CampaignWorkspaceTab>("decision");
   // One panel for the three readings: whichever card was pressed last.
-  const [openInsight, setOpenInsight] = useState<MetricDetail | null>(null);
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
   useRegisterNexusView("campaigns", { tab: workspaceTab });
@@ -339,80 +338,94 @@ function Campaigns() {
             }
           >
             <InsightRow>
-              <InsightCard
-                index={0}
-                kind="best"
-                eyebrow={lang === "ar" ? "أفضل حملة" : "Best campaign"}
-                title={
-                  headline.best
-                    ? headline.best.name
-                    : lang === "ar"
-                      ? "لا توجد حملة مؤهلة"
-                      : "No eligible campaign"
-                }
-                value={headline.best ? fmtUSD(headline.best.revenue) : undefined}
-                detail={
-                  headline.best
-                    ? lang === "ar"
-                      ? `${fmtUSD(headline.best.spend)} إنفاق مقابل إيراد مرتبط`
-                      : `${fmtUSD(headline.best.spend)} spent against linked revenue`
-                    : lang === "ar"
-                      ? "لا توجد حملة صرفت وحققت إيراداً مرتبطاً في الفترة."
-                      : "No campaign both spent and returned linked revenue this period."
-                }
-                onClick={() => setOpenInsight(insights.best)}
-                actionLabel={lang === "ar" ? "لماذا هذه الحملة؟" : "Why this campaign?"}
-              />
-              <InsightCard
-                index={1}
-                kind="attention"
-                eyebrow={lang === "ar" ? "حملة تحتاج متابعة" : "Campaign needing attention"}
-                title={
-                  headline.leak
-                    ? headline.leak.name
-                    : lang === "ar"
-                      ? "لا توجد حملة خاسرة"
-                      : "No loss-making campaign"
-                }
-                value={
-                  headline.leak ? fmtUSD(headline.leak.spend - headline.leak.revenue) : undefined
-                }
-                detail={
-                  headline.leak
-                    ? lang === "ar"
-                      ? `صرفت ${fmtUSD(headline.leak.spend)} مقابل ${fmtUSD(headline.leak.revenue)} إيراد مرتبط.`
-                      : `Spent ${fmtUSD(headline.leak.spend)} against ${fmtUSD(headline.leak.revenue)} of linked revenue.`
-                    : lang === "ar"
-                      ? "كل حملة صرفت في الفترة غطّت تكلفتها على الأقل."
-                      : "Every campaign that spent this period at least covered its cost."
-                }
-                onClick={() => setOpenInsight(insights.leak)}
-                actionLabel={lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?"}
-              />
-              <InsightCard
-                index={2}
-                kind="opportunity"
-                eyebrow={lang === "ar" ? "أفضل تكلفة لكل عميل محتمل" : "Best cost per lead"}
-                title={
-                  headline.bestCpl
-                    ? headline.bestCpl.name
-                    : lang === "ar"
-                      ? "لا توجد تكلفة قابلة للقياس"
-                      : "No measurable cost per lead"
-                }
-                value={headline.bestCpl ? fmtUSDFull(headline.bestCpl.cpl ?? 0) : undefined}
-                detail={
-                  headline.bestCpl
-                    ? lang === "ar"
-                      ? `${fmtNum(headline.bestCpl.crmLeads)} عميل من ${fmtUSD(headline.bestCpl.spend)} إنفاق.`
-                      : `${fmtNum(headline.bestCpl.crmLeads)} leads from ${fmtUSD(headline.bestCpl.spend)} of spend.`
-                    : lang === "ar"
-                      ? "لا توجد حملة صرفت وجاءت منها عملاء في الفترة."
-                      : "No campaign both spent and produced leads this period."
-                }
-                onClick={() => setOpenInsight(insights.bestCpl)}
-                actionLabel={lang === "ar" ? "على أي أساس؟" : "On what basis?"}
-              />
+              <MetricDrilldown detail={insights.best}>
+                {(open) => (
+                  <InsightCard
+                    index={0}
+                    kind="best"
+                    eyebrow={lang === "ar" ? "أفضل حملة" : "Best campaign"}
+                    title={
+                      headline.best
+                        ? headline.best.name
+                        : lang === "ar"
+                          ? "لا توجد حملة مؤهلة"
+                          : "No eligible campaign"
+                    }
+                    value={headline.best ? fmtUSD(headline.best.revenue) : undefined}
+                    detail={
+                      headline.best
+                        ? lang === "ar"
+                          ? `${fmtUSD(headline.best.spend)} إنفاق مقابل إيراد مرتبط`
+                          : `${fmtUSD(headline.best.spend)} spent against linked revenue`
+                        : lang === "ar"
+                          ? "لا توجد حملة صرفت وحققت إيراداً مرتبطاً في الفترة."
+                          : "No campaign both spent and returned linked revenue this period."
+                    }
+                    onClick={open}
+                    actionLabel={lang === "ar" ? "لماذا هذه الحملة؟" : "Why this campaign?"}
+                  />
+                )}
+              </MetricDrilldown>
+              <MetricDrilldown detail={insights.leak}>
+                {(open) => (
+                  <InsightCard
+                    index={1}
+                    kind="attention"
+                    eyebrow={lang === "ar" ? "حملة تحتاج متابعة" : "Campaign needing attention"}
+                    title={
+                      headline.leak
+                        ? headline.leak.name
+                        : lang === "ar"
+                          ? "لا توجد حملة خاسرة"
+                          : "No loss-making campaign"
+                    }
+                    value={
+                      headline.leak
+                        ? fmtUSD(headline.leak.spend - headline.leak.revenue)
+                        : undefined
+                    }
+                    detail={
+                      headline.leak
+                        ? lang === "ar"
+                          ? `صرفت ${fmtUSD(headline.leak.spend)} مقابل ${fmtUSD(headline.leak.revenue)} إيراد مرتبط.`
+                          : `Spent ${fmtUSD(headline.leak.spend)} against ${fmtUSD(headline.leak.revenue)} of linked revenue.`
+                        : lang === "ar"
+                          ? "كل حملة صرفت في الفترة غطّت تكلفتها على الأقل."
+                          : "Every campaign that spent this period at least covered its cost."
+                    }
+                    onClick={open}
+                    actionLabel={lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?"}
+                  />
+                )}
+              </MetricDrilldown>
+              <MetricDrilldown detail={insights.bestCpl}>
+                {(open) => (
+                  <InsightCard
+                    index={2}
+                    kind="opportunity"
+                    eyebrow={lang === "ar" ? "أفضل تكلفة لكل عميل محتمل" : "Best cost per lead"}
+                    title={
+                      headline.bestCpl
+                        ? headline.bestCpl.name
+                        : lang === "ar"
+                          ? "لا توجد تكلفة قابلة للقياس"
+                          : "No measurable cost per lead"
+                    }
+                    value={headline.bestCpl ? fmtUSDFull(headline.bestCpl.cpl ?? 0) : undefined}
+                    detail={
+                      headline.bestCpl
+                        ? lang === "ar"
+                          ? `${fmtNum(headline.bestCpl.crmLeads)} عميل من ${fmtUSD(headline.bestCpl.spend)} إنفاق.`
+                          : `${fmtNum(headline.bestCpl.crmLeads)} leads from ${fmtUSD(headline.bestCpl.spend)} of spend.`
+                        : lang === "ar"
+                          ? "لا توجد حملة صرفت وجاءت منها عملاء في الفترة."
+                          : "No campaign both spent and produced leads this period."
+                    }
+                    onClick={open}
+                    actionLabel={lang === "ar" ? "على أي أساس؟" : "On what basis?"}
+                  />
+                )}
+              </MetricDrilldown>
             </InsightRow>
           </PageSection>
         )}
@@ -661,14 +674,6 @@ function Campaigns() {
           )}
         </PageSection>
       </PageSections>
-
-      {openInsight && (
-        <MetricDetailSheet
-          detail={openInsight}
-          open={Boolean(openInsight)}
-          onClose={() => setOpenInsight(null)}
-        />
-      )}
     </div>
   );
 }

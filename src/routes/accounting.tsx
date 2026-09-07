@@ -621,7 +621,7 @@ function Accounting() {
 
               <CourseRevenueExplorer data={data.courses} />
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="card-grid md:grid-cols-2 xl:grid-cols-3">
                 <Money title={t("main_category")} rows={data.byMainCategory} />
                 <Money title={t("product_category")} rows={data.byProductCategory} />
                 <Money title={t("product")} rows={data.byProduct} />

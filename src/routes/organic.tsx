@@ -18,8 +18,8 @@ import { FilterSummary } from "@/components/ads/FilterSummary";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { DataTable, type Col } from "@/components/DataTable";
 import { Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
-import { KpiRow } from "@/components/dashboard-bits";
-import { MetricDetailTrigger } from "@/components/metric-detail";
+import { InsightRow, KpiRow } from "@/components/dashboard-bits";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
@@ -102,39 +102,383 @@ interface OrganicResponse {
   health: DataHealth;
 }
 
-function InsightCard({
-  icon,
-  eyebrow,
-  title,
-  value,
-  note,
-}: {
-  icon: ReactNode;
-  eyebrow: string;
-  title: string;
-  value: ReactNode;
-  note: ReactNode;
-}) {
-  return (
-    <Card className="relative overflow-hidden" hoverable>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-subtle">
-          {eyebrow}
-        </span>
-        <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-          style={{ background: "var(--success-soft)", color: "var(--success)" }}
-        >
-          {icon}
-        </span>
-      </div>
-      <div className="truncate text-base font-semibold text-text" title={title}>
-        {title || "—"}
-      </div>
-      <div className="num mt-1 text-2xl font-semibold tracking-tight text-text">{value}</div>
-      <div className="mt-2 text-xs leading-relaxed text-text-muted">{note}</div>
-    </Card>
-  );
+/**
+ * The six findings, and the ranking each one came out of.
+ *
+ * A "key finding" is the app naming a winner. Naming one without showing the
+ * table it was picked from asks the reader to trust a sort they cannot see, so
+ * each of these carries that table — the top five of the very list the winner
+ * leads — plus the counts behind its own headline figure.
+ */
+function organicInsights(
+  data: OrganicResponse,
+  lostAvailable: boolean,
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const insight = data.insights;
+  const report: MetricDetail["report"] = {
+    to: "/leads",
+    label: A ? "فتح تقرير العملاء المحتملين" : "Open the leads report",
+  };
+
+  const sourceRows = (pick: (row: OrganicBreakdown) => number, format: (n: number) => string) =>
+    topRows(
+      data.sources.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.leads)} ${A ? "ليد" : "leads"}`,
+        tone: "cyan" as const,
+      })),
+    );
+
+  return {
+    topLeadSource: {
+      id: "organic.topLeadSource",
+      title: A ? "أكبر مصدر حجمًا" : "Source with the most volume",
+      value: insight.topLeadSource?.name ?? "—",
+      tone: "violet",
+      icon: <MessageCircleMore size={16} />,
+      entity: insight.topLeadSource
+        ? { type: "source", id: insight.topLeadSource.key, name: insight.topLeadSource.name }
+        : null,
+      definition: A
+        ? "المصدر غير المدفوع الذي جاء منه أكبر عدد عملاء محتملين في الفترة. الترتيب بعدد الليدز وحده."
+        : "The non-paid source that produced the most leads in the period. Ranked by lead count alone.",
+      caveat: A
+        ? "الحجم ليس جودة: راجع نسبة الإغلاق والإيراد في نفس الصف قبل نقل مجهود إليه."
+        : "Volume is not quality: read the conversion and revenue on the same row before shifting effort onto it.",
+      supporting: insight.topLeadSource
+        ? [
+            {
+              key: "leads",
+              label: A ? "الليدز" : "Leads",
+              value: fmtNum(insight.topLeadSource.leads),
+            },
+            {
+              key: "share",
+              label: A ? "حصته من الليدز" : "Share of leads",
+              value: fmtPct(insight.topLeadSource.leadShare, 1),
+            },
+            { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(insight.topLeadSource.won) },
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSD(insight.topLeadSource.revenue),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "الليدز حسب المصدر" : "Leads by source",
+          hint: A
+            ? "هذا هو الترتيب الذي اختار المصدر أعلاه."
+            : "The ranking that named the source above.",
+          rows: sourceRows((row) => row.leads, fmtNum),
+          emptyLabel: A ? "لا توجد مصادر في الفترة" : "No sources in this period",
+        },
+      ],
+      report,
+    },
+
+    topRevenueSource: {
+      id: "organic.topRevenueSource",
+      title: A ? "أعلى مصدر إيرادًا" : "Top revenue source",
+      value: insight.topRevenueSource?.name ?? "—",
+      tone: "mint",
+      icon: <HandCoins size={16} />,
+      entity: insight.topRevenueSource
+        ? { type: "source", id: insight.topRevenueSource.key, name: insight.topRevenueSource.name }
+        : null,
+      definition: A
+        ? "المصدر غير المدفوع الذي جاء منه أكبر تحصيل في الفترة، محسوبًا من الفواتير المدفوعة."
+        : "The non-paid source that collected the most in the period, counted from paid invoices.",
+      supporting: insight.topRevenueSource
+        ? [
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSD(insight.topRevenueSource.revenue),
+            },
+            {
+              key: "invoices",
+              label: A ? "الفواتير المدفوعة" : "Paid invoices",
+              value: fmtNum(insight.topRevenueSource.invoices),
+            },
+            {
+              key: "share",
+              label: A ? "حصته من الإيراد" : "Share of revenue",
+              value: fmtPct(insight.topRevenueSource.revenueShare, 1),
+            },
+            {
+              key: "perLead",
+              label: A ? "إيراد لكل ليد" : "Revenue per lead",
+              value: fmtUSDFull(insight.topRevenueSource.revenuePerLead),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "الإيراد حسب المصدر" : "Revenue by source",
+          rows: sourceRows((row) => row.revenue, fmtUSD),
+          emptyLabel: A ? "لا يوجد إيراد في الفترة" : "No revenue in this period",
+        },
+      ],
+      report: {
+        to: "/accounting",
+        label: A ? "فتح التقرير المحاسبي" : "Open the accounting report",
+      },
+    },
+
+    topRevenueCourse: {
+      id: "organic.topRevenueCourse",
+      title: A ? "أفضل دورة مبيعًا" : "Best-selling course",
+      value: insight.topRevenueCourse?.name ?? "—",
+      tone: "mint",
+      icon: <Trophy size={16} />,
+      entity: insight.topRevenueCourse
+        ? { type: "course", id: insight.topRevenueCourse.key, name: insight.topRevenueCourse.name }
+        : null,
+      definition: A
+        ? "الدورة التي حققت أكبر تحصيل من مصادر غير مدفوعة في الفترة."
+        : "The course that collected the most from non-paid sources in the period.",
+      supporting: insight.topRevenueCourse
+        ? [
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSD(insight.topRevenueCourse.revenue),
+            },
+            {
+              key: "invoices",
+              label: A ? "الفواتير" : "Invoices",
+              value: fmtNum(insight.topRevenueCourse.invoices),
+            },
+            {
+              key: "leads",
+              label: A ? "الليدز" : "Leads",
+              value: fmtNum(insight.topRevenueCourse.crmLeads),
+            },
+            {
+              key: "avgOrder",
+              label: A ? "متوسط الطلب" : "Average order",
+              value: fmtUSDFull(insight.topRevenueCourse.avgOrder),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "الإيراد حسب الدورة" : "Revenue by course",
+          rows: topRows(
+            data.courses.map((row) => ({
+              key: row.key,
+              label: row.name,
+              value: row.revenue,
+              display: fmtUSD(row.revenue),
+              meta: `${fmtNum(row.invoices)} ${A ? "فاتورة" : "invoices"}`,
+              tone: "mint" as const,
+            })),
+          ),
+          moreTo: "/courses",
+          moreLabel: A ? "فتح تقرير الدورات" : "Open the courses report",
+          emptyLabel: A ? "لا توجد دورات في الفترة" : "No courses in this period",
+        },
+      ],
+      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
+    },
+
+    bestConversionCourse: {
+      id: "organic.bestConversionCourse",
+      title: A ? "أقوى دورة تحويلًا" : "Best-converting course",
+      value: lostAvailable ? (insight.bestConversionCourse?.name ?? "—") : "—",
+      tone: "sky",
+      icon: <BookOpenCheck size={16} />,
+      entity: insight.bestConversionCourse
+        ? {
+            type: "course",
+            id: insight.bestConversionCourse.key,
+            name: insight.bestConversionCourse.name,
+          }
+        : null,
+      definition: A
+        ? "الدورة التي أغلقت أعلى نسبة من عملائها المحتملين، بين الدورات التي لديها 20 ليدًا على الأقل."
+        : "The course that closed the highest share of its leads, among courses with at least 20 leads.",
+      caveat: lostAvailable
+        ? undefined
+        : A
+          ? "هذه القراءة تحتاج مصدر الفرص المؤرشفة، وهو غير متاح الآن — فلا يُعرض ترتيب لا تدعمه البيانات."
+          : "This reading needs the archived-opportunity source, which is currently unavailable, so no ranking is shown that the data cannot support.",
+      supporting:
+        lostAvailable && insight.bestConversionCourse
+          ? [
+              {
+                key: "rate",
+                label: A ? "نسبة الإغلاق" : "Conversion",
+                value: fmtPct(insight.bestConversionCourse.conversionRate),
+              },
+              {
+                key: "won",
+                label: A ? "البسط · Won" : "Numerator · won",
+                value: fmtNum(insight.bestConversionCourse.won),
+              },
+              {
+                key: "leads",
+                label: A ? "المقام · الليدز" : "Denominator · leads",
+                value: fmtNum(insight.bestConversionCourse.crmLeads),
+              },
+              {
+                key: "revenue",
+                label: A ? "الإيراد" : "Revenue",
+                value: fmtUSD(insight.bestConversionCourse.revenue),
+              },
+            ]
+          : undefined,
+      breakdowns: lostAvailable
+        ? [
+            {
+              id: "conversion",
+              title: A ? "نسبة الإغلاق حسب الدورة" : "Conversion by course",
+              hint: A
+                ? "الدورات التي لديها 20 ليدًا فأكثر فقط."
+                : "Only courses with 20 leads or more.",
+              rows: topRows(
+                data.courses
+                  .filter((row) => row.crmLeads >= 20)
+                  .map((row) => ({
+                    key: row.key,
+                    label: row.name,
+                    value: row.conversionRate ?? 0,
+                    display: fmtPct(row.conversionRate),
+                    meta: `${fmtNum(row.won)}/${fmtNum(row.crmLeads)}`,
+                    tone: "sky" as const,
+                  })),
+              ),
+              emptyLabel: A
+                ? "لا توجد دورة بلغت 20 ليدًا في الفترة"
+                : "No course reached 20 leads in this period",
+            },
+          ]
+        : undefined,
+      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
+    },
+
+    topSalesperson: {
+      id: "organic.topSalesperson",
+      title: A ? "أفضل موظف بالإيراد" : "Top salesperson by revenue",
+      value: insight.topSalesperson?.displayName ?? insight.topSalesperson?.name ?? "—",
+      tone: "violet",
+      icon: <UserRoundCheck size={16} />,
+      entity: insight.topSalesperson
+        ? {
+            type: "salesperson",
+            id: insight.topSalesperson.key,
+            name: insight.topSalesperson.name,
+          }
+        : null,
+      definition: A
+        ? "الموظف الذي حقق أكبر تحصيل من عملاء غير مدفوعين في الفترة."
+        : "The salesperson who collected the most from non-paid leads in the period.",
+      supporting: insight.topSalesperson
+        ? [
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSD(insight.topSalesperson.revenue),
+            },
+            { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(insight.topSalesperson.won) },
+            {
+              key: "leads",
+              label: A ? "الليدز" : "Leads",
+              value: fmtNum(insight.topSalesperson.crmLeads),
+            },
+            {
+              key: "team",
+              label: A ? "الفريق" : "Team",
+              value: insight.topSalesperson.parent ?? "—",
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "people",
+          title: A ? "الإيراد حسب الموظف" : "Revenue by salesperson",
+          rows: topRows(
+            data.people.map((row) => ({
+              key: row.key,
+              label: row.displayName ?? row.name,
+              value: row.revenue,
+              display: fmtUSD(row.revenue),
+              meta: `${fmtNum(row.won)}/${fmtNum(row.crmLeads)}`,
+              tone: "violet" as const,
+            })),
+          ),
+          moreTo: "/teams",
+          moreLabel: A ? "فتح تقرير الفرق" : "Open the teams report",
+          emptyLabel: A ? "لا يوجد موظف بإيراد في الفترة" : "Nobody collected in this period",
+        },
+      ],
+      report: { to: "/teams", label: A ? "فتح تقرير الفرق" : "Open the teams report" },
+    },
+
+    topTeam: {
+      id: "organic.topTeam",
+      title: A ? "أفضل فريق" : "Top team",
+      value: insight.topTeam?.name ?? "—",
+      tone: "sky",
+      icon: <UsersRound size={16} />,
+      entity: insight.topTeam
+        ? { type: "team", id: insight.topTeam.key, name: insight.topTeam.name }
+        : null,
+      definition: A
+        ? "الفريق الذي حقق أكبر تحصيل من عملاء غير مدفوعين في الفترة."
+        : "The team that collected the most from non-paid leads in the period.",
+      supporting: insight.topTeam
+        ? [
+            {
+              key: "revenue",
+              label: A ? "الإيراد" : "Revenue",
+              value: fmtUSD(insight.topTeam.revenue),
+            },
+            { key: "won", label: A ? "الصفقات" : "Won", value: fmtNum(insight.topTeam.won) },
+            {
+              key: "leads",
+              label: A ? "الليدز" : "Leads",
+              value: fmtNum(insight.topTeam.crmLeads),
+            },
+            {
+              key: "conversion",
+              label: A ? "نسبة الإغلاق" : "Conversion",
+              value: fmtPct(insight.topTeam.conversionRate),
+            },
+          ]
+        : undefined,
+      breakdowns: [
+        {
+          id: "teams",
+          title: A ? "الإيراد حسب الفريق" : "Revenue by team",
+          rows: topRows(
+            data.teams.map((row) => ({
+              key: row.key,
+              label: row.name,
+              value: row.revenue,
+              display: fmtUSD(row.revenue),
+              meta: `${fmtNum(row.won)}/${fmtNum(row.crmLeads)}`,
+              tone: "sky" as const,
+            })),
+          ),
+          moreTo: "/teams",
+          moreLabel: A ? "فتح تقرير الفرق" : "Open the teams report",
+          emptyLabel: A ? "لا يوجد فريق بإيراد في الفترة" : "No team collected in this period",
+        },
+      ],
+      report: { to: "/teams", label: A ? "فتح تقرير الفرق" : "Open the teams report" },
+    },
+  };
 }
 
 /**
@@ -328,6 +672,8 @@ function Organic() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   const lostAvailable = data ? hasReportableLost(data.health.lostAuthority) : false;
+  // The six findings, described from the same response the cards already read.
+  const insights = data ? organicInsights(data, lostAvailable, lang) : null;
 
   const sourceColumns: Col<OrganicBreakdown>[] = [
     {
@@ -860,74 +1206,101 @@ function Organic() {
             >
               {lang === "ar" ? "أهم النتائج" : "Key findings"}
             </SectionTitle>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <InsightCard
-                eyebrow={lang === "ar" ? "أكبر حجم" : "Most volume"}
-                icon={<MessageCircleMore size={17} />}
-                title={insight?.topLeadSource?.name || "—"}
-                value={fmtNum(insight?.topLeadSource?.leads)}
-                note={
-                  lang === "ar"
-                    ? `${fmtPct(insight?.topLeadSource?.leadShare, 1)} من ${lostAvailable ? "كل الليدز" : "الليدز المتاحة"}`
-                    : `${fmtPct(insight?.topLeadSource?.leadShare, 1)} of ${lostAvailable ? "all leads" : "available leads"}`
-                }
+            <InsightRow className="sm:grid-cols-2 xl:grid-cols-3">
+              <InsightDetailTrigger
+                detail={insights!.topLeadSource}
+                card={{
+                  index: 0,
+                  kind: "note",
+                  eyebrow: lang === "ar" ? "أكبر حجم" : "Most volume",
+                  title: insight?.topLeadSource?.name || "—",
+                  value: fmtNum(insight?.topLeadSource?.leads),
+                  detail:
+                    lang === "ar"
+                      ? `${fmtPct(insight?.topLeadSource?.leadShare, 1)} من ${lostAvailable ? "كل الليدز" : "الليدز المتاحة"}`
+                      : `${fmtPct(insight?.topLeadSource?.leadShare, 1)} of ${lostAvailable ? "all leads" : "available leads"}`,
+                  actionLabel: lang === "ar" ? "ما ترتيب المصادر؟" : "How do the sources rank?",
+                }}
               />
-              <InsightCard
-                eyebrow={lang === "ar" ? "أعلى إيراد" : "Top revenue source"}
-                icon={<HandCoins size={17} />}
-                title={insight?.topRevenueSource?.name || "—"}
-                value={fmtUSD(insight?.topRevenueSource?.revenue)}
-                note={
-                  lang === "ar"
-                    ? `${fmtNum(insight?.topRevenueSource?.invoices)} فاتورة مدفوعة`
-                    : `${fmtNum(insight?.topRevenueSource?.invoices)} paid invoices`
-                }
+              <InsightDetailTrigger
+                detail={insights!.topRevenueSource}
+                card={{
+                  index: 1,
+                  kind: "best",
+                  eyebrow: lang === "ar" ? "أعلى إيراد" : "Top revenue source",
+                  title: insight?.topRevenueSource?.name || "—",
+                  value: fmtUSD(insight?.topRevenueSource?.revenue),
+                  detail:
+                    lang === "ar"
+                      ? `${fmtNum(insight?.topRevenueSource?.invoices)} فاتورة مدفوعة`
+                      : `${fmtNum(insight?.topRevenueSource?.invoices)} paid invoices`,
+                  actionLabel: lang === "ar" ? "من أين جاء الإيراد؟" : "Where did it come from?",
+                }}
               />
-              <InsightCard
-                eyebrow={lang === "ar" ? "أفضل دورة مبيعًا" : "Best-selling course"}
-                icon={<Trophy size={17} />}
-                title={insight?.topRevenueCourse?.name || "—"}
-                value={fmtUSD(insight?.topRevenueCourse?.revenue)}
-                note={
-                  lang === "ar"
-                    ? `${fmtNum(insight?.topRevenueCourse?.invoices)} فاتورة · ${fmtNum(insight?.topRevenueCourse?.crmLeads)} ليد`
-                    : `${fmtNum(insight?.topRevenueCourse?.invoices)} invoices · ${fmtNum(insight?.topRevenueCourse?.crmLeads)} leads`
-                }
+              <InsightDetailTrigger
+                detail={insights!.topRevenueCourse}
+                card={{
+                  index: 2,
+                  kind: "best",
+                  eyebrow: lang === "ar" ? "أفضل دورة مبيعًا" : "Best-selling course",
+                  title: insight?.topRevenueCourse?.name || "—",
+                  value: fmtUSD(insight?.topRevenueCourse?.revenue),
+                  detail:
+                    lang === "ar"
+                      ? `${fmtNum(insight?.topRevenueCourse?.invoices)} فاتورة · ${fmtNum(insight?.topRevenueCourse?.crmLeads)} ليد`
+                      : `${fmtNum(insight?.topRevenueCourse?.invoices)} invoices · ${fmtNum(insight?.topRevenueCourse?.crmLeads)} leads`,
+                  actionLabel: lang === "ar" ? "لماذا هذه الدورة؟" : "Why this course?",
+                }}
               />
-              <InsightCard
-                eyebrow={lang === "ar" ? "أقوى تحويل" : "Best conversion"}
-                icon={<BookOpenCheck size={17} />}
-                title={lostAvailable ? insight?.bestConversionCourse?.name || "—" : "—"}
-                value={lostAvailable ? fmtPct(insight?.bestConversionCourse?.conversionRate) : "—"}
-                note={
-                  !lostAvailable
+              <InsightDetailTrigger
+                detail={insights!.bestConversionCourse}
+                card={{
+                  index: 3,
+                  kind: "opportunity",
+                  eyebrow: lang === "ar" ? "أقوى تحويل" : "Best conversion",
+                  title: lostAvailable ? insight?.bestConversionCourse?.name || "—" : "—",
+                  value: lostAvailable
+                    ? fmtPct(insight?.bestConversionCourse?.conversionRate)
+                    : "—",
+                  detail: !lostAvailable
                     ? lang === "ar"
                       ? "يظهر بعد رجوع مصدر Archived Lost"
                       : "available when Archived Lost recovers"
                     : lang === "ar"
                       ? `بين الدورات التي لديها 20 ليد على الأقل`
-                      : "among courses with at least 20 leads"
-                }
+                      : "among courses with at least 20 leads",
+                  actionLabel: lang === "ar" ? "على أي أساس؟" : "On what basis?",
+                }}
               />
-              <InsightCard
-                eyebrow={lang === "ar" ? "أفضل موظف بالإيراد" : "Top salesperson"}
-                icon={<UserRoundCheck size={17} />}
-                title={insight?.topSalesperson?.name || "—"}
-                value={fmtUSD(insight?.topSalesperson?.revenue)}
-                note={insight?.topSalesperson?.parent || "—"}
+              <InsightDetailTrigger
+                detail={insights!.topSalesperson}
+                card={{
+                  index: 4,
+                  kind: "note",
+                  eyebrow: lang === "ar" ? "أفضل موظف بالإيراد" : "Top salesperson",
+                  title:
+                    insight?.topSalesperson?.displayName || insight?.topSalesperson?.name || "—",
+                  value: fmtUSD(insight?.topSalesperson?.revenue),
+                  detail: insight?.topSalesperson?.parent || "—",
+                  actionLabel: lang === "ar" ? "ما ترتيب الموظفين؟" : "How do people rank?",
+                }}
               />
-              <InsightCard
-                eyebrow={lang === "ar" ? "أفضل فريق" : "Top team"}
-                icon={<UsersRound size={17} />}
-                title={insight?.topTeam?.name || "—"}
-                value={fmtUSD(insight?.topTeam?.revenue)}
-                note={
-                  lang === "ar"
-                    ? `${fmtNum(insight?.topTeam?.won)} Won من ${fmtNum(insight?.topTeam?.crmLeads)} ليد`
-                    : `${fmtNum(insight?.topTeam?.won)} Won from ${fmtNum(insight?.topTeam?.crmLeads)} leads`
-                }
+              <InsightDetailTrigger
+                detail={insights!.topTeam}
+                card={{
+                  index: 5,
+                  kind: "opportunity",
+                  eyebrow: lang === "ar" ? "أفضل فريق" : "Top team",
+                  title: insight?.topTeam?.name || "—",
+                  value: fmtUSD(insight?.topTeam?.revenue),
+                  detail:
+                    lang === "ar"
+                      ? `${fmtNum(insight?.topTeam?.won)} Won من ${fmtNum(insight?.topTeam?.crmLeads)} ليد`
+                      : `${fmtNum(insight?.topTeam?.won)} Won from ${fmtNum(insight?.topTeam?.crmLeads)} leads`,
+                  actionLabel: lang === "ar" ? "ما ترتيب الفرق؟" : "How do teams rank?",
+                }}
               />
-            </div>
+            </InsightRow>
           </section>
 
           <section>
@@ -940,7 +1313,7 @@ function Organic() {
             >
               {lang === "ar" ? "من أين يأتي الأورجانيك؟" : "Where does Organic come from?"}
             </SectionTitle>
-            <div className="mb-3 grid gap-3 xl:grid-cols-2">
+            <div className="mb-3 card-grid xl:grid-cols-2">
               <Card>
                 <SectionTitle
                   hint={lang === "ar" ? "مرتب حسب عدد الليدز" : "ranked by lead volume"}
@@ -1004,7 +1377,7 @@ function Organic() {
             >
               {lang === "ar" ? "أداء الدورات من الأورجانيك" : "Organic course performance"}
             </SectionTitle>
-            <div className="mb-3 grid gap-3 xl:grid-cols-[0.8fr_1.2fr]">
+            <div className="mb-3 card-grid xl:grid-cols-[0.8fr_1.2fr]">
               <Card>
                 <SectionTitle hint={lang === "ar" ? "أعلى إيراد مدفوع" : "highest paid revenue"}>
                   {lang === "ar" ? "الدورات الأقوى" : "Top courses"}

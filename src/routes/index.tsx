@@ -1,7 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  AlertTriangle,
   Award,
   BookOpenCheck,
   BrainCircuit,
@@ -47,7 +46,6 @@ import {
   DashboardPanel,
   DataHealthSummary,
   ExecutiveSummary,
-  InsightCard,
   InsightRow,
   KpiRow,
   PageSection,
@@ -57,10 +55,13 @@ import {
   type DataHealthIssue,
 } from "@/components/dashboard-bits";
 import { AcosPill, CloseTime, CountPct, RoasCell } from "@/components/metric-bits";
-import { MetricDetailSheet, MetricDetailTrigger } from "@/components/metric-detail";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import {
+  businessSignals,
+  insightDetails,
   overviewEfficiencyMetrics,
   overviewMetrics,
+  type BusinessSignals,
   type CourseSaleContribution,
   type OverviewResp,
 } from "@/components/overview-metrics";
@@ -116,368 +117,6 @@ function moneyTrend(
     .map(([date, value]) => ({ date, value }));
 }
 
-interface BusinessSignals {
-  topCourse: CourseSaleContribution | null;
-  courseTargetShare: number | null;
-  targetComplete: boolean;
-  bestEmployee: AgentAnalyticsResult["agents"][number] | null;
-  bestCampaign: PerfRow | null;
-  risk: { title: string; detail: string };
-  decision: { title: string; detail: string; href: string };
-}
-
-function businessSignals(
-  data: OverviewResp,
-  workforce: AgentAnalyticsResult | undefined,
-  lang: "ar" | "en",
-): BusinessSignals {
-  const topCourse = data.courseSales[0] ?? null;
-  const target = workforce?.targets.totalTarget ?? null;
-  const courseTargetShare =
-    topCourse && target !== null && target > 0 ? (topCourse.revenue / target) * 100 : null;
-  const bestEmployee =
-    [...(workforce?.agents ?? [])]
-      .filter((agent) => agent.averageQualityScore !== null && (agent.analyzedCalls ?? 0) > 0)
-      .sort(
-        (a, b) =>
-          (b.averageQualityScore ?? 0) - (a.averageQualityScore ?? 0) ||
-          (b.analyzedCalls ?? 0) - (a.analyzedCalls ?? 0),
-      )[0] ?? null;
-
-  let risk: BusinessSignals["risk"];
-  if (data.fetchErrors.length || data.staleTabs.length) {
-    // This card used to print the raw connector errors — "Archived Lost
-    // unavailable: direct Odoo is not configured or could not be reached" —
-    // into an executive summary. The count and the consequence are what a
-    // reader here can act on; the connector names are stated in full in the
-    // data-health card at the foot of the page.
-    const affected = data.fetchErrors.length + data.staleTabs.length;
-    risk = {
-      title: lang === "ar" ? "بيانات تحتاج مراجعة" : "Data needs review",
-      detail:
-        lang === "ar"
-          ? `${affected} من المصادر لم تُحدَّث بعد. راجع بطاقة صحة البيانات أسفل الصفحة قبل اتخاذ قرار مالي.`
-          : `${affected} source${affected === 1 ? "" : "s"} have not refreshed. Check the data-health card at the foot of the page before making a budget call.`,
-    };
-  } else if (data.leak) {
-    risk = {
-      title: data.leak.name || (lang === "ar" ? "حملة عالية المخاطرة" : "High-risk campaign"),
-      detail:
-        lang === "ar"
-          ? `صرف ${fmtUSD(data.leak.spend)} مقابل ${fmtUSD(data.leak.revenue)} إيراد مرتبط.`
-          : `${fmtUSD(data.leak.spend)} spend versus ${fmtUSD(data.leak.revenue)} linked revenue.`,
-    };
-  } else if ((data.totals.lostRate ?? 0) >= 35) {
-    risk = {
-      title: lang === "ar" ? "نسبة Lost مرتفعة" : "High Lost rate",
-      detail: `${fmtPct(data.totals.lostRate, 1)} · ${fmtNum(data.totals.lost)} ${lang === "ar" ? "ليد" : "leads"}`,
-    };
-  } else {
-    risk = {
-      title: lang === "ar" ? "لا يوجد إنذار حرج ظاهر" : "No critical alert detected",
-      detail:
-        lang === "ar"
-          ? "استمر في مراقبة الصرف وجودة الليد يوميًا."
-          : "Keep monitoring spend and lead quality daily.",
-    };
-  }
-
-  let decision: BusinessSignals["decision"];
-  if (data.fetchErrors.length || data.staleTabs.length) {
-    decision = {
-      title:
-        lang === "ar"
-          ? "ثبّت مصادر الداتا قبل تغيير الميزانية"
-          : "Stabilize data before changing budget",
-      detail:
-        lang === "ar"
-          ? "القرار المالي المبني على مصدر ناقص أو نسخة قديمة قد يكون مضللاً؛ راجع المصادر المتأثرة أولاً."
-          : "A budget decision based on missing or stale sources can mislead; fix the affected feeds first.",
-      href: "/guide",
-    };
-  } else if (data.leak && data.leak.spend > data.leak.revenue) {
-    decision = {
-      title:
-        lang === "ar" ? `راجع أو خفّض ${data.leak.name}` : `Review or reduce ${data.leak.name}`,
-      detail:
-        lang === "ar"
-          ? "الحملة تصرف أكثر من الإيراد المرتبط بها في الفترة. افحص جودة الليد والتتبع قبل ضخ ميزانية إضافية."
-          : "This campaign spends more than its linked revenue. Audit lead quality and attribution before adding budget.",
-      href: "/campaigns",
-    };
-  } else if ((data.totals.lostRate ?? 0) >= 35) {
-    decision = {
-      title:
-        lang === "ar"
-          ? "الأولوية لتحسين المتابعة لا لزيادة الصرف"
-          : "Prioritize follow-up before more spend",
-      detail:
-        lang === "ar"
-          ? "نسبة Lost الحالية تشير أن تحسين سرعة وجودة المتابعة قد يحقق نتيجة أكبر من توسيع الحملات."
-          : "The current Lost rate suggests follow-up quality can create more value than campaign expansion.",
-      href: "/lost",
-    };
-  } else if (data.best) {
-    decision = {
-      title:
-        lang === "ar"
-          ? `اختبر زيادة منضبطة لـ ${data.best.name}`
-          : `Test a controlled increase for ${data.best.name}`,
-      detail:
-        lang === "ar"
-          ? "ابدأ بزيادة 10–15% مع مراقبة CPL وجودة الليد، ولا تعتبر ROAS وحده ضمانًا للاستمرار."
-          : "Start with a 10–15% increase while watching CPL and lead quality; ROAS alone is not a guarantee.",
-      href: "/campaigns",
-    };
-  } else {
-    decision = {
-      title:
-        lang === "ar"
-          ? "اجمع عينة أكبر قبل تغيير الخطة"
-          : "Collect a larger sample before changing course",
-      detail:
-        lang === "ar"
-          ? "لا توجد حملة مؤهلة بما يكفي لقرار توسّع أو إيقاف موثوق في الفترة الحالية."
-          : "No campaign has enough reliable evidence for a scale-or-stop decision in this period.",
-      href: "/campaigns",
-    };
-  }
-
-  return {
-    topCourse,
-    courseTargetShare,
-    targetComplete: workforce?.targets.complete ?? false,
-    bestEmployee,
-    bestCampaign: data.best,
-    risk,
-    decision,
-  };
-}
-/* ---------------------------------------------------------------------------
-   THE READINGS, AND WHY EACH ONE WAS CHOSEN
-
-   An insight that cannot be opened is an assertion. Each of the three cards
-   below carries the same drill-down every KPI does — what the verdict is, which
-   figures produced it, what it means for the reader, and where the underlying
-   report lives — because "CFM produced the most revenue" is only useful if the
-   reader can see how far ahead it was and what it was measured against.
---------------------------------------------------------------------------- */
-
-function insightDetails(
-  data: OverviewResp,
-  signals: BusinessSignals,
-  workforce: AgentAnalyticsResult | undefined,
-  lang: "ar" | "en",
-): { best: MetricDetail; risk: MetricDetail; decision: MetricDetail } {
-  const A = lang === "ar";
-  const T = data.totals;
-  const course = signals.topCourse;
-  const runnerUp = data.courseSales[1] ?? null;
-
-  const best: MetricDetail = {
-    id: "overview.revenue",
-    title: course
-      ? A
-        ? `أعلى دورة إيرادًا: ${course.course}`
-        : `Top course by revenue: ${course.course}`
-      : A
-        ? "لا توجد مبيعات دورات مصنّفة"
-        : "No classified course sales",
-    value: course ? fmtUSD(course.revenue) : "—",
-    tone: "mint",
-    icon: <Crown size={16} />,
-    definition: course
-      ? A
-        ? `اختيرت هذه الدورة لأنها صاحبة أعلى إيراد محصّل في الفترة: ${fmtUSD(course.revenue)} من ${fmtNum(course.paidInvoices)} فاتورة مدفوعة، أي ${fmtPct(course.contribution, 1)} من إيراد الدورات المصنّف.`
-        : `This course is named because it collected the most in the period: ${fmtUSD(course.revenue)} across ${fmtNum(course.paidInvoices)} paid invoices — ${fmtPct(course.contribution, 1)} of classified course revenue.`
-      : A
-        ? "لا توجد فاتورة مدفوعة في هذه الفترة يمكن نسبتها إلى دورة مصنّفة، فلا توجد دورة تتصدر."
-        : "No paid invoice in this period maps to a classified course, so no course leads.",
-    formula: course
-      ? A
-        ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف داخل الفترة."
-        : "Contribution = course revenue ÷ classified course revenue inside the window."
-      : undefined,
-    supporting: course
-      ? [
-          {
-            key: "revenue",
-            label: A ? "إيراد الدورة" : "Course revenue",
-            value: fmtUSD(course.revenue),
-          },
-          {
-            key: "invoices",
-            label: A ? "فواتير مدفوعة" : "Paid invoices",
-            value: fmtNum(course.paidInvoices),
-          },
-          {
-            key: "avg",
-            label: A ? "متوسط سعر البيع" : "Average sale price",
-            value: fmtUSDFull(course.averageSalePrice),
-          },
-          {
-            key: "gap",
-            label: A ? "الفارق عن التالية" : "Lead over the runner-up",
-            value: runnerUp ? fmtUSD(course.revenue - runnerUp.revenue) : "—",
-            hint: runnerUp?.course,
-          },
-        ]
-      : undefined,
-    breakdowns: [
-      {
-        id: "courses",
-        title: A ? "ترتيب الدورات بالإيراد" : "Courses ranked by revenue",
-        rows: data.courseSales.slice(0, 5).map((row) => ({
-          key: row.course,
-          label: row.course,
-          value: row.revenue,
-          display: fmtUSD(row.revenue),
-          meta: fmtPct(row.contribution, 1),
-          tone: "mint" as const,
-        })),
-        moreTo: "/courses",
-        moreLabel: A ? "عرض كل الدورات" : "View every course",
-        emptyLabel: A ? "لا توجد مبيعات دورات مصنّفة" : "No classified course sales",
-      },
-    ],
-    report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
-  };
-
-  const feeds = data.fetchErrors.length + data.staleTabs.length;
-  const risk: MetricDetail = {
-    id: "overview.risk",
-    title: signals.risk.title,
-    value: feeds
-      ? `${fmtNum(feeds)} ${A ? "مصدر" : "sources"}`
-      : data.leak
-        ? fmtUSD(data.leak.spend - data.leak.revenue)
-        : fmtPct(T.lostRate, 1),
-    tone: "rose",
-    icon: <AlertTriangle size={16} />,
-    definition: signals.risk.detail,
-    caveat: feeds
-      ? A
-        ? "الأرقام في هذه الصفحة لا تشمل ما لم يُحمَّل، فأي قرار ميزانية الآن مبني على صورة ناقصة."
-        : "The figures on this page exclude whatever failed to load, so any budget call made now rests on a partial picture."
-      : undefined,
-    supporting: data.leak
-      ? [
-          { key: "spend", label: A ? "أنفقت" : "Spent", value: fmtUSD(data.leak.spend) },
-          {
-            key: "revenue",
-            label: A ? "أعادت" : "Returned",
-            value: fmtUSD(data.leak.revenue),
-          },
-          {
-            key: "leads",
-            label: A ? "عملاء أنتجتهم" : "Leads produced",
-            value: fmtNum(data.leak.crmLeads),
-          },
-          { key: "roas", label: A ? "العائد" : "Return", value: fmtRoas(data.leak.roas) },
-        ]
-      : [
-          { key: "lost", label: A ? "صفقات ضائعة" : "Lost deals", value: fmtNum(T.lost) },
-          { key: "rate", label: A ? "نسبة الخسارة" : "Lost rate", value: fmtPct(T.lostRate, 1) },
-          { key: "won", label: A ? "صفقات رابحة" : "Won deals", value: fmtNum(T.won) },
-          { key: "leads", label: A ? "إجمالي العملاء" : "All leads", value: fmtNum(T.totalLeads) },
-        ],
-    breakdowns: data.topLeaks.length
-      ? [
-          {
-            id: "leaks",
-            title: A
-              ? "الحملات التي أنفقت أكثر مما أعادت"
-              : "Campaigns that spent more than they returned",
-            rows: data.topLeaks.slice(0, 5).map((row) => ({
-              key: row.key,
-              label: row.name,
-              value: row.spend - row.revenue,
-              display: fmtUSD(row.spend - row.revenue),
-              meta: `${fmtUSD(row.spend)} → ${fmtUSD(row.revenue)}`,
-              tone: "rose" as const,
-            })),
-            moreTo: "/campaigns",
-            moreLabel: A ? "عرض كل الحملات" : "View every campaign",
-          },
-        ]
-      : undefined,
-    records:
-      data.fetchErrors.length || data.staleTabs.length
-        ? {
-            title: A ? "المصادر المتأثرة" : "Affected sources",
-            hint: A
-              ? "التفاصيل الكاملة في بطاقة صحة البيانات أسفل الصفحة."
-              : "The full statement is in the data-health card at the foot of the page.",
-            rows: [
-              ...data.fetchErrors.slice(0, 3).map((error, index) => ({
-                key: `err-${index}`,
-                title: error,
-                subtitle: A ? "لم يُحمَّل في هذه الجلسة" : "Did not load in this session",
-              })),
-              ...data.staleTabs.slice(0, 2).map((tab, index) => ({
-                key: `stale-${index}`,
-                title: tab,
-                subtitle: A ? "يُعرض من آخر نسخة ناجحة" : "Served from the last good copy",
-              })),
-            ],
-          }
-        : undefined,
-    report: feeds
-      ? { to: "/guide", label: A ? "فتح دليل المصادر" : "Open the source guide" }
-      : { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
-  };
-
-  const decision: MetricDetail = {
-    id: "overview.decision",
-    title: signals.decision.title,
-    value: A ? "قرار مقترح" : "Recommended",
-    tone: "sky",
-    icon: <Lightbulb size={16} />,
-    definition: signals.decision.detail,
-    formula: A
-      ? "القرار مبني على ثلاثة فحوص بالترتيب: سلامة المصادر، ثم وجود حملة تنفق أكثر مما تعيد، ثم نسبة الخسارة."
-      : "The recommendation runs three checks in order: source health, then any campaign spending more than it returns, then the lost rate.",
-    supporting: [
-      { key: "roas", label: A ? "العائد الحالي" : "Current return", value: fmtRoas(T.roas) },
-      { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(T.spend) },
-      { key: "lostRate", label: A ? "نسبة الخسارة" : "Lost rate", value: fmtPct(T.lostRate, 1) },
-      {
-        key: "sources",
-        label: A ? "مصادر تحتاج مراجعة" : "Sources needing review",
-        value: fmtNum(feeds),
-      },
-    ],
-    breakdowns: signals.bestCampaign
-      ? [
-          {
-            id: "best",
-            title: A ? "الحملات المرشّحة للتوسّع" : "Campaigns worth scaling",
-            hint: A
-              ? "الأعلى عائدًا في الفترة. العائد وحده ليس ضمانًا؛ راقب التكلفة وجودة الليد."
-              : "Highest return in the period. Return alone is not a guarantee; watch cost and lead quality.",
-            rows: data.topByROAS.slice(0, 5).map((row) => ({
-              key: row.key,
-              label: row.name,
-              value: row.roas ?? 0,
-              display: fmtRoas(row.roas),
-              meta: `${fmtUSD(row.spend)} → ${fmtUSD(row.revenue)}`,
-              tone: "mint" as const,
-            })),
-            moreTo: "/campaigns",
-            moreLabel: A ? "عرض كل الحملات" : "View every campaign",
-          },
-        ]
-      : undefined,
-    report: {
-      to: signals.decision.href,
-      label: A ? "فتح التحليل الكامل" : "Open the full analysis",
-    },
-  };
-
-  void workforce;
-  return { best, risk, decision };
-}
-
 /**
  * "What you need to know today" — the three readings of the period a manager
  * is expected to act on.
@@ -489,13 +128,11 @@ function insightDetails(
 function TodaysInsights({
   signals,
   details,
-  onOpen,
   workforceLoading,
   lang,
 }: {
   signals: BusinessSignals;
   details: ReturnType<typeof insightDetails>;
-  onOpen: (detail: MetricDetail) => void;
   workforceLoading: boolean;
   lang: "ar" | "en";
 }) {
@@ -506,47 +143,49 @@ function TodaysInsights({
   return (
     <>
       <InsightRow>
-        <InsightCard
-          index={0}
-          kind="best"
-          title={
-            course
+        <InsightDetailTrigger
+          detail={details.best}
+          card={{
+            index: 0,
+            kind: "best",
+            title: course
               ? lang === "ar"
                 ? `كورس ${course.course} حقق أعلى إيراد`
                 : `${course.course} produced the most revenue`
               : lang === "ar"
                 ? "لا توجد مبيعات دورات مصنفة"
-                : "No classified course sales"
-          }
-          value={course ? fmtUSD(course.revenue) : undefined}
-          detail={
-            course
+                : "No classified course sales",
+            value: course ? fmtUSD(course.revenue) : undefined,
+            detail: course
               ? signals.courseTargetShare !== null
                 ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` · ${lang === "ar" ? "تارجت جزئي" : "partial target"}`}`
                 : `${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إجمالي إيراد الدورات" : "of total course revenue"}`
-              : undefined
-          }
-          onClick={() => onOpen(details.best)}
-          actionLabel={lang === "ar" ? "لماذا هذه الدورة؟" : "Why this course?"}
+              : undefined,
+            actionLabel: lang === "ar" ? "لماذا هذه الدورة؟" : "Why this course?",
+          }}
         />
 
-        <InsightCard
-          index={1}
-          kind="attention"
-          title={signals.risk.title}
-          detail={signals.risk.detail}
-          onClick={() => onOpen(details.risk)}
-          actionLabel={lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?"}
+        <InsightDetailTrigger
+          detail={details.risk}
+          card={{
+            index: 1,
+            kind: "attention",
+            title: signals.risk.title,
+            detail: signals.risk.detail,
+            actionLabel: lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?",
+          }}
         />
 
-        <InsightCard
-          index={2}
-          kind="opportunity"
-          eyebrow={lang === "ar" ? "القرار المقترح" : "Recommended decision"}
-          title={signals.decision.title}
-          detail={signals.decision.detail}
-          onClick={() => onOpen(details.decision)}
-          actionLabel={lang === "ar" ? "على أي أساس؟" : "On what basis?"}
+        <InsightDetailTrigger
+          detail={details.decision}
+          card={{
+            index: 2,
+            kind: "opportunity",
+            eyebrow: lang === "ar" ? "القرار المقترح" : "Recommended decision",
+            title: signals.decision.title,
+            detail: signals.decision.detail,
+            actionLabel: lang === "ar" ? "على أي أساس؟" : "On what basis?",
+          }}
         />
       </InsightRow>
 
@@ -611,9 +250,6 @@ function Overview() {
   const workforce = useApi<AgentAnalyticsResult>("/api/teams");
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
-  // One panel at a time for the three readings. The five KPI cards own their
-  // own, because each one is a trigger in its own right.
-  const [openInsight, setOpenInsight] = useState<MetricDetail | null>(null);
   const business = useMemo(
     () => (data ? businessSignals(data, workforce.data, lang) : null),
     [data, workforce.data, lang],
@@ -862,7 +498,6 @@ function Overview() {
           <TodaysInsights
             signals={business}
             details={insights}
-            onOpen={setOpenInsight}
             workforceLoading={workforce.isLoading}
             lang={lang}
           />
@@ -1268,15 +903,6 @@ function Overview() {
 
         <DataHealthSummary issues={healthIssues} syncedLabel={syncLabel} />
       </PageSections>
-
-      {/* One panel for the three readings: whichever card was pressed last. */}
-      {openInsight && (
-        <MetricDetailSheet
-          detail={openInsight}
-          open={Boolean(openInsight)}
-          onClose={() => setOpenInsight(null)}
-        />
-      )}
     </div>
   );
 }

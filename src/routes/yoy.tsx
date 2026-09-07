@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarOff, CalendarRange } from "lucide-react";
+import { CalendarOff, CalendarRange, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import {
   Card,
@@ -13,14 +13,13 @@ import {
 import {
   DashboardPageHeader,
   DashboardPanel,
-  InsightCard,
   InsightRow,
   KpiRow,
 } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
-import { MetricDetailTrigger } from "@/components/metric-detail";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 
 export const Route = createFileRoute("/yoy")({ component: Yoy });
@@ -71,6 +70,166 @@ function metricLabel(metric: string, lang: "ar" | "en"): string {
  * A metric with no history shows no delta and no chart: "0% year on year" from
  * an absent baseline reads as "flat", which is a claim the data has not made.
  */
+/**
+ * The three readings of the year comparison.
+ *
+ * Two of them name a course and one states the scope. All three open, because
+ * "largest gain" is a sort the reader cannot see and "the comparison ignores
+ * your filters" is the single most useful thing to know about this page — and
+ * both were previously stated on a card that did nothing.
+ */
+function yoyInsights(
+  data: Resp,
+  movers: (YoyPoint & { metric: string })[],
+  decliner: (YoyPoint & { metric: string }) | null,
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const gainer = movers[0] ?? null;
+  const scopeNote = A
+    ? "المقارنة السنوية تقرأ الملف كاملًا ولا تتأثر بالفلاتر أو الفترة المختارة."
+    : "The year comparison reads the whole file and is deliberately unaffected by the filters or the selected period.";
+
+  const courseRows = (pick: (row: YoyPoint) => number, tone: "mint" | "rose") =>
+    topRows(
+      movers.map((course) => ({
+        key: course.key,
+        label: course.key,
+        value: pick(course),
+        display: fmtUSD(pick(course)),
+        meta: `${fmtUSD(course.previous)} → ${fmtUSD(course.current)}`,
+        tone,
+      })),
+    );
+
+  const courseFacts = (row: (YoyPoint & { metric: string }) | null) =>
+    row
+      ? [
+          { key: "previous", label: String(data.previousYear), value: fmtUSD(row.previous) },
+          { key: "current", label: String(data.currentYear), value: fmtUSD(row.current) },
+          {
+            key: "delta",
+            label: A ? "الفرق" : "Change",
+            value: fmtUSD(row.current - row.previous),
+          },
+          { key: "growth", label: A ? "النمو" : "Growth", value: fmtPct(row.growth, 1) },
+        ]
+      : undefined;
+
+  return {
+    gainer: {
+      id: "yoy.largestGain",
+      title: A ? "أكبر نمو" : "Largest gain",
+      value: gainer ? gainer.key : "—",
+      tone: "mint",
+      icon: <TrendingUp size={16} />,
+      entity: gainer ? { type: "course", id: gainer.key, name: gainer.key } : null,
+      definition: A
+        ? "الدورة التي زاد إيرادها بأكبر مبلغ بين العامين. الترتيب بالمبلغ لا بالنسبة: نمو 300% على مئة دولار ليس حدثًا."
+        : "The course whose revenue grew by the largest amount between the two years. Ranked by amount, not by percentage: 300% growth on a hundred dollars is not an event.",
+      formula: gainer
+        ? `${fmtUSD(gainer.current)} − ${fmtUSD(gainer.previous)} = ${fmtUSD(gainer.current - gainer.previous)}`
+        : undefined,
+      caveat: scopeNote,
+      supporting: courseFacts(gainer),
+      breakdowns: [
+        {
+          id: "gains",
+          title: A ? "أكبر الزيادات بالمبلغ" : "Largest increases, by amount",
+          rows: courseRows((row) => Math.max(0, row.current - row.previous), "mint"),
+          emptyLabel: A ? "لا توجد زيادة في أي دورة" : "No course grew",
+        },
+      ],
+      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
+    },
+
+    decliner: {
+      id: "yoy.largestDecline",
+      title: A ? "أكبر تراجع" : "Largest decline",
+      value: decliner ? decliner.key : "—",
+      tone: "rose",
+      icon: <TrendingDown size={16} />,
+      deltaInvert: true,
+      entity: decliner ? { type: "course", id: decliner.key, name: decliner.key } : null,
+      definition: A
+        ? "الدورة التي انخفض إيرادها بأكبر مبلغ بين العامين."
+        : "The course whose revenue fell by the largest amount between the two years.",
+      formula: decliner
+        ? `${fmtUSD(decliner.current)} − ${fmtUSD(decliner.previous)} = ${fmtUSD(decliner.current - decliner.previous)}`
+        : undefined,
+      caveat: scopeNote,
+      supporting: courseFacts(decliner),
+      breakdowns: [
+        {
+          id: "declines",
+          title: A ? "أكبر التراجعات بالمبلغ" : "Largest declines, by amount",
+          rows: courseRows((row) => Math.min(0, row.current - row.previous), "rose"),
+          emptyLabel: A ? "لم تتراجع أي دورة" : "No course declined",
+        },
+      ],
+      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
+    },
+
+    scope: {
+      id: "yoy.scope",
+      title: A ? "نطاق المقارنة" : "Comparison scope",
+      value: `${data.currentYear} ${A ? "مقابل" : "vs"} ${data.previousYear}`,
+      tone: "violet",
+      icon: <CalendarRange size={16} />,
+      definition: scopeNote,
+      formula: A
+        ? `يقارن كل ${data.currentYear} حتى اليوم بنفس الأيام من ${data.previousYear}.`
+        : `Compares ${data.currentYear} to date against the same days of ${data.previousYear}.`,
+      caveat: A
+        ? "أي مؤشر لا يملك تاريخًا في العام السابق يظهر بشرطة بدلًا من صفر يقرأه القارئ كتراجع."
+        : "A metric with no history in the previous year shows an em dash rather than a zero a reader would take for a collapse.",
+      supporting: [
+        {
+          key: "courses",
+          label: A ? "الدورات المقارَنة" : "Courses compared",
+          value: fmtNum(movers.length),
+        },
+        {
+          key: "rising",
+          label: A ? "دورات نمت" : "Courses that grew",
+          value: fmtNum(movers.filter((row) => row.current > row.previous).length),
+        },
+        {
+          key: "falling",
+          label: A ? "دورات تراجعت" : "Courses that fell",
+          value: fmtNum(movers.filter((row) => row.current < row.previous).length),
+        },
+        {
+          key: "metrics",
+          label: A ? "مؤشرات لها تاريخ" : "Metrics with history",
+          value: fmtNum(Object.values(data.metricAvailability).filter(Boolean).length),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "ytd",
+          title: A ? "المقارنة حسب المؤشر" : "The comparison, by metric",
+          rows: data.ytd.map((row) => ({
+            key: row.metric,
+            label: row.metric,
+            value: row.current,
+            display:
+              row.metric === "spend" || row.metric === "revenue"
+                ? fmtUSD(row.current)
+                : fmtNum(row.current),
+            meta:
+              row.metric === "spend" || row.metric === "revenue"
+                ? `${data.previousYear}: ${fmtUSD(row.previous)}`
+                : `${data.previousYear}: ${fmtNum(row.previous)}`,
+            tone: "violet" as const,
+          })),
+          emptyLabel: A ? "لا توجد مؤشرات قابلة للمقارنة" : "No comparable metric",
+        },
+      ],
+    },
+  };
+}
+
 function yoyMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
   const A = lang === "ar";
   const TONE: Record<string, MetricDetail["tone"]> = {
@@ -206,6 +365,7 @@ function Yoy() {
     .filter((course) => Number.isFinite(course.current) && Number.isFinite(course.previous))
     .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
   const decliner = movers.find((course) => course.current < course.previous) ?? null;
+  const insights = data ? yoyInsights(data, movers, decliner, lang) : null;
 
   return (
     <div className="page-sections">
@@ -309,47 +469,55 @@ function Yoy() {
             <>
               <InsightRow>
                 {movers[0] && (
-                  <InsightCard
-                    index={0}
-                    kind="best"
-                    eyebrow={lang === "ar" ? "أكبر نمو" : "Largest gain"}
-                    title={movers[0].key}
-                    value={fmtUSD(movers[0].current - movers[0].previous)}
-                    detail={
-                      lang === "ar"
-                        ? `${fmtUSD(movers[0].previous)} في ${data.previousYear} ← ${fmtUSD(movers[0].current)} في ${data.currentYear}`
-                        : `${fmtUSD(movers[0].previous)} in ${data.previousYear} → ${fmtUSD(movers[0].current)} in ${data.currentYear}`
-                    }
+                  <InsightDetailTrigger
+                    detail={insights!.gainer}
+                    card={{
+                      index: 0,
+                      kind: "best",
+                      eyebrow: lang === "ar" ? "أكبر نمو" : "Largest gain",
+                      title: movers[0].key,
+                      value: fmtUSD(movers[0].current - movers[0].previous),
+                      detail:
+                        lang === "ar"
+                          ? `${fmtUSD(movers[0].previous)} في ${data.previousYear} ← ${fmtUSD(movers[0].current)} في ${data.currentYear}`
+                          : `${fmtUSD(movers[0].previous)} in ${data.previousYear} → ${fmtUSD(movers[0].current)} in ${data.currentYear}`,
+                      actionLabel: lang === "ar" ? "ما ترتيب الدورات؟" : "How do courses rank?",
+                    }}
                   />
                 )}
                 {decliner && (
-                  <InsightCard
-                    index={1}
-                    kind="attention"
-                    eyebrow={lang === "ar" ? "أكبر تراجع" : "Largest decline"}
-                    title={decliner.key}
-                    value={fmtUSD(decliner.current - decliner.previous)}
-                    detail={
-                      lang === "ar"
-                        ? `${fmtUSD(decliner.previous)} في ${data.previousYear} ← ${fmtUSD(decliner.current)} في ${data.currentYear}`
-                        : `${fmtUSD(decliner.previous)} in ${data.previousYear} → ${fmtUSD(decliner.current)} in ${data.currentYear}`
-                    }
+                  <InsightDetailTrigger
+                    detail={insights!.decliner}
+                    card={{
+                      index: 1,
+                      kind: "attention",
+                      eyebrow: lang === "ar" ? "أكبر تراجع" : "Largest decline",
+                      title: decliner.key,
+                      value: fmtUSD(decliner.current - decliner.previous),
+                      detail:
+                        lang === "ar"
+                          ? `${fmtUSD(decliner.previous)} في ${data.previousYear} ← ${fmtUSD(decliner.current)} في ${data.currentYear}`
+                          : `${fmtUSD(decliner.previous)} in ${data.previousYear} → ${fmtUSD(decliner.current)} in ${data.currentYear}`,
+                      actionLabel: lang === "ar" ? "ما الذي تراجع أيضًا؟" : "What else fell?",
+                    }}
                   />
                 )}
-                <InsightCard
-                  index={2}
-                  kind="note"
-                  eyebrow={lang === "ar" ? "نطاق المقارنة" : "Comparison scope"}
-                  title={
-                    lang === "ar"
-                      ? `${data.currentYear} مقابل ${data.previousYear}`
-                      : `${data.currentYear} against ${data.previousYear}`
-                  }
-                  detail={
-                    lang === "ar"
-                      ? "المقارنة السنوية تقرأ الملف كاملاً ولا تتأثر بالفلاتر أو الفترة المختارة."
-                      : "The year comparison reads the whole file and is deliberately unaffected by the filters or the selected period."
-                  }
+                <InsightDetailTrigger
+                  detail={insights!.scope}
+                  card={{
+                    index: 2,
+                    kind: "note",
+                    eyebrow: lang === "ar" ? "نطاق المقارنة" : "Comparison scope",
+                    title:
+                      lang === "ar"
+                        ? `${data.currentYear} مقابل ${data.previousYear}`
+                        : `${data.currentYear} against ${data.previousYear}`,
+                    detail:
+                      lang === "ar"
+                        ? "المقارنة السنوية تقرأ الملف كاملاً ولا تتأثر بالفلاتر أو الفترة المختارة."
+                        : "The year comparison reads the whole file and is deliberately unaffected by the filters or the selected period.",
+                    actionLabel: lang === "ar" ? "ما الذي يُقارَن؟" : "What is compared?",
+                  }}
                 />
               </InsightRow>
 

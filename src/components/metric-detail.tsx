@@ -18,6 +18,7 @@ import { nexusStore } from "./engo-nexus/state/nexus-store";
 import { DetailPanel } from "./DetailPanel";
 import { MultiLineChart } from "./charts";
 import { DeltaBadge, KpiCard } from "./ui-bits";
+import { InsightCard } from "./dashboard-bits";
 import { MetricCard } from "./ads/MetricCard";
 
 /* ---------------------------------------------------------------------------
@@ -588,7 +589,7 @@ export function MetricDetailSheet({
  * carry, and the advertising `MetricCard` with its glossary and verdict — and
  * neither has to re-implement any of that.
  */
-function MetricTriggerShell({
+export function MetricTriggerShell({
   detail,
   scopeExtra,
   className = "",
@@ -620,7 +621,11 @@ function MetricTriggerShell({
    */
   const close = useCallback(() => {
     setOpen(false);
-    const card = host.current?.querySelector<HTMLButtonElement>("[data-metric-trigger]");
+    const card =
+      host.current?.querySelector<HTMLElement>("[data-metric-trigger]") ??
+      // A page that wraps a card shape of its own still gets the keyboard back:
+      // whatever control opened the panel is the first focusable thing inside.
+      host.current?.querySelector<HTMLElement>("button, [href], [tabindex]:not([tabindex='-1'])");
     if (card) requestAnimationFrame(() => card.focus());
   }, []);
 
@@ -652,6 +657,18 @@ function MetricTriggerShell({
     </div>
   );
 }
+
+/**
+ * Any card shape, wired to the metric drill-down.
+ *
+ * The named triggers below cover the app's two standard KPI cards and the
+ * shared insight card. This is for everything else: a page that already has a
+ * card of its own — the sales attribution highlight, an organic winner, one
+ * media buyer's four figures — hands over the description and calls `open` from
+ * its own control, and gets the panel, the escape key, the focus return and the
+ * Nexus hand-off unchanged.
+ */
+export const MetricDrilldown = MetricTriggerShell;
 
 /**
  * A KPI card wired to its own drill-down.
@@ -694,6 +711,50 @@ export function MetricDetailTrigger({
               : `${detail.title} — open the detail for this figure`
           }
           testId={`kpi-${detail.id}`}
+        />
+      )}
+    </MetricTriggerShell>
+  );
+}
+
+/**
+ * A reading of the period, wired to the same drill-down as the figures above it.
+ *
+ * An insight makes a claim — "CFM produced the most revenue", "one source has
+ * not refreshed" — and a claim a reader cannot open is an assertion they have
+ * to take on trust. Pressing it opens the same panel a KPI does, carrying the
+ * figures that produced the verdict, the breakdown behind it and the report it
+ * came from, so the judgement is checkable rather than announced.
+ *
+ * It shares `MetricTriggerShell` with the KPI triggers, which is what makes the
+ * escape key, the focus return and the Nexus hand-off identical on both.
+ */
+export function InsightDetailTrigger({
+  detail,
+  card,
+  scopeExtra,
+  className = "",
+}: {
+  detail: MetricDetail;
+  card: Omit<Parameters<typeof InsightCard>[0], "onClick" | "to" | "search" | "ariaLabel">;
+  scopeExtra?: { key: string; label: string; value: string }[];
+  className?: string;
+}) {
+  const { lang } = useI18n();
+  const title = typeof card.title === "string" ? card.title : detail.title;
+  return (
+    <MetricTriggerShell detail={detail} scopeExtra={scopeExtra} className={className}>
+      {(open) => (
+        <InsightCard
+          {...card}
+          onClick={open}
+          actionLabel={card.actionLabel ?? (lang === "ar" ? "على أي أساس؟" : "On what basis?")}
+          ariaLabel={
+            lang === "ar"
+              ? `${title} — عرض الأرقام التي أدت لهذه القراءة`
+              : `${title} — open the figures behind this reading`
+          }
+          testId={card.testId ?? `insight-${detail.id}`}
         />
       )}
     </MetricTriggerShell>
