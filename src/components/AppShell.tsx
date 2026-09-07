@@ -1,39 +1,28 @@
-import { useEffect, type ReactNode } from "react";
-import { useLocation } from "@tanstack/react-router";
-import { PanelRightOpen } from "lucide-react";
-import { chromeStore, useAutoHideChrome } from "@/lib/chrome-store";
-import { useI18n } from "@/lib/i18n";
+import { type ReactNode } from "react";
+import { useAutoHideChrome } from "@/lib/chrome-store";
 import { Sidebar, MobileNav } from "./Sidebar";
 import { SectionTabs } from "./SectionTabs";
 import { TopBar } from "./TopBar";
 
 /**
- * The application frame: fixed navigation rail, auto-hiding control bar, scrolling
- * content, mobile bottom nav. Mounted ONCE in __root around the router Outlet,
- * so the rail and top bar (and their filter state) persist across navigation
- * and only the page content swaps. Each page supplies its own DashboardPageHeader,
- * the top bar carries controls only — no title is passed here.
+ * The application frame: fixed, reader-controlled navigation rail, fixed control
+ * bar, scrolling content and mobile bottom nav. Mounted ONCE in __root around
+ * the router Outlet, so the rail and top bar (and their filter state) persist
+ * across navigation and only the page content swaps. Each page supplies its own
+ * DashboardPageHeader; the top bar carries controls only.
  *
  * The rail is `fixed` rather than a flex sibling. As a sibling it could only be
- * hidden by leaving the flow, which reflows the whole content column in one
- * frame — a visible jump, and on a page carrying a 200-row table a dropped
- * frame with it. Fixed, it leaves on a composited `transform` while the column
- * reclaims the space through one animated padding value.
+ * collapsed by leaving the flow, which would reflow the whole content column
+ * in one frame — a visible jump on a long table. Fixed, it moves on a
+ * composited `transform` while the column reclaims the space through one
+ * deliberate transition.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const chrome = useAutoHideChrome();
-  const { pathname } = useLocation();
-
-  // A new page is a new context: what the reader scrolled away on the last one
-  // should not decide how much chrome the next one opens with.
-  useEffect(() => {
-    chromeStore.reveal();
-  }, [pathname]);
+  useAutoHideChrome();
 
   return (
     <div className="min-h-dvh bg-bg overflow-x-clip">
       <Sidebar />
-      <NavEdgeTrigger />
 
       <div className="chrome-inset flex min-h-dvh min-w-0 flex-col">
         <TopBar />
@@ -53,50 +42,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <MobileNav />
-      {chrome.navHidden && !chrome.pinned && <ShowNavButton />}
     </div>
-  );
-}
-
-/**
- * A hit strip on the edge the rail retreated to. Hovering it — or reaching it
- * with Tab — brings the rail back for as long as the pointer stays; clicking
- * pins it open for good. It is a real button, not a bare div, so the affordance
- * exists for a keyboard too.
- */
-function NavEdgeTrigger() {
-  const { lang } = useI18n();
-  return (
-    <button
-      type="button"
-      data-app-chrome=""
-      aria-label={lang === "ar" ? "إظهار قائمة التنقل" : "Show navigation"}
-      className="chrome-edge-trigger hidden lg:block"
-      onPointerEnter={() => chromeStore.setPeeking(true)}
-      onPointerLeave={() => chromeStore.setPeeking(false)}
-      onFocus={() => chromeStore.setPeeking(true)}
-      onBlur={() => chromeStore.setPeeking(false)}
-      onClick={() => chromeStore.setPinned(true)}
-    />
-  );
-}
-
-/**
- * The visible way back while the rail is away. The edge strip is a shortcut for
- * people who already know it is there; this is the one that can be seen.
- */
-function ShowNavButton() {
-  const { lang } = useI18n();
-  return (
-    <button
-      type="button"
-      data-app-chrome=""
-      onClick={() => chromeStore.reveal()}
-      className="animate-fade-in fixed bottom-6 z-40 hidden min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-3.5 text-[12px] font-semibold text-text shadow-md transition-colors hover:bg-surface-2 lg:inline-flex"
-      style={{ insetInlineStart: "1rem" }}
-    >
-      <PanelRightOpen size={16} aria-hidden="true" className="rtl:-scale-x-100" />
-      {lang === "ar" ? "التنقل" : "Navigation"}
-    </button>
   );
 }

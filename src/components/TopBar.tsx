@@ -9,8 +9,8 @@ import {
   Leaf,
   Moon,
   MoreHorizontal,
-  Pin,
-  PinOff,
+  PanelRightClose,
+  PanelRightOpen,
   RefreshCw,
   SlidersHorizontal,
   Sun,
@@ -119,9 +119,12 @@ export function TopBar({ title }: { title?: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const chrome = useChrome();
-  const compact = chrome.header !== "full";
-  const hidden = chrome.header === "hidden" && !chrome.pinned;
-  const { barRef, reserved } = useReservedHeight(!compact, hidden);
+  // The top controls no longer react to scroll either. A manager should not
+  // lose filters, refresh or the navigation switch just because they reached
+  // the lower half of a report.
+  const compact = false;
+  const hidden = false;
+  const { barRef, reserved } = useReservedHeight(true, false);
 
   const { data } = useFiltersData();
   const activeCount = activeDimensionCount(filters);
@@ -226,7 +229,7 @@ export function TopBar({ title }: { title?: string }) {
               <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
             </button>
 
-            <ChromePinButton />
+            <NavigationVisibilityButton />
 
             <button
               onClick={toggleTheme}
@@ -306,38 +309,39 @@ export function TopBar({ title }: { title?: string }) {
 }
 
 /**
- * The same pin control the rail carries, repeated on the bar.
- *
- * A reader who wants the chrome to stop moving usually decides that while it is
- * in the act of moving — at which point the rail's copy of this button is
- * halfway off the screen. Shown from `lg` up only: below that there is no rail
- * to pin.
+ * The explicit navigation switch. It is always available in the fixed bar, so
+ * a collapsed rail can be brought back without relying on hover, scroll or an
+ * invisible screen-edge target.
  */
-function ChromePinButton() {
+function NavigationVisibilityButton() {
   const { lang } = useI18n();
   const chrome = useChrome();
-  const label = chrome.pinned
+  const label = chrome.navHidden
     ? lang === "ar"
-      ? "إلغاء التثبيت والسماح بالإخفاء عند التمرير (⌘/Ctrl + B)"
-      : "Unpin and allow hiding on scroll (⌘/Ctrl + B)"
+      ? "فتح قائمة التنقل (⌘/Ctrl + B)"
+      : "Open navigation (⌘/Ctrl + B)"
     : lang === "ar"
-      ? "تثبيت الهيدر والتنقل ومنع إخفائهما (⌘/Ctrl + B)"
-      : "Pin the bar and navigation open (⌘/Ctrl + B)";
+      ? "تصغير قائمة التنقل (⌘/Ctrl + B)"
+      : "Collapse navigation (⌘/Ctrl + B)";
 
   return (
     <button
       type="button"
-      onClick={() => chromeStore.togglePinned()}
-      aria-pressed={chrome.pinned}
+      onClick={() => chromeStore.toggleNavigation()}
+      aria-pressed={!chrome.navHidden}
       aria-label={label}
       title={label}
       className={`hidden h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors active:scale-[0.97] lg:inline-flex ${
-        chrome.pinned
+        chrome.navHidden
           ? "border-brand bg-brand-soft text-brand"
           : "border-border bg-surface text-text-muted hover:bg-surface-2"
       }`}
     >
-      {chrome.pinned ? <Pin size={16} /> : <PinOff size={16} />}
+      {chrome.navHidden ? (
+        <PanelRightOpen size={16} className="rtl:-scale-x-100" />
+      ) : (
+        <PanelRightClose size={16} className="rtl:-scale-x-100" />
+      )}
     </button>
   );
 }

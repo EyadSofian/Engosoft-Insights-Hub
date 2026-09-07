@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen, MoreHorizontal, Pin, PinOff, Sparkles } from "lucide-react";
+import { BookOpen, MoreHorizontal, PanelRightClose, Sparkles } from "lucide-react";
 import { chromeStore, useChrome } from "@/lib/chrome-store";
 import { useI18n } from "@/lib/i18n";
 import { useModalGuard } from "@/lib/ui-store";
@@ -11,9 +11,9 @@ import logoImg from "@/assets/engosoft-logo.png";
 /**
  * The desktop navigation rail.
  *
- * Fixed to the inline edge and taken out of the flow, so it can slide away on a
- * `transform` without the content column relaying out frame by frame; the
- * column's own padding follows in one transition (see `chrome-inset`).
+ * Fixed to the inline edge and taken out of the flow, so a reader can collapse
+ * it without a heavy reflow; the content column follows in one transition (see
+ * `chrome-inset`). It never reacts to scrolling.
  *
  * `inert` while it is off screen: a rail translated out of view is still in the
  * tab order, and a keyboard user would otherwise tab into links nobody can see.
@@ -22,7 +22,7 @@ export function Sidebar() {
   const { t, lang } = useI18n();
   const { pathname } = useLocation();
   const chrome = useChrome();
-  const out = chrome.navHidden && !chrome.peeking && !chrome.pinned;
+  const out = chrome.navHidden;
 
   return (
     <aside
@@ -52,7 +52,7 @@ export function Sidebar() {
             <div className="truncate text-[11px] text-nav-text-muted">{t("app_sub")}</div>
           </div>
         </Link>
-        <PinToggle />
+        <NavigationToggle />
       </div>
 
       <nav
@@ -121,37 +121,25 @@ export function Sidebar() {
 }
 
 /**
- * Turns the auto-hide off and back on, and remembers the answer.
- *
- * The preference is the reader's, so it is stated in words in the tooltip
- * rather than left to a pin glyph, and the keyboard shortcut is named where
- * somebody can actually find it.
+ * The rail only changes when the reader asks it to. This closes it; the matching
+ * button in the fixed control bar reopens it. The choice survives refreshes.
  */
-function PinToggle() {
+function NavigationToggle() {
   const { lang } = useI18n();
-  const chrome = useChrome();
-  const label = chrome.pinned
-    ? lang === "ar"
-      ? "إلغاء التثبيت والسماح بالإخفاء عند التمرير (⌘/Ctrl + B)"
-      : "Unpin and allow hiding on scroll (⌘/Ctrl + B)"
-    : lang === "ar"
-      ? "تثبيت التنقل ومنع إخفائه عند التمرير (⌘/Ctrl + B)"
-      : "Pin navigation open (⌘/Ctrl + B)";
+  const label =
+    lang === "ar"
+      ? "تصغير قائمة التنقل (⌘/Ctrl + B)"
+      : "Collapse navigation (⌘/Ctrl + B)";
 
   return (
     <button
       type="button"
-      onClick={() => chromeStore.togglePinned()}
-      aria-pressed={chrome.pinned}
+      onClick={() => chromeStore.setNavigationHidden(true)}
       aria-label={label}
       title={label}
-      className={`grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition-colors ${
-        chrome.pinned
-          ? "border-brand bg-brand-soft text-brand"
-          : "border-nav-border text-nav-text-muted hover:bg-nav-hover hover:text-nav-text"
-      }`}
+      className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-nav-border text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text active:scale-[0.97]"
     >
-      {chrome.pinned ? <Pin size={15} /> : <PinOff size={15} />}
+      <PanelRightClose size={16} className="rtl:-scale-x-100" />
     </button>
   );
 }
