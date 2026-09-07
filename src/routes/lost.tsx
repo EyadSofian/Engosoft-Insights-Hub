@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CalendarClock, Info, TrendingDown } from "lucide-react";
+import { CalendarClock, Info, MessageSquareWarning, Percent, TrendingDown } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
@@ -12,7 +12,9 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader, DataHealthSummary } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
@@ -53,6 +55,196 @@ interface Resp {
   health: DataHealth;
 }
 
+/** A Lost distribution the response already carried, as a drill-down section. */
+function lostSection(
+  id: string,
+  title: string,
+  rows: Grouped[],
+  lang: "ar" | "en",
+): MetricBreakdownGroup {
+  return {
+    id,
+    title,
+    rows: [...rows]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((row) => ({
+        key: row.label,
+        label: row.label,
+        value: row.count,
+        display: fmtNum(row.count),
+        meta: fmtPct(row.share, 1),
+        tone: "rose" as const,
+      })),
+    emptyLabel: lang === "ar" ? "لا توجد بيانات في الفترة" : "Nothing in this period",
+  };
+}
+
+/**
+ * What the four Lost figures are made of.
+ *
+ * The two dates matter more here than anywhere else on the dashboard: "total
+ * lost" counts leads CREATED in the window, and "closed in period" counts deals
+ * CLOSED in it. They are different populations and the drill-down says so.
+ */
+function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const B = data.breakdown;
+  const T = data.totals;
+  const M = data.closureMovement;
+  const topReason = B.byReason[0] ?? null;
+
+  const common = [
+    lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", B.byReason, lang),
+    lostSection("teams", A ? "أكثر الفرق تأثرًا" : "Most affected teams", B.byTeam, lang),
+    lostSection("courses", A ? "أكثر الدورات تأثرًا" : "Most affected courses", B.byCourse, lang),
+    lostSection("sources", A ? "حسب المصدر" : "By source", B.bySource, lang),
+  ];
+
+  return {
+    total: {
+      id: "lost.lost",
+      title: A ? "إجمالي الصفقات الضائعة" : "Total lost",
+      value: fmtNum(B.total),
+      tone: "rose",
+      icon: <TrendingDown size={16} />,
+      definition: A
+        ? "العملاء الذين أُنشئوا داخل الفترة وانتهت صفقتهم بالخسارة، من مصدر الخسائر المعتمد وحده."
+        : "Leads created inside the window whose deal ended as lost, from the approved Lost source only.",
+      formula: A
+        ? `${fmtNum(B.total)} صفقة ضائعة، محسوبة بتاريخ إنشاء الليد لا بتاريخ إغلاقه.`
+        : `${fmtNum(B.total)} lost deals, counted on the lead's creation date and not on its close date.`,
+      supporting: [
+        { key: "rate", label: A ? "نسبة الخسارة" : "Lost rate", value: fmtPct(T.lostRate, 2) },
+        { key: "leads", label: A ? "إجمالي العملاء" : "All leads", value: fmtNum(T.totalLeads) },
+        { key: "won", label: A ? "صفقات رابحة" : "Won deals", value: fmtNum(T.won) },
+        {
+          key: "closed",
+          label: A ? "أُغلقت في الفترة" : "Closed in period",
+          value: fmtNum(M.closedLost),
+        },
+      ],
+      breakdowns: common,
+      records: {
+        title: A ? "نسبة الخسارة حسب الفريق" : "Lost rate by team",
+        rows: [...data.teamLostRates]
+          .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0))
+          .slice(0, 5)
+          .map((row) => ({
+            key: row.team,
+            title: row.team,
+            subtitle: `${fmtNum(row.lost)} / ${fmtNum(row.leads)}`,
+            value: fmtPct(row.rate, 1),
+          })),
+      },
+    },
+    rate: {
+      id: "lost.lostRate",
+      title: A ? "نسبة الخسارة" : "Lost rate",
+      value: fmtPct(T.lostRate, 2),
+      tone: "rose",
+      icon: <Percent size={16} />,
+      definition: A
+        ? "نسبة العملاء المحتملين الذين انتهت صفقتهم بالخسارة داخل الفترة. النسبة وحدها بلا معنى بغير عدديها."
+        : "The share of leads whose deal ended as lost inside the period. The percentage means nothing without both of its numbers.",
+      formula: `${fmtNum(T.lost)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.lostRate, 2)}`,
+      supporting: [
+        { key: "lost", label: A ? "البسط · ضائعة" : "Numerator · lost", value: fmtNum(T.lost) },
+        {
+          key: "leads",
+          label: A ? "المقام · كل العملاء" : "Denominator · all leads",
+          value: fmtNum(T.totalLeads),
+        },
+        { key: "won", label: A ? "رابحة" : "Won", value: fmtNum(T.won) },
+        {
+          key: "open",
+          label: A ? "ما زال مفتوحًا" : "Still open",
+          value: fmtNum(Math.max(0, T.totalLeads - T.won - T.lost)),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "teams",
+          title: A ? "النسبة حسب الفريق" : "Rate by team",
+          rows: [...data.teamLostRates]
+            .filter((row) => row.leads > 0)
+            .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0))
+            .slice(0, 5)
+            .map((row) => ({
+              key: row.team,
+              label: row.team,
+              value: row.rate ?? 0,
+              display: fmtPct(row.rate, 1),
+              meta: `${fmtNum(row.lost)} / ${fmtNum(row.leads)}`,
+              tone: "rose" as const,
+            })),
+          emptyLabel: A ? "لا توجد فرق بعملاء" : "No team carries leads",
+        },
+        ...common.slice(0, 2),
+      ],
+    },
+    closed: {
+      id: "lost.closed",
+      title: A ? "اتقفل خلال الفترة" : "Closed in period",
+      value: fmtNum(M.closedLost),
+      tone: "amber",
+      icon: <CalendarClock size={16} />,
+      definition: A
+        ? "الصفقات التي أُغلقت خاسرة داخل الفترة أيًا كان تاريخ إنشائها. هذا مقياس عمل الفترة، بخلاف الرقم المجاور الذي يقيس كوهورت الليدز."
+        : "Deals closed as lost inside the window, whatever their creation date. This measures the period's work, unlike the figure beside it, which measures the period's lead cohort.",
+      formula: A
+        ? `منها ${fmtNum(M.createdInPeriod)} أُنشئت داخل الفترة و${fmtNum(M.fromOlderCohorts)} من كوهورتات أقدم.`
+        : `Of these, ${fmtNum(M.createdInPeriod)} were created inside the window and ${fmtNum(M.fromOlderCohorts)} came from older cohorts.`,
+      supporting: [
+        {
+          key: "created",
+          label: A ? "أُنشئت داخل الفترة" : "Created in period",
+          value: fmtNum(M.createdInPeriod),
+        },
+        {
+          key: "older",
+          label: A ? "من كوهورتات أقدم" : "From older cohorts",
+          value: fmtNum(M.fromOlderCohorts),
+        },
+        {
+          key: "campaign",
+          label: A ? "من حملات" : "From campaigns",
+          value: fmtNum(M.fromCampaign),
+        },
+        { key: "cohort", label: A ? "كوهورت الفترة" : "Cohort lost", value: fmtNum(B.total) },
+      ],
+      breakdowns: common.slice(0, 3),
+    },
+    reason: {
+      id: "lost.reason",
+      title: A ? "أقدم سبب متكرر" : "Top recurring reason",
+      value: topReason?.label ?? "—",
+      tone: "amber",
+      icon: <MessageSquareWarning size={16} />,
+      definition: topReason
+        ? A
+          ? `أكثر سبب خسارة تكرارًا في الفترة: ${fmtNum(topReason.count)} صفقة، أي ${fmtPct(topReason.share, 1)} من كل الخسائر المصنّفة.`
+          : `The most frequent loss reason in the period: ${fmtNum(topReason.count)} deals, ${fmtPct(topReason.share, 1)} of all classified losses.`
+        : A
+          ? "لا توجد أسباب خسارة مصنّفة في هذه الفترة."
+          : "No classified loss reason in this period.",
+      supporting: topReason
+        ? [
+            { key: "count", label: A ? "عدد الصفقات" : "Deals", value: fmtNum(topReason.count) },
+            { key: "share", label: A ? "نسبتها" : "Share", value: fmtPct(topReason.share, 1) },
+            { key: "total", label: A ? "إجمالي الخسائر" : "Total lost", value: fmtNum(B.total) },
+            {
+              key: "reasons",
+              label: A ? "عدد الأسباب المصنّفة" : "Classified reasons",
+              value: fmtNum(B.byReason.length),
+            },
+          ]
+        : undefined,
+      breakdowns: [common[0], common[2]],
+    },
+  };
+}
+
 function Lost() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
@@ -64,6 +256,10 @@ function Lost() {
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+
+  // Built from the response the strip already renders, so a card and its panel
+  // can never disagree.
+  const metrics = data ? lostMetrics(data, lang) : null;
 
   const cols: Col<LostRowView>[] = [
     {
@@ -136,8 +332,9 @@ function Lost() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<TrendingDown size={20} />}
         title={t("lost")}
         subtitle={
@@ -204,35 +401,39 @@ function Lost() {
             />
           )}
 
-          <Card padded={false} className="overflow-hidden">
-            <div className="grid grid-cols-2 divide-x divide-y divide-border md:grid-cols-4 md:divide-y-0 rtl:divide-x-reverse">
-              <LostMetric
-                label={t("total_lost")}
-                value={fmtNum(data.breakdown.total)}
-                note={lang === "ar" ? "حسب تاريخ إنشاء الليد" : "By lead creation date"}
-              />
-              <LostMetric
-                label={t("lost_rate")}
-                value={fmtPct(data.totals.lostRate, 2)}
-                note={`${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`}
-              />
-              <LostMetric
-                label={lang === "ar" ? "اتقفل خلال الفترة" : "Closed in period"}
-                value={fmtNum(data.closureMovement.closedLost)}
-                note={lang === "ar" ? "حسب تاريخ الإغلاق" : "By close date"}
-              />
-              <LostMetric
-                label={lang === "ar" ? "أقدم سبب متكرر" : "Top recurring reason"}
-                value={data.breakdown.byReason[0]?.label || "—"}
-                note={
-                  data.breakdown.byReason[0]
-                    ? `${fmtNum(data.breakdown.byReason[0].count)} · ${fmtPct(data.breakdown.byReason[0].share, 1)}`
-                    : undefined
-                }
-                compact
-              />
-            </div>
-          </Card>
+          {/* Four coloured cards rather than four cells of a divided strip
+              inside a card. Same four figures, each of them now openable — and
+              one less card-inside-a-card. */}
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={{ ...metrics!.total, title: t("total_lost") }}
+              card={{
+                index: 0,
+                sub: lang === "ar" ? "حسب تاريخ إنشاء الليد" : "By lead creation date",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={{ ...metrics!.rate, title: t("lost_rate") }}
+              card={{
+                index: 1,
+                sub: `${fmtNum(data.totals.lost)} / ${fmtNum(data.totals.totalLeads)}`,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics!.closed}
+              card={{ index: 2, sub: lang === "ar" ? "حسب تاريخ الإغلاق" : "By close date" }}
+            />
+            <MetricDetailTrigger
+              detail={metrics!.reason}
+              card={{
+                index: 3,
+                valueWrap: true,
+                sub: data.breakdown.byReason[0]
+                  ? `${fmtNum(data.breakdown.byReason[0].count)} · ${fmtPct(data.breakdown.byReason[0].share, 1)}`
+                  : undefined,
+              }}
+            />
+          </KpiRow>
 
           <Card className="border-brand/20 bg-brand-soft/35">
             <SectionTitle
@@ -408,30 +609,6 @@ function Lost() {
           </details>
         </>
       )}
-    </div>
-  );
-}
-
-function LostMetric({
-  label,
-  value,
-  note,
-  compact = false,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  compact?: boolean;
-}) {
-  return (
-    <div className="min-h-28 p-4 sm:p-5">
-      <div className="text-[11px] font-semibold text-text-muted">{label}</div>
-      <div
-        className={`mt-2 font-semibold text-text ${compact ? "line-clamp-2 text-base leading-snug" : "num text-2xl"}`}
-      >
-        {value}
-      </div>
-      {note && <div className="mt-2 text-[10px] text-text-subtle">{note}</div>}
     </div>
   );
 }

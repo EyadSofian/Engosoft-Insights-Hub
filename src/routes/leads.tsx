@@ -1,26 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  BadgeDollarSign,
-  CircleCheckBig,
-  Clock3,
-  PhoneCall,
-  TrendingDown,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, BadgeDollarSign, CircleCheckBig, Clock3, PhoneCall, Users } from "lucide-react";
 import { useApi } from "@/lib/use-api";
-import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { BarList, Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
 import {
-  BarList,
-  Card,
-  ErrorState,
-  KpiCard,
-  Pill,
-  SectionTitle,
-  Skeleton,
-} from "@/components/ui-bits";
-import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
+  DashboardPageHeader,
+  KpiRow,
+  PageSection,
+  PageSections,
+} from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { standardMetrics } from "@/components/standard-metrics";
+import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { AdSetOriginBadge } from "@/components/metric-bits";
 import { DataTable, type Col } from "@/components/DataTable";
@@ -244,8 +236,9 @@ function Leads() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div>
       <DashboardPageHeader
+        flush
         icon={<Users size={20} />}
         title={lang === "ar" ? "CRM — إدارة العملاء" : "CRM — Customer management"}
         subtitle={
@@ -256,184 +249,406 @@ function Leads() {
         period={reportingPeriod}
       />
 
-      {isLoading || !data ? (
-        <>
-          <Skeleton className="h-48" />
-          <Skeleton className="h-96" />
-        </>
-      ) : (
-        <>
-          <CrmHeadline data={data} />
+      <PageSections className="gap-after-header">
+        {isLoading || !data ? (
+          <>
+            <Skeleton className="h-48" />
+            <Skeleton className="h-96" />
+          </>
+        ) : (
+          <>
+            <PageSection
+              level="headline"
+              aria-label={lang === "ar" ? "مؤشرات إدارة العملاء" : "CRM headline figures"}
+            >
+              <CrmHeadline data={data} />
+            </PageSection>
 
-          <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:w-fit">
-            {tabOptions.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setTab(option.key)}
-                className={`shrink-0 rounded-xl px-4 py-2 text-[13.5px] font-bold transition-colors ${tab === option.key ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
-              >
-                {option[lang]}
-              </button>
-            ))}
-          </div>
-
-          {tab === "overview" && (
-            <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr]">
-                <PipelineCard data={data} />
-                <QualityTable rows={data.salesFunnel.campaigns} />
-              </div>
-              <div id="calls" className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-                <CallsPanel state={calls} />
-                <SourceConversion rows={data.salesFunnel.sources} />
-              </div>
+            <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:w-fit">
+              {tabOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setTab(option.key)}
+                  className={`shrink-0 rounded-xl px-4 py-2 text-[13.5px] font-bold transition-colors ${tab === option.key ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
+                >
+                  {option[lang]}
+                </button>
+              ))}
             </div>
-          )}
 
-          {tab === "breakdowns" && (
-            <Card>
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "بدل ستة مربعات في نفس الوقت: اختار سؤالًا واحدًا واقرأ ترتيبه."
-                    : "Choose one business question instead of scanning six cards at once."
-                }
-              >
-                {lang === "ar" ? "توزيع العملاء" : "Lead breakdown"}
-              </SectionTitle>
-              <div className="hscroll mb-5 flex gap-2">
-                {(
-                  [
-                    ["stage", t("by_stage")],
-                    ["source", t("by_source")],
-                    ["course", t("by_course")],
-                    ["campaign", t("by_campaign")],
-                    ["team", t("by_team")],
-                    ["salesperson", t("by_salesperson")],
-                  ] as [BreakdownKey, string][]
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setBreakdown(key)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${breakdown === key ? "border-brand bg-brand-soft text-brand" : "border-border text-text-muted hover:bg-surface-2"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {tab === "overview" && (
+              <div className="space-y-4">
+                <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr]">
+                  <PipelineCard data={data} />
+                  <QualityTable rows={data.salesFunnel.campaigns} />
+                </div>
+                <div id="calls" className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                  <CallsPanel state={calls} />
+                  <SourceConversion rows={data.salesFunnel.sources} />
+                </div>
               </div>
-              <div className="max-w-4xl">
-                <BarList
-                  items={breakdownRows.slice(0, 12).map((row) => ({
-                    label: row.label,
-                    value: row.count,
-                    meta: (
-                      <span>
-                        <span className="num">{fmtNum(row.count)}</span>
-                        <span className="num ms-1.5 text-[11px] text-text-muted">
-                          ({fmtPct(row.share, 1)})
+            )}
+
+            {tab === "breakdowns" && (
+              <Card>
+                <SectionTitle
+                  hint={
+                    lang === "ar"
+                      ? "بدل ستة مربعات في نفس الوقت: اختار سؤالًا واحدًا واقرأ ترتيبه."
+                      : "Choose one business question instead of scanning six cards at once."
+                  }
+                >
+                  {lang === "ar" ? "توزيع العملاء" : "Lead breakdown"}
+                </SectionTitle>
+                <div className="hscroll mb-5 flex gap-2">
+                  {(
+                    [
+                      ["stage", t("by_stage")],
+                      ["source", t("by_source")],
+                      ["course", t("by_course")],
+                      ["campaign", t("by_campaign")],
+                      ["team", t("by_team")],
+                      ["salesperson", t("by_salesperson")],
+                    ] as [BreakdownKey, string][]
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setBreakdown(key)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${breakdown === key ? "border-brand bg-brand-soft text-brand" : "border-border text-text-muted hover:bg-surface-2"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="max-w-4xl">
+                  <BarList
+                    items={breakdownRows.slice(0, 12).map((row) => ({
+                      label: row.label,
+                      value: row.count,
+                      meta: (
+                        <span>
+                          <span className="num">{fmtNum(row.count)}</span>
+                          <span className="num ms-1.5 text-[11px] text-text-muted">
+                            ({fmtPct(row.share, 1)})
+                          </span>
                         </span>
-                      </span>
-                    ),
-                  }))}
-                  format={fmtNum}
-                />
-              </div>
-            </Card>
-          )}
+                      ),
+                    }))}
+                    format={fmtNum}
+                  />
+                </div>
+              </Card>
+            )}
 
-          {tab === "records" && (
-            <DataTable
-              rows={data.detail.rows}
-              cols={cols}
-              searchable={(r) =>
-                `${r.contact} ${r.campaign} ${r.course} ${r.salesperson} ${r.source}`
-              }
-              initialSort={{ key: "createdAt", dir: -1 }}
-              csvFilename="engosoft-crm-leads"
-              maxHeight={680}
-              truncatedNote={
-                data.detail.truncated
-                  ? lang === "ar"
-                    ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف.`
-                    : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
-                  : undefined
-              }
-              csvRow={(r) => ({
-                created: r.createdAt,
-                contact: r.contact,
-                stage: r.stage,
-                course: r.course,
-                source: r.source,
-                campaign: r.campaign,
-                ad_name: r.adName,
-                ad_set: r.adset,
-                salesperson: r.salesperson,
-                sales_team: r.salesTeam,
-              })}
-            />
-          )}
-        </>
-      )}
+            {tab === "records" && (
+              <DataTable
+                rows={data.detail.rows}
+                cols={cols}
+                searchable={(r) =>
+                  `${r.contact} ${r.campaign} ${r.course} ${r.salesperson} ${r.source}`
+                }
+                initialSort={{ key: "createdAt", dir: -1 }}
+                csvFilename="engosoft-crm-leads"
+                maxHeight={680}
+                truncatedNote={
+                  data.detail.truncated
+                    ? lang === "ar"
+                      ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف.`
+                      : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
+                    : undefined
+                }
+                csvRow={(r) => ({
+                  created: r.createdAt,
+                  contact: r.contact,
+                  stage: r.stage,
+                  course: r.course,
+                  source: r.source,
+                  campaign: r.campaign,
+                  ad_name: r.adName,
+                  ad_set: r.adset,
+                  salesperson: r.salesperson,
+                  sales_team: r.salesTeam,
+                })}
+              />
+            )}
+          </>
+        )}
+      </PageSections>
     </div>
   );
+}
+
+/** A ranked distribution the CRM already returned, as a drill-down section. */
+function groupSection(
+  id: string,
+  title: string,
+  rows: Grouped[],
+  lang: "ar" | "en",
+  tone: MetricBreakdownGroup["rows"][number]["tone"] = "sky",
+): MetricBreakdownGroup {
+  return {
+    id,
+    title,
+    rows: rows
+      .slice()
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((group) => ({
+        key: group.label,
+        label: group.label,
+        value: group.count,
+        display: fmtNum(group.count),
+        meta: fmtPct(group.share, 1),
+        tone,
+      })),
+    emptyLabel: lang === "ar" ? "لا توجد بيانات في الفترة" : "Nothing in this period",
+  };
+}
+
+/**
+ * What each CRM headline figure is made of.
+ *
+ * The page already fetches every distribution it needs — by stage, source,
+ * course, campaign, team and salesperson — so the drill-downs are a re-shaping
+ * of data on screen rather than a second round of requests.
+ */
+function crmMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const T = data.totals;
+  const invoiceConversion = rate(T.orders, T.totalLeads);
+  const base = standardMetrics({ totals: T, surface: "leads", lang });
+
+  const leads: MetricDetail = {
+    ...base.leads,
+    title: A ? "إجمالي العملاء المحتملين" : "All leads",
+    breakdowns: [
+      groupSection("sources", A ? "حسب المصدر" : "By source", data.bySource, lang),
+      groupSection("courses", A ? "حسب الدورة" : "By course", data.byCourse, lang, "amber"),
+      groupSection("campaigns", A ? "حسب الحملة" : "By campaign", data.byCampaign, lang, "rose"),
+      groupSection("stages", A ? "حسب المرحلة" : "By stage", data.byStage, lang, "violet"),
+    ],
+    records: {
+      title: A ? "التوزيع على الفرق" : "How the teams split it",
+      hint: A
+        ? "سياسة الخصوصية تمنع عرض بيانات عميل بعينه هنا؛ سجل العملاء موجود في تبويب السجلات."
+        : "Privacy policy keeps individual lead details out of here; the record list lives in the Records tab.",
+      rows: data.byTeam.slice(0, 5).map((team) => ({
+        key: team.label,
+        title: team.label,
+        value: fmtNum(team.count),
+        meta: fmtPct(team.share, 1),
+      })),
+    },
+    report: undefined,
+  };
+
+  const paid: MetricDetail = {
+    id: "leads.revenue",
+    title: A ? "صفقات مدفوعة" : "Paid deals",
+    value: fmtNum(T.orders),
+    tone: "violet",
+    icon: <BadgeDollarSign size={16} />,
+    definition: A
+      ? "عدد الفواتير المدفوعة المميزة في الفترة. هذا هو تعريف البيع المعتمد هنا — لا مرحلة الـCRM."
+      : "Distinct paid invoices in the period. This is the approved definition of a sale here — not a CRM stage.",
+    formula: A
+      ? `${fmtNum(T.orders)} فاتورة ÷ ${fmtNum(T.totalLeads)} عميل = ${fmtPct(invoiceConversion, 1)} تحويل حقيقي.`
+      : `${fmtNum(T.orders)} invoices ÷ ${fmtNum(T.totalLeads)} leads = ${fmtPct(invoiceConversion, 1)} paid conversion.`,
+    supporting: [
+      {
+        key: "revenue",
+        label: A ? "الإيراد المحصّل" : "Collected revenue",
+        value: fmtUSD(T.revenue),
+      },
+      {
+        key: "avg",
+        label: A ? "متوسط الفاتورة" : "Average invoice",
+        value: fmtUSDFull(T.avgOrder),
+      },
+      { key: "won", label: A ? "صفقات CRM رابحة" : "CRM won deals", value: fmtNum(T.won) },
+      {
+        key: "conversion",
+        label: A ? "التحويل الحقيقي" : "Paid conversion",
+        value: fmtPct(invoiceConversion, 1),
+      },
+    ],
+    breakdowns: [
+      {
+        id: "campaigns",
+        title: A ? "أعلى الحملات إيرادًا" : "Campaigns with the most revenue",
+        rows: data.salesFunnel.campaigns
+          .slice()
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+          .map((row) => ({
+            key: row.key,
+            label: row.name,
+            value: row.revenue,
+            display: fmtUSD(row.revenue),
+            meta: `${fmtNum(row.invoices)} ${A ? "فاتورة" : "inv."}`,
+            tone: "mint" as const,
+          })),
+        emptyLabel: A ? "لا توجد حملة بإيراد" : "No campaign carries revenue",
+      },
+      {
+        id: "sources",
+        title: A ? "أعلى المصادر إيرادًا" : "Sources with the most revenue",
+        rows: data.salesFunnel.sources
+          .slice()
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+          .map((row) => ({
+            key: row.key,
+            label: row.name,
+            value: row.revenue,
+            display: fmtUSD(row.revenue),
+            meta: `${fmtNum(row.invoices)} ${A ? "فاتورة" : "inv."}`,
+            tone: "mint" as const,
+          })),
+        emptyLabel: A ? "لا يوجد مصدر بإيراد" : "No source carries revenue",
+      },
+    ],
+    report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+  };
+
+  const conversion: MetricDetail = {
+    id: "leads.conversion",
+    title: A ? "التحويل الحقيقي" : "Paid conversion",
+    value: fmtPct(invoiceConversion, 1),
+    tone: "mint",
+    icon: <CircleCheckBig size={16} />,
+    definition: A
+      ? "نسبة العملاء الذين انتهى بهم الأمر إلى فاتورة مدفوعة. تُقاس على الفواتير لا على مرحلة الـCRM، لأن المرحلة رأي والفاتورة واقعة."
+      : "The share of leads that ended in a paid invoice. Measured on invoices, not CRM stage: a stage is an opinion and an invoice is a fact.",
+    formula: A
+      ? `${fmtNum(T.orders)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(invoiceConversion, 1)}.`
+      : `${fmtNum(T.orders)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(invoiceConversion, 1)}.`,
+    supporting: [
+      {
+        key: "invoices",
+        label: A ? "البسط · فواتير" : "Numerator · invoices",
+        value: fmtNum(T.orders),
+      },
+      {
+        key: "leads",
+        label: A ? "المقام · كل الليدز" : "Denominator · all leads",
+        value: fmtNum(T.totalLeads),
+      },
+      {
+        key: "crm",
+        label: A ? "تحويل CRM" : "CRM conversion",
+        value: fmtPct(T.conversionRate, 1),
+      },
+      { key: "won", label: A ? "صفقات رابحة" : "Won deals", value: fmtNum(T.won) },
+    ],
+    breakdowns: [
+      {
+        id: "sources",
+        title: A ? "التحويل حسب المصدر" : "Conversion by source",
+        rows: data.salesFunnel.sources
+          .filter((row) => row.leads > 0)
+          .slice(0, 5)
+          .map((row) => ({
+            key: row.key,
+            label: row.name,
+            value: rate(row.invoices, row.leads) ?? 0,
+            display: fmtPct(rate(row.invoices, row.leads), 1),
+            meta: `${fmtNum(row.invoices)} / ${fmtNum(row.leads)}`,
+            tone: "mint" as const,
+          })),
+        emptyLabel: A ? "لا توجد مصادر بعملاء" : "No source carries leads",
+      },
+    ],
+  };
+
+  const followUp: MetricDetail = {
+    id: "leads.followUp",
+    title: A ? "قيد المتابعة" : "Follow-up",
+    value: fmtNum(data.pipeline.followUp),
+    tone: "violet",
+    icon: <Clock3 size={16} />,
+    definition: A
+      ? "العملاء الذين ما زالوا داخل المسار فعليًا: بعد استبعاد الصفقات الرابحة والصفوف القديمة أو غير الصالحة."
+      : "Leads genuinely still in the pipeline: won deals and stale or junk rows removed.",
+    formula: A
+      ? `من إجمالي ${fmtNum(T.totalLeads)} عميل: ${fmtNum(data.pipeline.followUp)} قيد المتابعة، ${fmtNum(data.pipeline.fresh)} جديد، ${fmtNum(data.pipeline.stalled)} متوقف.`
+      : `Of ${fmtNum(T.totalLeads)} leads: ${fmtNum(data.pipeline.followUp)} in follow-up, ${fmtNum(data.pipeline.fresh)} fresh, ${fmtNum(data.pipeline.stalled)} stalled.`,
+    supporting: [
+      { key: "fresh", label: A ? "جديد" : "Fresh", value: fmtNum(data.pipeline.fresh) },
+      { key: "stalled", label: A ? "متوقف" : "Stalled", value: fmtNum(data.pipeline.stalled) },
+      {
+        key: "active",
+        label: A ? "صفقات نشطة" : "Active deals",
+        value: fmtNum(data.pipeline.activeDeals),
+      },
+      { key: "lost", label: A ? "ضائعة" : "Lost", value: fmtNum(T.lost) },
+    ],
+    breakdowns: [
+      groupSection("stages", A ? "حسب المرحلة" : "By stage", data.byStage, lang, "violet"),
+      groupSection(
+        "salespeople",
+        A ? "حسب الموظف" : "By salesperson",
+        data.bySalesperson,
+        lang,
+        "violet",
+      ),
+    ],
+  };
+
+  const lost: MetricDetail = {
+    ...standardMetrics({ totals: T, surface: "leads", lang }).lost,
+    title: A ? "صفقات ضائعة" : "Closed Lost",
+    breakdowns: [
+      groupSection("teams", A ? "حسب الفريق" : "By team", data.byTeam, lang, "rose"),
+      groupSection("courses", A ? "حسب الدورة" : "By course", data.byCourse, lang, "rose"),
+    ],
+    report: { to: "/lost", label: A ? "فتح تحليل الخسائر" : "Open the Lost analysis" },
+  };
+
+  return { leads, paid, conversion, followUp, lost };
 }
 
 /**
  * The CRM's five headline figures.
  *
  * Same five numbers the navy "control room" carried, on the shared KPI card so
- * this page's first row matches every other report's. The dark slab it
- * replaces was the only element on the page that did not scroll like a card
- * and could not be read at a glance beside the tabs under it.
+ * this page's first row matches every other report's. Each one now opens what
+ * it is made of, from the distributions the page already holds.
  */
 function CrmHeadline({ data }: { data: Resp }) {
   const { lang } = useI18n();
-  const invoiceConversion = rate(data.totals.orders, data.totals.totalLeads);
+  const metrics = crmMetrics(data, lang);
 
   return (
-    <KpiRow columns={5}>
-      <KpiCard
-        index={0}
-        label={lang === "ar" ? "إجمالي العملاء المحتملين" : "All leads"}
-        value={fmtNum(data.totals.totalLeads)}
-        tone="brand"
-        icon={<Users size={15} />}
-        sub={lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost"}
+    <KpiRow>
+      <MetricDetailTrigger
+        detail={metrics.leads}
+        card={{ index: 0, sub: lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost" }}
       />
-      <KpiCard
-        tone="violet"
-        index={1}
-        label={lang === "ar" ? "صفقات مدفوعة" : "Paid deals"}
-        value={fmtNum(data.totals.orders)}
-        hero
-        icon={<BadgeDollarSign size={15} />}
-        sub={lang === "ar" ? "عدد الفواتير المميزة" : "Distinct paid invoices"}
+      <MetricDetailTrigger
+        detail={metrics.paid}
+        card={{
+          index: 1,
+          hero: true,
+          sub: lang === "ar" ? "عدد الفواتير المميزة" : "Distinct paid invoices",
+        }}
       />
-      <KpiCard
-        index={2}
-        label={lang === "ar" ? "التحويل الحقيقي" : "Paid conversion"}
-        value={fmtPct(invoiceConversion, 1)}
-        tone="success"
-        icon={<CircleCheckBig size={15} />}
-        sub={lang === "ar" ? "الفواتير ÷ كل الليدز" : "Invoices ÷ all leads"}
+      <MetricDetailTrigger
+        detail={metrics.conversion}
+        card={{ index: 2, sub: lang === "ar" ? "الفواتير ÷ كل الليدز" : "Invoices ÷ all leads" }}
       />
-      <KpiCard
-        index={3}
-        label={lang === "ar" ? "قيد المتابعة" : "Follow-up"}
-        value={fmtNum(data.pipeline.followUp)}
-        tone="violet"
-        icon={<Clock3 size={15} />}
-        sub={lang === "ar" ? "من غير Won وبيانات قديمة" : "Excludes Won and junk"}
+      <MetricDetailTrigger
+        detail={metrics.followUp}
+        card={{
+          index: 3,
+          sub: lang === "ar" ? "من غير Won وبيانات قديمة" : "Excludes Won and junk",
+        }}
       />
-      <KpiCard
-        index={4}
-        label={lang === "ar" ? "صفقات ضائعة" : "Closed Lost"}
-        value={fmtNum(data.totals.lost)}
-        tone="danger"
-        icon={<TrendingDown size={15} />}
-        sub={fmtPct(data.totals.lostRate, 1)}
+      <MetricDetailTrigger
+        detail={metrics.lost}
+        card={{ index: 4, sub: fmtPct(data.totals.lostRate, 1) }}
       />
     </KpiRow>
   );

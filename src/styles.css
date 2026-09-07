@@ -304,6 +304,192 @@
   --nexus-launcher-clearance: calc(3.5rem + 1.5rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* ---------------------------------------------------------------------------
+   THE SPATIAL SYSTEM
+
+   Four distances, declared once, instead of `gap-3` at every level of every
+   page. The absolute values matter less than the ratio between them: the space
+   between two groups of the page is roughly twice the space between two cards
+   of one group, and that ratio alone is what lets a reader see "revenue, spend,
+   leads, won, return" as ONE thing and "what you need to know today" as the
+   next one — with no border drawn anywhere.
+
+     --pad-card    the padding inside a card          20 / 18 / 16
+     --gap-card    between cards of one group         16 / 14 / 12
+     --gap-group   between the groups of a page       30 / 24 / 20
+     --gap-title   a section heading and its content  16 / 15 / 14
+     --gap-header  the page header and the first KPI  24 / 22 / 20
+
+   Phone first, because that is where the budget is tightest and where a
+   too-generous constant does the most damage.
+--------------------------------------------------------------------------- */
+:root {
+  --pad-card: 16px;
+  --gap-card: 12px;
+  --gap-group: 20px;
+  --gap-title: 14px;
+  --gap-header: 20px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --pad-card: 18px;
+    --gap-card: 14px;
+    --gap-group: 24px;
+    --gap-title: 15px;
+    --gap-header: 22px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --pad-card: 20px;
+    --gap-card: 16px;
+    --gap-group: 30px;
+    --gap-title: 16px;
+    --gap-header: 24px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   THE KPI GRID
+
+   `repeat(auto-fit, minmax(205px, 1fr))` gets the column count right and the
+   LAST ROW wrong: five cards in a four-column track leaves one card alone at a
+   quarter width, which is exactly the "orphan" the redesign set out to kill.
+
+   So: a twelve-column track, spans chosen per tier, and an explicit rule for
+   the counts that actually occur (4, 5, 6, 7). Five across only above 1120px of
+   REAL available width — measured with a container query on the content column
+   rather than a viewport breakpoint, because the navigation rail hides and the
+   viewport does not know it. 1120px is (5 x 205) + (4 x 16): the point at which
+   five cards clear the 205px floor a figure needs to stay on one line.
+--------------------------------------------------------------------------- */
+.kpi-scope {
+  container-type: inline-size;
+  container-name: kpis;
+}
+
+.kpi-grid {
+  display: grid;
+  gap: var(--gap-card);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+/* Two up, and an odd card takes the full width rather than sitting half-empty
+   beside a hole. */
+.kpi-grid > * {
+  grid-column: span 6;
+  min-width: 0;
+}
+
+.kpi-grid[data-odd="true"] > *:last-child {
+  grid-column: span 12;
+}
+
+/* Under 360px a two-up row cannot hold "$37.4K" and its label at once. */
+@container kpis (max-width: 359px) {
+  .kpi-grid > * {
+    grid-column: span 12;
+  }
+}
+
+/* Three up. Five becomes a balanced 3 + 2, not 3 + 1 + 1. */
+@container kpis (min-width: 560px) {
+  .kpi-grid > * {
+    grid-column: span 4;
+  }
+
+  .kpi-grid[data-count="1"] > *,
+  .kpi-grid[data-count="2"] > * {
+    grid-column: span 6;
+  }
+
+  .kpi-grid[data-count="1"] > * {
+    grid-column: span 12;
+  }
+
+  .kpi-grid[data-odd="true"] > *:last-child {
+    grid-column: span 4;
+  }
+
+  .kpi-grid[data-count="4"] > * {
+    grid-column: span 6;
+  }
+
+  .kpi-grid[data-count="5"] > *:nth-child(n + 4) {
+    grid-column: span 6;
+  }
+
+  .kpi-grid[data-count="7"] > *:last-child {
+    grid-column: span 12;
+  }
+}
+
+/* Four up. Five stays 3 + 2 here: four plus a lone fifth is the orphan. */
+@container kpis (min-width: 900px) {
+  .kpi-grid > * {
+    grid-column: span 3;
+  }
+
+  .kpi-grid[data-count="1"] > * {
+    grid-column: span 12;
+  }
+
+  .kpi-grid[data-count="2"] > * {
+    grid-column: span 6;
+  }
+
+  .kpi-grid[data-count="3"] > * {
+    grid-column: span 4;
+  }
+
+  .kpi-grid[data-odd="true"] > *:last-child {
+    grid-column: span 3;
+  }
+
+  .kpi-grid[data-count="4"] > * {
+    grid-column: span 3;
+  }
+
+  .kpi-grid[data-count="5"] > * {
+    grid-column: span 4;
+  }
+
+  .kpi-grid[data-count="5"] > *:nth-child(n + 4) {
+    grid-column: span 6;
+  }
+
+  .kpi-grid[data-count="6"] > * {
+    grid-column: span 4;
+  }
+
+  .kpi-grid[data-count="7"] > * {
+    grid-column: span 3;
+  }
+
+  .kpi-grid[data-count="7"] > *:nth-child(n + 5) {
+    grid-column: span 4;
+  }
+}
+
+/* Five across — only where five cards each clear 205px. */
+@container kpis (min-width: 1120px) {
+  .kpi-grid[data-count="5"] {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .kpi-grid[data-count="5"] > *,
+  .kpi-grid[data-count="5"] > *:nth-child(n + 4) {
+    grid-column: auto;
+  }
+
+  .kpi-grid[data-count="6"] > * {
+    grid-column: span 2;
+  }
+}
+
 /* Between lg and xl the 248px rail plus a dense table is a tight fit; the rail
    gives up the space first because it is chrome, not content. */
 @media (min-width: 1024px) and (max-width: 1279px) {
@@ -612,6 +798,109 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--shadow-xs);
+}
+
+/* --- the spatial system, as utilities ------------------------------------
+   Four classes so a page never writes a raw gap again. `page-sections` is the
+   only vertical rhythm a route needs; everything narrower lives inside a
+   section. */
+
+/** The page's top-level stack: one group, one child. */
+@utility page-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-group);
+}
+
+/** A section's own stack: heading, then content, then a footnote. */
+@utility section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-title);
+}
+
+/** Any grid of peer cards. Never used for two different levels at once. */
+@utility card-grid {
+  display: grid;
+  gap: var(--gap-card);
+  align-items: stretch;
+}
+
+/** The one padding a card gets. 20 on a desktop, 16 on a phone. */
+@utility pad-card {
+  padding: var(--pad-card);
+}
+
+/** The page header owes the first figure below it more room than a card gap. */
+@utility gap-after-header {
+  margin-block-start: var(--gap-header);
+}
+
+/* The header and the row of figures under it are one unit, so they sit closer
+   than two groups do — 24px against 30px. Written as a correction on the stack
+   rather than a margin on the header, so a page never has to remember it. */
+.page-sections > header:first-child {
+  margin-block-end: calc(var(--gap-header) - var(--gap-group));
+}
+
+/* ---------------------------------------------------------------------------
+   AN INTERACTIVE KPI CARD
+
+   A figure a reader may open has to say so before they touch it: the hairline
+   firms up into the family's own strong tone, the "view detail" cue comes to
+   full opacity and its chevron steps one notch toward the inline end. The lift
+   itself is the shared `lift` utility — two pixels, no glow, no bounce.
+
+   The keyboard gets the same promise in a form it can see: a two-pixel outline
+   in the same family, offset so it never sits on the card's own border.
+--------------------------------------------------------------------------- */
+.kpi-card {
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    background-color var(--dur-base) var(--ease-out);
+}
+
+.kpi-card:hover {
+  border-color: var(--tone-strong);
+}
+
+.kpi-card:hover .kpi-cue {
+  opacity: 1;
+}
+
+.kpi-card:hover .kpi-cue-arrow {
+  transform: translateX(2px);
+}
+
+[dir="rtl"] .kpi-card:hover .kpi-cue-arrow {
+  transform: translateX(-2px);
+}
+
+.kpi-card:focus-visible {
+  outline: 2px solid var(--tone-strong);
+  outline-offset: 2px;
+  border-color: var(--tone-strong);
+}
+
+.kpi-cue {
+  opacity: 0.72;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.kpi-cue-arrow {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-card,
+  .kpi-cue,
+  .kpi-cue-arrow {
+    transition: none;
+  }
+
+  .kpi-card:hover .kpi-cue-arrow {
+    transform: none;
+  }
 }
 
 /* --- tonal surfaces -------------------------------------------------------

@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useModalGuard } from "@/lib/ui-store";
-import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "./ui/drawer";
 
 /**
  * One detail surface, two shapes.
@@ -69,14 +69,27 @@ export function DetailPanel({
         <DrawerContent className="max-h-[92dvh] border-border bg-surface">
           <div className="border-b border-border px-4 py-3">
             {eyebrow && <div className="mb-1.5 flex flex-wrap items-center gap-1.5">{eyebrow}</div>}
-            <DrawerTitle className="text-start text-[16px] font-bold leading-snug text-text">
-              {title}
-            </DrawerTitle>
-            {subtitle && (
-              <p className="mt-1 text-start text-[11.5px] leading-relaxed text-text-muted">
-                {subtitle}
-              </p>
-            )}
+            {/* A phone gets the same visible way out as a desktop. The drag
+                handle and the swipe are shortcuts for people who already know
+                they are there; this is the one that can be seen. */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <DrawerTitle className="text-start text-[16px] font-bold leading-snug text-text">
+                  {title}
+                </DrawerTitle>
+                {subtitle && (
+                  <p className="mt-1 text-start text-[11.5px] leading-relaxed text-text-muted">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+              <DrawerClose
+                className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                aria-label={lang === "ar" ? "إغلاق" : "Close"}
+              >
+                <X size={18} aria-hidden="true" />
+              </DrawerClose>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
             {children}

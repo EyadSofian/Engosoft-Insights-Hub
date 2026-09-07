@@ -20,6 +20,8 @@ import {
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 
 export const Route = createFileRoute("/yoy")({ component: Yoy });
 
@@ -55,15 +57,122 @@ const YTD_LABEL: Record<string, { ar: string; en: string }> = {
   won: { ar: "الصفقات الرابحة", en: "Won" },
 };
 
-const YTD_TONE: Record<string, "brand" | "success" | "danger" | "violet"> = {
-  spend: "danger",
-  revenue: "success",
-  leads: "brand",
-  won: "violet",
-};
-
 function metricLabel(metric: string, lang: "ar" | "en"): string {
   return YTD_LABEL[metric]?.[lang] ?? metric;
+}
+
+/**
+ * What each year-to-date comparison is made of.
+ *
+ * The monthly series and the per-course split are already in the response, so
+ * opening "Revenue" shows the twelve months and the courses that moved it —
+ * without a second request and without inventing a month the sheet never had.
+ *
+ * A metric with no history shows no delta and no chart: "0% year on year" from
+ * an absent baseline reads as "flat", which is a claim the data has not made.
+ */
+function yoyMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const TONE: Record<string, MetricDetail["tone"]> = {
+    spend: "rose",
+    revenue: "mint",
+    leads: "sky",
+    won: "violet",
+  };
+
+  const out: Record<string, MetricDetail> = {};
+  for (const row of data.ytd) {
+    const money = row.metric === "spend" || row.metric === "revenue";
+    const format = money ? fmtUSD : fmtNum;
+    const available = isAvailable(data, row.metric);
+    const monthly = (data[row.metric as "spend" | "revenue" | "leads" | "won"] ?? []) as YoyPoint[];
+    const courses = data.byCourse.filter((course) => course.metric === row.metric);
+
+    out[row.metric] = {
+      id: `yoy.${row.metric}`,
+      title: metricLabel(row.metric, lang),
+      value: available ? format(row.current) : "—",
+      tone: TONE[row.metric] ?? "slate",
+      delta: available && row.growth !== null ? row.growth : undefined,
+      deltaInvert: row.metric === "spend",
+      definition: available
+        ? A
+          ? `${metricLabel(row.metric, lang)} من بداية ${data.currentYear} حتى اليوم، مقابل نفس المدة من ${data.previousYear}. المقارنة على مدى متساوٍ من السنة، لا على سنة كاملة مقابل سنة ناقصة.`
+          : `${metricLabel(row.metric, lang)} from the start of ${data.currentYear} to today, against the same stretch of ${data.previousYear}. Equal spans of the year, never a full year against a partial one.`
+        : A
+          ? "لا توجد بيانات تاريخية لهذا المؤشر، فلا تُعرض مقارنة سنوية له."
+          : "There is no history for this metric, so no year-on-year comparison is shown for it.",
+      formula: available
+        ? A
+          ? `${format(row.previous)} في ${data.previousYear} ← ${format(row.current)} في ${data.currentYear}.`
+          : `${format(row.previous)} in ${data.previousYear} → ${format(row.current)} in ${data.currentYear}.`
+        : undefined,
+      supporting: available
+        ? [
+            {
+              key: "previous",
+              label: `${data.previousYear}`,
+              value: format(row.previous),
+            },
+            { key: "current", label: `${data.currentYear}`, value: format(row.current) },
+            {
+              key: "delta",
+              label: A ? "الفارق" : "Difference",
+              value: format(row.current - row.previous),
+            },
+            {
+              key: "growth",
+              label: A ? "النمو" : "Growth",
+              value: row.growth === null ? "—" : fmtPct(row.growth, 1),
+            },
+          ]
+        : undefined,
+      breakdowns: available
+        ? [
+            {
+              id: "months",
+              title: A ? "أكبر الشهور تغيّرًا" : "Months that moved the most",
+              hint: A
+                ? `الفارق بين ${data.currentYear} و${data.previousYear} لكل شهر.`
+                : `The difference between ${data.currentYear} and ${data.previousYear}, month by month.`,
+              rows: topRows(
+                monthly.map((point) => ({
+                  key: point.key,
+                  label: point.key,
+                  value: point.delta,
+                  display: format(point.delta),
+                  meta: point.growth === null ? undefined : fmtPct(point.growth, 1),
+                  tone: point.delta >= 0 ? ("mint" as const) : ("rose" as const),
+                })),
+              ),
+              emptyLabel: A ? "لا توجد شهور قابلة للمقارنة" : "No comparable months",
+            },
+            {
+              id: "courses",
+              title: A ? "أكبر الدورات تغيّرًا" : "Courses that moved the most",
+              rows: topRows(
+                courses.map((course) => ({
+                  key: course.key,
+                  label: course.key,
+                  value: course.delta,
+                  display: format(course.delta),
+                  meta: course.growth === null ? undefined : fmtPct(course.growth, 1),
+                  tone: course.delta >= 0 ? ("mint" as const) : ("rose" as const),
+                })),
+              ),
+              emptyLabel: A ? "لا توجد دورات قابلة للمقارنة" : "No comparable courses",
+            },
+          ]
+        : undefined,
+      report:
+        row.metric === "revenue"
+          ? { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" }
+          : row.metric === "spend"
+            ? { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" }
+            : { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    };
+  }
+  return out;
 }
 
 function Yoy() {
@@ -86,6 +195,9 @@ function Yoy() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
+  // One description per figure, built once from the response on screen.
+  const metrics = data ? yoyMetrics(data, lang) : {};
+
   // Courses ranked by how much money actually moved, not by percentage: a
   // course that went from $80 to $320 is a 300% gain and a $240 event, and
   // ranking it above a course that lost $9,000 would be a lie about which one
@@ -96,8 +208,9 @@ function Yoy() {
   const decliner = movers.find((course) => course.current < course.previous) ?? null;
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<CalendarRange size={20} />}
         title={t("yoy")}
         subtitle={
@@ -171,26 +284,22 @@ function Yoy() {
               `delta` is the growth the API returned; a metric with no history
               renders an em dash and no delta at all rather than a zero and a
               0% that would read as "flat year on year". */}
-          <KpiRow columns={4}>
+          <KpiRow>
             {data.ytd.map((m, index) => {
               const money = m.metric === "spend" || m.metric === "revenue";
               const available = isAvailable(data, m.metric);
               return (
-                <KpiCard
+                <MetricDetailTrigger
                   key={m.metric}
-                  index={index}
-                  label={metricLabel(m.metric, lang)}
-                  value={available ? (money ? fmtUSD(m.current) : fmtNum(m.current)) : "—"}
-                  delta={available && m.growth !== null ? m.growth : undefined}
-                  deltaInvert={m.metric === "spend"}
-                  tone={YTD_TONE[m.metric] ?? "neutral"}
-                  sub={
-                    available
+                  detail={metrics[m.metric]}
+                  card={{
+                    index,
+                    sub: available
                       ? `${data.previousYear}: ${money ? fmtUSD(m.previous) : fmtNum(m.previous)}`
                       : lang === "ar"
                         ? "لا توجد بيانات تاريخية لهذا المؤشر"
-                        : "No historical data for this metric"
-                  }
+                        : "No historical data for this metric",
+                  }}
                 />
               );
             })}

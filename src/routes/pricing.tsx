@@ -728,7 +728,7 @@ function PricingPage() {
   ];
 
   return (
-    <div className="space-y-3.5">
+    <div className="page-sections">
       <PricingPageHeader
         title={ar ? "الأسعار والالتزام" : "Pricing & compliance"}
         description={

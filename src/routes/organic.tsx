@@ -17,7 +17,10 @@ import {
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { DataTable, type Col } from "@/components/DataTable";
-import { Card, ErrorState, KpiCard, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { setAcquisitionFilter, useFilters } from "@/lib/filter-store";
@@ -134,6 +137,179 @@ function InsightCard({
   );
 }
 
+/**
+ * The four organic money figures, and what each is made of.
+ *
+ * Organic is the one surface where spend is not part of the story: nothing here
+ * cost media money, so every explanation is about where the revenue came from
+ * rather than what it cost to get.
+ */
+function organicMetrics(data: OrganicResponse, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const T = data.totals;
+  const bySource = (pick: (row: OrganicBreakdown) => number, format: (n: number) => string) =>
+    topRows(
+      data.sources.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.leads)} ${A ? "ليد" : "leads"}`,
+        tone: "cyan" as const,
+      })),
+    );
+  const byCourse = (pick: (row: CourseAgg) => number, format: (n: number) => string) =>
+    topRows(
+      data.courses.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.crmLeads)} ${A ? "ليد" : "leads"}`,
+        tone: "amber" as const,
+      })),
+    );
+
+  return {
+    invoices: {
+      id: "organic.revenue",
+      title: A ? "الفواتير المدفوعة" : "Paid invoices",
+      value: fmtNum(T.orders),
+      tone: "mint",
+      icon: <ReceiptText size={16} />,
+      definition: A
+        ? "عدد الحركات المحاسبية المدفوعة المرتبطة بعملاء جاءوا من مصادر غير مدفوعة داخل الفترة."
+        : "Distinct paid accounting moves tied to leads that arrived from non-paid sources inside the period.",
+      formula: A
+        ? `${fmtNum(T.orders)} فاتورة بقيمة ${fmtUSD(T.revenue)}، بمتوسط ${fmtUSD(T.avgOrder)} للفاتورة.`
+        : `${fmtNum(T.orders)} invoices worth ${fmtUSD(T.revenue)}, averaging ${fmtUSD(T.avgOrder)} each.`,
+      supporting: [
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(T.revenue) },
+        { key: "avg", label: A ? "متوسط الفاتورة" : "Average invoice", value: fmtUSD(T.avgOrder) },
+        { key: "leads", label: A ? "العملاء" : "Leads", value: fmtNum(T.totalLeads) },
+        { key: "won", label: A ? "صفقات رابحة" : "Won", value: fmtNum(T.won) },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "أعلى المصادر إيرادًا" : "Sources with the most revenue",
+          rows: bySource((row) => row.revenue, fmtUSD),
+          emptyLabel: A ? "لا يوجد مصدر بإيراد" : "No source carries revenue",
+        },
+        {
+          id: "courses",
+          title: A ? "أعلى الدورات إيرادًا" : "Courses with the most revenue",
+          rows: byCourse((row) => row.revenue, fmtUSD),
+          emptyLabel: A ? "لا توجد دورة بإيراد" : "No course carries revenue",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+    average: {
+      id: "organic.average",
+      title: A ? "متوسط الفاتورة" : "Average invoice",
+      value: fmtUSD(T.avgOrder),
+      tone: "amber",
+      icon: <HandCoins size={16} />,
+      definition: A
+        ? "متوسط قيمة الفاتورة المدفوعة من العملاء الأورجانيك في الفترة."
+        : "The average value of a paid invoice from organic leads in the period.",
+      formula: `${fmtUSD(T.revenue)} ÷ ${fmtNum(T.orders)} = ${fmtUSD(T.avgOrder)}`,
+      supporting: [
+        {
+          key: "revenue",
+          label: A ? "البسط · الإيراد" : "Numerator · revenue",
+          value: fmtUSD(T.revenue),
+        },
+        {
+          key: "invoices",
+          label: A ? "المقام · الفواتير" : "Denominator · invoices",
+          value: fmtNum(T.orders),
+        },
+        {
+          key: "perLead",
+          label: A ? "الإيراد لكل ليد" : "Revenue per lead",
+          value: fmtUSD(T.revenuePerLead),
+        },
+        { key: "won", label: A ? "صفقات رابحة" : "Won", value: fmtNum(T.won) },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "أعلى الدورات إيرادًا" : "Courses with the most revenue",
+          rows: byCourse((row) => row.revenue, fmtUSD),
+          emptyLabel: A ? "لا توجد دورة بإيراد" : "No course carries revenue",
+        },
+      ],
+    },
+    perLead: {
+      id: "organic.perLead",
+      title: A ? "الإيراد لكل ليد" : "Revenue per lead",
+      value: fmtUSD(T.revenuePerLead),
+      tone: "mint",
+      icon: <BadgeDollarSign size={16} />,
+      definition: A
+        ? "قيمة الليد الأورجانيك: الإيراد المحصّل مقسومًا على كل العملاء الذين جاءوا من مصادر غير مدفوعة."
+        : "What an organic lead is worth: collected revenue divided by every lead that arrived from a non-paid source.",
+      formula: `${fmtUSD(T.revenue)} ÷ ${fmtNum(T.totalLeads)} = ${fmtUSD(T.revenuePerLead)}`,
+      supporting: [
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(T.revenue) },
+        { key: "leads", label: A ? "العملاء" : "Leads", value: fmtNum(T.totalLeads) },
+        {
+          key: "conversion",
+          label: A ? "معدل التحويل" : "Conversion",
+          value: fmtPct(T.conversionRate, 1),
+        },
+        { key: "avg", label: A ? "متوسط الفاتورة" : "Average invoice", value: fmtUSD(T.avgOrder) },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "قيمة الليد حسب المصدر" : "Lead value by source",
+          rows: bySource((row) => row.revenuePerLead ?? 0, fmtUSD),
+          emptyLabel: A ? "لا يوجد مصدر بعملاء" : "No source carries leads",
+        },
+      ],
+    },
+    lost: {
+      id: "organic.lost",
+      title: "Lost",
+      value: fmtNum(T.lost),
+      tone: "rose",
+      icon: <Target size={16} />,
+      definition: A
+        ? "الصفقات الأورجانيك التي أُغلقت خاسرة، من مصدر الخسائر المعتمد وحده."
+        : "Organic deals closed as lost, from the approved Lost source only.",
+      formula: `${fmtNum(T.lost)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.lostRate, 2)}`,
+      supporting: [
+        { key: "rate", label: A ? "نسبة الخسارة" : "Lost rate", value: fmtPct(T.lostRate, 2) },
+        { key: "leads", label: A ? "المقام" : "Denominator", value: fmtNum(T.totalLeads) },
+        { key: "won", label: A ? "رابحة" : "Won", value: fmtNum(T.won) },
+        {
+          key: "open",
+          label: A ? "مفتوح" : "Open",
+          value: fmtNum(Math.max(0, T.totalLeads - T.won - T.lost)),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "الخسائر حسب المصدر" : "Losses by source",
+          rows: bySource((row) => row.lost, fmtNum),
+          emptyLabel: A ? "لا توجد خسائر في الفترة" : "No losses in this period",
+        },
+        {
+          id: "courses",
+          title: A ? "الخسائر حسب الدورة" : "Losses by course",
+          rows: byCourse((row) => row.lost, fmtNum),
+          emptyLabel: A ? "لا توجد خسائر في الفترة" : "No losses in this period",
+        },
+      ],
+      report: { to: "/lost", label: A ? "فتح تحليل الخسائر" : "Open the Lost analysis" },
+    },
+  };
+}
+
 function Organic() {
   const reportingPeriod = useReportingPeriod();
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
@@ -147,6 +323,8 @@ function Organic() {
   }, [filters.channel, filters.platform]);
 
   const { data, isLoading, error, refetch } = useApi<OrganicResponse>("/api/organic");
+  // One description per figure, built once from the response on screen.
+  const metrics = data ? organicMetrics(data, lang) : null;
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   const lostAvailable = data ? hasReportableLost(data.health.lostAuthority) : false;
@@ -518,9 +696,10 @@ function Organic() {
   const insight = data?.insights;
 
   return (
-    <div className="space-y-5 sm:space-y-7">
+    <div className="page-sections">
       <div>
         <DashboardPageHeader
+          flush
           icon={<Leaf size={20} />}
           title={lang === "ar" ? "أورجانيك" : "Organic"}
           subtitle={
@@ -636,46 +815,40 @@ function Organic() {
             </div>
           </Card>
 
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <KpiCard
-              tone="mint"
-              index={0}
-              label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
-              value={fmtNum(data.totals.orders)}
-              sub={lang === "ar" ? "حركة محاسبية منفصلة" : "distinct accounting moves"}
-              icon={<ReceiptText size={18} />}
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={metrics!.invoices}
+              card={{
+                index: 0,
+                sub: lang === "ar" ? "حركة محاسبية منفصلة" : "distinct accounting moves",
+              }}
             />
-            <KpiCard
-              tone="amber"
-              index={1}
-              label={lang === "ar" ? "متوسط الفاتورة" : "Average invoice"}
-              value={fmtUSD(data.totals.avgOrder)}
-              sub={lang === "ar" ? "الإيراد ÷ الفواتير" : "revenue ÷ invoices"}
-              icon={<HandCoins size={18} />}
+            <MetricDetailTrigger
+              detail={metrics!.average}
+              card={{ index: 1, sub: lang === "ar" ? "الإيراد ÷ الفواتير" : "revenue ÷ invoices" }}
             />
-            <KpiCard
-              tone="mint"
-              index={2}
-              label={lang === "ar" ? "الإيراد لكل ليد" : "Revenue per lead"}
-              value={fmtUSD(data.totals.revenuePerLead)}
-              sub={lang === "ar" ? "قيمة الليد الأورجانيك" : "organic lead value"}
-              icon={<BadgeDollarSign size={18} />}
+            <MetricDetailTrigger
+              detail={metrics!.perLead}
+              card={{
+                index: 2,
+                sub: lang === "ar" ? "قيمة الليد الأورجانيك" : "organic lead value",
+              }}
             />
-            <KpiCard
-              tone="rose"
-              index={3}
-              label="Lost"
-              value={lostAvailable ? fmtNum(data.totals.lost) : "—"}
-              sub={
-                lostAvailable
+            <MetricDetailTrigger
+              detail={{
+                ...metrics!.lost,
+                value: lostAvailable ? fmtNum(data.totals.lost) : "—",
+              }}
+              card={{
+                index: 3,
+                sub: lostAvailable
                   ? fmtPct(data.totals.lostRate)
                   : lang === "ar"
                     ? "المصدر غير متاح حاليًا"
-                    : "source currently unavailable"
-              }
-              icon={<Target size={18} />}
+                    : "source currently unavailable",
+              }}
             />
-          </div>
+          </KpiRow>
 
           <section>
             <SectionTitle

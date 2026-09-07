@@ -46,8 +46,9 @@ function Teams() {
     });
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<UsersRound size={20} />}
         title={lang === "ar" ? "أداء الموظفين وفرق المبيعات" : "Employees and sales teams"}
         subtitle={

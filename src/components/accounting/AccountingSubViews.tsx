@@ -45,6 +45,9 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
+import { KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n, type Lang } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { filterStore, useFilters } from "@/lib/filter-store";
@@ -110,13 +113,25 @@ interface EmployeeEvidenceResponse {
     truncated: boolean;
   };
   orders: {
-    rows: Array<{ orderRef: string; customer: string; course: string; revenueDate: string; usdSales: number }>;
+    rows: Array<{
+      orderRef: string;
+      customer: string;
+      course: string;
+      revenueDate: string;
+      usdSales: number;
+    }>;
     total: number;
     truncated: boolean;
     amount: number;
   };
   invoices: {
-    rows: Array<{ movement: string; partner: string; paymentDate: string; usdPaid: number; isCreditNote: boolean }>;
+    rows: Array<{
+      movement: string;
+      partner: string;
+      paymentDate: string;
+      usdPaid: number;
+      isCreditNote: boolean;
+    }>;
     total: number;
     truncated: boolean;
     paidTotal: number;
@@ -141,9 +156,9 @@ interface EmployeeEvidenceResponse {
 
 type EmployeeEvidenceKind = "target" | "sales" | "leads" | "calls" | "chatwoot";
 
-const EmployeeEvidenceContext = createContext<
-  { openEvidence: (kind: EmployeeEvidenceKind) => void } | null
->(null);
+const EmployeeEvidenceContext = createContext<{
+  openEvidence: (kind: EmployeeEvidenceKind) => void;
+} | null>(null);
 
 function evidenceKindFromHref(href: string): EmployeeEvidenceKind | null {
   if (href.includes("target")) return "target";
@@ -192,12 +207,196 @@ const localMoney = (value: number | null, currency = "LE") =>
     ? "—"
     : `${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 
+/** The month-by-month figures, and the months behind each. */
+function monthlyMetrics(
+  monthly: AccountingMonth[],
+  latest: AccountingMonth | undefined,
+  previous: AccountingMonth | undefined,
+  lang: Lang,
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const months = (
+    pick: (row: AccountingMonth) => number,
+    format: (n: number) => string,
+    tone: MetricBreakdownRow["tone"],
+  ): MetricBreakdownRow[] =>
+    topRows(
+      monthly.map((row) => ({
+        key: row.month,
+        label: monthLabel(row.month, lang),
+        value: pick(row),
+        display: format(pick(row)),
+        tone,
+      })),
+      6,
+    );
+  const monthName = latest ? monthLabel(latest.month, lang) : "—";
+  const previousName = previous ? monthLabel(previous.month, lang) : "—";
+
+  return {
+    revenue: {
+      id: "accounting.monthRevenue",
+      title: A ? "تحصيل آخر شهر" : "Latest month collections",
+      value: fmtUSDExact(latest?.revenue ?? null),
+      tone: "mint",
+      definition: A
+        ? `ما حُصّل فعليًا في ${monthName}. كل شهر يُقارن بالشهر الذي يسبقه مباشرة، لا بمتوسط السنة.`
+        : `What was actually collected in ${monthName}. Each month is compared with the one directly before it, never with a yearly average.`,
+      formula: A
+        ? `${fmtUSDExact(latest?.revenue ?? null)} في ${monthName} مقابل ${fmtUSDExact(previous?.revenue ?? null)} في ${previousName}.`
+        : `${fmtUSDExact(latest?.revenue ?? null)} in ${monthName} against ${fmtUSDExact(previous?.revenue ?? null)} in ${previousName}.`,
+      supporting: [
+        {
+          key: "invoices",
+          label: A ? "الفواتير" : "Invoices",
+          value: fmtNum(latest?.invoices ?? 0),
+        },
+        {
+          key: "growth",
+          label: A ? "النمو الشهري" : "Month-over-month",
+          value: fmtPct(latest?.growthPct ?? null, 1),
+        },
+        {
+          key: "previous",
+          label: previousName,
+          value: fmtUSDExact(previous?.revenue ?? null),
+        },
+        { key: "months", label: A ? "شهور معروضة" : "Months shown", value: fmtNum(monthly.length) },
+      ],
+      breakdowns: [
+        {
+          id: "months",
+          title: A ? "التحصيل شهرًا بشهر" : "Collections month by month",
+          rows: months((row) => row.revenue, fmtUSDExact, "mint"),
+          emptyLabel: A ? "لا توجد شهور" : "No months",
+        },
+      ],
+    },
+    invoices: {
+      id: "accounting.monthInvoices",
+      title: A ? "فواتير آخر شهر" : "Latest month invoices",
+      value: fmtNum(latest?.invoices ?? 0),
+      tone: "violet",
+      definition: A
+        ? `عدد الفواتير المدفوعة المميزة في ${monthName}.`
+        : `Distinct paid invoices in ${monthName}.`,
+      formula: A
+        ? `${fmtNum(latest?.invoices ?? 0)} فاتورة بقيمة ${fmtUSDExact(latest?.revenue ?? null)}.`
+        : `${fmtNum(latest?.invoices ?? 0)} invoices worth ${fmtUSDExact(latest?.revenue ?? null)}.`,
+      supporting: [
+        {
+          key: "revenue",
+          label: A ? "التحصيل" : "Collections",
+          value: fmtUSDExact(latest?.revenue ?? null),
+        },
+        {
+          key: "previous",
+          label: previousName,
+          value: fmtNum(previous?.invoices ?? 0),
+        },
+        {
+          key: "credits",
+          label: A ? "إشعارات خصم" : "Credit notes",
+          value: fmtNum(latest?.creditNotes ?? 0),
+        },
+        { key: "months", label: A ? "شهور معروضة" : "Months shown", value: fmtNum(monthly.length) },
+      ],
+      breakdowns: [
+        {
+          id: "months",
+          title: A ? "الفواتير شهرًا بشهر" : "Invoices month by month",
+          rows: months((row) => row.invoices, fmtNum, "violet"),
+          emptyLabel: A ? "لا توجد شهور" : "No months",
+        },
+      ],
+    },
+    growth: {
+      id: "accounting.monthGrowth",
+      title: A ? "النمو الشهري" : "Month-over-month growth",
+      value: fmtPct(latest?.growthPct ?? null, 1),
+      tone: "amber",
+      definition: A
+        ? `تغيّر التحصيل في ${monthName} مقابل ${previousName}. لا تُعرض نسبة أمام أساس صفري، لأنها بلا معنى.`
+        : `The change in collections in ${monthName} against ${previousName}. No percentage is shown against a zero baseline — it would be meaningless.`,
+      formula: A
+        ? `(${fmtUSDExact(latest?.revenue ?? null)} − ${fmtUSDExact(previous?.revenue ?? null)}) ÷ ${fmtUSDExact(previous?.revenue ?? null)}.`
+        : `(${fmtUSDExact(latest?.revenue ?? null)} − ${fmtUSDExact(previous?.revenue ?? null)}) ÷ ${fmtUSDExact(previous?.revenue ?? null)}.`,
+      supporting: [
+        { key: "latest", label: monthName, value: fmtUSDExact(latest?.revenue ?? null) },
+        { key: "previous", label: previousName, value: fmtUSDExact(previous?.revenue ?? null) },
+        {
+          key: "difference",
+          label: A ? "الفارق" : "Difference",
+          value: fmtUSDExact((latest?.revenue ?? 0) - (previous?.revenue ?? 0)),
+        },
+        {
+          key: "invoices",
+          label: A ? "الفواتير" : "Invoices",
+          value: fmtNum(latest?.invoices ?? 0),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "months",
+          title: A ? "النمو شهرًا بشهر" : "Growth month by month",
+          rows: months(
+            (row) => row.growthPct ?? 0,
+            (n) => fmtPct(n, 1),
+            "amber",
+          ),
+          emptyLabel: A ? "لا توجد شهور" : "No months",
+        },
+      ],
+    },
+    credits: {
+      id: "accounting.monthCredits",
+      title: A ? "إلغاءات آخر شهر" : "Latest month cancellations",
+      value: fmtUSDExact(latest?.creditNoteUsd ?? null),
+      tone: "rose",
+      definition: A
+        ? `قيمة الإلغاءات وإشعارات الخصم في ${monthName}. تظهر بالسالب في شهر تاريخ العكس، لا في شهر الفاتورة الأصلية.`
+        : `The value of cancellations and credit notes in ${monthName}. They land negative in the month of the reversal, not in the month of the original invoice.`,
+      formula: A
+        ? `${fmtNum(latest?.creditNotes ?? 0)} إشعار بقيمة ${fmtUSDExact(latest?.creditNoteUsd ?? null)}.`
+        : `${fmtNum(latest?.creditNotes ?? 0)} notes worth ${fmtUSDExact(latest?.creditNoteUsd ?? null)}.`,
+      supporting: [
+        {
+          key: "count",
+          label: A ? "عدد الإشعارات" : "Notes",
+          value: fmtNum(latest?.creditNotes ?? 0),
+        },
+        {
+          key: "revenue",
+          label: A ? "التحصيل" : "Collections",
+          value: fmtUSDExact(latest?.revenue ?? null),
+        },
+        {
+          key: "previous",
+          label: previousName,
+          value: fmtUSDExact(previous?.creditNoteUsd ?? null),
+        },
+        { key: "months", label: A ? "شهور معروضة" : "Months shown", value: fmtNum(monthly.length) },
+      ],
+      breakdowns: [
+        {
+          id: "months",
+          title: A ? "الإلغاءات شهرًا بشهر" : "Cancellations month by month",
+          rows: months((row) => row.creditNoteUsd, fmtUSDExact, "rose"),
+          emptyLabel: A ? "لا توجد شهور" : "No months",
+        },
+      ],
+    },
+  };
+}
+
 export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] }) {
   const { lang } = useI18n();
   const filters = useFilters();
   const dateBasis = filters.dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
   const latest = monthly.at(-1);
   const previous = monthly.at(-2);
+  // One description per figure, built from the months already on screen.
+  const monthlyFigures = monthlyMetrics(monthly, latest, previous, lang);
   return (
     <div className="space-y-4">
       <Notice tone="info" icon={<Info size={16} />}>
@@ -205,34 +404,22 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
           ? `الفواتير الموجبة حسب ${dateBasis}، والإلغاء يظهر بالسالب في شهر تاريخ العكس. كل شهر يُقارن بالشهر السابق مباشرة.`
           : `Positive invoices use ${dateBasis}; cancellations are negative in their reversal month. Each month is compared with its predecessor.`}
       </Notice>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
-          tone="mint"
-          index={0}
-          label={lang === "ar" ? "تحصيل آخر شهر" : "Latest month collections"}
-          value={fmtUSDExact(latest?.revenue ?? null)}
-          hero
+      <KpiRow>
+        <MetricDetailTrigger
+          detail={monthlyFigures.revenue}
+          card={{ index: 0, hero: true, valueWrap: true }}
         />
-        <KpiCard
-          tone="violet"
-          index={1}
-          label={lang === "ar" ? "فواتير آخر شهر" : "Latest month invoices"}
-          value={fmtNum(latest?.invoices ?? 0)}
+        <MetricDetailTrigger detail={monthlyFigures.invoices} card={{ index: 1 }} />
+        <MetricDetailTrigger detail={monthlyFigures.growth} card={{ index: 2 }} />
+        <MetricDetailTrigger
+          detail={monthlyFigures.credits}
+          card={{
+            index: 3,
+            valueWrap: true,
+            sub: `${fmtNum(latest?.creditNotes ?? 0)} ${lang === "ar" ? "إشعار خصم" : "credit notes"}`,
+          }}
         />
-        <KpiCard
-          tone="amber"
-          index={2}
-          label={lang === "ar" ? "النمو الشهري" : "Month-over-month growth"}
-          value={fmtPct(latest?.growthPct ?? null, 1)}
-        />
-        <KpiCard
-          tone="rose"
-          index={3}
-          label={lang === "ar" ? "إلغاءات آخر شهر" : "Latest month cancellations"}
-          value={fmtUSDExact(latest?.creditNoteUsd ?? null)}
-          sub={`${fmtNum(latest?.creditNotes ?? 0)} ${lang === "ar" ? "إشعار خصم" : "credit notes"}`}
-        />
-      </div>
+      </KpiRow>
       <Card>
         <SectionTitle>
           {lang === "ar" ? "اتجاه التحصيل وعدد الفواتير" : "Collections and invoice trend"}
@@ -315,6 +502,436 @@ export function AccountingMonthlyView({ monthly }: { monthly: AccountingMonth[] 
       </Card>
     </div>
   );
+}
+
+/**
+ * What each figure on the employee board is made of.
+ *
+ * Everything comes from the `/api/teams` payload the board already renders, so
+ * a manager can open "Target for period" and see the same roster the table
+ * below is built from — not a second, differently-filtered answer.
+ */
+function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const S = data.summary;
+  const targets = data.targets;
+  const agents = data.agents;
+
+  const roster = (
+    pick: (agent: AgentsResponse["agents"][number]) => number,
+    format: (n: number) => string,
+    tone: MetricBreakdownRow["tone"],
+  ): MetricBreakdownRow[] =>
+    topRows(
+      agents.map((agent) => ({
+        key: agent.key,
+        label: agent.displayName || agent.name,
+        value: pick(agent),
+        display: format(pick(agent)),
+        meta: agent.team || undefined,
+        tone,
+      })),
+    );
+
+  const byTeam = (
+    pick: (agent: AgentsResponse["agents"][number]) => number,
+    format: (n: number) => string,
+  ): MetricBreakdownRow[] => {
+    const totals = new Map<string, number>();
+    for (const agent of agents) {
+      const team = agent.team?.trim();
+      if (!team) continue;
+      totals.set(team, (totals.get(team) ?? 0) + pick(agent));
+    }
+    return topRows(
+      [...totals.entries()].map(([team, value]) => ({
+        key: team,
+        label: team,
+        value,
+        display: format(value),
+        tone: "cyan" as const,
+      })),
+    );
+  };
+
+  const remaining =
+    targets.totalTarget === null
+      ? null
+      : Math.max(0, targets.totalTarget - targets.totalPaidRevenue);
+
+  return {
+    employees: {
+      id: "teams.employees",
+      title: A ? "الموظفون" : "Active employees",
+      value: fmtNum(S.agents),
+      tone: "sky",
+      icon: <Users size={16} />,
+      definition: A
+        ? "الموظفون الذين لديهم نشاط في الفترة: فاتورة، أو ليد مسند، أو مكالمة."
+        : "Employees with activity in the period: an invoice, an assigned lead, or a call.",
+      formula: A
+        ? `${fmtNum(S.agents)} موظفًا، منهم ${fmtNum(targets.matched)} لديهم تارجت منشور.`
+        : `${fmtNum(S.agents)} employees, of whom ${fmtNum(targets.matched)} have a published target.`,
+      supporting: [
+        {
+          key: "targeted",
+          label: A ? "لهم تارجت" : "With a target",
+          value: fmtNum(targets.matched),
+        },
+        {
+          key: "untargeted",
+          label: A ? "بلا تارجت" : "Without a target",
+          value: fmtNum(targets.untargeted.length),
+        },
+        { key: "leads", label: A ? "ليدز الفترة" : "Leads in period", value: fmtNum(S.cleanLeads) },
+        { key: "won", label: A ? "صفقات رابحة" : "Won", value: fmtNum(S.won) },
+      ],
+      breakdowns: [
+        {
+          id: "teams",
+          title: A ? "التحصيل حسب الفريق" : "Collections by team",
+          rows: byTeam((agent) => agent.paidRevenue, fmtUSDFull),
+          emptyLabel: A ? "لا توجد فرق بتحصيل" : "No team collected",
+        },
+      ],
+      records: targets.untargeted.length
+        ? {
+            title: A ? "يبيعون بلا تارجت منشور" : "Selling with no published target",
+            hint: A
+              ? "يظهرون في التحصيل ولا يدخلون في نسبة الإنجاز."
+              : "They appear in collections and not in the achievement percentage.",
+            rows: targets.untargeted.slice(0, 5).map((person) => ({
+              key: person.name,
+              title: person.name,
+              value: fmtUSDFull(person.paidRevenue),
+            })),
+          }
+        : undefined,
+    },
+    collections: {
+      id: "teams.revenue",
+      title: A ? "التحصيل" : "Paid collections",
+      value: fmtUSDFull(S.paidRevenue),
+      tone: "mint",
+      icon: <ReceiptText size={16} />,
+      definition: A
+        ? "ما حصّله الموظفون فعليًا من فواتير مدفوعة داخل الفترة، منسوبًا إلى الموظف المسؤول عن الفاتورة."
+        : "What employees actually collected from paid invoices inside the period, attributed to the invoice's owner.",
+      formula: A
+        ? `${fmtUSDFull(S.paidRevenue)} من ${fmtNum(S.invoices)} فاتورة.`
+        : `${fmtUSDFull(S.paidRevenue)} across ${fmtNum(S.invoices)} invoices.`,
+      supporting: [
+        { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(S.invoices) },
+        {
+          key: "target",
+          label: A ? "التارجت" : "Target",
+          value: targets.totalTarget === null ? "—" : fmtUSDFull(targets.totalTarget),
+        },
+        {
+          key: "achievement",
+          label: A ? "نسبة الإنجاز" : "Achievement",
+          value: fmtPct(targets.totalAchievementPaid, 1),
+        },
+        { key: "won", label: A ? "صفقات رابحة" : "Won deals", value: fmtNum(S.won) },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "أعلى الموظفين تحصيلًا" : "Top employees by collection",
+          rows: roster((agent) => agent.paidRevenue, fmtUSDFull, "mint"),
+          emptyLabel: A ? "لا يوجد تحصيل في الفترة" : "Nothing collected in this period",
+        },
+        {
+          id: "teams",
+          title: A ? "حسب الفريق" : "By team",
+          rows: byTeam((agent) => agent.paidRevenue, fmtUSDFull),
+          emptyLabel: A ? "لا توجد فرق بتحصيل" : "No team collected",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+    target: {
+      id: "teams.target",
+      title: A ? "التارجت" : "Target for period",
+      value: targets.totalTarget === null ? "—" : fmtUSDFull(targets.totalTarget),
+      tone: "amber",
+      icon: <Target size={16} />,
+      definition: A
+        ? "مجموع الحصص المنشورة للموظفين الظاهرين في هذه الفترة، محسوبة بالتناسب: نصف شهر يعني نصف الحصة."
+        : "The published quotas of the employees present in this window, prorated: half a month means half the quota.",
+      formula:
+        targets.totalTarget === null
+          ? A
+            ? "لا يوجد تارجت منشور لهذه الفترة، ولذلك لا تُحسب نسبة إنجاز."
+            : "No target is published for this window, so no achievement percentage is computed."
+          : A
+            ? `${fmtUSDFull(targets.totalPaidRevenue)} محقق ÷ ${fmtUSDFull(targets.totalTarget)} تارجت = ${fmtPct(targets.totalAchievementPaid, 1)}.`
+            : `${fmtUSDFull(targets.totalPaidRevenue)} achieved ÷ ${fmtUSDFull(targets.totalTarget)} target = ${fmtPct(targets.totalAchievementPaid, 1)}.`,
+      caveat: targets.complete
+        ? undefined
+        : A
+          ? `الفترة تمتد على ${targets.monthsMissing.length} شهرًا بلا تارجت منشور، فالنسبة محسوبة على جزء من المدة فقط.`
+          : `The window spans ${targets.monthsMissing.length} month(s) with no published target, so the percentage covers part of the period only.`,
+      supporting: [
+        {
+          key: "achieved",
+          label: A ? "المحقق" : "Achieved",
+          value: fmtUSDFull(targets.totalPaidRevenue),
+        },
+        {
+          key: "remaining",
+          label: A ? "المتبقي" : "Remaining",
+          value: remaining === null ? "—" : fmtUSDFull(remaining),
+        },
+        {
+          key: "achievement",
+          label: A ? "نسبة الإنجاز" : "Achievement",
+          value: fmtPct(targets.totalAchievementPaid, 1),
+        },
+        {
+          key: "matched",
+          label: A ? "موظفون لهم تارجت" : "Employees with a target",
+          value: fmtNum(targets.matched),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "المشاركون في التارجت" : "Who the target is shared between",
+          rows: roster((agent) => agent.paidRevenue, fmtUSDFull, "amber"),
+          emptyLabel: A ? "لا يوجد موظفون في الفترة" : "No employees in this period",
+        },
+      ],
+      records: targets.unmatched.length
+        ? {
+            title: A ? "تارجت بلا موظف مطابق" : "Targets with no matching employee",
+            hint: A
+              ? "إما أن الشخص لم ينتج شيئًا في الفترة، أو أن اسمه مكتوب بشكل مختلف في المصدر."
+              : "Either the person produced nothing this period, or their name is spelled differently upstream.",
+            rows: targets.unmatched.slice(0, 5).map((row) => ({
+              key: row.employeeId || row.name,
+              title: row.name,
+              subtitle: row.teamLeader || undefined,
+              value: row.target === null ? "—" : fmtUSDFull(row.target),
+            })),
+          }
+        : undefined,
+    },
+    leads: {
+      id: "teams.leads",
+      title: A ? "الليدز الجديدة" : "Leads created in period",
+      value: fmtNum(S.cleanLeads),
+      tone: "sky",
+      icon: <UserRound size={16} />,
+      definition: A
+        ? "العملاء الذين أُنشئوا داخل الفترة وأُسندوا إلى موظف. المتابعة الهاتفية عليهم هي ما يقيسه العمود المجاور."
+        : "Leads created inside the window and assigned to an employee. The phone follow-up on them is what the next figure measures.",
+      formula: A
+        ? `${fmtNum(S.won)} من ${fmtNum(S.cleanLeads)} تحوّلوا إلى صفقات رابحة = ${fmtPct(S.conversionRate, 1)}.`
+        : `${fmtNum(S.won)} of ${fmtNum(S.cleanLeads)} became won = ${fmtPct(S.conversionRate, 1)}.`,
+      supporting: [
+        { key: "won", label: A ? "تم كسبها" : "Became won", value: fmtNum(S.won) },
+        { key: "lost", label: A ? "ضائعة" : "Lost", value: fmtNum(S.lost) },
+        {
+          key: "uncalled",
+          label: A ? "لم يتم الاتصال بهم" : "Never called",
+          value: S.uncalledDistributedLeads === null ? "—" : fmtNum(S.uncalledDistributedLeads),
+        },
+        {
+          key: "conversion",
+          label: A ? "معدل التحويل" : "Conversion",
+          value: fmtPct(S.conversionRate, 1),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "حسب الموظف" : "By employee",
+          rows: roster((agent) => agent.cleanLeads, fmtNum, "sky"),
+          emptyLabel: A ? "لا توجد ليدز في الفترة" : "No leads in this period",
+        },
+        {
+          id: "uncalled",
+          title: A ? "ليدز بلا اتصال، حسب الموظف" : "Never-called leads by employee",
+          rows: roster((agent) => agent.uncalledDistributedLeads ?? 0, fmtNum, "rose"),
+          emptyLabel: A ? "كل الليدز الموزّعة تم الاتصال بها" : "Every distributed lead was called",
+        },
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+    closures: {
+      id: "teams.won",
+      title: A ? "الصفقات الرابحة" : "Won closures during period",
+      value: fmtNum(S.periodClosedWon),
+      tone: "violet",
+      icon: <Trophy size={16} />,
+      definition: A
+        ? "الصفقات التي أُغلقت داخل الفترة، بصرف النظر عن تاريخ إنشاء العميل. هذا مقياس عمل الفترة، لا مقياس جودة كوهورت الليدز."
+        : "Deals closed inside the window, whatever the lead's creation date. This measures the period's work, not the quality of the period's lead cohort.",
+      formula: A
+        ? `${fmtNum(S.periodClosedWon)} رابحة و${fmtNum(S.periodClosedLost)} خاسرة = ${fmtPct(S.decidedConversionRate, 1)} من الصفقات المحسومة.`
+        : `${fmtNum(S.periodClosedWon)} won and ${fmtNum(S.periodClosedLost)} lost = ${fmtPct(S.decidedConversionRate, 1)} of decided deals.`,
+      supporting: [
+        { key: "lost", label: A ? "خاسرة" : "Lost", value: fmtNum(S.periodClosedLost) },
+        {
+          key: "decided",
+          label: A ? "تحويل الصفقات المحسومة" : "Decided conversion",
+          value: fmtPct(S.decidedConversionRate, 1),
+        },
+        { key: "cohortWon", label: A ? "كوهورت الفترة" : "Cohort won", value: fmtNum(S.won) },
+        { key: "revenue", label: A ? "التحصيل" : "Collections", value: fmtUSDFull(S.paidRevenue) },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "حسب الموظف" : "By employee",
+          rows: roster((agent) => agent.won, fmtNum, "violet"),
+          emptyLabel: A ? "لا توجد صفقات في الفترة" : "No deals closed in this period",
+        },
+        {
+          id: "teams",
+          title: A ? "حسب الفريق" : "By team",
+          rows: byTeam((agent) => agent.won, fmtNum),
+          emptyLabel: A ? "لا توجد فرق أغلقت صفقات" : "No team closed a deal",
+        },
+      ],
+    },
+    calls: {
+      id: "teams.calls",
+      title: A ? "المكالمات" : "Total calls",
+      value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+      tone: "cyan",
+      icon: <PhoneCall size={16} />,
+      definition: A
+        ? "المكالمات الصادرة من مقاسم Yeastar داخل الفترة، منسوبة إلى الموظف صاحب التحويلة."
+        : "Outbound calls from the Yeastar extensions inside the period, attributed to the extension's owner.",
+      formula:
+        S.answeredCalls === null
+          ? A
+            ? "لا توجد بيانات مكالمات لهذه الفترة."
+            : "No call data for this window."
+          : A
+            ? `${fmtNum(S.answeredCalls)} مردود عليها من ${fmtNum(S.outboundCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`
+            : `${fmtNum(S.answeredCalls)} answered of ${fmtNum(S.outboundCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`,
+      supporting: [
+        {
+          key: "answered",
+          label: A ? "مردود عليها" : "Answered",
+          value: S.answeredCalls === null ? "—" : fmtNum(S.answeredCalls),
+        },
+        { key: "rate", label: A ? "نسبة الرد" : "Answer rate", value: fmtPct(S.answerRate, 1) },
+        {
+          key: "leads",
+          label: A ? "ليدز موزّعة" : "Distributed leads",
+          value: fmtNum(S.distributedLeads),
+        },
+        {
+          key: "uncalled",
+          label: A ? "لم يتم الاتصال بهم" : "Never called",
+          value: S.uncalledDistributedLeads === null ? "—" : fmtNum(S.uncalledDistributedLeads),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "حسب الموظف" : "By employee",
+          rows: roster((agent) => agent.outboundCalls ?? 0, fmtNum, "cyan"),
+          emptyLabel: A ? "لا توجد مكالمات في الفترة" : "No calls in this period",
+        },
+      ],
+    },
+    callTime: {
+      id: "teams.callTime",
+      title: A ? "وقت المكالمات" : "Call hours",
+      value: formatCallHours(S.totalCallSeconds, lang),
+      tone: "cyan",
+      icon: <Clock3 size={16} />,
+      definition: A
+        ? "إجمالي زمن المكالمات في الفترة. وقت التحدث هو الجزء الذي رُد فيه فعلًا؛ الفرق بينهما هو الرنين والانتظار."
+        : "Total call time in the period. Talk time is the part that was actually answered; the difference is ringing and waiting.",
+      formula: A
+        ? `وقت التحدث ${formatCallHours(S.talkSeconds, lang)} من إجمالي ${formatCallHours(S.totalCallSeconds, lang)}.`
+        : `${formatCallHours(S.talkSeconds, lang)} of talk time within ${formatCallHours(S.totalCallSeconds, lang)} total.`,
+      supporting: [
+        {
+          key: "talk",
+          label: A ? "وقت التحدث" : "Talk time",
+          value: formatCallHours(S.talkSeconds, lang),
+        },
+        {
+          key: "calls",
+          label: A ? "عدد المكالمات" : "Calls",
+          value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+        },
+        {
+          key: "answered",
+          label: A ? "مردود عليها" : "Answered",
+          value: S.answeredCalls === null ? "—" : fmtNum(S.answeredCalls),
+        },
+        { key: "rate", label: A ? "نسبة الرد" : "Answer rate", value: fmtPct(S.answerRate, 1) },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "حسب الموظف" : "By employee",
+          rows: roster(
+            (agent) => agent.talkSeconds ?? 0,
+            (seconds) => formatCallHours(seconds, lang),
+            "cyan",
+          ),
+          emptyLabel: A ? "لا توجد مكالمات في الفترة" : "No calls in this period",
+        },
+      ],
+    },
+    quality: {
+      id: "teams.quality",
+      title: A ? "تقييم الجودة" : "Average quality",
+      value: fmtQuality(S.averageQualityScore),
+      tone: "amber",
+      icon: <CircleGauge size={16} />,
+      definition: A
+        ? "متوسط تقييم جودة المكالمات المحلَّلة في الفترة. يُحسب على المكالمات التي جرى تحليلها فقط، لا على كل المكالمات."
+        : "The average quality score of the calls analysed in the period. Computed over analysed calls only, not over every call.",
+      formula:
+        S.analyzedCalls === null
+          ? A
+            ? "لا يوجد تحليل جودة لهذه الفترة."
+            : "No quality analysis for this window."
+          : A
+            ? `محسوب على ${fmtNum(S.analyzedCalls)} مكالمة محلَّلة، منها ${fmtNum(S.qualityNeedsReview ?? 0)} تحتاج مراجعة.`
+            : `Measured over ${fmtNum(S.analyzedCalls)} analysed calls, of which ${fmtNum(S.qualityNeedsReview ?? 0)} need review.`,
+      supporting: [
+        {
+          key: "analyzed",
+          label: A ? "مكالمات محلَّلة" : "Analysed calls",
+          value: S.analyzedCalls === null ? "—" : fmtNum(S.analyzedCalls),
+        },
+        {
+          key: "review",
+          label: A ? "تحتاج مراجعة" : "Need review",
+          value: fmtNum(S.qualityNeedsReview ?? 0),
+        },
+        {
+          key: "calls",
+          label: A ? "إجمالي المكالمات" : "Total calls",
+          value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+        },
+        { key: "rate", label: A ? "نسبة الرد" : "Answer rate", value: fmtPct(S.answerRate, 1) },
+      ],
+      breakdowns: [
+        {
+          id: "employees",
+          title: A ? "أعلى تقييمًا" : "Highest scoring",
+          rows: roster(
+            (agent) => agent.averageQualityScore ?? 0,
+            (score) => fmtQuality(score || null),
+            "amber",
+          ),
+          emptyLabel: A ? "لا يوجد تقييم في الفترة" : "No quality data in this period",
+        },
+      ],
+    },
+  };
 }
 
 export function AccountingAgentsView() {
@@ -401,6 +1018,10 @@ export function AccountingAgentsView() {
         <Skeleton className="mt-4 h-96" />
       </>
     );
+
+  // One description per figure, built from the response the board is already
+  // rendering — so opening a card can never disagree with the card itself.
+  const boardMetrics = agentBoardMetrics(data, lang);
 
   const filterMonth = filters.from?.slice(0, 7) || "";
   const selectedMonth =
@@ -502,113 +1123,102 @@ export function AccountingAgentsView() {
         // report is re-read rather than left showing the previous numbers.
         onSaved={() => refetch()}
       />
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 xl:gap-4">
-        <KpiCard
-          tone="sky"
-          index={0}
-          label={lang === "ar" ? "الموظفون" : "Active employees"}
-          value={fmtNum(data.summary.agents)}
-          sub={
-            data.targets.matched > 0
-              ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "لهم تارجت" : "with a published target"}`
-              : undefined
-          }
-          icon={<Users size={18} />}
+      <KpiRow>
+        <MetricDetailTrigger
+          detail={boardMetrics.employees}
+          card={{
+            index: 0,
+            sub:
+              data.targets.matched > 0
+                ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "لهم تارجت" : "with a published target"}`
+                : undefined,
+          }}
         />
-        <KpiCard
-          tone="mint"
-          index={1}
-          label={lang === "ar" ? "التحصيل" : "Paid collections"}
-          value={fmtUSDFull(data.summary.paidRevenue)}
-          sub={invoiceCount(data.summary.invoices, lang)}
-          icon={<ReceiptText size={18} />}
-          hero
+        <MetricDetailTrigger
+          detail={boardMetrics.collections}
+          card={{ index: 1, hero: true, sub: invoiceCount(data.summary.invoices, lang) }}
         />
-        <KpiCard
-          tone="amber"
-          index={2}
-          label={lang === "ar" ? "التارجت" : "Target for period"}
-          // Prorated, so half a month shows half the quota. An em dash means no
-          // target is published for this window — never a zero.
-          value={data.targets.totalTarget === null ? "—" : fmtUSDFull(data.targets.totalTarget)}
-          sub={
-            data.targets.totalTarget === null
-              ? lang === "ar"
-                ? "لا يوجد تارجت للفترة"
-                : "No target published for this window"
-              : `${lang === "ar" ? "تم تحقيق" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`
-          }
-          icon={<Target size={18} />}
+        <MetricDetailTrigger
+          detail={boardMetrics.target}
+          card={{
+            index: 2,
+            // Prorated, so half a month shows half the quota. An em dash means
+            // no target is published for this window — never a zero.
+            sub:
+              data.targets.totalTarget === null
+                ? lang === "ar"
+                  ? "لا يوجد تارجت للفترة"
+                  : "No target published for this window"
+                : `${lang === "ar" ? "تم تحقيق" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`,
+          }}
         />
-        <KpiCard
-          tone="sky"
-          index={3}
-          label={lang === "ar" ? "الليدز الجديدة" : "Leads created in period"}
-          value={fmtNum(data.summary.cleanLeads)}
-          sub={`${fmtNum(data.summary.won)} ${lang === "ar" ? "تم كسبها" : "became won"}`}
-          icon={<UserRound size={18} />}
-          info={<EmployeeMetricInfo metric="cohortWon" />}
+        <MetricDetailTrigger
+          detail={boardMetrics.leads}
+          card={{
+            index: 3,
+            sub: `${fmtNum(data.summary.won)} ${lang === "ar" ? "تم كسبها" : "became won"}`,
+            info: <EmployeeMetricInfo metric="cohortWon" />,
+          }}
         />
-        <KpiCard
-          tone="violet"
-          index={4}
-          label={lang === "ar" ? "الصفقات الرابحة" : "Won closures during period"}
-          value={fmtNum(data.summary.periodClosedWon)}
-          sub={
-            lang === "ar"
-              ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · تحويل ${fmtPct(data.summary.decidedConversionRate, 1)}`
-              : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`
-          }
-          icon={<Trophy size={18} />}
-          info={<EmployeeMetricInfo metric="periodClosures" />}
+        <MetricDetailTrigger
+          detail={boardMetrics.closures}
+          card={{
+            index: 4,
+            sub:
+              lang === "ar"
+                ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · تحويل ${fmtPct(data.summary.decidedConversionRate, 1)}`
+                : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`,
+            info: <EmployeeMetricInfo metric="periodClosures" />,
+          }}
         />
-        <KpiCard
-          tone="cyan"
-          index={5}
-          label={lang === "ar" ? "المكالمات" : "Total calls"}
-          value={data.summary.outboundCalls === null ? "—" : fmtNum(data.summary.outboundCalls)}
-          sub={
-            data.summary.answeredCalls === null
-              ? lang === "ar"
-                ? "لا توجد بيانات"
-                : "Unavailable for period"
-              : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "مردود عليها" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`
-          }
-          icon={<PhoneCall size={18} />}
+        <MetricDetailTrigger
+          detail={boardMetrics.calls}
+          card={{
+            index: 5,
+            sub:
+              data.summary.answeredCalls === null
+                ? lang === "ar"
+                  ? "لا توجد بيانات"
+                  : "Unavailable for period"
+                : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "مردود عليها" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`,
+          }}
         />
-        <KpiCard
-          tone="cyan"
-          index={6}
-          label={lang === "ar" ? "وقت المكالمات" : "Call hours"}
-          value={<CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />}
-          valueWrap
-          sub={
-            lang === "ar"
-              ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
-              : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`
-          }
-          icon={<Clock3 size={18} />}
+        <MetricDetailTrigger
+          detail={{
+            ...boardMetrics.callTime,
+            value: <CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />,
+          }}
+          card={{
+            index: 6,
+            valueWrap: true,
+            sub:
+              lang === "ar"
+                ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
+                : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`,
+          }}
         />
-        <KpiCard
-          tone="amber"
-          index={7}
-          label={lang === "ar" ? "تقييم الجودة" : "Average quality"}
-          value={fmtQuality(data.summary.averageQualityScore)}
-          sub={
-            data.summary.analyzedCalls === null
-              ? lang === "ar"
-                ? "لا يوجد تقييم"
-                : "Quality data unavailable"
-              : lang === "ar"
-                ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
-                : `${fmtNum(data.summary.analyzedCalls)} analyzed calls · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`
-          }
-          icon={<CircleGauge size={18} />}
+        <MetricDetailTrigger
+          detail={boardMetrics.quality}
+          card={{
+            index: 7,
+            sub:
+              data.summary.analyzedCalls === null
+                ? lang === "ar"
+                  ? "لا يوجد تقييم"
+                  : "Quality data unavailable"
+                : lang === "ar"
+                  ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
+                  : `${fmtNum(data.summary.analyzedCalls)} analyzed calls · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`,
+          }}
         />
-      </div>
+      </KpiRow>
 
       <Card padded={false} className="p-2">
-        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label={lang === "ar" ? "أقسام أداء الموظفين" : "Employee performance sections"}>
+        <div
+          className="grid grid-cols-2 gap-2"
+          role="tablist"
+          aria-label={lang === "ar" ? "أقسام أداء الموظفين" : "Employee performance sections"}
+        >
           <button
             type="button"
             role="tab"
@@ -651,201 +1261,278 @@ export function AccountingAgentsView() {
         />
       ) : (
         <>
-
-      <Card>
-        <SectionTitle
-          hint={
-            lang === "ar"
-              ? "التوزيع من Odoo، والتواصل يُثبت برقم الهاتف من مكالمات Yeastar أو رسائل وردود الموظفين في Chatwoot."
-              : "Assignment comes from Odoo; contact is proven by phone using Yeastar calls or employee messages and replies in Chatwoot."
-          }
-          action={
-            <div className="flex flex-wrap gap-1.5">
-              <Pill tone={data.callsHub.leadCoverageAvailable ? "success" : "warning"}>
-                {data.callsHub.leadCoverageAvailable
-                  ? lang === "ar" ? "مطابقة فعلية بالرقم" : "Live phone matching"
-                  : lang === "ar" ? "مطابقة المكالمات غير متاحة" : "Call matching unavailable"}
-              </Pill>
-              <Pill tone={data.chatwoot.ok ? "success" : "warning"}>
-                {data.chatwoot.ok
-                  ? lang === "ar" ? "Chatwoot متصل" : "Chatwoot connected"
-                  : lang === "ar" ? "تعذّر تحميل Chatwoot" : "Chatwoot unavailable"}
-              </Pill>
-            </div>
-          }
-        >
-          {lang === "ar" ? "الليدز والمكالمات والشات" : "Lead distribution, calls, and chats"}
-        </SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <MiniMetric label={lang === "ar" ? "الليدز" : "Assigned leads"} value={fmtNum(data.summary.distributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "تواصل معها الموظف المسؤول" : "Contacted by assigned owner"} value={data.summary.ownerCalledDistributedLeads === null ? "—" : fmtNum(data.summary.ownerCalledDistributedLeads)} />
-          <MiniMetric
-            label={lang === "ar" ? "لم يتواصل معها الموظف المسؤول" : "Not contacted by assigned owner"}
-            value={
-              data.summary.ownerCalledDistributedLeads === null
-                ? "—"
-                : fmtNum(
-                    Math.max(
-                      0,
-                      data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads,
-                    ),
-                  )
-            }
-            hint={
-              lang === "ar" ? "يشمل ليدز تابعها زميل آخر" : "Includes leads handled by a colleague"
-            }
-            onDrill={
-              data.summary.ownerCalledDistributedLeads === null
-                ? undefined
-                : () => {
-                    setUncalledEmployee(null);
-                    setUncalledScope("owner");
-                  }
-            }
-            drillLabel={
-              lang === "ar"
-                ? "اعرض الليدز التي لم يتواصل معها الموظف المسؤول"
-                : "Show the leads the assigned owner never contacted"
-            }
-          />
-          <MiniMetric label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"} value={data.summary.calledDistributedLeads === null ? "—" : fmtNum(data.summary.calledDistributedLeads)} />
-          <MiniMetric
-            label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
-            value={
-              data.summary.uncalledDistributedLeads === null
-                ? "—"
-                : fmtNum(data.summary.uncalledDistributedLeads)
-            }
-            hint={
-              lang === "ar"
-                ? "لا مكالمة ولا رسالة أو رد من موظف"
-                : "No employee call, message, or reply"
-            }
-            onDrill={
-              data.summary.uncalledDistributedLeads === null
-                ? undefined
-                : () => {
-                    setUncalledEmployee(null);
-                    setUncalledScope("none");
-                  }
-            }
-            drillLabel={
-              lang === "ar" ? "اعرض الليدز التي لم يتواصل معها أحد" : "Show the leads nobody contacted"
-            }
-          />
-          <MiniMetric label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"} value={data.summary.callsFromDistributedLeads === null ? "—" : fmtNum(data.summary.callsFromDistributedLeads)} />
-          <MiniMetric label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"} value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)} />
-          <MiniMetric label={lang === "ar" ? "الشات" : "Chat conversations"} value={data.summary.chatConversations === null ? "—" : fmtNum(data.summary.chatConversations)} />
-          <MiniMetric label={lang === "ar" ? "عملاء ينتظرون الرد الآن" : "Awaiting reply now"} value={data.summary.chatAwaitingReply === null ? "—" : fmtNum(data.summary.chatAwaitingReply)} />
-          <MiniMetric label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open conversations now"} value={data.summary.chatOpenConversations === null ? "—" : fmtNum(data.summary.chatOpenConversations)} />
-          <MiniMetric label={lang === "ar" ? "محادثات بلا موظف الآن" : "Unassigned now"} value={data.chatwoot.unassignedConversations === null ? "—" : fmtNum(data.chatwoot.unassignedConversations)} />
-          <MiniMetric label={lang === "ar" ? "أول رد" : "First response"} value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)} />
-        </div>
-        <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
-          {lang === "ar"
-            ? "التوزيع حسب الموظف المسجل على الليد في Odoo. لمعرفة من غيّر التوزيع نحتاج سجل التعديلات من Odoo."
-            : "This is the current distribution by the salesperson assigned in Odoo. Identifying which admin changed an assignment requires Odoo tracking history; a normal last edit is not mislabeled as a distribution event."}
-        </p>
-        {!data.chatwoot.ok && data.chatwoot.error && (
-          <p className="mt-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[10px] leading-relaxed text-text-muted">
-            {lang === "ar" ? `سبب تعذّر Chatwoot: ${data.chatwoot.error}` : `Chatwoot error: ${data.chatwoot.error}`}
-          </p>
-        )}
-      </Card>
-
-      <Card>
-        <div className="grid gap-3 xl:grid-cols-[minmax(190px,.7fr)_minmax(250px,1fr)_auto_auto] xl:items-end">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "اختر الشهر" : "Choose month"}
-            </span>
-            <select
-              value={selectedMonth}
-              onChange={(event) => selectMonth(event.target.value)}
-              className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+          <Card>
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "التوزيع من Odoo، والتواصل يُثبت برقم الهاتف من مكالمات Yeastar أو رسائل وردود الموظفين في Chatwoot."
+                  : "Assignment comes from Odoo; contact is proven by phone using Yeastar calls or employee messages and replies in Chatwoot."
+              }
+              action={
+                <div className="flex flex-wrap gap-1.5">
+                  <Pill tone={data.callsHub.leadCoverageAvailable ? "success" : "warning"}>
+                    {data.callsHub.leadCoverageAvailable
+                      ? lang === "ar"
+                        ? "مطابقة فعلية بالرقم"
+                        : "Live phone matching"
+                      : lang === "ar"
+                        ? "مطابقة المكالمات غير متاحة"
+                        : "Call matching unavailable"}
+                  </Pill>
+                  <Pill tone={data.chatwoot.ok ? "success" : "warning"}>
+                    {data.chatwoot.ok
+                      ? lang === "ar"
+                        ? "Chatwoot متصل"
+                        : "Chatwoot connected"
+                      : lang === "ar"
+                        ? "تعذّر تحميل Chatwoot"
+                        : "Chatwoot unavailable"}
+                  </Pill>
+                </div>
+              }
             >
-              <option value="">{lang === "ar" ? "الفترة الحالية" : "Current date range"}</option>
-              {[...data.months].reverse().map((month) => (
-                <option key={month} value={month}>
-                  {monthLabel(month, lang)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "ابحث بالاسم" : "Search employee or team"}
-            </span>
-            <span className="relative block">
-              <Search
-                size={16}
-                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-text-muted"
+              {lang === "ar" ? "الليدز والمكالمات والشات" : "Lead distribution, calls, and chats"}
+            </SectionTitle>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <MiniMetric
+                label={lang === "ar" ? "الليدز" : "Assigned leads"}
+                value={fmtNum(data.summary.distributedLeads)}
               />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={lang === "ar" ? "اكتب الاسم…" : "Type a name…"}
-                className="min-h-11 w-full rounded-xl border border-border bg-surface ps-10 pe-3 text-sm text-text outline-none placeholder:text-text-subtle focus:border-brand focus:ring-2 focus:ring-brand/15"
+              <MiniMetric
+                label={lang === "ar" ? "تواصل معها الموظف المسؤول" : "Contacted by assigned owner"}
+                value={
+                  data.summary.ownerCalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(data.summary.ownerCalledDistributedLeads)
+                }
               />
-            </span>
-          </label>
-
-          <div className="table-wrap scroll-hint-x">
-            <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "الترتيب حسب" : "Rank cards by"}
-            </span>
-            <Segmented
-              value={sortBy}
-              onChange={setSortBy}
-              options={[
-                { value: "revenue", label: lang === "ar" ? "التحصيل" : "Revenue" },
-                { value: "closing", label: lang === "ar" ? "الإغلاقات" : "Closures" },
-                ...(data.callsHub.callsAvailable
-                  ? [{ value: "calls" as const, label: lang === "ar" ? "المكالمات" : "Calls" }]
-                  : []),
-              ]}
-            />
-            <p className="mt-1.5 text-[10px] text-text-subtle">
+              <MiniMetric
+                label={
+                  lang === "ar"
+                    ? "لم يتواصل معها الموظف المسؤول"
+                    : "Not contacted by assigned owner"
+                }
+                value={
+                  data.summary.ownerCalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(
+                        Math.max(
+                          0,
+                          data.summary.distributedLeads - data.summary.ownerCalledDistributedLeads,
+                        ),
+                      )
+                }
+                hint={
+                  lang === "ar"
+                    ? "يشمل ليدز تابعها زميل آخر"
+                    : "Includes leads handled by a colleague"
+                }
+                onDrill={
+                  data.summary.ownerCalledDistributedLeads === null
+                    ? undefined
+                    : () => {
+                        setUncalledEmployee(null);
+                        setUncalledScope("owner");
+                      }
+                }
+                drillLabel={
+                  lang === "ar"
+                    ? "اعرض الليدز التي لم يتواصل معها الموظف المسؤول"
+                    : "Show the leads the assigned owner never contacted"
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"}
+                value={
+                  data.summary.calledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(data.summary.calledDistributedLeads)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
+                value={
+                  data.summary.uncalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(data.summary.uncalledDistributedLeads)
+                }
+                hint={
+                  lang === "ar"
+                    ? "لا مكالمة ولا رسالة أو رد من موظف"
+                    : "No employee call, message, or reply"
+                }
+                onDrill={
+                  data.summary.uncalledDistributedLeads === null
+                    ? undefined
+                    : () => {
+                        setUncalledEmployee(null);
+                        setUncalledScope("none");
+                      }
+                }
+                drillLabel={
+                  lang === "ar"
+                    ? "اعرض الليدز التي لم يتواصل معها أحد"
+                    : "Show the leads nobody contacted"
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "مكالمات من الليدز" : "Calls from assigned leads"}
+                value={
+                  data.summary.callsFromDistributedLeads === null
+                    ? "—"
+                    : fmtNum(data.summary.callsFromDistributedLeads)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "نسبة اتصال الموظف بليدزه" : "Owner contact coverage"}
+                value={fmtPct(data.summary.leadOwnerCallCoverageRate, 1)}
+              />
+              <MiniMetric
+                label={lang === "ar" ? "الشات" : "Chat conversations"}
+                value={
+                  data.summary.chatConversations === null
+                    ? "—"
+                    : fmtNum(data.summary.chatConversations)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "عملاء ينتظرون الرد الآن" : "Awaiting reply now"}
+                value={
+                  data.summary.chatAwaitingReply === null
+                    ? "—"
+                    : fmtNum(data.summary.chatAwaitingReply)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "محادثات مفتوحة الآن" : "Open conversations now"}
+                value={
+                  data.summary.chatOpenConversations === null
+                    ? "—"
+                    : fmtNum(data.summary.chatOpenConversations)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "محادثات بلا موظف الآن" : "Unassigned now"}
+                value={
+                  data.chatwoot.unassignedConversations === null
+                    ? "—"
+                    : fmtNum(data.chatwoot.unassignedConversations)
+                }
+              />
+              <MiniMetric
+                label={lang === "ar" ? "أول رد" : "First response"}
+                value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)}
+              />
+            </div>
+            <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
               {lang === "ar"
-                ? "يغيّر ترتيب الموظفين فقط."
-                : "Changes card order and emphasis, not period totals."}
+                ? "التوزيع حسب الموظف المسجل على الليد في Odoo. لمعرفة من غيّر التوزيع نحتاج سجل التعديلات من Odoo."
+                : "This is the current distribution by the salesperson assigned in Odoo. Identifying which admin changed an assignment requires Odoo tracking history; a normal last edit is not mislabeled as a distribution event."}
             </p>
-          </div>
+            {!data.chatwoot.ok && data.chatwoot.error && (
+              <p className="mt-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[10px] leading-relaxed text-text-muted">
+                {lang === "ar"
+                  ? `سبب تعذّر Chatwoot: ${data.chatwoot.error}`
+                  : `Chatwoot error: ${data.chatwoot.error}`}
+              </p>
+            )}
+          </Card>
 
-          <div className="table-wrap scroll-hint-x">
-            <span className="mb-1.5 block text-xs font-medium text-text-muted">
-              {lang === "ar" ? "طريقة العرض" : "View"}
-            </span>
-            <Segmented
-              value={display}
-              onChange={setDisplay}
-              options={[
-                { value: "cards", label: lang === "ar" ? "كروت" : "Cards" },
-                { value: "table", label: lang === "ar" ? "جدول" : "Table" },
-              ]}
+          <Card>
+            <div className="grid gap-3 xl:grid-cols-[minmax(190px,.7fr)_minmax(250px,1fr)_auto_auto] xl:items-end">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "اختر الشهر" : "Choose month"}
+                </span>
+                <select
+                  value={selectedMonth}
+                  onChange={(event) => selectMonth(event.target.value)}
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                >
+                  <option value="">
+                    {lang === "ar" ? "الفترة الحالية" : "Current date range"}
+                  </option>
+                  {[...data.months].reverse().map((month) => (
+                    <option key={month} value={month}>
+                      {monthLabel(month, lang)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "ابحث بالاسم" : "Search employee or team"}
+                </span>
+                <span className="relative block">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-text-muted"
+                  />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={lang === "ar" ? "اكتب الاسم…" : "Type a name…"}
+                    className="min-h-11 w-full rounded-xl border border-border bg-surface ps-10 pe-3 text-sm text-text outline-none placeholder:text-text-subtle focus:border-brand focus:ring-2 focus:ring-brand/15"
+                  />
+                </span>
+              </label>
+
+              <div className="table-wrap scroll-hint-x">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "الترتيب حسب" : "Rank cards by"}
+                </span>
+                <Segmented
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={[
+                    { value: "revenue", label: lang === "ar" ? "التحصيل" : "Revenue" },
+                    { value: "closing", label: lang === "ar" ? "الإغلاقات" : "Closures" },
+                    ...(data.callsHub.callsAvailable
+                      ? [{ value: "calls" as const, label: lang === "ar" ? "المكالمات" : "Calls" }]
+                      : []),
+                  ]}
+                />
+                <p className="mt-1.5 text-[10px] text-text-subtle">
+                  {lang === "ar"
+                    ? "يغيّر ترتيب الموظفين فقط."
+                    : "Changes card order and emphasis, not period totals."}
+                </p>
+              </div>
+
+              <div className="table-wrap scroll-hint-x">
+                <span className="mb-1.5 block text-xs font-medium text-text-muted">
+                  {lang === "ar" ? "طريقة العرض" : "View"}
+                </span>
+                <Segmented
+                  value={display}
+                  onChange={setDisplay}
+                  options={[
+                    { value: "cards", label: lang === "ar" ? "كروت" : "Cards" },
+                    { value: "table", label: lang === "ar" ? "جدول" : "Table" },
+                  ]}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {display === "cards" ? (
+            <AgentCards
+              rows={visibleAgents}
+              sortBy={sortBy}
+              callsAvailable={data.callsHub.callsAvailable}
+              onSelect={(row) => setSelectedAgentKey(row.key)}
             />
-          </div>
-        </div>
-      </Card>
-
-      {display === "cards" ? (
-        <AgentCards
-          rows={visibleAgents}
-          sortBy={sortBy}
-          callsAvailable={data.callsHub.callsAvailable}
-          onSelect={(row) => setSelectedAgentKey(row.key)}
-        />
-      ) : (
-        <AgentTable
-          rows={visibleAgents}
-          onSelect={(row) => setSelectedAgentKey(row.key)}
-          onOpenUncalled={(row) => {
-            setUncalledEmployee({ name: row.name, displayName: row.displayName });
-            setUncalledScope("owner");
-          }}
-        />
-      )}
+          ) : (
+            <AgentTable
+              rows={visibleAgents}
+              onSelect={(row) => setSelectedAgentKey(row.key)}
+              onOpenUncalled={(row) => {
+                setUncalledEmployee({ name: row.name, displayName: row.displayName });
+                setUncalledScope("owner");
+              }}
+            />
+          )}
         </>
       )}
 
@@ -933,10 +1620,23 @@ function TargetUnitsDashboard({
         </div>
 
         <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:grid-cols-4 rtl:divide-x-reverse">
-          <TargetHeadlineMetric label={lang === "ar" ? "إجمالي التارجت" : "Total target"} value={fmtUSDFull(rollup.target)} />
-          <TargetHeadlineMetric label={lang === "ar" ? "المحقق بالتحصيل" : "Paid achievement"} value={fmtUSDFull(rollup.paidRevenue)} accent />
-          <TargetHeadlineMetric label={lang === "ar" ? "نسبة التحقيق" : "Achievement"} value={fmtPct(rollup.achievement, 1)} />
-          <TargetHeadlineMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(rollup.remaining)} />
+          <TargetHeadlineMetric
+            label={lang === "ar" ? "إجمالي التارجت" : "Total target"}
+            value={fmtUSDFull(rollup.target)}
+          />
+          <TargetHeadlineMetric
+            label={lang === "ar" ? "المحقق بالتحصيل" : "Paid achievement"}
+            value={fmtUSDFull(rollup.paidRevenue)}
+            accent
+          />
+          <TargetHeadlineMetric
+            label={lang === "ar" ? "نسبة التحقيق" : "Achievement"}
+            value={fmtPct(rollup.achievement, 1)}
+          />
+          <TargetHeadlineMetric
+            label={lang === "ar" ? "المتبقي" : "Remaining"}
+            value={fmtUSDFull(rollup.remaining)}
+          />
         </div>
       </Card>
 
@@ -977,7 +1677,10 @@ function TargetUnitsDashboard({
       )}
 
       {rollup.unassigned.length > 0 && (
-        <Notice tone="warning" title={lang === "ar" ? "تارجتات تحتاج توزيعًا" : "Targets need an org assignment"}>
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "تارجتات تحتاج توزيعًا" : "Targets need an org assignment"}
+        >
           {lang === "ar"
             ? `${fmtNum(rollup.unassigned.length)} موظف لهم تارجت منشور لكنهم غير موجودين في تقسيم الوحدات الحالي. لم يتم حذفهم من الإجمالي.`
             : `${fmtNum(rollup.unassigned.length)} published targets are not mapped to the current unit layout. They remain included in the total.`}
@@ -999,7 +1702,9 @@ function TargetHeadlineMetric({
   return (
     <div className="min-w-0 px-3 py-4 text-center sm:px-5">
       <p className="text-[10px] font-bold text-text-muted sm:text-xs">{label}</p>
-      <p className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}>
+      <p
+        className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}
+      >
         {value}
       </p>
     </div>
@@ -1037,15 +1742,27 @@ function TargetUnitCard({
             </p>
           </div>
           <div className="text-end">
-            <p className="text-xs font-semibold text-text-muted">{lang === "ar" ? "نسبة التحقيق" : "Achievement"}</p>
+            <p className="text-xs font-semibold text-text-muted">
+              {lang === "ar" ? "نسبة التحقيق" : "Achievement"}
+            </p>
             <p className="mt-0.5 text-3xl font-black text-brand">{fmtPct(unit.achievement, 1)}</p>
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-surface-muted p-3">
-          <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(unit.target)} />
-          <TargetCompactMetric label={lang === "ar" ? "المحقق" : "Achieved"} value={fmtUSDFull(unit.paidRevenue)} strong />
-          <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(unit.remaining)} />
+          <TargetCompactMetric
+            label={lang === "ar" ? "التارجت" : "Target"}
+            value={fmtUSDFull(unit.target)}
+          />
+          <TargetCompactMetric
+            label={lang === "ar" ? "المحقق" : "Achieved"}
+            value={fmtUSDFull(unit.paidRevenue)}
+            strong
+          />
+          <TargetCompactMetric
+            label={lang === "ar" ? "المتبقي" : "Remaining"}
+            value={fmtUSDFull(unit.remaining)}
+          />
         </div>
         <TargetProgress value={unit.achievement} className="mt-4" />
       </div>
@@ -1080,7 +1797,9 @@ function TargetLeaderCard({
           <Users size={17} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black text-text">{lang === "ar" ? leader.nameAr : leader.nameEn}</p>
+          <p className="truncate text-sm font-black text-text">
+            {lang === "ar" ? leader.nameAr : leader.nameEn}
+          </p>
           <p className="mt-0.5 text-[10px] text-text-muted">
             {fmtNum(leader.members.length)} {lang === "ar" ? "موظف" : "employees"} ·{" "}
             {lang === "ar" ? "تارجت" : "target"} {fmtUSDFull(leader.target)}
@@ -1090,13 +1809,26 @@ function TargetLeaderCard({
           <p className="text-sm font-black text-brand">{fmtPct(leader.achievement, 1)}</p>
           <p className="text-[9px] text-text-subtle">{fmtUSDFull(leader.paidRevenue)}</p>
         </div>
-        <ChevronDown size={17} className="shrink-0 text-text-subtle transition-transform group-open:rotate-180" />
+        <ChevronDown
+          size={17}
+          className="shrink-0 text-text-subtle transition-transform group-open:rotate-180"
+        />
       </summary>
       <div className="border-t border-border px-3 py-3">
         <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-surface-muted p-2.5">
-          <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(leader.target)} />
-          <TargetCompactMetric label={lang === "ar" ? "التحصيل" : "Paid"} value={fmtUSDFull(leader.paidRevenue)} strong />
-          <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(leader.remaining)} />
+          <TargetCompactMetric
+            label={lang === "ar" ? "التارجت" : "Target"}
+            value={fmtUSDFull(leader.target)}
+          />
+          <TargetCompactMetric
+            label={lang === "ar" ? "التحصيل" : "Paid"}
+            value={fmtUSDFull(leader.paidRevenue)}
+            strong
+          />
+          <TargetCompactMetric
+            label={lang === "ar" ? "المتبقي" : "Remaining"}
+            value={fmtUSDFull(leader.remaining)}
+          />
         </div>
         <div className="space-y-1.5">
           {leader.members.map((member) => (
@@ -1113,10 +1845,22 @@ function TargetLeaderCard({
                 </span>
               </span>
               <span className="text-end">
-                <span className="block text-xs font-black text-text">{fmtUSDFull(member.paidRevenue)}</span>
-                <span className="block text-[9px] text-text-subtle">/ {fmtUSDFull(member.target)}</span>
+                <span className="block text-xs font-black text-text">
+                  {fmtUSDFull(member.paidRevenue)}
+                </span>
+                <span className="block text-[9px] text-text-subtle">
+                  / {fmtUSDFull(member.target)}
+                </span>
               </span>
-              <Pill tone={member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"}>
+              <Pill
+                tone={
+                  member.achievement >= 100
+                    ? "success"
+                    : member.achievement >= 60
+                      ? "warning"
+                      : "neutral"
+                }
+              >
                 {fmtPct(member.achievement, 1)}
               </Pill>
             </button>
@@ -1145,27 +1889,55 @@ function TargetMemberCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-text">{member.name}</p>
-          <p className="mt-1 text-[10px] text-text-muted">{lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}</p>
+          <p className="mt-1 text-[10px] text-text-muted">
+            {lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}
+          </p>
         </div>
-        <Pill tone={member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"}>
+        <Pill
+          tone={
+            member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"
+          }
+        >
           {fmtPct(member.achievement, 1)}
         </Pill>
       </div>
       <TargetProgress value={member.achievement} className="mt-4" />
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <TargetCompactMetric label={lang === "ar" ? "التارجت" : "Target"} value={fmtUSDFull(member.target)} />
-        <TargetCompactMetric label={lang === "ar" ? "المحقق" : "Achieved"} value={fmtUSDFull(member.paidRevenue)} strong />
-        <TargetCompactMetric label={lang === "ar" ? "المتبقي" : "Remaining"} value={fmtUSDFull(member.remaining)} />
+        <TargetCompactMetric
+          label={lang === "ar" ? "التارجت" : "Target"}
+          value={fmtUSDFull(member.target)}
+        />
+        <TargetCompactMetric
+          label={lang === "ar" ? "المحقق" : "Achieved"}
+          value={fmtUSDFull(member.paidRevenue)}
+          strong
+        />
+        <TargetCompactMetric
+          label={lang === "ar" ? "المتبقي" : "Remaining"}
+          value={fmtUSDFull(member.remaining)}
+        />
       </div>
     </button>
   );
 }
 
-function TargetCompactMetric({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function TargetCompactMetric({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <p className="truncate text-[9px] font-semibold text-text-subtle">{label}</p>
-      <p className={`mt-0.5 truncate text-xs font-black sm:text-sm ${strong ? "text-brand" : "text-text"}`}>{value}</p>
+      <p
+        className={`mt-0.5 truncate text-xs font-black sm:text-sm ${strong ? "text-brand" : "text-text"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -1174,8 +1946,14 @@ function TargetProgress({ value, className = "" }: { value: number; className?: 
   const width = Math.max(0, Math.min(100, value));
   const color = value >= 100 ? "bg-success" : value >= 60 ? "bg-warning" : "bg-brand";
   return (
-    <div className={`h-2 overflow-hidden rounded-full bg-surface-muted ${className}`} aria-label={`${fmtPct(value, 1)}`}>
-      <div className={`h-full rounded-full transition-[width] duration-500 ${color}`} style={{ width: `${width}%` }} />
+    <div
+      className={`h-2 overflow-hidden rounded-full bg-surface-muted ${className}`}
+      aria-label={`${fmtPct(value, 1)}`}
+    >
+      <div
+        className={`h-full rounded-full transition-[width] duration-500 ${color}`}
+        style={{ width: `${width}%` }}
+      />
     </div>
   );
 }
@@ -1253,7 +2031,10 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
   };
 
   return (
-    <section id="employee-target-summary" className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5">
+    <section
+      id="employee-target-summary"
+      className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-brand">
           <Target size={16} />
@@ -1333,8 +2114,13 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
                 : `A target exists only for ${target.monthsCovered.join(", ")}, while the window is longer — the percentage is partial.`}
             </p>
           )}
-          <div id="employee-target-evidence" className="mt-3 scroll-mt-24 rounded-xl border border-brand/15 bg-surface/75 px-3 py-2 text-[10px] leading-relaxed text-text-muted">
-            <b className="text-text">{lang === "ar" ? "دليل التارجت المنشور:" : "Published target evidence:"}</b>{" "}
+          <div
+            id="employee-target-evidence"
+            className="mt-3 scroll-mt-24 rounded-xl border border-brand/15 bg-surface/75 px-3 py-2 text-[10px] leading-relaxed text-text-muted"
+          >
+            <b className="text-text">
+              {lang === "ar" ? "دليل التارجت المنشور:" : "Published target evidence:"}
+            </b>{" "}
             {lang === "ar"
               ? `كود الموظف ${target.employeeId} · الشهور ${target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · القيمة ${money(target.target)}.`
               : `Employee ${target.employeeId} · months ${target.monthsCovered.join(", ") || "—"} · value ${money(target.target)}.`}
@@ -1369,7 +2155,10 @@ function EvidenceLink({ href }: { href: string }) {
     );
   }
   return (
-    <a href={href} className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline">
+    <a
+      href={href}
+      className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline"
+    >
       {lang === "ar" ? "عرض الدليل" : "View evidence"}
       <ArrowUpRight size={12} aria-hidden="true" />
     </a>
@@ -1380,42 +2169,128 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
   const { lang } = useI18n();
   const score = row.performanceScore;
   return (
-    <section id="employee-score-summary" className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/35 p-4 sm:p-5">
+    <section
+      id="employee-score-summary"
+      className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/35 p-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold text-brand">{lang === "ar" ? "ملخص الأداء" : "Performance summary"}</div>
-          <h3 className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "النتيجة أولًا، ثم الدليل" : "Score first, evidence next"}</h3>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "25 نقطة للمكالمات + 30 للتواصل والبيع + 20 لمتابعة Chatwoot + 25 لتحقيق التارجت. الجزء الذي لا توجد له بيانات يأخذ صفرًا ولا يرفع باقي الأجزاء." : "25 points for calls + 30 for lead execution + 20 for Chatwoot follow-up + 25 for target attainment. Missing evidence earns zero and never inflates the other areas."}</p>
+          <div className="text-xs font-semibold text-brand">
+            {lang === "ar" ? "ملخص الأداء" : "Performance summary"}
+          </div>
+          <h3 className="mt-0.5 text-lg font-bold text-text">
+            {lang === "ar" ? "النتيجة أولًا، ثم الدليل" : "Score first, evidence next"}
+          </h3>
+          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-text-muted">
+            {lang === "ar"
+              ? "25 نقطة للمكالمات + 30 للتواصل والبيع + 20 لمتابعة Chatwoot + 25 لتحقيق التارجت. الجزء الذي لا توجد له بيانات يأخذ صفرًا ولا يرفع باقي الأجزاء."
+              : "25 points for calls + 30 for lead execution + 20 for Chatwoot follow-up + 25 for target attainment. Missing evidence earns zero and never inflates the other areas."}
+          </p>
         </div>
         <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
           <div className="num text-3xl font-bold text-brand">{fmtQuality(score.overall)}</div>
-          <small className="block text-[10px] text-text-muted">{lang === "ar" ? "نقطة مكتسبة من 100" : "Earned points out of 100"}</small>
-          <small className="mt-0.5 block text-[10px] font-medium text-brand">{lang === "ar" ? `تغطية البيانات ${fmtPct(score.dataCoverage, 0)}` : `${fmtPct(score.dataCoverage, 0)} evidence coverage`}</small>
+          <small className="block text-[10px] text-text-muted">
+            {lang === "ar" ? "نقطة مكتسبة من 100" : "Earned points out of 100"}
+          </small>
+          <small className="mt-0.5 block text-[10px] font-medium text-brand">
+            {lang === "ar"
+              ? `تغطية البيانات ${fmtPct(score.dataCoverage, 0)}`
+              : `${fmtPct(score.dataCoverage, 0)} evidence coverage`}
+          </small>
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `جودة المكالمات · ${score.weights.callQuality} نقطة` : `Call quality · ${score.weights.callQuality} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.callQuality)}</span></div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.analyzedCalls)} محللة من ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} مكالمة · ${fmtScorePoints(score.earnedPoints.callQuality)} نقطة مكتسبة` : `${fmtNum(score.evidence.analyzedCalls)} analyzed of ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} calls · ${fmtScorePoints(score.earnedPoints.callQuality)} pts earned`}</p>
-          <div className="mt-3"><EvidenceLink href="#employee-call-evidence" /></div>
+          <div className="flex items-center justify-between gap-2">
+            <b className="text-xs text-text">
+              {lang === "ar"
+                ? `جودة المكالمات · ${score.weights.callQuality} نقطة`
+                : `Call quality · ${score.weights.callQuality} pts`}
+            </b>
+            <span className="num font-bold text-brand">{fmtQuality(score.callQuality)}</span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+            {lang === "ar"
+              ? `${fmtNum(score.evidence.analyzedCalls)} محللة من ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} مكالمة · ${fmtScorePoints(score.earnedPoints.callQuality)} نقطة مكتسبة`
+              : `${fmtNum(score.evidence.analyzedCalls)} analyzed of ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} calls · ${fmtScorePoints(score.earnedPoints.callQuality)} pts earned`}
+          </p>
+          <div className="mt-3">
+            <EvidenceLink href="#employee-call-evidence" />
+          </div>
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `التواصل والبيع · ${score.weights.salesExecution} نقطة` : `Lead execution · ${score.weights.salesExecution} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.salesExecution)}</span></div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `اتصل بنفسه بـ ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} من ${fmtNum(score.evidence.distributedLeads)} ليد · تغطية ${fmtPct(score.evidence.leadCoverageRate, 1)} · ${fmtScorePoints(score.earnedPoints.salesExecution)} نقطة مكتسبة` : `Personally called ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} of ${fmtNum(score.evidence.distributedLeads)} leads · ${fmtPct(score.evidence.leadCoverageRate, 1)} coverage · ${fmtScorePoints(score.earnedPoints.salesExecution)} pts earned`}</p>
-          <div className="mt-3"><EvidenceLink href="#employee-lead-evidence" /></div>
+          <div className="flex items-center justify-between gap-2">
+            <b className="text-xs text-text">
+              {lang === "ar"
+                ? `التواصل والبيع · ${score.weights.salesExecution} نقطة`
+                : `Lead execution · ${score.weights.salesExecution} pts`}
+            </b>
+            <span className="num font-bold text-brand">{fmtQuality(score.salesExecution)}</span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+            {lang === "ar"
+              ? `اتصل بنفسه بـ ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} من ${fmtNum(score.evidence.distributedLeads)} ليد · تغطية ${fmtPct(score.evidence.leadCoverageRate, 1)} · ${fmtScorePoints(score.earnedPoints.salesExecution)} نقطة مكتسبة`
+              : `Personally called ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} of ${fmtNum(score.evidence.distributedLeads)} leads · ${fmtPct(score.evidence.leadCoverageRate, 1)} coverage · ${fmtScorePoints(score.earnedPoints.salesExecution)} pts earned`}
+          </p>
+          <div className="mt-3">
+            <EvidenceLink href="#employee-lead-evidence" />
+          </div>
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `متابعة Chatwoot · ${score.weights.chatFollowUp} نقطة` : `Chatwoot follow-up · ${score.weights.chatFollowUp} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span></div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? `${fmtNum(score.evidence.chatConversations)} محادثة مفتوحة الآن · ${fmtNum(score.evidence.chatRepliedConversations)} لا تنتظر ردًا · ${fmtNum(score.evidence.chatAwaitingReply)} ينتظرون الرد · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة` : `${fmtNum(score.evidence.chatConversations)} open now · ${fmtNum(score.evidence.chatRepliedConversations)} not awaiting · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}</p>
-          <div className="mt-3"><EvidenceLink href="#employee-chat-evidence" /></div>
+          <div className="flex items-center justify-between gap-2">
+            <b className="text-xs text-text">
+              {lang === "ar"
+                ? `متابعة Chatwoot · ${score.weights.chatFollowUp} نقطة`
+                : `Chatwoot follow-up · ${score.weights.chatFollowUp} pts`}
+            </b>
+            <span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+            {lang === "ar"
+              ? `${fmtNum(score.evidence.chatConversations)} محادثة مفتوحة الآن · ${fmtNum(score.evidence.chatRepliedConversations)} لا تنتظر ردًا · ${fmtNum(score.evidence.chatAwaitingReply)} ينتظرون الرد · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة`
+              : `${fmtNum(score.evidence.chatConversations)} open now · ${fmtNum(score.evidence.chatRepliedConversations)} not awaiting · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}
+          </p>
+          <div className="mt-3">
+            <EvidenceLink href="#employee-chat-evidence" />
+          </div>
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{lang === "ar" ? `تحقيق التارجت · ${score.weights.targetAttainment} نقطة` : `Target attainment · ${score.weights.targetAttainment} pts`}</b><span className="num font-bold text-brand">{fmtQuality(score.targetAttainment)}</span></div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{score.evidence.targetBasis === "orders" ? (lang === "ar" ? "محسوب من أوامر البيع المؤكدة." : "Based on confirmed sale orders.") : score.evidence.targetBasis === "collections" ? (lang === "ar" ? "محسوب من التحصيل لعدم توفر أوامر البيع." : "Based on collections because orders are unavailable.") : (lang === "ar" ? "لا يوجد تارجت صالح للفترة." : "No scoreable target for this period.")} {lang === "ar" ? `${fmtScorePoints(score.earnedPoints.targetAttainment)} نقطة مكتسبة` : `${fmtScorePoints(score.earnedPoints.targetAttainment)} pts earned`}</p>
-          <div className="mt-3"><EvidenceLink href="#employee-target-summary" /></div>
+          <div className="flex items-center justify-between gap-2">
+            <b className="text-xs text-text">
+              {lang === "ar"
+                ? `تحقيق التارجت · ${score.weights.targetAttainment} نقطة`
+                : `Target attainment · ${score.weights.targetAttainment} pts`}
+            </b>
+            <span className="num font-bold text-brand">{fmtQuality(score.targetAttainment)}</span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+            {score.evidence.targetBasis === "orders"
+              ? lang === "ar"
+                ? "محسوب من أوامر البيع المؤكدة."
+                : "Based on confirmed sale orders."
+              : score.evidence.targetBasis === "collections"
+                ? lang === "ar"
+                  ? "محسوب من التحصيل لعدم توفر أوامر البيع."
+                  : "Based on collections because orders are unavailable."
+                : lang === "ar"
+                  ? "لا يوجد تارجت صالح للفترة."
+                  : "No scoreable target for this period."}{" "}
+            {lang === "ar"
+              ? `${fmtScorePoints(score.earnedPoints.targetAttainment)} نقطة مكتسبة`
+              : `${fmtScorePoints(score.earnedPoints.targetAttainment)} pts earned`}
+          </p>
+          <div className="mt-3">
+            <EvidenceLink href="#employee-target-summary" />
+          </div>
         </div>
       </div>
-      {score.missing.length > 0 && <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "الدرجة محافظة: الجزء بلا بيانات كافية يأخذ صفرًا مؤقتًا." : "This is conservative: a component without enough evidence temporarily earns zero."}</p>}
+      {score.missing.length > 0 && (
+        <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+          {lang === "ar"
+            ? "الدرجة محافظة: الجزء بلا بيانات كافية يأخذ صفرًا مؤقتًا."
+            : "This is conservative: a component without enough evidence temporarily earns zero."}
+        </p>
+      )}
     </section>
   );
 }
@@ -1432,49 +2307,285 @@ function EmployeeEvidencePanel({
   const { data, isLoading, error, refetch } = useApi<EmployeeEvidenceResponse>(query);
   const outcomeLabel = (outcome: "won" | "open" | "lost") =>
     outcome === "won"
-      ? lang === "ar" ? "تم البيع" : "Won"
+      ? lang === "ar"
+        ? "تم البيع"
+        : "Won"
       : outcome === "lost"
-        ? lang === "ar" ? "لم يتم البيع" : "Lost"
-        : lang === "ar" ? "مفتوح" : "Open";
+        ? lang === "ar"
+          ? "لم يتم البيع"
+          : "Lost"
+        : lang === "ar"
+          ? "مفتوح"
+          : "Open";
 
   return (
     <section className="space-y-3">
       <div>
-        <div className="text-xs font-semibold text-brand">{lang === "ar" ? "السجلات الأصلية" : "Source records"}</div>
+        <div className="text-xs font-semibold text-brand">
+          {lang === "ar" ? "السجلات الأصلية" : "Source records"}
+        </div>
         <h3 className="mt-0.5 text-lg font-bold text-text">
           {kind === "sales"
-            ? lang === "ar" ? "التحصيل وأوامر البيع" : "Collections and sale orders"
+            ? lang === "ar"
+              ? "التحصيل وأوامر البيع"
+              : "Collections and sale orders"
             : kind === "leads"
-              ? lang === "ar" ? "الليدز واتصالات الموظف بها" : "Leads and the employee's calls"
-              : lang === "ar" ? "محادثات الموظف في Chatwoot" : "Employee Chatwoot conversations"}
+              ? lang === "ar"
+                ? "الليدز واتصالات الموظف بها"
+                : "Leads and the employee's calls"
+              : lang === "ar"
+                ? "محادثات الموظف في Chatwoot"
+                : "Employee Chatwoot conversations"}
         </h3>
-        <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "هذه القائمة تخص الرقم الذي ضغطت عليه فقط، وكل زر يفتح السجل الأصلي مباشرة." : "This list only supports the KPI you opened, and every action opens the original record directly."}</p>
+        <p className="mt-1 text-[11px] text-text-muted">
+          {lang === "ar"
+            ? "هذه القائمة تخص الرقم الذي ضغطت عليه فقط، وكل زر يفتح السجل الأصلي مباشرة."
+            : "This list only supports the KPI you opened, and every action opens the original record directly."}
+        </p>
       </div>
-      {isLoading ? <Skeleton className="h-80" /> : error ? <ErrorState message={(error as Error).message} onRetry={() => refetch()} /> : data && (
-        <div>
-          {kind === "sales" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "أوامر البيع والفواتير" : "Sale orders and invoices"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.orders.total)}</bdi> {lang === "ar" ? "أمر بيع" : "orders"} · <bdi dir="ltr" className="num">{fmtUSDFull(data.orders.amount)}</bdi></p><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.invoices.paidTotal)}</bdi> {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}{data.invoices.creditNoteTotal > 0 ? <> · <bdi dir="ltr" className="num">{fmtNum(data.invoices.creditNoteTotal)}</bdi> {lang === "ar" ? "إشعار دائن" : "credit notes"}</> : null} · <bdi dir="ltr" className="num">{fmtUSDFull(data.invoices.amount)}</bdi></p></header>
-            <div className="max-h-72 divide-y divide-border overflow-auto">
-              {data.orders.rows.slice(0, 8).map((order) => <div key={order.orderRef} className="px-4 py-3"><div className="flex items-start justify-between gap-3"><bdi dir="ltr" className="num text-xs font-semibold text-text">{order.orderRef}</bdi><strong className="num text-xs text-brand">{fmtUSDFull(order.usdSales)}</strong></div><p className="mt-1 truncate text-[10px] text-text-muted">{order.customer || order.course || "—"}</p></div>)}
-              {data.orders.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد أوامر بيع في الفترة." : "No sale orders in this period."}</p>}
-              {data.invoices.rows.slice(0, 6).map((invoice) => <div key={invoice.movement} className="bg-surface-2/45 px-4 py-3"><div className="flex items-start justify-between gap-3"><span className="min-w-0"><bdi dir="ltr" className="num block truncate text-xs font-semibold text-text">{invoice.movement}</bdi><small className="mt-0.5 block truncate text-[10px] text-text-muted">{invoice.partner || "—"} · {invoice.paymentDate}</small></span><strong className={`num shrink-0 text-xs ${invoice.isCreditNote ? "text-danger" : "text-brand"}`}>{fmtUSDFull(invoice.usdPaid)}</strong></div><small className="mt-1 block text-[10px] text-text-muted">{invoice.isCreditNote ? (lang === "ar" ? "إشعار دائن مخصوم من الصافي" : "Credit note deducted from net") : (lang === "ar" ? "فاتورة مدفوعة" : "Paid invoice")}</small></div>)}
-            </div>
-          </article>}
-          {kind === "leads" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "الليدز في Odoo" : "Odoo leads"}</b><p className="mt-0.5 text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(data.leads.total)}</bdi> {lang === "ar" ? "ليد في الفترة" : "leads in period"}</p></header>
-            <div className="max-h-72 divide-y divide-border overflow-auto">
-              {data.leads.rows.map((lead) => <div key={`${lead.outcome}-${lead.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="min-w-0 flex-1"><b className="block truncate text-xs text-text">{lead.contact || lead.phone || `#${lead.id}`}</b><small className="mt-0.5 block truncate text-[10px] text-text-muted">{outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}</small><small className="mt-1 block text-[10px] text-text-muted"><bdi dir="ltr" className="num">{fmtNum(lead.ownerCalls)}</bdi> {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} · {lead.calledByOwner ? (lang === "ar" ? "تم التواصل" : "contacted") : (lang === "ar" ? "لم يتواصل" : "not contacted")}</small></div><span className="flex shrink-0 flex-wrap gap-1.5">{lead.latestCallUrl && <a href={lead.latestCallUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}<ExternalLink size={11} className="ms-1 inline" /></a>}{lead.url ? <a href={lead.url} target="_blank" rel="noreferrer" className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft">{lang === "ar" ? "فتح الليد" : "Open lead"}<ExternalLink size={11} className="ms-1 inline" /></a> : <bdi dir="ltr" className="num text-[10px] text-text-muted">#{lead.id}</bdi>}</span></div>)}
-              {data.leads.rows.length === 0 && <p className="p-4 text-xs text-text-muted">{lang === "ar" ? "لا توجد ليدز في الفترة." : "No leads in this period."}</p>}
-            </div>
-          </article>}
-          {kind === "chatwoot" && <article className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <header className="border-b border-border bg-surface-2/65 px-4 py-3"><b className="text-sm text-text">{lang === "ar" ? "محادثات Chatwoot" : "Chatwoot conversations"}</b><p className="mt-0.5 text-[10px] text-text-muted">{data.chatwoot ? <><bdi dir="ltr" className="num">{fmtNum(data.chatwoot.total)}</bdi> {lang === "ar" ? "محادثة في الفترة" : "conversations in period"}</> : (lang === "ar" ? "لا يوجد موظف Chatwoot مطابق" : "No matched Chatwoot agent")}</p></header>
-            <div className="max-h-72 divide-y divide-border overflow-auto">
-              {data.chatwoot?.conversations.slice(0, 12).map((conversation) => <a key={conversation.id} href={conversation.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2"><div className="min-w-0"><b className="block truncate text-xs text-text">{conversation.contactName || `#${conversation.id}`}</b><small className="mt-0.5 block text-[10px] text-text-muted">{conversation.awaitingReply ? (lang === "ar" ? "العميل ينتظر ردًا" : "Customer awaiting reply") : (lang === "ar" ? "تم الرد" : "Replied")} · <bdi dir="ltr" className="num">{fmtNum(conversation.unreadMessages)}</bdi> {lang === "ar" ? "غير مقروءة" : "unread"}</small></div><ExternalLink size={13} className="shrink-0 text-brand" /></a>)}
-              {!data.chatwoot?.conversations.length && <p className="p-4 text-xs text-text-muted">{data.chatwootError || (lang === "ar" ? "لا توجد محادثات قابلة للفتح في الفترة." : "No openable conversations in this period.")}</p>}
-            </div>
-          </article>}
-        </div>
+      {isLoading ? (
+        <Skeleton className="h-80" />
+      ) : error ? (
+        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+      ) : (
+        data && (
+          <div>
+            {kind === "sales" && (
+              <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+                <header className="border-b border-border bg-surface-2/65 px-4 py-3">
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "أوامر البيع والفواتير" : "Sale orders and invoices"}
+                  </b>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    <bdi dir="ltr" className="num">
+                      {fmtNum(data.orders.total)}
+                    </bdi>{" "}
+                    {lang === "ar" ? "أمر بيع" : "orders"} ·{" "}
+                    <bdi dir="ltr" className="num">
+                      {fmtUSDFull(data.orders.amount)}
+                    </bdi>
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    <bdi dir="ltr" className="num">
+                      {fmtNum(data.invoices.paidTotal)}
+                    </bdi>{" "}
+                    {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}
+                    {data.invoices.creditNoteTotal > 0 ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <bdi dir="ltr" className="num">
+                          {fmtNum(data.invoices.creditNoteTotal)}
+                        </bdi>{" "}
+                        {lang === "ar" ? "إشعار دائن" : "credit notes"}
+                      </>
+                    ) : null}{" "}
+                    ·{" "}
+                    <bdi dir="ltr" className="num">
+                      {fmtUSDFull(data.invoices.amount)}
+                    </bdi>
+                  </p>
+                </header>
+                <div className="max-h-72 divide-y divide-border overflow-auto">
+                  {data.orders.rows.slice(0, 8).map((order) => (
+                    <div key={order.orderRef} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <bdi dir="ltr" className="num text-xs font-semibold text-text">
+                          {order.orderRef}
+                        </bdi>
+                        <strong className="num text-xs text-brand">
+                          {fmtUSDFull(order.usdSales)}
+                        </strong>
+                      </div>
+                      <p className="mt-1 truncate text-[10px] text-text-muted">
+                        {order.customer || order.course || "—"}
+                      </p>
+                    </div>
+                  ))}
+                  {data.orders.rows.length === 0 && (
+                    <p className="p-4 text-xs text-text-muted">
+                      {lang === "ar"
+                        ? "لا توجد أوامر بيع في الفترة."
+                        : "No sale orders in this period."}
+                    </p>
+                  )}
+                  {data.invoices.rows.slice(0, 6).map((invoice) => (
+                    <div key={invoice.movement} className="bg-surface-2/45 px-4 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <bdi
+                            dir="ltr"
+                            className="num block truncate text-xs font-semibold text-text"
+                          >
+                            {invoice.movement}
+                          </bdi>
+                          <small className="mt-0.5 block truncate text-[10px] text-text-muted">
+                            {invoice.partner || "—"} · {invoice.paymentDate}
+                          </small>
+                        </span>
+                        <strong
+                          className={`num shrink-0 text-xs ${invoice.isCreditNote ? "text-danger" : "text-brand"}`}
+                        >
+                          {fmtUSDFull(invoice.usdPaid)}
+                        </strong>
+                      </div>
+                      <small className="mt-1 block text-[10px] text-text-muted">
+                        {invoice.isCreditNote
+                          ? lang === "ar"
+                            ? "إشعار دائن مخصوم من الصافي"
+                            : "Credit note deducted from net"
+                          : lang === "ar"
+                            ? "فاتورة مدفوعة"
+                            : "Paid invoice"}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )}
+            {kind === "leads" && (
+              <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+                <header className="border-b border-border bg-surface-2/65 px-4 py-3">
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "الليدز في Odoo" : "Odoo leads"}
+                  </b>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    <bdi dir="ltr" className="num">
+                      {fmtNum(data.leads.total)}
+                    </bdi>{" "}
+                    {lang === "ar" ? "ليد في الفترة" : "leads in period"}
+                  </p>
+                </header>
+                <div className="max-h-72 divide-y divide-border overflow-auto">
+                  {data.leads.rows.map((lead) => (
+                    <div
+                      key={`${lead.outcome}-${lead.id}`}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <b className="block truncate text-xs text-text">
+                          {lead.contact || lead.phone || `#${lead.id}`}
+                        </b>
+                        <small className="mt-0.5 block truncate text-[10px] text-text-muted">
+                          {outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}
+                        </small>
+                        <small className="mt-1 block text-[10px] text-text-muted">
+                          <bdi dir="ltr" className="num">
+                            {fmtNum(lead.ownerCalls)}
+                          </bdi>{" "}
+                          {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} ·{" "}
+                          {lead.calledByOwner
+                            ? lang === "ar"
+                              ? "تم التواصل"
+                              : "contacted"
+                            : lang === "ar"
+                              ? "لم يتواصل"
+                              : "not contacted"}
+                        </small>
+                      </div>
+                      <span className="flex shrink-0 flex-wrap gap-1.5">
+                        {lead.latestCallUrl && (
+                          <a
+                            href={lead.latestCallUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                          >
+                            {lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}
+                            <ExternalLink size={11} className="ms-1 inline" />
+                          </a>
+                        )}
+                        {lead.url ? (
+                          <a
+                            href={lead.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                          >
+                            {lang === "ar" ? "فتح الليد" : "Open lead"}
+                            <ExternalLink size={11} className="ms-1 inline" />
+                          </a>
+                        ) : (
+                          <bdi dir="ltr" className="num text-[10px] text-text-muted">
+                            #{lead.id}
+                          </bdi>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  {data.leads.rows.length === 0 && (
+                    <p className="p-4 text-xs text-text-muted">
+                      {lang === "ar" ? "لا توجد ليدز في الفترة." : "No leads in this period."}
+                    </p>
+                  )}
+                </div>
+              </article>
+            )}
+            {kind === "chatwoot" && (
+              <article className="overflow-hidden rounded-2xl border border-border bg-surface">
+                <header className="border-b border-border bg-surface-2/65 px-4 py-3">
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "محادثات Chatwoot" : "Chatwoot conversations"}
+                  </b>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    {data.chatwoot ? (
+                      <>
+                        <bdi dir="ltr" className="num">
+                          {fmtNum(data.chatwoot.total)}
+                        </bdi>{" "}
+                        {lang === "ar" ? "محادثة في الفترة" : "conversations in period"}
+                      </>
+                    ) : lang === "ar" ? (
+                      "لا يوجد موظف Chatwoot مطابق"
+                    ) : (
+                      "No matched Chatwoot agent"
+                    )}
+                  </p>
+                </header>
+                <div className="max-h-72 divide-y divide-border overflow-auto">
+                  {data.chatwoot?.conversations.slice(0, 12).map((conversation) => (
+                    <a
+                      key={conversation.id}
+                      href={conversation.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2"
+                    >
+                      <div className="min-w-0">
+                        <b className="block truncate text-xs text-text">
+                          {conversation.contactName || `#${conversation.id}`}
+                        </b>
+                        <small className="mt-0.5 block text-[10px] text-text-muted">
+                          {conversation.awaitingReply
+                            ? lang === "ar"
+                              ? "العميل ينتظر ردًا"
+                              : "Customer awaiting reply"
+                            : lang === "ar"
+                              ? "تم الرد"
+                              : "Replied"}{" "}
+                          ·{" "}
+                          <bdi dir="ltr" className="num">
+                            {fmtNum(conversation.unreadMessages)}
+                          </bdi>{" "}
+                          {lang === "ar" ? "غير مقروءة" : "unread"}
+                        </small>
+                      </div>
+                      <ExternalLink size={13} className="shrink-0 text-brand" />
+                    </a>
+                  ))}
+                  {!data.chatwoot?.conversations.length && (
+                    <p className="p-4 text-xs text-text-muted">
+                      {data.chatwootError ||
+                        (lang === "ar"
+                          ? "لا توجد محادثات قابلة للفتح في الفترة."
+                          : "No openable conversations in this period.")}
+                    </p>
+                  )}
+                </div>
+              </article>
+            )}
+          </div>
+        )
       )}
     </section>
   );
@@ -1503,43 +2614,61 @@ function EmployeeEvidenceDialog({
         dir={lang === "ar" ? "rtl" : "ltr"}
         className="max-h-[88vh] w-[min(94vw,920px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
       >
-        {kind && <>
-          <DialogHeader className="sticky top-0 z-10 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
-            <DialogTitle>{titles[kind][lang]}</DialogTitle>
-            <DialogDescription className="text-xs text-text-muted">
-              {lang === "ar"
-                ? `السجلات الخاصة بـ ${row.displayName} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
-                : `Only ${row.displayName}'s records for the selected period. Each evidence view contains one source and one purpose.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-4 sm:p-5">
-            {kind === "target" && (
-              <div className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-5">
-                {row.target ? <>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <MiniMetric label={lang === "ar" ? "التارجت المنشور" : "Published target"} value={fmtUSDFull(row.target.target)} />
-                    <MiniMetric label={lang === "ar" ? "التحصيل" : "Collections"} value={fmtUSDFull(row.paidRevenue)} />
-                    <MiniMetric label={lang === "ar" ? "نسبة الإنجاز" : "Achievement"} value={fmtPct(row.target.achievementPaid, 1)} />
-                  </div>
-                  <p className="mt-4 text-xs leading-relaxed text-text-muted">
-                    {lang === "ar"
-                      ? `كود الموظف ${row.target.employeeId} · الشهور: ${row.target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · المسؤول: ${row.target.teamLeader}.`
-                      : `Employee ${row.target.employeeId} · months: ${row.target.monthsCovered.join(", ") || "—"} · owner: ${row.target.teamLeader}.`}
-                  </p>
-                </> : <p className="text-sm text-text-muted">{lang === "ar" ? "لا يوجد تارجت منشور لهذا الموظف في الفترة." : "No published target for this employee and period."}</p>}
-              </div>
-            )}
-            {(kind === "sales" || kind === "leads" || kind === "chatwoot") && (
-              <EmployeeEvidencePanel row={row} kind={kind} />
-            )}
-            {kind === "calls" && <EmployeeCallsPanel row={row} />}
-          </div>
-        </>}
+        {kind && (
+          <>
+            <DialogHeader className="sticky top-0 z-10 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+              <DialogTitle>{titles[kind][lang]}</DialogTitle>
+              <DialogDescription className="text-xs text-text-muted">
+                {lang === "ar"
+                  ? `السجلات الخاصة بـ ${row.displayName} في الفترة المختارة فقط. لن نعرض فواتير داخل دليل الليدز أو محادثات داخل دليل المكالمات.`
+                  : `Only ${row.displayName}'s records for the selected period. Each evidence view contains one source and one purpose.`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-4 sm:p-5">
+              {kind === "target" && (
+                <div className="rounded-2xl border border-brand/20 bg-brand-soft/35 p-5">
+                  {row.target ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <MiniMetric
+                          label={lang === "ar" ? "التارجت المنشور" : "Published target"}
+                          value={fmtUSDFull(row.target.target)}
+                        />
+                        <MiniMetric
+                          label={lang === "ar" ? "التحصيل" : "Collections"}
+                          value={fmtUSDFull(row.paidRevenue)}
+                        />
+                        <MiniMetric
+                          label={lang === "ar" ? "نسبة الإنجاز" : "Achievement"}
+                          value={fmtPct(row.target.achievementPaid, 1)}
+                        />
+                      </div>
+                      <p className="mt-4 text-xs leading-relaxed text-text-muted">
+                        {lang === "ar"
+                          ? `كود الموظف ${row.target.employeeId} · الشهور: ${row.target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ") || "—"} · المسؤول: ${row.target.teamLeader}.`
+                          : `Employee ${row.target.employeeId} · months: ${row.target.monthsCovered.join(", ") || "—"} · owner: ${row.target.teamLeader}.`}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-text-muted">
+                      {lang === "ar"
+                        ? "لا يوجد تارجت منشور لهذا الموظف في الفترة."
+                        : "No published target for this employee and period."}
+                    </p>
+                  )}
+                </div>
+              )}
+              {(kind === "sales" || kind === "leads" || kind === "chatwoot") && (
+                <EmployeeEvidencePanel row={row} kind={kind} />
+              )}
+              {kind === "calls" && <EmployeeCallsPanel row={row} />}
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
-
 
 /** Achievement pill: green once the prorated quota is met, grey while short. */
 function TargetPill({ value }: { value: number | null }) {
@@ -1571,7 +2700,9 @@ function AgentCards({
           key={row.key}
           onClick={() => onSelect(row)}
           className="card w-full overflow-hidden p-4 text-start transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35 sm:p-5"
-          aria-label={lang === "ar" ? `فتح تحليل ${row.displayName}` : `Open ${row.displayName} analysis`}
+          aria-label={
+            lang === "ar" ? `فتح تحليل ${row.displayName}` : `Open ${row.displayName} analysis`
+          }
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1850,7 +2981,9 @@ function AgentTable({
                 <td className="num px-3 py-3 text-end">{fmtNum(row.cleanLeads)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.distributedLeads)}</td>
                 <td className="num px-3 py-3 text-end">
-                  {row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
+                  {row.ownerCalledDistributedLeads === null
+                    ? "—"
+                    : fmtNum(row.ownerCalledDistributedLeads)}
                 </td>
                 <td className="px-3 py-3 text-end">
                   {row.ownerCalledDistributedLeads === null ? (
@@ -1871,18 +3004,20 @@ function AgentTable({
                     >
                       <bdi dir="ltr" className="num">
                         {fmtNum(
-                          Math.max(
-                            0,
-                            row.distributedLeads - row.ownerCalledDistributedLeads,
-                          ),
+                          Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads),
                         )}
                       </bdi>
-                      <ArrowUpRight size={12} className="transition-transform group-hover:-translate-y-0.5" />
+                      <ArrowUpRight
+                        size={12}
+                        className="transition-transform group-hover:-translate-y-0.5"
+                      />
                     </button>
                   )}
                 </td>
                 <td className="num px-3 py-3 text-end">
-                  {row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)}
+                  {row.callsFromDistributedLeads === null
+                    ? "—"
+                    : fmtNum(row.callsFromDistributedLeads)}
                 </td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.won)}</td>
                 <td className="num px-3 py-3 text-end">{fmtNum(row.lost)}</td>
@@ -1909,9 +3044,7 @@ function AgentTable({
                 <td className="num px-3 py-3 text-end">
                   {formatCallHours(row.totalCallSeconds, lang)}
                 </td>
-                <td className="num px-3 py-3 text-end">
-                  {formatCallHours(row.talkSeconds, lang)}
-                </td>
+                <td className="num px-3 py-3 text-end">{formatCallHours(row.talkSeconds, lang)}</td>
                 <td className="px-3 py-3 text-end">
                   <Pill tone={qualityTone(row.averageQualityScore)}>
                     {fmtQuality(row.averageQualityScore)}
@@ -1984,9 +3117,17 @@ function AgentPerformanceSheet({
     setUncalledScope(null);
   }, [row?.key]);
   useEffect(() => {
-    if (!row || !open || typeof window === "undefined" || !window.location.hash.startsWith("#employee-")) return;
+    if (
+      !row ||
+      !open ||
+      typeof window === "undefined" ||
+      !window.location.hash.startsWith("#employee-")
+    )
+      return;
     const timer = window.setTimeout(() => {
-      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(window.location.hash.slice(1))
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 160);
     return () => window.clearTimeout(timer);
   }, [open, row?.key]);
@@ -2037,614 +3178,748 @@ function AgentPerformanceSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <EmployeeEvidenceContext.Provider value={{ openEvidence: setEvidenceKind }}>
-      <SheetContent
-        side={lang === "ar" ? "left" : "right"}
-        className="w-[min(100vw,1040px)] max-w-none overflow-y-auto border-border bg-surface p-0 text-text [&>button]:z-30 [&>button]:text-white [&>button]:opacity-100 rtl:[&>button]:left-4 rtl:[&>button]:right-auto sm:max-w-[1040px]"
-        dir={lang === "ar" ? "rtl" : "ltr"}
-      >
-        <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,var(--brand),color-mix(in_srgb,var(--brand)_72%,#08142e))] px-5 py-6 text-white sm:px-7">
-          <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[34px] border-white/8" />
-          <SheetHeader className="relative pe-8 text-start sm:text-start">
-            <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/70">
-              <span className="rounded-full bg-white/12 px-2.5 py-1">
-                {lang === "ar" ? "ملف أداء الموظف" : "Employee performance profile"}
-              </span>
-              <span>{row.team}</span>
-            </div>
-            <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">
-              {row.displayName}
-            </SheetTitle>
-            <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
-              {lang === "ar"
-                ? "تفصيل التحصيل والليدز والتحويل حسب كل كورس وتخصص داخل الفترة والفلاتر المختارة."
-                : "Paid collections, leads, and conversion by course and specialization for the selected period and filters."}
-            </SheetDescription>
-          </SheetHeader>
-        </div>
-
-        <div className="space-y-5 p-4 sm:p-7">
-          <EmployeeScoreSummary row={row} />
-          {row.target && <AgentTargetPanel target={row.target} row={row} />}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <ProfileMetric
-              label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
-              explain="paidCollections"
-              value={fmtUSDFull(row.paidRevenue)}
-              sub={invoiceCount(row.invoices, lang)}
-              icon={<ReceiptText size={17} />}
-              hero
-              evidenceHref="#employee-sales-evidence"
-            />
-            <ProfileMetric
-              label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
-              explain="totalLeads"
-              value={fmtNum(row.cleanLeads)}
-              sub={
-                lang === "ar"
-                  ? `${fmtNum(row.won)} رابحة · ${fmtNum(row.lost)} خاسرة`
-                  : `${fmtNum(row.won)} won · ${fmtNum(row.lost)} lost`
-              }
-              icon={<Users size={17} />}
-              evidenceHref="#employee-lead-evidence"
-            />
-            <ProfileMetric
-              label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
-              explain="conversionAll"
-              value={fmtPct(row.conversionRate, 1)}
-              sub={lang === "ar" ? "الرابحة ÷ إجمالي الليدز" : "Won ÷ all leads"}
-              icon={<ChartNoAxesCombined size={17} />}
-              evidenceHref="#employee-lead-evidence"
-            />
-            <ProfileMetric
-              label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
-              explain="periodClosureRate"
-              value={fmtPct(row.decidedConversionRate, 1)}
-              sub={
-                lang === "ar"
-                  ? `${fmtNum(row.slaWon)} رابحة · ${fmtNum(row.slaLost)} خاسرة · اتقفلوا في الفترة`
-                  : `${fmtNum(row.slaWon)} won · ${fmtNum(row.slaLost)} lost · closed in period`
-              }
-              icon={<Trophy size={17} />}
-              evidenceHref="#employee-lead-evidence"
-            />
+        <SheetContent
+          side={lang === "ar" ? "left" : "right"}
+          className="w-[min(100vw,1040px)] max-w-none overflow-y-auto border-border bg-surface p-0 text-text [&>button]:z-30 [&>button]:text-white [&>button]:opacity-100 rtl:[&>button]:left-4 rtl:[&>button]:right-auto sm:max-w-[1040px]"
+          dir={lang === "ar" ? "rtl" : "ltr"}
+        >
+          <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,var(--brand),color-mix(in_srgb,var(--brand)_72%,#08142e))] px-5 py-6 text-white sm:px-7">
+            <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[34px] border-white/8" />
+            <SheetHeader className="relative pe-8 text-start sm:text-start">
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/70">
+                <span className="rounded-full bg-white/12 px-2.5 py-1">
+                  {lang === "ar" ? "ملف أداء الموظف" : "Employee performance profile"}
+                </span>
+                <span>{row.team}</span>
+              </div>
+              <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">
+                {row.displayName}
+              </SheetTitle>
+              <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
+                {lang === "ar"
+                  ? "تفصيل التحصيل والليدز والتحويل حسب كل كورس وتخصص داخل الفترة والفلاتر المختارة."
+                  : "Paid collections, leads, and conversion by course and specialization for the selected period and filters."}
+              </SheetDescription>
+            </SheetHeader>
           </div>
 
-          <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div><div className="text-xs font-semibold text-brand">{lang === "ar" ? "التواصل والبيع" : "Lead execution"}</div><h3 id="employee-lead-execution-title" className="mt-0.5 text-lg font-bold text-text">{lang === "ar" ? "هل اتصل الموظف بالليدز التي وُزعت عليه؟" : "Did the employee contact their assigned leads?"}</h3></div>
-              <button
-                type="button"
-                onClick={() => setUncalledScope("owner")}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[11px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
-              >
-                <PhoneCall size={13} />
-                {lang === "ar" ? "فلتر الليدز التي لم يتواصل معها" : "Filter leads not contacted"}
-              </button>
-            </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><b className="text-sm text-text">{lang === "ar" ? "تغطية الليدز بواسطة صاحب الليد" : "Owner lead coverage"}</b><Pill tone={row.leadOwnerCallCoverageRate === null ? "neutral" : row.leadOwnerCallCoverageRate >= 80 ? "success" : "warning"}>{fmtPct(row.leadOwnerCallCoverageRate, 1)}</Pill></div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                <MiniMetric label={lang === "ar" ? "موزعة عليه" : "Assigned"} value={fmtNum(row.distributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "تواصل معها بنفسه" : "Contacted by this employee"} value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)} />
-                <MiniMetric
-                  label={lang === "ar" ? "لم يتواصل معها هو" : "Not contacted by this employee"}
-                  value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads))}
-                  hint={lang === "ar" ? "يشمل ليدز تابعها زميل آخر" : "Includes leads handled by a colleague"}
-                  onDrill={row.ownerCalledDistributedLeads === null ? undefined : () => setUncalledScope("owner")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها` : `Show the leads ${row.displayName} never contacted`}
-                />
-                <MiniMetric label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"} value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)} />
-                <MiniMetric
-                  label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
-                  value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
-                  hint={lang === "ar" ? "لا مكالمة ولا رسالة أو رد من موظف" : "No employee call, message, or reply"}
-                  onDrill={row.uncalledDistributedLeads === null ? undefined : () => setUncalledScope("none")}
-                  drillLabel={lang === "ar" ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها أحد` : `Show ${row.displayName}'s leads that nobody contacted`}
-                />
-                <MiniMetric label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"} value={row.callsFromDistributedLeads === null ? "—" : fmtNum(row.callsFromDistributedLeads)} />
-                <MiniMetric label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"} value={row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} />
-                <MiniMetric
-                  label={lang === "ar" ? "مكالمات الموظف لكل ليد" : "Owner calls per lead"}
-                  value={
-                    row.callsByAssignedEmployee === null || row.distributedLeads <= 0
-                      ? "—"
-                      : (row.callsByAssignedEmployee / row.distributedLeads).toFixed(2)
-                  }
-                  hint={
-                    lang === "ar"
-                      ? `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} مكالمة ÷ ${fmtNum(row.distributedLeads)} ليد في الفترة`
-                      : `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} calls ÷ ${fmtNum(row.distributedLeads)} period leads`
-                  }
-                />
-                <MiniMetric
-                  label={lang === "ar" ? "نسبة إغلاق الفترة" : "Period close rate"}
-                  value={fmtPct(row.decidedConversionRate, 1)}
-                  hint={
-                    lang === "ar"
-                      ? `${fmtNum(row.slaWon)} رابحة من ${fmtNum(row.slaWon + row.slaLost)} صفقة متحسمة`
-                      : `${fmtNum(row.slaWon)} won of ${fmtNum(row.slaWon + row.slaLost)} decided deals`
-                  }
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-              <div className="text-xs font-semibold text-brand">
-                {lang === "ar" ? "أداء المكالمات" : "Call performance"}
-              </div>
-              <h3 className="mt-0.5 text-lg font-bold text-text">
-                {lang === "ar"
-                  ? "المكالمات ووقت الحديث والجودة"
-                  : "Calls, talk time, and quality"}
-              </h3>
-              <p className="mt-1 text-[11px] text-text-muted">
-                {lang === "ar"
-                  ? "كل الأرقام محسوبة على نفس الفترة المختارة أعلى الصفحة؛ وقت الكلام الفعلي لا يشمل الرنين والانتظار."
-                  : "Every figure uses the selected page date range; actual talk time excludes ringing and waiting."}
-              </p>
-              </div>
-              <EvidenceLink href="#employee-call-evidence" />
-            </div>
+          <div className="space-y-5 p-4 sm:p-7">
+            <EmployeeScoreSummary row={row} />
+            {row.target && <AgentTargetPanel target={row.target} row={row} />}
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <ProfileMetric
-                label={lang === "ar" ? "إجمالي المكالمات" : "Total calls"}
-                value={row.totalCalls === null ? "—" : fmtNum(row.totalCalls)}
-                sub={
-                  row.answeredCalls === null
-                    ? lang === "ar"
-                      ? "غير مربوط بامتداد Yeastar"
-                      : "No Yeastar extension matched"
-                    : `${fmtNum(row.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(row.answerRate, 1)}`
-                }
-                icon={<PhoneCall size={17} />}
-                evidenceHref="#employee-call-evidence"
+                label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+                explain="paidCollections"
+                value={fmtUSDFull(row.paidRevenue)}
+                sub={invoiceCount(row.invoices, lang)}
+                icon={<ReceiptText size={17} />}
+                hero
+                evidenceHref="#employee-sales-evidence"
               />
               <ProfileMetric
-                label={lang === "ar" ? "الوقت من الاتصال إلى الإغلاق" : "Dial-to-hangup time"}
-                value={formatCallHours(row.totalCallSeconds, lang)}
+                label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
+                explain="totalLeads"
+                value={fmtNum(row.cleanLeads)}
                 sub={
                   lang === "ar"
-                    ? `${formatCallHours(row.talkSeconds, lang)} حديث فعلي مع العملاء`
-                    : `${formatCallHours(row.talkSeconds, lang)} actual talk time`
+                    ? `${fmtNum(row.won)} رابحة · ${fmtNum(row.lost)} خاسرة`
+                    : `${fmtNum(row.won)} won · ${fmtNum(row.lost)} lost`
                 }
-                icon={<Clock3 size={17} />}
-                evidenceHref="#employee-call-evidence"
+                icon={<Users size={17} />}
+                evidenceHref="#employee-lead-evidence"
               />
               <ProfileMetric
-                label={lang === "ar" ? "متوسط مدة المكالمة" : "Average call length"}
-                value={formatCallDuration(row.averageCallSeconds, lang)}
-                sub={lang === "ar" ? "للمكالمات التي تم الرد عليها" : "Across answered calls"}
-                icon={<AudioLines size={17} />}
-                evidenceHref="#employee-call-evidence"
+                label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
+                explain="conversionAll"
+                value={fmtPct(row.conversionRate, 1)}
+                sub={lang === "ar" ? "الرابحة ÷ إجمالي الليدز" : "Won ÷ all leads"}
+                icon={<ChartNoAxesCombined size={17} />}
+                evidenceHref="#employee-lead-evidence"
               />
               <ProfileMetric
-                label={lang === "ar" ? "متوسط الجودة" : "Average quality"}
-                value={fmtQuality(row.averageQualityScore)}
+                label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
+                explain="periodClosureRate"
+                value={fmtPct(row.decidedConversionRate, 1)}
                 sub={
-                  row.analyzedCalls === null
-                    ? lang === "ar"
-                      ? "التقييم غير متاح"
-                      : "Quality unavailable"
-                    : lang === "ar"
-                      ? `${fmtNum(row.analyzedCalls)} مكالمة محللة · ${fmtNum(row.qualityNeedsReview ?? 0)} تحتاج مراجعة`
-                      : `${fmtNum(row.analyzedCalls)} analyzed · ${fmtNum(row.qualityNeedsReview ?? 0)} to review`
+                  lang === "ar"
+                    ? `${fmtNum(row.slaWon)} رابحة · ${fmtNum(row.slaLost)} خاسرة · اتقفلوا في الفترة`
+                    : `${fmtNum(row.slaWon)} won · ${fmtNum(row.slaLost)} lost · closed in period`
                 }
-                icon={<CircleGauge size={17} />}
-                evidenceHref="#employee-call-evidence"
+                icon={<Trophy size={17} />}
+                evidenceHref="#employee-lead-evidence"
               />
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <b className="text-sm text-text">{lang === "ar" ? "أداء محادثات Chatwoot" : "Chatwoot conversation performance"}</b>
-                <span className="flex items-center gap-2"><EvidenceLink href="#employee-chat-evidence" /><Pill tone={row.chatConversations === null ? "neutral" : "success"}>{row.chatConversations === null ? (lang === "ar" ? "غير مطابق" : "Not matched") : "Connected"}</Pill></span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                <MiniMetric label={lang === "ar" ? "كل محادثات الفترة" : "All conversations in period"} value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)} />
-                <MiniMetric label={lang === "ar" ? "تم التعامل معها وإغلاقها" : "Handled and resolved"} value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)} />
-                <MiniMetric label={lang === "ar" ? "تنتظر رد الموظف الآن" : "Await employee reply now"} value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)} />
-                <MiniMetric label={lang === "ar" ? "كل المفتوح الآن" : "All open now"} value={row.chatOpenConversations === null ? "—" : fmtNum(row.chatOpenConversations)} />
-                <MiniMetric
-                  label={lang === "ar" ? "مفتوحة ولا تنتظر رده" : "Open, not awaiting agent"}
-                  value={
-                    row.chatOpenConversations === null || row.chatAwaitingReply === null
-                      ? "—"
-                      : fmtNum(Math.max(0, row.chatOpenConversations - row.chatAwaitingReply))
-                  }
-                />
-                <MiniMetric label={lang === "ar" ? "متوسط أول رد" : "Avg. first response"} value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)} />
-              </div>
-              <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{lang === "ar" ? "«كل محادثات الفترة» و«تم إغلاقها» حسب التاريخ المختار. أما «المفتوح الآن» و«تنتظر رد الموظف» فهي حالة Chatwoot الحالية. لأن الفريق لا يغلق كل المحادثات، فعدد المنتظرين هو المؤشر الأوضح لمن يحتاج ردًا الآن." : "Period conversations and resolved conversations follow the selected dates. Open and awaiting-reply counts are the current Chatwoot workload. Because not every conversation is closed, awaiting reply is the clearest action metric."}</p>
-            </div>
-          </section>
 
-          {!courseProfile.lostDataAvailable && (
-            <Notice
-              tone="warning"
-              title={
-                lang === "ar"
-                  ? "بيانات Lost غير مكتملة حاليًا"
-                  : "Lost data is currently incomplete"
-              }
-            >
-              {lang === "ar"
-                ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
-                : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until Archived Lost returns; current rates are directional only."}
-            </Notice>
-          )}
-
-          <section>
-            <div className="mb-3 flex items-end justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-brand">
-                  {lang === "ar" ? "الخلاصة التنفيذية" : "Executive summary"}
+            <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-brand">
+                    {lang === "ar" ? "التواصل والبيع" : "Lead execution"}
+                  </div>
+                  <h3
+                    id="employee-lead-execution-title"
+                    className="mt-0.5 text-lg font-bold text-text"
+                  >
+                    {lang === "ar"
+                      ? "هل اتصل الموظف بالليدز التي وُزعت عليه؟"
+                      : "Did the employee contact their assigned leads?"}
+                  </h3>
                 </div>
-                <h3 className="mt-0.5 text-lg font-bold text-text">
+                <button
+                  type="button"
+                  onClick={() => setUncalledScope("owner")}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[11px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                >
+                  <PhoneCall size={13} />
+                  {lang === "ar" ? "فلتر الليدز التي لم يتواصل معها" : "Filter leads not contacted"}
+                </button>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "تغطية الليدز بواسطة صاحب الليد" : "Owner lead coverage"}
+                  </b>
+                  <Pill
+                    tone={
+                      row.leadOwnerCallCoverageRate === null
+                        ? "neutral"
+                        : row.leadOwnerCallCoverageRate >= 80
+                          ? "success"
+                          : "warning"
+                    }
+                  >
+                    {fmtPct(row.leadOwnerCallCoverageRate, 1)}
+                  </Pill>
+                </div>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                  <MiniMetric
+                    label={lang === "ar" ? "موزعة عليه" : "Assigned"}
+                    value={fmtNum(row.distributedLeads)}
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "تواصل معها بنفسه" : "Contacted by this employee"}
+                    value={
+                      row.ownerCalledDistributedLeads === null
+                        ? "—"
+                        : fmtNum(row.ownerCalledDistributedLeads)
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "لم يتواصل معها هو" : "Not contacted by this employee"}
+                    value={
+                      row.ownerCalledDistributedLeads === null
+                        ? "—"
+                        : fmtNum(
+                            Math.max(0, row.distributedLeads - row.ownerCalledDistributedLeads),
+                          )
+                    }
+                    hint={
+                      lang === "ar"
+                        ? "يشمل ليدز تابعها زميل آخر"
+                        : "Includes leads handled by a colleague"
+                    }
+                    onDrill={
+                      row.ownerCalledDistributedLeads === null
+                        ? undefined
+                        : () => setUncalledScope("owner")
+                    }
+                    drillLabel={
+                      lang === "ar"
+                        ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها`
+                        : `Show the leads ${row.displayName} never contacted`
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by any employee"}
+                    value={
+                      row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "لم يتواصل معها أحد" : "Never contacted by anyone"}
+                    value={
+                      row.uncalledDistributedLeads === null
+                        ? "—"
+                        : fmtNum(row.uncalledDistributedLeads)
+                    }
+                    hint={
+                      lang === "ar"
+                        ? "لا مكالمة ولا رسالة أو رد من موظف"
+                        : "No employee call, message, or reply"
+                    }
+                    onDrill={
+                      row.uncalledDistributedLeads === null
+                        ? undefined
+                        : () => setUncalledScope("none")
+                    }
+                    drillLabel={
+                      lang === "ar"
+                        ? `اعرض ليدز ${row.displayName} التي لم يتواصل معها أحد`
+                        : `Show ${row.displayName}'s leads that nobody contacted`
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "كل مكالمات الليدز" : "All lead calls"}
+                    value={
+                      row.callsFromDistributedLeads === null
+                        ? "—"
+                        : fmtNum(row.callsFromDistributedLeads)
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "مكالمات الموظف نفسه" : "Calls by assigned employee"}
+                    value={
+                      row.callsByAssignedEmployee === null
+                        ? "—"
+                        : fmtNum(row.callsByAssignedEmployee)
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "مكالمات الموظف لكل ليد" : "Owner calls per lead"}
+                    value={
+                      row.callsByAssignedEmployee === null || row.distributedLeads <= 0
+                        ? "—"
+                        : (row.callsByAssignedEmployee / row.distributedLeads).toFixed(2)
+                    }
+                    hint={
+                      lang === "ar"
+                        ? `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} مكالمة ÷ ${fmtNum(row.distributedLeads)} ليد في الفترة`
+                        : `${row.callsByAssignedEmployee === null ? "—" : fmtNum(row.callsByAssignedEmployee)} calls ÷ ${fmtNum(row.distributedLeads)} period leads`
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "نسبة إغلاق الفترة" : "Period close rate"}
+                    value={fmtPct(row.decidedConversionRate, 1)}
+                    hint={
+                      lang === "ar"
+                        ? `${fmtNum(row.slaWon)} رابحة من ${fmtNum(row.slaWon + row.slaLost)} صفقة متحسمة`
+                        : `${fmtNum(row.slaWon)} won of ${fmtNum(row.slaWon + row.slaLost)} decided deals`
+                    }
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-brand">
+                    {lang === "ar" ? "أداء المكالمات" : "Call performance"}
+                  </div>
+                  <h3 className="mt-0.5 text-lg font-bold text-text">
+                    {lang === "ar"
+                      ? "المكالمات ووقت الحديث والجودة"
+                      : "Calls, talk time, and quality"}
+                  </h3>
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    {lang === "ar"
+                      ? "كل الأرقام محسوبة على نفس الفترة المختارة أعلى الصفحة؛ وقت الكلام الفعلي لا يشمل الرنين والانتظار."
+                      : "Every figure uses the selected page date range; actual talk time excludes ringing and waiting."}
+                  </p>
+                </div>
+                <EvidenceLink href="#employee-call-evidence" />
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <ProfileMetric
+                  label={lang === "ar" ? "إجمالي المكالمات" : "Total calls"}
+                  value={row.totalCalls === null ? "—" : fmtNum(row.totalCalls)}
+                  sub={
+                    row.answeredCalls === null
+                      ? lang === "ar"
+                        ? "غير مربوط بامتداد Yeastar"
+                        : "No Yeastar extension matched"
+                      : `${fmtNum(row.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(row.answerRate, 1)}`
+                  }
+                  icon={<PhoneCall size={17} />}
+                  evidenceHref="#employee-call-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "الوقت من الاتصال إلى الإغلاق" : "Dial-to-hangup time"}
+                  value={formatCallHours(row.totalCallSeconds, lang)}
+                  sub={
+                    lang === "ar"
+                      ? `${formatCallHours(row.talkSeconds, lang)} حديث فعلي مع العملاء`
+                      : `${formatCallHours(row.talkSeconds, lang)} actual talk time`
+                  }
+                  icon={<Clock3 size={17} />}
+                  evidenceHref="#employee-call-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "متوسط مدة المكالمة" : "Average call length"}
+                  value={formatCallDuration(row.averageCallSeconds, lang)}
+                  sub={lang === "ar" ? "للمكالمات التي تم الرد عليها" : "Across answered calls"}
+                  icon={<AudioLines size={17} />}
+                  evidenceHref="#employee-call-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "متوسط الجودة" : "Average quality"}
+                  value={fmtQuality(row.averageQualityScore)}
+                  sub={
+                    row.analyzedCalls === null
+                      ? lang === "ar"
+                        ? "التقييم غير متاح"
+                        : "Quality unavailable"
+                      : lang === "ar"
+                        ? `${fmtNum(row.analyzedCalls)} مكالمة محللة · ${fmtNum(row.qualityNeedsReview ?? 0)} تحتاج مراجعة`
+                        : `${fmtNum(row.analyzedCalls)} analyzed · ${fmtNum(row.qualityNeedsReview ?? 0)} to review`
+                  }
+                  icon={<CircleGauge size={17} />}
+                  evidenceHref="#employee-call-evidence"
+                />
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "أداء محادثات Chatwoot" : "Chatwoot conversation performance"}
+                  </b>
+                  <span className="flex items-center gap-2">
+                    <EvidenceLink href="#employee-chat-evidence" />
+                    <Pill tone={row.chatConversations === null ? "neutral" : "success"}>
+                      {row.chatConversations === null
+                        ? lang === "ar"
+                          ? "غير مطابق"
+                          : "Not matched"
+                        : "Connected"}
+                    </Pill>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                  <MiniMetric
+                    label={lang === "ar" ? "كل محادثات الفترة" : "All conversations in period"}
+                    value={row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "تم التعامل معها وإغلاقها" : "Handled and resolved"}
+                    value={row.chatResolved === null ? "—" : fmtNum(row.chatResolved)}
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "تنتظر رد الموظف الآن" : "Await employee reply now"}
+                    value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)}
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "كل المفتوح الآن" : "All open now"}
+                    value={
+                      row.chatOpenConversations === null ? "—" : fmtNum(row.chatOpenConversations)
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "مفتوحة ولا تنتظر رده" : "Open, not awaiting agent"}
+                    value={
+                      row.chatOpenConversations === null || row.chatAwaitingReply === null
+                        ? "—"
+                        : fmtNum(Math.max(0, row.chatOpenConversations - row.chatAwaitingReply))
+                    }
+                  />
+                  <MiniMetric
+                    label={lang === "ar" ? "متوسط أول رد" : "Avg. first response"}
+                    value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)}
+                  />
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
                   {lang === "ar"
-                    ? "قوي في إيه وضعيف في إيه — من الكورسات اللي بيبيعها"
-                    : "Strongest and weakest — within the courses he sells"}
-                </h3>
-                {/* The population is stated on the section, not buried in a
-                    footnote: all four cards below rank the same courses. */}
-                <p className="mt-1 text-[11px] text-text-muted">
-                  {lang === "ar"
-                    ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس دخل فيهم بيع أو قفل فيهم صفقة رابحة — الكورسات اللي جاتله ليدز ومحصلش فيها لا بيع ولا صفقة رابحة متحسبش عليه، وموضّحة تحت لوحدها. الكورس اللي قفل فيه صفقة لسه فاتورتها مجتش بيبان بـ$0، وده مش خطأ: الفلوس محسوبة بتاريخ الدفع.`
-                    : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has either sold or won a deal in. Courses that only received leads are never counted against him; they are reported separately below. A course he won but whose invoice has not landed yet shows $0 — collections are dated by payment, so that is timing, not an error.`}
+                    ? "«كل محادثات الفترة» و«تم إغلاقها» حسب التاريخ المختار. أما «المفتوح الآن» و«تنتظر رد الموظف» فهي حالة Chatwoot الحالية. لأن الفريق لا يغلق كل المحادثات، فعدد المنتظرين هو المؤشر الأوضح لمن يحتاج ردًا الآن."
+                    : "Period conversations and resolved conversations follow the selected dates. Open and awaiting-reply counts are the current Chatwoot workload. Because not every conversation is closed, awaiting reply is the clearest action metric."}
                 </p>
               </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {/* Each card carries money *and* cohort, because the row is read
+            </section>
+
+            {!courseProfile.lostDataAvailable && (
+              <Notice
+                tone="warning"
+                title={
+                  lang === "ar"
+                    ? "بيانات Lost غير مكتملة حاليًا"
+                    : "Lost data is currently incomplete"
+                }
+              >
+                {lang === "ar"
+                  ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
+                  : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until Archived Lost returns; current rates are directional only."}
+              </Notice>
+            )}
+
+            <section>
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-brand">
+                    {lang === "ar" ? "الخلاصة التنفيذية" : "Executive summary"}
+                  </div>
+                  <h3 className="mt-0.5 text-lg font-bold text-text">
+                    {lang === "ar"
+                      ? "قوي في إيه وضعيف في إيه — من الكورسات اللي بيبيعها"
+                      : "Strongest and weakest — within the courses he sells"}
+                  </h3>
+                  {/* The population is stated on the section, not buried in a
+                    footnote: all four cards below rank the same courses. */}
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    {lang === "ar"
+                      ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس دخل فيهم بيع أو قفل فيهم صفقة رابحة — الكورسات اللي جاتله ليدز ومحصلش فيها لا بيع ولا صفقة رابحة متحسبش عليه، وموضّحة تحت لوحدها. الكورس اللي قفل فيه صفقة لسه فاتورتها مجتش بيبان بـ$0، وده مش خطأ: الفلوس محسوبة بتاريخ الدفع.`
+                      : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has either sold or won a deal in. Courses that only received leads are never counted against him; they are reported separately below. A course he won but whose invoice has not landed yet shows $0 — collections are dated by payment, so that is timing, not an error.`}
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Each card carries money *and* cohort, because the row is read
                   left to right as one comparison. Showing revenue on two cards
                   and a bare percentage on the others is what let a $0 course sit
                   beside the best seller looking like its peer. */}
-              <CourseInsight
-                icon={<TrendingUp size={18} />}
-                eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
-                onOpenInvoices={setInvoiceCourse}
-                explain="bestSelling"
-                course={courseProfile.bestSellingCourse}
-                value={(course) => fmtUSDFull(course.paidRevenue)}
-                sub={(course) =>
-                  `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`
-                }
-                foot={cohortLine}
-                tone="success"
-                empty={
-                  lang === "ar"
-                    ? "مفيش أي بيع للموظف في الفترة دي"
-                    : "No sale at all in this period"
-                }
-              />
-              <CourseInsight
-                icon={<TrendingDown size={18} />}
-                eyebrow={lang === "ar" ? "أقل مبيعات" : "Lowest sales"}
-                onOpenInvoices={setInvoiceCourse}
-                explain="leastSelling"
-                course={courseProfile.leastSellingCourse}
-                value={(course) => fmtUSDFull(course.paidRevenue)}
-                // $0 here means a course he won in but has not been paid for
-                // yet, not a course he was never selling — those are excluded
-                // from this row entirely.
-                sub={(course) =>
-                  course.paidRevenue === 0 && course.invoices === 0
-                    ? lang === "ar"
-                      ? `${fmtNum(course.won)} صفقة رابحة لسه فاتورتها مجتش`
-                      : `${fmtNum(course.won)} won, not yet invoiced`
-                    : invoiceCount(course.invoices, lang)
-                }
-                foot={cohortLine}
-                tone="neutral"
-                empty={
-                  lang === "ar"
-                    ? "كورس واحد بس فيه بيع — مفيش مقارنة"
-                    : "Only one course sold — nothing to compare"
-                }
-              />
-              <CourseInsight
-                icon={<Sparkles size={18} />}
-                eyebrow={lang === "ar" ? "أفضل تحويل" : "Best conversion"}
-                onOpenInvoices={setInvoiceCourse}
-                explain="bestConverting"
-                course={courseProfile.bestConvertingCourse}
-                value={(course) => fmtPct(course.conversionRate, 1)}
-                sub={(course) =>
-                  lang === "ar"
-                    ? `${fmtNum(course.won)} رابحة من ${fmtNum(course.leads)} ليد`
-                    : `${fmtNum(course.won)} won of ${fmtNum(course.leads)} leads`
-                }
-                foot={moneyLine}
-                tone="brand"
-                // Three different reasons, three different sentences. A cohort
-                // can be perfectly large and still hold no win yet, so this must
-                // never read as "not enough data".
-                empty={
-                  courseProfile.bestReason === "no_win_yet"
-                    ? lang === "ar"
-                      ? "لسه مفيش ولا صفقة رابحة في أي كورس بيبيعه من ليدز الفترة دي"
-                      : "No lead from this period has been won yet in a course he sells"
-                    : courseProfile.bestReason === "no_book"
+                <CourseInsight
+                  icon={<TrendingUp size={18} />}
+                  eyebrow={lang === "ar" ? "أفضل مبيعات" : "Best sales"}
+                  onOpenInvoices={setInvoiceCourse}
+                  explain="bestSelling"
+                  course={courseProfile.bestSellingCourse}
+                  value={(course) => fmtUSDFull(course.paidRevenue)}
+                  sub={(course) =>
+                    `${fmtPct(course.salesShare, 1)} ${lang === "ar" ? "من مبيعات الموظف" : "of employee sales"}`
+                  }
+                  foot={cohortLine}
+                  tone="success"
+                  empty={
+                    lang === "ar"
+                      ? "مفيش أي بيع للموظف في الفترة دي"
+                      : "No sale at all in this period"
+                  }
+                />
+                <CourseInsight
+                  icon={<TrendingDown size={18} />}
+                  eyebrow={lang === "ar" ? "أقل مبيعات" : "Lowest sales"}
+                  onOpenInvoices={setInvoiceCourse}
+                  explain="leastSelling"
+                  course={courseProfile.leastSellingCourse}
+                  value={(course) => fmtUSDFull(course.paidRevenue)}
+                  // $0 here means a course he won in but has not been paid for
+                  // yet, not a course he was never selling — those are excluded
+                  // from this row entirely.
+                  sub={(course) =>
+                    course.paidRevenue === 0 && course.invoices === 0
                       ? lang === "ar"
-                        ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
-                        : "He sold no course in this period, so there is nothing to rank"
-                      : lang === "ar"
-                        ? `مفيش كورس باعه وصل ${fmtNum(courseProfile.minimumLeadSample)} ليدز في الفترة دي`
-                        : `No course he sells reached ${fmtNum(courseProfile.minimumLeadSample)} leads in this period`
-                }
-              />
-              <CourseInsight
-                icon={<Layers3 size={18} />}
-                eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
-                onOpenInvoices={setInvoiceCourse}
-                explain="needsSupport"
-                course={courseProfile.needsSupportCourse}
-                value={(course) => fmtPct(course.conversionRate, 1)}
-                sub={(course) =>
-                  `${fmtNum(course.won + course.lost)} ${lang === "ar" ? "محسومة من" : "decided of"} ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`
-                }
-                foot={moneyLine}
-                tone="danger"
-                // A course whose cohort is mostly still open is not a proven
-                // weakness. Saying "not enough sample" would be wrong — the
-                // sample is large, it just has not finished.
-                empty={
-                  courseProfile.needsSupportReason === "too_few_decided"
-                    ? lang === "ar"
-                      ? `لسه مفيش كورس اتحسم فيه ${fmtNum(courseProfile.minimumDecidedSample)} ليدز — أقل من كده الرقم بيبقى صدفة مش نتيجة.`
-                      : `No course has ${fmtNum(courseProfile.minimumDecidedSample)} settled leads yet — below that the rate is chance, not a result.`
-                    : courseProfile.needsSupportReason === "no_book"
+                        ? `${fmtNum(course.won)} صفقة رابحة لسه فاتورتها مجتش`
+                        : `${fmtNum(course.won)} won, not yet invoiced`
+                      : invoiceCount(course.invoices, lang)
+                  }
+                  foot={cohortLine}
+                  tone="neutral"
+                  empty={
+                    lang === "ar"
+                      ? "كورس واحد بس فيه بيع — مفيش مقارنة"
+                      : "Only one course sold — nothing to compare"
+                  }
+                />
+                <CourseInsight
+                  icon={<Sparkles size={18} />}
+                  eyebrow={lang === "ar" ? "أفضل تحويل" : "Best conversion"}
+                  onOpenInvoices={setInvoiceCourse}
+                  explain="bestConverting"
+                  course={courseProfile.bestConvertingCourse}
+                  value={(course) => fmtPct(course.conversionRate, 1)}
+                  sub={(course) =>
+                    lang === "ar"
+                      ? `${fmtNum(course.won)} رابحة من ${fmtNum(course.leads)} ليد`
+                      : `${fmtNum(course.won)} won of ${fmtNum(course.leads)} leads`
+                  }
+                  foot={moneyLine}
+                  tone="brand"
+                  // Three different reasons, three different sentences. A cohort
+                  // can be perfectly large and still hold no win yet, so this must
+                  // never read as "not enough data".
+                  empty={
+                    courseProfile.bestReason === "no_win_yet"
                       ? lang === "ar"
-                        ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
-                        : "He sold no course in this period, so there is nothing to rank"
-                      : lang === "ar"
-                        ? "مفيش كورس بيبيعه اتحسمت ليدزه وطلع ضعيف"
-                        : "No course he sells has a decided cohort that went badly"
-                }
-              />
-            </div>
-            <NonCourseLine profile={courseProfile} />
-          </section>
+                        ? "لسه مفيش ولا صفقة رابحة في أي كورس بيبيعه من ليدز الفترة دي"
+                        : "No lead from this period has been won yet in a course he sells"
+                      : courseProfile.bestReason === "no_book"
+                        ? lang === "ar"
+                          ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
+                          : "He sold no course in this period, so there is nothing to rank"
+                        : lang === "ar"
+                          ? `مفيش كورس باعه وصل ${fmtNum(courseProfile.minimumLeadSample)} ليدز في الفترة دي`
+                          : `No course he sells reached ${fmtNum(courseProfile.minimumLeadSample)} leads in this period`
+                  }
+                />
+                <CourseInsight
+                  icon={<Layers3 size={18} />}
+                  eyebrow={lang === "ar" ? "يحتاج دعم" : "Needs support"}
+                  onOpenInvoices={setInvoiceCourse}
+                  explain="needsSupport"
+                  course={courseProfile.needsSupportCourse}
+                  value={(course) => fmtPct(course.conversionRate, 1)}
+                  sub={(course) =>
+                    `${fmtNum(course.won + course.lost)} ${lang === "ar" ? "محسومة من" : "decided of"} ${fmtNum(course.leads)} ${lang === "ar" ? "ليد" : "leads"}`
+                  }
+                  foot={moneyLine}
+                  tone="danger"
+                  // A course whose cohort is mostly still open is not a proven
+                  // weakness. Saying "not enough sample" would be wrong — the
+                  // sample is large, it just has not finished.
+                  empty={
+                    courseProfile.needsSupportReason === "too_few_decided"
+                      ? lang === "ar"
+                        ? `لسه مفيش كورس اتحسم فيه ${fmtNum(courseProfile.minimumDecidedSample)} ليدز — أقل من كده الرقم بيبقى صدفة مش نتيجة.`
+                        : `No course has ${fmtNum(courseProfile.minimumDecidedSample)} settled leads yet — below that the rate is chance, not a result.`
+                      : courseProfile.needsSupportReason === "no_book"
+                        ? lang === "ar"
+                          ? "مفيش كورس باعه في الفترة دي عشان نحكم عليه"
+                          : "He sold no course in this period, so there is nothing to rank"
+                        : lang === "ar"
+                          ? "مفيش كورس بيبيعه اتحسمت ليدزه وطلع ضعيف"
+                          : "No course he sells has a decided cohort that went badly"
+                  }
+                />
+              </div>
+              <NonCourseLine profile={courseProfile} />
+            </section>
 
-          <CourseLeadTotals profile={courseProfile} />
-          <UnsoldCoursesNotice profile={courseProfile} />
+            <CourseLeadTotals profile={courseProfile} />
+            <UnsoldCoursesNotice profile={courseProfile} />
 
-          <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_.8fr]">
-            <Card>
-              <SectionTitle
-                hint={lang === "ar" ? "أعلى 10 كورسات في الفترة" : "Top 10 courses in the period"}
-                action={
-                  <Segmented
-                    value={courseMetric}
-                    onChange={setCourseMetric}
-                    options={[
-                      { value: "revenue", label: lang === "ar" ? "المبيعات" : "Sales" },
-                      { value: "invoices", label: lang === "ar" ? "الفواتير" : "Invoices" },
-                      { value: "leads", label: lang === "ar" ? "الليدز" : "Leads" },
-                    ]}
-                  />
-                }
-              >
-                {lang === "ar" ? "أداء كل كورس" : "Performance by course"}
-              </SectionTitle>
-              <HBarChart
-                data={courseChart}
-                height={Math.max(260, courseChart.length * 38)}
-                color="var(--chart-1)"
-                format={metricConfig.format}
-                name={metricConfig.name}
-                labelWidth={132}
-                showValues
-              />
-            </Card>
+            <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_.8fr]">
+              <Card>
+                <SectionTitle
+                  hint={lang === "ar" ? "أعلى 10 كورسات في الفترة" : "Top 10 courses in the period"}
+                  action={
+                    <Segmented
+                      value={courseMetric}
+                      onChange={setCourseMetric}
+                      options={[
+                        { value: "revenue", label: lang === "ar" ? "المبيعات" : "Sales" },
+                        { value: "invoices", label: lang === "ar" ? "الفواتير" : "Invoices" },
+                        { value: "leads", label: lang === "ar" ? "الليدز" : "Leads" },
+                      ]}
+                    />
+                  }
+                >
+                  {lang === "ar" ? "أداء كل كورس" : "Performance by course"}
+                </SectionTitle>
+                <HBarChart
+                  data={courseChart}
+                  height={Math.max(260, courseChart.length * 38)}
+                  color="var(--chart-1)"
+                  format={metricConfig.format}
+                  name={metricConfig.name}
+                  labelWidth={132}
+                  showValues
+                />
+              </Card>
 
-            <Card>
-              <SectionTitle hint={lang === "ar" ? "حسب عدد الليدز" : "By lead count"}>
-                {lang === "ar" ? "توزيع الليدز حسب التخصص" : "Lead distribution by specialization"}
-              </SectionTitle>
-              <DonutChart
-                data={courseProfile.specializations
-                  .filter((item) => item.leads > 0)
-                  .map((item) => ({
-                    label: displayDimension(item.label, lang),
-                    value: item.leads,
-                    color: SPECIALIZATION_COLORS[item.key],
-                  }))}
-                /* Fixed: the ring no longer grows with the slice count now that
+              <Card>
+                <SectionTitle hint={lang === "ar" ? "حسب عدد الليدز" : "By lead count"}>
+                  {lang === "ar"
+                    ? "توزيع الليدز حسب التخصص"
+                    : "Lead distribution by specialization"}
+                </SectionTitle>
+                <DonutChart
+                  data={courseProfile.specializations
+                    .filter((item) => item.leads > 0)
+                    .map((item) => ({
+                      label: displayDimension(item.label, lang),
+                      value: item.leads,
+                      color: SPECIALIZATION_COLORS[item.key],
+                    }))}
+                  /* Fixed: the ring no longer grows with the slice count now that
                    the legend is a list beneath it rather than wrapped inside. */
-                height={244}
-                format={fmtNum}
-                centerCaption={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
-              />
+                  height={244}
+                  format={fmtNum}
+                  centerCaption={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
+                />
+              </Card>
+            </div>
+
+            <Card padded={false}>
+              <div className="border-b border-border p-4 sm:p-5">
+                <SectionTitle className="mb-0">
+                  {lang === "ar" ? "تحليل التخصصات" : "Specialization analysis"}
+                </SectionTitle>
+                <p className="mt-1 text-xs text-text-muted">
+                  {lang === "ar"
+                    ? "الحجم يوضح توزيع الفرص، والتحويل يوضح النتيجة بعد مراعاة عدد الليدز."
+                    : "Volume shows opportunity distribution; conversion shows outcomes relative to lead count."}
+                </p>
+              </div>
+              <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
+                {courseProfile.specializations.map((item) => (
+                  <SpecializationCard key={item.key} item={item} lang={lang} />
+                ))}
+              </div>
             </Card>
-          </div>
 
-          <Card padded={false}>
-            <div className="border-b border-border p-4 sm:p-5">
-              <SectionTitle className="mb-0">
-                {lang === "ar" ? "تحليل التخصصات" : "Specialization analysis"}
-              </SectionTitle>
-              <p className="mt-1 text-xs text-text-muted">
-                {lang === "ar"
-                  ? "الحجم يوضح توزيع الفرص، والتحويل يوضح النتيجة بعد مراعاة عدد الليدز."
-                  : "Volume shows opportunity distribution; conversion shows outcomes relative to lead count."}
-              </p>
-            </div>
-            <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
-              {courseProfile.specializations.map((item) => (
-                <SpecializationCard key={item.key} item={item} lang={lang} />
-              ))}
-            </div>
-          </Card>
-
-          <Card padded={false}>
-            <div className="border-b border-border p-4 sm:p-5">
-              <SectionTitle className="mb-0">
-                {lang === "ar" ? "التفاصيل الكاملة حسب الكورس" : "Full course detail"}
-              </SectionTitle>
-            </div>
-            <div className="max-h-[620px] overflow-auto">
-              <table className="w-full min-w-[1180px] text-sm">
-                <thead className="sticky top-0 z-10 bg-surface-2">
-                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                    {[
-                      lang === "ar" ? "الكورس" : "Course",
-                      lang === "ar" ? "التخصص" : "Specialization",
-                      lang === "ar" ? "الليدز" : "Leads",
-                      lang === "ar" ? "رابحة" : "Won",
-                      lang === "ar" ? "خاسرة" : "Lost",
-                      lang === "ar" ? "مفتوح" : "Open",
-                      lang === "ar" ? "تحويل الليدز" : "Lead conversion",
-                      lang === "ar" ? "تحويل المحسوم" : "Decided conversion",
-                      lang === "ar" ? "الفواتير" : "Invoices",
-                      lang === "ar" ? "المبيعات" : "Sales",
-                      lang === "ar" ? "% المبيعات" : "Sales share",
-                      lang === "ar" ? "حجم العينة" : "Sample",
-                    ].map((label, index) => (
-                      <th
-                        key={`${label}-${index}`}
-                        className={`px-3 py-2.5 ${index < 2 ? "text-start" : "text-end"}`}
-                      >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {courseProfile.courses.map((course) => (
-                    <tr key={course.key} className="border-t border-border hover:bg-surface-2/70">
-                      <td className="px-3 py-3 font-semibold text-text">
-                        {/* The course name is the handle for its invoices. A
+            <Card padded={false}>
+              <div className="border-b border-border p-4 sm:p-5">
+                <SectionTitle className="mb-0">
+                  {lang === "ar" ? "التفاصيل الكاملة حسب الكورس" : "Full course detail"}
+                </SectionTitle>
+              </div>
+              <div className="max-h-[620px] overflow-auto">
+                <table className="w-full min-w-[1180px] text-sm">
+                  <thead className="sticky top-0 z-10 bg-surface-2">
+                    <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                      {[
+                        lang === "ar" ? "الكورس" : "Course",
+                        lang === "ar" ? "التخصص" : "Specialization",
+                        lang === "ar" ? "الليدز" : "Leads",
+                        lang === "ar" ? "رابحة" : "Won",
+                        lang === "ar" ? "خاسرة" : "Lost",
+                        lang === "ar" ? "مفتوح" : "Open",
+                        lang === "ar" ? "تحويل الليدز" : "Lead conversion",
+                        lang === "ar" ? "تحويل المحسوم" : "Decided conversion",
+                        lang === "ar" ? "الفواتير" : "Invoices",
+                        lang === "ar" ? "المبيعات" : "Sales",
+                        lang === "ar" ? "% المبيعات" : "Sales share",
+                        lang === "ar" ? "حجم العينة" : "Sample",
+                      ].map((label, index) => (
+                        <th
+                          key={`${label}-${index}`}
+                          className={`px-3 py-2.5 ${index < 2 ? "text-start" : "text-end"}`}
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {courseProfile.courses.map((course) => (
+                      <tr key={course.key} className="border-t border-border hover:bg-surface-2/70">
+                        <td className="px-3 py-3 font-semibold text-text">
+                          {/* The course name is the handle for its invoices. A
                             revenue figure with no way to reach the move numbers
                             behind it cannot be checked against Odoo. */}
-                        <button
-                          type="button"
-                          onClick={() => setInvoiceCourse(course)}
-                          title={dimensionNote(course.label, lang)}
-                          className="inline-flex items-center gap-1.5 rounded text-start underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          {displayDimension(course.label, lang)}
-                          <ReceiptText
-                            size={13}
-                            className="shrink-0 text-text-muted"
-                            aria-hidden="true"
-                          />
-                          <span className="sr-only">
-                            {lang === "ar" ? "اعرض فواتير الكورس" : "Show this course's invoices"}
-                          </span>
-                        </button>
-                      </td>
-                      <td className="px-3 py-3 text-text-muted">
-                        {displayDimension(course.mainCategory, lang)}
-                      </td>
-                      <td className="num px-3 py-3 text-end">{fmtNum(course.leads)}</td>
-                      <td className="num px-3 py-3 text-end text-success">{fmtNum(course.won)}</td>
-                      <td className="num px-3 py-3 text-end text-danger">{fmtNum(course.lost)}</td>
-                      <td className="num px-3 py-3 text-end">{fmtNum(course.openLeads)}</td>
-                      <td className="px-3 py-3 text-end">
-                        <Pill tone={conversionTone(course)}>
-                          {fmtPct(course.conversionRate, 1)}
-                        </Pill>
-                      </td>
-                      <td className="num px-3 py-3 text-end">
-                        {fmtPct(course.decidedConversionRate, 1)}
-                      </td>
-                      <td className="num px-3 py-3 text-end">{fmtNum(course.invoices)}</td>
-                      <td className="num px-3 py-3 text-end font-semibold">
-                        {fmtUSDFull(course.paidRevenue)}
-                      </td>
-                      <td className="num px-3 py-3 text-end">{fmtPct(course.salesShare, 1)}</td>
-                      <td className="px-3 py-3 text-end">
-                        <Pill tone={course.sampleStatus === "reliable" ? "success" : "neutral"}>
-                          {course.sampleStatus === "reliable"
-                            ? lang === "ar"
-                              ? "كافية"
-                              : "Reliable"
-                            : lang === "ar"
-                              ? "استرشادية"
-                              : "Directional"}
-                        </Pill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {/* The totals the summary cards are a slice of. Without them the
+                          <button
+                            type="button"
+                            onClick={() => setInvoiceCourse(course)}
+                            title={dimensionNote(course.label, lang)}
+                            className="inline-flex items-center gap-1.5 rounded text-start underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                          >
+                            {displayDimension(course.label, lang)}
+                            <ReceiptText
+                              size={13}
+                              className="shrink-0 text-text-muted"
+                              aria-hidden="true"
+                            />
+                            <span className="sr-only">
+                              {lang === "ar" ? "اعرض فواتير الكورس" : "Show this course's invoices"}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-3 py-3 text-text-muted">
+                          {displayDimension(course.mainCategory, lang)}
+                        </td>
+                        <td className="num px-3 py-3 text-end">{fmtNum(course.leads)}</td>
+                        <td className="num px-3 py-3 text-end text-success">
+                          {fmtNum(course.won)}
+                        </td>
+                        <td className="num px-3 py-3 text-end text-danger">
+                          {fmtNum(course.lost)}
+                        </td>
+                        <td className="num px-3 py-3 text-end">{fmtNum(course.openLeads)}</td>
+                        <td className="px-3 py-3 text-end">
+                          <Pill tone={conversionTone(course)}>
+                            {fmtPct(course.conversionRate, 1)}
+                          </Pill>
+                        </td>
+                        <td className="num px-3 py-3 text-end">
+                          {fmtPct(course.decidedConversionRate, 1)}
+                        </td>
+                        <td className="num px-3 py-3 text-end">{fmtNum(course.invoices)}</td>
+                        <td className="num px-3 py-3 text-end font-semibold">
+                          {fmtUSDFull(course.paidRevenue)}
+                        </td>
+                        <td className="num px-3 py-3 text-end">{fmtPct(course.salesShare, 1)}</td>
+                        <td className="px-3 py-3 text-end">
+                          <Pill tone={course.sampleStatus === "reliable" ? "success" : "neutral"}>
+                            {course.sampleStatus === "reliable"
+                              ? lang === "ar"
+                                ? "كافية"
+                                : "Reliable"
+                              : lang === "ar"
+                                ? "استرشادية"
+                                : "Directional"}
+                          </Pill>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {/* The totals the summary cards are a slice of. Without them the
                     reader cannot tell whether a named course is most of his
                     volume or a rounding error. */}
-                <tfoot className="sticky bottom-0 bg-surface-2">
-                  <tr className="border-t-2 border-border text-[12px] font-semibold text-text">
-                    <td className="px-3 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
-                    <td className="px-3 py-3 text-text-muted">
-                      {fmtNum(totals.courses)} {lang === "ar" ? "كورس" : "courses"}
-                    </td>
-                    <td className="num px-3 py-3 text-end">{fmtNum(totals.leads)}</td>
-                    <td className="num px-3 py-3 text-end text-success">{fmtNum(totals.won)}</td>
-                    <td className="num px-3 py-3 text-end text-danger">{fmtNum(totals.lost)}</td>
-                    <td className="num px-3 py-3 text-end">{fmtNum(totals.openLeads)}</td>
-                    <td className="num px-3 py-3 text-end">{fmtPct(totals.conversionRate, 1)}</td>
-                    <td className="num px-3 py-3 text-end">
-                      {fmtPct(totals.decidedConversionRate, 1)}
-                    </td>
-                    <td className="num px-3 py-3 text-end">{fmtNum(totals.invoices)}</td>
-                    <td className="num px-3 py-3 text-end">{fmtUSDFull(totals.paidRevenue)}</td>
-                    {/* Shares are taken over positive revenue while this row is
+                  <tfoot className="sticky bottom-0 bg-surface-2">
+                    <tr className="border-t-2 border-border text-[12px] font-semibold text-text">
+                      <td className="px-3 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
+                      <td className="px-3 py-3 text-text-muted">
+                        {fmtNum(totals.courses)} {lang === "ar" ? "كورس" : "courses"}
+                      </td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(totals.leads)}</td>
+                      <td className="num px-3 py-3 text-end text-success">{fmtNum(totals.won)}</td>
+                      <td className="num px-3 py-3 text-end text-danger">{fmtNum(totals.lost)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(totals.openLeads)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtPct(totals.conversionRate, 1)}</td>
+                      <td className="num px-3 py-3 text-end">
+                        {fmtPct(totals.decidedConversionRate, 1)}
+                      </td>
+                      <td className="num px-3 py-3 text-end">{fmtNum(totals.invoices)}</td>
+                      <td className="num px-3 py-3 text-end">{fmtUSDFull(totals.paidRevenue)}</td>
+                      {/* Shares are taken over positive revenue while this row is
                         net of credit notes, so they do not add to a meaningful
                         total. Better blank than a 100% that is not true. */}
-                    <td className="num px-3 py-3 text-end text-text-muted">—</td>
-                    <td className="px-3 py-3 text-end text-[11px] font-normal text-text-muted">
-                      {lang === "ar"
-                        ? `${fmtNum(courseProfile.soldTotals.courses)} فيها بيع`
-                        : `${fmtNum(courseProfile.soldTotals.courses)} sold`}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </Card>
+                      <td className="num px-3 py-3 text-end text-text-muted">—</td>
+                      <td className="px-3 py-3 text-end text-[11px] font-normal text-text-muted">
+                        {lang === "ar"
+                          ? `${fmtNum(courseProfile.soldTotals.courses)} فيها بيع`
+                          : `${fmtNum(courseProfile.soldTotals.courses)} sold`}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
 
-          <Notice tone="info" icon={<Info size={16} />}>
-            {lang === "ar"
-              ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس، والتصنيفات اللي مش كورس زي «أخرى» مستبعدة من الترتيب ومعروضة في سطر تحت الكروت؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
-              : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold, and non-course buckets such as "Other" are held out of the ranking and reported on a line under the cards; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
-          </Notice>
-          <section className="rounded-2xl border border-brand/15 bg-brand-soft/25 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <b className="text-sm text-text">{lang === "ar" ? "السجلات التفصيلية" : "Detailed source records"}</b>
-                <p className="mt-1 text-[11px] text-text-muted">{lang === "ar" ? "افتح نوع الدليل الذي تحتاجه مباشرة؛ كل مصدر يظهر منفصلًا عن الآخر." : "Open the exact evidence you need; every source is kept separate."}</p>
+            <Notice tone="info" icon={<Info size={16} />}>
+              {lang === "ar"
+                ? `المبيعات هي صافي التحصيل من فواتير Odoo المدفوعة بتاريخ الدفع، فممكن تكون من ليدز اتعملت قبل الفترة. تحويل الليدز = الرابحة ÷ ليدز الفترة نفسها، عشان كده الرقمين ممكن يختلفوا. كروت «قوي وضعيف» بتترتب كلها على الكورسات اللي فيها بيع فعلي للموظف بس، والتصنيفات اللي مش كورس زي «أخرى» مستبعدة من الترتيب ومعروضة في سطر تحت الكروت؛ «أفضل تحويل» محتاج ${courseProfile.minimumLeadSample} ليدز على الأقل ومعاهم صفقة رابحة حقيقية واحدة، و«يحتاج دعم» محتاج كمان ${fmtNum(courseProfile.minimumDecidedSample)} ليدز متحسمة على الأقل من اللي معاه دلوقتي — الليدز اللي لسه مفتوحة مش محسوبة ضده، والكورس اللي مباعش فيه خالص ما يتحاسبش عليه أصلاً. والصفقة اللي اتقفلت رابحة واتأرشفت بعدها بتتحسب رابحة زي أي صفقة تانية.`
+                : `Sales are net paid Odoo collections dated by payment, so they can come from cohorts created before this period. Lead conversion is Won ÷ this period's cohort, which is why the two can disagree. The strength and weakness cards all rank the courses he has actually sold, and non-course buckets such as "Other" are held out of the ranking and reported on a line under the cards; "best conversion" needs at least ${courseProfile.minimumLeadSample} leads and one real win, and "needs support" additionally requires at least ${fmtNum(courseProfile.minimumDecidedSample)} settled leads among the ones he holds now — leads still open are not counted against him, and a course he never sold is never judged at all.`}
+            </Notice>
+            <section className="rounded-2xl border border-brand/15 bg-brand-soft/25 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <b className="text-sm text-text">
+                    {lang === "ar" ? "السجلات التفصيلية" : "Detailed source records"}
+                  </b>
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    {lang === "ar"
+                      ? "افتح نوع الدليل الذي تحتاجه مباشرة؛ كل مصدر يظهر منفصلًا عن الآخر."
+                      : "Open the exact evidence you need; every source is kept separate."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <EvidenceLink href="#employee-lead-evidence" />
+                  <EvidenceLink href="#employee-call-evidence" />
+                  <EvidenceLink href="#employee-chat-evidence" />
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <EvidenceLink href="#employee-lead-evidence" />
-                <EvidenceLink href="#employee-call-evidence" />
-                <EvidenceLink href="#employee-chat-evidence" />
-              </div>
-            </div>
-          </section>
-        </div>
-        {invoiceCourse && (
-          <CourseInvoicesDialog
-            course={invoiceCourse}
-            agent={row.name}
-            onClose={() => setInvoiceCourse(null)}
+            </section>
+          </div>
+          {invoiceCourse && (
+            <CourseInvoicesDialog
+              course={invoiceCourse}
+              agent={row.name}
+              onClose={() => setInvoiceCourse(null)}
+            />
+          )}
+          <EmployeeEvidenceDialog
+            row={row}
+            kind={evidenceKind}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setEvidenceKind(null);
+            }}
           />
-        )}
-        <EmployeeEvidenceDialog
-          row={row}
-          kind={evidenceKind}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setEvidenceKind(null);
-          }}
-        />
-        <UncalledLeadsDialog
-          scope={uncalledScope}
-          employee={row.name}
-          employeeLabel={row.displayName}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setUncalledScope(null);
-          }}
-        />
-      </SheetContent>
+          <UncalledLeadsDialog
+            scope={uncalledScope}
+            employee={row.name}
+            employeeLabel={row.displayName}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setUncalledScope(null);
+            }}
+          />
+        </SheetContent>
       </EmployeeEvidenceContext.Provider>
     </Sheet>
   );
@@ -2685,7 +3960,10 @@ function EmployeeCallsPanel({ row }: { row: AgentRow }) {
 
   if (!row.callExtension) {
     return (
-      <Notice tone="warning" title={lang === "ar" ? "امتداد الموظف غير مطابق" : "Employee extension not matched"}>
+      <Notice
+        tone="warning"
+        title={lang === "ar" ? "امتداد الموظف غير مطابق" : "Employee extension not matched"}
+      >
         {lang === "ar"
           ? "اسم الموظف موجود في Odoo لكن مش مطابق لاسم أي Extension نشط في Calls Hub. بعد توحيد الاسم هتظهر سجلاته وتحليلات مكالماته هنا تلقائيًا."
           : "The employee exists in Odoo but does not match an active Calls Hub extension. Once the names are aligned, records and call analyses will appear automatically."}
@@ -2717,89 +3995,178 @@ function EmployeeCallsList({
   const { data, isLoading, error, refetch } = useApi<CallsHubEmployeeCalls>(
     `/api/employee-calls?extension=${encodeURIComponent(row.callExtension || "")}&page_size=50`,
   );
-  const reviewCalls = data?.calls.filter((call) => call.qualityScore !== null && call.qualityScore < QUALITY_REVIEW_THRESHOLD) ?? [];
-  const remainingCalls = data?.calls.filter((call) => call.qualityScore === null || call.qualityScore >= QUALITY_REVIEW_THRESHOLD) ?? [];
+  const reviewCalls =
+    data?.calls.filter(
+      (call) => call.qualityScore !== null && call.qualityScore < QUALITY_REVIEW_THRESHOLD,
+    ) ?? [];
+  const remainingCalls =
+    data?.calls.filter(
+      (call) => call.qualityScore === null || call.qualityScore >= QUALITY_REVIEW_THRESHOLD,
+    ) ?? [];
   const callGroups = [
-    { key: "review", label: lang === "ar" ? "مكالمات تحتاج مراجعة" : "Calls needing review", calls: reviewCalls, warning: true },
-    { key: "remaining", label: lang === "ar" ? "باقي المكالمات" : "Remaining calls", calls: remainingCalls, warning: false },
+    {
+      key: "review",
+      label: lang === "ar" ? "مكالمات تحتاج مراجعة" : "Calls needing review",
+      calls: reviewCalls,
+      warning: true,
+    },
+    {
+      key: "remaining",
+      label: lang === "ar" ? "باقي المكالمات" : "Remaining calls",
+      calls: remainingCalls,
+      warning: false,
+    },
   ].filter((group) => group.calls.length > 0);
   return (
-    <div id="employee-call-evidence" className="scroll-mt-24"><Card padded={false}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
-        <div>
-          <SectionTitle className="mb-0">
-            {lang === "ar" ? "دليل المكالمات وتقييمها" : "Call evidence and scores"}
-          </SectionTitle>
-          <p className="mt-1 text-[11px] text-text-muted">
+    <div id="employee-call-evidence" className="scroll-mt-24">
+      <Card padded={false}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
+          <div>
+            <SectionTitle className="mb-0">
+              {lang === "ar" ? "دليل المكالمات وتقييمها" : "Call evidence and scores"}
+            </SectionTitle>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {lang === "ar"
+                ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
+                : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
+            </p>
+          </div>
+          {data && (
+            <Pill tone="brand">
+              <bdi dir="ltr" className="num">
+                {fmtNum(data.calls.length)}
+              </bdi>{" "}
+              {lang === "ar" ? "معروضة من" : "shown of"}{" "}
+              <bdi dir="ltr" className="num">
+                {fmtNum(data.total)}
+              </bdi>
+            </Pill>
+          )}
+        </div>
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+        ) : error ? (
+          <div className="p-4">
+            <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+          </div>
+        ) : !data?.calls.length ? (
+          <div className="grid min-h-32 place-items-center p-6 text-center text-sm text-text-muted">
             {lang === "ar"
-              ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
-              : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
-          </p>
-        </div>
-        {data && (
-          <Pill tone="brand">
-            <bdi dir="ltr" className="num">{fmtNum(data.calls.length)}</bdi> {lang === "ar" ? "معروضة من" : "shown of"} <bdi dir="ltr" className="num">{fmtNum(data.total)}</bdi>
-          </Pill>
+              ? "لا توجد مكالمات لهذا الموظف في الفترة المختارة."
+              : "No calls for this employee in the selected period."}
+          </div>
+        ) : (
+          <div>
+            {callGroups.map((group) => (
+              <section
+                key={group.key}
+                className={group.key === "remaining" ? "border-t-8 border-surface-2" : ""}
+              >
+                <div
+                  className={`flex items-center justify-between border-b px-4 py-3 ${group.warning ? "border-danger/15 bg-danger/5" : "border-border bg-surface-2/60"}`}
+                >
+                  <b className={`text-xs ${group.warning ? "text-danger" : "text-text"}`}>
+                    {group.label}
+                  </b>
+                  <Pill tone={group.warning ? "danger" : "neutral"}>
+                    {fmtNum(group.calls.length)}
+                  </Pill>
+                </div>
+                <div className="divide-y divide-border">
+                  {group.calls.map((call) => {
+                    const open = selectedCallId === call.id;
+                    return (
+                      <article
+                        key={call.id}
+                        className="bg-surface transition-colors hover:bg-surface-2/55"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelect(open ? null : call.id)}
+                          className="grid w-full gap-3 p-4 text-start sm:grid-cols-[minmax(180px,1.3fr)_minmax(140px,1fr)_110px_100px_28px] sm:items-center"
+                        >
+                          <span className="min-w-0">
+                            <b className="block truncate text-sm text-text">
+                              {call.customerNumber || "—"}
+                            </b>
+                            <small className="mt-0.5 block text-[11px] text-text-muted">
+                              {formatCallDate(call.startedAt, lang)} ·{" "}
+                              {call.callType === "inbound"
+                                ? lang === "ar"
+                                  ? "واردة"
+                                  : "Inbound"
+                                : lang === "ar"
+                                  ? "صادرة"
+                                  : "Outbound"}
+                            </small>
+                          </span>
+                          <span className="min-w-0">
+                            <b className="block truncate text-xs text-text">
+                              {call.intent || (lang === "ar" ? "غير مصنفة" : "Unclassified")}
+                            </b>
+                            <small className="mt-0.5 block truncate text-[11px] text-text-muted">
+                              {call.summary || call.recordingState}
+                            </small>
+                          </span>
+                          <span className="num text-xs font-semibold text-text">
+                            {formatCallDuration(call.durationSeconds, lang)}
+                          </span>
+                          <span>
+                            <Pill tone={qualityTone(call.qualityScore)}>
+                              {fmtQuality(call.qualityScore)}
+                            </Pill>
+                          </span>
+                          <ChevronDown
+                            size={17}
+                            className={`text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                        {open && (
+                          <EmployeeCallDetail call={call} lang={lang} appUrl={data.appUrl} />
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
         )}
-      </div>
-      {isLoading ? (
-        <div className="space-y-2 p-4"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
-      ) : error ? (
-        <div className="p-4"><ErrorState message={(error as Error).message} onRetry={() => refetch()} /></div>
-      ) : !data?.calls.length ? (
-        <div className="grid min-h-32 place-items-center p-6 text-center text-sm text-text-muted">
-          {lang === "ar" ? "لا توجد مكالمات لهذا الموظف في الفترة المختارة." : "No calls for this employee in the selected period."}
-        </div>
-      ) : (
-        <div>
-          {callGroups.map((group) => <section key={group.key} className={group.key === "remaining" ? "border-t-8 border-surface-2" : ""}>
-            <div className={`flex items-center justify-between border-b px-4 py-3 ${group.warning ? "border-danger/15 bg-danger/5" : "border-border bg-surface-2/60"}`}>
-              <b className={`text-xs ${group.warning ? "text-danger" : "text-text"}`}>{group.label}</b>
-              <Pill tone={group.warning ? "danger" : "neutral"}>{fmtNum(group.calls.length)}</Pill>
-            </div>
-            <div className="divide-y divide-border">
-              {group.calls.map((call) => {
-                const open = selectedCallId === call.id;
-                return (
-                  <article key={call.id} className="bg-surface transition-colors hover:bg-surface-2/55">
-                    <button
-                      type="button"
-                      onClick={() => onSelect(open ? null : call.id)}
-                      className="grid w-full gap-3 p-4 text-start sm:grid-cols-[minmax(180px,1.3fr)_minmax(140px,1fr)_110px_100px_28px] sm:items-center"
-                    >
-                      <span className="min-w-0">
-                        <b className="block truncate text-sm text-text">{call.customerNumber || "—"}</b>
-                        <small className="mt-0.5 block text-[11px] text-text-muted">
-                          {formatCallDate(call.startedAt, lang)} · {call.callType === "inbound" ? (lang === "ar" ? "واردة" : "Inbound") : (lang === "ar" ? "صادرة" : "Outbound")}
-                        </small>
-                      </span>
-                      <span className="min-w-0">
-                        <b className="block truncate text-xs text-text">{call.intent || (lang === "ar" ? "غير مصنفة" : "Unclassified")}</b>
-                        <small className="mt-0.5 block truncate text-[11px] text-text-muted">{call.summary || call.recordingState}</small>
-                      </span>
-                      <span className="num text-xs font-semibold text-text">{formatCallDuration(call.durationSeconds, lang)}</span>
-                      <span><Pill tone={qualityTone(call.qualityScore)}>{fmtQuality(call.qualityScore)}</Pill></span>
-                      <ChevronDown size={17} className={`text-text-muted transition-transform ${open ? "rotate-180" : ""}`} />
-                    </button>
-                    {open && <EmployeeCallDetail call={call} lang={lang} appUrl={data.appUrl} />}
-                  </article>
-                );
-              })}
-            </div>
-          </section>)}
-        </div>
-      )}
-    </Card></div>
+      </Card>
+    </div>
   );
 }
 
-function EmployeeCallDetail({ call, lang, appUrl }: { call: CallsHubCall; lang: "ar" | "en"; appUrl: string }) {
+function EmployeeCallDetail({
+  call,
+  lang,
+  appUrl,
+}: {
+  call: CallsHubCall;
+  lang: "ar" | "en";
+  appUrl: string;
+}) {
   const { data, isLoading, error, refetch } = useApi<CallDetailResponse>(
     `/api/employee-call-detail?id=${encodeURIComponent(call.id)}`,
   );
-  if (isLoading) return <div className="border-t border-border p-4"><Skeleton className="h-44" /></div>;
+  if (isLoading)
+    return (
+      <div className="border-t border-border p-4">
+        <Skeleton className="h-44" />
+      </div>
+    );
   if (error || !data)
-    return <div className="border-t border-border p-4"><ErrorState message={(error as Error)?.message || "Call details unavailable"} onRetry={() => refetch()} /></div>;
+    return (
+      <div className="border-t border-border p-4">
+        <ErrorState
+          message={(error as Error)?.message || "Call details unavailable"}
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
 
   const audit = data.call.qualityAudit;
   const detail = audit?.detailed_analysis ?? {};
@@ -2812,7 +4179,9 @@ function EmployeeCallDetail({ call, lang, appUrl }: { call: CallsHubCall; lang: 
   const findings = findingKeys.flatMap((key) => {
     const value = detail[key];
     return Array.isArray(value)
-      ? value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+      ? value.filter((item): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object"),
+        )
       : [];
   });
   const classification = audit?.call_classification?.type || "—";
@@ -2822,40 +4191,106 @@ function EmployeeCallDetail({ call, lang, appUrl }: { call: CallsHubCall; lang: 
       <div className="grid gap-3 lg:grid-cols-[1.05fr_.95fr]">
         <div className="rounded-2xl border border-border bg-surface p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <b className="inline-flex items-center gap-2 text-sm text-text"><FileAudio size={16} className="text-brand" />{lang === "ar" ? "تسجيل المكالمة" : "Call recording"}</b>
-            <span className="text-[10px] text-text-muted">{call.recordingPlayable ? "WAV · Private stream" : (lang === "ar" ? "غير متاح" : "Unavailable")}</span>
+            <b className="inline-flex items-center gap-2 text-sm text-text">
+              <FileAudio size={16} className="text-brand" />
+              {lang === "ar" ? "تسجيل المكالمة" : "Call recording"}
+            </b>
+            <span className="text-[10px] text-text-muted">
+              {call.recordingPlayable
+                ? "WAV · Private stream"
+                : lang === "ar"
+                  ? "غير متاح"
+                  : "Unavailable"}
+            </span>
           </div>
           {call.recordingPlayable ? (
-            <audio className="w-full" controls preload="none" src={`/api/employee-call-recording?id=${encodeURIComponent(call.id)}`} />
+            <audio
+              className="w-full"
+              controls
+              preload="none"
+              src={`/api/employee-call-recording?id=${encodeURIComponent(call.id)}`}
+            />
           ) : (
-            <p className="text-xs text-text-muted">{lang === "ar" ? "لا يوجد ملف صوت محفوظ لهذه المكالمة." : "No stored audio file is available for this call."}</p>
+            <p className="text-xs text-text-muted">
+              {lang === "ar"
+                ? "لا يوجد ملف صوت محفوظ لهذه المكالمة."
+                : "No stored audio file is available for this call."}
+            </p>
           )}
         </div>
         <div className="rounded-2xl border border-border bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <b className="text-sm text-text">{lang === "ar" ? "أساس التقييم" : "Scoring basis"}</b>
-            <Pill tone={classification === "Follow-up" ? "brand" : "neutral"}>{classification}</Pill>
+            <Pill tone={classification === "Follow-up" ? "brand" : "neutral"}>
+              {classification}
+            </Pill>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
-            {audit?.call_classification?.reasoning || (lang === "ar" ? "لم يكتمل تحليل هذه المكالمة بعد." : "This call has not completed quality analysis yet.")}
+            {audit?.call_classification?.reasoning ||
+              (lang === "ar"
+                ? "لم يكتمل تحليل هذه المكالمة بعد."
+                : "This call has not completed quality analysis yet.")}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(lang === "ar"
-              ? ["الافتتاح", "فهم الاحتياج", "الاستماع", "العرض البيعي", "الاعتراضات", "الإغلاق", "الـCRM"]
-              : ["Opening", "Discovery", "Listening", "Sales pitch", "Objections", "Closing", "CRM discipline"]
-            ).map((criterion) => <span key={criterion} className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[10px] text-text-muted">{criterion}</span>)}
+              ? [
+                  "الافتتاح",
+                  "فهم الاحتياج",
+                  "الاستماع",
+                  "العرض البيعي",
+                  "الاعتراضات",
+                  "الإغلاق",
+                  "الـCRM",
+                ]
+              : [
+                  "Opening",
+                  "Discovery",
+                  "Listening",
+                  "Sales pitch",
+                  "Objections",
+                  "Closing",
+                  "CRM discipline",
+                ]
+            ).map((criterion) => (
+              <span
+                key={criterion}
+                className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[10px] text-text-muted"
+              >
+                {criterion}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
       {findings.length > 0 && (
         <div className="rounded-2xl border border-border bg-surface p-4">
-          <div className="mb-3 flex items-center justify-between gap-3"><b className="text-sm text-text">{lang === "ar" ? "الخصومات المثبتة" : "Evidence-backed deductions"}</b><span className="num text-xs text-text-muted">{fmtNum(findings.length)}</span></div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <b className="text-sm text-text">
+              {lang === "ar" ? "الخصومات المثبتة" : "Evidence-backed deductions"}
+            </b>
+            <span className="num text-xs text-text-muted">{fmtNum(findings.length)}</span>
+          </div>
           <div className="grid gap-2 md:grid-cols-2">
             {findings.map((finding, index) => (
-              <div key={`${String(finding.code)}-${index}`} className="rounded-xl border border-danger/15 bg-danger/5 p-3">
-                <div className="flex items-center justify-between gap-2"><b className="text-xs text-text">{String(finding.code || "—")} · {String(finding.criterion || (lang === "ar" ? "معيار جودة" : "Quality criterion"))}</b><span className="num text-[10px] font-semibold text-danger">{String(finding.penalty || "")}</span></div>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">{String(finding.evidence || "")}</p>
+              <div
+                key={`${String(finding.code)}-${index}`}
+                className="rounded-xl border border-danger/15 bg-danger/5 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <b className="text-xs text-text">
+                    {String(finding.code || "—")} ·{" "}
+                    {String(
+                      finding.criterion || (lang === "ar" ? "معيار جودة" : "Quality criterion"),
+                    )}
+                  </b>
+                  <span className="num text-[10px] font-semibold text-danger">
+                    {String(finding.penalty || "")}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
+                  {String(finding.evidence || "")}
+                </p>
               </div>
             ))}
           </div>
@@ -2864,27 +4299,93 @@ function EmployeeCallDetail({ call, lang, appUrl }: { call: CallsHubCall; lang: 
 
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <b className="text-sm text-text">{lang === "ar" ? "النص المصحح" : "Corrected transcript"}</b>
-          <span className="text-[10px] text-text-muted">Deepgram Nova-3 · Arabic dialect-aware correction</span>
+          <b className="text-sm text-text">
+            {lang === "ar" ? "النص المصحح" : "Corrected transcript"}
+          </b>
+          <span className="text-[10px] text-text-muted">
+            Deepgram Nova-3 · Arabic dialect-aware correction
+          </span>
         </div>
         {data.transcript.length ? (
           <div className="max-h-80 overflow-y-auto rounded-xl border border-border bg-surface-2/60 p-4 pe-3">
             <p className="text-sm leading-[2.1] text-text" dir="auto">
               {data.transcript.map((segment, index) => {
                 const agent = segment.speaker_role === "agent";
-                const lowConfidence = typeof segment.confidence === "number" && (segment.confidence <= 1 ? segment.confidence < 0.6 : segment.confidence < 60);
-                return <span key={segment.id}>{index > 0 && " "}<b className="me-1 text-[10px] text-brand">{agent ? (lang === "ar" ? "الموظف:" : "Agent:") : (lang === "ar" ? "العميل:" : "Customer:")}</b>{lowConfidence && !(segment.suspect_terms?.length) ? <mark className="rounded bg-warning-soft px-1 text-text" title={lang === "ar" ? "مقطع مشتبه به ولا يعتمد عليه في الخصم" : "Suspect segment excluded from deductions"}>{segment.text}</mark> : highlightSuspectText(segment.text, segment.suspect_terms ?? [], lang)}</span>;
+                const lowConfidence =
+                  typeof segment.confidence === "number" &&
+                  (segment.confidence <= 1 ? segment.confidence < 0.6 : segment.confidence < 60);
+                return (
+                  <span key={segment.id}>
+                    {index > 0 && " "}
+                    <b className="me-1 text-[10px] text-brand">
+                      {agent
+                        ? lang === "ar"
+                          ? "الموظف:"
+                          : "Agent:"
+                        : lang === "ar"
+                          ? "العميل:"
+                          : "Customer:"}
+                    </b>
+                    {lowConfidence && !segment.suspect_terms?.length ? (
+                      <mark
+                        className="rounded bg-warning-soft px-1 text-text"
+                        title={
+                          lang === "ar"
+                            ? "مقطع مشتبه به ولا يعتمد عليه في الخصم"
+                            : "Suspect segment excluded from deductions"
+                        }
+                      >
+                        {segment.text}
+                      </mark>
+                    ) : (
+                      highlightSuspectText(segment.text, segment.suspect_terms ?? [], lang)
+                    )}
+                  </span>
+                );
               })}
             </p>
-            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[10px] text-text-muted"><span className="h-2.5 w-2.5 rounded-sm bg-warning-soft" />{lang === "ar" ? "الكلام المظلل مشتبه به ولا يستخدم كدليل خصم." : "Highlighted text is uncertain and is never used as deduction evidence."}</div>
+            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[10px] text-text-muted">
+              <span className="h-2.5 w-2.5 rounded-sm bg-warning-soft" />
+              {lang === "ar"
+                ? "الكلام المظلل مشتبه به ولا يستخدم كدليل خصم."
+                : "Highlighted text is uncertain and is never used as deduction evidence."}
+            </div>
           </div>
         ) : (
-          <p className="text-xs text-text-muted">{lang === "ar" ? "النص ما زال قيد المعالجة أو لا يوجد تسجيل صالح للمكالمة." : "The transcript is still processing or this call has no eligible recording."}</p>
+          <p className="text-xs text-text-muted">
+            {lang === "ar"
+              ? "النص ما زال قيد المعالجة أو لا يوجد تسجيل صالح للمكالمة."
+              : "The transcript is still processing or this call has no eligible recording."}
+          </p>
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] text-text-muted">
-        <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={13} className="text-success" />{lang === "ar" ? "الحسابات تتم برمجيًا بعد استخراج الأدلة؛ الموديل لا يحدد الدرجة بنفسه." : "The model extracts evidence; deterministic code calculates the score."}</span>
-        <span className="flex flex-wrap items-center gap-3"><a href={`${appUrl.replace(/\/+$/, "")}/?call=${encodeURIComponent(call.id)}#archive`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح نفس المكالمة في Calls Hub" : "Open this call in Calls Hub"}<ExternalLink size={12} /></a><a href="https://engosoft-pbx.ras.yeastar.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">{lang === "ar" ? "فتح Yeastar" : "Open Yeastar"}<ExternalLink size={12} /></a></span>
+        <span className="inline-flex items-center gap-1.5">
+          <CheckCircle2 size={13} className="text-success" />
+          {lang === "ar"
+            ? "الحسابات تتم برمجيًا بعد استخراج الأدلة؛ الموديل لا يحدد الدرجة بنفسه."
+            : "The model extracts evidence; deterministic code calculates the score."}
+        </span>
+        <span className="flex flex-wrap items-center gap-3">
+          <a
+            href={`${appUrl.replace(/\/+$/, "")}/?call=${encodeURIComponent(call.id)}#archive`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+          >
+            {lang === "ar" ? "فتح نفس المكالمة في Calls Hub" : "Open this call in Calls Hub"}
+            <ExternalLink size={12} />
+          </a>
+          <a
+            href="https://engosoft-pbx.ras.yeastar.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+          >
+            {lang === "ar" ? "فتح Yeastar" : "Open Yeastar"}
+            <ExternalLink size={12} />
+          </a>
+        </span>
       </div>
     </div>
   );
@@ -3473,11 +4974,12 @@ function formatCallHours(seconds: number | null, lang: "ar" | "en"): string {
   const totalMinutes = Math.max(0, Math.round(seconds / 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (lang === "ar") return bidiArabic(
-    hours > 0
-      ? `${bidiNumber(hours)}\u00a0ساعة و${bidiNumber(minutes)}\u00a0دقيقة`
-      : `${bidiNumber(minutes)}\u00a0دقيقة`,
-  );
+  if (lang === "ar")
+    return bidiArabic(
+      hours > 0
+        ? `${bidiNumber(hours)}\u00a0ساعة و${bidiNumber(minutes)}\u00a0دقيقة`
+        : `${bidiNumber(minutes)}\u00a0دقيقة`,
+    );
   return hours > 0 ? `${fmtNum(hours)}h ${fmtNum(minutes)}m` : `${fmtNum(minutes)}m`;
 }
 
@@ -3533,14 +5035,30 @@ function bidiArabic(value: string): string {
 }
 
 function highlightSuspectText(text: string, terms: string[], lang: "ar" | "en"): ReactNode {
-  const cleaned = [...new Set(terms.map((term) => term.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+  const cleaned = [...new Set(terms.map((term) => term.trim()).filter(Boolean))].sort(
+    (a, b) => b.length - a.length,
+  );
   if (!cleaned.length) return text;
   const escaped = cleaned.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const expression = new RegExp(`(${escaped.join("|")})`, "giu");
   const suspect = new Set(cleaned.map((term) => term.toLocaleLowerCase("ar")));
-  return text.split(expression).map((part, index) => suspect.has(part.toLocaleLowerCase("ar"))
-    ? <mark key={`${part}-${index}`} className="rounded bg-warning-soft px-1 text-text" title={lang === "ar" ? "كلمة مشتبه بها ولا تستخدم كدليل خصم" : "Suspect word excluded from deductions"}>{part}</mark>
-    : part);
+  return text.split(expression).map((part, index) =>
+    suspect.has(part.toLocaleLowerCase("ar")) ? (
+      <mark
+        key={`${part}-${index}`}
+        className="rounded bg-warning-soft px-1 text-text"
+        title={
+          lang === "ar"
+            ? "كلمة مشتبه بها ولا تستخدم كدليل خصم"
+            : "Suspect word excluded from deductions"
+        }
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
 }
 
 function fmtQuality(value: number | null): string {
@@ -3601,6 +5119,163 @@ function ProgressMetric({
       </div>
     </div>
   );
+}
+
+/**
+ * The four profit-and-loss figures, straight from Odoo.
+ *
+ * These are not the dashboard's own arithmetic: they are Odoo's posted Profit
+ * and Loss report, in the company's own currency. Each panel names the lines it
+ * is made of so a reader can trace it back to the ledger rather than to a
+ * calculation this app performed.
+ */
+function profitabilityMetrics(
+  snapshot: NonNullable<ProfitabilityResponse["snapshot"]>,
+  companyScope: string,
+  lang: Lang,
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const money = (value: number | null) => localMoney(value, snapshot.currency);
+  const margin =
+    snapshot.income && snapshot.income !== 0 && snapshot.netProfit !== null
+      ? fmtPct((snapshot.netProfit / snapshot.income) * 100, 1)
+      : "—";
+  const authority = A
+    ? `تقرير Profit and Loss من Odoo ${companyScope}، قيود مرحلة فقط، للفترة ${snapshot.from} → ${snapshot.to}.`
+    : `Odoo's Profit and Loss report ${companyScope}, posted entries only, ${snapshot.from} → ${snapshot.to}.`;
+  const lines = (predicate: (value: number) => boolean, tone: MetricBreakdownRow["tone"]) =>
+    topRows(
+      snapshot.lines
+        .filter((line) => Number.isFinite(line.value) && predicate(line.value))
+        .map((line) => ({
+          key: line.id,
+          label: line.label,
+          value: Math.abs(line.value),
+          display: money(line.value),
+          tone,
+        })),
+    );
+  const shared = [
+    { key: "income", label: A ? "الدخل" : "Income", value: money(snapshot.income) },
+    { key: "expenses", label: A ? "المصروفات" : "Expenses", value: money(snapshot.expenses) },
+    {
+      key: "gross",
+      label: A ? "إجمالي الربح" : "Gross profit",
+      value: money(snapshot.grossProfit),
+    },
+    { key: "margin", label: A ? "هامش صافي الربح" : "Net margin", value: margin },
+  ];
+
+  return {
+    netProfit: {
+      id: "accounting.netProfit",
+      title: A ? "صافي الربح" : "Net profit",
+      value: money(snapshot.netProfit),
+      tone: "mint",
+      definition: A
+        ? "الدخل ناقص المصروفات، كما يحسبه Odoo نفسه لهذه الفترة."
+        : "Income less expenses, as Odoo itself computes it for this window.",
+      formula: `${money(snapshot.income)} − ${money(snapshot.expenses)} = ${money(snapshot.netProfit)}`,
+      caveat: authority,
+      supporting: shared,
+      breakdowns: [
+        {
+          id: "expenses",
+          title: A ? "أكبر بنود المصروفات" : "Largest expense lines",
+          rows: lines((balance) => balance < 0, "rose"),
+          emptyLabel: A ? "لا توجد بنود مصروفات" : "No expense lines",
+        },
+      ],
+    },
+    income: {
+      id: "accounting.income",
+      title: A ? "الدخل" : "Income",
+      value: money(snapshot.income),
+      tone: "mint",
+      definition: A
+        ? "كل الدخل المسجَّل في دفاتر Odoo لهذه الفترة، تشغيليًا كان أو غير تشغيلي."
+        : "All income recorded in Odoo's books for this window, operating and non-operating alike.",
+      formula: A
+        ? `تشغيلي ${money(snapshot.operatingIncome)} + غير تشغيلي ${money(snapshot.otherIncome)}.`
+        : `Operating ${money(snapshot.operatingIncome)} plus other ${money(snapshot.otherIncome)}.`,
+      caveat: authority,
+      supporting: [
+        {
+          key: "operating",
+          label: A ? "دخل تشغيلي" : "Operating income",
+          value: money(snapshot.operatingIncome),
+        },
+        { key: "other", label: A ? "دخل آخر" : "Other income", value: money(snapshot.otherIncome) },
+        {
+          key: "cost",
+          label: A ? "تكلفة الإيراد" : "Cost of revenue",
+          value: money(snapshot.costOfRevenue),
+        },
+        { key: "net", label: A ? "صافي الربح" : "Net profit", value: money(snapshot.netProfit) },
+      ],
+      breakdowns: [
+        {
+          id: "income",
+          title: A ? "أكبر بنود الدخل" : "Largest income lines",
+          rows: lines((balance) => balance > 0, "mint"),
+          emptyLabel: A ? "لا توجد بنود دخل" : "No income lines",
+        },
+      ],
+    },
+    expenses: {
+      id: "accounting.expenses",
+      title: A ? "المصروفات" : "Expenses",
+      value: money(snapshot.expenses),
+      tone: "rose",
+      definition: A
+        ? "كل المصروفات المرحّلة في دفاتر Odoo لهذه الفترة، بما فيها الإهلاك."
+        : "All expenses posted in Odoo's books for this window, depreciation included.",
+      formula: `${money(snapshot.income)} − ${money(snapshot.expenses)} = ${money(snapshot.netProfit)}`,
+      caveat: authority,
+      supporting: [
+        {
+          key: "depreciation",
+          label: A ? "الإهلاك" : "Depreciation",
+          value: money(snapshot.depreciation),
+        },
+        {
+          key: "cost",
+          label: A ? "تكلفة الإيراد" : "Cost of revenue",
+          value: money(snapshot.costOfRevenue),
+        },
+        { key: "income", label: A ? "الدخل" : "Income", value: money(snapshot.income) },
+        { key: "margin", label: A ? "هامش صافي الربح" : "Net margin", value: margin },
+      ],
+      breakdowns: [
+        {
+          id: "expenses",
+          title: A ? "أكبر بنود المصروفات" : "Largest expense lines",
+          rows: lines((balance) => balance < 0, "rose"),
+          emptyLabel: A ? "لا توجد بنود مصروفات" : "No expense lines",
+        },
+      ],
+    },
+    grossProfit: {
+      id: "accounting.grossProfit",
+      title: A ? "إجمالي الربح" : "Gross profit",
+      value: money(snapshot.grossProfit),
+      tone: "cyan",
+      definition: A
+        ? "الدخل التشغيلي ناقص تكلفة الإيراد، قبل المصروفات العامة. يقيس ربح النشاط نفسه لا ربح الشركة."
+        : "Operating income less the cost of revenue, before general expenses. It measures the activity's own profit, not the company's.",
+      formula: `${money(snapshot.operatingIncome)} − ${money(snapshot.costOfRevenue)} = ${money(snapshot.grossProfit)}`,
+      caveat: authority,
+      supporting: shared,
+      breakdowns: [
+        {
+          id: "income",
+          title: A ? "أكبر بنود الدخل" : "Largest income lines",
+          rows: lines((balance) => balance > 0, "mint"),
+          emptyLabel: A ? "لا توجد بنود دخل" : "No income lines",
+        },
+      ],
+    },
+  };
 }
 
 export function AccountingProfitabilityView() {
@@ -3665,6 +5340,9 @@ export function AccountingProfitabilityView() {
       : lang === "ar"
         ? `لكل الشركات المتاحة في Odoo (${p.companies.length}): ${companyNames}`
         : `for every Odoo-accessible company (${p.companies.length}): ${companyNames}`;
+  // One description per figure, built from the snapshot already on screen.
+  const profitFigures = profitabilityMetrics(p, companyScope, lang);
+
   return (
     <div className="space-y-4">
       <Notice
@@ -3676,33 +5354,18 @@ export function AccountingProfitabilityView() {
           ? `تقرير Profit and Loss مباشر من Odoo 17 ${companyScope}، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. الربح = الدخل − المصروفات.`
           : `Direct Odoo 17 Profit and Loss ${companyScope}, posted entries only, ${p.from} → ${p.to}. Profit = income − expenses.`}
       </Notice>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
-          tone="mint"
-          index={0}
-          label={lang === "ar" ? "صافي الربح" : "Net profit"}
-          value={localMoney(p.netProfit, p.currency)}
-          hero
+      <KpiRow>
+        <MetricDetailTrigger
+          detail={profitFigures.netProfit}
+          card={{ index: 0, hero: true, valueWrap: true }}
         />
-        <KpiCard
-          tone="mint"
-          index={1}
-          label={lang === "ar" ? "الدخل" : "Income"}
-          value={localMoney(p.income, p.currency)}
+        <MetricDetailTrigger detail={profitFigures.income} card={{ index: 1, valueWrap: true }} />
+        <MetricDetailTrigger detail={profitFigures.expenses} card={{ index: 2, valueWrap: true }} />
+        <MetricDetailTrigger
+          detail={profitFigures.grossProfit}
+          card={{ index: 3, valueWrap: true }}
         />
-        <KpiCard
-          tone="rose"
-          index={2}
-          label={lang === "ar" ? "المصروفات" : "Expenses"}
-          value={localMoney(p.expenses, p.currency)}
-        />
-        <KpiCard
-          tone="mint"
-          index={3}
-          label={lang === "ar" ? "إجمالي الربح" : "Gross profit"}
-          value={localMoney(p.grossProfit, p.currency)}
-        />
-      </div>
+      </KpiRow>
       <Card>
         <SectionTitle
           action={

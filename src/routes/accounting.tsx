@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BadgeDollarSign,
   Building2,
@@ -39,7 +39,15 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import {
+  DashboardPageHeader,
+  DataHealthSummary,
+  KpiRow,
+  PageSection,
+  PageSections,
+} from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
@@ -132,6 +140,9 @@ function Accounting() {
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+  // Built once per response, not once per card: the five summary figures share
+  // the same distributions and the same day series.
+  const metrics = useMemo(() => (data ? accountingMetrics(data, lang) : null), [data, lang]);
 
   useEffect(() => {
     filterStore.hydrateFx();
@@ -318,8 +329,9 @@ function Accounting() {
     : cols.filter((column) => column.key !== "quantity");
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<Receipt size={20} />}
         title={t("accounting")}
         subtitle={
@@ -450,47 +462,31 @@ function Accounting() {
         <>
           {view === "summary" && (
             <>
-              <KpiRow columns={5}>
-                <KpiCard
-                  tone="mint"
-                  index={0}
-                  label={t("revenue")}
-                  value={fmtUSDExact(data.summary.paidUsd)}
-                  sub={lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date"}
-                  hero
-                  valueWrap
-                  icon={<BadgeDollarSign size={15} />}
+              <KpiRow>
+                <MetricDetailTrigger
+                  detail={{ ...metrics!.revenue, title: t("revenue") }}
+                  card={{
+                    index: 0,
+                    hero: true,
+                    valueWrap: true,
+                    sub: lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date",
+                  }}
                 />
-                <KpiCard
-                  index={1}
-                  label={t("invoices")}
-                  value={fmtNum(data.summary.invoices)}
-                  tone="sky"
-                  icon={<Receipt size={15} />}
+                <MetricDetailTrigger
+                  detail={{ ...metrics!.invoices, title: t("invoices") }}
+                  card={{ index: 1 }}
                 />
-                <KpiCard
-                  index={2}
-                  label={t("avg_invoice")}
-                  value={fmtUSDExact(data.summary.averageInvoice)}
-                  tone="violet"
-                  valueWrap
-                  icon={<Calculator size={15} />}
+                <MetricDetailTrigger
+                  detail={{ ...metrics!.average, title: t("avg_invoice") }}
+                  card={{ index: 2, valueWrap: true }}
                 />
-                <KpiCard
-                  index={3}
-                  label={t("product_lines")}
-                  value={fmtNum(data.summary.productLines)}
-                  tone="cyan"
-                  icon={<Layers size={15} />}
+                <MetricDetailTrigger
+                  detail={{ ...metrics!.lines, title: t("product_lines") }}
+                  card={{ index: 3 }}
                 />
-                <KpiCard
-                  index={4}
-                  label={lang === "ar" ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes"}
-                  value={fmtNum(data.summary.creditNotes)}
-                  tone={data.summary.creditNotes > 0 ? "rose" : "amber"}
-                  valueWrap
-                  icon={<RotateCcw size={15} />}
-                  sub={fmtUSDExact(data.summary.creditNoteUsd)}
+                <MetricDetailTrigger
+                  detail={metrics!.credits}
+                  card={{ index: 4, valueWrap: true, sub: fmtUSDExact(data.summary.creditNoteUsd) }}
                 />
               </KpiRow>
 
@@ -672,6 +668,278 @@ function Accounting() {
       )}
     </div>
   );
+}
+
+/** A money distribution the response already carried, as a drill-down section. */
+function moneySection(
+  id: string,
+  title: string,
+  rows: Grouped[],
+  lang: "ar" | "en",
+  tone: MetricBreakdownGroup["rows"][number]["tone"] = "mint",
+): MetricBreakdownGroup {
+  return {
+    id,
+    title,
+    rows: [...rows]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+      .map((row) => ({
+        key: row.label,
+        label: row.label,
+        value: row.value,
+        display: fmtUSDExact(row.value),
+        meta: fmtPct(row.share, 1),
+        tone,
+      })),
+    emptyLabel: lang === "ar" ? "لا توجد بيانات في الفترة" : "Nothing in this period",
+  };
+}
+
+/**
+ * The accounting summary's five figures, and what each is made of.
+ *
+ * Everything here comes from the same response the cards render — the product,
+ * team, salesperson and company splits, and the day-by-day collection series —
+ * so a reader who opens "collected revenue" sees the very rows that produced
+ * the number above their finger.
+ */
+function accountingMetrics(
+  data: AccountingResponse,
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const S = data.summary;
+  const collectionTrend = data.byDay
+    .filter((row) => Number.isFinite(row.revenue))
+    .map((row) => ({ date: row.date, value: row.revenue }));
+
+  const revenue: MetricDetail = {
+    id: "accounting.revenue",
+    title: A ? "الإيراد المحصّل" : "Collected revenue",
+    value: fmtUSDExact(S.paidUsd),
+    tone: "mint",
+    icon: <BadgeDollarSign size={16} />,
+    definition: A
+      ? "المبالغ المدفوعة فعليًا خلال الفترة، محسوبة بتاريخ الدفع من عمود USD Paid. الفاتورة التي صدرت ولم تُدفع بعد لا تدخل هنا."
+      : "Money actually collected in the period, counted on payment date from the USD Paid column. An invoice raised but not yet paid is not in this figure.",
+    formula: A
+      ? "مجموع USD Paid لكل فاتورة يقع تاريخ دفعها داخل الفترة المحددة، بعد خصم إشعارات الخصم."
+      : "Sum of USD Paid for every invoice whose payment date falls inside the window, credit notes deducted.",
+    trend:
+      collectionTrend.length > 1
+        ? {
+            points: collectionTrend,
+            label: A ? "حركة التحصيل اليومية" : "Daily collection",
+            format: fmtUSDExact,
+          }
+        : undefined,
+    supporting: [
+      { key: "invoices", label: A ? "عدد الفواتير" : "Invoices", value: fmtNum(S.invoices) },
+      {
+        key: "avg",
+        label: A ? "متوسط الفاتورة" : "Average invoice",
+        value: fmtUSDExact(S.averageInvoice),
+      },
+      { key: "lines", label: A ? "بنود المنتجات" : "Product lines", value: fmtNum(S.productLines) },
+      {
+        key: "credit",
+        label: A ? "إشعارات خصم" : "Credit notes",
+        value: fmtUSDExact(S.creditNoteUsd),
+      },
+    ],
+    breakdowns: [
+      moneySection(
+        "courses",
+        A ? "حسب التصنيف الرئيسي" : "By main category",
+        data.byMainCategory,
+        lang,
+        "amber",
+      ),
+      moneySection("products", A ? "حسب المنتج" : "By product", data.byProduct, lang),
+      moneySection(
+        "salespeople",
+        A ? "حسب الموظف" : "By salesperson",
+        data.bySalesperson,
+        lang,
+        "violet",
+      ),
+      moneySection("teams", A ? "حسب الفريق" : "By team", data.byTeam, lang, "cyan"),
+    ],
+    records: {
+      title: A ? "حسب الشركة والعملة" : "By company and currency",
+      rows: [
+        ...data.byCompany.slice(0, 3).map((row) => ({
+          key: `company-${row.label}`,
+          title: row.label,
+          subtitle: A ? "شركة" : "Company",
+          value: fmtUSDExact(row.value),
+          meta: fmtPct(row.share, 1),
+        })),
+        ...data.byCurrency.slice(0, 2).map((row) => ({
+          key: `currency-${row.label}`,
+          title: row.label,
+          subtitle: A ? "عملة الفاتورة" : "Invoice currency",
+          value: fmtUSDExact(row.value),
+          meta: fmtPct(row.share, 1),
+        })),
+      ],
+    },
+  };
+
+  const invoices: MetricDetail = {
+    id: "accounting.invoices",
+    title: A ? "عدد الفواتير" : "Invoices",
+    value: fmtNum(S.invoices),
+    tone: "sky",
+    icon: <Receipt size={16} />,
+    definition: A
+      ? "عدد الفواتير المدفوعة المميزة في الفترة. الفاتورة الواحدة قد تحمل أكثر من بند منتج."
+      : "Distinct paid invoices in the period. One invoice can carry more than one product line.",
+    formula: A
+      ? `${fmtNum(S.invoices)} فاتورة تحمل ${fmtNum(S.productLines)} بند منتج، بمتوسط ${fmtUSDExact(S.averageInvoice)} للفاتورة.`
+      : `${fmtNum(S.invoices)} invoices carrying ${fmtNum(S.productLines)} product lines, averaging ${fmtUSDExact(S.averageInvoice)} each.`,
+    supporting: [
+      { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDExact(S.paidUsd) },
+      { key: "lines", label: A ? "بنود المنتجات" : "Product lines", value: fmtNum(S.productLines) },
+      {
+        key: "avg",
+        label: A ? "متوسط الفاتورة" : "Average invoice",
+        value: fmtUSDExact(S.averageInvoice),
+      },
+      { key: "credit", label: A ? "إشعارات خصم" : "Credit notes", value: fmtNum(S.creditNotes) },
+    ],
+    breakdowns: [
+      {
+        id: "salespeople",
+        title: A ? "عدد البنود حسب الموظف" : "Lines by salesperson",
+        rows: [...data.bySalesperson]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5)
+          .map((row) => ({
+            key: row.label,
+            label: row.label,
+            value: row.count,
+            display: fmtNum(row.count),
+            meta: fmtUSDExact(row.value),
+            tone: "sky" as const,
+          })),
+        emptyLabel: A ? "لا توجد بيانات في الفترة" : "Nothing in this period",
+      },
+    ],
+  };
+
+  const average: MetricDetail = {
+    id: "accounting.average",
+    title: A ? "متوسط الفاتورة" : "Average invoice",
+    value: fmtUSDExact(S.averageInvoice),
+    tone: "violet",
+    icon: <Calculator size={16} />,
+    definition: A
+      ? "متوسط قيمة الفاتورة المدفوعة في الفترة. متوسط مرتفع مع عدد فواتير منخفض يعني اعتمادًا على صفقات قليلة كبيرة."
+      : "The average value of a paid invoice in the period. A high average on few invoices means the month rests on a small number of large deals.",
+    formula: A
+      ? `${fmtUSDExact(S.paidUsd)} ÷ ${fmtNum(S.invoices)} فاتورة = ${fmtUSDExact(S.averageInvoice)}.`
+      : `${fmtUSDExact(S.paidUsd)} ÷ ${fmtNum(S.invoices)} invoices = ${fmtUSDExact(S.averageInvoice)}.`,
+    supporting: [
+      {
+        key: "revenue",
+        label: A ? "البسط · الإيراد" : "Numerator · revenue",
+        value: fmtUSDExact(S.paidUsd),
+      },
+      {
+        key: "invoices",
+        label: A ? "المقام · الفواتير" : "Denominator · invoices",
+        value: fmtNum(S.invoices),
+      },
+      { key: "lines", label: A ? "بنود المنتجات" : "Product lines", value: fmtNum(S.productLines) },
+      {
+        key: "perLine",
+        label: A ? "متوسط البند" : "Average line",
+        value: S.productLines > 0 ? fmtUSDExact(S.paidUsd / S.productLines) : "—",
+      },
+    ],
+    breakdowns: [
+      moneySection(
+        "products",
+        A ? "أعلى المنتجات قيمة" : "Highest-value products",
+        data.byProduct,
+        lang,
+        "violet",
+      ),
+    ],
+  };
+
+  const lines: MetricDetail = {
+    id: "accounting.lines",
+    title: A ? "بنود المنتجات" : "Product lines",
+    value: fmtNum(S.productLines),
+    tone: "cyan",
+    icon: <Layers size={16} />,
+    definition: A
+      ? "عدد بنود المنتجات داخل الفواتير المدفوعة. هذا هو المستوى الذي تُنسب عنده الدورة والمنتج، لا مستوى الفاتورة."
+      : "Product lines inside the paid invoices. This is the level at which a course and a product are attributed — not the invoice.",
+    formula: A
+      ? `${fmtNum(S.productLines)} بند داخل ${fmtNum(S.invoices)} فاتورة.`
+      : `${fmtNum(S.productLines)} lines inside ${fmtNum(S.invoices)} invoices.`,
+    supporting: [
+      { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(S.invoices) },
+      {
+        key: "perInvoice",
+        label: A ? "بنود لكل فاتورة" : "Lines per invoice",
+        value: S.invoices > 0 ? (S.productLines / S.invoices).toFixed(2) : "—",
+      },
+      { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDExact(S.paidUsd) },
+      {
+        key: "categories",
+        label: A ? "تصنيفات رئيسية" : "Main categories",
+        value: fmtNum(data.byMainCategory.length),
+      },
+    ],
+    breakdowns: [
+      moneySection(
+        "categories",
+        A ? "حسب فئة المنتج" : "By product category",
+        data.byProductCategory,
+        lang,
+        "cyan",
+      ),
+    ],
+  };
+
+  const credits: MetricDetail = {
+    id: "accounting.credits",
+    title: A ? "إلغاءات / إشعارات خصم" : "Cancellations / credit notes",
+    value: fmtNum(S.creditNotes),
+    tone: S.creditNotes > 0 ? "rose" : "amber",
+    icon: <RotateCcw size={16} />,
+    definition: A
+      ? "الفواتير التي أُلغيت أو صدر لها إشعار خصم داخل الفترة. قيمتها مخصومة بالفعل من الإيراد المعروض."
+      : "Invoices cancelled or credited inside the period. Their value is already deducted from the revenue shown.",
+    formula: A
+      ? `${fmtNum(S.creditNotes)} إشعار بقيمة ${fmtUSDExact(S.creditNoteUsd)}، مخصومة من ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} إجمالي محصّل قبل الخصم.`
+      : `${fmtNum(S.creditNotes)} notes worth ${fmtUSDExact(S.creditNoteUsd)}, deducted from ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} collected before the deduction.`,
+    supporting: [
+      {
+        key: "value",
+        label: A ? "قيمة الإشعارات" : "Credit value",
+        value: fmtUSDExact(S.creditNoteUsd),
+      },
+      {
+        key: "net",
+        label: A ? "الإيراد بعد الخصم" : "Revenue after deduction",
+        value: fmtUSDExact(S.paidUsd),
+      },
+      { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(S.invoices) },
+      {
+        key: "share",
+        label: A ? "نسبتها من التحصيل" : "Share of collection",
+        value: S.paidUsd > 0 ? fmtPct((S.creditNoteUsd / S.paidUsd) * 100, 1) : "—",
+      },
+    ],
+  };
+
+  return { revenue, invoices, average, lines, credits };
 }
 
 function Money({ title, rows }: { title: string; rows: Grouped[] }) {

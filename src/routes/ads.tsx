@@ -30,7 +30,10 @@ import {
   SectionTitle,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
+import { MetricCardDetailTrigger } from "@/components/metric-detail";
+import { standardMetrics } from "@/components/standard-metrics";
+
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { MultiLineChart, ScatterPlot } from "@/components/charts";
 import { CompareBars } from "@/components/ads/CompareBars";
@@ -147,6 +150,44 @@ function Ads() {
         : "No recorded spend in the selected period."
       : undefined;
 
+  // Built from the response already on screen, so opening a figure costs a
+  // render and never a request.
+  const metrics = totals
+    ? standardMetrics({
+        totals,
+        rows: data?.rows ?? [],
+        trend: data?.trend ?? [],
+        surface: "ads",
+        lang,
+        reports: {
+          revenue: {
+            to: "/accounting",
+            label: lang === "ar" ? "فتح تقرير الحسابات" : "Open the Accounting report",
+          },
+          leads: {
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
+          },
+          spend: {
+            to: "/campaigns",
+            label: lang === "ar" ? "فتح تقرير الحملات" : "Open the campaigns report",
+          },
+          roas: {
+            to: "/campaigns",
+            label: lang === "ar" ? "فتح تقرير الحملات" : "Open the campaigns report",
+          },
+          cpl: {
+            to: "/campaigns",
+            label: lang === "ar" ? "فتح تقرير الحملات" : "Open the campaigns report",
+          },
+          conversion: {
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
+          },
+        },
+      })
+    : null;
+
   const nothingAtAll =
     !!selectedCoverage &&
     selectedCoverage.adRows === 0 &&
@@ -154,9 +195,10 @@ function Ads() {
     selectedCoverage.revenue === 0;
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <DashboardPageHeader
+          flush
           icon={<BarChart3 size={20} />}
           title={t("ads_tech")}
           subtitle={
@@ -223,85 +265,111 @@ function Ads() {
             <>
               {/* Six primary KPIs. The rest sit one click away so the first
                   screen answers "did this work?" and not much else. */}
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                <MetricCard
-                  metric="spend"
-                  index={0}
-                  icon={<Wallet size={14} />}
-                  value={fmtUSD(totals.spend)}
-                  unavailableReason={noSpendTab ? spendNote : undefined}
-                  sub={<SpendSplit totals={totals} />}
-                  note={spendNote}
+              <KpiRow>
+                <MetricCardDetailTrigger
+                  detail={metrics!.spend}
+                  card={{
+                    metric: "spend",
+                    index: 0,
+                    icon: <Wallet size={14} />,
+                    value: fmtUSD(totals.spend),
+                    unavailableReason: noSpendTab ? spendNote : undefined,
+                    sub: <SpendSplit totals={totals} />,
+                    note: spendNote,
+                  }}
                 />
-                <MetricCard
-                  metric="platformLeads"
-                  index={1}
-                  icon={<Users size={14} />}
-                  value={
-                    totals.platformLeads === null ? (
-                      <Unavailable
-                        reason={
-                          lang === "ar"
-                            ? "المنصة دي مبتبلّغش عن عدد ليدز"
-                            : "This platform reports no lead metric"
-                        }
-                      />
-                    ) : (
-                      fmtNum(totals.platformLeads)
-                    )
-                  }
-                  sub={
-                    lang === "ar"
-                      ? `${fmtNum(totals.totalLeads)} في أودو`
-                      : `${fmtNum(totals.totalLeads)} in Odoo`
-                  }
+                <MetricCardDetailTrigger
+                  detail={{
+                    ...metrics!.leads,
+                    id: "ads.platformLeads",
+                    title: lang === "ar" ? "ليدز أبلغت عنها المنصات" : "Platform-reported leads",
+                    value: totals.platformLeads === null ? "—" : fmtNum(totals.platformLeads),
+                    definition:
+                      lang === "ar"
+                        ? "عدد العملاء الذي تبلّغ عنه المنصة الإعلانية نفسها. يختلف عن عدد العملاء في أودو: المنصة تعدّ نموذجًا مُرسلًا، وأودو يعدّ صفًا وصل فعلًا."
+                        : "The lead count the ad platform itself reports. It differs from the Odoo count: the platform counts a submitted form, Odoo counts a row that actually arrived.",
+                    formula:
+                      lang === "ar"
+                        ? `${fmtNum(totals.platformLeads ?? 0)} حسب المنصات، مقابل ${fmtNum(totals.totalLeads)} في أودو.`
+                        : `${fmtNum(totals.platformLeads ?? 0)} per the platforms, against ${fmtNum(totals.totalLeads)} in Odoo.`,
+                  }}
+                  card={{
+                    metric: "platformLeads",
+                    index: 1,
+                    icon: <Users size={14} />,
+                    value:
+                      totals.platformLeads === null ? (
+                        <Unavailable
+                          reason={
+                            lang === "ar"
+                              ? "المنصة دي مبتبلّغش عن عدد ليدز"
+                              : "This platform reports no lead metric"
+                          }
+                        />
+                      ) : (
+                        fmtNum(totals.platformLeads)
+                      ),
+                    sub:
+                      lang === "ar"
+                        ? `${fmtNum(totals.totalLeads)} في أودو`
+                        : `${fmtNum(totals.totalLeads)} in Odoo`,
+                  }}
                 />
-                <MetricCard
-                  metric="cpl"
-                  index={2}
-                  icon={<BadgeDollarSign size={14} />}
-                  value={ratioCell(totals.cpl, spend, fmtUSDFull)}
-                  unavailableReason={unavailableReason}
-                  note={spendNote}
+                <MetricCardDetailTrigger
+                  detail={metrics!.cpl}
+                  card={{
+                    metric: "cpl",
+                    index: 2,
+                    icon: <BadgeDollarSign size={14} />,
+                    value: ratioCell(totals.cpl, spend, fmtUSDFull),
+                    unavailableReason,
+                    note: spendNote,
+                  }}
                 />
-                <MetricCard
-                  metric="revenue"
-                  index={3}
-                  icon={<CircleDollarSign size={14} />}
-                  value={fmtUSD(totals.revenue)}
-                  sub={
-                    lang === "ar"
-                      ? `منها ${fmtUSD(totals.attributedRevenue)} مربوط بحملات`
-                      : `${fmtUSD(totals.attributedRevenue)} linked to campaigns`
-                  }
+                <MetricCardDetailTrigger
+                  detail={metrics!.revenue}
+                  card={{
+                    metric: "revenue",
+                    index: 3,
+                    icon: <CircleDollarSign size={14} />,
+                    value: fmtUSD(totals.revenue),
+                    sub:
+                      lang === "ar"
+                        ? `منها ${fmtUSD(totals.attributedRevenue)} مربوط بحملات`
+                        : `${fmtUSD(totals.attributedRevenue)} linked to campaigns`,
+                  }}
                 />
-                <MetricCard
-                  metric="roas"
-                  index={4}
-                  icon={<TrendingUp size={14} />}
-                  value={ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`)}
-                  unavailableReason={unavailableReason}
-                  note={
-                    spendNote ??
-                    (lang === "ar"
-                      ? `البسط هنا هو كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}) — ده تعريف الإدارة المعتمد.`
-                      : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}) — that is the approved definition.`)
-                  }
-                  verdict={roasVerdict(totals.roas, spend) ?? undefined}
-                  verdictLabel={verdictWord(roasVerdict(totals.roas, spend), lang)}
+                <MetricCardDetailTrigger
+                  detail={metrics!.roas}
+                  card={{
+                    metric: "roas",
+                    index: 4,
+                    icon: <TrendingUp size={14} />,
+                    value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
+                    unavailableReason,
+                    note:
+                      spendNote ??
+                      (lang === "ar"
+                        ? `البسط هنا هو كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}) — ده تعريف الإدارة المعتمد.`
+                        : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}) — that is the approved definition.`),
+                    verdict: roasVerdict(totals.roas, spend) ?? undefined,
+                    verdictLabel: verdictWord(roasVerdict(totals.roas, spend), lang),
+                  }}
                 />
-                <MetricCard
-                  metric="conversionRate"
-                  index={5}
-                  icon={<Handshake size={14} />}
-                  value={ratioCell(totals.conversionRate, totals.totalLeads, (v) => fmtPct(v, 2))}
-                  sub={
-                    lang === "ar"
-                      ? `${fmtNum(totals.won)} من ${fmtNum(totals.totalLeads)}`
-                      : `${fmtNum(totals.won)} of ${fmtNum(totals.totalLeads)}`
-                  }
+                <MetricCardDetailTrigger
+                  detail={metrics!.conversion}
+                  card={{
+                    metric: "conversionRate",
+                    index: 5,
+                    icon: <Handshake size={14} />,
+                    value: ratioCell(totals.conversionRate, totals.totalLeads, (v) => fmtPct(v, 2)),
+                    sub:
+                      lang === "ar"
+                        ? `${fmtNum(totals.won)} من ${fmtNum(totals.totalLeads)}`
+                        : `${fmtNum(totals.won)} of ${fmtNum(totals.totalLeads)}`,
+                  }}
                 />
-              </div>
+              </KpiRow>
 
               <button
                 onClick={() => setShowAllKpis((v) => !v)}

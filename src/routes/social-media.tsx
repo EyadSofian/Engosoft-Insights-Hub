@@ -23,6 +23,8 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader, InsightCard, InsightRow, KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
@@ -73,6 +75,262 @@ function duration(seconds: number | null, lang: "ar" | "en") {
   if (seconds < 60) return `${Math.round(seconds)} ${lang === "ar" ? "ث" : "sec"}`;
   if (seconds < 3600) return `${Math.round(seconds / 60)} ${lang === "ar" ? "د" : "min"}`;
   return `${(seconds / 3600).toFixed(1)} ${lang === "ar" ? "س" : "hr"}`;
+}
+
+/**
+ * The five social figures, and where each one comes from.
+ *
+ * PAID AND NON-PAID ARE NEVER ADDED TOGETHER HERE. Reach, clicks and CTR are
+ * what the ad platforms reported; leads and revenue are what arrived through
+ * sources that carry no media cost. Mixing them would produce a "social ROAS"
+ * with a numerator and a denominator from different populations.
+ */
+function socialMetrics(
+  reach: {
+    impressions: number;
+    clicks: number;
+    paidResults: number;
+    ctr: number | null;
+    best: PaidChannel | null;
+  },
+  channels: PaidChannel[],
+  organicTotals: { leads: number; won: number; revenue: number; top: OrganicSource | null },
+  organicSources: OrganicSource[],
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const byPlatform = (pick: (row: PaidChannel) => number, format: (n: number) => string) =>
+    topRows(
+      channels.map((channel) => ({
+        key: channel.platform,
+        label: PLATFORM_LABEL[channel.platform] ?? channel.platform,
+        value: pick(channel),
+        display: format(pick(channel)),
+        meta: `${fmtNum(channel.rows)} ${A ? "صف" : "rows"}`,
+        tone: "sky" as const,
+      })),
+    );
+  const bySource = (pick: (row: OrganicSource) => number, format: (n: number) => string) =>
+    topRows(
+      organicSources.map((source) => ({
+        key: source.key,
+        label: source.name,
+        value: pick(source),
+        display: format(pick(source)),
+        meta: `${fmtNum(source.leads)} ${A ? "ليد" : "leads"}`,
+        tone: "mint" as const,
+      })),
+    );
+
+  const paidNote = A
+    ? "هذا رقم مدفوع بالكامل: ما أبلغت عنه منصات الإعلان. لا يُجمع مع أرقام المصادر غير المدفوعة أسفله."
+    : "This is entirely a paid figure — what the ad platforms reported. It is never added to the non-paid figures beside it.";
+  const organicNote = A
+    ? "هذا رقم غير مدفوع بالكامل: لا يُنسب إليه أي إنفاق إعلاني، ولذلك لا يوجد عائد على الإنفاق لهذه المصادر."
+    : "This is entirely a non-paid figure: no ad spend is attributed to it, so there is no return-on-spend for these sources.";
+
+  return {
+    reach: {
+      id: "social_media.reach",
+      title: A ? "الظهور" : "Reach",
+      value: fmtNum(reach.impressions),
+      tone: "sky",
+      icon: <Radio size={16} />,
+      definition: A
+        ? "إجمالي مرات ظهور الإعلانات التي أبلغت عنها المنصات في الفترة."
+        : "Total ad impressions reported by the platforms in the period.",
+      caveat: paidNote,
+      formula: A
+        ? `${fmtNum(reach.impressions)} ظهور و${fmtNum(reach.clicks)} نقرة = ${fmtPct(reach.ctr, 2)} نسبة نقر.`
+        : `${fmtNum(reach.impressions)} impressions and ${fmtNum(reach.clicks)} clicks = ${fmtPct(reach.ctr, 2)} click-through.`,
+      supporting: [
+        { key: "clicks", label: A ? "النقرات" : "Clicks", value: fmtNum(reach.clicks) },
+        { key: "ctr", label: A ? "نسبة النقر" : "CTR", value: fmtPct(reach.ctr, 2) },
+        {
+          key: "results",
+          label: A ? "نتائج المنصات" : "Platform results",
+          value: fmtNum(reach.paidResults),
+        },
+        {
+          key: "platforms",
+          label: A ? "المنصات النشطة" : "Active platforms",
+          value: fmtNum(channels.length),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "الظهور حسب المنصة" : "Impressions by platform",
+          rows: byPlatform((channel) => channel.impressions, fmtNum),
+          emptyLabel: A ? "لا توجد منصات نشطة" : "No active platform",
+        },
+      ],
+      report: { to: "/ads", label: A ? "فتح تقرير الإعلانات" : "Open the ads report" },
+    },
+    clicks: {
+      id: "social_media.clicks",
+      title: A ? "النقرات" : "Clicks",
+      value: fmtNum(reach.clicks),
+      tone: "violet",
+      icon: <MousePointerClick size={16} />,
+      definition: A
+        ? "كل النقرات التي أبلغت عنها المنصات، بما فيها النقرات التي لم تفتح رابطًا."
+        : "Every click the platforms reported, including clicks that did not open a link.",
+      caveat: paidNote,
+      formula: `${fmtNum(reach.clicks)} ÷ ${fmtNum(reach.impressions)} = ${fmtPct(reach.ctr, 2)}`,
+      supporting: [
+        {
+          key: "impressions",
+          label: A ? "الظهور" : "Impressions",
+          value: fmtNum(reach.impressions),
+        },
+        { key: "ctr", label: A ? "نسبة النقر" : "CTR", value: fmtPct(reach.ctr, 2) },
+        {
+          key: "results",
+          label: A ? "نتائج المنصات" : "Platform results",
+          value: fmtNum(reach.paidResults),
+        },
+        {
+          key: "best",
+          label: A ? "أعلى منصة ظهورًا" : "Top platform by reach",
+          value: reach.best ? (PLATFORM_LABEL[reach.best.platform] ?? reach.best.platform) : "—",
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "النقرات حسب المنصة" : "Clicks by platform",
+          rows: byPlatform((channel) => channel.clicksAll, fmtNum),
+          emptyLabel: A ? "لا توجد منصات نشطة" : "No active platform",
+        },
+      ],
+      report: { to: "/ads", label: A ? "فتح تقرير الإعلانات" : "Open the ads report" },
+    },
+    ctr: {
+      id: "social_media.ctr",
+      title: A ? "نسبة النقر" : "Click-through rate",
+      value: fmtPct(reach.ctr, 2),
+      tone: "amber",
+      icon: <BadgeCheck size={16} />,
+      definition: A
+        ? "نسبة من رأى الإعلان ثم نقر عليه. تقيس جاذبية المحتوى، لا جودة الليد."
+        : "The share of people who saw an ad and clicked it. It measures how compelling the content is, not lead quality.",
+      caveat: paidNote,
+      formula: `${fmtNum(reach.clicks)} ÷ ${fmtNum(reach.impressions)} = ${fmtPct(reach.ctr, 2)}`,
+      supporting: [
+        {
+          key: "clicks",
+          label: A ? "البسط · النقرات" : "Numerator · clicks",
+          value: fmtNum(reach.clicks),
+        },
+        {
+          key: "impressions",
+          label: A ? "المقام · الظهور" : "Denominator · impressions",
+          value: fmtNum(reach.impressions),
+        },
+        {
+          key: "results",
+          label: A ? "نتائج المنصات" : "Platform results",
+          value: fmtNum(reach.paidResults),
+        },
+        {
+          key: "platforms",
+          label: A ? "المنصات النشطة" : "Active platforms",
+          value: fmtNum(channels.length),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "نسبة النقر حسب المنصة" : "CTR by platform",
+          rows: byPlatform(
+            (channel) => channel.ctrAll ?? 0,
+            (n) => fmtPct(n, 2),
+          ),
+          emptyLabel: A ? "لا توجد منصات نشطة" : "No active platform",
+        },
+      ],
+    },
+    organicLeads: {
+      id: "social_media.organicLeads",
+      title: A ? "العملاء من المصادر غير المدفوعة" : "Leads from non-paid sources",
+      value: fmtNum(organicTotals.leads),
+      tone: "mint",
+      icon: <Users size={16} />,
+      definition: A
+        ? "العملاء الذين وصلوا عبر قنوات لا يُنسب إليها إنفاق إعلاني: واتساب، الموقع، الترشيحات وما شابه."
+        : "Leads that arrived through channels with no attributed ad spend: WhatsApp, the website, referrals and the like.",
+      caveat: organicNote,
+      formula: A
+        ? `${fmtNum(organicTotals.won)} من ${fmtNum(organicTotals.leads)} أُغلقت رابحة.`
+        : `${fmtNum(organicTotals.won)} of ${fmtNum(organicTotals.leads)} closed as won.`,
+      supporting: [
+        { key: "won", label: A ? "صفقات مغلقة" : "Closed won", value: fmtNum(organicTotals.won) },
+        {
+          key: "revenue",
+          label: A ? "الإيراد" : "Revenue",
+          value: fmtUSDFull(organicTotals.revenue),
+        },
+        {
+          key: "top",
+          label: A ? "أعلى مصدر" : "Top source",
+          value: organicTotals.top?.name ?? "—",
+        },
+        {
+          key: "sources",
+          label: A ? "عدد المصادر" : "Sources",
+          value: fmtNum(organicSources.length),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "العملاء حسب المصدر" : "Leads by source",
+          rows: bySource((source) => source.leads, fmtNum),
+          emptyLabel: A ? "لا توجد مصادر غير مدفوعة" : "No non-paid source",
+        },
+      ],
+      report: { to: "/organic", label: A ? "فتح تقرير الأورجانيك" : "Open the organic report" },
+    },
+    organicRevenue: {
+      id: "social_media.organicRevenue",
+      title: A ? "إيراد المصادر غير المدفوعة" : "Non-paid revenue",
+      value: fmtUSDFull(organicTotals.revenue),
+      tone: "mint",
+      icon: <DollarSign size={16} />,
+      definition: A
+        ? "الإيراد المحصّل من العملاء الذين وصلوا عبر قنوات غير مدفوعة داخل الفترة."
+        : "Revenue collected from leads that arrived through non-paid channels inside the period.",
+      caveat: organicNote,
+      formula: A
+        ? `${fmtUSDFull(organicTotals.revenue)} من ${fmtNum(organicTotals.won)} صفقة مغلقة.`
+        : `${fmtUSDFull(organicTotals.revenue)} from ${fmtNum(organicTotals.won)} closed deals.`,
+      supporting: [
+        { key: "leads", label: A ? "العملاء" : "Leads", value: fmtNum(organicTotals.leads) },
+        { key: "won", label: A ? "صفقات مغلقة" : "Closed won", value: fmtNum(organicTotals.won) },
+        {
+          key: "perLead",
+          label: A ? "الإيراد لكل ليد" : "Revenue per lead",
+          value:
+            organicTotals.leads > 0 ? fmtUSDFull(organicTotals.revenue / organicTotals.leads) : "—",
+        },
+        {
+          key: "top",
+          label: A ? "أعلى مصدر" : "Top source",
+          value: organicTotals.top?.name ?? "—",
+        },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "الإيراد حسب المصدر" : "Revenue by source",
+          rows: bySource((source) => source.revenue, fmtUSDFull),
+          emptyLabel: A ? "لا توجد مصادر غير مدفوعة" : "No non-paid source",
+        },
+      ],
+      report: { to: "/organic", label: A ? "فتح تقرير الأورجانيك" : "Open the organic report" },
+    },
+  };
 }
 
 function SocialMedia() {
@@ -135,6 +393,14 @@ function SocialMedia() {
     };
   }, [organic.data?.sources]);
 
+  const metrics = socialMetrics(
+    reach,
+    ads.data?.byPlatform ?? [],
+    organicTotals,
+    organic.data?.sources ?? [],
+    lang,
+  );
+
   if (ads.error || organic.error) {
     const message = ((ads.error || organic.error) as Error).message;
     return (
@@ -165,8 +431,9 @@ function SocialMedia() {
     0,
   );
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<MessagesSquare size={20} />}
         title={lang === "ar" ? "السوشيال ميديا والموديريشن" : "Social media & moderation"}
         subtitle={
@@ -181,66 +448,55 @@ function SocialMedia() {
           already loads. There is no engagement or follower count in either
           response, so none is shown: an invented figure alongside measured
           ones is worse than a missing one. */}
-      <KpiRow columns={5}>
-        <KpiCard
-          index={0}
-          label={lang === "ar" ? "الظهور" : "Reach"}
-          value={fmtNum(reach.impressions)}
-          tone="brand"
-          icon={<Radio size={15} />}
-          sub={
-            lang === "ar"
-              ? "إجمالي مرات الظهور التي أبلغت عنها المنصات"
-              : "Total impressions reported by the ad platforms"
-          }
+      <KpiRow>
+        <MetricDetailTrigger
+          detail={metrics.reach}
+          card={{
+            index: 0,
+            sub:
+              lang === "ar"
+                ? "إجمالي مرات الظهور التي أبلغت عنها المنصات"
+                : "Total impressions reported by the ad platforms",
+          }}
         />
-        <KpiCard
-          index={1}
-          label={lang === "ar" ? "النقرات" : "Clicks"}
-          value={fmtNum(reach.clicks)}
-          tone="violet"
-          icon={<MousePointerClick size={15} />}
-          sub={
-            reach.best
+        <MetricDetailTrigger
+          detail={metrics.clicks}
+          card={{
+            index: 1,
+            sub: reach.best
               ? `${lang === "ar" ? "أعلى منصة" : "Top platform"}: ${PLATFORM_LABEL[reach.best.platform] ?? reach.best.platform}`
-              : undefined
-          }
+              : undefined,
+          }}
         />
-        <KpiCard
-          index={2}
-          label={lang === "ar" ? "نسبة النقر" : "Click-through rate"}
-          value={fmtPct(reach.ctr, 2)}
-          tone="warning"
-          icon={<BadgeCheck size={15} />}
-          sub={
-            lang === "ar"
-              ? `${fmtNum(reach.clicks)} نقرة ÷ ${fmtNum(reach.impressions)} ظهور`
-              : `${fmtNum(reach.clicks)} clicks ÷ ${fmtNum(reach.impressions)} impressions`
-          }
+        <MetricDetailTrigger
+          detail={metrics.ctr}
+          card={{
+            index: 2,
+            sub:
+              lang === "ar"
+                ? `${fmtNum(reach.clicks)} نقرة ÷ ${fmtNum(reach.impressions)} ظهور`
+                : `${fmtNum(reach.clicks)} clicks ÷ ${fmtNum(reach.impressions)} impressions`,
+          }}
         />
-        <KpiCard
-          index={3}
-          label={lang === "ar" ? "العملاء من المصادر غير المدفوعة" : "Leads from non-paid sources"}
-          value={fmtNum(organicTotals.leads)}
-          tone="success"
-          icon={<Users size={15} />}
-          sub={
-            lang === "ar"
-              ? `${fmtNum(organicTotals.won)} صفقة مغلقة`
-              : `${fmtNum(organicTotals.won)} closed`
-          }
+        <MetricDetailTrigger
+          detail={metrics.organicLeads}
+          card={{
+            index: 3,
+            sub:
+              lang === "ar"
+                ? `${fmtNum(organicTotals.won)} صفقة مغلقة`
+                : `${fmtNum(organicTotals.won)} closed`,
+          }}
         />
-        <KpiCard
-          index={4}
-          label={lang === "ar" ? "إيراد المصادر غير المدفوعة" : "Non-paid revenue"}
-          value={fmtUSDFull(organicTotals.revenue)}
-          tone="success"
-          icon={<DollarSign size={15} />}
-          sub={
-            lang === "ar"
-              ? "لا يُنسب لهذه المصادر أي إنفاق إعلاني"
-              : "No ad spend is attributed to these sources"
-          }
+        <MetricDetailTrigger
+          detail={metrics.organicRevenue}
+          card={{
+            index: 4,
+            sub:
+              lang === "ar"
+                ? "لا يُنسب لهذه المصادر أي إنفاق إعلاني"
+                : "No ad spend is attributed to these sources",
+          }}
         />
       </KpiRow>
 

@@ -16,6 +16,9 @@ import { HBarChart, MultiLineChart } from "@/components/charts";
 import { DataTable, type Col } from "@/components/DataTable";
 import { Card, ErrorState, KpiCard, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import { buildQuery, filterStore, useFilters } from "@/lib/filter-store";
@@ -163,6 +166,232 @@ function Change({
   );
 }
 
+/**
+ * The five weekend figures, each against its own workday benchmark.
+ *
+ * EVERY COMPARISON HERE IS LIKE FOR LIKE. The weekend is Friday and Saturday;
+ * the benchmark is Sunday to Thursday in the SAME window, not the previous
+ * period and not a whole-week average — that is the only comparison that
+ * answers "is the weekend worth the budget".
+ */
+function weekendMetrics(data: WeekendResponse, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const W = data.portfolio.weekend;
+  const C = data.portfolio.comparison;
+  const perPlatform = (
+    pick: (row: WeekendPlatformRow) => number,
+    format: (n: number) => string,
+    tone: "mint" | "rose" | "sky" | "amber",
+  ) =>
+    topRows(
+      data.platforms.map((row) => ({
+        key: row.platform,
+        label: labelPlatform(row.platform, lang),
+        value: pick(row),
+        display: format(pick(row)),
+        meta: row.hasSpendData ? undefined : A ? "بلا بيانات إنفاق" : "no spend data",
+        tone,
+      })),
+    );
+  const window = A
+    ? `${fmtNum(data.window.weekendDays)} يوم عطلة مقابل ${fmtNum(data.window.comparisonDays)} يوم عمل داخل نفس الفترة.`
+    : `${fmtNum(data.window.weekendDays)} weekend days against ${fmtNum(data.window.comparisonDays)} workdays inside the same window.`;
+
+  const shared = [
+    { key: "spend", label: A ? "صرف العطلة" : "Weekend spend", value: fmtUSD(W.spend) },
+    { key: "leads", label: A ? "ليدز العطلة" : "Weekend leads", value: fmtNum(W.leads) },
+    { key: "won", label: A ? "صفقات رابحة" : "Won", value: fmtNum(W.won) },
+    { key: "lost", label: A ? "صفقات ضائعة" : "Lost", value: fmtNum(W.lost) },
+  ];
+
+  return {
+    spend: {
+      id: "weekend.spend",
+      title: A ? "متوسط الصرف اليومي" : "Average daily spend",
+      value: fmtUSD(W.avgDailySpend),
+      tone: "rose",
+      icon: <CircleDollarSign size={16} />,
+      definition: A
+        ? "متوسط ما يُنفق في يوم العطلة الواحد: الجمعة والسبت فقط، لا متوسط الأسبوع كله."
+        : "What an average weekend day costs — Friday and Saturday only, never a whole-week average.",
+      formula: `${fmtUSD(W.spend)} ÷ ${fmtNum(data.window.weekendDays)} = ${fmtUSD(W.avgDailySpend)}`,
+      caveat: window,
+      supporting: [
+        ...shared.slice(0, 2),
+        {
+          key: "workday",
+          label: A ? "المتوسط في أيام العمل" : "Workday average",
+          value: fmtUSD(C.avgDailySpend),
+        },
+        {
+          key: "activeDay",
+          label: A ? "متوسط اليوم النشط" : "Active-day average",
+          value: fmtUSD(W.avgActiveDaySpend ?? 0),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "صرف العطلة حسب المنصة" : "Weekend spend by platform",
+          rows: perPlatform((row) => row.weekend.spend, fmtUSD, "rose"),
+          emptyLabel: A ? "لا توجد منصات أنفقت" : "No platform spent",
+        },
+      ],
+      report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
+    },
+    leads: {
+      id: "weekend.leads",
+      title: A ? "عملاء العطلة" : "Weekend leads",
+      value: fmtNum(W.leads),
+      tone: "sky",
+      icon: <Users size={16} />,
+      definition: A
+        ? "العملاء المحتملون الذين دخلوا النظام في أيام الجمعة والسبت داخل الفترة."
+        : "Leads that entered the system on Fridays and Saturdays inside the window.",
+      formula: `${fmtNum(W.leads)} ÷ ${fmtNum(data.window.weekendDays)} = ${fmtNum(W.leadsPerDay)} ${A ? "ليد/يوم" : "leads/day"}`,
+      caveat: window,
+      supporting: [
+        ...shared.slice(0, 1),
+        {
+          key: "workdayLeads",
+          label: A ? "ليدز أيام العمل" : "Workday leads",
+          value: fmtNum(C.leads),
+        },
+        {
+          key: "perDayWorkday",
+          label: A ? "ليد/يوم في أيام العمل" : "Workday leads/day",
+          value: fmtNum(C.leadsPerDay),
+        },
+        {
+          key: "platformLeads",
+          label: A ? "ليدز أبلغت عنها المنصات" : "Platform-reported",
+          value: W.platformLeads === null ? "—" : fmtNum(W.platformLeads),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "عملاء العطلة حسب المنصة" : "Weekend leads by platform",
+          rows: perPlatform((row) => row.weekend.leads, fmtNum, "sky"),
+          emptyLabel: A ? "لا توجد منصات بعملاء" : "No platform produced leads",
+        },
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+    cpl: {
+      id: "weekend.cpl",
+      title: A ? "تكلفة العميل في العطلة" : "Weekend cost per lead",
+      value: fmtUSDFull(W.cpl),
+      tone: "amber",
+      icon: <Gauge size={16} />,
+      definition: A
+        ? "تكلفة العميل المحتمل في أيام العطلة، مقارنة بتكلفته في أيام العمل من نفس الفترة. هذه المقارنة هي قرار الميزانية."
+        : "What a lead costs on weekend days, against what it costs on workdays in the same window. That comparison is the budget decision.",
+      formula: `${fmtUSD(W.spend)} ÷ ${fmtNum(W.leads)} = ${fmtUSDFull(W.cpl)}`,
+      caveat: window,
+      supporting: [
+        { key: "workdayCpl", label: A ? "في أيام العمل" : "On workdays", value: fmtUSDFull(C.cpl) },
+        {
+          key: "delta",
+          label: A ? "الفارق" : "Difference",
+          value: data.portfolio.cplDelta === null ? "—" : fmtPct(data.portfolio.cplDelta, 1),
+        },
+        ...shared.slice(0, 2),
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "تكلفة العميل حسب المنصة" : "Cost per lead by platform",
+          rows: perPlatform((row) => row.weekend.cpl ?? 0, fmtUSDFull, "amber"),
+          emptyLabel: A ? "لا توجد منصات قابلة للقياس" : "No measurable platform",
+        },
+      ],
+    },
+    salesRate: {
+      id: "weekend.salesRate",
+      title: A ? "نسبة المبيعات في العطلة" : "Weekend sales rate",
+      value: fmtPct(W.salesRate, 1),
+      tone: "mint",
+      icon: <Target size={16} />,
+      definition: A
+        ? "نسبة عملاء العطلة الذين تحولوا إلى صفقات رابحة. تُقاس على نفس الليدز، لا على ليدز الأسبوع كله."
+        : "The share of weekend leads that became won deals. Measured on those same leads, never on the whole week's.",
+      formula: `${fmtNum(W.won)} ÷ ${fmtNum(W.leads)} = ${fmtPct(W.salesRate, 1)}`,
+      caveat: window,
+      supporting: [
+        { key: "won", label: A ? "البسط · رابحة" : "Numerator · won", value: fmtNum(W.won) },
+        {
+          key: "leads",
+          label: A ? "المقام · الليدز" : "Denominator · leads",
+          value: fmtNum(W.leads),
+        },
+        {
+          key: "workday",
+          label: A ? "في أيام العمل" : "On workdays",
+          value: fmtPct(C.salesRate, 1),
+        },
+        {
+          key: "delta",
+          label: A ? "الفارق" : "Difference",
+          value:
+            data.portfolio.salesRateDelta === null ? "—" : fmtPct(data.portfolio.salesRateDelta, 1),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "نسبة المبيعات حسب المنصة" : "Sales rate by platform",
+          rows: perPlatform(
+            (row) => row.weekend.salesRate ?? 0,
+            (n) => fmtPct(n, 1),
+            "mint",
+          ),
+          emptyLabel: A ? "لا توجد منصات قابلة للقياس" : "No measurable platform",
+        },
+      ],
+    },
+    lostRate: {
+      id: "weekend.lostRate",
+      title: A ? "نسبة الخسارة في العطلة" : "Weekend lost rate",
+      value: fmtPct(W.lostRate, 1),
+      tone: "rose",
+      icon: <TrendingDown size={16} />,
+      definition: A
+        ? `نسبة عملاء العطلة الذين انتهت صفقتهم بالخسارة. ${data.methodology.lostSource}`
+        : `The share of weekend leads whose deal ended as lost. ${data.methodology.lostSource}`,
+      formula: `${fmtNum(W.lost)} ÷ ${fmtNum(W.leads)} = ${fmtPct(W.lostRate, 1)}`,
+      caveat: window,
+      supporting: [
+        { key: "lost", label: A ? "البسط · ضائعة" : "Numerator · lost", value: fmtNum(W.lost) },
+        {
+          key: "leads",
+          label: A ? "المقام · الليدز" : "Denominator · leads",
+          value: fmtNum(W.leads),
+        },
+        {
+          key: "workday",
+          label: A ? "في أيام العمل" : "On workdays",
+          value: fmtPct(C.lostRate, 1),
+        },
+        { key: "open", label: A ? "ما زال مفتوحًا" : "Still open", value: fmtNum(W.open) },
+      ],
+      breakdowns: [
+        {
+          id: "platforms",
+          title: A ? "نسبة الخسارة حسب المنصة" : "Lost rate by platform",
+          rows: perPlatform(
+            (row) => row.weekend.lostRate ?? 0,
+            (n) => fmtPct(n, 1),
+            "rose",
+          ),
+          emptyLabel: A ? "لا توجد منصات قابلة للقياس" : "No measurable platform",
+        },
+      ],
+      report: { to: "/lost", label: A ? "فتح تحليل الخسائر" : "Open the Lost analysis" },
+    },
+  };
+}
+
 function WeekendPerformance() {
   const reportingPeriod = useReportingPeriod();
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
@@ -180,6 +409,9 @@ function WeekendPerformance() {
     },
     staleTime: 5 * 60_000,
   });
+
+  // One description per figure, built from the response already on screen.
+  const figures = data ? weekendMetrics(data, lang) : null;
 
   // This report deliberately compares the whole paid portfolio. A stale course,
   // campaign or platform selection would make that fixed scope look incomplete.
@@ -226,8 +458,9 @@ function WeekendPerformance() {
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<CalendarClock size={20} />}
         title={lang === "ar" ? "أداء الحملات خلال الويك إند" : "Weekend campaign performance"}
         subtitle={
@@ -238,60 +471,58 @@ function WeekendPerformance() {
         period={reportingPeriod}
       />
 
-      {isLoading || !data ? (
+      {isLoading || !data || !figures ? (
         <WeekendSkeleton />
       ) : (
         <>
           <BudgetSignal data={data} lang={lang} />
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <KpiCard
-              tone="rose"
-              label={lang === "ar" ? "متوسط الصرف اليومي" : "Average daily spend"}
-              value={fmtUSD(data.portfolio.weekend.avgDailySpend)}
-              sub={
-                lang === "ar"
-                  ? `عبر ${fmtNum(data.window.weekendDays)} يوم: الجمعة والسبت فقط`
-                  : `Across ${fmtNum(data.window.weekendDays)} Friday–Saturday days only`
-              }
-              icon={<CircleDollarSign size={18} />}
-              index={0}
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={figures.spend}
+              card={{
+                index: 0,
+                sub:
+                  lang === "ar"
+                    ? `عبر ${fmtNum(data.window.weekendDays)} يوم: الجمعة والسبت فقط`
+                    : `Across ${fmtNum(data.window.weekendDays)} Friday–Saturday days only`,
+              }}
             />
-            <KpiCard
-              tone="sky"
-              label={t("crm_leads")}
-              value={fmtNum(data.portfolio.weekend.leads)}
-              sub={`${fmtNum(data.portfolio.weekend.leadsPerDay)} ${lang === "ar" ? "ليد/يوم" : "leads/day"}`}
-              icon={<Users size={18} />}
-              index={1}
+            <MetricDetailTrigger
+              detail={{ ...figures.leads, title: t("crm_leads") }}
+              card={{
+                index: 1,
+                sub: `${fmtNum(data.portfolio.weekend.leadsPerDay)} ${lang === "ar" ? "ليد/يوم" : "leads/day"}`,
+              }}
             />
-            <KpiCard
-              tone="amber"
-              label={t("cpl")}
-              value={fmtUSDFull(data.portfolio.weekend.cpl)}
-              delta={data.portfolio.cplDelta ?? undefined}
-              deltaInvert
-              sub={lang === "ar" ? "مقابل أيام العمل: الأحد–الخميس" : "vs Sunday–Thursday workdays"}
-              icon={<Gauge size={18} />}
-              index={2}
+            <MetricDetailTrigger
+              detail={{
+                ...figures.cpl,
+                title: t("cpl"),
+                delta: data.portfolio.cplDelta ?? undefined,
+                deltaInvert: true,
+              }}
+              card={{
+                index: 2,
+                sub:
+                  lang === "ar" ? "مقابل أيام العمل: الأحد–الخميس" : "vs Sunday–Thursday workdays",
+              }}
             />
-            <KpiCard
-              tone="amber"
-              label={lang === "ar" ? "نسبة المبيعات (Won)" : "Sales rate (Won)"}
-              value={fmtPct(data.portfolio.weekend.salesRate, 1)}
-              sub={`${fmtNum(data.portfolio.weekend.won)} ${lang === "ar" ? "صفقة من نفس الليدز" : "won from the same leads"}`}
-              icon={<Target size={18} />}
-              index={3}
+            <MetricDetailTrigger
+              detail={figures.salesRate}
+              card={{
+                index: 3,
+                sub: `${fmtNum(data.portfolio.weekend.won)} ${lang === "ar" ? "صفقة من نفس الليدز" : "won from the same leads"}`,
+              }}
             />
-            <KpiCard
-              tone="amber"
-              label={t("lost_rate")}
-              value={fmtPct(data.portfolio.weekend.lostRate, 1)}
-              sub={`${fmtNum(data.portfolio.weekend.lost)} ${lang === "ar" ? "ليد Lost مؤكد" : "confirmed Lost leads"}`}
-              icon={<TrendingDown size={18} />}
-              index={4}
+            <MetricDetailTrigger
+              detail={{ ...figures.lostRate, title: t("lost_rate") }}
+              card={{
+                index: 4,
+                sub: `${fmtNum(data.portfolio.weekend.lost)} ${lang === "ar" ? "ليد Lost مؤكد" : "confirmed Lost leads"}`,
+              }}
             />
-          </div>
+          </KpiRow>
 
           <PeriodComparison data={data} lang={lang} />
 

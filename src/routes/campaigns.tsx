@@ -14,7 +14,7 @@ import {
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
 import { hasReportableLost } from "@/lib/lost-authority";
-import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
 import {
   DashboardPageHeader,
@@ -22,11 +22,15 @@ import {
   InsightCard,
   InsightRow,
   KpiRow,
+  PageSection,
+  PageSections,
 } from "@/components/dashboard-bits";
+import { MetricCardDetailTrigger, MetricDetailSheet } from "@/components/metric-detail";
+import { standardMetrics } from "@/components/standard-metrics";
+import type { MetricDetail } from "@/lib/metric-detail";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { CompareBars } from "@/components/ads/CompareBars";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
-import { MetricCard, Unavailable } from "@/components/ads/MetricCard";
 import { roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricsGlossaryButton } from "@/components/ads/MetricsGlossary";
 import { FilterSummary } from "@/components/ads/FilterSummary";
@@ -84,12 +88,100 @@ function campaignHeadlines(rows: PerfRow[]) {
   return { best, leak, bestCpl, any: spending.length > 0 };
 }
 
+/**
+ * Why each named campaign was named.
+ *
+ * An insight card that states a verdict and cannot be opened is an assertion.
+ * These are the figures behind each one, so a reader can check the call before
+ * acting on it.
+ */
+function headlineDetails(
+  headline: ReturnType<typeof campaignHeadlines>,
+  lang: "ar" | "en",
+): { best: MetricDetail; leak: MetricDetail; bestCpl: MetricDetail } {
+  const A = lang === "ar";
+  const row = (
+    id: string,
+    title: string,
+    value: string,
+    tone: MetricDetail["tone"],
+    definition: string,
+    perf: PerfRow | null,
+  ): MetricDetail => ({
+    id,
+    title,
+    value,
+    tone,
+    definition,
+    supporting: perf
+      ? [
+          { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(perf.spend) },
+          {
+            key: "revenue",
+            label: A ? "الإيراد المرتبط" : "Linked revenue",
+            value: fmtUSD(perf.revenue),
+          },
+          { key: "leads", label: A ? "عملاء" : "Leads", value: fmtNum(perf.crmLeads) },
+          { key: "won", label: A ? "صفقات رابحة" : "Won", value: fmtNum(perf.won) },
+        ]
+      : undefined,
+    report: { to: "/campaigns", label: A ? "افتح جدول الحملات" : "Open the campaign table" },
+  });
+
+  return {
+    best: row(
+      "campaigns.roas",
+      A ? "أفضل حملة في الفترة" : "Best campaign this period",
+      headline.best ? fmtUSD(headline.best.revenue) : "—",
+      "mint",
+      headline.best
+        ? A
+          ? `اختيرت لأنها أعادت أكثر من ضعف تكلفتها (${fmtRoas(headline.best.roas)}) وهي الأعلى إيرادًا بين الحملات التي بلغت هذا الحد.`
+          : `Named because it returned more than twice its cost (${fmtRoas(headline.best.roas)}) and is the highest-earning campaign to clear that bar.`
+        : A
+          ? "لا توجد حملة صرفت وأعادت أكثر من ضعف تكلفتها في هذه الفترة، فلا توجد حملة تتصدر."
+          : "No campaign both spent and returned more than twice its cost this period, so none leads.",
+      headline.best,
+    ),
+    leak: row(
+      "campaigns.spend",
+      A ? "حملة تحتاج متابعة" : "Campaign needing attention",
+      headline.leak ? fmtUSD(headline.leak.spend - headline.leak.revenue) : "—",
+      "rose",
+      headline.leak
+        ? A
+          ? `اختيرت لأن إنفاقها تجاوز الإيراد المرتبط بها، وهي أكبر فارق بين الإنفاق والعائد في الفترة. الفارق نفسه هو الرقم المعروض.`
+          : `Named because its spend exceeded the revenue linked to it, by the largest margin in the period. That margin is the figure shown.`
+        : A
+          ? "كل حملة صرفت في الفترة غطّت تكلفتها على الأقل."
+          : "Every campaign that spent this period at least covered its cost.",
+      headline.leak,
+    ),
+    bestCpl: row(
+      "campaigns.cpl",
+      A ? "أفضل تكلفة لكل عميل محتمل" : "Best cost per lead",
+      headline.bestCpl ? fmtUSDFull(headline.bestCpl.cpl ?? 0) : "—",
+      "cyan",
+      headline.bestCpl
+        ? A
+          ? "اختيرت لأنها أقل تكلفة لكل عميل محتمل بين الحملات التي صرفت وجاء منها عملاء في الفترة."
+          : "Named because it has the lowest cost per lead among campaigns that both spent and produced leads this period."
+        : A
+          ? "لا توجد حملة صرفت وجاء منها عملاء في الفترة، فلا توجد تكلفة قابلة للمقارنة."
+          : "No campaign both spent and produced leads this period, so there is no comparable cost.",
+      headline.bestCpl,
+    ),
+  };
+}
+
 function Campaigns() {
   const { t, lang } = useI18n();
   const { view: initialView } = Route.useSearch();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
   const [workspaceTab, setWorkspaceTab] = useState<CampaignWorkspaceTab>("decision");
+  // One panel for the three readings: whichever card was pressed last.
+  const [openInsight, setOpenInsight] = useState<MetricDetail | null>(null);
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
   useRegisterNexusView("campaigns", { tab: workspaceTab });
@@ -102,10 +194,36 @@ function Campaigns() {
   const spend = totals?.spend ?? 0;
   const headline = campaignHeadlines(data?.rows ?? []);
   const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
+  // Built from the response already on screen — the drill-down never re-queries
+  // and so can never disagree with the card that opened it.
+  const metrics = totals
+    ? standardMetrics({
+        totals,
+        rows: data?.rows ?? [],
+        surface: "campaigns",
+        lang,
+        reports: {
+          revenue: {
+            to: "/accounting",
+            label: lang === "ar" ? "فتح تقرير الحسابات" : "Open the Accounting report",
+          },
+          leads: {
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
+          },
+          won: {
+            to: "/sales",
+            label: lang === "ar" ? "فتح تقرير المبيعات" : "Open the sales report",
+          },
+        },
+      })
+    : null;
+  const insights = headlineDetails(headline, lang);
 
   return (
-    <div className="space-y-5">
+    <div>
       <DashboardPageHeader
+        flush
         icon={<Megaphone size={20} />}
         title={t("campaigns")}
         subtitle={
@@ -117,382 +235,439 @@ function Campaigns() {
         actions={<MetricsGlossaryButton />}
       />
 
-      <FilterSummary />
+      <PageSections className="gap-after-header">
+        <PageSection
+          level="headline"
+          aria-label={lang === "ar" ? "مؤشرات الفترة" : "Period figures"}
+        >
+          <FilterSummary />
 
-      {/* The period's five figures, and the three readings of it worth acting
-          on. Both describe the selected window rather than any one workspace
-          tab, so they sit above the tabs: two of the three tabs used to open
-          straight onto a table with no headline context at all. */}
-      {totals && (
-        <KpiRow columns={5}>
-          <MetricCard
-            metric="spend"
-            index={0}
-            icon={<Wallet size={14} />}
-            value={fmtUSD(totals.spend)}
-          />
-          <MetricCard
-            metric="attributedRevenue"
-            index={1}
-            icon={<CircleDollarSign size={14} />}
-            value={fmtUSD(totals.attributedRevenue)}
-            sub={
-              lang === "ar"
-                ? `${fmtUSD(totals.revenue)} إجمالي التحصيل`
-                : `${fmtUSD(totals.revenue)} collected in total`
-            }
-          />
-          <MetricCard
-            metric="crmLeads"
-            index={2}
-            icon={<Users size={14} />}
-            value={fmtNum(totals.totalLeads)}
-            sub={
-              totals.platformLeads === null
-                ? lang === "ar"
-                  ? "المنصة لا تبلّغ عن عدد ليدز"
-                  : "Platform reports no lead metric"
-                : lang === "ar"
-                  ? `${fmtNum(totals.platformLeads)} أبلغت عنهم المنصة`
-                  : `${fmtNum(totals.platformLeads)} reported by the platform`
-            }
-          />
-          <MetricCard
-            metric="won"
-            index={3}
-            icon={<UserPlus size={14} />}
-            value={fmtNum(totals.won)}
-            sub={fmtPct(totals.conversionRate, 1)}
-          />
-          <MetricCard
-            metric="roas"
-            index={4}
-            icon={<TrendingUp size={14} />}
-            value={ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`)}
-            unavailableReason={
-              spend <= 0
-                ? lang === "ar"
-                  ? "مفيش إنفاق مسجّل في الفترة المختارة."
-                  : "No recorded spend in the selected period."
-                : undefined
-            }
-            verdict={roasVerdict(totals.roas, spend) ?? undefined}
-            verdictLabel={verdictWord(roasVerdict(totals.roas, spend), lang)}
-            note={
-              lang === "ar"
-                ? `البسط هنا كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}).`
-                : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}).`
-            }
-          />
-        </KpiRow>
-      )}
-
-      {headline.any && (
-        <InsightRow>
-          <InsightCard
-            index={0}
-            kind="best"
-            eyebrow={lang === "ar" ? "أفضل حملة" : "Best campaign"}
-            title={
-              headline.best
-                ? headline.best.name
-                : lang === "ar"
-                  ? "لا توجد حملة مؤهلة"
-                  : "No eligible campaign"
-            }
-            value={headline.best ? fmtUSD(headline.best.revenue) : undefined}
-            detail={
-              headline.best
-                ? lang === "ar"
-                  ? `${fmtUSD(headline.best.spend)} إنفاق مقابل إيراد مرتبط`
-                  : `${fmtUSD(headline.best.spend)} spent against linked revenue`
-                : lang === "ar"
-                  ? "لا توجد حملة صرفت وحققت إيراداً مرتبطاً في الفترة."
-                  : "No campaign both spent and returned linked revenue this period."
-            }
-          />
-          <InsightCard
-            index={1}
-            kind="attention"
-            eyebrow={lang === "ar" ? "حملة تحتاج متابعة" : "Campaign needing attention"}
-            title={
-              headline.leak
-                ? headline.leak.name
-                : lang === "ar"
-                  ? "لا توجد حملة خاسرة"
-                  : "No loss-making campaign"
-            }
-            value={headline.leak ? fmtUSD(headline.leak.spend - headline.leak.revenue) : undefined}
-            detail={
-              headline.leak
-                ? lang === "ar"
-                  ? `صرفت ${fmtUSD(headline.leak.spend)} مقابل ${fmtUSD(headline.leak.revenue)} إيراد مرتبط.`
-                  : `Spent ${fmtUSD(headline.leak.spend)} against ${fmtUSD(headline.leak.revenue)} of linked revenue.`
-                : lang === "ar"
-                  ? "كل حملة صرفت في الفترة غطّت تكلفتها على الأقل."
-                  : "Every campaign that spent this period at least covered its cost."
-            }
-          />
-          <InsightCard
-            index={2}
-            kind="opportunity"
-            eyebrow={lang === "ar" ? "أفضل تكلفة لكل عميل محتمل" : "Best cost per lead"}
-            title={
-              headline.bestCpl
-                ? headline.bestCpl.name
-                : lang === "ar"
-                  ? "لا توجد تكلفة قابلة للقياس"
-                  : "No measurable cost per lead"
-            }
-            value={headline.bestCpl ? fmtUSDFull(headline.bestCpl.cpl ?? 0) : undefined}
-            detail={
-              headline.bestCpl
-                ? lang === "ar"
-                  ? `${fmtNum(headline.bestCpl.crmLeads)} عميل من ${fmtUSD(headline.bestCpl.spend)} إنفاق.`
-                  : `${fmtNum(headline.bestCpl.crmLeads)} leads from ${fmtUSD(headline.bestCpl.spend)} of spend.`
-                : lang === "ar"
-                  ? "لا توجد حملة صرفت وجاءت منها عملاء في الفترة."
-                  : "No campaign both spent and produced leads this period."
-            }
-          />
-        </InsightRow>
-      )}
-
-      <div
-        role="tablist"
-        aria-label={lang === "ar" ? "أقسام صفحة الحملات" : "Campaign workspace"}
-        /* Scrolls with full labels on a phone, equal 3-up from `sm`. */
-        className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:grid sm:grid-cols-3"
-      >
-        {(
-          [
-            {
-              key: "decision" as const,
-              label: lang === "ar" ? "قرار سريع" : "Quick decision",
-              description: lang === "ar" ? "ناجحة ولا محتاجة تدخل؟" : "What needs action?",
-              icon: Target,
-            },
-            {
-              key: "live" as const,
-              label: lang === "ar" ? "الحملات الشغالة" : "Live campaigns",
-              description: lang === "ar" ? "حالة التشغيل على المنصات" : "Platform delivery state",
-              icon: Activity,
-            },
-            {
-              key: "analysis" as const,
-              label: lang === "ar" ? "تحليل الفترة" : "Period analysis",
-              description: lang === "ar" ? "صرف، إيراد، وكل التفاصيل" : "Spend, revenue and detail",
-              icon: BarChart3,
-            },
-          ] satisfies Array<{
-            key: CampaignWorkspaceTab;
-            label: string;
-            description: string;
-            icon: typeof Target;
-          }>
-        ).map((tab) => {
-          const active = workspaceTab === tab.key;
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setWorkspaceTab(tab.key)}
-              className={`shrink-0 rounded-xl px-3 py-2 text-start transition-colors sm:min-w-0 sm:shrink sm:px-3 ${
-                active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
-              }`}
-            >
-              <span className="flex items-center gap-2 text-[12.5px] font-bold sm:text-[13.5px]">
-                <span
-                  className="grid size-6 shrink-0 place-items-center rounded-lg transition-colors"
-                  style={
-                    active
-                      ? { background: "var(--sky-strong)", color: "#fff" }
-                      : { background: "var(--surface-3)", color: "var(--text-subtle)" }
-                  }
-                  aria-hidden="true"
-                >
-                  <Icon size={13} />
-                </span>
-                <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
-              </span>
-              <span className="mt-0.5 hidden truncate ps-8 text-[10.5px] text-text-subtle sm:block">
-                {tab.description}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {isLoading || !data || !totals ? (
-        <Skeleton className="h-[520px]" />
-      ) : (
-        <>
-          {workspaceTab === "decision" && (
-            <PerfExplorer
-              rows={data.rows}
-              grain={grain}
-              onGrainChange={setGrain}
-              initialView={initialView}
-              unknownAdsetKey={data.unknownAdsetKey}
-              csvPrefix="engosoft"
-              activeCampaignStates={Object.values(data.activity.delivery)}
-              lostAvailable={hasReportableLost(data.health.lostAuthority)}
-              spendAvailable={spend > 0}
-              spendNote={
-                spend <= 0
-                  ? lang === "ar"
-                    ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
-                    : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
-                  : undefined
-              }
-              title={
-                grain === "campaign"
-                  ? lang === "ar"
-                    ? "قرار الحملات اللي شغالة دلوقتي"
-                    : "Live campaign decisions"
-                  : lang === "ar"
-                    ? "تفاصيل الحملة"
-                    : "Campaign details"
-              }
-              subtitle={
-                lang === "ar"
-                  ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
-                  : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
-              }
-            />
-          )}
-
-          {workspaceTab === "live" && <CampaignActivityPanel activity={data.activity} />}
-
-          {workspaceTab === "analysis" && (
-            <>
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "ملخص الفترة والمنصات، وبعده حالة الاتصال والمقارنة المالية."
-                    : "Selected-period and platform summary, followed by delivery health and financial comparison."
-                }
-                className="border-t border-border/70 pt-4"
-              >
-                {lang === "ar" ? "الصورة الكاملة للفترة" : "Period overview"}
-              </SectionTitle>
-
-              <Card>
-                <SectionTitle
-                  action={
-                    <Pill tone="neutral">
-                      {grain === "campaign"
-                        ? t("campaign")
-                        : grain === "adset"
-                          ? t("ad_set")
-                          : t("ad_name")}
-                    </Pill>
-                  }
-                  hint={
+          {/* The period's five figures, and the three readings of it worth
+              acting on. Both describe the selected window rather than any one
+              workspace tab, so they sit above the tabs: two of the three tabs
+              used to open straight onto a table with no headline context at
+              all. Every card opens its own explanation. */}
+          {totals && metrics && (
+            <KpiRow>
+              <MetricCardDetailTrigger
+                detail={metrics.spend}
+                card={{ metric: "spend", index: 0, icon: <Wallet size={14} /> }}
+              />
+              <MetricCardDetailTrigger
+                detail={{
+                  ...metrics.revenue,
+                  title: lang === "ar" ? "الإيراد المرتبط بالحملات" : "Campaign-linked revenue",
+                  value: fmtUSD(totals.attributedRevenue),
+                  definition:
                     lang === "ar"
-                      ? "كل الصفوف اللي صرفت في الفترة المختارة. الأزرق هو الإنفاق والبرتقالي هو التحصيل — مرّر داخل الكارت لمراجعة كل الحملات."
-                      : "Every row with spend in the selected period. Blue is spend and orange is collected revenue; scroll inside the card to review all campaigns."
-                  }
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <BarChart3 size={15} className="text-text-subtle" />
-                    {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
-                  </span>
-                </SectionTitle>
-                <div className="max-h-[720px] overflow-y-auto pe-1 scrollbar-thin">
-                  <CompareBars
-                    rows={[...data.rows]
-                      .filter((r) => r.spend > 0)
-                      .sort((a, b) => b.spend - a.spend)}
-                  />
-                </div>
-              </Card>
+                      ? "الإيراد المحصّل الذي يمكن نسبته إلى حملة أنفقت في هذه الفترة. باقي التحصيل حقيقي أيضًا، لكنه لا يحمل حملة."
+                      : "Collected revenue that can be traced to a campaign which spent in this window. The rest of the collection is just as real, but carries no campaign.",
+                }}
+                card={{
+                  metric: "attributedRevenue",
+                  index: 1,
+                  icon: <CircleDollarSign size={14} />,
+                  value: fmtUSD(totals.attributedRevenue),
+                  sub:
+                    lang === "ar"
+                      ? `${fmtUSD(totals.revenue)} إجمالي التحصيل`
+                      : `${fmtUSD(totals.revenue)} collected in total`,
+                }}
+              />
+              <MetricCardDetailTrigger
+                detail={metrics.leads}
+                card={{
+                  metric: "crmLeads",
+                  index: 2,
+                  icon: <Users size={14} />,
+                  value: fmtNum(totals.totalLeads),
+                  sub:
+                    totals.platformLeads === null
+                      ? lang === "ar"
+                        ? "المنصة لا تبلّغ عن عدد ليدز"
+                        : "Platform reports no lead metric"
+                      : lang === "ar"
+                        ? `${fmtNum(totals.platformLeads)} أبلغت عنهم المنصة`
+                        : `${fmtNum(totals.platformLeads)} reported by the platform`,
+                }}
+              />
+              <MetricCardDetailTrigger
+                detail={metrics.won}
+                card={{
+                  metric: "won",
+                  index: 3,
+                  icon: <UserPlus size={14} />,
+                  value: fmtNum(totals.won),
+                  sub: fmtPct(totals.conversionRate, 1),
+                }}
+              />
+              <MetricCardDetailTrigger
+                detail={metrics.roas}
+                card={{
+                  metric: "roas",
+                  index: 4,
+                  icon: <TrendingUp size={14} />,
+                  value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
+                  unavailableReason:
+                    spend <= 0
+                      ? lang === "ar"
+                        ? "مفيش إنفاق مسجّل في الفترة المختارة."
+                        : "No recorded spend in the selected period."
+                      : undefined,
+                  verdict: roasVerdict(totals.roas, spend) ?? undefined,
+                  verdictLabel: verdictWord(roasVerdict(totals.roas, spend), lang),
+                  note:
+                    lang === "ar"
+                      ? `البسط هنا كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}).`
+                      : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}).`,
+                }}
+              />
+            </KpiRow>
+          )}
+        </PageSection>
 
-              {/* Four stacked technical notices became one card. Every fact
+        {headline.any && (
+          <PageSection
+            level="insight"
+            tone="amber"
+            icon={<Target size={16} />}
+            title={lang === "ar" ? "ثلاث قراءات للفترة" : "Three readings of the period"}
+            hint={
+              lang === "ar"
+                ? "اضغط أي بطاقة لترى لماذا اختيرت هذه الحملة تحديدًا."
+                : "Open any card to see why that campaign was named."
+            }
+          >
+            <InsightRow>
+              <InsightCard
+                index={0}
+                kind="best"
+                eyebrow={lang === "ar" ? "أفضل حملة" : "Best campaign"}
+                title={
+                  headline.best
+                    ? headline.best.name
+                    : lang === "ar"
+                      ? "لا توجد حملة مؤهلة"
+                      : "No eligible campaign"
+                }
+                value={headline.best ? fmtUSD(headline.best.revenue) : undefined}
+                detail={
+                  headline.best
+                    ? lang === "ar"
+                      ? `${fmtUSD(headline.best.spend)} إنفاق مقابل إيراد مرتبط`
+                      : `${fmtUSD(headline.best.spend)} spent against linked revenue`
+                    : lang === "ar"
+                      ? "لا توجد حملة صرفت وحققت إيراداً مرتبطاً في الفترة."
+                      : "No campaign both spent and returned linked revenue this period."
+                }
+                onClick={() => setOpenInsight(insights.best)}
+                actionLabel={lang === "ar" ? "لماذا هذه الحملة؟" : "Why this campaign?"}
+              />
+              <InsightCard
+                index={1}
+                kind="attention"
+                eyebrow={lang === "ar" ? "حملة تحتاج متابعة" : "Campaign needing attention"}
+                title={
+                  headline.leak
+                    ? headline.leak.name
+                    : lang === "ar"
+                      ? "لا توجد حملة خاسرة"
+                      : "No loss-making campaign"
+                }
+                value={
+                  headline.leak ? fmtUSD(headline.leak.spend - headline.leak.revenue) : undefined
+                }
+                detail={
+                  headline.leak
+                    ? lang === "ar"
+                      ? `صرفت ${fmtUSD(headline.leak.spend)} مقابل ${fmtUSD(headline.leak.revenue)} إيراد مرتبط.`
+                      : `Spent ${fmtUSD(headline.leak.spend)} against ${fmtUSD(headline.leak.revenue)} of linked revenue.`
+                    : lang === "ar"
+                      ? "كل حملة صرفت في الفترة غطّت تكلفتها على الأقل."
+                      : "Every campaign that spent this period at least covered its cost."
+                }
+                onClick={() => setOpenInsight(insights.leak)}
+                actionLabel={lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?"}
+              />
+              <InsightCard
+                index={2}
+                kind="opportunity"
+                eyebrow={lang === "ar" ? "أفضل تكلفة لكل عميل محتمل" : "Best cost per lead"}
+                title={
+                  headline.bestCpl
+                    ? headline.bestCpl.name
+                    : lang === "ar"
+                      ? "لا توجد تكلفة قابلة للقياس"
+                      : "No measurable cost per lead"
+                }
+                value={headline.bestCpl ? fmtUSDFull(headline.bestCpl.cpl ?? 0) : undefined}
+                detail={
+                  headline.bestCpl
+                    ? lang === "ar"
+                      ? `${fmtNum(headline.bestCpl.crmLeads)} عميل من ${fmtUSD(headline.bestCpl.spend)} إنفاق.`
+                      : `${fmtNum(headline.bestCpl.crmLeads)} leads from ${fmtUSD(headline.bestCpl.spend)} of spend.`
+                    : lang === "ar"
+                      ? "لا توجد حملة صرفت وجاءت منها عملاء في الفترة."
+                      : "No campaign both spent and produced leads this period."
+                }
+                onClick={() => setOpenInsight(insights.bestCpl)}
+                actionLabel={lang === "ar" ? "على أي أساس؟" : "On what basis?"}
+              />
+            </InsightRow>
+          </PageSection>
+        )}
+
+        <PageSection
+          level="primary"
+          aria-label={lang === "ar" ? "مساحة عمل الحملات" : "Campaign workspace"}
+        >
+          <div
+            role="tablist"
+            aria-label={lang === "ar" ? "أقسام صفحة الحملات" : "Campaign workspace"}
+            /* Scrolls with full labels on a phone, equal 3-up from `sm`. */
+            className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:grid sm:grid-cols-3"
+          >
+            {(
+              [
+                {
+                  key: "decision" as const,
+                  label: lang === "ar" ? "قرار سريع" : "Quick decision",
+                  description: lang === "ar" ? "ناجحة ولا محتاجة تدخل؟" : "What needs action?",
+                  icon: Target,
+                },
+                {
+                  key: "live" as const,
+                  label: lang === "ar" ? "الحملات الشغالة" : "Live campaigns",
+                  description:
+                    lang === "ar" ? "حالة التشغيل على المنصات" : "Platform delivery state",
+                  icon: Activity,
+                },
+                {
+                  key: "analysis" as const,
+                  label: lang === "ar" ? "تحليل الفترة" : "Period analysis",
+                  description:
+                    lang === "ar" ? "صرف، إيراد، وكل التفاصيل" : "Spend, revenue and detail",
+                  icon: BarChart3,
+                },
+              ] satisfies Array<{
+                key: CampaignWorkspaceTab;
+                label: string;
+                description: string;
+                icon: typeof Target;
+              }>
+            ).map((tab) => {
+              const active = workspaceTab === tab.key;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setWorkspaceTab(tab.key)}
+                  className={`shrink-0 rounded-xl px-3 py-2 text-start transition-colors sm:min-w-0 sm:shrink sm:px-3 ${
+                    active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-[12.5px] font-bold sm:text-[13.5px]">
+                    <span
+                      className="grid size-6 shrink-0 place-items-center rounded-lg transition-colors"
+                      style={
+                        active
+                          ? { background: "var(--sky-strong)", color: "#fff" }
+                          : { background: "var(--surface-3)", color: "var(--text-subtle)" }
+                      }
+                      aria-hidden="true"
+                    >
+                      <Icon size={13} />
+                    </span>
+                    <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
+                  </span>
+                  <span className="mt-0.5 hidden truncate ps-8 text-[10.5px] text-text-subtle sm:block">
+                    {tab.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {isLoading || !data || !totals ? (
+            <Skeleton className="h-[520px]" />
+          ) : (
+            <>
+              {workspaceTab === "decision" && (
+                <PerfExplorer
+                  rows={data.rows}
+                  grain={grain}
+                  onGrainChange={setGrain}
+                  initialView={initialView}
+                  unknownAdsetKey={data.unknownAdsetKey}
+                  csvPrefix="engosoft"
+                  activeCampaignStates={Object.values(data.activity.delivery)}
+                  lostAvailable={hasReportableLost(data.health.lostAuthority)}
+                  spendAvailable={spend > 0}
+                  spendNote={
+                    spend <= 0
+                      ? lang === "ar"
+                        ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
+                        : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
+                      : undefined
+                  }
+                  title={
+                    grain === "campaign"
+                      ? lang === "ar"
+                        ? "قرار الحملات اللي شغالة دلوقتي"
+                        : "Live campaign decisions"
+                      : lang === "ar"
+                        ? "تفاصيل الحملة"
+                        : "Campaign details"
+                  }
+                  subtitle={
+                    lang === "ar"
+                      ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
+                      : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
+                  }
+                />
+              )}
+
+              {workspaceTab === "live" && <CampaignActivityPanel activity={data.activity} />}
+
+              {workspaceTab === "analysis" && (
+                <>
+                  <SectionTitle
+                    hint={
+                      lang === "ar"
+                        ? "ملخص الفترة والمنصات، وبعده حالة الاتصال والمقارنة المالية."
+                        : "Selected-period and platform summary, followed by delivery health and financial comparison."
+                    }
+                    className="border-t border-border/70 pt-4"
+                  >
+                    {lang === "ar" ? "الصورة الكاملة للفترة" : "Period overview"}
+                  </SectionTitle>
+
+                  <Card>
+                    <SectionTitle
+                      action={
+                        <Pill tone="neutral">
+                          {grain === "campaign"
+                            ? t("campaign")
+                            : grain === "adset"
+                              ? t("ad_set")
+                              : t("ad_name")}
+                        </Pill>
+                      }
+                      hint={
+                        lang === "ar"
+                          ? "كل الصفوف اللي صرفت في الفترة المختارة. الأزرق هو الإنفاق والبرتقالي هو التحصيل — مرّر داخل الكارت لمراجعة كل الحملات."
+                          : "Every row with spend in the selected period. Blue is spend and orange is collected revenue; scroll inside the card to review all campaigns."
+                      }
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <BarChart3 size={15} className="text-text-subtle" />
+                        {lang === "ar" ? "الإنفاق مقابل التحصيل" : "Spend against collections"}
+                      </span>
+                    </SectionTitle>
+                    <div className="max-h-[720px] overflow-y-auto pe-1 scrollbar-thin">
+                      <CompareBars
+                        rows={[...data.rows]
+                          .filter((r) => r.spend > 0)
+                          .sort((a, b) => b.spend - a.spend)}
+                      />
+                    </div>
+                  </Card>
+
+                  {/* Four stacked technical notices became one card. Every fact
                   they carried survives — the scope rule, the revenue basis,
                   the unmatched ad-set bucket — but the sentence a manager
                   needs is now separated from the mechanics behind it. */}
-              <DataHealthSummary
-                issues={[
-                  ...(grain === "adset"
-                    ? [
-                        {
-                          tone: "info" as const,
-                          message:
-                            lang === "ar"
-                              ? "بعض المجموعات الإعلانية مستنتَجة وليست مطابَقة مباشرة."
-                              : "Some ad sets are inferred rather than matched directly.",
-                          impact:
-                            lang === "ar"
-                              ? `${fmtPct(data.health.adsetResolutionRate * 100, 1)} من الصفوف مربوطة بشكل مؤكد؛ الباقي معلَّم داخل الجدول.`
-                              : `${fmtPct(data.health.adsetResolutionRate * 100, 1)} of rows are matched exactly; the rest are flagged in the table.`,
-                          technical:
-                            lang === "ar"
-                              ? "الربط يتم من معرّف الإعلان أولاً — وهو ربط مضبوط — ثم من اسم الإعلان عند اللزوم. أسماء الإعلانات ليست فريدة، فما يُحدَّد بالاسم يحمل علامة «غير مؤكد»."
-                              : 'Ad set resolves from the ad id first — an exact join — then from the ad name where needed. Ad names are not unique, so name-derived values carry an "ambiguous" badge.',
-                        },
-                      ]
-                    : []),
-                  {
-                    tone: "info" as const,
-                    message:
-                      lang === "ar"
-                        ? "الإيراد هنا هو المحصَّل فعلياً بتاريخ الدفع."
-                        : "Revenue here is what was actually collected, by payment date.",
-                    impact:
-                      lang === "ar"
-                        ? "الصفوف بلا حملة معروفة غير معروضة، فمجموع الجدول قد يقل عن إجمالي الإيراد."
-                        : "Rows without a known campaign are excluded, so the table may total less than headline revenue.",
-                    technical: "Accounting.USD Paid · Payment Date",
-                  },
-                  ...(filters.account
-                    ? [
-                        {
-                          tone: "warning" as const,
-                          message:
-                            lang === "ar"
-                              ? "أنت تشاهد حساباً إعلانياً واحداً، وليس كل النشاط."
-                              : "You are viewing a single ad account, not all activity.",
-                          impact:
-                            lang === "ar"
-                              ? "الصفوف التي لا يمكن ربطها بهذا الحساب بشكل مؤكد مستبعدة بدل تخمينها."
-                              : "Rows that cannot be tied to this account with certainty are excluded rather than guessed in.",
-                          technical:
-                            lang === "ar"
-                              ? "الربط يتم عبر Campaign ID مطابق فعلاً داخل الحساب؛ الصفوف بلا Campaign ID تُستبعد."
-                              : "Scoping runs through an exact Campaign ID observed in that account; rows without a Campaign ID are excluded.",
-                        },
-                      ]
-                    : []),
-                  ...(unknownRow
-                    ? [
-                        {
-                          tone: "warning" as const,
-                          message:
-                            lang === "ar"
-                              ? "جزء من النشاط لم يُربط بمجموعة إعلانية."
-                              : "Part of this activity could not be tied to an ad set.",
-                          impact:
-                            lang === "ar"
-                              ? `${fmtNum(unknownRow.crmLeads)} عميل و${fmtUSD(unknownRow.revenue)} تحصيل — معروضة كصف مستقل وليست محذوفة.`
-                              : `${fmtNum(unknownRow.crmLeads)} leads and ${fmtUSD(unknownRow.revenue)} of revenue — shown as their own row, not dropped.`,
-                        },
-                      ]
-                    : []),
-                ]}
-              />
+                  <DataHealthSummary
+                    issues={[
+                      ...(grain === "adset"
+                        ? [
+                            {
+                              tone: "info" as const,
+                              message:
+                                lang === "ar"
+                                  ? "بعض المجموعات الإعلانية مستنتَجة وليست مطابَقة مباشرة."
+                                  : "Some ad sets are inferred rather than matched directly.",
+                              impact:
+                                lang === "ar"
+                                  ? `${fmtPct(data.health.adsetResolutionRate * 100, 1)} من الصفوف مربوطة بشكل مؤكد؛ الباقي معلَّم داخل الجدول.`
+                                  : `${fmtPct(data.health.adsetResolutionRate * 100, 1)} of rows are matched exactly; the rest are flagged in the table.`,
+                              technical:
+                                lang === "ar"
+                                  ? "الربط يتم من معرّف الإعلان أولاً — وهو ربط مضبوط — ثم من اسم الإعلان عند اللزوم. أسماء الإعلانات ليست فريدة، فما يُحدَّد بالاسم يحمل علامة «غير مؤكد»."
+                                  : 'Ad set resolves from the ad id first — an exact join — then from the ad name where needed. Ad names are not unique, so name-derived values carry an "ambiguous" badge.',
+                            },
+                          ]
+                        : []),
+                      {
+                        tone: "info" as const,
+                        message:
+                          lang === "ar"
+                            ? "الإيراد هنا هو المحصَّل فعلياً بتاريخ الدفع."
+                            : "Revenue here is what was actually collected, by payment date.",
+                        impact:
+                          lang === "ar"
+                            ? "الصفوف بلا حملة معروفة غير معروضة، فمجموع الجدول قد يقل عن إجمالي الإيراد."
+                            : "Rows without a known campaign are excluded, so the table may total less than headline revenue.",
+                        technical: "Accounting.USD Paid · Payment Date",
+                      },
+                      ...(filters.account
+                        ? [
+                            {
+                              tone: "warning" as const,
+                              message:
+                                lang === "ar"
+                                  ? "أنت تشاهد حساباً إعلانياً واحداً، وليس كل النشاط."
+                                  : "You are viewing a single ad account, not all activity.",
+                              impact:
+                                lang === "ar"
+                                  ? "الصفوف التي لا يمكن ربطها بهذا الحساب بشكل مؤكد مستبعدة بدل تخمينها."
+                                  : "Rows that cannot be tied to this account with certainty are excluded rather than guessed in.",
+                              technical:
+                                lang === "ar"
+                                  ? "الربط يتم عبر Campaign ID مطابق فعلاً داخل الحساب؛ الصفوف بلا Campaign ID تُستبعد."
+                                  : "Scoping runs through an exact Campaign ID observed in that account; rows without a Campaign ID are excluded.",
+                            },
+                          ]
+                        : []),
+                      ...(unknownRow
+                        ? [
+                            {
+                              tone: "warning" as const,
+                              message:
+                                lang === "ar"
+                                  ? "جزء من النشاط لم يُربط بمجموعة إعلانية."
+                                  : "Part of this activity could not be tied to an ad set.",
+                              impact:
+                                lang === "ar"
+                                  ? `${fmtNum(unknownRow.crmLeads)} عميل و${fmtUSD(unknownRow.revenue)} تحصيل — معروضة كصف مستقل وليست محذوفة.`
+                                  : `${fmtNum(unknownRow.crmLeads)} leads and ${fmtUSD(unknownRow.revenue)} of revenue — shown as their own row, not dropped.`,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
 
-              <p className="text-[11px] text-text-subtle px-1">
-                {lang === "ar"
-                  ? `${fmtNum(data.rows.length)} صف في المستوى ده. متوسط تكلفة الصفقة ${fmtUSDFull(totals.cpa)} على أساس ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}.`
-                  : `${fmtNum(data.rows.length)} rows at this level. Blended CPA is ${fmtUSDFull(totals.cpa)} on the ${filters.cpaBasis === "invoices" ? "invoice-count" : "won-deals"} basis.`}
-              </p>
+                  <p className="text-[11px] text-text-subtle px-1">
+                    {lang === "ar"
+                      ? `${fmtNum(data.rows.length)} صف في المستوى ده. متوسط تكلفة الصفقة ${fmtUSDFull(totals.cpa)} على أساس ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}.`
+                      : `${fmtNum(data.rows.length)} rows at this level. Blended CPA is ${fmtUSDFull(totals.cpa)} on the ${filters.cpaBasis === "invoices" ? "invoice-count" : "won-deals"} basis.`}
+                  </p>
+                </>
+              )}
             </>
           )}
-        </>
+        </PageSection>
+      </PageSections>
+
+      {openInsight && (
+        <MetricDetailSheet
+          detail={openInsight}
+          open={Boolean(openInsight)}
+          onClose={() => setOpenInsight(null)}
+        />
       )}
     </div>
   );

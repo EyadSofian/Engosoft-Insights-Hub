@@ -35,3 +35,46 @@ if (url && !/localhost|127\.0\.0\.1|::1/.test(url)) {
 if (typeof document !== "undefined") {
   await import("@testing-library/jest-dom/vitest");
 }
+
+// jsdom ships no `matchMedia`, and several presentation components ask it
+// whether they are on a phone. Without a stub the first `useEffect` throws and
+// the failure reads as a component bug rather than a missing browser API.
+//
+// Deliberately driven by `window.innerWidth`, so a test that wants the mobile
+// shape sets the width and gets a consistent answer from both `matchMedia` and
+// the width checks the same hooks make.
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = ((query: string) => {
+    const max = /max-width:\s*(\d+)px/.exec(query);
+    const min = /min-width:\s*(\d+)px/.exec(query);
+    const matches = max
+      ? window.innerWidth <= Number(max[1])
+      : min
+        ? window.innerWidth >= Number(min[1])
+        : false;
+    return {
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    };
+  }) as typeof window.matchMedia;
+}
+
+// Recharts measures its own container. jsdom has no layout and no
+// `ResizeObserver`, so the stub reports one observation of nothing: the chart
+// mounts, renders no geometry, and the test can go on asserting the text around
+// it. A chart's SHAPE is verified in the browser, not here.
+if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+  class StubResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  window.ResizeObserver = StubResizeObserver as unknown as typeof ResizeObserver;
+  globalThis.ResizeObserver = window.ResizeObserver;
+}

@@ -128,6 +128,102 @@ const commonElements = (capability: string): NexusElement[] => [
       q("مين أحسن مصدر ليدز؟", "Which source produces the best leads?"),
     ],
   },
+  // Declared because every analytical page now lets a reader OPEN these
+  // figures. A KPI the user can drill into and Nexus cannot name is a KPI where
+  // "اشرحلي الرقم ده" answers about the wrong thing.
+  {
+    id: `${capability}.won`,
+    type: "kpi",
+    title: q("الصفقات المغلقة", "Won deals"),
+    meaning: q(
+      "عدد العملاء اللي وصلوا لمرحلة الربح جوه الفترة المختارة.",
+      "How many leads reached the won stage inside the selected period.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [
+      q("مين أكتر حد قفل صفقات؟", "Who closed the most?"),
+      q("الرقم ده كويس بالنسبة للتارجت؟", "Is this good against target?"),
+    ],
+  },
+  {
+    id: `${capability}.conversion`,
+    type: "kpi",
+    title: q("معدل التحويل", "Conversion rate"),
+    meaning: q(
+      "نسبة العملاء اللي بقوا صفقات مكسوبة. بتتقرا مع عدد الليدز نفسه مش لوحدها.",
+      "The share of leads that became won deals. Read with the lead count, never alone.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [
+      q("النسبة دي محسوبة على إيه؟", "What is this measured against?"),
+      q("مين أعلى وأقل في التحويل؟", "Who converts best and worst?"),
+    ],
+  },
+  {
+    id: `${capability}.lost`,
+    type: "kpi",
+    title: q("الصفقات الضائعة", "Lost deals"),
+    meaning: q(
+      "الصفقات اللي اتقفلت خسارة، من مصدر الخسائر المعتمد لوحده.",
+      "Deals closed as lost, from the approved Lost source only.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [
+      q("إيه أهم أسباب الخسارة؟", "What are the main loss reasons?"),
+      q("مين أكتر فريق متأثر؟", "Which team is most affected?"),
+    ],
+  },
+  {
+    id: `${capability}.cpl`,
+    type: "kpi",
+    title: q("تكلفة الليد", "Cost per lead"),
+    meaning: q(
+      "الإنفاق مقسوم على الليدز اللي أبلغت عنها المنصات، مش ليدز الـCRM.",
+      "Spend divided by platform-reported leads, not CRM leads.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [
+      q("التكلفة دي عالية؟", "Is this cost high?"),
+      q("أنهي منصة أرخص؟", "Which platform is cheapest?"),
+    ],
+  },
+  {
+    id: `${capability}.cpa`,
+    type: "kpi",
+    title: q("تكلفة الصفقة", "Cost per won deal"),
+    meaning: q(
+      "الإعلان كلّف كام مقابل كل صفقة مكسوبة في الفترة.",
+      "What advertising cost for each won deal in the period.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [
+      q("الرقم ده كويس؟", "Is this number good?"),
+      q("قارنه بالفترة اللي فاتت", "Compare with the previous period"),
+    ],
+  },
+  {
+    id: `${capability}.acos`,
+    type: "kpi",
+    title: q("ACOS", "ACOS"),
+    meaning: q(
+      "الإنفاق كنسبة من الإيراد المحصّل. كل ما قلّت كان الإعلان أرخص مقابل اللي رجّعه.",
+      "Spend as a share of collected revenue. Lower means cheaper advertising for what it returned.",
+    ),
+    sourceCapability: capability,
+    periodSensitive: true,
+    filterSensitive: true,
+    questions: [q("يعني إيه ACOS؟", "What is ACOS?"), q("الرقم ده كويس؟", "Is this number good?")],
+  },
 ];
 
 export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
@@ -330,8 +426,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
     elements: commonElements("campaigns"),
     suggestedQuestions: [
-      q("تحب أقارن الحملات على الإيراد والـROAS وجودة الـleads؟",
-        "Compare campaigns on revenue, ROAS and lead quality?"),
+      q(
+        "تحب أقارن الحملات على الإيراد والـROAS وجودة الـleads؟",
+        "Compare campaigns on revenue, ROAS and lead quality?",
+      ),
       q("أنهي حملة أحسن؟", "Which campaign is best?"),
       q("مين محتاج مراجعة؟", "Which needs review?"),
     ],
@@ -499,8 +597,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       },
     ],
     suggestedQuestions: [
-      q("تحب أرتب الفريق حسب تحقيق التارجت ولا حسب كورس معين؟",
-        "Rank the team by quota attainment, or by a particular course?"),
+      q(
+        "تحب أرتب الفريق حسب تحقيق التارجت ولا حسب كورس معين؟",
+        "Rank the team by quota attainment, or by a particular course?",
+      ),
       q("مين أحسن فريق؟", "Which team performs best?"),
       q("مين لسه بعيد عن تارجته؟", "Who is furthest from their quota?"),
       q("مين أنسب موظف يبيع كورس PMP؟", "Who is best placed to sell PMP?"),
@@ -599,8 +699,10 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     sections: [],
     elements: [],
     suggestedQuestions: [
-      q("تحب أشوف إحنا سابقين ولا متأخرين عن pacing الخطة؟",
-        "See whether we are ahead of or behind the plan's pacing?"),
+      q(
+        "تحب أشوف إحنا سابقين ولا متأخرين عن pacing الخطة؟",
+        "See whether we are ahead of or behind the plan's pacing?",
+      ),
       q("إحنا فين من الخطة؟", "How are we tracking against plan?"),
       q("أنهي كورس أبعد عن خطته؟", "Which course is furthest from its plan?"),
     ],

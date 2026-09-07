@@ -31,6 +31,8 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
@@ -107,6 +109,235 @@ interface CoursesResponse {
   drill?: CourseDrill | null;
 }
 
+/**
+ * The five course figures, and the courses behind each.
+ *
+ * EVERY BREAKDOWN HERE IS PER COURSE, because that is the page's unit. The
+ * money side (revenue, invoices, sales orders) comes from the accounting rows
+ * and carries a course written by the sync; the spend side is matched onto a
+ * course from the ad text, which is a weaker link — so the spend panel says so
+ * rather than letting the two look equally solid.
+ */
+function courseMetrics(
+  courses: CourseAgg[],
+  linked: { spend: number; leads: number; salesOrders: number; invoices: number; revenue: number },
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const byCourse = (
+    pick: (course: CourseAgg) => number,
+    format: (n: number) => string,
+    tone: "mint" | "rose" | "sky" | "violet" | "amber" | "cyan",
+  ) =>
+    topRows(
+      courses.map((course) => ({
+        key: course.key,
+        label: course.name,
+        value: pick(course),
+        display: format(pick(course)),
+        meta: course.mainCategory || undefined,
+        tone,
+      })),
+    );
+
+  const attributionCaveat = A
+    ? "الإنفاق يُنسب إلى الدورة من نص الإعلان، لا من عمود دورة في مصدر الإعلانات. الإيراد والليدز ينسبان من عمود الدورة نفسه، ولذلك فالجانبان ليسا بنفس درجة الثقة."
+    : "Spend is matched to a course from the ad's own text, not from a course column in the ads feed. Revenue and leads carry a course written by the sync, so the two sides are not equally reliable.";
+
+  return {
+    revenue: {
+      id: "courses.revenue",
+      title: A ? "المحصل من الدورات" : "Course revenue",
+      value: fmtUSD(linked.revenue),
+      tone: "mint",
+      icon: <GraduationCap size={16} />,
+      definition: A
+        ? "الإيراد المحصّل من الفواتير المدفوعة التي تحمل دورة معروفة داخل الفترة."
+        : "Revenue collected from paid invoices that carry a known course inside the period.",
+      formula: A
+        ? `${fmtUSD(linked.revenue)} من ${fmtNum(linked.invoices)} فاتورة عبر ${fmtNum(courses.length)} دورة.`
+        : `${fmtUSD(linked.revenue)} from ${fmtNum(linked.invoices)} invoices across ${fmtNum(courses.length)} courses.`,
+      supporting: [
+        { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(linked.invoices) },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(linked.leads) },
+        { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(linked.spend) },
+        {
+          key: "roas",
+          label: A ? "العائد" : "Return",
+          value: linked.spend > 0 ? fmtRoas(linked.revenue / linked.spend) : "—",
+        },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "أعلى الدورات إيرادًا" : "Top courses by revenue",
+          rows: byCourse((course) => course.revenue, fmtUSD, "mint"),
+          emptyLabel: A ? "لا توجد دورة بإيراد" : "No course carries revenue",
+        },
+        {
+          id: "avg",
+          title: A ? "أعلى متوسط فاتورة" : "Highest average invoice",
+          rows: byCourse((course) => course.avgOrder ?? 0, fmtUSD, "amber"),
+          emptyLabel: A ? "لا توجد فواتير" : "No invoices",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+    spend: {
+      id: "courses.spend",
+      title: A ? "إنفاق الدورات" : "Course ad spend",
+      value: fmtUSD(linked.spend),
+      tone: "rose",
+      icon: <BadgeDollarSign size={16} />,
+      definition: A
+        ? "الإنفاق الإعلاني الذي أمكن نسبته إلى دورة بعينها في الفترة."
+        : "Ad spend that could be matched to a specific course in the period.",
+      caveat: attributionCaveat,
+      formula: A
+        ? `${fmtUSD(linked.spend)} مقابل ${fmtUSD(linked.revenue)} إيراد = ${linked.spend > 0 ? fmtRoas(linked.revenue / linked.spend) : "—"}.`
+        : `${fmtUSD(linked.spend)} against ${fmtUSD(linked.revenue)} of revenue = ${linked.spend > 0 ? fmtRoas(linked.revenue / linked.spend) : "—"}.`,
+      supporting: [
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(linked.revenue) },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(linked.leads) },
+        {
+          key: "cpl",
+          label: "CPL",
+          value: linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—",
+        },
+        { key: "courses", label: A ? "الدورات" : "Courses", value: fmtNum(courses.length) },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "أعلى الدورات إنفاقًا" : "Courses with the most spend",
+          rows: byCourse((course) => course.spend, fmtUSD, "rose"),
+          emptyLabel: A ? "لا توجد دورة بإنفاق" : "No course carries spend",
+        },
+        {
+          id: "returns",
+          title: A ? "أعلى الدورات عائدًا" : "Courses with the best return",
+          rows: byCourse((course) => course.roas ?? 0, fmtRoas, "mint"),
+          emptyLabel: A ? "لا توجد دورة مؤهلة" : "No eligible course",
+        },
+      ],
+      report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
+    },
+    leads: {
+      id: "courses.leads",
+      title: A ? "ليدز الدورات" : "Course leads",
+      value: fmtNum(linked.leads),
+      tone: "sky",
+      icon: <Users size={16} />,
+      definition: A
+        ? "العملاء المحتملون الذين تحمل صفوفهم دورة معروفة داخل الفترة."
+        : "Leads whose rows carry a known course inside the period.",
+      formula: A
+        ? `${fmtNum(linked.leads)} ليد عبر ${fmtNum(courses.length)} دورة، بتكلفة ${linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—"} لكل ليد.`
+        : `${fmtNum(linked.leads)} leads across ${fmtNum(courses.length)} courses, at ${linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—"} each.`,
+      supporting: [
+        { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(linked.spend) },
+        {
+          key: "cpl",
+          label: "CPL",
+          value: linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—",
+        },
+        { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(linked.invoices) },
+        {
+          key: "conversion",
+          label: A ? "التحويل إلى فاتورة" : "Lead to invoice",
+          value: linked.leads > 0 ? fmtPct((linked.invoices / linked.leads) * 100, 1) : "—",
+        },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "أعلى الدورات في العملاء" : "Courses with the most leads",
+          rows: byCourse((course) => course.crmLeads, fmtNum, "sky"),
+          emptyLabel: A ? "لا توجد دورة بعملاء" : "No course carries leads",
+        },
+        {
+          id: "conversion",
+          title: A ? "أعلى الدورات تحويلًا" : "Best converting courses",
+          rows: byCourse(
+            (course) => course.conversionRate ?? 0,
+            (n) => fmtPct(n, 1),
+            "violet",
+          ),
+          emptyLabel: A ? "لا توجد دورة قابلة للقياس" : "No measurable course",
+        },
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+    salesOrders: {
+      id: "courses.salesOrders",
+      title: A ? "أوامر البيع المرتبطة" : "Linked sales orders",
+      value: fmtNum(linked.salesOrders),
+      tone: "violet",
+      icon: <ShoppingCart size={16} />,
+      definition: A
+        ? "أوامر البيع المفوترة بالكامل والمرتبطة بدورة. مؤشر استرشادي بجانب الفواتير المدفوعة، وليس بديلًا عنها."
+        : "Fully invoiced sales orders linked to a course. An advisory figure beside the paid invoices, never a replacement for them.",
+      formula: A
+        ? `${fmtNum(linked.salesOrders)} أمر بيع مقابل ${fmtNum(linked.invoices)} فاتورة مدفوعة.`
+        : `${fmtNum(linked.salesOrders)} sales orders against ${fmtNum(linked.invoices)} paid invoices.`,
+      supporting: [
+        {
+          key: "invoices",
+          label: A ? "الفواتير المدفوعة" : "Paid invoices",
+          value: fmtNum(linked.invoices),
+        },
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(linked.revenue) },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(linked.leads) },
+        { key: "courses", label: A ? "الدورات" : "Courses", value: fmtNum(courses.length) },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "حسب الدورة" : "By course",
+          rows: byCourse((course) => course.salesOrders, fmtNum, "violet"),
+          emptyLabel: A ? "لا توجد أوامر بيع" : "No sales orders",
+        },
+      ],
+    },
+    invoices: {
+      id: "courses.invoices",
+      title: A ? "الفواتير المرتبطة" : "Linked paid invoices",
+      value: fmtNum(linked.invoices),
+      tone: "cyan",
+      icon: <ReceiptText size={16} />,
+      definition: A
+        ? "عدد الفواتير المدفوعة المميزة التي تحمل دورة معروفة. هذا هو تعريف البيع المعتمد على هذه الصفحة."
+        : "Distinct paid invoices carrying a known course. This is the approved definition of a sale on this page.",
+      formula: A
+        ? `${fmtNum(linked.invoices)} فاتورة بقيمة ${fmtUSD(linked.revenue)}.`
+        : `${fmtNum(linked.invoices)} invoices worth ${fmtUSD(linked.revenue)}.`,
+      supporting: [
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(linked.revenue) },
+        {
+          key: "avg",
+          label: A ? "متوسط الفاتورة" : "Average invoice",
+          value: linked.invoices > 0 ? fmtUSD(linked.revenue / linked.invoices) : "—",
+        },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(linked.leads) },
+        {
+          key: "rate",
+          label: A ? "التحويل إلى فاتورة" : "Lead to invoice",
+          value: linked.leads > 0 ? fmtPct((linked.invoices / linked.leads) * 100, 1) : "—",
+        },
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "حسب الدورة" : "By course",
+          rows: byCourse((course) => course.invoices, fmtNum, "cyan"),
+          emptyLabel: A ? "لا توجد فواتير" : "No invoices",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+  };
+}
+
 function Courses() {
   const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
@@ -120,9 +351,7 @@ function Courses() {
   const courses = useMemo(() => data?.courses ?? [], [data?.courses]);
   const selectedCourse = courses.find((course) => course.key === selectedKey) ?? courses[0] ?? null;
   useRegisterNexusEntity(
-    selectedCourse
-      ? { type: "course", id: selectedCourse.key, name: selectedCourse.name }
-      : null,
+    selectedCourse ? { type: "course", id: selectedCourse.key, name: selectedCourse.name } : null,
   );
   const detailPath = selectedCourse
     ? `/api/courses?detail=${encodeURIComponent(selectedCourse.name)}`
@@ -151,6 +380,8 @@ function Courses() {
     },
     { spend: 0, leads: 0, salesOrders: 0, invoices: 0, revenue: 0 },
   );
+  // One description per figure, built from the course rows already on screen.
+  const courseTotals = courseMetrics(courses, linked, lang);
 
   const columns: Col<CourseAgg>[] = [
     {
@@ -285,8 +516,9 @@ function Courses() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<GraduationCap size={20} />}
         title={lang === "ar" ? "الدورات" : "Courses"}
         subtitle={
@@ -326,43 +558,12 @@ function Courses() {
         </>
       ) : (
         <>
-          <KpiRow columns={5}>
-            <KpiCard
-              tone="mint"
-              index={0}
-              hero
-              icon={<GraduationCap size={16} />}
-              label={lang === "ar" ? "المحصل من الدورات" : "Course revenue"}
-              value={fmtUSD(linked.revenue)}
-            />
-            <KpiCard
-              index={1}
-              tone="danger"
-              icon={<BadgeDollarSign size={16} />}
-              label={lang === "ar" ? "إنفاق الدورات" : "Course ad spend"}
-              value={fmtUSD(linked.spend)}
-            />
-            <KpiCard
-              index={2}
-              tone="brand"
-              icon={<Users size={16} />}
-              label={lang === "ar" ? "ليدز الدورات" : "Course leads"}
-              value={fmtNum(linked.leads)}
-            />
-            <KpiCard
-              index={3}
-              tone="violet"
-              icon={<ShoppingCart size={16} />}
-              label={lang === "ar" ? "أوامر البيع المرتبطة" : "Linked sales orders"}
-              value={fmtNum(linked.salesOrders)}
-            />
-            <KpiCard
-              index={4}
-              tone="success"
-              icon={<ReceiptText size={16} />}
-              label={lang === "ar" ? "الفواتير المرتبطة" : "Linked paid invoices"}
-              value={fmtNum(linked.invoices)}
-            />
+          <KpiRow>
+            <MetricDetailTrigger detail={courseTotals.revenue} card={{ index: 0, hero: true }} />
+            <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 1 }} />
+            <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 2 }} />
+            <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 3 }} />
+            <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 4 }} />
           </KpiRow>
 
           {/* The attribution chain is what makes a course figure trustworthy or

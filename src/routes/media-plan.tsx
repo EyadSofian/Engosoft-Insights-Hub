@@ -27,6 +27,8 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader, DashboardPanel, KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { MonthlyMediaPlan } from "@/lib/media-plan";
@@ -141,6 +143,277 @@ function courseState(row: CourseRow, phase: PlanPhase) {
   return { tone: "success" as const, key: "on_track" };
 }
 
+/**
+ * The six plan figures, and how far through the month they are.
+ *
+ * A PLAN IS NOT AN ACHIEVEMENT. Every panel here states the target, what has
+ * actually happened, and how much of the month has elapsed — because 60% of a
+ * target on day 6 and 60% on day 26 are opposite readings of the same number.
+ */
+function mediaPlanMetrics(
+  data: MediaPlanResponse,
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const P = data.plan;
+  const V = data.actual;
+  const W = data.window;
+  const pace = W.days > 0 ? (W.elapsed / W.days) * 100 : null;
+  const paceFact = {
+    key: "pace",
+    label: A ? "المنقضي من الشهر" : "Month elapsed",
+    value: pace === null ? "—" : fmtPct(pace, 0),
+    hint: `${fmtNum(W.elapsed)} / ${fmtNum(W.days)} ${A ? "يوم" : "days"}`,
+  };
+  const byCourse = (
+    pick: (row: CourseRow) => number,
+    format: (n: number) => string,
+    tone: "mint" | "rose" | "sky" | "amber" | "violet",
+  ) =>
+    topRows(
+      data.courses.map((row) => ({
+        key: row.key,
+        label: row.label,
+        value: pick(row),
+        display: format(pick(row)),
+        tone,
+      })),
+    );
+
+  return {
+    leadTarget: {
+      id: "media_plan.leadTarget",
+      title: A ? "تارجت الشهر" : "Monthly lead target",
+      value: fmtNum(P.leadTarget),
+      tone: "sky",
+      icon: <Target size={16} />,
+      definition: A
+        ? "عدد العملاء المحتملين الذي تلتزم به الخطة هذا الشهر، من المدفوع ومن الأورجانيك والويبينار معًا."
+        : "The number of leads the plan commits to this month, paid and organic/webinar together.",
+      formula: A
+        ? `${fmtNum(P.paidLeadTarget)} مدفوع + ${fmtNum(P.organicWebinarLeadTarget)} أورجانيك/ويبينار = ${fmtNum(P.leadTarget)}.`
+        : `${fmtNum(P.paidLeadTarget)} paid + ${fmtNum(P.organicWebinarLeadTarget)} organic/webinar = ${fmtNum(P.leadTarget)}.`,
+      supporting: [
+        { key: "paid", label: A ? "تارجت Paid" : "Paid target", value: fmtNum(P.paidLeadTarget) },
+        {
+          key: "organic",
+          label: A ? "تارجت أورجانيك" : "Organic target",
+          value: fmtNum(P.organicWebinarLeadTarget),
+        },
+        {
+          key: "actual",
+          label: A ? "المحقق من Paid" : "Paid so far",
+          value: fmtNum(V.targetedLeads),
+        },
+        paceFact,
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "التارجت حسب الدورة" : "Target by course",
+          rows: byCourse((row) => row.targetLeads, fmtNum, "sky"),
+          emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
+        },
+      ],
+    },
+    paidTarget: {
+      id: "media_plan.paidTarget",
+      title: A ? "تارجت Paid" : "Paid lead target",
+      value: fmtNum(P.paidLeadTarget),
+      tone: "violet",
+      icon: <Users size={16} />,
+      definition: A
+        ? "الجزء من تارجت الشهر الذي يُفترض أن تأتي به الحملات المدفوعة."
+        : "The part of the month's target the paid campaigns are expected to deliver.",
+      formula: A
+        ? `${fmtNum(V.targetedLeads)} من ${fmtNum(P.paidLeadTarget)} = ${ratioPct(V.paidLeadAchievement)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
+        : `${fmtNum(V.targetedLeads)} of ${fmtNum(P.paidLeadTarget)} = ${ratioPct(V.paidLeadAchievement)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
+      supporting: [
+        { key: "actual", label: A ? "المحقق" : "Achieved", value: fmtNum(V.targetedLeads) },
+        {
+          key: "remaining",
+          label: A ? "المتبقي" : "Remaining",
+          value: fmtNum(Math.max(0, P.paidLeadTarget - V.targetedLeads)),
+        },
+        {
+          key: "achievement",
+          label: A ? "نسبة الإنجاز" : "Achievement",
+          value: ratioPct(V.paidLeadAchievement),
+        },
+        paceFact,
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "الليدز الفعلية حسب الدورة" : "Actual leads by course",
+          rows: byCourse((row) => row.actual.crmLeads, fmtNum, "violet"),
+          emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
+        },
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+    budget: {
+      id: "media_plan.budget",
+      title: A ? "ميزانية الليدز" : "Lead-gen budget",
+      value: fmtUSDFull(P.leadGenerationBudgetUsd),
+      tone: "amber",
+      icon: <WalletCards size={16} />,
+      definition: A
+        ? "الميزانية المخصصة لجلب العملاء هذا الشهر. الأنشطة الأخرى لها ميزانيتها المنفصلة."
+        : "The budget set aside to bring in leads this month. Other activities carry their own budget.",
+      formula: A
+        ? `${fmtUSDFull(V.targetedSpend)} مصروف من ${fmtUSDFull(P.leadGenerationBudgetUsd)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
+        : `${fmtUSDFull(V.targetedSpend)} spent of ${fmtUSDFull(P.leadGenerationBudgetUsd)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
+      caveat:
+        V.unattributedOrUnplannedSpend > 0
+          ? A
+            ? `${fmtUSDFull(V.unattributedOrUnplannedSpend)} أُنفقت خارج دورات الخطة أو بلا نسبة، وهي ليست داخل هذا الرقم.`
+            : `${fmtUSDFull(V.unattributedOrUnplannedSpend)} ran outside the planned courses or with no attribution, and is not inside this figure.`
+          : undefined,
+      supporting: [
+        { key: "spent", label: A ? "المصروف" : "Spent", value: fmtUSDFull(V.targetedSpend) },
+        {
+          key: "remaining",
+          label: A ? "المتبقي" : "Remaining",
+          value: fmtUSDFull(Math.max(0, P.leadGenerationBudgetUsd - V.targetedSpend)),
+        },
+        { key: "allSpend", label: A ? "كل الإنفاق" : "All spend", value: fmtUSDFull(V.allSpend) },
+        paceFact,
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "الإنفاق الفعلي حسب الدورة" : "Actual spend by course",
+          rows: byCourse((row) => row.actual.spend, fmtUSDFull, "amber"),
+          emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
+        },
+      ],
+      report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
+    },
+    cpl: {
+      id: "media_plan.cpl",
+      title: A ? "CPL المستهدف" : "Target CPL",
+      value: fmtUSDFull(P.targetCpl),
+      tone: "amber",
+      icon: <Gauge size={16} />,
+      definition: A
+        ? "التكلفة التي تفترضها الخطة لكل عميل محتمل. الفعلي فوقها يعني أن الميزانية لن تكفي التارجت."
+        : "The cost per lead the plan assumes. An actual above it means the budget will not reach the target.",
+      formula: A
+        ? `المستهدف ${fmtUSDFull(P.targetCpl)} مقابل الفعلي ${fmtUSDFull(V.targetedCpl)}.`
+        : `Target ${fmtUSDFull(P.targetCpl)} against an actual of ${fmtUSDFull(V.targetedCpl)}.`,
+      supporting: [
+        { key: "actual", label: A ? "الفعلي" : "Actual", value: fmtUSDFull(V.targetedCpl) },
+        { key: "spent", label: A ? "المصروف" : "Spent", value: fmtUSDFull(V.targetedSpend) },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(V.targetedLeads) },
+        paceFact,
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "CPL الفعلي حسب الدورة" : "Actual CPL by course",
+          rows: byCourse((row) => row.actual.actualCpl ?? 0, fmtUSDFull, "rose"),
+          emptyLabel: A ? "لا توجد دورات قابلة للقياس" : "No measurable course",
+        },
+        {
+          id: "targets",
+          title: A ? "CPL المستهدف حسب الدورة" : "Target CPL by course",
+          rows: byCourse((row) => row.targetCpl, fmtUSDFull, "amber"),
+          emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
+        },
+      ],
+    },
+    salesTarget: {
+      id: "media_plan.salesTarget",
+      title: A ? "تارجت المبيعات" : "Sales target",
+      value: fmtUSDFull(P.salesTargetUsd),
+      tone: "mint",
+      icon: <Landmark size={16} />,
+      definition: A
+        ? "الإيراد الذي تلتزم به الخطة هذا الشهر، مقابل ما تم تحصيله فعلًا حتى الآن."
+        : "The revenue the plan commits to this month, against what has actually been collected so far.",
+      formula: A
+        ? `${fmtUSDFull(V.revenueUsd)} من ${fmtUSDFull(P.salesTargetUsd)} = ${ratioPct(V.salesAchievement)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
+        : `${fmtUSDFull(V.revenueUsd)} of ${fmtUSDFull(P.salesTargetUsd)} = ${ratioPct(V.salesAchievement)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
+      supporting: [
+        { key: "actual", label: A ? "المحقق" : "Achieved", value: fmtUSDFull(V.revenueUsd) },
+        {
+          key: "remaining",
+          label: A ? "المتبقي" : "Remaining",
+          value: fmtUSDFull(Math.max(0, P.salesTargetUsd - V.revenueUsd)),
+        },
+        {
+          key: "achievement",
+          label: A ? "نسبة الإنجاز" : "Achievement",
+          value: ratioPct(V.salesAchievement),
+        },
+        paceFact,
+      ],
+      breakdowns: [
+        {
+          id: "courses",
+          title: A ? "الإيراد الفعلي حسب الدورة" : "Actual revenue by course",
+          rows: byCourse((row) => row.actual.revenueUsd, fmtUSDFull, "mint"),
+          emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+    totalBudget: {
+      id: "media_plan.totalBudget",
+      title: A ? "إجمالي ميزانية التسويق" : "Total marketing budget",
+      value: fmtUSDFull(P.totalMarketingBudgetUsd),
+      tone: "slate",
+      icon: <BadgeDollarSign size={16} />,
+      definition: A
+        ? "كل ما خُصص للتسويق هذا الشهر: ميزانية جلب العملاء، بالإضافة إلى الأنشطة الأخرى."
+        : "Everything set aside for marketing this month: the lead-generation budget plus the other activities.",
+      formula: A
+        ? `${fmtUSDFull(P.leadGenerationBudgetUsd)} ليدز + ${fmtUSDFull(P.additionalBudgetUsd)} أنشطة إضافية = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`
+        : `${fmtUSDFull(P.leadGenerationBudgetUsd)} lead-gen + ${fmtUSDFull(P.additionalBudgetUsd)} extra activities = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`,
+      supporting: [
+        {
+          key: "leadGen",
+          label: A ? "ميزانية الليدز" : "Lead-gen budget",
+          value: fmtUSDFull(P.leadGenerationBudgetUsd),
+        },
+        {
+          key: "extra",
+          label: A ? "أنشطة إضافية" : "Extra activities",
+          value: fmtUSDFull(P.additionalBudgetUsd),
+        },
+        {
+          key: "reserve",
+          label: A ? "الاحتياطي" : "Reserve",
+          value: fmtUSDFull(P.reserveBudgetUsd),
+        },
+        {
+          key: "spent",
+          label: A ? "المصروف فعلًا" : "Actually spent",
+          value: fmtUSDFull(V.allSpend),
+        },
+      ],
+      breakdowns: P.additionalActivities.length
+        ? [
+            {
+              id: "activities",
+              title: A ? "الأنشطة الإضافية" : "Extra activities",
+              rows: topRows(
+                P.additionalActivities.map((activity) => ({
+                  key: activity.key,
+                  label: activity.label,
+                  value: activity.budgetUsd,
+                  display: fmtUSDFull(activity.budgetUsd),
+                  tone: "slate" as const,
+                })),
+              ),
+            },
+          ]
+        : undefined,
+    },
+  };
+}
+
 function MediaPlanPage() {
   const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
@@ -155,10 +428,14 @@ function MediaPlanPage() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
+  // One description per figure, built from the plan already on screen.
+  const figures = data ? mediaPlanMetrics(data, lang) : ({} as ReturnType<typeof mediaPlanMetrics>);
+
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <DashboardPageHeader
+          flush
           icon={<CalendarRange size={20} />}
           title={lang === "ar" ? "خطة الميديا الشهرية" : "Monthly media plan"}
           subtitle={
@@ -255,55 +532,39 @@ function MediaPlanPage() {
             </div>
           </DashboardPanel>
 
-          <KpiRow columns={6}>
-            <KpiCard
-              index={0}
-              label={lang === "ar" ? "تارجت الشهر" : "Monthly lead target"}
-              value={fmtNum(data.plan.leadTarget)}
-              tone="brand"
-              icon={<Target size={15} />}
-              sub="Paid + Organic/Webinar"
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={figures.leadTarget}
+              card={{ index: 0, sub: "Paid + Organic/Webinar" }}
             />
-            <KpiCard
-              index={1}
-              label={lang === "ar" ? "تارجت Paid" : "Paid lead target"}
-              value={fmtNum(data.plan.paidLeadTarget)}
-              tone="violet"
-              icon={<Users size={15} />}
-              sub={ratioPct(data.actual.paidLeadAchievement)}
+            <MetricDetailTrigger
+              detail={figures.paidTarget}
+              card={{ index: 1, sub: ratioPct(data.actual.paidLeadAchievement) }}
             />
-            <KpiCard
-              index={2}
-              label={lang === "ar" ? "ميزانية الليدز" : "Lead-gen budget"}
-              value={fmtUSDFull(data.plan.leadGenerationBudgetUsd)}
-              tone="warning"
-              icon={<WalletCards size={15} />}
-              sub={`${fmtUSDFull(data.actual.targetedSpend)} ${lang === "ar" ? "مصروف" : "spent"}`}
+            <MetricDetailTrigger
+              detail={figures.budget}
+              card={{
+                index: 2,
+                sub: `${fmtUSDFull(data.actual.targetedSpend)} ${lang === "ar" ? "مصروف" : "spent"}`,
+              }}
             />
-            <KpiCard
-              index={3}
-              label={lang === "ar" ? "CPL المستهدف" : "Target CPL"}
-              value={fmtUSDFull(data.plan.targetCpl)}
-              tone="warning"
-              icon={<Gauge size={15} />}
-              sub={`${lang === "ar" ? "الفعلي" : "actual"} ${fmtUSDFull(data.actual.targetedCpl)}`}
+            <MetricDetailTrigger
+              detail={figures.cpl}
+              card={{
+                index: 3,
+                sub: `${lang === "ar" ? "الفعلي" : "actual"} ${fmtUSDFull(data.actual.targetedCpl)}`,
+              }}
             />
-            <KpiCard
-              tone="mint"
-              index={4}
-              label={lang === "ar" ? "تارجت المبيعات" : "Sales target"}
-              value={fmtUSDFull(data.plan.salesTargetUsd)}
-              hero
-              icon={<Landmark size={15} />}
-              sub={ratioPct(data.actual.salesAchievement)}
+            <MetricDetailTrigger
+              detail={figures.salesTarget}
+              card={{ index: 4, hero: true, sub: ratioPct(data.actual.salesAchievement) }}
             />
-            <KpiCard
-              index={5}
-              label={lang === "ar" ? "إجمالي ميزانية التسويق" : "Total marketing budget"}
-              value={fmtUSDFull(data.plan.totalMarketingBudgetUsd)}
-              tone="neutral"
-              icon={<BadgeDollarSign size={15} />}
-              sub={`+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`}
+            <MetricDetailTrigger
+              detail={figures.totalBudget}
+              card={{
+                index: 5,
+                sub: `+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`,
+              }}
             />
           </KpiRow>
 

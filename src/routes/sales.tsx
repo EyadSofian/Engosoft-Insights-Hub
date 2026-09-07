@@ -26,6 +26,9 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtRoas, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { Platform } from "@/lib/types";
@@ -106,6 +109,253 @@ function rate(value: number, total: number) {
   return total > 0 ? (value / total) * 100 : null;
 }
 
+/**
+ * Each step of the funnel, and the sources and campaigns behind it.
+ *
+ * THE STAGES ARE NOT A HISTORY. "Interested" and "Quotation" are read from the
+ * lead's CURRENT stage or a clearly later one, because this dataset carries no
+ * record of every transition a lead made. Each panel says so, so nobody reads a
+ * step as "how many passed through here".
+ */
+function salesMetrics(data: SalesResponse, lang: "ar" | "en"): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const F = data.funnel;
+  const T = data.totals;
+  const stageNote = A
+    ? "المرحلة تُقرأ من حالة العميل الحالية أو مرحلة أبعد منها؛ لا يوجد سجل كامل لكل انتقال، فالرقم يعني «وصل إلى هنا على الأقل» لا «مرّ من هنا»."
+    : "A stage is read from the lead's current position or a clearly later one; there is no complete transition history, so the figure means “reached at least here”, not “passed through here”.";
+
+  const bySource = (
+    pick: (row: SalesAttributionRow) => number,
+    format: (n: number) => string,
+    tone: "mint" | "sky" | "violet",
+  ) =>
+    topRows(
+      data.sources.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.leads)} ${A ? "ليد" : "leads"}`,
+        tone,
+      })),
+    );
+  const byCampaign = (
+    pick: (row: SalesCampaignRow) => number,
+    format: (n: number) => string,
+    tone: "mint" | "sky" | "violet",
+  ) =>
+    topRows(
+      data.campaigns.map((row) => ({
+        key: row.key,
+        label: row.name,
+        value: pick(row),
+        display: format(pick(row)),
+        meta: `${fmtNum(row.leads)} ${A ? "ليد" : "leads"}`,
+        tone,
+      })),
+    );
+
+  const step = (
+    id: string,
+    title: string,
+    value: number,
+    definition: string,
+    pick: (row: SalesAttributionRow) => number,
+    pickCampaign: (row: SalesCampaignRow) => number,
+    tone: MetricDetail["tone"],
+  ): MetricDetail => ({
+    id,
+    title,
+    value: fmtNum(value),
+    tone,
+    definition,
+    caveat: stageNote,
+    formula: `${fmtNum(value)} ÷ ${fmtNum(F.leads)} = ${fmtPct(rate(value, F.leads), 1)}`,
+    supporting: [
+      { key: "leads", label: A ? "الليدز الداخلة" : "Leads entered", value: fmtNum(F.leads) },
+      { key: "won", label: "Won", value: fmtNum(F.won) },
+      { key: "invoices", label: A ? "فواتير مدفوعة" : "Paid invoices", value: fmtNum(F.invoices) },
+      { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDFull(T.revenue) },
+    ],
+    breakdowns: [
+      {
+        id: "sources",
+        title: A ? "حسب المصدر" : "By source",
+        rows: bySource(pick, fmtNum, "sky"),
+        emptyLabel: A ? "لا توجد مصادر" : "No sources",
+      },
+      {
+        id: "campaigns",
+        title: A ? "حسب الحملة" : "By campaign",
+        rows: byCampaign(pickCampaign, fmtNum, "violet"),
+        emptyLabel: A ? "لا توجد حملات" : "No campaigns",
+      },
+    ],
+    report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+  });
+
+  return {
+    leads: step(
+      "sales.leads",
+      A ? "الليدز الداخلة" : "Leads entered",
+      F.leads,
+      A
+        ? "العملاء المحتملون الذين دخلوا النظام داخل الفترة. هذا هو مقام كل نسبة في هذا الصف."
+        : "Leads that entered the system inside the period. This is the denominator of every rate in this row.",
+      (row) => row.leads,
+      (row) => row.leads,
+      "sky",
+    ),
+    interested: step(
+      "sales.interested",
+      A ? "مهتم أو أبعد" : "Interested+",
+      F.interested,
+      A
+        ? "العملاء الذين وصلوا إلى مرحلة الاهتمام أو ما بعدها."
+        : "Leads that reached the interested stage or anything beyond it.",
+      (row) => row.interested,
+      (row) => row.interested,
+      "violet",
+    ),
+    quotations: step(
+      "sales.quotations",
+      A ? "كوتيشن أو أبعد" : "Quotation+",
+      F.quotations,
+      A
+        ? "العملاء الذين وصلوا إلى مرحلة عرض السعر أو ما بعدها."
+        : "Leads that reached the quotation stage or anything beyond it.",
+      (row) => row.quotations,
+      (row) => row.quotations,
+      "violet",
+    ),
+    won: step(
+      "sales.won",
+      "Won",
+      F.won,
+      A
+        ? "العملاء الذين أُغلقت صفقتهم رابحة داخل الفترة."
+        : "Leads whose deal closed as won inside the period.",
+      (row) => row.won,
+      (row) => row.won,
+      "violet",
+    ),
+    salesOrders: {
+      id: "sales.salesOrders",
+      title: A ? "أوامر بيع" : "Sales orders",
+      value: fmtNum(F.salesOrders),
+      tone: "cyan",
+      icon: <ShoppingCart size={16} />,
+      definition: A
+        ? "أوامر البيع المفوترة بالكامل. مصدرها مختلف عن الفواتير المدفوعة، فلا يلزم أن يتطابق العددان."
+        : "Fully invoiced sales orders. A different source from the paid invoices, so the two counts are not required to match.",
+      formula: A
+        ? `${fmtNum(F.salesOrders)} أمر بيع مقابل ${fmtNum(F.invoices)} فاتورة مدفوعة و${fmtNum(F.won)} صفقة رابحة.`
+        : `${fmtNum(F.salesOrders)} sales orders against ${fmtNum(F.invoices)} paid invoices and ${fmtNum(F.won)} won deals.`,
+      supporting: [
+        {
+          key: "invoices",
+          label: A ? "فواتير مدفوعة" : "Paid invoices",
+          value: fmtNum(F.invoices),
+        },
+        { key: "won", label: "Won", value: fmtNum(F.won) },
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDFull(T.revenue) },
+        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(F.leads) },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "حسب المصدر" : "By source",
+          rows: bySource((row) => row.salesOrders, fmtNum, "mint"),
+          emptyLabel: A ? "لا توجد مصادر" : "No sources",
+        },
+      ],
+    },
+    invoices: {
+      id: "sales.invoices",
+      title: A ? "فواتير مدفوعة" : "Paid invoices",
+      value: fmtNum(F.invoices),
+      tone: "mint",
+      icon: <ReceiptText size={16} />,
+      definition: A
+        ? "المستندات المحاسبية المدفوعة المميزة في الفترة. هذا هو تعريف البيع المعتمد."
+        : "Distinct paid accounting documents in the period. This is the approved definition of a sale.",
+      formula: `${fmtNum(F.invoices)} ÷ ${fmtNum(F.leads)} = ${fmtPct(rate(F.invoices, F.leads), 1)}`,
+      supporting: [
+        { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDFull(T.revenue) },
+        {
+          key: "avg",
+          label: A ? "متوسط الفاتورة" : "Average invoice",
+          value: fmtUSDFull(T.averageInvoice),
+        },
+        { key: "won", label: "Won", value: fmtNum(F.won) },
+        { key: "orders", label: A ? "أوامر بيع" : "Sales orders", value: fmtNum(F.salesOrders) },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "حسب المصدر" : "By source",
+          rows: bySource((row) => row.invoices, fmtNum, "mint"),
+          emptyLabel: A ? "لا توجد مصادر" : "No sources",
+        },
+        {
+          id: "campaigns",
+          title: A ? "حسب الحملة" : "By campaign",
+          rows: byCampaign((row) => row.invoices, fmtNum, "mint"),
+          emptyLabel: A ? "لا توجد حملات" : "No campaigns",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+    revenue: {
+      id: "sales.revenue",
+      title: A ? "الإيراد المحصّل" : "Paid revenue",
+      value: fmtUSDFull(T.revenue),
+      tone: "mint",
+      icon: <BadgeDollarSign size={16} />,
+      definition: A
+        ? "المبالغ المدفوعة فعليًا في الفترة، بتاريخ الدفع، من فواتير الحسابات."
+        : "Money actually collected in the period, on payment date, from Accounting invoices.",
+      formula: A
+        ? `${fmtUSDFull(T.revenue)} من ${fmtNum(F.invoices)} فاتورة، بمتوسط ${fmtUSDFull(T.averageInvoice)}.`
+        : `${fmtUSDFull(T.revenue)} across ${fmtNum(F.invoices)} invoices, averaging ${fmtUSDFull(T.averageInvoice)}.`,
+      supporting: [
+        {
+          key: "avg",
+          label: A ? "متوسط الفاتورة" : "Average invoice",
+          value: fmtUSDFull(T.averageInvoice),
+        },
+        {
+          key: "attributed",
+          label: A ? "مرتبط بحملات" : "Campaign-linked",
+          value: fmtUSDFull(T.attributedRevenue),
+        },
+        {
+          key: "unmatched",
+          label: A ? "غير مرتبط" : "Unlinked",
+          value: fmtUSDFull(T.unmatchedRevenue),
+        },
+        { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(F.invoices) },
+      ],
+      breakdowns: [
+        {
+          id: "sources",
+          title: A ? "أعلى المصادر إيرادًا" : "Sources with the most revenue",
+          rows: bySource((row) => row.revenue, fmtUSDFull, "mint"),
+          emptyLabel: A ? "لا توجد مصادر" : "No sources",
+        },
+        {
+          id: "campaigns",
+          title: A ? "أعلى الحملات إيرادًا" : "Campaigns with the most revenue",
+          rows: byCampaign((row) => row.revenue, fmtUSDFull, "mint"),
+          emptyLabel: A ? "لا توجد حملات" : "No campaigns",
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+  };
+}
+
 function SalesReport() {
   const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
@@ -124,6 +374,8 @@ function SalesReport() {
   }
 
   const ar = lang === "ar";
+  // One description per figure, built from the response already on screen.
+  const metrics = salesMetrics(data, lang);
   const sourceCols: Col<SalesAttributionRow>[] = [
     {
       key: "source",
@@ -248,8 +500,9 @@ function SalesReport() {
   ].map((step) => ({ ...step, display: fmtNum(step.value) }));
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<Receipt size={20} />}
         title={ar ? "تقرير المبيعات والفانل" : "Sales funnel report"}
         subtitle={
@@ -267,64 +520,40 @@ function SalesReport() {
           : "Interested and quotation use the current CRM stage or a clearly later stage; this dataset has no complete stage-transition history. Sales orders come from Full Invoiced Orders, while invoices and revenue come from paid Accounting invoices, so counts are not required to match Won one-for-one."}
       </Notice>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-        <KpiCard
-          tone="sky"
-          index={0}
-          label={ar ? "الليدز الداخلة" : "Leads entered"}
-          value={fmtNum(data.funnel.leads)}
-          icon={<Users size={16} />}
+      <KpiRow>
+        <MetricDetailTrigger
+          detail={{ ...metrics.leads, icon: <Users size={16} /> }}
+          card={{ index: 0 }}
         />
-        <KpiCard
-          tone="violet"
-          index={1}
-          label={ar ? "مهتم أو أبعد" : "Interested+"}
-          value={fmtNum(data.funnel.interested)}
-          sub={fmtPct(rate(data.funnel.interested, data.funnel.leads), 1)}
-          icon={<HeartHandshake size={16} />}
+        <MetricDetailTrigger
+          detail={{ ...metrics.interested, icon: <HeartHandshake size={16} /> }}
+          card={{ index: 1, sub: fmtPct(rate(data.funnel.interested, data.funnel.leads), 1) }}
         />
-        <KpiCard
-          tone="violet"
-          index={2}
-          label={ar ? "كوتيشن أو أبعد" : "Quotation+"}
-          value={fmtNum(data.funnel.quotations)}
-          sub={fmtPct(rate(data.funnel.quotations, data.funnel.leads), 1)}
-          icon={<FileText size={16} />}
+        <MetricDetailTrigger
+          detail={{ ...metrics.quotations, icon: <FileText size={16} /> }}
+          card={{ index: 2, sub: fmtPct(rate(data.funnel.quotations, data.funnel.leads), 1) }}
         />
-        <KpiCard
-          tone="violet"
-          index={3}
-          label="Won"
-          value={fmtNum(data.funnel.won)}
-          sub={fmtPct(rate(data.funnel.won, data.funnel.leads), 1)}
-          icon={<Trophy size={16} />}
+        <MetricDetailTrigger
+          detail={{ ...metrics.won, icon: <Trophy size={16} /> }}
+          card={{ index: 3, sub: fmtPct(rate(data.funnel.won, data.funnel.leads), 1) }}
         />
-        <KpiCard
-          tone="mint"
-          index={4}
-          label={ar ? "أوامر بيع" : "Sales orders"}
-          value={fmtNum(data.funnel.salesOrders)}
-          sub={ar ? "مفوترة بالكامل" : "Fully invoiced"}
-          icon={<ShoppingCart size={16} />}
+        <MetricDetailTrigger
+          detail={metrics.salesOrders}
+          card={{ index: 4, sub: ar ? "مفوترة بالكامل" : "Fully invoiced" }}
         />
-        <KpiCard
-          tone="mint"
-          index={5}
-          label={ar ? "فواتير مدفوعة" : "Paid invoices"}
-          value={fmtNum(data.funnel.invoices)}
-          sub={ar ? "مستندات محاسبية مميزة" : "Distinct accounting documents"}
-          icon={<ReceiptText size={16} />}
+        <MetricDetailTrigger
+          detail={metrics.invoices}
+          card={{ index: 5, sub: ar ? "مستندات محاسبية مميزة" : "Distinct accounting documents" }}
         />
-        <KpiCard
-          tone="mint"
-          index={6}
-          label={ar ? "الإيراد المحصّل" : "Paid revenue"}
-          value={fmtUSDFull(data.totals.revenue)}
-          sub={`${ar ? "متوسط الفاتورة" : "Avg. invoice"}: ${fmtUSDFull(data.totals.averageInvoice)}`}
-          hero
-          icon={<BadgeDollarSign size={16} />}
+        <MetricDetailTrigger
+          detail={metrics.revenue}
+          card={{
+            index: 6,
+            hero: true,
+            sub: `${ar ? "متوسط الفاتورة" : "Avg. invoice"}: ${fmtUSDFull(data.totals.averageInvoice)}`,
+          }}
         />
-      </div>
+      </KpiRow>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">
         <Card>

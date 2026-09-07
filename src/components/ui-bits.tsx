@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight, Minus, Inbox } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  Inbox,
+} from "lucide-react";
 import { fmtDelta, fmtRoas, useI18n } from "@/lib/i18n";
-import { toneOf, toneVars, type AnyTone } from "@/lib/dashboard-tone";
+import { toneVars, type AnyTone } from "@/lib/dashboard-tone";
 
 /* --- surfaces ------------------------------------------------------------ */
 
@@ -142,10 +149,21 @@ export function Pill({
  * to read as five different things from across a desk, and five white cards
  * with five small coloured icons read as one grey block.
  *
+ * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
+ * is `--pad-card`, the label sits 11px above the figure, the figure 8px above
+ * its explanation, and the "view detail" cue is pinned to the bottom edge by
+ * `mt-auto` so every card in a row ends on the same line however long its
+ * explanation runs.
+ *
  * `spark` draws only from a genuine series out of the same response the value
  * came from. Two points minimum, no synthesised curve, no placeholder: an
  * empty sparkline slot means the API returned no series, not that the metric
  * was flat.
+ *
+ * `onClick` turns the card into a real button. When it is set the card says so
+ * before it is touched — chevron, "view detail", a firming border on hover and
+ * a family-coloured focus ring — because a figure that silently does something
+ * when clicked is worse than one that does nothing.
  */
 export function KpiCard({
   label,
@@ -164,6 +182,9 @@ export function KpiCard({
   compact = false,
   loading = false,
   onClick,
+  actionLabel,
+  ariaLabel,
+  testId,
 }: {
   label: string;
   value: ReactNode;
@@ -188,19 +209,24 @@ export function KpiCard({
   compact?: boolean;
   loading?: boolean;
   onClick?: () => void;
+  /** Overrides the "view detail" wording on the affordance. */
+  actionLabel?: string;
+  /** Overrides the button's accessible name, which defaults to label + value. */
+  ariaLabel?: string;
+  testId?: string;
 }) {
-  const t = toneOf(tone);
+  const { lang } = useI18n();
 
   if (loading) {
     return (
       <div
-        className={`tone-surface @container relative overflow-hidden ${
-          compact ? "min-h-[104px]" : "min-h-[142px] sm:min-h-[156px]"
+        className={`tone-surface @container pad-card relative h-full overflow-hidden ${
+          compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"
         }`}
         style={toneVars(tone)}
         aria-busy="true"
       >
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="space-y-3">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-7 w-28" />
           <Skeleton className="h-3 w-24" />
@@ -209,15 +235,21 @@ export function KpiCard({
     );
   }
 
-  const Tag = onClick ? "button" : "div";
+  const interactive = Boolean(onClick);
+  const Tag = interactive ? "button" : "div";
+  const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
 
   return (
     <Tag
-      type={onClick ? "button" : undefined}
+      type={interactive ? "button" : undefined}
       onClick={onClick}
-      className={`tone-surface stagger @container relative overflow-hidden text-start ${
-        onClick ? "lift w-full cursor-pointer" : ""
-      } ${compact ? "min-h-[98px] p-3.5" : "min-h-[136px] p-4 sm:min-h-[148px] sm:px-4.5 sm:py-4"}`}
+      aria-haspopup={interactive ? "dialog" : undefined}
+      aria-label={interactive ? ariaLabel : undefined}
+      data-metric-trigger={interactive ? "" : undefined}
+      data-testid={testId}
+      className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+        interactive ? "kpi-card lift cursor-pointer" : ""
+      } ${compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"}`}
       style={
         {
           ...toneVars(tone),
@@ -272,9 +304,11 @@ export function KpiCard({
         )}
       </div>
 
+      {/* Label to figure: 11px. Close enough to read as one unit, far enough
+          that the figure is the thing the eye lands on. */}
       <div
         className={`num relative max-w-full min-w-0 font-bold tracking-[-0.03em] ${
-          compact ? "mt-1.5" : "mt-2.5"
+          compact ? "mt-1.5" : "mt-[11px]"
         } ${
           valueWrap
             ? "overflow-visible whitespace-normal text-[clamp(1rem,13cqi,1.6rem)] leading-[1.15]"
@@ -285,10 +319,13 @@ export function KpiCard({
         {value}
       </div>
 
-      <div
-        className={`relative flex items-end justify-between gap-2 ${compact ? "mt-1.5" : "mt-2.5 min-h-[30px]"}`}
-      >
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+      {/* Figure to explanation: 8px; between the parts of the explanation: 6. */}
+      {(delta !== undefined || sub != null) && (
+        <div
+          className={`relative flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${
+            compact ? "mt-1.5" : "mt-2"
+          }`}
+        >
           <DeltaBadge value={delta} invert={deltaInvert} />
           {sub != null && (
             <span
@@ -300,9 +337,30 @@ export function KpiCard({
               {sub}
             </span>
           )}
-        </span>
-        {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
-      </div>
+        </div>
+      )}
+
+      {/* The foot of the card. `mt-auto` is what makes a row of cards line up
+          along the bottom as well as the top, whatever length of explanation
+          each one carries. */}
+      {(interactive || (!compact && spark)) && (
+        <div className="relative mt-auto flex items-end justify-between gap-2 pt-2.5">
+          {interactive ? (
+            <span
+              className="kpi-cue inline-flex items-center gap-0.5 text-[10.5px] font-bold"
+              style={{ color: "var(--tone-strong)" }}
+            >
+              {cue}
+              <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
+                {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+              </span>
+            </span>
+          ) : (
+            <span />
+          )}
+          {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
+        </div>
+      )}
     </Tag>
   );
 }

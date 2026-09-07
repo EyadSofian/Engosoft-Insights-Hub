@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Children, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -44,6 +44,7 @@ export function DashboardPageHeader({
   sync,
   actions,
   tone = "sky",
+  flush = false,
   children,
 }: {
   icon?: ReactNode;
@@ -56,12 +57,19 @@ export function DashboardPageHeader({
   actions?: ReactNode;
   /** The section's colour family, on the icon tile. */
   tone?: AnyTone;
+  /**
+   * Drops the header's own bottom margin, for a page whose stack already owns
+   * the distance below it. `--gap-header` is 24px against the first figure,
+   * which is deliberately less than the 30px between two groups: the header and
+   * the row under it are one unit.
+   */
+  flush?: boolean;
   /** Sub-navigation, rendered under the heading rule. */
   children?: ReactNode;
 }) {
   const t = toneOf(tone);
   return (
-    <header className="mb-4">
+    <header className={flush ? "" : "mb-4"}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
         <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
           {icon && (
@@ -125,28 +133,138 @@ export function SyncStatus({ label, tone = "mint" }: { label?: string; tone?: An
   );
 }
 
+/* --- page rhythm --------------------------------------------------------- */
+
+/**
+ * The page's vertical rhythm, in one place.
+ *
+ * Every route's outermost element. It sets ONE gap — `--gap-group`, 30px on a
+ * desktop — between the groups of the page, and nothing inside a group is ever
+ * allowed to be that far apart. That single ratio (group ≈ 2 x card) is what
+ * separates "the five headline figures" from "what you need to know today"
+ * without a rule or a border being drawn anywhere.
+ */
+export function PageSections({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`page-sections ${className}`}>{children}</div>;
+}
+
+/**
+ * The five levels of a report, as one component.
+ *
+ * A page that gives every panel the same weight is a list of boxes. These are
+ * the levels, in the order a reader meets them:
+ *
+ *   1. the page header       — `DashboardPageHeader`, one per route
+ *   2. the headline figures  — `level="headline"`: coloured, no heading of
+ *                              their own, because the figures ARE the heading
+ *   3. the readings          — `level="insight"`: a light heading with an icon
+ *   4. the primary analysis  — `level="primary"`: a full-weight heading over
+ *                              white panels
+ *   5. the detailed records  — `level="records"`: a quiet, small-caps heading,
+ *                              deliberately lighter than the analysis above it
+ *
+ * The heading sits `--gap-title` above its content, and the section itself is
+ * `--gap-group` from its neighbours. No borders around the section: the space
+ * is the separation.
+ */
+export type SectionLevel = "headline" | "insight" | "primary" | "records";
+
+export function PageSection({
+  level = "primary",
+  title,
+  hint,
+  icon,
+  action,
+  tone = "sky",
+  children,
+  className = "",
+  id,
+  "aria-label": ariaLabel,
+}: {
+  level?: SectionLevel;
+  title?: ReactNode;
+  hint?: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  tone?: AnyTone;
+  children: ReactNode;
+  className?: string;
+  id?: string;
+  "aria-label"?: string;
+}) {
+  const t = toneOf(tone);
+  const heading = title != null && (
+    <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        {icon && level !== "records" && (
+          <span
+            className="grid size-8 shrink-0 place-items-center rounded-xl"
+            style={{ background: t.surface, color: t.strong }}
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          {level === "records" ? (
+            <h2 className="text-[12px] font-bold uppercase tracking-[0.06em] text-text-muted">
+              {title}
+            </h2>
+          ) : (
+            <h2
+              className={`font-bold leading-snug tracking-[-0.01em] text-text ${
+                level === "primary" ? "text-[16px] sm:text-[17px]" : "text-[14px] sm:text-[15px]"
+              }`}
+            >
+              {title}
+            </h2>
+          )}
+          {hint && <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{hint}</p>}
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+
+  return (
+    <section id={id} aria-label={ariaLabel} className={`section-stack ${className}`}>
+      {heading}
+      {children}
+    </section>
+  );
+}
+
 /* --- KPI row ------------------------------------------------------------- */
 
 /**
  * The first row of a report: four to six figures, never twelve.
  *
- * `columns` is the count at the widest breakpoint. Below that it steps down to
- * three, then two — a KPI is a number read at a glance, and a single column of
- * them on a phone is a list, not a glance.
+ * The column count is NOT a prop and not a viewport breakpoint. It comes from a
+ * container query on the content column — which knows how much room there
+ * actually is, unlike the viewport, which cannot see whether the navigation
+ * rail is showing — and from how many cards were handed over, so the last row
+ * is balanced instead of leaving one card alone at a quarter width. Five cards
+ * are five across only above 1120px of real width; below that they are 3 + 2,
+ * then 3 + 2 again, then 2 + 2 + 1-across-the-width, then one column under
+ * 360px. The rules live in `styles.css` under THE KPI GRID.
  */
-export function KpiRow({
-  children,
-  columns = 5,
-  className = "",
-}: {
-  children: ReactNode;
-  columns?: 4 | 5 | 6;
-  className?: string;
-}) {
-  const wide = { 4: "xl:grid-cols-4", 5: "xl:grid-cols-5", 6: "xl:grid-cols-6" }[columns];
+export function KpiRow({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const count = Children.toArray(children).filter(Boolean).length;
   return (
-    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 ${wide} ${className}`}>
-      {children}
+    <div className="kpi-scope">
+      <div
+        className={`kpi-grid ${className}`}
+        data-count={count}
+        data-odd={count % 2 === 1 ? "true" : undefined}
+      >
+        {children}
+      </div>
     </div>
   );
 }

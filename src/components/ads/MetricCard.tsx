@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Ban } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { MetricInfo } from "./MetricInfo";
@@ -94,6 +94,9 @@ export function MetricCard({
   tone,
   note,
   onClick,
+  actionLabel,
+  ariaLabel,
+  testId,
 }: {
   metric: MetricKey;
   value: ReactNode;
@@ -107,18 +110,36 @@ export function MetricCard({
   /** Overrides the family this metric normally takes. */
   tone?: AnyTone;
   note?: string;
+  /**
+   * Opens this figure's drill-down. When set the card becomes a real button —
+   * it used to be a `div` with a click handler, which no keyboard could reach
+   * and no screen reader announced as anything at all.
+   */
   onClick?: () => void;
+  actionLabel?: string;
+  ariaLabel?: string;
+  testId?: string;
 }) {
   const { lang } = useI18n();
   const copy = METRICS[metric][lang];
   const unavailable = !!unavailableReason;
   const family = tone ?? METRIC_TONE[metric] ?? "slate";
+  const interactive = Boolean(onClick);
+  const Tag = interactive ? "button" : "div";
+  const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
 
   return (
-    <div
-      className="tone-surface stagger @container relative flex flex-col overflow-hidden p-4"
+    <Tag
+      type={interactive ? "button" : undefined}
+      className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+        interactive ? "kpi-card lift cursor-pointer" : ""
+      }`}
       style={{ ...toneVars(family), "--i": index } as React.CSSProperties}
       onClick={onClick}
+      aria-haspopup={interactive ? "dialog" : undefined}
+      aria-label={interactive ? (ariaLabel ?? `${copy.label} — ${cue}`) : undefined}
+      data-metric-trigger={interactive ? "" : undefined}
+      data-testid={testId}
     >
       <span
         aria-hidden="true"
@@ -166,7 +187,21 @@ export function MetricCard({
           {sub ?? (unavailable ? unavailableReason : copy.formula)}
         </span>
       </div>
-    </div>
+
+      {interactive && (
+        <div className="relative mt-auto pt-2.5">
+          <span
+            className="kpi-cue inline-flex items-center gap-0.5 text-[10.5px] font-bold"
+            style={{ color: "var(--tone-strong)" }}
+          >
+            {cue}
+            <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
+              {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+            </span>
+          </span>
+        </div>
+      )}
+    </Tag>
   );
 }
 

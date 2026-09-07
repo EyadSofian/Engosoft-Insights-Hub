@@ -28,6 +28,9 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader } from "@/components/dashboard-bits";
+import { KpiRow } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
@@ -192,6 +195,238 @@ interface Resp {
 
 const fmtAmount = (value: number) =>
   value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+/**
+ * The six website figures, and what stands behind each.
+ *
+ * Two populations meet on this page and must not be confused: leads, which come
+ * from the CRM, and orders, which come from the store. `reconciliation` is the
+ * bridge between them, and the sales panel opens onto it rather than implying
+ * one number explains the other.
+ */
+function websiteMetrics(
+  data: Resp,
+  copy: Record<string, string>,
+  lang: "ar" | "en",
+): Record<string, MetricDetail> {
+  const A = lang === "ar";
+  const T = data.totals;
+  const share = (part: number) => (T.leads > 0 ? fmtPct((part / T.leads) * 100, 1) : "—");
+  const soldCourses = topRows(
+    data.soldCourses.map((course) => ({
+      key: course.label,
+      label: course.label,
+      value: course.value,
+      display: fmtUSDFull(course.value),
+      meta: `${fmtNum(course.orders)} ${A ? "طلب" : "orders"}`,
+      tone: "mint" as const,
+    })),
+  );
+  const unsoldCourses = topRows(
+    data.unsoldCourses.map((course) => ({
+      key: course.label,
+      label: course.label,
+      value: course.leads,
+      display: fmtNum(course.leads),
+      meta: `${fmtNum(course.open)} ${A ? "مفتوح" : "open"}`,
+      tone: "amber" as const,
+    })),
+  );
+  const waiting = topRows(
+    data.waitingBuckets.map((bucket) => ({
+      key: bucket.label,
+      label: bucket.label,
+      value: bucket.count,
+      display: fmtNum(bucket.count),
+      tone: "rose" as const,
+    })),
+    5,
+    { keepZero: true },
+  );
+
+  const leadFacts = [
+    { key: "won", label: A ? "رابحة" : "Won", value: fmtNum(T.won) },
+    { key: "lost", label: A ? "ضائعة" : "Lost", value: fmtNum(T.lost) },
+    { key: "open", label: A ? "مفتوحة" : "Open", value: fmtNum(T.open) },
+    {
+      key: "notContacted",
+      label: A ? "بلا تواصل" : "Not contacted",
+      value: fmtNum(T.notContacted),
+    },
+  ];
+
+  return {
+    leads: {
+      id: "website.leads",
+      title: A ? "عملاء الموقع" : "Website leads",
+      value: fmtNum(T.leads),
+      tone: "sky",
+      icon: <Globe2 size={16} />,
+      definition: A
+        ? "العملاء الذين وصلوا من الموقع داخل الفترة: صفوف CRM النشطة، بالإضافة إلى الصفقات الضائعة المؤرشفة."
+        : "Leads that arrived from the website inside the period: active CRM rows plus the archived losses.",
+      formula: `${fmtNum(data.leadSources.activeCrm)} + ${fmtNum(data.leadSources.archivedLost)} = ${fmtNum(T.leads)}`,
+      supporting: leadFacts,
+      breakdowns: [
+        {
+          id: "waiting",
+          title: A ? "مدة الانتظار بلا تواصل" : "How long they have waited",
+          rows: waiting,
+          emptyLabel: A ? "لا يوجد عملاء منتظرون" : "Nobody is waiting",
+        },
+        {
+          id: "unsold",
+          title: A ? "دورات عليها طلب بلا مبيعات" : "Courses in demand with no sales",
+          rows: unsoldCourses,
+          emptyLabel: A ? "كل دورة مطلوبة باعت" : "Every course in demand has sold",
+        },
+      ],
+      report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
+    },
+    won: {
+      id: "website.won",
+      title: A ? "الصفقات الرابحة" : "Won",
+      value: fmtNum(T.won),
+      tone: "violet",
+      icon: <CircleCheckBig size={16} />,
+      definition: copy.wonDefinition,
+      formula: `${fmtNum(T.won)} ÷ ${fmtNum(T.leads)} = ${share(T.won)}`,
+      supporting: leadFacts,
+      breakdowns: [
+        {
+          id: "sold",
+          title: A ? "أعلى الدورات مبيعًا" : "Best-selling courses",
+          rows: soldCourses,
+          emptyLabel: A ? "لا توجد مبيعات" : "No sales",
+        },
+      ],
+    },
+    lost: {
+      id: "website.lost",
+      title: A ? "الصفقات الضائعة" : "Lost",
+      value: fmtNum(T.lost),
+      tone: "rose",
+      icon: <CircleX size={16} />,
+      definition: copy.lostDefinition,
+      formula: `${fmtNum(T.lost)} ÷ ${fmtNum(T.leads)} = ${share(T.lost)}`,
+      supporting: leadFacts,
+      breakdowns: [
+        {
+          id: "unsold",
+          title: A ? "دورات عليها طلب بلا مبيعات" : "Courses in demand with no sales",
+          rows: unsoldCourses,
+          emptyLabel: A ? "كل دورة مطلوبة باعت" : "Every course in demand has sold",
+        },
+      ],
+      report: { to: "/lost", label: A ? "فتح تحليل الخسائر" : "Open the Lost analysis" },
+    },
+    open: {
+      id: "website.open",
+      title: A ? "عملاء مفتوحون" : "Open leads",
+      value: fmtNum(T.open),
+      tone: "cyan",
+      icon: <CircleDot size={16} />,
+      definition: copy.openDefinition,
+      formula: `${fmtNum(T.open)} ÷ ${fmtNum(T.leads)} = ${share(T.open)}`,
+      supporting: leadFacts,
+      breakdowns: [
+        {
+          id: "waiting",
+          title: A ? "مدة الانتظار بلا تواصل" : "How long they have waited",
+          rows: waiting,
+          emptyLabel: A ? "لا يوجد عملاء منتظرون" : "Nobody is waiting",
+        },
+      ],
+    },
+    notContacted: {
+      id: "website.notContacted",
+      title: A ? "بلا تواصل" : "Not contacted",
+      value: fmtNum(T.notContacted),
+      tone: "amber",
+      icon: <Clock3 size={16} />,
+      definition: copy.notContactedDefinition,
+      formula: `${fmtNum(T.notContacted)} ÷ ${fmtNum(T.leads)} = ${share(T.notContacted)}`,
+      supporting: leadFacts,
+      breakdowns: [
+        {
+          id: "waiting",
+          title: A ? "مدة الانتظار" : "How long they have waited",
+          rows: waiting,
+          emptyLabel: A ? "لا يوجد عملاء منتظرون" : "Nobody is waiting",
+        },
+      ],
+    },
+    sales: {
+      id: "website.sales",
+      title: A ? "مبيعات الموقع" : "Website sales",
+      value: fmtUSDFull(T.sales),
+      tone: "mint",
+      icon: <Banknote size={16} />,
+      definition: A
+        ? "قيمة أوامر الموقع في الفترة. الطلبات مجتمعة من مصدرين — أودو وملف المتجر — والتسوية أدناه تبيّن أيهما رأى كل طلب."
+        : "The value of website orders in the period. Orders come from two sources — Odoo and the store's own file — and the reconciliation below shows which of them saw each order.",
+      formula: A
+        ? `${fmtUSDFull(T.sales)} على ${fmtNum(T.salesOrders)} طلب، بمتوسط ${fmtUSDFull(T.averageOrder)}.`
+        : `${fmtUSDFull(T.sales)} across ${fmtNum(T.salesOrders)} orders, averaging ${fmtUSDFull(T.averageOrder)}.`,
+      caveat:
+        data.reconciliation.discrepancyOrders > 0
+          ? A
+            ? `${fmtNum(data.reconciliation.discrepancyOrders)} طلبًا لا يتفق عليه المصدران، وهو الفارق الذي يجب تسويته قبل الاعتماد على الرقم.`
+            : `${fmtNum(data.reconciliation.discrepancyOrders)} orders are not agreed between the two sources — the gap to settle before relying on this figure.`
+          : undefined,
+      supporting: [
+        { key: "orders", label: A ? "الطلبات" : "Orders", value: fmtNum(T.salesOrders) },
+        {
+          key: "avg",
+          label: A ? "متوسط الطلب" : "Average order",
+          value: fmtUSDFull(T.averageOrder),
+        },
+        { key: "sold", label: A ? "دورات باعت" : "Courses sold", value: fmtNum(T.soldCourses) },
+        {
+          key: "unsold",
+          label: A ? "دورات لم تبع" : "Courses unsold",
+          value: fmtNum(T.unsoldCourses),
+        },
+      ],
+      breakdowns: [
+        {
+          id: "sold",
+          title: A ? "أعلى الدورات مبيعًا" : "Best-selling courses",
+          rows: soldCourses,
+          emptyLabel: A ? "لا توجد مبيعات" : "No sales",
+        },
+        {
+          id: "reconciliation",
+          title: A ? "تسوية مصدري الطلبات" : "Reconciling the two order sources",
+          rows: [
+            {
+              key: "matched",
+              label: copy.matchedOrders,
+              value: data.reconciliation.matchedOrders,
+              display: fmtNum(data.reconciliation.matchedOrders),
+              tone: "mint" as const,
+            },
+            {
+              key: "odoo",
+              label: copy.odooOnlyOrders,
+              value: data.reconciliation.odooOnlyOrders,
+              display: fmtNum(data.reconciliation.odooOnlyOrders),
+              tone: "amber" as const,
+            },
+            {
+              key: "external",
+              label: copy.externalOnlyOrders,
+              value: data.reconciliation.externalOnlyOrders,
+              display: fmtNum(data.reconciliation.externalOnlyOrders),
+              tone: "rose" as const,
+            },
+          ],
+        },
+      ],
+      report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
+    },
+  };
+}
 
 function Website() {
   const reportingPeriod = useReportingPeriod();
@@ -383,6 +618,11 @@ function Website() {
   };
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+
+  // One description per figure, built from the response already on screen.
+  const websiteFigures = data
+    ? websiteMetrics(data, copy as unknown as Record<string, string>, lang)
+    : ({} as ReturnType<typeof websiteMetrics>);
 
   const specialtyCols: Col<SpecialtyRow>[] = [
     {
@@ -603,8 +843,9 @@ function Website() {
   } as const;
 
   return (
-    <div className="space-y-5">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<Globe2 size={20} />}
         title={t("website")}
         subtitle={copy.subtitle}
@@ -809,63 +1050,49 @@ function Website() {
           </div>
 
           <div className={websiteTab === "owner" ? "space-y-5" : "hidden"}>
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              <KpiCard
-                tone="sky"
-                index={0}
-                label={t("website_leads")}
-                value={fmtNum(data.totals.leads)}
-                sub={`${fmtNum(data.leadSources.activeCrm)} ${copy.activeCrm} + ${fmtNum(data.leadSources.archivedLost)} ${copy.archivedLost}`}
-                subWrap
-                icon={<Globe2 size={18} />}
+            <KpiRow>
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.leads, title: t("website_leads") }}
+                card={{
+                  index: 0,
+                  subWrap: true,
+                  sub: `${fmtNum(data.leadSources.activeCrm)} ${copy.activeCrm} + ${fmtNum(data.leadSources.archivedLost)} ${copy.archivedLost}`,
+                }}
               />
-              <KpiCard
-                tone="violet"
-                index={1}
-                label={t("won")}
-                value={fmtNum(data.totals.won)}
-                sub={`${fmtPct(data.totals.leads ? (data.totals.won / data.totals.leads) * 100 : null, 1)} · ${copy.wonDefinition}`}
-                subWrap
-                icon={<CircleCheckBig size={18} />}
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.won, title: t("won") }}
+                card={{
+                  index: 1,
+                  subWrap: true,
+                  sub: `${fmtPct(data.totals.leads ? (data.totals.won / data.totals.leads) * 100 : null, 1)} · ${copy.wonDefinition}`,
+                }}
               />
-              <KpiCard
-                tone="rose"
-                index={2}
-                label={t("lost_count")}
-                value={fmtNum(data.totals.lost)}
-                sub={`${fmtPct(data.totals.leads ? (data.totals.lost / data.totals.leads) * 100 : null, 1)} · ${copy.lostDefinition}`}
-                subWrap
-                icon={<CircleX size={18} />}
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.lost, title: t("lost_count") }}
+                card={{
+                  index: 2,
+                  subWrap: true,
+                  sub: `${fmtPct(data.totals.leads ? (data.totals.lost / data.totals.leads) * 100 : null, 1)} · ${copy.lostDefinition}`,
+                }}
               />
-              <KpiCard
-                tone="cyan"
-                index={3}
-                label={t("open_leads")}
-                value={fmtNum(data.totals.open)}
-                sub={copy.openDefinition}
-                subWrap
-                icon={<CircleDot size={18} />}
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.open, title: t("open_leads") }}
+                card={{ index: 3, subWrap: true, sub: copy.openDefinition }}
               />
-              <KpiCard
-                tone="amber"
-                index={4}
-                label={t("not_contacted")}
-                value={fmtNum(data.totals.notContacted)}
-                sub={copy.notContactedDefinition}
-                subWrap
-                icon={<Clock3 size={18} />}
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.notContacted, title: t("not_contacted") }}
+                card={{ index: 4, subWrap: true, sub: copy.notContactedDefinition }}
               />
-              <KpiCard
-                tone="mint"
-                index={5}
-                hero
-                label={t("website_sales")}
-                value={fmtUSDFull(data.totals.sales)}
-                sub={`${fmtNum(data.totals.salesOrders)} ${copy.orders} · ${fmtNum(data.reconciliation.odooOnlyOrders)} ${copy.odooOnlyOrders} · ${fmtNum(data.reconciliation.matchedOrders)} ${copy.matchedOrders} · ${fmtNum(data.reconciliation.externalOnlyOrders)} ${copy.externalOnlyOrders}`}
-                subWrap
-                icon={<Banknote size={18} />}
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.sales, title: t("website_sales") }}
+                card={{
+                  index: 5,
+                  hero: true,
+                  subWrap: true,
+                  sub: `${fmtNum(data.totals.salesOrders)} ${copy.orders} · ${fmtNum(data.reconciliation.odooOnlyOrders)} ${copy.odooOnlyOrders} · ${fmtNum(data.reconciliation.matchedOrders)} ${copy.matchedOrders} · ${fmtNum(data.reconciliation.externalOnlyOrders)} ${copy.externalOnlyOrders}`,
+                }}
               />
-            </div>
+            </KpiRow>
 
             <Card className="overflow-hidden border-brand/15">
               <SectionTitle

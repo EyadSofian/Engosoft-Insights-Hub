@@ -30,8 +30,9 @@ function GuidePage() {
   const ar = lang === "ar";
 
   return (
-    <div className="space-y-6">
+    <div className="page-sections">
       <DashboardPageHeader
+        flush
         icon={<BookOpen size={20} />}
         title={ar ? "دليل استخدام الداشبورد" : "Dashboard user guide"}
         subtitle={
