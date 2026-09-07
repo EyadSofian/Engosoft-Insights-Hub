@@ -73,10 +73,19 @@ export function SectionTabs() {
       }}
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
-        <div className="hidden shrink-0 items-center gap-2 pe-3 text-sm font-semibold text-text sm:flex lg:hidden">
-          <SectionIcon size={17} aria-hidden="true" />
-          <span>{label}</span>
-          <span className="h-5 w-px bg-border" aria-hidden="true" />
+        {/* This label deliberately stays visible on desktop as well as mobile.
+            Without it, three route links such as Leads / Lost / Team appear as
+            unrelated buttons; the reader cannot tell they are all reports
+            inside one CRM workspace. */}
+        <div className="flex shrink-0 items-center gap-2 pe-2 text-sm font-semibold text-text sm:pe-3">
+          <span className="grid size-7 place-items-center rounded-lg bg-brand-soft text-brand" aria-hidden="true">
+            <SectionIcon size={15} />
+          </span>
+          <span className="hidden lg:inline">{label}</span>
+          <span className="hidden text-[11px] font-medium text-text-subtle xl:inline">
+            {lang === "ar" ? `${section.items.length} تبويبات` : `${section.items.length} tabs`}
+          </span>
+          <span className="h-6 w-px bg-border" aria-hidden="true" />
         </div>
 
         <div className="hscroll flex min-w-0 flex-1 items-stretch gap-1">
@@ -89,10 +98,10 @@ export function SectionTabs() {
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
-                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium transition-colors duration-150 sm:px-3 sm:text-sm ${
+                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
                   active
-                    ? "bg-brand-soft text-brand"
-                    : "text-text-muted hover:bg-surface-2 hover:text-text"
+                    ? "border-brand bg-brand text-white shadow-sm"
+                    : "border-transparent text-text-muted hover:border-border hover:bg-surface-2 hover:text-text"
                 }`}
               >
                 <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />

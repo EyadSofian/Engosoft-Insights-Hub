@@ -1,13 +1,15 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Award,
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
+  ChevronLeft,
   Crown,
   DollarSign,
   Info,
+  LayoutGrid,
   Lightbulb,
   Percent,
   Target,
@@ -66,6 +68,7 @@ import {
   type OverviewResp,
 } from "@/components/overview-metrics";
 import type { MetricDetail } from "@/lib/metric-detail";
+import { toneVars, type Tone } from "@/lib/dashboard-tone";
 import { TelegramPanel } from "@/components/TelegramPanel";
 import { HBarChart, MultiLineChart } from "@/components/charts";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
@@ -240,6 +243,159 @@ function TodaysInsights({
   );
 }
 
+/* -------------------------------------------------------------------------
+   THE EXECUTIVE MAP
+
+   The overview is not another long report to memorize. It is the one place a
+   manager should be able to answer "where do I go next?" without knowing the
+   left navigation by heart. These are ordinary route Links, not faux tabs:
+   browser history, deep links and keyboard navigation stay intact.
+------------------------------------------------------------------------- */
+
+type WorkspaceCard = {
+  to: string;
+  title: string;
+  description: string;
+  detail: string;
+  icon: typeof Award;
+  tone: Tone;
+};
+
+function ExecutiveMap({
+  data,
+  signals,
+  workforceLoading,
+  lang,
+}: {
+  data: OverviewResp;
+  signals: BusinessSignals;
+  workforceLoading: boolean;
+  lang: "ar" | "en";
+}) {
+  const topCourse = signals.topCourse;
+  const topEmployee = signals.bestEmployee;
+  const cards: WorkspaceCard[] = [
+    {
+      to: "/courses",
+      title: lang === "ar" ? "أفضل الكورسات" : "Top courses",
+      description:
+        lang === "ar" ? "ترتيب الدورات، الإيراد، وسعر البيع" : "Course ranking, revenue and selling price",
+      detail: topCourse
+        ? `${topCourse.course} · ${fmtUSD(topCourse.revenue)}`
+        : lang === "ar"
+          ? "افتح تحليل الكورسات"
+          : "Open course analysis",
+      icon: BookOpenCheck,
+      tone: "amber",
+    },
+    {
+      to: "/campaigns",
+      title: lang === "ar" ? "الحملات والإعلانات" : "Campaigns and ads",
+      description:
+        lang === "ar" ? "تابع العائد والإنفاق والحملات المحتاجة قرار" : "Review return, spend and campaigns needing action",
+      detail: data.best
+        ? `${data.best.name} · ${fmtRoas(data.best.roas)}`
+        : lang === "ar"
+          ? "تحليل أداء الحملات"
+          : "Campaign performance analysis",
+      icon: Target,
+      tone: "sky",
+    },
+    {
+      to: "/accounting",
+      title: lang === "ar" ? "المبيعات والتحصيل" : "Sales and collection",
+      description:
+        lang === "ar" ? "الفواتير المدفوعة، التحصيل، والتارجت" : "Paid invoices, collection and targets",
+      detail: `${fmtUSD(data.totals.revenue)} ${lang === "ar" ? "تحصيل في الفترة" : "collected in this period"}`,
+      icon: DollarSign,
+      tone: "mint",
+    },
+    {
+      to: "/leads",
+      title: lang === "ar" ? "إدارة العملاء" : "CRM management",
+      description:
+        lang === "ar" ? "العملاء، المتابعة، والخسائر في مكان واحد" : "Leads, follow-up and losses in one workspace",
+      detail: `${fmtNum(data.totals.crmLeads)} ${lang === "ar" ? "عميل داخل CRM" : "CRM leads"}`,
+      icon: Users,
+      tone: "violet",
+    },
+    {
+      to: "/pricing",
+      title: lang === "ar" ? "الأسعار والالتزام" : "Pricing and compliance",
+      description:
+        lang === "ar" ? "راجع دليل الأسعار والفواتير الاستثنائية" : "Review the price book and invoice exceptions",
+      detail: lang === "ar" ? "دليل السعر والفواتير" : "Price book and invoices",
+      icon: Percent,
+      tone: "cyan",
+    },
+    {
+      to: "/teams",
+      title: lang === "ar" ? "أداء الفريق" : "Team performance",
+      description:
+        lang === "ar" ? "الأداء، جودة المكالمات، وتحقيق التارجت" : "Performance, call quality and target progress",
+      detail: workforceLoading
+        ? lang === "ar"
+          ? "جارٍ حساب الأداء…"
+          : "Calculating performance…"
+        : topEmployee
+          ? `${topEmployee.name} · ${topEmployee.averageQualityScore?.toFixed(0) ?? "—"}/100`
+          : lang === "ar"
+            ? "افتح أداء الفريق"
+            : "Open team performance",
+      icon: UserRoundCheck,
+      tone: "rose",
+    },
+    {
+      to: "/social-media",
+      title: lang === "ar" ? "قنوات النمو" : "Growth channels",
+      description:
+        lang === "ar" ? "السوشيال ميديا والمصادر غير المدفوعة" : "Social media and non-paid sources",
+      detail: lang === "ar" ? "السوشيال ميديا وOrganic" : "Social media and Organic",
+      icon: TrendingUp,
+      tone: "slate",
+    },
+  ];
+
+  return (
+    <div className="card-grid sm:grid-cols-2 xl:grid-cols-4" data-testid="executive-map">
+      {cards.map((card, index) => {
+        const Icon = card.icon;
+        return (
+          <Link
+            key={card.to}
+            to={card.to}
+            className="tone-surface lift stagger group relative flex min-h-[154px] flex-col overflow-hidden p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]"
+            style={{ ...toneVars(card.tone), "--i": index } as CSSProperties}
+            aria-label={`${card.title} — ${lang === "ar" ? "فتح التقرير" : "Open report"}`}
+          >
+            <span
+              className="mb-4 grid size-9 place-items-center rounded-xl text-white shadow-sm"
+              style={{ background: "var(--tone-strong)" }}
+              aria-hidden="true"
+            >
+              <Icon size={18} />
+            </span>
+            <span className="text-[14px] font-bold text-[var(--tone-ink)]">{card.title}</span>
+            <span className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-text-muted">
+              {card.description}
+            </span>
+            <span className="mt-auto flex items-end justify-between gap-2 pt-3">
+              <bdi className="min-w-0 truncate text-[11.5px] font-semibold text-[var(--tone-ink)]">
+                {card.detail}
+              </bdi>
+              <ChevronLeft
+                size={17}
+                className="shrink-0 text-[var(--tone-strong)] transition-transform duration-200 group-hover:-translate-x-0.5 rtl:rotate-180 rtl:group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function Overview() {
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
@@ -388,11 +544,11 @@ function Overview() {
       <DashboardPageHeader
         flush
         icon={<BrainCircuit size={20} />}
-        title={t("business_analytics")}
+        title={lang === "ar" ? "الملخص العام" : "Executive summary"}
         subtitle={
           lang === "ar"
-            ? "رؤية شاملة لأداء أعمالك عبر جميع القنوات"
-            : "A single read of business performance across every channel"
+            ? "صورة سريعة للأداء، ثم طريق واضح لكل تقرير تحتاجه"
+            : "A quick read of performance, then a clear route to every report"
         }
         period={period}
         sync={<SyncStatus label={syncLabel} tone={healthIssues.length ? "warning" : "success"} />}
@@ -498,6 +654,25 @@ function Overview() {
           <TodaysInsights
             signals={business}
             details={insights}
+            workforceLoading={workforce.isLoading}
+            lang={lang}
+          />
+        </PageSection>
+
+        <PageSection
+          level="primary"
+          tone="violet"
+          icon={<LayoutGrid size={16} />}
+          title={lang === "ar" ? "من الملخص إلى التفاصيل" : "From summary to detail"}
+          hint={
+            lang === "ar"
+              ? "اختر مساحة العمل المطلوبة؛ كل بطاقة تفتح التقرير المناسب مباشرة."
+              : "Choose the workspace you need; every card opens its report directly."
+          }
+        >
+          <ExecutiveMap
+            data={data}
+            signals={business}
             workforceLoading={workforce.isLoading}
             lang={lang}
           />
