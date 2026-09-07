@@ -73,19 +73,25 @@ export function SectionTabs() {
       }}
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
-        {/* This label deliberately stays visible on desktop as well as mobile.
-            Without it, three route links such as Leads / Lost / Team appear as
-            unrelated buttons; the reader cannot tell they are all reports
-            inside one CRM workspace. */}
-        <div className="flex shrink-0 items-center gap-2 pe-2 text-sm font-semibold text-text sm:pe-3">
-          <span className="grid size-7 place-items-center rounded-lg bg-brand-soft text-brand" aria-hidden="true">
+        {/* The section's own name, at EVERY width — phone included.
+            Without it, three route links such as Leads / Lost / Team read as
+            unrelated buttons: the reader cannot tell they are three reports
+            inside one CRM workspace, and on a phone, where the rail is gone,
+            this line is the only thing left saying which section they are in.
+            It shrinks (the name truncates, the tab count drops below `sm`)
+            but it never disappears. */}
+        <div className="flex min-w-0 max-w-[45%] shrink items-center gap-2 pe-2 text-sm font-semibold text-text sm:max-w-none sm:shrink-0 sm:pe-3">
+          <span
+            className="grid size-7 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"
+            aria-hidden="true"
+          >
             <SectionIcon size={15} />
           </span>
-          <span className="hidden lg:inline">{label}</span>
-          <span className="hidden text-[11px] font-medium text-text-subtle xl:inline">
-            {lang === "ar" ? `${section.items.length} تبويبات` : `${section.items.length} tabs`}
+          <span className="truncate text-[12.5px] sm:text-sm">{label}</span>
+          <span className="hidden whitespace-nowrap text-[11px] font-medium text-text-subtle sm:inline">
+            {lang === "ar" ? `· ${section.items.length} تبويبات` : `· ${section.items.length} tabs`}
           </span>
-          <span className="h-6 w-px bg-border" aria-hidden="true" />
+          <span className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
         </div>
 
         <div className="hscroll flex min-w-0 flex-1 items-stretch gap-1">
@@ -98,14 +104,18 @@ export function SectionTabs() {
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
-                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
+                /* Filled in the brand colour when you are on it, a quiet
+                   hairline outline when you are not — so the strip reads as
+                   "one of these three, and it is this one" rather than as a
+                   row of links with one of them slightly darker. */
+                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
                   active
                     ? "border-brand bg-brand text-white shadow-sm"
-                    : "border-transparent text-text-muted hover:border-border hover:bg-surface-2 hover:text-text"
+                    : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
                 }`}
               >
                 <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
-                <span>{t(item.key)}</span>
+                <span>{item.tabLabel?.[lang] ?? t(item.key)}</span>
               </Link>
             );
           })}

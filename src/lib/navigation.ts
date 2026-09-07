@@ -23,6 +23,17 @@ export interface NavigationItem {
   to: string;
   key: DictKey;
   icon: LucideIcon;
+  /**
+   * What this report is called ON THE TAB STRIP, when the dictionary entry is
+   * not what a reader needs there.
+   *
+   * `t(key)` names the PAGE — "الحسابات", "الدورات" — and those names are also
+   * the page headings, so they cannot be rewritten without renaming the report
+   * itself. A tab has a different job: sitting beside its siblings it has to
+   * say which of the three reports in this section it is. Only the items whose
+   * page name is ambiguous in that row carry one; the rest fall back to `t(key)`.
+   */
+  tabLabel?: Record<Lang, string>;
 }
 
 export interface NavigationSection {
@@ -57,8 +68,13 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     defaultTo: "/campaigns",
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
-      { to: "/ads", key: "ads_tech", icon: BarChart3 },
-      { to: "/website", key: "website", icon: Globe2 },
+      { to: "/ads", key: "ads_tech", icon: BarChart3, tabLabel: { ar: "الإعلانات", en: "Ads" } },
+      {
+        to: "/website",
+        key: "website",
+        icon: Globe2,
+        tabLabel: { ar: "الموقع الإلكتروني", en: "Website" },
+      },
     ],
   },
   {
@@ -69,14 +85,29 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     defaultTo: "/accounting",
     aliases: ["/full-invoiced", "/sales", "/products"],
     items: [
-      { to: "/accounting", key: "accounting", icon: Receipt },
-      { to: "/courses", key: "courses", icon: GraduationCap },
-      { to: "/pricing", key: "price_book", icon: BookMarked },
+      {
+        to: "/accounting",
+        key: "accounting",
+        icon: Receipt,
+        tabLabel: { ar: "الحسابات والتحصيل", en: "Accounts & collection" },
+      },
+      {
+        to: "/courses",
+        key: "courses",
+        icon: GraduationCap,
+        tabLabel: { ar: "الكورسات", en: "Courses" },
+      },
+      {
+        to: "/pricing",
+        key: "price_book",
+        icon: BookMarked,
+        tabLabel: { ar: "الأسعار والالتزام", en: "Pricing & compliance" },
+      },
     ],
   },
   {
     id: "leads",
-    label: { ar: "CRM إدارة العملاء", en: "CRM management" },
+    label: { ar: "إدارة العملاء CRM", en: "CRM management" },
     shortLabel: { ar: "CRM", en: "CRM" },
     icon: Users,
     defaultTo: "/leads",

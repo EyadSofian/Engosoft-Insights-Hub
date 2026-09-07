@@ -1,23 +1,24 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  Award,
+  AlertTriangle,
+  BarChart3,
+  BookMarked,
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
   ChevronLeft,
-  Crown,
-  DollarSign,
+  ChevronRight,
+  GraduationCap,
   Info,
-  LayoutGrid,
   Lightbulb,
-  Percent,
-  Target,
-  Timer,
-  TrendingDown,
+  Megaphone,
+  MessagesSquare,
+  Receipt,
   TrendingUp,
-  UserRoundCheck,
   Users,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
@@ -52,7 +53,6 @@ import {
   KpiRow,
   PageSection,
   PageSections,
-  SupportingFacts,
   SyncStatus,
   type DataHealthIssue,
 } from "@/components/dashboard-bits";
@@ -91,12 +91,20 @@ interface MoneyPoint extends Record<string, string | number> {
   value: number;
 }
 
+/**
+ * The funnel stages, named the way the rest of the dashboard names them.
+ *
+ * Only the stages `/api/overview` actually returns are listed. There is no
+ * "qualified" step in that response, so there is no label for one here: a
+ * stage nobody measures cannot be drawn, however much a funnel picture wants
+ * a middle.
+ */
 const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
   impressions: { ar: "مرات الظهور", en: "Impressions" },
   clicks: { ar: "النقرات", en: "Clicks" },
-  platform_leads: { ar: "عملاء أبلغت عنهم المنصة", en: "Platform leads" },
-  crm_leads: { ar: "عملاء دخلوا النظام", en: "CRM leads" },
-  won: { ar: "صفقات مغلقة", en: "Won" },
+  platform_leads: { ar: "عملاء من المنصات", en: "Platform leads" },
+  crm_leads: { ar: "العملاء المحتملون", en: "CRM leads" },
+  won: { ar: "الصفقات الرابحة", en: "Won deals" },
 };
 
 function sundayWeekStart(value: string): string {
@@ -121,143 +129,108 @@ function moneyTrend(
 }
 
 /**
- * "What you need to know today" — the three readings of the period a manager
- * is expected to act on.
+ * "أهم حاجة محتاج تعرفها" — the three readings of the period a manager is
+ * expected to act on, and nothing else.
  *
- * Every value comes from `businessSignals`, which is unchanged. What did change
- * is that each card now opens: the verdict, the figures behind it, and the
- * report it came from, in the same panel every KPI uses.
+ * Every value comes from `businessSignals`, which is unchanged, and each card
+ * opens the verdict, the figures behind it and the report it came from, in the
+ * same panel every KPI uses.
+ *
+ * Three cards, deliberately. The strip of supporting facts that used to sit
+ * under them — best campaign, top employee, top course — said the same three
+ * things the navigation cards at the foot of the page now carry beside the
+ * report each one belongs to, so a reader met every one of those names twice
+ * before reaching the analysis.
  */
 function TodaysInsights({
   signals,
   details,
-  workforceLoading,
   lang,
 }: {
   signals: BusinessSignals;
   details: ReturnType<typeof insightDetails>;
-  workforceLoading: boolean;
   lang: "ar" | "en";
 }) {
   const course = signals.topCourse;
-  const campaign = signals.bestCampaign;
-  const employee = signals.bestEmployee;
 
   return (
-    <>
-      <InsightRow>
-        <InsightDetailTrigger
-          detail={details.best}
-          card={{
-            index: 0,
-            kind: "best",
-            title: course
-              ? lang === "ar"
-                ? `كورس ${course.course} حقق أعلى إيراد`
-                : `${course.course} produced the most revenue`
-              : lang === "ar"
-                ? "لا توجد مبيعات دورات مصنفة"
-                : "No classified course sales",
-            value: course ? fmtUSD(course.revenue) : undefined,
-            detail: course
-              ? signals.courseTargetShare !== null
-                ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` · ${lang === "ar" ? "تارجت جزئي" : "partial target"}`}`
-                : `${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إجمالي إيراد الدورات" : "of total course revenue"}`
-              : undefined,
-            actionLabel: lang === "ar" ? "لماذا هذه الدورة؟" : "Why this course?",
-          }}
-        />
-
-        <InsightDetailTrigger
-          detail={details.risk}
-          card={{
-            index: 1,
-            kind: "attention",
-            title: signals.risk.title,
-            detail: signals.risk.detail,
-            actionLabel: lang === "ar" ? "ما الذي أدى لهذا؟" : "What led to this?",
-          }}
-        />
-
-        <InsightDetailTrigger
-          detail={details.decision}
-          card={{
-            index: 2,
-            kind: "opportunity",
-            eyebrow: lang === "ar" ? "القرار المقترح" : "Recommended decision",
-            title: signals.decision.title,
-            detail: signals.decision.detail,
-            actionLabel: lang === "ar" ? "على أي أساس؟" : "On what basis?",
-          }}
-        />
-      </InsightRow>
-
-      {/* The two supporting readings the cockpit also carried. They are facts,
-          not calls to action, so they share one divided strip rather than
-          taking a near-empty card each. */}
-      <SupportingFacts
-        items={[
-          {
-            key: "campaign",
-            tone: "mint",
-            icon: <Crown size={16} />,
-            label: lang === "ar" ? "أفضل حملة" : "Best campaign",
-            value: campaign?.name ?? "—",
-            detail: campaign
-              ? `${fmtRoas(campaign.roas)} · ${fmtUSD(campaign.revenue)} ${lang === "ar" ? "إيراد" : "revenue"}`
-              : lang === "ar"
-                ? "لا توجد حملة مؤهلة في الفترة"
-                : "No eligible campaign in this period",
-          },
-          {
-            key: "employee",
-            tone: "violet",
-            icon: <UserRoundCheck size={16} />,
-            label: lang === "ar" ? "أفضل موظف" : "Top employee",
-            value: workforceLoading
-              ? lang === "ar"
-                ? "جارٍ الحساب…"
-                : "Calculating…"
-              : (employee?.name ?? "—"),
-            detail: employee
-              ? `${employee.averageQualityScore?.toFixed(0) ?? "—"}/100 · ${fmtNum(employee.analyzedCalls)} ${lang === "ar" ? "مكالمة" : "calls"}`
-              : lang === "ar"
-                ? "لا توجد مكالمات محلّلة"
-                : "No analyzed calls",
-          },
-          {
-            key: "course",
-            tone: "amber",
-            icon: <BookOpenCheck size={16} />,
-            label: lang === "ar" ? "أهم دورة" : "Top course",
-            value: course?.course ?? "—",
-            detail: course
-              ? `${fmtUSD(course.revenue)} · ${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إيراد الدورات" : "of course revenue"}`
-              : lang === "ar"
-                ? "لا توجد مبيعات دورات مصنفة"
-                : "No classified course sales",
-          },
-        ]}
+    <InsightRow>
+      <InsightDetailTrigger
+        detail={details.best}
+        card={{
+          index: 0,
+          kind: "best",
+          eyebrow: lang === "ar" ? "أحسن نتيجة" : "Best result",
+          title: course
+            ? lang === "ar"
+              ? `كورس ${course.course} حقق أعلى إيراد`
+              : `${course.course} produced the most revenue`
+            : lang === "ar"
+              ? "لا توجد مبيعات دورات مصنفة"
+              : "No classified course sales",
+          value: course ? fmtUSD(course.revenue) : undefined,
+          detail: course
+            ? signals.courseTargetShare !== null
+              ? `${fmtPct(signals.courseTargetShare, 1)} ${lang === "ar" ? "من التارجت" : "of target"}${signals.targetComplete ? "" : ` · ${lang === "ar" ? "تارجت جزئي" : "partial target"}`}`
+              : `${fmtPct(course.contribution, 1)} ${lang === "ar" ? "من إجمالي إيراد الدورات" : "of total course revenue"}`
+            : undefined,
+          actionLabel: lang === "ar" ? "ليه الكورس ده؟" : "Why this course?",
+        }}
       />
-    </>
+
+      <InsightDetailTrigger
+        detail={details.risk}
+        card={{
+          index: 1,
+          kind: "attention",
+          eyebrow: lang === "ar" ? "محتاج متابعة" : "Needs attention",
+          title: signals.risk.title,
+          detail: signals.risk.detail,
+          actionLabel: lang === "ar" ? "إيه اللي وصلنا لكده؟" : "What led to this?",
+        }}
+      />
+
+      <InsightDetailTrigger
+        detail={details.decision}
+        card={{
+          index: 2,
+          kind: "opportunity",
+          eyebrow: lang === "ar" ? "فرصة وقرار مقترح" : "Opportunity and decision",
+          title: signals.decision.title,
+          detail: signals.decision.detail,
+          actionLabel: lang === "ar" ? "على أي أساس؟" : "On what basis?",
+        }}
+      />
+    </InsightRow>
   );
 }
 
 /* -------------------------------------------------------------------------
-   THE EXECUTIVE MAP
+   "روح للتفاصيل" — THE ROUTE OUT OF THE SUMMARY
 
    The overview is not another long report to memorize. It is the one place a
    manager should be able to answer "where do I go next?" without knowing the
-   left navigation by heart. These are ordinary route Links, not faux tabs:
-   browser history, deep links and keyboard navigation stay intact.
+   left navigation by heart.
+
+   Two things changed here. These sit AFTER the analysis, not in front of it:
+   seven large cards at the top of the page were the first thing a reader met,
+   and they pushed the figures the page exists to state below the fold. And
+   they are compact — one row each, icon, name, one line, and the single real
+   figure that report is currently showing. A card with no figure available in
+   `/api/overview` simply has no figure line; it does not get a sentence
+   dressed up to look like one.
+
+   They are ordinary route Links, not faux tabs: browser history, deep links,
+   middle-click and keyboard navigation all stay intact.
 ------------------------------------------------------------------------- */
 
 type WorkspaceCard = {
   to: string;
   title: string;
   description: string;
-  detail: string;
-  icon: typeof Award;
+  /** A real figure from this response, or nothing at all. */
+  detail?: string;
+  icon: LucideIcon;
   tone: Tone;
 };
 
@@ -279,42 +252,42 @@ function ExecutiveMap({
       to: "/courses",
       title: lang === "ar" ? "أفضل الكورسات" : "Top courses",
       description:
-        lang === "ar" ? "ترتيب الدورات، الإيراد، وسعر البيع" : "Course ranking, revenue and selling price",
-      detail: topCourse
-        ? `${topCourse.course} · ${fmtUSD(topCourse.revenue)}`
-        : lang === "ar"
-          ? "افتح تحليل الكورسات"
-          : "Open course analysis",
-      icon: BookOpenCheck,
+        lang === "ar"
+          ? "ترتيب الكورسات والإيراد وسعر البيع"
+          : "Course ranking, revenue and selling price",
+      detail: topCourse ? `${topCourse.course} · ${fmtUSD(topCourse.revenue)}` : undefined,
+      icon: GraduationCap,
       tone: "amber",
     },
     {
       to: "/campaigns",
       title: lang === "ar" ? "الحملات والإعلانات" : "Campaigns and ads",
       description:
-        lang === "ar" ? "تابع العائد والإنفاق والحملات المحتاجة قرار" : "Review return, spend and campaigns needing action",
-      detail: data.best
-        ? `${data.best.name} · ${fmtRoas(data.best.roas)}`
-        : lang === "ar"
-          ? "تحليل أداء الحملات"
-          : "Campaign performance analysis",
-      icon: Target,
+        lang === "ar"
+          ? "العائد والإنفاق والحملات اللي محتاجة قرار"
+          : "Return, spend and the campaigns needing a decision",
+      detail: data.best ? `${data.best.name} · ${fmtRoas(data.best.roas)}` : undefined,
+      icon: Megaphone,
       tone: "sky",
     },
     {
       to: "/accounting",
       title: lang === "ar" ? "المبيعات والتحصيل" : "Sales and collection",
       description:
-        lang === "ar" ? "الفواتير المدفوعة، التحصيل، والتارجت" : "Paid invoices, collection and targets",
+        lang === "ar"
+          ? "الفواتير المدفوعة والتحصيل والتارجت"
+          : "Paid invoices, collection and targets",
       detail: `${fmtUSD(data.totals.revenue)} ${lang === "ar" ? "تحصيل في الفترة" : "collected in this period"}`,
-      icon: DollarSign,
+      icon: Receipt,
       tone: "mint",
     },
     {
       to: "/leads",
       title: lang === "ar" ? "إدارة العملاء" : "CRM management",
       description:
-        lang === "ar" ? "العملاء، المتابعة، والخسائر في مكان واحد" : "Leads, follow-up and losses in one workspace",
+        lang === "ar"
+          ? "العملاء والمتابعة والخسائر في مكان واحد"
+          : "Leads, follow-up and losses in one workspace",
       detail: `${fmtNum(data.totals.crmLeads)} ${lang === "ar" ? "عميل داخل CRM" : "CRM leads"}`,
       icon: Users,
       tone: "violet",
@@ -323,76 +296,173 @@ function ExecutiveMap({
       to: "/pricing",
       title: lang === "ar" ? "الأسعار والالتزام" : "Pricing and compliance",
       description:
-        lang === "ar" ? "راجع دليل الأسعار والفواتير الاستثنائية" : "Review the price book and invoice exceptions",
-      detail: lang === "ar" ? "دليل السعر والفواتير" : "Price book and invoices",
-      icon: Percent,
+        lang === "ar"
+          ? "دليل الأسعار والفواتير الخارجة عنه"
+          : "The price book and the invoices outside it",
+      icon: BookMarked,
       tone: "cyan",
     },
     {
       to: "/teams",
       title: lang === "ar" ? "أداء الفريق" : "Team performance",
       description:
-        lang === "ar" ? "الأداء، جودة المكالمات، وتحقيق التارجت" : "Performance, call quality and target progress",
+        lang === "ar"
+          ? "الأداء وجودة المكالمات وتحقيق التارجت"
+          : "Performance, call quality and target progress",
       detail: workforceLoading
         ? lang === "ar"
           ? "جارٍ حساب الأداء…"
           : "Calculating performance…"
         : topEmployee
           ? `${topEmployee.name} · ${topEmployee.averageQualityScore?.toFixed(0) ?? "—"}/100`
-          : lang === "ar"
-            ? "افتح أداء الفريق"
-            : "Open team performance",
-      icon: UserRoundCheck,
+          : undefined,
+      icon: UsersRound,
       tone: "rose",
     },
     {
       to: "/social-media",
-      title: lang === "ar" ? "قنوات النمو" : "Growth channels",
+      title: lang === "ar" ? "السوشيال ميديا وOrganic" : "Social media and Organic",
       description:
-        lang === "ar" ? "السوشيال ميديا والمصادر غير المدفوعة" : "Social media and non-paid sources",
-      detail: lang === "ar" ? "السوشيال ميديا وOrganic" : "Social media and Organic",
-      icon: TrendingUp,
+        lang === "ar"
+          ? "القنوات غير المدفوعة والسوشيال ميديا"
+          : "Non-paid channels and social media",
+      icon: MessagesSquare,
       tone: "slate",
     },
   ];
 
   return (
-    <div className="card-grid sm:grid-cols-2 xl:grid-cols-4" data-testid="executive-map">
+    <div
+      className="card-grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+      data-testid="executive-map"
+    >
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
           <Link
             key={card.to}
             to={card.to}
-            className="tone-surface lift stagger group relative flex min-h-[154px] flex-col overflow-hidden p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]"
+            className="tone-surface lift stagger group flex min-w-0 items-center gap-3 p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]"
             style={{ ...toneVars(card.tone), "--i": index } as CSSProperties}
             aria-label={`${card.title} — ${lang === "ar" ? "فتح التقرير" : "Open report"}`}
           >
             <span
-              className="mb-4 grid size-9 place-items-center rounded-xl text-white shadow-sm"
+              className="grid size-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
               style={{ background: "var(--tone-strong)" }}
               aria-hidden="true"
             >
-              <Icon size={18} />
+              <Icon size={17} />
             </span>
-            <span className="text-[14px] font-bold text-[var(--tone-ink)]">{card.title}</span>
-            <span className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-text-muted">
-              {card.description}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13.5px] font-bold text-[var(--tone-ink)]">
+                {card.title}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] leading-snug text-text-muted">
+                {card.description}
+              </span>
+              {card.detail && (
+                <bdi className="mt-1 block truncate text-[11.5px] font-semibold text-[var(--tone-ink)]">
+                  {card.detail}
+                </bdi>
+              )}
             </span>
-            <span className="mt-auto flex items-end justify-between gap-2 pt-3">
-              <bdi className="min-w-0 truncate text-[11.5px] font-semibold text-[var(--tone-ink)]">
-                {card.detail}
-              </bdi>
-              <ChevronLeft
-                size={17}
-                className="shrink-0 text-[var(--tone-strong)] transition-transform duration-200 group-hover:-translate-x-0.5 rtl:rotate-180 rtl:group-hover:translate-x-0.5"
-                aria-hidden="true"
-              />
-            </span>
+            <ChevronLeft
+              size={17}
+              className="shrink-0 text-[var(--tone-strong)] transition-transform duration-200 group-hover:-translate-x-0.5 rtl:rotate-180 rtl:group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
           </Link>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * "أفضل الكورسات في الفترة" — the shortest honest answer to "what is selling".
+ *
+ * Five rows out of `data.courseSales`, which is already sorted by revenue, and
+ * a link to the full report. Rank, name, revenue and — where the response
+ * carries it — how many paid invoices are behind that revenue, because "أعلى
+ * إيراد" from three invoices and from ninety are different facts.
+ *
+ * Deliberately not a table: the column that would answer the next question is
+ * on /courses, and this card's job is to get the reader there.
+ */
+function TopCoursesPanel({
+  rows,
+  currency,
+  sarRate,
+  lang,
+}: {
+  rows: CourseSaleContribution[];
+  currency: DisplayCurrency;
+  sarRate: number;
+  lang: "ar" | "en";
+}) {
+  const shown = rows.slice(0, 5);
+  return (
+    <DashboardPanel
+      tone="amber"
+      icon={<BookOpenCheck size={16} />}
+      title={lang === "ar" ? "أفضل الكورسات في الفترة" : "Top courses this period"}
+      hint={lang === "ar" ? "مرتبة بالإيراد المحصّل." : "Ranked by collected revenue."}
+      footer={
+        <Link
+          to="/courses"
+          className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+        >
+          {lang === "ar" ? "عرض كل الكورسات" : "View all courses"}
+          {lang === "ar" ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </Link>
+      }
+    >
+      {shown.length === 0 ? (
+        <EmptyState
+          label={
+            lang === "ar" ? "لا توجد مبيعات كورسات في الفترة" : "No course sales in this period"
+          }
+          compact
+        />
+      ) : (
+        <ol className="space-y-2.5">
+          {shown.map((row, index) => (
+            <li key={row.course} className="flex items-center gap-2.5">
+              <span
+                className="num grid size-6 shrink-0 place-items-center rounded-lg text-[11px] font-bold"
+                style={
+                  index === 0
+                    ? { background: "var(--amber-strong)", color: "#fff" }
+                    : { background: "var(--amber-surface)", color: "var(--amber-ink)" }
+                }
+              >
+                {index + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span
+                  className="block truncate text-[13px] font-semibold text-text"
+                  title={row.course}
+                >
+                  {row.course}
+                </span>
+                {row.paidInvoices > 0 && (
+                  <span className="block text-[10.5px] text-text-muted">
+                    {fmtNum(row.paidInvoices)} {lang === "ar" ? "فاتورة مدفوعة" : "paid invoices"}
+                  </span>
+                )}
+              </span>
+              <bdi className="num shrink-0 text-[13px] font-bold text-text">
+                {formatDisplayMoney(
+                  usdToDisplayCurrency(row.revenue, currency, sarRate),
+                  currency,
+                  lang,
+                )}
+              </bdi>
+            </li>
+          ))}
+        </ol>
+      )}
+    </DashboardPanel>
   );
 }
 
@@ -479,8 +549,12 @@ function Overview() {
       technical: data.staleTabs.join(" · "),
     });
   }
+  // Held onto so the data-health section does not restate it: this exact
+  // problem already interrupts the top of the page in its own alert bar, and
+  // reading the same warning twice in one screen makes a reader trust neither.
+  let spendTabIssue: DataHealthIssue | null = null;
   if (health.platformsWithoutSpendTab?.length) {
-    healthIssues.push({
+    spendTabIssue = {
       tone: "danger",
       message:
         lang === "ar"
@@ -493,7 +567,8 @@ function Overview() {
       technical: health.platformsWithoutSpendTab
         .map((row) => `${row.platform}: ${fmtNum(row.leads)} leads`)
         .join(" · "),
-    });
+    };
+    healthIssues.push(spendTabIssue);
   }
   if (health.excludedStages?.length) {
     healthIssues.push({
@@ -521,6 +596,19 @@ function Overview() {
     });
   }
 
+  // The severity, from what the issues ARE rather than from how many there
+  // are. A period that only carries the standing note about the Lost source
+  // has nothing wrong with it, and painting the freshness chip amber for it
+  // teaches a reader that amber means nothing.
+  const blockingIssues = healthIssues.filter(
+    (issue) => issue.tone === "danger" && issue !== spendTabIssue,
+  );
+  const healthTone = blockingIssues.length
+    ? "danger"
+    : healthIssues.some((issue) => issue.tone === "warning")
+      ? "warning"
+      : "success";
+
   const sarRate = fxRatesFromFilters(filters).SAR;
   // One series set for one chart. Both metrics already share a grain and a
   // display currency, so they are converted together rather than each card
@@ -547,11 +635,11 @@ function Overview() {
         title={lang === "ar" ? "الملخص العام" : "Executive summary"}
         subtitle={
           lang === "ar"
-            ? "صورة سريعة للأداء، ثم طريق واضح لكل تقرير تحتاجه"
-            : "A quick read of performance, then a clear route to every report"
+            ? "صورة سريعة للأداء، ثم طريق واضح للتقارير المهمة"
+            : "A quick read of performance, then a clear route to the reports that matter"
         }
         period={period}
-        sync={<SyncStatus label={syncLabel} tone={healthIssues.length ? "warning" : "success"} />}
+        sync={<SyncStatus label={syncLabel} tone={healthTone} />}
       />
 
       {/* Only the one class of problem that changes what the figures MEAN is
@@ -573,12 +661,20 @@ function Overview() {
       )}
 
       <PageSections className="gap-after-header">
-        {/* LEVEL 2 — the five figures the page exists to state. No heading of
-            their own: at this size and in these colours the figures ARE the
-            heading, and a label above them would only push them down. */}
+        {/* LEVEL 2 — the five figures the page exists to state. The heading is
+            the lightest one on the page: the figures under it are large and
+            coloured and carry themselves, so this line is here to name the
+            group and to say the figures open, not to compete with them. */}
         <PageSection
           level="headline"
-          aria-label={lang === "ar" ? "المؤشرات الأساسية" : "Headline figures"}
+          tone="slate"
+          icon={<BarChart3 size={16} />}
+          title={lang === "ar" ? "أهم الأرقام" : "Headline figures"}
+          hint={
+            lang === "ar"
+              ? "اضغط أي رقم تشوف مكوناته والتفاصيل اللي وراه."
+              : "Open any figure to see what it is made of."
+          }
         >
           <KpiRow>
             <MetricDetailTrigger
@@ -639,43 +735,21 @@ function Overview() {
         </PageSection>
 
         {/* LEVEL 3 — the readings. Lighter than the figures above and than the
-            analysis below, and every one of them opens. */}
+            analysis below, and every one of them opens. Three, and only three:
+            a reader who is given six things that all "need to know" has been
+            given none. */}
         <PageSection
           level="insight"
           tone="amber"
           icon={<Lightbulb size={16} />}
-          title={lang === "ar" ? "أهم ما تحتاج معرفته اليوم" : "What you need to know today"}
+          title={lang === "ar" ? "أهم حاجة محتاج تعرفها" : "What you need to know today"}
           hint={
             lang === "ar"
-              ? "اضغط أي بطاقة لترى الأرقام التي أدت إلى هذا الحكم."
+              ? "اضغط أي بطاقة تشوف الأرقام اللي طلّعت الكلام ده."
               : "Open any card to see the figures that produced the verdict."
           }
         >
-          <TodaysInsights
-            signals={business}
-            details={insights}
-            workforceLoading={workforce.isLoading}
-            lang={lang}
-          />
-        </PageSection>
-
-        <PageSection
-          level="primary"
-          tone="violet"
-          icon={<LayoutGrid size={16} />}
-          title={lang === "ar" ? "من الملخص إلى التفاصيل" : "From summary to detail"}
-          hint={
-            lang === "ar"
-              ? "اختر مساحة العمل المطلوبة؛ كل بطاقة تفتح التقرير المناسب مباشرة."
-              : "Choose the workspace you need; every card opens its report directly."
-          }
-        >
-          <ExecutiveMap
-            data={data}
-            signals={business}
-            workforceLoading={workforce.isLoading}
-            lang={lang}
-          />
+          <TodaysInsights signals={business} details={insights} lang={lang} />
         </PageSection>
 
         {!data.prevComparable && data.prevRange && (
@@ -686,33 +760,39 @@ function Overview() {
           </Notice>
         )}
 
-        {/* LEVEL 4 — the analysis the figures rest on. One heading over white
-            panels, each of which carries its own quieter title. */}
+        {/* LEVEL 4 — the analysis the figures rest on, and the most important
+            row on the page. One heading over white panels, each of which
+            carries its own quieter title. */}
         <PageSection
           level="primary"
           tone="sky"
           icon={<TrendingUp size={16} />}
-          title={lang === "ar" ? "تحليل الفترة" : "The period in detail"}
+          title={lang === "ar" ? "تفاصيل الأداء" : "The period in detail"}
           hint={
             lang === "ar"
-              ? "من أين جاء التحصيل، وأين ذهب الصرف، وكيف تحرك المسار."
-              : "Where the collection came from, where the spend went, and how the funnel moved."
+              ? "التحصيل والإنفاق، مسار التحويل، وأفضل الكورسات في الفترة."
+              : "Collection against spend, the funnel, and the courses that sold."
           }
         >
-          {/* One chart, two series, at two-thirds width — with the funnel beside
-              it. Spend and collection are the same question asked twice, and
-              plotting them apart in two equal cards made the reader hold one
-              shape in their head to compare it with the other. */}
-          <div className="card-grid lg:grid-cols-3">
+          {/* Three columns, deliberately unequal. The trend is the widest
+              because a line needs length to have a shape; the funnel is a
+              column of five bars and asks for less; the course ranking is five
+              short rows and asks for least.
+              Below `xl` the trend takes the full width and the two narrow
+              panels pair up under it; below `lg` they stack in reading order.
+              Spend and collection stay on ONE chart — they are the same
+              question asked twice, and two equal cards made the reader hold
+              one shape in their head to compare it with the other. */}
+          <div className="card-grid lg:grid-cols-2 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1.15fr)_minmax(0,1fr)]">
             <DashboardPanel
-              className="lg:col-span-2"
+              className="lg:col-span-2 xl:col-span-1"
               tone="mint"
               icon={<TrendingUp size={16} />}
-              title={lang === "ar" ? "حركة الصرف والتحصيل" : "Spend and collection"}
+              title={lang === "ar" ? "اتجاه التحصيل والإنفاق" : "Collection and spend trend"}
               hint={
                 lang === "ar"
-                  ? "الصرف بتاريخ الإعلان، والتحصيل بتاريخ الدفع."
-                  : "Spend follows ad date; collection follows Payment Date."
+                  ? "التحصيل بتاريخ الدفع، والإنفاق بتاريخ الإعلان."
+                  : "Collection follows Payment Date; spend follows ad date."
               }
               action={
                 <div className="flex flex-wrap items-center gap-2">
@@ -770,16 +850,20 @@ function Overview() {
             <DashboardPanel
               tone="sky"
               icon={<Users size={16} />}
-              title={t("funnel")}
+              title={lang === "ar" ? "مسار التحويل" : "Conversion funnel"}
               hint={
-                lang === "ar" ? "من الظهور إلى الصفقة المغلقة" : "From impression to closed deal"
+                lang === "ar" ? "من الظهور للصفقة المقفولة." : "From impression to closed deal."
               }
               footer={
                 lang === "ar"
-                  ? "عدد العملاء في النظام قد يتجاوز ما تُبلغ عنه المنصات، لأن بعضهم يأتي من واتساب والترشيحات."
+                  ? "عدد العملاء في النظام ممكن يزيد عن اللي المنصات بتقوله، لأن فيه ناس بتيجي من واتساب والترشيحات."
                   : "CRM leads can exceed platform-reported leads: some arrive from WhatsApp and referrals."
               }
             >
+              {/* The stages, and the rate between them, exactly as the response
+                  states them. A stage the API returns as null shows a dash, not
+                  a zero — "we did not measure it" and "it was none" are two
+                  different sentences. */}
               <FunnelBars
                 steps={data.funnel.map((s) => ({
                   label: FUNNEL_LABELS[s.key]?.[lang] ?? s.key,
@@ -788,19 +872,91 @@ function Overview() {
                 }))}
               />
             </DashboardPanel>
-          </div>
 
+            <TopCoursesPanel
+              rows={data.courseSales}
+              currency={displayCurrency}
+              sarRate={sarRate}
+              lang={lang}
+            />
+          </div>
+        </PageSection>
+
+        {/* The secondary row: what the reader should know about the numbers
+            themselves before acting on them.
+
+            The chip states the level honestly — a note that does not move a
+            figure stays green, because an amber badge for "Lost comes from one
+            approved source" teaches a reader to ignore the badge. Anything that
+            DOES change what the figures mean is spelled out here in full,
+            without them having to open anything. */}
+        <PageSection
+          level="records"
+          title={lang === "ar" ? "حالة البيانات" : "Data health"}
+          hint={
+            lang === "ar"
+              ? "آخر مزامنة والمصادر اللي مش داخلة في الأرقام."
+              : "Last sync, and the sources these figures do not include."
+          }
+        >
+          <DataHealthSummary issues={healthIssues} syncedLabel={syncLabel} />
+          {blockingIssues.map((issue, i) => (
+            <Notice key={i} tone="danger" title={issue.message} icon={<AlertTriangle size={16} />}>
+              {issue.impact}
+            </Notice>
+          ))}
+        </PageSection>
+
+        {/* "روح للتفاصيل" — where to go next, AFTER the analysis rather than
+            in front of it. Compact rows, real routes, and a figure only where
+            this response actually carries one. */}
+        <PageSection
+          level="records"
+          title={lang === "ar" ? "روح للتفاصيل" : "From summary to detail"}
+          hint={
+            lang === "ar"
+              ? "اختار مساحة العمل اللي محتاجها؛ كل بطاقة بتفتح تقريرها على طول."
+              : "Choose the workspace you need; every card opens its report directly."
+          }
+        >
+          <ExecutiveMap
+            data={data}
+            signals={business}
+            workforceLoading={workforce.isLoading}
+            lang={lang}
+          />
+        </PageSection>
+
+        {/* LEVEL 5 — the rows behind the analysis. A deliberately quieter
+            heading: this is where a reader goes to check something, not where
+            they start.
+
+            The course-contribution chart and the campaign activity table used
+            to sit in the analysis row above. They are both worth keeping and
+            neither is a headline: contribution restates, at length, the ranking
+            the top-courses card already gives, and the activity table is a list
+            of rows. They are checks, so they live where a reader goes to
+            check. */}
+        <PageSection
+          level="records"
+          title={lang === "ar" ? "التفاصيل والسجلات" : "Detailed records"}
+          hint={
+            lang === "ar"
+              ? "الصفوف اللي واقفة ورا الأرقام اللي فوق."
+              : "The rows the figures above are built from."
+          }
+        >
           <DashboardPanel
             tone="amber"
             icon={<BookOpenCheck size={16} />}
             title={
               lang === "ar"
-                ? "مساهمة الدورات ومتوسط سعر البيع"
+                ? "مساهمة الكورسات ومتوسط سعر البيع"
                 : "Course contribution and average sale price"
             }
             hint={
               lang === "ar"
-                ? "المساهمة = إيراد الدورة ÷ إجمالي إيراد الدورات المصنّف."
+                ? "المساهمة = إيراد الكورس ÷ إجمالي إيراد الكورسات المصنّف."
                 : "Contribution = course revenue ÷ classified course revenue."
             }
           >
@@ -813,20 +969,7 @@ function Overview() {
           </DashboardPanel>
 
           <CampaignActivityPanel activity={data.activity} />
-        </PageSection>
 
-        {/* LEVEL 5 — the rows behind the analysis. A deliberately quieter
-            heading: this is where a reader goes to check something, not where
-            they start. */}
-        <PageSection
-          level="records"
-          title={lang === "ar" ? "السجلات التفصيلية" : "Detailed records"}
-          hint={
-            lang === "ar"
-              ? "الصفوف التي تقف خلف الأرقام أعلاه."
-              : "The rows the figures above are built from."
-          }
-        >
           <Card>
             <SectionTitle hint={t("origin_note")}>{t("lead_origin")}</SectionTitle>
             <div className="card-grid sm:grid-cols-2">
@@ -1075,8 +1218,6 @@ function Overview() {
         </ExecutiveSummary>
 
         <TelegramPanel />
-
-        <DataHealthSummary issues={healthIssues} syncedLabel={syncLabel} />
       </PageSections>
     </div>
   );

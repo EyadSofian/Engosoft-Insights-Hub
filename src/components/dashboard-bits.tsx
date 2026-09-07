@@ -768,6 +768,13 @@ export interface DataHealthIssue {
   technical?: string;
 }
 
+/** Arabic counts one, two and many differently; "3 ملاحظة" is not a sentence. */
+function arabicNotes(count: number): string {
+  if (count === 1) return "ملاحظة واحدة";
+  if (count === 2) return "ملاحظتين";
+  return `${count} ملاحظات`;
+}
+
 function healthLevel(issues: DataHealthIssue[]): "danger" | "warning" | "ok" {
   if (issues.some((i) => i.tone === "danger")) return "danger";
   if (issues.some((i) => i.tone === "warning")) return "warning";
@@ -839,7 +846,7 @@ export function DataHealthButton({
           <span className="block text-[11px] leading-tight opacity-70">
             {issues.length > 0
               ? lang === "ar"
-                ? `${issues.length} ملاحظة · اضغط للتفاصيل`
+                ? `${arabicNotes(issues.length)} · اضغط للتفاصيل`
                 : `${issues.length} note${issues.length === 1 ? "" : "s"} · tap for detail`
               : (syncedLabel ?? (lang === "ar" ? "اضغط لعرض صحة البيانات" : "Tap for data health"))}
           </span>
