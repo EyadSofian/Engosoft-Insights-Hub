@@ -181,7 +181,7 @@ export interface TargetCoverage {
    */
   unmatched: { employeeId: string; name: string; teamLeader: string; target: number | null }[];
   /** People selling in this window with no published quota. */
-  untargeted: { name: string; paidRevenue: number }[];
+  untargeted: { name: string; paidRevenue: number; note?: string }[];
   /** Workbook contradictions, e.g. one name resolving to two employees. */
   duplicates: string[];
 }
@@ -1409,7 +1409,10 @@ function buildTargetCoverage(
     const gap = (value: number | null): number | null =>
       target !== null && value !== null ? target - value : null;
 
-    matchedEmployeeIds.add(person.entry.employeeId);
+    // A workbook match with `target: null` is useful for explaining revenue
+    // outside target, but it must not inflate the count labelled "employees
+    // with a target" anywhere in the dashboard.
+    if (target !== null) matchedEmployeeIds.add(person.entry.employeeId);
     row.target = {
       employeeId: person.entry.employeeId,
       name: person.entry.name,
@@ -1466,9 +1469,17 @@ function buildTargetCoverage(
     complete: targeted.every((row) => row.target?.complete ?? false),
     monthsMissing: [...new Set(targeted.flatMap((row) => row.target?.monthsMissing ?? []))].sort(),
     unmatched: unmatched.sort((left, right) => (right.target ?? 0) - (left.target ?? 0)),
+    // `target` exists even when the workbook explicitly says this employee
+    // has no quota.  Test the quota value itself, otherwise these collections
+    // disappear from the explanation of why all collections differ from the
+    // collections counted against target.
     untargeted: agents
-      .filter((row) => !row.target && row.paidRevenue !== 0)
-      .map((row) => ({ name: row.displayName || row.name, paidRevenue: row.paidRevenue }))
+      .filter((row) => row.target?.target === null && row.paidRevenue !== 0)
+      .map((row) => ({
+        name: row.displayName || row.name,
+        paidRevenue: row.paidRevenue,
+        note: row.target?.note || undefined,
+      }))
       .sort((left, right) => right.paidRevenue - left.paidRevenue),
     duplicates,
   };

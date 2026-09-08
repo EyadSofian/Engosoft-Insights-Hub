@@ -46,7 +46,7 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { KpiRow } from "@/components/dashboard-bits";
-import { MetricDetailTrigger } from "@/components/metric-detail";
+import { MetricDetailTrigger, MetricDrilldown } from "@/components/metric-detail";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n, type Lang } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
@@ -521,9 +521,10 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
     pick: (agent: AgentsResponse["agents"][number]) => number,
     format: (n: number) => string,
     tone: MetricBreakdownRow["tone"],
+    source: AgentsResponse["agents"] = agents,
   ): MetricBreakdownRow[] =>
     topRows(
-      agents.map((agent) => ({
+      source.map((agent) => ({
         key: agent.key,
         label: agent.displayName || agent.name,
         value: pick(agent),
@@ -698,7 +699,12 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
         {
           id: "employees",
           title: A ? "المشاركون في التارجت" : "Who the target is shared between",
-          rows: roster((agent) => agent.paidRevenue, fmtUSDFull, "amber"),
+          rows: roster(
+            (agent) => agent.paidRevenue,
+            fmtUSDFull,
+            "amber",
+            agents.filter((agent) => agent.target?.target !== null),
+          ),
           emptyLabel: A ? "لا يوجد موظفون في الفترة" : "No employees in this period",
         },
       ],
@@ -1253,6 +1259,8 @@ export function AccountingAgentsView() {
       {section === "units" ? (
         <TargetUnitsDashboard
           rollup={targetUnitRollup}
+          allPaidRevenue={data.summary.paidRevenue}
+          untargeted={data.targets.untargeted}
           months={data.months}
           selectedMonth={selectedMonth}
           lang={lang}
@@ -1561,6 +1569,8 @@ export function AccountingAgentsView() {
 
 function TargetUnitsDashboard({
   rollup,
+  allPaidRevenue,
+  untargeted,
   months,
   selectedMonth,
   lang,
@@ -1568,6 +1578,8 @@ function TargetUnitsDashboard({
   onSelectEmployee,
 }: {
   rollup: ReturnType<typeof buildTargetUnitRollup>;
+  allPaidRevenue: number;
+  untargeted: AgentsResponse["targets"]["untargeted"];
   months: string[];
   selectedMonth: string;
   lang: Lang;
@@ -1579,6 +1591,66 @@ function TargetUnitsDashboard({
     : lang === "ar"
       ? "الفترة المختارة"
       : "Selected period";
+  const outsideTargetRevenue = untargeted.reduce((sum, person) => sum + person.paidRevenue, 0);
+  const collectionDetail: MetricDetail = {
+    id: "teams.target-collections",
+    title: lang === "ar" ? "التحصيل المحسوب على التارجت" : "Collections counted toward target",
+    value: fmtUSDFull(rollup.paidRevenue),
+    tone: "sky",
+    icon: <ReceiptText size={16} />,
+    definition:
+      lang === "ar"
+        ? `ده تحصيل الموظفين اللي لهم تارجت منشور في ${periodLabel}. مش كل تحصيل الشركة يدخل في نسبة التارجت.`
+        : `Collections from employees with a published target in ${periodLabel}; not every company collection belongs in target achievement.`,
+    formula:
+      lang === "ar"
+        ? `${fmtUSDFull(allPaidRevenue)} إجمالي تحصيل الموظفين − ${fmtUSDFull(outsideTargetRevenue)} تحصيل موظفين بلا تارجت = ${fmtUSDFull(rollup.paidRevenue)} داخل حساب التارجت.`
+        : `${fmtUSDFull(allPaidRevenue)} all employee collections − ${fmtUSDFull(outsideTargetRevenue)} from employees without a target = ${fmtUSDFull(rollup.paidRevenue)} counted toward target.`,
+    caveat:
+      untargeted.length > 0
+        ? lang === "ar"
+          ? `لذلك لا تضيف ${fmtUSDFull(outsideTargetRevenue)} إلى نسبة التحقيق: مفيش تارجت مقابل له. افتح القائمة تحت لمعرفة الموظفين والمبالغ.`
+          : `${fmtUSDFull(outsideTargetRevenue)} is excluded from the achievement rate because it has no corresponding target. See the employees below.`
+        : undefined,
+    supporting: [
+      {
+        key: "all-collections",
+        label: lang === "ar" ? "إجمالي تحصيل الموظفين" : "All employee collections",
+        value: fmtUSDFull(allPaidRevenue),
+      },
+      {
+        key: "target-collections",
+        label: lang === "ar" ? "داخل حساب التارجت" : "Counted toward target",
+        value: fmtUSDFull(rollup.paidRevenue),
+      },
+      {
+        key: "outside-target",
+        label: lang === "ar" ? "خارج حساب التارجت" : "Outside target calculation",
+        value: fmtUSDFull(outsideTargetRevenue),
+        hint: lang === "ar" ? `${fmtNum(untargeted.length)} موظف بلا تارجت منشور` : `${fmtNum(untargeted.length)} employees without a published target`,
+      },
+      {
+        key: "target-members",
+        label: lang === "ar" ? "نسبة التحقيق" : "Achievement rate",
+        value: fmtPct(rollup.achievement, 1),
+      },
+    ],
+    records: untargeted.length
+      ? {
+          title: lang === "ar" ? "تحصيل ظاهر في الإيراد لكنه خارج التارجت" : "Collections in revenue but outside target",
+          hint:
+            lang === "ar"
+              ? "هؤلاء الموظفون لهم تحصيل في الفترة، لكن ملف التارجت لا يضع لهم تارجت. لذلك يظهروا في إجمالي الإيراد ولا يدخلوا في نسبة التحقيق."
+              : "These employees collected in the period but have no target in the target file, so they appear in revenue but not in achievement.",
+          rows: untargeted.map((person) => ({
+            key: person.name,
+            title: person.name,
+            subtitle: person.note || (lang === "ar" ? "بلا تارجت منشور" : "No published target"),
+            value: fmtUSDFull(person.paidRevenue),
+          })),
+        }
+      : undefined,
+  };
 
   return (
     <section className="space-y-4" aria-labelledby="target-units-title">
@@ -1625,9 +1697,10 @@ function TargetUnitsDashboard({
             value={fmtUSDFull(rollup.target)}
           />
           <TargetHeadlineMetric
-            label={lang === "ar" ? "المحقق بالتحصيل" : "Paid achievement"}
+            label={lang === "ar" ? "المحقق داخل التارجت" : "Collections toward target"}
             value={fmtUSDFull(rollup.paidRevenue)}
             accent
+            detail={collectionDetail}
           />
           <TargetHeadlineMetric
             label={lang === "ar" ? "نسبة التحقيق" : "Achievement"}
@@ -1694,21 +1767,37 @@ function TargetHeadlineMetric({
   label,
   value,
   accent = false,
+  detail,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  detail?: MetricDetail;
 }) {
-  return (
-    <div className="min-w-0 px-3 py-4 text-center sm:px-5">
+  const metric = (onOpen?: () => void) => (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={!onOpen}
+      data-metric-trigger={onOpen ? "true" : undefined}
+      className={`min-w-0 px-3 py-4 text-center ${onOpen ? "group w-full cursor-pointer transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand" : "w-full"} sm:px-5`}
+      aria-label={onOpen ? `${label} — عرض التفاصيل` : undefined}
+    >
       <p className="text-[10px] font-bold text-text-muted sm:text-xs">{label}</p>
       <p
         className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}
       >
         {value}
       </p>
-    </div>
+      {onOpen && (
+        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand opacity-80 group-hover:opacity-100">
+          <Info size={11} aria-hidden="true" />
+          اضغط للتوضيح
+        </span>
+      )}
+    </button>
   );
+  return detail ? <MetricDrilldown detail={detail}>{(open) => metric(open)}</MetricDrilldown> : metric();
 }
 
 function TargetUnitCard({
