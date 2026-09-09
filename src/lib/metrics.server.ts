@@ -2360,10 +2360,10 @@ export function execSummary(
   }
 
   en.push(
-    `Collected revenue was ${money(t.revenue)} from Accounting.USD Paid by Payment Date, giving a primary ROAS of ${roasStr(t.roas)}. ${money(t.attributedRevenue)} of that paid revenue traces to a campaign in this window. Sales orders are not used as recognised revenue.`,
+    `Collected revenue was ${money(t.revenue)} from Accounting.USD Paid by Payment Date. ${money(t.attributedRevenue)} of it traces to a campaign, giving an attributed ad ROAS of ${roasStr(t.attributedRoas)} on ${money(t.spend)} spend. All collected revenue ÷ ad spend is ${roasStr(t.roas)}, but that is not advertising ROAS because it includes revenue not attributed to a campaign. Sales orders are not used as recognised revenue.`,
   );
   ar.push(
-    `الإيراد المحصَّل ${money(t.revenue)} من عمود USD Paid في تبويب Accounting حسب تاريخ الدفع، والعائد الأساسي ${roasStr(t.roas)}. ومنه ${money(t.attributedRevenue)} مرتبط بحملة داخل نفس الفترة. أوامر البيع لا تُستخدم كإيراد محاسبي.`,
+    `الإيراد المحصَّل ${money(t.revenue)} من عمود USD Paid في تبويب Accounting حسب تاريخ الدفع. منه ${money(t.attributedRevenue)} مرتبط بحملة، ولذلك العائد الإعلاني المنسوب ${roasStr(t.attributedRoas)} على إنفاق ${money(t.spend)}. إجمالي التحصيل ÷ الإنفاق الإعلاني ${roasStr(t.roas)}، لكنه ليس ROAS إعلانيًا لأنه يشمل إيرادًا غير منسوب إلى حملة. أوامر البيع لا تُستخدم كإيراد محاسبي.`,
   );
 
   if (health.platformsWithoutSpendTab.length > 0) {

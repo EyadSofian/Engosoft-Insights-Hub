@@ -159,7 +159,12 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
     esc(`CPL = الإنفاق ÷ Leads المنصات: ${money(t.cpl, 2)}  ${change(t.cpl ?? 0, p.cpl ?? 0)}`),
   );
   L.push(esc(`CPA = الإنفاق ÷ Won: ${money(t.cpa, 2)}`));
-  L.push(esc(`العائد على الإنفاق: ${times(t.roas)} · نسبة الإنفاق للإيراد: ${pct(t.acos)}`));
+  L.push(
+    esc(
+      `العائد الإعلاني المنسوب: ${times(t.attributedRoas)} على إيراد مرتبط ${money(t.attributedRevenue)} · إجمالي التحصيل ÷ الإنفاق: ${times(t.roas)} (ليس ROAS إعلانيًا)`,
+    ),
+  );
+  L.push(esc(`نسبة الإنفاق إلى إجمالي التحصيل: ${pct(t.acos)}`));
   L.push("");
 
   const best = bestCampaign(cur.rows, 1);
@@ -204,8 +209,10 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   if (t.spend > 0 && t.crmLeads === 0) {
     notes.push("أُنفق مال دون وصول أي عميل محتمل في هذه الفترة — يُراجع ربط النماذج فوراً.");
   }
-  if (t.revenue === 0 && t.spend > 0) {
-    notes.push("لم تُسجَّل أي فاتورة في هذه الفترة، لذلك يظهر العائد على الإنفاق صفراً.");
+  if (t.attributedRevenue === 0 && t.spend > 0) {
+    notes.push(
+      "لم يُسجَّل إيراد محصّل مرتبط بحملة في هذه الفترة، لذلك يظهر العائد الإعلاني المنسوب صفراً.",
+    );
   }
   const ratio = div(t.leadsOther, t.crmLeads);
   if (ratio !== null && ratio > 0.4) {
