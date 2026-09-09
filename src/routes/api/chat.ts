@@ -290,6 +290,18 @@ export const Route = createFileRoute("/api/chat")({
         };
 
         const shortAnswer = shortcut();
+        const sourceLine = ar
+          ? `المصدر: Insights Hub — ${filters.from} إلى ${filters.to}`
+          : `Source: Insights Hub — ${filters.from} to ${filters.to}`;
+        const withSource = (answer: string): string => {
+          // This endpoint exposes one compact analytics block from one source.
+          // Attach its provenance deterministically instead of relying on the
+          // language model to remember it. Existing source explanations remain
+          // intact; the footer identifies the dashboard snapshot and window.
+          if (answer.includes(sourceLine)) return answer;
+          return `${answer}\n\n${sourceLine}`;
+        };
+        const sourcedShortAnswer = shortAnswer ? withSource(shortAnswer) : null;
 
         // Aggregates only — no lead names, emails, or phone numbers leave here.
         const context = {
@@ -360,10 +372,14 @@ export const Route = createFileRoute("/api/chat")({
         if (!key) {
           return Response.json({
             answer:
-              shortAnswer ??
+              sourcedShortAnswer ??
               (ar
-                ? `أنا شغال حالياً على بيانات الداشبورد المفلترة: إنفاق **${money(totals.spend)}**، إيراد مدفوع **${money(totals.revenue)}**، ${totals.totalLeads} ليد و${totals.won} Won. اسألني باسم حملة أو دورة، أو اكتب «الرقم ده جاي منين؟». المحادثة التحليلية المفتوحة هتتوسع لما يتربط API الذكاء الخارجي.`
-                : `I'm currently working from the filtered dashboard data: **${money(totals.spend)}** spend, **${money(totals.revenue)}** paid revenue, ${totals.totalLeads} leads and ${totals.won} won. Ask by campaign/course name or ask where a number comes from. Open-ended analysis will expand when the external AI API is connected.`),
+                ? withSource(
+                    `أنا شغال حالياً على بيانات الداشبورد المفلترة: إنفاق **${money(totals.spend)}**، إيراد مدفوع **${money(totals.revenue)}**، ${totals.totalLeads} ليد و${totals.won} Won. اسألني باسم حملة أو دورة، أو اكتب «الرقم ده جاي منين؟». المحادثة التحليلية المفتوحة هتتوسع لما يتربط API الذكاء الخارجي.`,
+                  )
+                : withSource(
+                    `I'm currently working from the filtered dashboard data: **${money(totals.spend)}** spend, **${money(totals.revenue)}** paid revenue, ${totals.totalLeads} leads and ${totals.won} won. Ask by campaign/course name or ask where a number comes from. Open-ended analysis will expand when the external AI API is connected.`,
+                  )),
             usedShortcut: !!shortAnswer,
             mode: "dashboard",
           });
@@ -378,6 +394,7 @@ export const Route = createFileRoute("/api/chat")({
           "A null value means the metric is not measurable — say so, never report it as zero.",
           "Respect the `definitions` block: CPL, ROAS and ACOS have specific meanings here.",
           "Be concise: 2-4 sentences. Always cite concrete figures and campaign names.",
+          "Every block of live figures must identify its source as Insights Hub and state the filters.from-to period once. Distinguish facts from your inference; never cite an internal function or tool name.",
           "Use markdown for emphasis on names and numbers.",
           "Reply in the user's language. If the question is Arabic, reply in simple, clear Modern Standard Arabic — everyday wording, not stiff or literal, and not dialect.",
           "If the context does not contain the answer, say so plainly instead of guessing.",
@@ -399,13 +416,13 @@ export const Route = createFileRoute("/api/chat")({
               { role: "user", content: question },
             ],
           });
-          const answer = completion.choices[0]?.message?.content?.trim() || shortAnswer;
-          return Response.json({ answer: answer ?? EM, usedShortcut: false });
+          const answer = completion.choices[0]?.message?.content?.trim() || sourcedShortAnswer;
+          return Response.json({ answer: answer ? withSource(answer) : EM, usedShortcut: false });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return Response.json({
             answer:
-              shortAnswer ??
+              sourcedShortAnswer ??
               (ar ? `تعذّر الوصول إلى المساعد الذكي: ${msg}` : `AI request failed: ${msg}`),
             usedShortcut: !!shortAnswer,
           });

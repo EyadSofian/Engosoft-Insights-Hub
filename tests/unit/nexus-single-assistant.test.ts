@@ -37,6 +37,19 @@ describe("exactly one assistant is mounted", () => {
   });
 });
 
+describe("the rollback chat still attributes live figures", () => {
+  const legacyChat = read("src/routes/api/chat.ts");
+
+  it("appends the Insights Hub source and selected period deterministically", () => {
+    expect(legacyChat).toContain("const sourceLine");
+    expect(legacyChat).toContain("const withSource");
+    expect(legacyChat).toContain("Source: Insights Hub");
+    expect(legacyChat).toContain("المصدر: Insights Hub");
+    expect(legacyChat).toContain("filters.from");
+    expect(legacyChat).toContain("filters.to");
+  });
+});
+
 describe("the current SDK API is used, not the deprecated one", () => {
   const files = [
     "src/components/engo-nexus/NexusSession.tsx",
