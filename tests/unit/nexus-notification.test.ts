@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  NEXUS_NOTIFICATION_ACK,
+  NEXUS_NOTIFICATION_READY,
   notificationAnalysisPrompt,
   notificationLanguage,
   notificationQuickActions,
@@ -22,6 +24,10 @@ const message = {
 };
 
 describe("Qodo notification handoff", () => {
+  it("uses a versioned ready/ack handshake so iframe timing cannot drop a brief", () => {
+    expect(NEXUS_NOTIFICATION_READY).toBe("engosoft:nexus-notification-ready:v1");
+    expect(NEXUS_NOTIFICATION_ACK).toBe("engosoft:nexus-notification-ack:v1");
+  });
   it("accepts the versioned, whitelisted contract", () => {
     const notice = parseNexusNotificationMessage(message);
     expect(notice).toMatchObject({ key: "website", from: "2026-09-01", to: "2026-09-09" });

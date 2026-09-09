@@ -1,10 +1,12 @@
-import { Suspense, useEffect, useState, type ComponentType } from "react";
+import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import { useAnyModalOpen } from "@/lib/ui-store";
 import { NEXUS_CLIENT_ID } from "./lib/nexus-config";
 import { NexusLauncher } from "./NexusLauncher";
 import { NexusProactivePopup } from "./NexusProactivePopup";
 import { nexusStore, useNexusUi } from "./state/nexus-store";
 import {
+  NEXUS_NOTIFICATION_ACK,
+  NEXUS_NOTIFICATION_READY,
   notificationAnalysisPrompt,
   notificationLanguage,
   parseNexusNotificationMessage,
@@ -47,6 +49,7 @@ export function NexusRoot() {
   const anyModalOpen = useAnyModalOpen();
   const [mounted, setMounted] = useState(false);
   const [Session, setSession] = useState<ComponentType | null>(null);
+  const receivedNoticeRef = useRef<string | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -98,11 +101,20 @@ export function NexusRoot() {
         return null;
       }
     })();
+    const targetOrigin = parentOrigin ?? "*";
     const receiveNotification = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
       if (parentOrigin && event.origin !== parentOrigin) return;
       const notice = parseNexusNotificationMessage(event.data);
       if (!notice) return;
+      window.parent.postMessage(
+        { type: NEXUS_NOTIFICATION_ACK, notificationId: notice.id },
+        targetOrigin,
+      );
+      // Qodo retries until it sees the acknowledgement. A retry must be
+      // acknowledged again, but must not reset the panel or resend analysis.
+      if (receivedNoticeRef.current === notice.id) return;
+      receivedNoticeRef.current = notice.id;
       const lang = notificationLanguage(
         notice,
         document.documentElement.lang === "ar" ? "ar" : "en",
@@ -110,6 +122,9 @@ export function NexusRoot() {
       nexusStore.openNotification(notice, notificationAnalysisPrompt(notice, lang));
     };
     window.addEventListener("message", receiveNotification);
+    // Parent and child can finish mounting in either order. This ready signal
+    // lets Qodo deliver immediately instead of relying on one iframe load tick.
+    window.parent.postMessage({ type: NEXUS_NOTIFICATION_READY }, targetOrigin);
     return () => window.removeEventListener("message", receiveNotification);
   }, []);
 
