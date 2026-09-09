@@ -1,8 +1,75 @@
-import { BellRing, CalendarRange, X } from "lucide-react";
 import {
-  notificationQuickActions,
-  type NexusNotificationContext,
-} from "./lib/nexus-notification";
+  CalendarRange,
+  Globe2,
+  Megaphone,
+  TrendingDown,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { notificationQuickActions, type NexusNotificationContext } from "./lib/nexus-notification";
+
+const PRESENTATION: Record<
+  NexusNotificationContext["key"],
+  {
+    icon: LucideIcon;
+    ar: string;
+    en: string;
+    border: string;
+    iconBox: string;
+    eyebrow: string;
+    footer: string;
+  }
+> = {
+  leads: {
+    icon: UsersRound,
+    ar: "العملاء والمتابعة",
+    en: "Leads and follow-up",
+    border: "border-blue-200 dark:border-blue-900/70",
+    iconBox: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    eyebrow: "text-blue-700 dark:text-blue-300",
+    footer: "border-blue-100 bg-blue-50/60 dark:border-blue-900/60 dark:bg-blue-950/20",
+  },
+  website: {
+    icon: Globe2,
+    ar: "الموقع والمبيعات",
+    en: "Website and sales",
+    border: "border-emerald-200 dark:border-emerald-900/70",
+    iconBox: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    eyebrow: "text-emerald-700 dark:text-emerald-300",
+    footer: "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20",
+  },
+  campaigns: {
+    icon: Megaphone,
+    ar: "الحملات",
+    en: "Campaigns",
+    border: "border-amber-200 dark:border-amber-900/70",
+    iconBox: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    eyebrow: "text-amber-700 dark:text-amber-300",
+    footer: "border-amber-100 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20",
+  },
+  employees: {
+    icon: TrendingDown,
+    ar: "أداء الفريق",
+    en: "Team performance",
+    border: "border-rose-200 dark:border-rose-900/70",
+    iconBox: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+    eyebrow: "text-rose-700 dark:text-rose-300",
+    footer: "border-rose-100 bg-rose-50/60 dark:border-rose-900/60 dark:bg-rose-950/20",
+  },
+};
+
+function rangeLabel(from: string, to: string, lang: "ar" | "en") {
+  const formatter = new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const start = formatter.format(new Date(`${from}T12:00:00Z`));
+  const end = formatter.format(new Date(`${to}T12:00:00Z`));
+  return lang === "ar" ? `من ${start} إلى ${end}` : `${start} to ${end}`;
+}
 
 export function NexusNotificationCard({
   notice,
@@ -18,20 +85,25 @@ export function NexusNotificationCard({
   onDismiss: () => void;
 }) {
   const ar = lang === "ar";
+  const presentation = PRESENTATION[notice.key];
+  const Icon = presentation.icon;
   return (
     <article
       data-testid="nexus-notification-context"
-      className="overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-b from-sky-50 to-bg shadow-sm dark:border-sky-900/70 dark:from-sky-950/30"
+      dir={ar ? "rtl" : "ltr"}
+      className={`overflow-hidden rounded-2xl border bg-bg shadow-sm ${presentation.border}`}
     >
       <div className="flex items-start gap-3 px-3.5 py-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300">
-          <BellRing className="size-4.5" aria-hidden />
+        <span
+          className={`grid size-9 shrink-0 place-items-center rounded-xl ${presentation.iconBox}`}
+        >
+          <Icon className="size-4.5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-sky-700 dark:text-sky-300">
-                {ar ? "إشعار من Qodo" : "Notification from Qodo"}
+              <p className={`text-[11px] font-semibold ${presentation.eyebrow}`}>
+                {ar ? presentation.ar : presentation.en}
               </p>
               <h2 className="mt-0.5 text-sm font-bold text-text">{notice.title}</h2>
             </div>
@@ -44,16 +116,16 @@ export function NexusNotificationCard({
               <X className="size-3.5" aria-hidden />
             </button>
           </div>
-          <p className="mt-2 text-[13px] leading-6 text-text" dir="auto">
+          <p className="mt-2 text-[13px] leading-6 text-text" dir={ar ? "rtl" : "ltr"}>
             {notice.body}
           </p>
-          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-text-subtle" dir="ltr">
+          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-text-subtle">
             <CalendarRange className="size-3.5" aria-hidden />
-            <span>{notice.from} → {notice.to}</span>
+            <span>{rangeLabel(notice.from, notice.to, lang)}</span>
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5 border-t border-sky-100 px-3 py-2.5 dark:border-sky-900/60">
+      <div className={`flex flex-wrap gap-1.5 border-t px-3 py-2.5 ${presentation.footer}`}>
         {notificationQuickActions(notice, lang).map((action) => (
           <button
             key={action.label}

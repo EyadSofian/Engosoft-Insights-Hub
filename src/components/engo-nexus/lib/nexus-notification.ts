@@ -36,6 +36,8 @@ const isoDay = (value: unknown): value is string =>
 const clean = (value: unknown, max: number): string | null => {
   if (typeof value !== "string") return null;
   const result = value
+    // Intentional input sanitisation for the cross-window handoff contract.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -83,15 +85,15 @@ const ANALYSIS: Record<NexusNotificationKey, { ar: string; en: string }> = {
     en: "Analyse lead flow, conversion and open follow-ups, using only a valid comparable period whose dates you state.",
   },
   website: {
-    ar: "حلّل مبيعات الموقع وإنفاق حملاته. لا تسمِّ أي نسبة ROAS إلا من الإيراد المرتبط بالحملات، ووضّح فجوة الربط إن وجدت.",
+    ar: "حلّل مبيعات الموقع وإنفاق حملاته. لا تعرض العائد الإعلاني إلا من الإيراد المرتبط بالحملات، ووضّح فجوة الربط إن وجدت.",
     en: "Analyse website sales and campaign spend. Call a ratio ROAS only when revenue is campaign-attributed, and expose any attribution gap.",
   },
   campaigns: {
-    ar: "رتّب الحملات المحتاجة للمراجعة بالدليل، وافصل سوء النتيجة عن سببها؛ لا تخمّن creative أو audience بدون بيانات تثبت ذلك.",
+    ar: "رتّب الحملات المحتاجة للمراجعة بالدليل، وافصل سوء النتيجة عن سببها؛ لا تخمّن مشكلة في المحتوى الإعلاني أو الجمهور بدون بيانات تثبت ذلك.",
     en: "Rank campaigns needing review from evidence, separating weak results from root cause; do not guess creative or audience causes without supporting data.",
   },
   employees: {
-    ar: "حلّل الأداء حسب الفريق والكورس وحجم العينة وجودة التغطية، واجعل النتيجة إشارة coaching ومراجعة لا قرار HR.",
+    ar: "حلّل الأداء حسب الفريق والكورس وحجم العينة وجودة التغطية، واجعل النتيجة أساسًا للتوجيه والمراجعة، لا قرارًا إداريًا يخص الموظف.",
     en: "Analyse performance by team, course, sample size and coverage, treating the result as a coaching/review signal rather than an HR decision.",
   },
 };
@@ -102,7 +104,7 @@ export function notificationAnalysisPrompt(
   lang: "ar" | "en",
 ): string {
   return lang === "ar"
-    ? `فتحت إشعارًا إداريًا من Qodo للفترة ${notice.from} → ${notice.to}. اقرأ بيانات Insights Hub الحية لنفس الفترة أولًا وتحقق من الإشعار بدل الاعتماد على نصه وحده. ${ANALYSIS[notice.key].ar} ابدأ بخلاصة واضحة، ثم الأدلة، ثم الإجراء المقترح والـKPI التالي.`
+    ? `فتحت ملخصًا إداريًا للفترة ${notice.from} → ${notice.to}. اقرأ بيانات لوحة التحليلات الحية لنفس الفترة أولًا وتحقق من الملخص بدل الاعتماد على نصه وحده. ${ANALYSIS[notice.key].ar} ابدأ بخلاصة واضحة، ثم الأدلة، ثم الإجراء المقترح ومؤشر القياس التالي.`
     : `I opened a Qodo management notification for ${notice.from} → ${notice.to}. Read live Insights Hub data for the same period first and verify the notification rather than relying on its text alone. ${ANALYSIS[notice.key].en} Start with a clear conclusion, then evidence, then the recommended action and next KPI.`;
 }
 
@@ -119,7 +121,10 @@ const QUICK_ACTIONS: Record<NexusNotificationKey, { ar: QuickAction[]; en: Quick
         label: "قارن صح",
         prompt: "قارن هذه الفترة بالفترة الصحيحة المماثلة واذكر تاريخ الفترتين والأرقام.",
       },
-      { label: "خطة متابعة", prompt: "اعمل خطة متابعة لمدة 7 أيام للحالات المفتوحة مع مالك وKPI." },
+      {
+        label: "خطة متابعة",
+        prompt: "اعمل خطة متابعة لمدة 7 أيام للحالات المفتوحة، وحدد المسؤول ومؤشر القياس.",
+      },
     ],
     en: [
       {
@@ -143,10 +148,13 @@ const QUICK_ACTIONS: Record<NexusNotificationKey, { ar: QuickAction[]; en: Quick
       {
         label: "تحقق من العائد",
         prompt:
-          "تحقق من عائد حملات الموقع باستخدام الإيراد المرتبط فقط، واشرح أي فجوة attribution.",
+          "تحقق من عائد حملات الموقع باستخدام الإيراد المرتبط فقط، واشرح أي فجوة في ربط المبيعات بالحملات.",
       },
       { label: "حلل المبيعات", prompt: "حلل مبيعات الموقع والكورسات ومصادر الطلب خلال الفترة." },
-      { label: "فرص التحسين", prompt: "اقترح أهم فرص تحسين الموقع والحملات مع الأولوية والـKPI." },
+      {
+        label: "فرص التحسين",
+        prompt: "اقترح أهم فرص تحسين الموقع والحملات، وحدد الأولوية ومؤشر القياس.",
+      },
     ],
     en: [
       {
@@ -176,7 +184,7 @@ const QUICK_ACTIONS: Record<NexusNotificationKey, { ar: QuickAction[]; en: Quick
       },
       {
         label: "قرارات 7 أيام",
-        prompt: "حوّل التحليل إلى قرارات 7 أيام: الإجراء والمالك والـKPI.",
+        prompt: "حوّل التحليل إلى قرارات لمدة 7 أيام: الإجراء والمسؤول ومؤشر القياس.",
       },
     ],
     en: [
@@ -199,10 +207,14 @@ const QUICK_ACTIONS: Record<NexusNotificationKey, { ar: QuickAction[]; en: Quick
     ar: [
       {
         label: "مين يحتاج متابعة؟",
-        prompt: "حدد من يحتاج متابعة مع حجم العينة والتغطية، بدون تحويلها لقرار HR.",
+        prompt:
+          "حدد من يحتاج متابعة مع حجم العينة والتغطية، بدون تحويل النتيجة إلى قرار إداري يخص الموظف.",
       },
       { label: "حسب الكورس", prompt: "حلل أداء الموظفين حسب الكورس بدل الترتيب الإجمالي فقط." },
-      { label: "خطة coaching", prompt: "اقترح خطة coaching ومراجعة عينة مكالمات مع KPI واضح." },
+      {
+        label: "خطة تطوير",
+        prompt: "اقترح خطة توجيه وتطوير، مع مراجعة عينة من المكالمات ومؤشر قياس واضح.",
+      },
     ],
     en: [
       {
