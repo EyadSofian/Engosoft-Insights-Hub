@@ -3,6 +3,14 @@
 Scope: the agent-facing surface contract, the gateway, page context, proactive
 assistant, and bidi-safe chat rendering. No production data was mutated.
 
+## 2026-09-09 — Nexus is not restricted by the open tab
+
+- Proactive copy now makes it clear that Nexus can answer about any dashboard area without navigating first.
+- Campaign and ad suggestions are full analytical questions, asking for ranking basis and evidence-bounded causes rather than unsupported creative guesses.
+- The legacy chat fallback no longer tells the user to open Campaigns. It returns the available campaign names and metrics in the conversation.
+- Campaign answer headings have stronger visual separation in the Nexus prose renderer for mobile and desktop readability.
+- Verification: 644 tests / 26 files, TypeScript and production build green; surface audit passed 112 endpoint calls with zero failures and zero unreachable groups; forced-404 self-test went red as required.
+
 ## Added
 
 - **`src/lib/agent-surface-contract.ts`** — the single, versioned declaration of

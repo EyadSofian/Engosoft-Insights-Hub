@@ -110,8 +110,8 @@ export const Route = createFileRoute("/api/chat")({
 
           if (has("what can you do", "تقدر تعمل ايه", "تعمل ايه", "بتعرف ايه", "ممكن اسالك")) {
             return ar
-              ? "أقدر أشرح أي رقم في الداشبورد ومصدره، ألخّص حملة أو دورة، أقارن الإنفاق بالمبيعات، أعدّ الحملات الجاهزة للتشغيل، وأوصلك للصفحة الصح. أنا ملتزم بالفترة والفلاتر الظاهرة ومش بخمّن رقم ناقص. جرّب: **دورة PMP صرفت وباعت كام؟**"
-              : "I can explain dashboard figures and sources, summarize campaigns or courses, compare spend with sales, count campaigns eligible to run now, and link you to the right page. I follow the visible filters and never invent missing values.";
+              ? "أقدر أشرح أي رقم في الداشبورد ومصدره، ألخّص حملة أو دورة، أقارن الإنفاق بالمبيعات، وأحلل الحملات الجاهزة للتشغيل — كله هنا في نفس المحادثة ومن غير ما تفتح صفحة تانية. أنا ملتزم بالفترة والفلاتر الظاهرة ومش بخمّن رقم ناقص. جرّب: **دورة PMP صرفت وباعت كام؟**"
+              : "I can explain dashboard figures and sources, summarize campaigns or courses, compare spend with sales, and analyse campaigns eligible to run — all in this chat without opening another page. I follow the visible filters and never invent missing values.";
           }
           if (
             has(
@@ -174,9 +174,13 @@ export const Route = createFileRoute("/api/chat")({
             const parts = Object.entries(activeByPlatform).map(
               ([platform, count]) => `${labels[platform] ?? platform} ${count}`,
             );
+            const names = activeStates
+              .slice(0, 5)
+              .map((state, index) => `${index + 1}. ${state.campaignKey}`)
+              .join("\n");
             return ar
-              ? `الحملات الجاهزة للتشغيل دلوقتي: **${activeStates.length}** (${parts.join("، ") || "لا يوجد"}). بنراجع زر التشغيل والجدول ووجود إعلان شغّال؛ الصرف مش هو اللي بيحدد الحالة. افتح [الحملات](/campaigns) للتفاصيل.`
-              : `Campaigns eligible to run now: **${activeStates.length}** (${parts.join(", ") || "none"}). We check the switch, schedule, and a live ad; spend does not decide status. Open [Campaigns](/campaigns) for details.`;
+              ? `الحملات الجاهزة للتشغيل دلوقتي: **${activeStates.length}** (${parts.join("، ") || "لا يوجد"}). بنراجع زر التشغيل والجدول ووجود إعلان شغّال؛ الصرف مش هو اللي بيحدد الحالة.\n\n${names || "مفيش حملات شغالة ظاهرة."}${activeStates.length > 5 ? `\n\nوفي ${activeStates.length - 5} حملات إضافية.` : ""}`
+              : `Campaigns eligible to run now: **${activeStates.length}** (${parts.join(", ") || "none"}). We check the switch, schedule, and a live ad; spend does not decide status.\n\n${names || "No active campaigns are reported."}${activeStates.length > 5 ? `\n\nAnd ${activeStates.length - 5} more.` : ""}`;
           }
           if (courseMention) {
             return ar
@@ -243,9 +247,17 @@ export const Route = createFileRoute("/api/chat")({
               "where are campaigns",
             )
           ) {
+            const ranked = campaigns.slice(0, 5);
+            const lines = ranked
+              .map((campaign, index) =>
+                ar
+                  ? `### ${index + 1}. ${campaign.name}\n- الإنفاق ${money(campaign.spend)} — الإيراد ${money(campaign.revenue)} — ROAS ${roas(campaign.roas)}\n- الليدز ${campaign.crmLeads} — الصفقات المقفولة ${campaign.won}`
+                  : `### ${index + 1}. ${campaign.name}\n- Spend ${money(campaign.spend)} — revenue ${money(campaign.revenue)} — ROAS ${roas(campaign.roas)}\n- Leads ${campaign.crmLeads} — won ${campaign.won}`,
+              )
+              .join("\n\n");
             return ar
-              ? "افتح **الحملات ← أداء الحملات** أو [اضغط هنا](/campaigns). هتلاقي حالة Active من المنصات نفسها، وتحت كل حملة أرقام الفترة المختارة؛ افتح السهم لرؤية إجمالي تاريخها."
-              : "Open **Campaigns → Campaign performance** or [go there now](/campaigns). Active status comes from the ad platforms; each row shows the selected period and expands to lifetime totals.";
+              ? `دي أعلى ${ranked.length} حملات في الفترة المختارة، مرتبة بالإيراد ثم الصفقات المقفولة ثم ROAS:\n\n${lines}`
+              : `These are the top ${ranked.length} campaigns in the selected period, ranked by revenue, then won deals, then ROAS:\n\n${lines}`;
           }
           if (has("فين الليدز", "الليدز منين", "أجيب الليدز", "اجيب الليدز", "where are leads")) {
             return ar

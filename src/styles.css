@@ -1315,6 +1315,14 @@
   font-size: 0.8125rem;
   color: var(--text);
 }
+.nexus-prose h3 {
+  margin-top: 0.95rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
 .nexus-prose strong {
   font-weight: 600;
   color: var(--text);

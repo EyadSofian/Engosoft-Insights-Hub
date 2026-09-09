@@ -240,12 +240,7 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       {
         id: "kpis",
         title: q("المؤشرات الأساسية", "Headline KPIs"),
-        elements: [
-          "overview.spend",
-          "overview.revenue",
-          "overview.roas",
-          "overview.leads",
-        ],
+        elements: ["overview.spend", "overview.revenue", "overview.roas", "overview.leads"],
       },
     ],
     elements: commonElements("overview"),
@@ -432,11 +427,14 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     elements: commonElements("campaigns"),
     suggestedQuestions: [
       q(
-        "تحب أقارن الحملات على الإيراد والـROAS وجودة الـleads؟",
+        "قارن الحملات على الإيراد والـROAS وجودة الليدز",
         "Compare campaigns on revenue, ROAS and lead quality?",
       ),
-      q("أنهي حملة أحسن؟", "Which campaign is best?"),
-      q("مين محتاج مراجعة؟", "Which needs review?"),
+      q(
+        "رتب أفضل الحملات وقولي الترتيب مبني على إيه",
+        "Rank the best campaigns and explain the basis",
+      ),
+      q("رتب الحملات المحتاجة مراجعة واشرح السبب", "Rank campaigns needing review and explain why"),
     ],
   },
   {
@@ -623,9 +621,12 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     sections: [{ id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["ads.spend"] }],
     elements: commonElements("ads"),
     suggestedQuestions: [
-      q("أنهي إعلان أحسن؟", "Which ad performs best?"),
-      q("في كرياتيف بايظ ولا لأ؟", "Is any creative fatiguing?"),
-      q("CPL الإعلانات دي كويس؟", "Is the CPL on these ads good?"),
+      q("رتب الإعلانات بالأرقام وقولي معيار الترتيب", "Rank the ads and state the ranking basis"),
+      q("أنهي إعلان محتاج مراجعة وليه؟", "Which ad needs review and why?"),
+      q(
+        "حلل CPL الإعلانات من غير ما تفترض سبب مش موجود",
+        "Analyse ad CPL without assuming an unsupported cause",
+      ),
     ],
   },
   {

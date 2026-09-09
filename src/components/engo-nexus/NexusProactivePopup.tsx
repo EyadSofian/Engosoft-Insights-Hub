@@ -135,11 +135,11 @@ export function NexusProactivePopup({ suppressed }: { suppressed?: boolean }) {
           <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
             {entityLabel
               ? ar
-                ? `أقدر أحلل ${entityLabel} من الأرقام اللي قدامك.`
-                : `I can analyse ${entityLabel} from the figures on screen.`
+                ? `أقدر أحلل ${entityLabel} هنا، أو تجاوبني عن أي جزء تاني في الداشبورد.`
+                : `I can analyse ${entityLabel} here, or answer about any other dashboard area.`
               : ar
-                ? "أنا ENGO Nexus، أقدر أحلل البيانات اللي قدامك وأساعدك في اتخاذ القرار."
-                : "I'm ENGO Nexus — I can analyse what's on screen and help you decide."}
+                ? "اسألني هنا عن أي حملة أو كورس أو مبيعات؛ مش لازم تفتح الصفحة الأول."
+                : "Ask here about any campaign, course or sales result; you do not need to open its page first."}
           </p>
         </div>
       </div>
