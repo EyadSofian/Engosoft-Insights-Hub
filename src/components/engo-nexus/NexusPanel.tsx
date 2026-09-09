@@ -8,10 +8,12 @@ import { Mascot } from "./Mascot";
 import { NexusHeader, type NexusStatus } from "./NexusHeader";
 import { NexusWelcome } from "./NexusWelcome";
 import { NexusComposer } from "./NexusComposer";
+import { NexusNotificationCard } from "./NexusNotificationCard";
 import { NexusMessageRenderer, hasRenderableContent } from "./NexusMessageRenderer";
 import { ProgressMessage } from "./messages/ProgressMessage";
 import { progressLabels } from "./lib/nexus-progress";
 import { ErrorBubble } from "./messages/AlertMessage";
+import { notificationLanguage } from "./lib/nexus-notification";
 import { buildPageContext, contextPreamble, pageTypeFor, stripContext } from "./lib/nexus-context";
 import { nexusStore, useNexusUi, rememberPanelOpened } from "./state/nexus-store";
 import { getNexusView, subscribeNexusView } from "./state/nexus-view-context";
@@ -48,8 +50,9 @@ export function NexusPanel() {
   const { lang } = useI18n();
   const filters = useFilters();
   const location = useLocation();
-  const { open, expanded } = useNexusUi();
+  const { open, expanded, notice } = useNexusUi();
   const ar = lang === "ar";
+  const noticeLang = notice ? notificationLanguage(notice, ar ? "ar" : "en") : null;
 
   const {
     messages,
@@ -250,7 +253,17 @@ export function NexusPanel() {
           className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4"
           data-testid="nexus-messages"
         >
-          {messages.length === 0 && !busy && (
+          {notice && (
+            <NexusNotificationCard
+              notice={notice}
+              lang={noticeLang ?? (ar ? "ar" : "en")}
+              disabled={!connected || busy}
+              onSend={(prompt) => void send(prompt)}
+              onDismiss={() => nexusStore.dismissNotice()}
+            />
+          )}
+
+          {messages.length === 0 && !busy && !notice && (
             <NexusWelcome
               lang={ar ? "ar" : "en"}
               pageType={pageTypeFor(location.pathname)}

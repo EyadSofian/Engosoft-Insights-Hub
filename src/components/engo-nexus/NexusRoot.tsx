@@ -4,6 +4,11 @@ import { NEXUS_CLIENT_ID } from "./lib/nexus-config";
 import { NexusLauncher } from "./NexusLauncher";
 import { NexusProactivePopup } from "./NexusProactivePopup";
 import { nexusStore, useNexusUi } from "./state/nexus-store";
+import {
+  notificationAnalysisPrompt,
+  notificationLanguage,
+  parseNexusNotificationMessage,
+} from "./lib/nexus-notification";
 
 /**
  * The single mount point for ENGO Nexus, mounted once in `__root.tsx` so the
@@ -78,6 +83,34 @@ export function NexusRoot() {
       window.removeEventListener("engosoft:open-nexus", openFromEvent);
       window.removeEventListener("engosoft:open-chat", openFromEvent);
     };
+  }, []);
+
+  // Qodo owns the authenticated notification record and embeds this Hub. It
+  // sends a narrow, versioned context object when the user opens that notice.
+  // The body is displayed as evidence only; the analysis prompt is selected
+  // locally from the whitelisted notice key.
+  useEffect(() => {
+    if (window.parent === window) return;
+    const parentOrigin = (() => {
+      try {
+        return document.referrer ? new URL(document.referrer).origin : null;
+      } catch {
+        return null;
+      }
+    })();
+    const receiveNotification = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      if (parentOrigin && event.origin !== parentOrigin) return;
+      const notice = parseNexusNotificationMessage(event.data);
+      if (!notice) return;
+      const lang = notificationLanguage(
+        notice,
+        document.documentElement.lang === "ar" ? "ar" : "en",
+      );
+      nexusStore.openNotification(notice, notificationAnalysisPrompt(notice, lang));
+    };
+    window.addEventListener("message", receiveNotification);
+    return () => window.removeEventListener("message", receiveNotification);
   }, []);
 
   if (!mounted || !NEXUS_CLIENT_ID) return null;

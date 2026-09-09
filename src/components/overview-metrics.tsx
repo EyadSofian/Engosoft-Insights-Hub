@@ -631,30 +631,42 @@ export function overviewMetrics({
 
   const roas: MetricDetail = {
     id: "overview.roas",
-    title: A ? "العائد على الإنفاق" : "Return on ad spend",
-    value: fmtRoas(T.roas),
-    tone: T.roas !== null && isFinite(T.roas) && T.roas < 1 ? "rose" : "amber",
+    title: A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS",
+    value: fmtRoas(T.attributedRoas),
+    tone:
+      T.attributedRoas !== null && isFinite(T.attributedRoas) && T.attributedRoas < 1
+        ? "rose"
+        : "amber",
     icon: <Target size={16} />,
-    delta: D.roas,
+    delta: D.attributedRoas,
     definition: A
-      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل قابله في الفترة."
-      : "For every dollar spent on ads, how many dollars of collected revenue came back in the period.",
+      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
+      : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
     formula: A
-      ? `الإيراد ÷ الإنفاق: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`
-      : `Revenue ÷ spend: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`,
+      ? `الإيراد المرتبط بحملة ÷ الإنفاق: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`
+      : `Campaign-attributed revenue ÷ spend: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`,
     caveat: A
-      ? `هذا هو العائد الإجمالي: كل التحصيل مقابل كل الإنفاق. العائد المرتبط — ${fmtRoas(T.attributedRoas)} — يحسب فقط الإيراد الذي يحمل حملة، وهما رقمان مختلفان لا يصح خلطهما.`
-      : `This is the total return: all collection against all spend. The attributed return — ${fmtRoas(T.attributedRoas)} — counts only revenue that carries a campaign. They are two different figures and must not be mixed.`,
+      ? `إجمالي التحصيل ÷ الإنفاق يساوي ${fmtRoas(T.roas)}، لكنه ليس ROAS إعلانيًا لأنه يشمل إيرادًا غير منسوب إلى حملة.`
+      : `All collected revenue ÷ spend is ${fmtRoas(T.roas)}, but it is not advertising ROAS because it includes revenue not attributed to a campaign.`,
     supporting: [
-      { key: "revenue", label: A ? "الإيراد المستخدم" : "Revenue used", value: fmtUSD(T.revenue) },
+      {
+        key: "attributed_revenue",
+        label: A ? "الإيراد المنسوب المستخدم" : "Attributed revenue used",
+        value: fmtUSD(T.attributedRevenue),
+      },
       { key: "spend", label: A ? "الإنفاق المستخدم" : "Spend used", value: fmtUSD(T.spend) },
       {
-        key: "attributed",
-        label: A ? "العائد المرتبط" : "Attributed return",
-        value: fmtRoas(T.attributedRoas),
-        hint: A ? `على ${fmtUSD(T.attributedRevenue)}` : `on ${fmtUSD(T.attributedRevenue)}`,
+        key: "all_revenue",
+        label: A ? "إجمالي التحصيل" : "All collected revenue",
+        value: fmtUSD(T.revenue),
+        hint: A ? "للسياق فقط" : "Context only",
       },
-      { key: "acos", label: "ACOS", value: fmtPct(T.acos, 1) },
+      {
+        key: "all_revenue_ratio",
+        label: A ? "إجمالي التحصيل ÷ الإنفاق" : "All revenue ÷ spend",
+        value: fmtRoas(T.roas),
+        hint: A ? "ليس ROAS إعلانيًا" : "Not advertising ROAS",
+      },
     ],
     breakdowns: [
       {

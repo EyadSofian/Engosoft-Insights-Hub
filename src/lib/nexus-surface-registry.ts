@@ -240,7 +240,12 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       {
         id: "kpis",
         title: q("المؤشرات الأساسية", "Headline KPIs"),
-        elements: ["overview.spend", "overview.revenue", "overview.roas", "overview.leads"],
+        elements: [
+          "overview.spend",
+          "overview.revenue",
+          "overview.roas",
+          "overview.leads",
+        ],
       },
     ],
     elements: commonElements("overview"),

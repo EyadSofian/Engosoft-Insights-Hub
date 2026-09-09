@@ -728,7 +728,10 @@ function Overview() {
               detail={metrics.roas}
               card={{
                 index: 4,
-                sub: `${t("attributed_roas")} ${fmtRoas(T.attributedRoas)}`,
+                sub:
+                  lang === "ar"
+                    ? `إجمالي التحصيل ÷ الإنفاق ${fmtRoas(T.roas)} (ليس ROAS إعلانيًا)`
+                    : `All revenue ÷ spend ${fmtRoas(T.roas)} (not ad ROAS)`,
               }}
             />
           </KpiRow>

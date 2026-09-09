@@ -21,17 +21,20 @@ import {
   PROACTIVE_SNOOZE_MS,
   PROACTIVE_SURFACE_SNOOZE_MS,
 } from "../lib/nexus-config";
+import type { NexusNotificationContext } from "../lib/nexus-notification";
 
 export interface NexusUiState {
   open: boolean;
   expanded: boolean;
   /** Set when the panel is opened from a quick action, sent once on connect. */
   pendingPrompt: string | null;
+  /** Stored Qodo brief shown above the conversation while it is being analysed. */
+  notice: NexusNotificationContext | null;
 }
 
 type Listener = () => void;
 
-let state: NexusUiState = { open: false, expanded: false, pendingPrompt: null };
+let state: NexusUiState = { open: false, expanded: false, pendingPrompt: null, notice: null };
 const listeners = new Set<Listener>();
 
 const emit = () => {
@@ -49,11 +52,19 @@ export const nexusStore = {
   subscribe,
   get: getSnapshot,
   open(prompt?: string) {
-    state = { ...state, open: true, pendingPrompt: prompt ?? null };
+    state = { ...state, open: true, pendingPrompt: prompt ?? null, notice: null };
+    emit();
+  },
+  openNotification(notice: NexusNotificationContext, prompt: string) {
+    state = { ...state, open: true, pendingPrompt: prompt, notice };
     emit();
   },
   close() {
-    state = { ...state, open: false, expanded: false, pendingPrompt: null };
+    state = { ...state, open: false, expanded: false, pendingPrompt: null, notice: null };
+    emit();
+  },
+  dismissNotice() {
+    state = { ...state, notice: null };
     emit();
   },
   toggleExpanded() {
@@ -70,7 +81,7 @@ export const nexusStore = {
   },
   /** Test-only reset; never called from application code. */
   reset() {
-    state = { open: false, expanded: false, pendingPrompt: null };
+    state = { open: false, expanded: false, pendingPrompt: null, notice: null };
     emit();
   },
 };

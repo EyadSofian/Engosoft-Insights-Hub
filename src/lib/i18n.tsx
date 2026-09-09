@@ -199,7 +199,7 @@ export const DICT = {
   revenue_per_lead: { ar: "الإيراد لكل عميل", en: "Revenue per lead" },
   attributed_revenue: { ar: "إيراد محصَّل مرتبط بحملة", en: "Campaign-linked collected revenue" },
   roas: { ar: "العائد على الإنفاق", en: "ROAS" },
-  attributed_roas: { ar: "العائد على الجزء المرتبط بحملة", en: "Campaign-linked ROAS" },
+  attributed_roas: { ar: "العائد الإعلاني المنسوب", en: "Attributed ad ROAS" },
   full_invoiced_revenue: { ar: "أوامر مفوترة (استرشادي)", en: "Invoiced orders (advisory)" },
   orders: { ar: "الطلبات", en: "Orders" },
   invoices: { ar: "الفواتير", en: "Invoices" },

@@ -79,6 +79,18 @@ function userText(id: string, text: string): BlockMessage {
   } as BlockMessage;
 }
 
+const qodoNotice = {
+  id: "notice-1",
+  source: "qodo" as const,
+  key: "campaigns" as const,
+  type: "insights.campaigns_review",
+  title: "حملات تحتاج مراجعة",
+  body: "حملتان تحتاجان تدخلًا خلال الفترة.",
+  from: "2026-09-01",
+  to: "2026-09-09",
+  createdAt: "2026-09-09T09:30:00.000Z",
+};
+
 beforeEach(() => {
   window.localStorage.clear();
   nexusStore.reset();
@@ -121,6 +133,27 @@ describe("panel — visibility", () => {
 });
 
 describe("panel — welcome and messages", () => {
+  it("shows the opened Qodo summary and type-specific actions instead of the generic welcome", async () => {
+    nexusStore.openNotification(qodoNotice, "تحقق من إشعار الحملات");
+    render(<NexusPanel />);
+
+    expect(screen.getByTestId("nexus-notification-context")).toHaveTextContent(
+      "حملات تحتاج مراجعة",
+    );
+    expect(screen.getByTestId("nexus-notification-context")).toHaveTextContent(
+      "2026-09-01 → 2026-09-09",
+    );
+    expect(screen.queryByTestId("nexus-welcome")).toBeNull();
+    await waitFor(() => expect(state.sendMessage).toHaveBeenCalledTimes(1));
+
+    state.sendMessage.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "رتب الأسوأ" }));
+    await waitFor(() => expect(state.sendMessage).toHaveBeenCalledTimes(1));
+    expect((state.sendMessage.mock.calls[0]![0] as { text: string }).text).toContain(
+      "رتب الحملات الأسوأ",
+    );
+  });
+
   it("shows the welcome state when the conversation is empty", () => {
     nexusStore.open();
     render(<NexusPanel />);

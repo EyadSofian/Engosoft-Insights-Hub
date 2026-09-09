@@ -2084,11 +2084,54 @@ export async function isPreviousComparable(
   return prev.from >= coverageStart;
 }
 
+/**
+ * The business comparison immediately preceding a selected window.
+ *
+ * A month-to-date selection is special: managers read 1–9 September as a
+ * comparison with 1–9 August, not with the final nine days of August. The old
+ * equal-length rule produced a mathematically valid but operationally wrong
+ * comparison in the executive report. A complete calendar month likewise
+ * compares with the complete previous calendar month. Custom windows keep the
+ * ordinary immediately-preceding, equal-length behaviour.
+ */
 export function previousPeriod(from?: string, to?: string): { from: string; to: string } | null {
   if (!from || !to) return null;
   const a = Date.parse(from + "T00:00:00Z");
   const b = Date.parse(to + "T00:00:00Z");
-  if (isNaN(a) || isNaN(b)) return null;
+  if (isNaN(a) || isNaN(b) || b < a) return null;
+
+  const start = new Date(a);
+  const end = new Date(b);
+  const sameCalendarMonth =
+    start.getUTCFullYear() === end.getUTCFullYear() &&
+    start.getUTCMonth() === end.getUTCMonth();
+  if (start.getUTCDate() === 1 && sameCalendarMonth) {
+    const previousMonthStart = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - 1, 1),
+    );
+    const currentMonthEnd = new Date(
+      Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0),
+    );
+    const previousMonthEnd = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 0),
+    );
+    const comparisonDay =
+      end.getUTCDate() === currentMonthEnd.getUTCDate()
+        ? previousMonthEnd.getUTCDate()
+        : Math.min(end.getUTCDate(), previousMonthEnd.getUTCDate());
+    const previousTo = new Date(
+      Date.UTC(
+        previousMonthStart.getUTCFullYear(),
+        previousMonthStart.getUTCMonth(),
+        comparisonDay,
+      ),
+    );
+    return {
+      from: previousMonthStart.toISOString().slice(0, 10),
+      to: previousTo.toISOString().slice(0, 10),
+    };
+  }
+
   const days = Math.round((b - a) / 86_400_000) + 1;
   const prevTo = new Date(a - 86_400_000);
   const prevFrom = new Date(prevTo.getTime() - (days - 1) * 86_400_000);

@@ -32,6 +32,18 @@ afterEach(() => {
 });
 
 describe("nexus-store — panel state", () => {
+  const notice = {
+    id: "notice-1",
+    source: "qodo" as const,
+    key: "campaigns" as const,
+    type: "insights.campaigns_review",
+    title: "حملات تحتاج مراجعة",
+    body: "حملتان تحتاجان تدخلًا.",
+    from: "2026-09-01",
+    to: "2026-09-09",
+    createdAt: "2026-09-09T09:30:00.000Z",
+  };
+
   it("opens, closes and carries a pending prompt exactly once", () => {
     expect(nexusStore.get().open).toBe(false);
     nexusStore.open("كام الإيرادات الشهر ده؟");
@@ -51,12 +63,26 @@ describe("nexus-store — panel state", () => {
     expect(nexusStore.consumePendingPrompt()).toBeNull();
   });
 
+  it("keeps a Qodo summary visible while its deterministic prompt is consumed", () => {
+    nexusStore.openNotification(notice, "حلل الإشعار");
+    expect(nexusStore.get()).toMatchObject({ open: true, notice, pendingPrompt: "حلل الإشعار" });
+    expect(nexusStore.consumePendingPrompt()).toBe("حلل الإشعار");
+    expect(nexusStore.get().notice).toEqual(notice);
+    nexusStore.dismissNotice();
+    expect(nexusStore.get().notice).toBeNull();
+  });
+
   it("closing clears expansion and any unsent prompt", () => {
     nexusStore.open("x");
     nexusStore.toggleExpanded();
     expect(nexusStore.get().expanded).toBe(true);
     nexusStore.close();
-    expect(nexusStore.get()).toEqual({ open: false, expanded: false, pendingPrompt: null });
+    expect(nexusStore.get()).toEqual({
+      open: false,
+      expanded: false,
+      pendingPrompt: null,
+      notice: null,
+    });
   });
 
   it("toggles expansion both ways", () => {
