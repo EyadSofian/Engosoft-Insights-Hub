@@ -213,7 +213,7 @@ export function NexusPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex justify-end"
+      className={`fixed inset-0 ${notice ? "z-[90]" : "z-[70]"} flex justify-end`}
       role="dialog"
       aria-modal="true"
       aria-label="ENGO Nexus"

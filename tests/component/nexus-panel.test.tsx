@@ -130,6 +130,12 @@ describe("panel — visibility", () => {
     expect(panel).toHaveAttribute("aria-label", "ENGO Nexus");
     expect(panel).toHaveAttribute("dir", "rtl");
   });
+
+  it("keeps a Qodo report above dashboard alerts that may already be open", () => {
+    nexusStore.openNotification(qodoNotice, "تحقق من إشعار الحملات");
+    render(<NexusPanel />);
+    expect(screen.getByTestId("nexus-panel")).toHaveClass("z-[90]");
+  });
 });
 
 describe("panel — welcome and messages", () => {
