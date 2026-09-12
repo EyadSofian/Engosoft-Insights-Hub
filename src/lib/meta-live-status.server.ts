@@ -1,11 +1,16 @@
 import type { CampaignOperationalState, CampaignPlatformHealth, Platform } from "./types";
+import { OPERATIONAL_STATE_MAX_AGE_MS } from "./campaign-status-policy";
 
 const DEFAULT_LIVE_STATUS_URL =
   "https://n8n.engosoft.com/webhook/engosoft-meta-campaign-live-status-v1-4fbe7508";
 const DEFAULT_LIVE_STATUS_REFRESH_URL =
   "https://n8n.engosoft.com/webhook/engosoft-meta-campaign-refresh-v1-7d6522755ea8";
 const CACHE_MS = 2 * 60 * 1000;
-const REFRESH_AFTER_MS = 10 * 60 * 1000;
+// The upstream job starts every ten minutes and normally finishes a few seconds
+// later. Reusing the operational-state policy's twenty-minute ceiling avoids a
+// false empty window at the exact schedule boundary while still failing closed
+// before any stale campaign can pass the downstream status guard.
+const REFRESH_AFTER_MS = OPERATIONAL_STATE_MAX_AGE_MS;
 const READ_TIMEOUT_MS = 12_000;
 const REFRESH_TIMEOUT_MS = 30_000;
 
