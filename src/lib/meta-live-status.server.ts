@@ -12,7 +12,10 @@ const CACHE_MS = 2 * 60 * 1000;
 // before any stale campaign can pass the downstream status guard.
 const REFRESH_AFTER_MS = OPERATIONAL_STATE_MAX_AGE_MS;
 const READ_TIMEOUT_MS = 12_000;
-const REFRESH_TIMEOUT_MS = 30_000;
+// A full four-platform scan currently walks more than 2,500 campaigns and can
+// legitimately take 35–60 seconds. It runs behind the page request, so allow
+// the workflow to finish without adding latency to the dashboard response.
+const REFRESH_TIMEOUT_MS = 90_000;
 
 interface LiveStatusResponse {
   ok: boolean;
