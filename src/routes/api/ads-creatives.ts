@@ -7,45 +7,12 @@ export const Route = createFileRoute("/api/ads-creatives")({
       GET: async ({ request }) => {
         const { parseFilters, json } = await import("@/lib/api.server");
         const { getFiltered, computePerf, adPerformanceKey } = await import("@/lib/metrics.server");
-        const { normalizeName } = await import("@/lib/sheet-cache.server");
+        const { invalidateDataCache, normalizeName } = await import("@/lib/sheet-cache.server");
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
-        const creativePlatforms = new Set(
-          data.snapshot.creatives.map((creative) => creative.platform),
-        );
-        const emptyHealth: PlatformSourceHealth = {
-          configured: false,
-          ok: false,
-          source: "none",
-          rows: 0,
-          creatives: 0,
-          syncedAt: "",
-          message: "Creative metadata is not available for this source yet.",
-        };
-        const health = filters.platform
-          ? (data.snapshot.health.platformSources?.[filters.platform] ?? emptyHealth)
-          : {
-              configured: creativePlatforms.size > 0,
-              ok: creativePlatforms.size > 0,
-              source: "sheet" as const,
-              rows: data.ads.length,
-              creatives: data.snapshot.creatives.length,
-              syncedAt: data.snapshot.syncedAt,
-              message: `${data.snapshot.creatives.length} creative resources are available.`,
-            };
-
-        if (filters.channel === "organic") {
-          return json({
-            rows: [] as CreativeAnalyticsRow[],
-            health,
-            facets: { accounts: [], campaigns: [], adsets: [], statuses: [], reviewStatuses: [] },
-            appliedFilters: filters,
-          });
-        }
-
         const performance = new Map(computePerf(data, "ad").map((row) => [row.key, row]));
         const wantedCourse = normalizeName(filters.course ?? "");
-        const creatives = data.snapshot.creatives.filter((creative) => {
+        const matchesFilters = (creative: (typeof data.snapshot.creatives)[number]) => {
           if (filters.platform && creative.platform !== filters.platform) return false;
           if (filters.account && creative.account !== filters.account) return false;
           if (filters.campaign && creative.campaign !== filters.campaign) return false;
@@ -61,7 +28,85 @@ export const Route = createFileRoute("/api/ads-creatives")({
             if (normalizeName(course) !== wantedCourse) return false;
           }
           return true;
-        });
+        };
+        let creatives = data.snapshot.creatives.filter(matchesFilters);
+
+        // A Meta daily fact already carries the real Ad ID and Creative ID, but
+        // not the image/copy resource. Enrich only the selected Meta ads on
+        // demand, return them in this very response, and retain a durable
+        // last-good copy in Railway PostgreSQL for later visits.
+        const metaCandidates = creatives.filter((creative) => creative.platform === "meta");
+        const shouldSyncMeta =
+          metaCandidates.length > 0 &&
+          (filters.platform === "meta" || !!filters.campaignKey || !!filters.adKey);
+        let metaSync:
+          | Awaited<ReturnType<typeof import("@/lib/meta-creatives.server").syncMetaCreativesDirect>>
+          | null = null;
+        if (shouldSyncMeta) {
+          const { syncMetaCreativesDirect } = await import("@/lib/meta-creatives.server");
+          metaSync = await syncMetaCreativesDirect(metaCandidates);
+          if (metaSync.creatives.length) {
+            const byAd = new Map(creatives.map((creative) => [creative.adId, creative] as const));
+            for (const creative of metaSync.creatives) byAd.set(creative.adId, creative);
+            creatives = [...byAd.values()];
+          }
+          if (metaSync.persisted) invalidateDataCache();
+        }
+
+        const creativePlatforms = new Set(creatives.map((creative) => creative.platform));
+        const emptyHealth: PlatformSourceHealth = {
+          configured: false,
+          ok: false,
+          source: "none",
+          rows: 0,
+          creatives: 0,
+          syncedAt: "",
+          message: "Creative metadata is not available for this source yet.",
+        };
+        const baseHealth = filters.platform
+          ? (data.snapshot.health.platformSources?.[filters.platform] ?? emptyHealth)
+          : null;
+        const metaContent = metaSync
+          ? creatives.filter(
+              (creative) =>
+                creative.platform === "meta" &&
+                (creative.imageUrl ||
+                  creative.thumbnailUrl ||
+                  creative.videoUrl ||
+                  creative.videoId ||
+                  creative.headline ||
+                  creative.body ||
+                  creative.permalinkUrl),
+            ).length
+          : 0;
+        const health: PlatformSourceHealth = metaSync
+          ? {
+              configured: metaSync.configured || (baseHealth?.configured ?? false),
+              ok: metaSync.failed === 0 && metaContent > 0,
+              source: metaSync.fetched > 0 ? "api" : (baseHealth?.source ?? "none"),
+              rows: baseHealth?.rows ?? data.ads.length,
+              creatives: metaContent,
+              syncedAt: metaSync.syncedAt || baseHealth?.syncedAt || "",
+              message: metaSync.message,
+            }
+          : baseHealth ?? {
+              configured: creativePlatforms.size > 0,
+              ok: creativePlatforms.size > 0,
+              source: "sheet",
+              rows: data.ads.length,
+              creatives: creatives.length,
+              syncedAt: data.snapshot.syncedAt,
+              message: `${creatives.length} creative resources are available.`,
+            };
+
+        if (filters.channel === "organic") {
+          return json({
+            rows: [] as CreativeAnalyticsRow[],
+            health,
+            facets: { accounts: [], campaigns: [], adsets: [], statuses: [], reviewStatuses: [] },
+            appliedFilters: filters,
+          });
+        }
 
         const rawRows: CreativeAnalyticsRow[] = creatives.map((creative) => {
           const performanceKey = adPerformanceKey(creative);
@@ -147,6 +192,15 @@ export const Route = createFileRoute("/api/ads-creatives")({
             statuses: unique(rows.map((row) => row.status)),
             reviewStatuses: unique(rows.map((row) => row.reviewStatus)),
           },
+          sync: metaSync
+            ? {
+                mode: "meta-direct",
+                requested: metaSync.requested,
+                fetched: metaSync.fetched,
+                failed: metaSync.failed,
+                persisted: metaSync.persisted,
+              }
+            : null,
           appliedFilters: filters,
         });
       },

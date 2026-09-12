@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  BadgeCheck,
   ExternalLink,
   Film,
   Image as ImageIcon,
@@ -17,6 +18,13 @@ import { Skeleton } from "@/components/ui-bits";
 interface CreativeResponse {
   rows: CreativeAnalyticsRow[];
   health: PlatformSourceHealth;
+  sync?: {
+    mode: "meta-direct";
+    requested: number;
+    fetched: number;
+    failed: number;
+    persisted: boolean;
+  } | null;
 }
 
 type CreativeSort = "won" | "leads" | "ctr" | "spend" | "roas";
@@ -260,6 +268,12 @@ export function CampaignCreativeGallery({
           </div>
           {!isLoading && rows.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5 text-[9.5px] text-text-muted">
+              {data?.health.source === "api" && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 font-semibold text-emerald-700">
+                  <BadgeCheck size={11} />
+                  {lang === "ar" ? "Meta API مباشر" : "Direct Meta API"}
+                </span>
+              )}
               <span className="rounded-full border border-border bg-surface px-2 py-1">
                 {fmtNum(rows.length)} {lang === "ar" ? "كرياتيف" : "creatives"}
               </span>
@@ -323,8 +337,8 @@ export function CampaignCreativeGallery({
           </h5>
           <p className="mx-auto mt-1 max-w-md text-[10.5px] leading-5 text-text-muted" dir="auto">
             {lang === "ar"
-              ? `الحملة «${campaignName}» موجودة في أرقام الأداء، لكن Meta Creative Catalog لم يرسل الصورة والنص الخاصين بها بعد.`
-              : `“${campaignName}” has performance data, but its image and copy have not reached the Meta Creative Catalog yet.`}
+              ? `الحملة «${campaignName}» موجودة في أرقام الأداء، لكن Meta لم ترجع محتوى للإعلانات المطابقة حاليًا.`
+              : `“${campaignName}” has performance data, but Meta returned no content for its matching ads.`}
           </p>
         </div>
       ) : (
