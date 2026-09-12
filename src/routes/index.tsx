@@ -81,6 +81,7 @@ import { fxRatesFromFilters } from "@/lib/fx-rates";
 import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import type { PerfRow } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 
 export const Route = createFileRoute("/")({ component: Overview });
 
@@ -508,6 +509,7 @@ function Overview() {
   }
 
   const { totals: T, deltas, health } = data;
+  const spendByPlatform = resolveSpendByPlatform(T);
 
   // Sparklines are drawn from the same daily series the trend charts use — the
   // response's own numbers, never a curve invented to fill the slot. A metric
@@ -694,17 +696,14 @@ function Overview() {
               card={{
                 index: 1,
                 spark: seriesOf("spend"),
-                sub: [
-                  `${lang === "ar" ? "ميتا" : "Meta"} ${fmtUSD(T.spendMeta)}`,
-                  `${lang === "ar" ? "سناب" : "Snap"} ${fmtUSD(T.spendSnap)}`,
-                  T.spendTikTok > 0
-                    ? `${lang === "ar" ? "تيك توك" : "TikTok"} ${fmtUSD(T.spendTikTok)}`
-                    : "",
-                  T.spendGoogle > 0
-                    ? `${lang === "ar" ? "جوجل" : "Google"} ${fmtUSD(T.spendGoogle)}`
-                    : "",
-                ]
-                  .filter(Boolean)
+                sub: PLATFORMS.map((platform) => ({
+                  platform,
+                  spend: spendByPlatform[platform],
+                }))
+                  .filter(({ spend }) => spend > 0)
+                  .map(
+                    ({ platform, spend }) => `${PLATFORM_LABEL[platform][lang]} ${fmtUSD(spend)}`,
+                  )
                   .join(" · "),
               }}
             />

@@ -1,6 +1,6 @@
 // Shared types (client + server-safe)
 
-export type Platform = "meta" | "snapchat" | "tiktok" | "google";
+export type Platform = "meta" | "snapchat" | "tiktok" | "google" | "chatgpt";
 
 /** A top-level acquisition filter. Organic has no ad-platform fact rows. */
 export type AcquisitionChannel = Platform | "organic";
@@ -86,6 +86,53 @@ export interface AdRow {
   platformLeads: number | null;
   viewCompletions: number | null;
   syncedAt: string;
+}
+
+/**
+ * Slowly-changing creative metadata, kept separate from one-ad-by-one-day
+ * delivery facts. Stable platform IDs join this record to AdRow/CRM/Accounting.
+ */
+export interface AdCreative {
+  platform: Platform;
+  account: string;
+  accountId: string;
+  campaign: string;
+  campaignId: string;
+  campaignKey: string;
+  adset: string;
+  adsetId: string;
+  ad: string;
+  adId: string;
+  creativeType: string;
+  /** OpenAI Ads media identifier when the creative uses an uploaded asset. */
+  fileId?: string;
+  headline: string;
+  body: string;
+  price: string;
+  imageUrl: string;
+  landingPageUrl: string;
+  status: string;
+  reviewStatus: string;
+  reviewReason: string;
+  createdAt: string;
+  updatedAt: string;
+  syncedAt: string;
+}
+
+/** Creative resource enriched with date-scoped delivery and Odoo outcomes. */
+export interface CreativeAnalyticsRow extends AdCreative {
+  performanceKey: string;
+  spend: Maybe;
+  impressions: Maybe;
+  clicksAll: Maybe;
+  ctrAll: Maybe;
+  cpc: Maybe;
+  platformLeads: Maybe;
+  crmLeads: number;
+  won: number;
+  lost: number;
+  revenue: number;
+  roas: Maybe;
 }
 
 export interface CrmLeadRow {
@@ -297,6 +344,8 @@ export type Maybe = number | null;
 export interface Totals {
   /* spend side */
   spend: number;
+  /** Scalable platform split. Legacy named fields below remain API-compatible. */
+  spendByPlatform: Record<Platform, number>;
   spendMeta: number;
   spendSnap: number;
   spendTikTok: number;
@@ -480,6 +529,17 @@ export interface CampaignPlatformHealth {
   checkedAt: string;
 }
 
+/** Non-sensitive availability/freshness summary for one paid-media connector. */
+export interface PlatformSourceHealth {
+  configured: boolean;
+  ok: boolean;
+  source: "api" | "postgres" | "postgres-last-good" | "sheet" | "none";
+  rows: number;
+  creatives: number;
+  syncedAt: string;
+  message: string;
+}
+
 /**
  * The platform's current operational truth, kept separate from historical ad
  * rows so a status snapshot can never inflate spend or move reporting dates.
@@ -632,6 +692,8 @@ export interface FunnelStep {
 }
 
 export interface DataHealth {
+  /** Connector-level diagnostics. Optional keeps older cached API payloads compatible. */
+  platformSources?: Partial<Record<Platform, PlatformSourceHealth>>;
   /** Authoritative CRM source used for this snapshot. */
   crmAuthority: "google-sheet" | "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
   /** Archived Lost is fail-closed and falls back only to its PostgreSQL last-good copy. */

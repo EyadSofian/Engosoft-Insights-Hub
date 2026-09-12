@@ -147,7 +147,7 @@ describe("panel — welcome and messages", () => {
       "حملات تحتاج مراجعة",
     );
     expect(screen.getByTestId("nexus-notification-context")).toHaveTextContent(
-      "2026-09-01 → 2026-09-09",
+      "من ١ سبتمبر ٢٠٢٦ إلى ٩ سبتمبر ٢٠٢٦",
     );
     expect(screen.queryByTestId("nexus-welcome")).toBeNull();
     await waitFor(() => expect(state.sendMessage).toHaveBeenCalledTimes(1));

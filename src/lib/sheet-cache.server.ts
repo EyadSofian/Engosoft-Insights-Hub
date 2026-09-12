@@ -24,6 +24,11 @@ import { odooConfigured } from "./odoo.server";
 import { fetchGoogleAds } from "./google-ads.server";
 import { fetchTikTokAds } from "./tiktok.server";
 import {
+  fetchOpenAIAds,
+  openAIAdsConfigured,
+  type OpenAIAdsFetchResult,
+} from "./openai-ads.server";
+import {
   canonicalCourseValue,
   courseFromMarketingName,
   isKnownCourse,
@@ -45,6 +50,7 @@ import {
 } from "./dashboard-db.server";
 import type {
   AdRow,
+  AdCreative,
   AdSetOrigin,
   AccountingRow,
   CampaignObjective,
@@ -128,6 +134,8 @@ export interface Snapshot {
    *  failing is not re-fetched on every single request. */
   lastAttemptAt: number;
   ads: AdRow[];
+  /** Creative resources are separate from daily delivery facts. */
+  creatives: AdCreative[];
   /** Latest operational campaign snapshot, kept out of historical ad facts. */
   campaignStates: CampaignOperationalState[];
   crm: CrmLeadRow[];
@@ -1091,6 +1099,29 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         syncedAt: "",
         errors: [error instanceof Error ? error.message : String(error)],
       }));
+    const safeOpenAI = (): Promise<OpenAIAdsFetchResult> =>
+      fetchOpenAIAds(refreshRemoteSources).catch((error: unknown) => {
+        const checkedAt = new Date().toISOString();
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          configured: openAIAdsConfigured(),
+          rows: [],
+          creatives: [],
+          campaigns: [],
+          syncedAt: "",
+          source: "none",
+          errors: [message],
+          warnings: [],
+          health: {
+            platform: "chatgpt",
+            ok: false,
+            active: 0,
+            total: 0,
+            message,
+            checkedAt,
+          },
+        };
+      });
     const [
       accountingPrimaryRaw,
       websiteSalesRawFromSheet,
@@ -1098,6 +1129,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       tiktokRaw,
       tiktokResult,
       googleResult,
+      openAIResult,
     ] = await Promise.all([
       accountingStored?.rows.length
         ? Promise.resolve([])
@@ -1109,6 +1141,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       safeFetch(TAB.tiktok, looksLikeAdsExport),
       safeTikTok(),
       safeGoogle(),
+      safeOpenAI(),
     ]);
     const websiteSalesRaw = websiteSalesStored?.rows.length
       ? websiteSalesStored.rows
@@ -1161,6 +1194,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const tiktokApiUsable = tiktokResult.configured && tiktokResult.errors.length === 0;
     fetchErrors.push(...googleResult.errors.map((error) => `Google Ads: ${error}`));
     const googleApiUsable = googleResult.configured && googleResult.errors.length === 0;
+    fetchErrors.push(...openAIResult.errors.map((error) => `ChatGPT Ads: ${error}`));
+    const openAIApiUsable = openAIResult.source === "api" && openAIResult.health.ok;
     // Existing deployments still expose the same paid invoice lines as `Sales`.
     // Always read it as an acceptance baseline: a newly-created Accounting tab
     // may contain a valid header and only part of the year. Switching on the
@@ -1536,6 +1571,14 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       keys.learn(r.campaignId, r.campaign);
       adsets.learn(r.adId, r.ad, r.adset);
     }
+    for (const r of openAIResult.rows) {
+      keys.learn(r.campaignId, r.campaign);
+      adsets.learn(r.adId, r.ad, r.adset);
+    }
+    for (const r of openAIResult.creatives) {
+      keys.learn(r.campaignId, r.campaign);
+      adsets.learn(r.adId, r.ad, r.adset);
+    }
     // CRM and invoices also pair ids with names; learning from them lets a
     // name-only row on one tab join an id-bearing row on another.
     for (const r of crmRaw) keys.learn(str(r["Campaign ID"]), str(r["Campaign Name"]));
@@ -1606,7 +1649,9 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       // dashboard lists the platform's current Active campaigns only.
       if (deliveryState !== "active") return [];
       const rawPlatform = str(state.platform);
-      const platform: Platform = ["meta", "snapchat", "tiktok", "google"].includes(rawPlatform)
+      const platform: Platform = ["meta", "snapchat", "tiktok", "google", "chatgpt"].includes(
+        rawPlatform,
+      )
         ? (rawPlatform as Platform)
         : "meta";
       return [
@@ -1830,7 +1875,43 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       };
     });
 
-    const currentAds = [...meta, ...snap, ...tiktok, ...google];
+    const chatgpt: AdRow[] = openAIResult.rows.map((r) => {
+      objectiveByAccount.set(r.account, r.objective);
+      return {
+        platform: "chatgpt" as const,
+        date: r.date,
+        account: r.account,
+        accountId: r.accountId,
+        objective: r.objective,
+        campaign: r.campaign,
+        campaignId: r.campaignId,
+        campaignKey: keys.key(r.campaignId, r.campaign),
+        adset: r.adset,
+        adsetId: r.adsetId,
+        ad: r.ad,
+        adId: r.adId,
+        spend: r.spend,
+        impressions: r.impressions,
+        clicksAll: r.clicks,
+        // The OpenAI report exposes general ad clicks, not Meta link clicks.
+        linkClicks: null,
+        platformLeads: r.conversions,
+        viewCompletions: null,
+        syncedAt: r.syncedAt,
+      };
+    });
+    const creatives = openAIResult.creatives.map((creative) => ({
+      ...creative,
+      campaignKey: keys.key(creative.campaignId, creative.campaign),
+    }));
+    campaignStates.push(
+      ...openAIResult.campaigns.map((campaign) => ({
+        ...campaign,
+        campaignKey: keys.key(campaign.campaignId, campaign.name),
+      })),
+    );
+
+    const currentAds = [...meta, ...snap, ...tiktok, ...google, ...chatgpt];
     const adFactKey = (row: AdRow) =>
       [
         row.platform,
@@ -2481,6 +2562,18 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
             },
           ]
         : []),
+      ...(openAIResult.configured || openAIResult.source === "postgres-last-good"
+        ? [
+            {
+              key: "chatgpt",
+              label:
+                openAIResult.source === "api"
+                  ? "ChatGPT Ads API"
+                  : "ChatGPT Ads (PostgreSQL last-good)",
+              syncedAt: openAIResult.syncedAt,
+            },
+          ]
+        : []),
       {
         key: "crm",
         label:
@@ -2612,6 +2705,17 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const negativeRows = accounting.filter((r) => r.usdPaid < 0);
 
     const health: DataHealth = {
+      platformSources: {
+        chatgpt: {
+          configured: openAIResult.configured,
+          ok: openAIApiUsable,
+          source: openAIResult.source,
+          rows: chatgpt.length,
+          creatives: creatives.length,
+          syncedAt: openAIResult.syncedAt,
+          message: openAIResult.health.message,
+        },
+      },
       crmAuthority,
       lostAuthority,
       lostDateBasis:
@@ -2676,6 +2780,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       fetchedAt: Date.now(),
       lastAttemptAt: Date.now(),
       ads,
+      creatives,
       campaignStates,
       crm,
       invoiced,
@@ -2717,8 +2822,10 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     // Lost Analysis tab passed as a healthy load and cached zeros for the full
     // TTL — the Website Analysis page reading empty was exactly this. Any tab
     // that previously carried rows and now carries none fails the check.
-    const emptied = (rows: unknown[], key: string) =>
-      !rows.length && !!previous && (previous[key as keyof Snapshot] as unknown[]).length > 0;
+    const emptied = (rows: unknown[], key: keyof Snapshot) => {
+      const previousRows = previous?.[key];
+      return !rows.length && Array.isArray(previousRows) && previousRows.length > 0;
+    };
     const empty =
       (!next.ads.length && !next.crm.length && !next.invoiced.length && !next.accounting.length) ||
       emptied(next.websiteSales, "websiteSales") ||
@@ -2726,6 +2833,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       emptied(next.crm, "crm") ||
       emptied(next.invoiced, "invoiced") ||
       emptied(next.accounting, "accounting") ||
+      emptied(next.creatives, "creatives") ||
       emptied(next.ads, "ads");
     if (empty && previous) {
       // Dataset-level fallbacks above already preserve every healthy source.

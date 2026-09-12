@@ -24,7 +24,7 @@ import type {
   Totals,
 } from "@/lib/types";
 import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
-import { PLATFORM_LABEL } from "@/lib/constants";
+import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 
@@ -96,12 +96,8 @@ const series = (rows: OverviewResp["trend"], metric: "spend" | "revenue" | "lead
 /* --- shared breakdown builders ------------------------------------------- */
 
 function platformSpendRows(totals: Totals, lang: Lang): MetricBreakdownRow[] {
-  const entries: [Platform, number][] = [
-    ["meta", totals.spendMeta],
-    ["snapchat", totals.spendSnap],
-    ["tiktok", totals.spendTikTok],
-    ["google", totals.spendGoogle],
-  ];
+  const spendByPlatform = resolveSpendByPlatform(totals);
+  const entries = PLATFORMS.map((platform) => [platform, spendByPlatform[platform]] as const);
   return topRows(
     entries.map(([platform, spend]) => ({
       key: platform,
@@ -111,7 +107,7 @@ function platformSpendRows(totals: Totals, lang: Lang): MetricBreakdownRow[] {
       meta: totals.spend > 0 ? fmtPct((spend / totals.spend) * 100, 1) : undefined,
       tone: "rose" as const,
     })),
-    4,
+    PLATFORMS.length,
   );
 }
 

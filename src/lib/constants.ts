@@ -1,12 +1,13 @@
 import type { AcquisitionChannel, Platform } from "./types";
 
-export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok", "google"];
+export const PLATFORMS: Platform[] = ["meta", "snapchat", "tiktok", "google", "chatgpt"];
 
 export const PLATFORM_LABEL: Record<Platform, { ar: string; en: string }> = {
   meta: { ar: "ميتا", en: "Meta" },
   snapchat: { ar: "سناب شات", en: "Snapchat" },
   tiktok: { ar: "تيك توك", en: "TikTok" },
   google: { ar: "جوجل", en: "Google Ads" },
+  chatgpt: { ar: "إعلانات ChatGPT", en: "ChatGPT Ads" },
 };
 
 /**
@@ -27,6 +28,7 @@ export const PLATFORM_COLOR: Record<Platform, string> = {
   snapchat: "var(--chart-2)",
   tiktok: "var(--chart-4)",
   google: "var(--chart-3)",
+  chatgpt: "#10a37f",
 };
 
 export const ACQUISITION_CHANNEL_COLOR: Record<AcquisitionChannel, string> = {
@@ -40,7 +42,33 @@ export const PLATFORM_GAPS: Record<Platform, string[]> = {
   snapchat: ["linkClicks", "ctrLink"],
   tiktok: ["linkClicks", "ctrLink"],
   google: ["linkClicks", "ctrLink"],
+  chatgpt: ["linkClicks", "ctrLink", "viewCompletions"],
 };
+
+/**
+ * Read the scalable platform map while remaining compatible with snapshots
+ * produced before `spendByPlatform` existed.
+ */
+export function resolveSpendByPlatform(totals: {
+  spendByPlatform?: Partial<Record<Platform, number>>;
+  spendMeta?: number;
+  spendSnap?: number;
+  spendTikTok?: number;
+  spendGoogle?: number;
+}): Record<Platform, number> {
+  const legacy: Partial<Record<Platform, number>> = {
+    meta: totals.spendMeta,
+    snapchat: totals.spendSnap,
+    tiktok: totals.spendTikTok,
+    google: totals.spendGoogle,
+  };
+  return Object.fromEntries(
+    PLATFORMS.map((platform) => {
+      const candidate = totals.spendByPlatform?.[platform] ?? legacy[platform] ?? 0;
+      return [platform, Number.isFinite(candidate) ? candidate : 0];
+    }),
+  ) as Record<Platform, number>;
+}
 
 /**
  * Public URL of this deployment, used for the link at the end of each report.

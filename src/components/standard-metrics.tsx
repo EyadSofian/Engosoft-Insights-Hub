@@ -1,7 +1,7 @@
 import { Award, DollarSign, Percent, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, type Lang } from "@/lib/i18n";
 import type { Deltas, PerfRow, Platform, Totals } from "@/lib/types";
-import { PLATFORM_LABEL } from "@/lib/constants";
+import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import {
   topRows,
@@ -107,6 +107,7 @@ export function standardMetrics({
   caveats = {},
 }: StandardMetricInputs): Record<StandardMetricKey, MetricDetail> {
   const A = lang === "ar";
+  const spendByPlatform = resolveSpendByPlatform(T);
   const series = (metric: "spend" | "revenue" | "leads" | "won") => {
     const points = trend
       .filter((row) => typeof row[metric] === "number")
@@ -221,8 +222,11 @@ export function standardMetrics({
         : undefined),
     trend: trendFor("spend", A ? "حركة الإنفاق" : "Spend over the period", fmtUSD),
     supporting: [
-      { key: "meta", label: PLATFORM_LABEL.meta[lang], value: fmtUSD(T.spendMeta) },
-      { key: "snap", label: PLATFORM_LABEL.snapchat[lang], value: fmtUSD(T.spendSnap) },
+      ...PLATFORMS.map((platform) => ({
+        key: platform,
+        label: PLATFORM_LABEL[platform][lang],
+        value: fmtUSD(spendByPlatform[platform]),
+      })),
       { key: "cpm", label: "CPM", value: fmtUSDFull(T.cpm) },
       { key: "cpc", label: "CPC", value: fmtUSDFull(T.cpc) },
     ],

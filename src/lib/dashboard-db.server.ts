@@ -11,6 +11,8 @@ import { Pool, type PoolClient } from "pg";
 export type DashboardDataset =
   | "meta_ads"
   | "snap_ads"
+  | "chatgpt_ads"
+  | "chatgpt_ad_creatives"
   | "accounting"
   | "accounting_legacy"
   | "ads_legacy"
@@ -61,6 +63,8 @@ export interface DatasetWriteResult {
 const DATASETS = new Set<DashboardDataset>([
   "meta_ads",
   "snap_ads",
+  "chatgpt_ads",
+  "chatgpt_ad_creatives",
   "accounting",
   "accounting_legacy",
   "ads_legacy",
@@ -216,7 +220,7 @@ function baseStableKey(dataset: DashboardDataset, row: DashboardRow): string {
   const explicit = first(row, candidates[dataset] ?? []);
   if (explicit) return `${dataset}:${explicit}`;
 
-  if (["meta_ads", "snap_ads", "ads_legacy"].includes(dataset)) {
+  if (["meta_ads", "snap_ads", "chatgpt_ads", "ads_legacy"].includes(dataset)) {
     const parts = [
       first(row, ["Date", "date", "التاريخ"]),
       first(row, ["__account_id", "Account ID", "accountId"]),
@@ -225,6 +229,12 @@ function baseStableKey(dataset: DashboardDataset, row: DashboardRow): string {
       first(row, ["__ad_id", "Ad ID", "adId"]),
     ];
     if (parts.some(Boolean)) return `${dataset}:fact:${parts.join("\u001f")}`;
+  }
+
+  if (dataset === "chatgpt_ad_creatives") {
+    const adId = first(row, ["adId", "Ad ID", "__ad_id"]);
+    const accountId = first(row, ["accountId", "Account ID", "__account_id"]);
+    if (adId) return `${dataset}:creative:${accountId}\u001f${adId}`;
   }
 
   // Order references and invoice moves are deliberately not used alone. They

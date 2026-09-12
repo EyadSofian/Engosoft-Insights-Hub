@@ -8,7 +8,7 @@ import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "../src/lib/cons
 
 assert.deepEqual(
   ACQUISITION_CHANNELS,
-  ["organic", "meta", "snapchat", "tiktok", "google"],
+  ["organic", "meta", "snapchat", "tiktok", "google", "chatgpt"],
   "Organic must remain the first visible channel after All on narrow screens",
 );
 assert.match(
@@ -48,7 +48,14 @@ for (const source of [
 
 assert.equal(isOrganicSourceKey("  Website  "), true, "source matching ignores outer whitespace");
 assert.equal(isOrganicSourceKey("FACEBOOK"), false, "paid matching ignores case");
+assert.equal(isOrganicSourceKey("ChatGPT Ads"), false, "ChatGPT paid traffic is not Organic");
+assert.equal(
+  isOrganicSourceKey("chatgpt.com"),
+  true,
+  "unpaid ChatGPT referrals remain Organic unless the source is explicitly paid",
+);
 assert.equal(acquisitionChannel({ platform: "meta" }), "meta");
+assert.equal(acquisitionChannel({ platform: "chatgpt" }), "chatgpt");
 assert.equal(acquisitionChannel({ channel: "organic" }), "organic");
 assert.equal(
   acquisitionChannel({ platform: "meta", channel: "organic" }),

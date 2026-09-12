@@ -111,9 +111,9 @@ export function MetricCard({
   tone?: AnyTone;
   note?: string;
   /**
-   * Opens this figure's drill-down. When set the card becomes a real button —
-   * it used to be a `div` with a click handler, which no keyboard could reach
-   * and no screen reader announced as anything at all.
+   * Opens this figure's drill-down. When set the card becomes a keyboard-
+   * accessible button-like control. It deliberately stays a `div` so the
+   * glossary's own information button is not nested inside another button.
    */
   onClick?: () => void;
   actionLabel?: string;
@@ -125,17 +125,28 @@ export function MetricCard({
   const unavailable = !!unavailableReason;
   const family = tone ?? METRIC_TONE[metric] ?? "slate";
   const interactive = Boolean(onClick);
-  const Tag = interactive ? "button" : "div";
   const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
 
   return (
-    <Tag
-      type={interactive ? "button" : undefined}
+    <div
       className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       }`}
       style={{ ...toneVars(family), "--i": index } as React.CSSProperties}
       onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
       aria-haspopup={interactive ? "dialog" : undefined}
       aria-label={interactive ? (ariaLabel ?? `${copy.label} — ${cue}`) : undefined}
       data-metric-trigger={interactive ? "" : undefined}
@@ -201,7 +212,7 @@ export function MetricCard({
           </span>
         </div>
       )}
-    </Tag>
+    </div>
   );
 }
 

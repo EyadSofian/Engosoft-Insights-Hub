@@ -22,7 +22,8 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
       platform === "meta" ||
       platform === "snapchat" ||
       platform === "tiktok" ||
-      platform === "google"
+      platform === "google" ||
+      platform === "chatgpt"
         ? (platform as Platform)
         : undefined,
     channel: p.get("channel") === "organic" ? "organic" : undefined,

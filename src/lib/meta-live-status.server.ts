@@ -38,7 +38,7 @@ const statusAge = (value: LiveStatusResponse): number => {
 function parseLiveStatus(raw: Partial<LiveStatusResponse>): LiveStatusResponse | null {
   if (!raw.ok || !Array.isArray(raw.campaigns) || !text(raw.generatedAt)) return null;
 
-  const platforms = new Set<Platform>(["meta", "snapchat", "tiktok", "google"]);
+  const platforms = new Set<Platform>(["meta", "snapchat", "tiktok", "google", "chatgpt"]);
   const campaigns = raw.campaigns
     .map((row) => {
       const platform = platforms.has(row.platform as Platform)

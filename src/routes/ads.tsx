@@ -8,6 +8,7 @@ import {
   Globe2,
   Handshake,
   Info,
+  Images,
   MousePointerClick,
   Percent,
   Presentation,
@@ -45,9 +46,15 @@ import { FilterSummary } from "@/components/ads/FilterSummary";
 import { MiniFunnel } from "@/components/ads/MiniFunnel";
 import { PlatformSwitcher, type PlatformCoverage } from "@/components/ads/PlatformSwitcher";
 import { PerfExplorer, type Grain } from "@/components/ads/PerfExplorer";
+import { CreativeAnalytics } from "@/components/ads/CreativeAnalytics";
 import { ratioCell } from "@/components/ads/cells";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
-import { ACQUISITION_CHANNEL_LABEL, PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
+import {
+  ACQUISITION_CHANNEL_LABEL,
+  PLATFORM_COLOR,
+  PLATFORM_LABEL,
+  resolveSpendByPlatform,
+} from "@/lib/constants";
 import { acquisitionChannel } from "@/lib/acquisition-channel";
 import type { AcquisitionChannel, DataHealth, Maybe, PerfRow, Platform, Totals } from "@/lib/types";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
@@ -254,9 +261,10 @@ function Ads() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
+  const [view, setView] = useState<"performance" | "creatives">("performance");
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
-  useRegisterNexusView("ads", { tab: grain });
+  useRegisterNexusView("ads", { tab: view === "performance" ? grain : "creatives" });
   const [showAllKpis, setShowAllKpis] = useState(false);
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/ads?grain=${grain}`);
 
@@ -347,7 +355,43 @@ function Ads() {
           }
           period={reportingPeriod}
         />
-        <MetricsGlossaryButton className="mt-0.5" />
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="inline-flex rounded-lg border border-border bg-surface p-1"
+            role="tablist"
+            aria-label={lang === "ar" ? "عرض الإعلانات" : "Ads view"}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "performance"}
+              onClick={() => setView("performance")}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                view === "performance"
+                  ? "bg-brand-soft text-brand"
+                  : "text-text-muted hover:bg-surface-2"
+              }`}
+            >
+              <BarChart3 size={14} />
+              {lang === "ar" ? "الأداء" : "Performance"}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "creatives"}
+              onClick={() => setView("creatives")}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                view === "creatives"
+                  ? "bg-emerald-500/10 text-emerald-700"
+                  : "text-text-muted hover:bg-surface-2"
+              }`}
+            >
+              <Images size={14} />
+              {lang === "ar" ? "الكرياتيف" : "Creatives"}
+            </button>
+          </div>
+          <MetricsGlossaryButton className="mt-0.5" />
+        </div>
       </div>
 
       <FilterSummary />
@@ -385,7 +429,9 @@ function Ads() {
             allCoverage={coverage}
           />
 
-          {nothingAtAll ? (
+          {view === "creatives" ? (
+            <CreativeAnalytics selected={selected} />
+          ) : nothingAtAll ? (
             <Card>
               <EmptyState
                 label={
@@ -794,12 +840,10 @@ function GrainPill({ grain }: { grain: Grain }) {
 
 function SpendSplit({ totals }: { totals: Totals }) {
   const { lang } = useI18n();
-  const parts = [
-    totals.spendMeta > 0 ? `${PLATFORM_LABEL.meta[lang]} ${fmtUSD(totals.spendMeta)}` : "",
-    totals.spendSnap > 0 ? `${PLATFORM_LABEL.snapchat[lang]} ${fmtUSD(totals.spendSnap)}` : "",
-    totals.spendTikTok > 0 ? `${PLATFORM_LABEL.tiktok[lang]} ${fmtUSD(totals.spendTikTok)}` : "",
-    totals.spendGoogle > 0 ? `${PLATFORM_LABEL.google[lang]} ${fmtUSD(totals.spendGoogle)}` : "",
-  ].filter(Boolean);
+  const split = resolveSpendByPlatform(totals);
+  const parts = Object.entries(split)
+    .filter((entry): entry is [Platform, number] => entry[0] in PLATFORM_LABEL && entry[1] > 0)
+    .map(([platform, spend]) => `${PLATFORM_LABEL[platform][lang]} ${fmtUSD(spend)}`);
   return <>{parts.join(" · ")}</>;
 }
 
@@ -993,6 +1037,43 @@ function PlatformState({
         {lang === "ar"
           ? `التقرير ده بيجمع مصادر Odoo غير المدفوعة زي الموقع وUChat وواتساب والترشيحات والمكالمات والـwebinars. فيه ${fmtNum(coverage.crmLeads)} عميل، ${fmtNum(coverage.won)} صفقة رابحة، وتحصيل ${fmtUSD(coverage.revenue)}. الإنفاق الإعلاني صفر لأن الصفوف دي مش من منصات الإعلانات.`
           : `This view groups non-paid Odoo sources such as Website, UChat, WhatsApp, recommendations, phone calls and webinars. It contains ${fmtNum(coverage.crmLeads)} leads, ${fmtNum(coverage.won)} won deals and ${fmtUSD(coverage.revenue)} collected. Paid-media spend is zero because these rows do not come from ad platforms.`}
+      </Notice>
+    );
+  }
+
+  const chatgptHealth = selected === "chatgpt" ? health.platformSources?.chatgpt : undefined;
+  if (chatgptHealth && (!chatgptHealth.configured || !chatgptHealth.ok)) {
+    const lastGood = chatgptHealth.source === "postgres-last-good";
+    return (
+      <Notice
+        tone="warning"
+        title={
+          !chatgptHealth.configured
+            ? lang === "ar"
+              ? "إعلانات ChatGPT محتاجة مفتاح API"
+              : "ChatGPT Ads needs an API key"
+            : lastGood
+              ? lang === "ar"
+                ? "إعلانات ChatGPT: آخر نسخة سليمة"
+                : "ChatGPT Ads: last-good snapshot"
+              : lang === "ar"
+                ? "اتصال إعلانات ChatGPT يحتاج مراجعة"
+                : "ChatGPT Ads connection needs attention"
+        }
+        icon={<Info size={16} />}
+      >
+        {!chatgptHealth.configured
+          ? lang === "ar"
+            ? "أضف OPENAI_ADS_API_KEY كمتغير سري على السيرفر. كل باقي المنصات مستمرة بشكل طبيعي، ومفيش إنفاق افتراضي بيتضاف."
+            : "Add OPENAI_ADS_API_KEY as a server secret. Every other platform continues normally and no synthetic spend is introduced."
+          : lastGood
+            ? lang === "ar"
+              ? "الـAPI المباشر غير متاح حاليًا، فالأرقام جاية من PostgreSQL last-good ومعلّمة كمعلومات قديمة."
+              : "The live API is currently unavailable, so figures come from PostgreSQL last-good and remain marked as stale."
+            : chatgptHealth.message ||
+              (lang === "ar"
+                ? "المفتاح موجود لكن القراءة المباشرة فشلت. باقي مصادر الإعلانات لم تتأثر."
+                : "The key exists, but the live read failed. Other advertising sources are unaffected.")}
       </Notice>
     );
   }

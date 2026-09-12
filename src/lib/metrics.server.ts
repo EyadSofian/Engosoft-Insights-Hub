@@ -19,6 +19,7 @@ import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
+import { fetchOpenAIAds } from "./openai-ads.server";
 import { isOperationalStateCurrent } from "./campaign-status-policy";
 import { leadStageBucket } from "./uncalled-leads";
 import type {
@@ -108,6 +109,16 @@ const dimensionPart = (value: string) => normalizeName(value) || "unknown";
 const dimensionPair = (campaignKey: string, value: string) =>
   `${campaignKey || "no-campaign"}|${dimensionPart(value)}`;
 
+/** Stable key used by ad drill-downs and creative-to-performance joins. */
+export function adPerformanceKey(
+  row: Pick<AdRow, "platform" | "accountId" | "account" | "adId" | "campaignKey" | "ad">,
+): string {
+  const accountPart = dimensionPart(row.accountId || row.account);
+  return row.adId
+    ? `ad:${row.platform}:${accountPart}:${row.adId}`
+    : `ad-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.ad)}`;
+}
+
 /**
  * Stable campaign/ad-set/ad identities shared by filtering and aggregation.
  *
@@ -162,9 +173,7 @@ class PerformanceDimensionIndex {
         ? `adset:${row.platform}:${accountPart}:${row.adsetId}`
         : `adset-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.adset)}`
       : UNKNOWN_ADSET;
-    const adKey = row.adId
-      ? `ad:${row.platform}:${accountPart}:${row.adId}`
-      : `ad-name:${row.campaignKey || "no-campaign"}:${dimensionPart(row.ad)}`;
+    const adKey = adPerformanceKey(row);
     return { adsetKey, adKey };
   }
 
@@ -640,22 +649,21 @@ export function computeTotals(data: FilteredData): Totals {
   const { ads, crm, invoiced, accounting, cpaBasis } = data;
 
   const spend = sum(ads, (a) => a.spend);
-  const spendMeta = sum(
-    ads.filter((a) => a.platform === "meta"),
-    (a) => a.spend,
-  );
-  const spendSnap = sum(
-    ads.filter((a) => a.platform === "snapchat"),
-    (a) => a.spend,
-  );
-  const spendTikTok = sum(
-    ads.filter((a) => a.platform === "tiktok"),
-    (a) => a.spend,
-  );
-  const spendGoogle = sum(
-    ads.filter((a) => a.platform === "google"),
-    (a) => a.spend,
-  );
+  const spendByPlatform = Object.fromEntries(
+    PLATFORMS.map((platform) => [
+      platform,
+      sum(
+        ads.filter((row) => row.platform === platform),
+        (row) => row.spend,
+      ),
+    ]),
+  ) as Record<Platform, number>;
+  // Named fields remain for existing API consumers while new clients use the
+  // platform-indexed map and automatically pick up future integrations.
+  const spendMeta = spendByPlatform.meta;
+  const spendSnap = spendByPlatform.snapchat;
+  const spendTikTok = spendByPlatform.tiktok;
+  const spendGoogle = spendByPlatform.google;
   const nonLeadSpend = sum(
     ads.filter((a) => a.objective !== "leads"),
     (a) => a.spend,
@@ -730,6 +738,7 @@ export function computeTotals(data: FilteredData): Totals {
 
   return {
     spend,
+    spendByPlatform,
     spendMeta,
     spendSnap,
     spendTikTok,
@@ -1141,8 +1150,9 @@ function platformBalancedRows(rows: PerfRow[], limit: number): PerfRow[] {
  * Operational "running now" signal.
  *
  * The official campaign switch comes from the platform APIs. Google Ads is
- * read directly by this server; Meta, Snapchat and TikTok use the shared live
- * status collector. Recent spend is reporting context only.
+ * read directly by this server; ChatGPT Ads is read from the same official API,
+ * while Meta, Snapchat and TikTok use the shared live status collector. Recent
+ * spend is reporting context only.
  */
 export async function computeRecentCampaignActivity(
   filters: GlobalFilters,
@@ -1261,26 +1271,33 @@ export async function computeRecentCampaignActivity(
 
   // Spend never decides whether a campaign is Active. Google is deliberately
   // read direct here so its OAuth authority cannot drift from the reporting API.
-  const [live, googleDirect] = await Promise.all([
+  const [live, googleDirect, openAIDirect] = await Promise.all([
     loadMetaLiveStatus(),
     fetchGoogleAdsCampaignStatus(),
+    fetchOpenAIAds(),
   ]);
   const collectorStates: CampaignOperationalState[] = (live?.campaigns ?? [])
-    .filter((state) => state.platform !== "google")
+    .filter((state) => state.platform !== "google" && state.platform !== "chatgpt")
     .map((state) => ({
       ...state,
       campaignKey: `id:${state.campaignId}`,
     }));
-  const directStates = googleDirect.health.ok
-    ? [...collectorStates, ...googleDirect.campaigns]
-    : [
-        ...collectorStates,
-        ...(live?.campaigns ?? [])
-          .filter((state) => state.platform === "google")
-          .map((state) => ({ ...state, campaignKey: `id:${state.campaignId}` })),
-      ];
+  const collectorFallback = (platform: Platform) =>
+    (live?.campaigns ?? [])
+      .filter((state) => state.platform === platform)
+      .map((state) => ({ ...state, campaignKey: `id:${state.campaignId}` }));
+  // A multi-account OpenAI read can be partially healthy: keep the campaigns
+  // returned by successful keys even when another account failed. Health stays
+  // false so the UI can explain the partial source, but good direct state must
+  // not disappear behind an empty collector fallback.
+  const openAIDirectLive = openAIDirect.source === "api";
+  const directStates = [
+    ...collectorStates,
+    ...(googleDirect.health.ok ? googleDirect.campaigns : collectorFallback("google")),
+    ...(openAIDirectLive ? openAIDirect.campaigns : collectorFallback("chatgpt")),
+  ];
   const fallbackStates = history.snapshot.campaignStates;
-  const usingDirectState = !!(live || googleDirect.health.ok);
+  const usingDirectState = !!(live || googleDirect.health.ok || openAIDirectLive);
   const statePool = usingDirectState ? directStates : fallbackStates;
   const now = Date.now();
   // A stale recovery row used to resurrect campaigns long after the team had
@@ -1290,9 +1307,9 @@ export async function computeRecentCampaignActivity(
   const officialStates = currentStates.filter(acceptsState);
   const rawPlatformHealth = (() => {
     const collectorHealth = (live?.platformHealth ?? []).filter(
-      (entry) => entry.platform !== "google",
+      (entry) => entry.platform !== "google" && entry.platform !== "chatgpt",
     );
-    return [...collectorHealth, googleDirect.health];
+    return [...collectorHealth, googleDirect.health, openAIDirect.health];
   })();
   const platformHealth = usingDirectState
     ? rawPlatformHealth.map((entry) => ({
@@ -1309,13 +1326,14 @@ export async function computeRecentCampaignActivity(
         message: "",
         checkedAt: fallbackStates.find((state) => state.platform === platform)?.checkedAt || "",
       }));
-  const stateSource = googleDirect.health.ok
-    ? "platform_direct"
-    : live
-      ? "n8n_live"
-      : fallbackStates.length
-        ? "google_snapshot"
-        : "daily_proxy";
+  const stateSource =
+    googleDirect.health.ok || openAIDirectLive
+      ? "platform_direct"
+      : live
+        ? "n8n_live"
+        : fallbackStates.length
+          ? "google_snapshot"
+          : "daily_proxy";
 
   // The campaign switch ignores the date filter; only these business figures
   // follow it. This is the central distinction the UI communicates.
@@ -1386,7 +1404,11 @@ export async function computeRecentCampaignActivity(
       ...empty,
       source: stateSource,
       generatedAt:
-        googleDirect.health.checkedAt || live?.generatedAt || fallbackStates[0]?.checkedAt || "",
+        openAIDirect.health.checkedAt ||
+        googleDirect.health.checkedAt ||
+        live?.generatedAt ||
+        fallbackStates[0]?.checkedAt ||
+        "",
       platformHealth,
       delivery,
       period,
@@ -1509,6 +1531,7 @@ export async function computeRecentCampaignActivity(
     definition: "official_status",
     source: stateSource,
     generatedAt:
+      openAIDirect.health.checkedAt ||
       googleDirect.health.checkedAt ||
       live?.generatedAt ||
       Object.values(delivery).reduce(
@@ -2103,18 +2126,13 @@ export function previousPeriod(from?: string, to?: string): { from: string; to: 
   const start = new Date(a);
   const end = new Date(b);
   const sameCalendarMonth =
-    start.getUTCFullYear() === end.getUTCFullYear() &&
-    start.getUTCMonth() === end.getUTCMonth();
+    start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth();
   if (start.getUTCDate() === 1 && sameCalendarMonth) {
     const previousMonthStart = new Date(
       Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - 1, 1),
     );
-    const currentMonthEnd = new Date(
-      Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0),
-    );
-    const previousMonthEnd = new Date(
-      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 0),
-    );
+    const currentMonthEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0));
+    const previousMonthEnd = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 0));
     const comparisonDay =
       end.getUTCDate() === currentMonthEnd.getUTCDate()
         ? previousMonthEnd.getUTCDate()

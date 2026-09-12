@@ -11,7 +11,7 @@ import {
   div,
 } from "./metrics.server";
 import { loadAllData } from "./sheet-cache.server";
-import { dashboardUrl } from "./constants";
+import { dashboardUrl, PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "./constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "./course-lead-alerts";
 import type { Maybe, PerfRow, Totals } from "./types";
 
@@ -118,15 +118,11 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
 
   L.push(`💰 *${esc("الإنفاق الإعلاني")}*`);
   L.push(esc(`الإجمالي: ${money(t.spend, 2)}  ${change(t.spend, p.spend)}`));
+  const spendByPlatform = resolveSpendByPlatform(t);
   L.push(
     esc(
-      [
-        `ميتا: ${money(t.spendMeta, 2)}`,
-        `سناب شات: ${money(t.spendSnap, 2)}`,
-        t.spendTikTok > 0 ? `تيك توك: ${money(t.spendTikTok, 2)}` : "",
-        t.spendGoogle > 0 ? `جوجل: ${money(t.spendGoogle, 2)}` : "",
-      ]
-        .filter(Boolean)
+      PLATFORMS.filter((platform) => spendByPlatform[platform] > 0)
+        .map((platform) => `${PLATFORM_LABEL[platform].ar}: ${money(spendByPlatform[platform], 2)}`)
         .join(" · "),
     ),
   );

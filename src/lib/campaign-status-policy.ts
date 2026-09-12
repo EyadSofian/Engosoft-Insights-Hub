@@ -64,5 +64,13 @@ export function isOperationalStateCurrent(
         configured === "ENABLED" &&
         (serving === "SERVING" || (!serving && !["ENDED", "PAUSED", "REMOVED"].includes(effective)))
       );
+    case "chatgpt":
+      return (
+        configured === "ACTIVE" &&
+        effective === "ACTIVE" &&
+        (!serving || serving === "SERVING") &&
+        state.activeAdsets > 0 &&
+        state.activeAds > 0
+      );
   }
 }

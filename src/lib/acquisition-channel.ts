@@ -6,6 +6,7 @@ export const PLATFORM_SOURCE_KEYS: Record<Platform, string[]> = {
   snapchat: ["snapchat", "snap"],
   tiktok: ["tiktok", "tik tok"],
   google: ["google", "google ads", "adwords", "youtube"],
+  chatgpt: ["chatgpt", "chatgpt ads", "openai", "openai ads"],
 };
 
 /**

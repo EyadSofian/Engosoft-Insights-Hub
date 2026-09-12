@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { GlobalFilters, Maybe } from "@/lib/types";
+import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 
 interface ChatBody {
   question?: string;
@@ -212,18 +213,13 @@ export const Route = createFileRoute("/api/chat")({
               : `Cheapest reported CPL: **${cheap.name}** at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} platform leads (${money(cheap.spend)} spent).`;
           }
           if (has("total spend", "إجمالي الإنفاق", "اجمالي الانفاق")) {
-            const spendPartsAr = [
-              `ميتا ${money(totals.spendMeta)}`,
-              `سناب ${money(totals.spendSnap)}`,
-              totals.spendTikTok > 0 ? `تيك توك ${money(totals.spendTikTok)}` : "",
-              totals.spendGoogle > 0 ? `جوجل ${money(totals.spendGoogle)}` : "",
-            ].filter(Boolean);
-            const spendPartsEn = [
-              `Meta ${money(totals.spendMeta)}`,
-              `Snapchat ${money(totals.spendSnap)}`,
-              totals.spendTikTok > 0 ? `TikTok ${money(totals.spendTikTok)}` : "",
-              totals.spendGoogle > 0 ? `Google ${money(totals.spendGoogle)}` : "",
-            ].filter(Boolean);
+            const spendByPlatform = resolveSpendByPlatform(totals);
+            const spendPartsAr = PLATFORMS.filter((platform) => spendByPlatform[platform] > 0).map(
+              (platform) => `${PLATFORM_LABEL[platform].ar} ${money(spendByPlatform[platform])}`,
+            );
+            const spendPartsEn = PLATFORMS.filter((platform) => spendByPlatform[platform] > 0).map(
+              (platform) => `${PLATFORM_LABEL[platform].en} ${money(spendByPlatform[platform])}`,
+            );
             return ar
               ? `إجمالي الإنفاق: **${money(totals.spend)}** (${spendPartsAr.join("، ")}).`
               : `Total spend: **${money(totals.spend)}** (${spendPartsEn.join(", ")}).`;
