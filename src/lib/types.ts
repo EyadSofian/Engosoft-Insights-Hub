@@ -103,13 +103,24 @@ export interface AdCreative {
   adsetId: string;
   ad: string;
   adId: string;
+  /** Stable creative resource id. It may be reused by more than one ad. */
+  creativeId: string;
+  /** Human-readable creative label from the ad platform. */
+  creativeName: string;
   creativeType: string;
+  /** Normalized presentation family used by the dashboard gallery. */
+  mediaType: string;
   /** OpenAI Ads media identifier when the creative uses an uploaded asset. */
   fileId?: string;
   headline: string;
   body: string;
   price: string;
   imageUrl: string;
+  thumbnailUrl: string;
+  videoUrl: string;
+  videoId: string;
+  /** Public post/reel preview when the platform exposes one. */
+  permalinkUrl: string;
   landingPageUrl: string;
   status: string;
   reviewStatus: string;

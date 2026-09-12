@@ -76,6 +76,8 @@ const DIRECT_ODOO_REFRESH_MS = 30 * 60 * 1000;
 
 const TAB = {
   meta: "Meta Ads Daily",
+  /** Slowly-changing Meta creative catalog written by the companion n8n sync. */
+  metaCreatives: "Meta Creatives",
   snap: "Snap Ads Daily",
   // Not in the workbook yet. TikTok spends real money and produces thousands of
   // CRM leads, so it is read optionally: the moment the tab exists with the same
@@ -92,7 +94,7 @@ const TAB = {
 } as const;
 
 /** Tabs that may legitimately be absent. A miss is a gap, not a fetch failure. */
-const OPTIONAL_TABS = new Set<string>([TAB.tiktok]);
+const OPTIONAL_TABS = new Set<string>([TAB.tiktok, TAB.metaCreatives]);
 
 const LOST_SHEET_GID = "1314891021";
 
@@ -586,6 +588,13 @@ function looksLikeAdsExport(rows: Raw[]): boolean {
   return hasAdsColumn && !hasCrmOnlyColumn;
 }
 
+/** Reject gviz's first-tab fallback when the optional creative catalog is absent. */
+function looksLikeCreativeExport(rows: Raw[]): boolean {
+  if (!rows.length) return true;
+  const header = new Set(Object.keys(rows[0]));
+  return header.has("__creative_key") && (header.has("Creative ID") || header.has("__creative_id"));
+}
+
 /**
  * gviz returns the workbook's first tab when a requested tab does not exist.
  * Require both an invoice identifier and the accounting date/value dimensions
@@ -1045,12 +1054,17 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     // Seven simultaneous requests to one document is what triggers Google's
     // rate limiting in the first place. Two smaller waves cost a few hundred
     // milliseconds and remove the burst.
-    const [metaSheetRaw, snapSheetRaw, crmSheetRaw, invoicedSheetRaw] = await Promise.all([
-      metaStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.meta),
-      snapStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.snap),
-      crmStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.crm),
-      invoicedStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.invoiced),
-    ]);
+    const [metaSheetRaw, snapSheetRaw, crmSheetRaw, invoicedSheetRaw, metaCreativesRaw] =
+      await Promise.all([
+        metaStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.meta),
+        snapStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.snap),
+        crmStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.crm),
+        invoicedStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.invoiced),
+        // Creative metadata is intentionally fetched even after ad facts move to
+        // PostgreSQL: it is small, changes slowly, and is maintained as a separate
+        // resource rather than being copied onto every ad-day row.
+        safeFetch(TAB.metaCreatives, looksLikeCreativeExport),
+      ]);
     const currentMetaRaw = metaStored?.rows.length ? metaStored.rows : metaSheetRaw;
     const currentSnapRaw = snapStored?.rows.length ? snapStored.rows : snapSheetRaw;
     // Historical spend lives under its own dataset, so the scheduled Meta and
@@ -1540,6 +1554,17 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]));
       adsets.learn(str(r["__ad_id"]), str(r["Ad Name"]), str(r["Ad set name"]));
     }
+    for (const r of metaCreativesRaw) {
+      keys.learn(
+        str(firstPresent(r["__campaign_id"], r["Campaign ID"])),
+        str(firstPresent(r["اسم الكامبين"], r["Campaign Name"])),
+      );
+      adsets.learn(
+        str(firstPresent(r["__ad_id"], r["Ad ID"])),
+        str(firstPresent(r["Ad Name"], r["Ad name"])),
+        str(firstPresent(r["Ad set name"], r["Ad Set Name"])),
+      );
+    }
     for (const r of snapRaw) {
       keys.learn(str(r["__campaign_id"]), str(r["اسم الكامبين"]));
       adsets.learn(str(r["__ad_id"]), str(r["Ad Name"]), str(r["Ad set name"]));
@@ -1595,6 +1620,118 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       adsets.learn(adId, adName, adset);
     }
     adsets.finalize();
+
+    const creativeUrl = (...values: unknown[]): string => {
+      const value = str(firstPresent(...values));
+      if (!value) return "";
+      try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+      } catch {
+        return "";
+      }
+    };
+    const metaCreativeFromRaw = (r: Raw): AdCreative | null => {
+      const account = str(
+        firstPresent(r["اسم الحساب الإعلاني"], r["Account Name"], r["__account_name"]),
+      );
+      const accountId = str(firstPresent(r["__account_id"], r["Account ID"]));
+      const campaign = str(firstPresent(r["اسم الكامبين"], r["Campaign Name"]));
+      const campaignId = str(firstPresent(r["__campaign_id"], r["Campaign ID"]));
+      const adset = str(firstPresent(r["Ad set name"], r["Ad Set Name"]));
+      const adsetId = str(firstPresent(r["__adset_id"], r["Ad Set ID"]));
+      const ad = str(firstPresent(r["Ad Name"], r["Ad name"]));
+      const adId = str(firstPresent(r["__ad_id"], r["Ad ID"]));
+      const creativeId = str(firstPresent(r["__creative_id"], r["Creative ID"]));
+      const creativeName = str(firstPresent(r["Creative Name"], r["اسم الكرياتيف"]));
+      const headline = str(firstPresent(r["Creative Headline"], r["Headline"], r["Title"]));
+      const body = str(firstPresent(r["Creative Body"], r["Primary Text"], r["Body"]));
+      const imageUrl = creativeUrl(r["Creative Image URL"], r["Image URL"]);
+      const thumbnailUrl = creativeUrl(r["Creative Thumbnail URL"], r["Thumbnail URL"], imageUrl);
+      const videoUrl = creativeUrl(r["Creative Video URL"], r["Video URL"]);
+      const videoId = str(firstPresent(r["Creative Video ID"], r["Video ID"]));
+      const permalinkUrl = creativeUrl(
+        r["Creative Permalink URL"],
+        r["Permalink URL"],
+        r["Post URL"],
+      );
+      const rawType = str(firstPresent(r["Media Type"], r["Creative Type"])).toLowerCase();
+      const mediaType = rawType.includes("carousel")
+        ? "carousel"
+        : rawType.includes("video") || videoId || videoUrl
+          ? "video"
+          : rawType.includes("image") || imageUrl || thumbnailUrl
+            ? "image"
+            : headline || body
+              ? "text"
+              : "unknown";
+      // Historical Meta rows started carrying creative ids/names before the
+      // media catalog existed. Keep those useful labels, but never fabricate a
+      // creative for a daily row that has no creative evidence at all.
+      if (!creativeId && !creativeName && !headline && !body && !imageUrl && !videoId) return null;
+      if (!adId && !ad) return null;
+
+      return {
+        platform: "meta",
+        account,
+        accountId,
+        campaign,
+        campaignId,
+        campaignKey: keys.key(campaignId, campaign),
+        adset,
+        adsetId,
+        ad,
+        adId,
+        creativeId: creativeId || adId || creativeName,
+        creativeName: creativeName || ad,
+        creativeType: str(firstPresent(r["Creative Type"], r["Media Type"])),
+        mediaType,
+        headline,
+        body,
+        price: str(r["Price"]),
+        imageUrl,
+        thumbnailUrl,
+        videoUrl,
+        videoId,
+        permalinkUrl,
+        landingPageUrl: creativeUrl(
+          r["Creative Landing Page URL"],
+          r["Landing Page URL"],
+          r["Destination URL"],
+        ),
+        status: str(firstPresent(r["Creative Status"], r["Ad Status"], r["Status"])),
+        reviewStatus: str(r["Review Status"]),
+        reviewReason: str(r["Review Reason"]),
+        createdAt: str(firstPresent(r["Creative Created At"], r["Created At"])),
+        updatedAt: str(firstPresent(r["Creative Updated At"], r["Updated At"])),
+        syncedAt: str(firstPresent(r["__synced_at"], r["Synced At"])),
+      };
+    };
+
+    const metaCreativesByKey = new Map<string, AdCreative>();
+    // Dedicated rows come last so richer API metadata fills the sparse fields
+    // learned from recent daily exports.
+    for (const raw of [...metaHistoryRaw, ...metaCreativesRaw]) {
+      const next = metaCreativeFromRaw(raw);
+      if (!next) continue;
+      const identity = [
+        next.accountId || normalizeName(next.account),
+        next.adId || normalizeName(next.ad),
+        next.creativeId || normalizeName(next.creativeName),
+      ].join("\u001f");
+      const previous = metaCreativesByKey.get(identity);
+      if (!previous) {
+        metaCreativesByKey.set(identity, next);
+        continue;
+      }
+      const merged = { ...previous } as AdCreative;
+      for (const [key, value] of Object.entries(next)) {
+        if (value !== "" && value !== undefined)
+          (merged as unknown as Record<string, unknown>)[key] = value;
+      }
+      metaCreativesByKey.set(identity, merged);
+    }
+    const metaCreatives = [...metaCreativesByKey.values()];
 
     /* -- ads --------------------------------------------------------------- */
     const objectiveByAccount = new Map<string, CampaignObjective>();
@@ -1900,10 +2037,13 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         syncedAt: r.syncedAt,
       };
     });
-    const creatives = openAIResult.creatives.map((creative) => ({
-      ...creative,
-      campaignKey: keys.key(creative.campaignId, creative.campaign),
-    }));
+    const creatives = [
+      ...metaCreatives,
+      ...openAIResult.creatives.map((creative) => ({
+        ...creative,
+        campaignKey: keys.key(creative.campaignId, creative.campaign),
+      })),
+    ];
     campaignStates.push(
       ...openAIResult.campaigns.map((campaign) => ({
         ...campaign,
@@ -2706,12 +2846,25 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
 
     const health: DataHealth = {
       platformSources: {
+        meta: {
+          configured: meta.length > 0 || metaCreatives.length > 0,
+          ok: meta.length > 0,
+          source: metaStored?.rows.length ? "postgres" : "sheet",
+          rows: meta.length,
+          creatives: metaCreatives.length,
+          syncedAt:
+            maxOf(metaCreativesRaw, "__synced_at") ||
+            (metaStored?.rows.length ? metaStored.syncedAt : maxOf(metaHistoryRaw, "__synced_at")),
+          message: metaCreatives.length
+            ? `${metaCreatives.length} Meta creatives are available.`
+            : "Meta delivery is available; the optional creative catalog has not synced yet.",
+        },
         chatgpt: {
           configured: openAIResult.configured,
           ok: openAIApiUsable,
           source: openAIResult.source,
           rows: chatgpt.length,
-          creatives: creatives.length,
+          creatives: openAIResult.creatives.length,
           syncedAt: openAIResult.syncedAt,
           message: openAIResult.health.message,
         },

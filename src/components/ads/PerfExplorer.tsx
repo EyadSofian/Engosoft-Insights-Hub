@@ -29,6 +29,7 @@ import { AdSetOriginBadge, InferredCourse, PlatformBadges } from "@/components/m
 import { MetricInfo } from "./MetricInfo";
 import { Unavailable, VerdictChip } from "./MetricCard";
 import { PerfCards } from "./PerfCards";
+import { CampaignCreativeGallery } from "./CampaignCreativeGallery";
 import { acosVerdict, roasVerdict } from "./verdict";
 import { csvMaybe, csvRatio, maybeCell, ratioCell, sortMaybe, sortRatio } from "./cells";
 import {
@@ -1142,7 +1143,7 @@ function RowDrawer({
       aria-label={nameOf(row)}
     >
       <div
-        className="w-full sm:max-w-md h-dvh overflow-y-auto overscroll-contain bg-surface border-s border-border shadow-xl animate-slide-up sm:animate-fade-in pb-[env(safe-area-inset-bottom)]"
+        className={`w-full ${grain === "campaign" ? "sm:max-w-4xl" : "sm:max-w-md"} h-dvh overflow-y-auto overscroll-contain bg-surface border-s border-border shadow-xl animate-slide-up sm:animate-fade-in pb-[env(safe-area-inset-bottom)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-4 py-3 border-b border-border bg-surface/95 backdrop-blur">
@@ -1248,6 +1249,13 @@ function RowDrawer({
                 ? "بيانات الإنفاق بتغطي جزء من الفترة بس، والإيراد بيمتد بره النطاق ده — يعني نسب العائد هنا مش قابلة للمقارنة بباقي الصفوف."
                 : "Spend data covers only part of this period while revenue extends beyond it, so the ratios here are not comparable with other rows."}
             </p>
+          )}
+
+          {grain === "campaign" && row.campaignKey && (
+            <CampaignCreativeGallery
+              campaignKey={row.campaignKey}
+              campaignName={row.campaignName || row.name}
+            />
           )}
 
           {facts.length > 0 && (
