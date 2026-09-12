@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  CREATIVE_STALE_AFTER_MS,
   STALE_AFTER_MS,
   datasetFreshnessAlerts,
   isHistoricalDataset,
@@ -59,6 +60,13 @@ const ok = (dataset, hours) => ({ dataset, status: "success", syncedAt: ago(hour
   assert.equal(datasetFreshnessAlerts([ok("meta_ads", 5.99)], NOW).length, 0);
   assert.equal(datasetFreshnessAlerts([ok("meta_ads", 6.01)], NOW).length, 1);
   assert.equal(STALE_AFTER_MS, 6 * HOUR);
+}
+
+/* --- slowly-changing creative catalog -------------------------------------- */
+{
+  assert.equal(CREATIVE_STALE_AFTER_MS, 30 * HOUR);
+  assert.deepEqual(datasetFreshnessAlerts([ok("meta_ad_creatives", 29.9)], NOW), []);
+  assert.equal(datasetFreshnessAlerts([ok("meta_ad_creatives", 30.1)], NOW).length, 1);
 }
 
 /* --- historical snapshots are exempt, permanently -------------------------- */

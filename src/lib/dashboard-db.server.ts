@@ -10,6 +10,7 @@ import { Pool, type PoolClient } from "pg";
 
 export type DashboardDataset =
   | "meta_ads"
+  | "meta_ad_creatives"
   | "snap_ads"
   | "chatgpt_ads"
   | "chatgpt_ad_creatives"
@@ -62,6 +63,7 @@ export interface DatasetWriteResult {
 
 const DATASETS = new Set<DashboardDataset>([
   "meta_ads",
+  "meta_ad_creatives",
   "snap_ads",
   "chatgpt_ads",
   "chatgpt_ad_creatives",
@@ -231,7 +233,7 @@ function baseStableKey(dataset: DashboardDataset, row: DashboardRow): string {
     if (parts.some(Boolean)) return `${dataset}:fact:${parts.join("\u001f")}`;
   }
 
-  if (dataset === "chatgpt_ad_creatives") {
+  if (dataset === "chatgpt_ad_creatives" || dataset === "meta_ad_creatives") {
     const adId = first(row, ["adId", "Ad ID", "__ad_id"]);
     const accountId = first(row, ["accountId", "Account ID", "__account_id"]);
     if (adId) return `${dataset}:creative:${accountId}\u001f${adId}`;

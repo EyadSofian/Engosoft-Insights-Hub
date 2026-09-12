@@ -47,4 +47,25 @@ import { dashboardRowsContentHash, prepareDashboardRows } from "../src/lib/dashb
   assert.equal(dashboardRowsContentHash(before), dashboardRowsContentHash(after));
 }
 
+/* Meta creative snapshots keep one durable resource per account/ad. */
+{
+  const result = prepareDashboardRows("meta_ad_creatives", [
+    {
+      "Account ID": "act_1",
+      "Ad ID": "ad_1",
+      "Creative ID": "creative_1",
+      "Creative Image URL": "https://example.com/one.jpg",
+    },
+    {
+      "Account ID": "act_1",
+      "Ad ID": "ad_2",
+      "Creative ID": "creative_2",
+      "Creative Video ID": "video_2",
+    },
+  ]);
+  assert.equal(result.rows.length, 2);
+  assert.equal(new Set(result.rows.map((row) => row.key)).size, 2);
+  assert.match(result.rows[0].key, /^meta_ad_creatives:creative:/);
+}
+
 console.log("dashboard database guards passed");

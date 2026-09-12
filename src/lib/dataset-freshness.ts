@@ -34,6 +34,8 @@ export interface StoredDatasetState {
  * Fourteen hours of silence is a real outage; three is a Tuesday.
  */
 export const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+/** The Meta creative catalog is intentionally a once-daily snapshot. */
+export const CREATIVE_STALE_AFTER_MS = 30 * 60 * 60 * 1000;
 
 /**
  * Datasets that are historical by design and never sync again.
@@ -78,7 +80,9 @@ export function datasetFreshnessAlerts(
       continue;
     }
 
-    if (ageMs !== null && ageMs > STALE_AFTER_MS) {
+    const staleAfterMs =
+      row.dataset === "meta_ad_creatives" ? CREATIVE_STALE_AFTER_MS : STALE_AFTER_MS;
+    if (ageMs !== null && ageMs > staleAfterMs) {
       alerts.push({
         dataset: row.dataset,
         kind: "stale",

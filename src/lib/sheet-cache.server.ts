@@ -859,6 +859,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     // bootstrap for installations that have not run the new n8n path yet.
     const storedDatasets = [
       "meta_ads",
+      "meta_ad_creatives",
       "snap_ads",
       "accounting",
       "accounting_legacy",
@@ -893,6 +894,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     );
     const [
       metaStored,
+      metaCreativesStored,
       snapStored,
       accountingStored,
       accountingLegacyStored,
@@ -1060,10 +1062,12 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         snapStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.snap),
         crmStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.crm),
         invoicedStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.invoiced),
-        // Creative metadata is intentionally fetched even after ad facts move to
-        // PostgreSQL: it is small, changes slowly, and is maintained as a separate
-        // resource rather than being copied onto every ad-day row.
-        safeFetch(TAB.metaCreatives, looksLikeCreativeExport),
+        // Creative metadata is a separate, slowly-changing resource. Railway
+        // PostgreSQL is authoritative once n8n has posted a snapshot; the old
+        // Google tab remains a migration fallback only.
+        metaCreativesStored?.rows.length
+          ? Promise.resolve(metaCreativesStored.rows)
+          : safeFetch(TAB.metaCreatives, looksLikeCreativeExport),
       ]);
     const currentMetaRaw = metaStored?.rows.length ? metaStored.rows : metaSheetRaw;
     const currentSnapRaw = snapStored?.rows.length ? snapStored.rows : snapSheetRaw;
@@ -1732,6 +1736,16 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       metaCreativesByKey.set(identity, merged);
     }
     const metaCreatives = [...metaCreativesByKey.values()];
+    const metaCreativesWithContent = metaCreatives.filter(
+      (creative) =>
+        creative.imageUrl ||
+        creative.thumbnailUrl ||
+        creative.videoUrl ||
+        creative.videoId ||
+        creative.headline ||
+        creative.body ||
+        creative.permalinkUrl,
+    );
 
     /* -- ads --------------------------------------------------------------- */
     const objectiveByAccount = new Map<string, CampaignObjective>();
@@ -2847,17 +2861,24 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const health: DataHealth = {
       platformSources: {
         meta: {
-          configured: meta.length > 0 || metaCreatives.length > 0,
+          configured: meta.length > 0 || metaCreativesWithContent.length > 0,
           ok: meta.length > 0,
-          source: metaStored?.rows.length ? "postgres" : "sheet",
+          source: metaCreativesStored?.rows.length
+            ? "postgres"
+            : metaCreativesRaw.length
+              ? "sheet"
+              : metaStored?.rows.length
+                ? "postgres"
+                : "sheet",
           rows: meta.length,
-          creatives: metaCreatives.length,
+          creatives: metaCreativesWithContent.length,
           syncedAt:
+            (metaCreativesStored?.rows.length ? metaCreativesStored.syncedAt : "") ||
             maxOf(metaCreativesRaw, "__synced_at") ||
             (metaStored?.rows.length ? metaStored.syncedAt : maxOf(metaHistoryRaw, "__synced_at")),
-          message: metaCreatives.length
-            ? `${metaCreatives.length} Meta creatives are available.`
-            : "Meta delivery is available; the optional creative catalog has not synced yet.",
+          message: metaCreativesWithContent.length
+            ? `${metaCreativesWithContent.length} Meta creatives include media or copy.`
+            : "Meta delivery is available, but creative media and copy have not synced yet.",
         },
         chatgpt: {
           configured: openAIResult.configured,
