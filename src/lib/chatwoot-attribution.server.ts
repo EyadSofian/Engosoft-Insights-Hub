@@ -179,11 +179,14 @@ async function ensureSchema(): Promise<void> {
           evidence jsonb NOT NULL DEFAULT '{}'::jsonb,
           status text NOT NULL DEFAULT 'pending',
           attempts integer NOT NULL DEFAULT 0,
+          duplicate_deliveries integer NOT NULL DEFAULT 0,
           locked_at timestamptz,
           processed_at timestamptz,
           last_error text NOT NULL DEFAULT ''
         );
         ALTER TABLE chatwoot_event_inbox ADD COLUMN IF NOT EXISTS locked_at timestamptz;
+        ALTER TABLE chatwoot_event_inbox
+          ADD COLUMN IF NOT EXISTS duplicate_deliveries integer NOT NULL DEFAULT 0;
         CREATE INDEX IF NOT EXISTS chatwoot_event_inbox_status_received_idx
           ON chatwoot_event_inbox (status, received_at DESC);
         CREATE INDEX IF NOT EXISTS chatwoot_event_inbox_conversation_idx
@@ -1040,6 +1043,12 @@ export async function processChatwootAttributionEvent(input: {
         projected: false,
         conversationId: candidate.conversationId,
       };
+    await db.query(
+      `UPDATE chatwoot_event_inbox
+          SET duplicate_deliveries = duplicate_deliveries + 1
+        WHERE id = $1`,
+      [eventId],
+    );
   }
   // Exactly one worker/delivery claims a pending or failed event. A crash lease
   // expires after fifteen minutes so the provider's redelivery can repair it.
@@ -1446,7 +1455,8 @@ export async function getAttributionHealth() {
       `SELECT count(*)::int AS received,
               count(*) FILTER (WHERE status = 'failed')::int AS failures,
               count(*) FILTER (WHERE status IN ('pending', 'processing'))::int AS pending,
-              count(*) FILTER (WHERE attempts > 1)::int AS duplicate_or_retried,
+              coalesce(sum(duplicate_deliveries), 0)::int AS duplicate_deliveries,
+              count(*) FILTER (WHERE attempts > 1)::int AS retried_events,
               max(received_at) AS last_received_at,
               max(processed_at) AS last_processed_at
          FROM chatwoot_event_inbox`,
