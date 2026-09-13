@@ -8,6 +8,7 @@ export const Route = createFileRoute("/api/ads-creatives")({
         const { parseFilters, json } = await import("@/lib/api.server");
         const { getFiltered, computePerf, adPerformanceKey } = await import("@/lib/metrics.server");
         const { invalidateDataCache, normalizeName } = await import("@/lib/sheet-cache.server");
+        const { courseForCreative } = await import("@/lib/course-creative-match");
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const performance = new Map(computePerf(data, "ad").map((row) => [row.key, row]));
@@ -21,11 +22,16 @@ export const Route = createFileRoute("/api/ads-creatives")({
           if (filters.ad && creative.ad !== filters.ad) return false;
           if (filters.adKey && adPerformanceKey(creative) !== filters.adKey) return false;
           if (wantedCourse) {
-            const course =
+            // Campaign attribution remains authoritative, so an ad named
+            // "auto profile" cannot pull a PMP campaign into Automotive. A
+            // creative/ad/ad-set name is only a discovery fallback when the
+            // campaign and its joined performance have no matching course.
+            const linkedCourse =
               performance.get(adPerformanceKey(creative))?.course ||
               data.snapshot.campaigns.get(creative.campaignKey)?.course ||
               "";
-            if (normalizeName(course) !== wantedCourse) return false;
+            if (normalizeName(courseForCreative(creative, linkedCourse)) !== wantedCourse)
+              return false;
           }
           return true;
         };
@@ -38,10 +44,13 @@ export const Route = createFileRoute("/api/ads-creatives")({
         const metaCandidates = creatives.filter((creative) => creative.platform === "meta");
         const shouldSyncMeta =
           metaCandidates.length > 0 &&
-          (filters.platform === "meta" || !!filters.campaignKey || !!filters.adKey);
-        let metaSync:
-          | Awaited<ReturnType<typeof import("@/lib/meta-creatives.server").syncMetaCreativesDirect>>
-          | null = null;
+          (filters.platform === "meta" ||
+            !!filters.campaignKey ||
+            !!filters.adKey ||
+            !!filters.course);
+        let metaSync: Awaited<
+          ReturnType<typeof import("@/lib/meta-creatives.server").syncMetaCreativesDirect>
+        > | null = null;
         if (shouldSyncMeta) {
           const { syncMetaCreativesDirect } = await import("@/lib/meta-creatives.server");
           metaSync = await syncMetaCreativesDirect(metaCandidates);
@@ -89,7 +98,7 @@ export const Route = createFileRoute("/api/ads-creatives")({
               syncedAt: metaSync.syncedAt || baseHealth?.syncedAt || "",
               message: metaSync.message,
             }
-          : baseHealth ?? {
+          : (baseHealth ?? {
               configured: creativePlatforms.size > 0,
               ok: creativePlatforms.size > 0,
               source: "sheet",
@@ -97,7 +106,7 @@ export const Route = createFileRoute("/api/ads-creatives")({
               creatives: creatives.length,
               syncedAt: data.snapshot.syncedAt,
               message: `${creatives.length} creative resources are available.`,
-            };
+            });
 
         if (filters.channel === "organic") {
           return json({

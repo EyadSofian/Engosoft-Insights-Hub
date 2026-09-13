@@ -1,12 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   BadgeCheck,
+  BarChart3,
   ExternalLink,
   Film,
   Image as ImageIcon,
   Images,
   LayoutGrid,
+  Megaphone,
   MousePointerClick,
+  Radio,
+  Sparkles,
   Trophy,
 } from "lucide-react";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
@@ -111,10 +115,12 @@ function CreativeCard({
   row,
   rank,
   showWinner,
+  showCampaign = false,
 }: {
   row: CreativeAnalyticsRow;
   rank: number;
   showWinner: boolean;
+  showCampaign?: boolean;
 }) {
   const { lang } = useI18n();
   const previewUrl = row.permalinkUrl || row.landingPageUrl;
@@ -157,10 +163,20 @@ function CreativeCard({
                 {title}
               </h5>
               <p className="mt-0.5 truncate text-[9.5px] text-text-subtle" title={row.ad}>
-                {lang === "ar" ? "الإعلان" : "Ad"}: {row.ad || "—"}
+                {showCampaign
+                  ? `${lang === "ar" ? "الحملة" : "Campaign"}: ${row.campaign || "—"}`
+                  : `${lang === "ar" ? "الإعلان" : "Ad"}: ${row.ad || "—"}`}
               </p>
             </div>
-            <PlatformBadges platforms={[row.platform]} />
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <PlatformBadges platforms={[row.platform]} />
+              {showCampaign && row.status.toUpperCase() === "ACTIVE" && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700">
+                  <Radio size={8} />
+                  {lang === "ar" ? "شغّال" : "Live"}
+                </span>
+              )}
+            </div>
           </div>
           {row.headline && (
             <p className="mt-2 text-[11.5px] font-medium leading-5 text-text" dir="auto">
@@ -363,4 +379,250 @@ export function CampaignCreativeGallery({
       )}
     </section>
   );
+}
+
+/**
+ * Executive creative view for one course. The default scope is deliberately
+ * limited to ads Meta currently reports as ACTIVE, so management sees what can
+ * be acted on today before historical winners. The same endpoint keeps the
+ * global date/channel filters and joins creative resources to CRM outcomes.
+ */
+export function CourseCreativeGallery({ courseName }: { courseName: string }) {
+  const { lang } = useI18n();
+  const [sort, setSort] = useState<CreativeSort>("won");
+  const [scope, setScope] = useState<"live" | "all">("live");
+  const { data, isLoading, isError } = useApi<CreativeResponse>(
+    `/api/ads-creatives?course=${encodeURIComponent(courseName)}`,
+    { enabled: !!courseName },
+  );
+  const allRows = useMemo(() => data?.rows ?? [], [data?.rows]);
+  const liveRows = useMemo(
+    () => allRows.filter((row) => row.status.toUpperCase() === "ACTIVE"),
+    [allRows],
+  );
+  const effectiveScope = scope === "live" && liveRows.length === 0 ? "all" : scope;
+  const rows = useMemo(() => {
+    const selected = effectiveScope === "live" ? liveRows : allRows;
+    return [...selected].sort(
+      (a, b) =>
+        SORTS[sort].value(b) - SORTS[sort].value(a) || b.won - a.won || b.crmLeads - a.crmLeads,
+    );
+  }, [allRows, effectiveScope, liveRows, sort]);
+  const campaignCount = useMemo(
+    () => new Set(rows.map((row) => row.campaignKey || row.campaign).filter(Boolean)).size,
+    [rows],
+  );
+  const mediaCounts = useMemo(
+    () =>
+      rows.reduce(
+        (counts, row) => {
+          const type = row.mediaType.toLowerCase();
+          if (type.includes("video")) counts.video++;
+          else if (type.includes("carousel")) counts.carousel++;
+          else counts.image++;
+          return counts;
+        },
+        { image: 0, video: 0, carousel: 0 },
+      ),
+    [rows],
+  );
+  const top = rows[0] ?? null;
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+      <div
+        className="relative overflow-hidden border-b border-border px-4 py-5 sm:px-6"
+        style={{
+          background:
+            "radial-gradient(circle at 12% 20%, color-mix(in oklab, var(--brand) 16%, transparent), transparent 34%), linear-gradient(135deg, var(--surface), var(--surface-2))",
+        }}
+      >
+        <div className="absolute -end-8 -top-10 h-36 w-36 rounded-full border border-brand/10" />
+        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/20">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
+                  {lang === "ar" ? "Creative intelligence" : "Creative intelligence"}
+                </p>
+                <h3 className="text-lg font-bold text-text sm:text-xl">
+                  {lang === "ar" ? `أفضل كرياتيفات ${courseName}` : `Best ${courseName} creatives`}
+                </h3>
+              </div>
+            </div>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-text-muted">
+              {lang === "ar"
+                ? "ترتيب موحّد من كل حملات الكورس: الصورة أو الريل، نص الإعلان، ونتيجته في CRM. العرض يبدأ بالإعلانات الشغّالة الآن."
+                : "One ranking across every course campaign: visual, copy and CRM outcome. The view starts with ads that are live now."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl border border-border bg-surface/85 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setScope("live")}
+                disabled={liveRows.length === 0}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-[10.5px] font-bold transition-colors ${
+                  effectiveScope === "live"
+                    ? "bg-brand text-white"
+                    : "text-text-muted hover:text-text disabled:opacity-40"
+                }`}
+              >
+                <Radio size={11} />
+                {lang === "ar" ? "الشغّالة الآن" : "Live now"}
+                <span className="num opacity-75">{fmtNum(liveRows.length)}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("all")}
+                className={`min-h-8 rounded-lg px-3 text-[10.5px] font-bold transition-colors ${
+                  effectiveScope === "all"
+                    ? "bg-brand text-white"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                {lang === "ar" ? "كل الكرياتيفات" : "All creatives"} · {fmtNum(allRows.length)}
+              </button>
+            </div>
+            <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border bg-surface/85 px-3 text-[10px] text-text-muted shadow-sm">
+              <BarChart3 size={12} className="text-brand" />
+              {lang === "ar" ? "الأفضل حسب" : "Rank by"}
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value as CreativeSort)}
+                className="bg-transparent text-[10.5px] font-bold text-text outline-none"
+              >
+                {(Object.keys(SORTS) as CreativeSort[]).map((key) => (
+                  <option key={key} value={key}>
+                    {SORTS[key][lang]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-3 p-4 md:grid-cols-2 2xl:grid-cols-3 sm:p-5">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-[390px] rounded-2xl" />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="m-4 rounded-2xl border border-danger/20 bg-danger-soft p-5 text-sm text-danger">
+          {lang === "ar"
+            ? "تعذر تحميل كرياتيفات الكورس دلوقتي. جرّب تحديث الصفحة."
+            : "Course creatives could not be loaded. Refresh and try again."}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="p-5">
+          <div className="rounded-2xl border border-dashed border-border bg-surface-2/40 px-5 py-9 text-center">
+            <Megaphone className="mx-auto text-brand" size={25} />
+            <h4 className="mt-3 text-sm font-bold text-text">
+              {lang === "ar" ? "مفيش كرياتيفات مرتبطة بالكورس" : "No course creatives found"}
+            </h4>
+            <p className="mt-1 text-xs text-text-muted">
+              {lang === "ar"
+                ? "هنظهرها هنا أول ما اسم الحملة أو الإعلان أو الكرياتيف يطابق اسم الكورس."
+                : "They will appear when the campaign, ad or creative name matches this course."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-2 border-b border-border bg-surface-2/30 p-3 sm:grid-cols-2 lg:grid-cols-4 sm:px-5">
+            <CourseCreativeStat
+              label={lang === "ar" ? "كرياتيف في العرض" : "Creatives in view"}
+              value={fmtNum(rows.length)}
+              icon={<LayoutGrid size={14} />}
+            />
+            <CourseCreativeStat
+              label={lang === "ar" ? "حملات ممثلة" : "Campaigns represented"}
+              value={fmtNum(campaignCount)}
+              icon={<Megaphone size={14} />}
+            />
+            <CourseCreativeStat
+              label={lang === "ar" ? "فيديو / ريل" : "Videos / reels"}
+              value={fmtNum(mediaCounts.video)}
+              icon={<Film size={14} />}
+            />
+            <CourseCreativeStat
+              label={lang === "ar" ? "صور / كاروسيل" : "Images / carousel"}
+              value={fmtNum(mediaCounts.image + mediaCounts.carousel)}
+              icon={<Images size={14} />}
+            />
+          </div>
+
+          {top && (
+            <div className="mx-4 mt-4 flex flex-col gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 sm:mx-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-2">
+                <Trophy size={16} className="shrink-0 text-amber-600" />
+                <p className="truncate text-xs text-text">
+                  <strong>{lang === "ar" ? "متصدر العرض:" : "Current leader:"}</strong>{" "}
+                  <span dir="auto">{top.creativeName || top.ad}</span>
+                </p>
+              </div>
+              <span className="shrink-0 text-[10.5px] font-bold text-amber-700">
+                {SORTS[sort][lang]}: {formatCreativeSortValue(top, sort)}
+              </span>
+            </div>
+          )}
+
+          <div className="grid gap-3 p-4 md:grid-cols-2 2xl:grid-cols-3 sm:p-5">
+            {rows.slice(0, 24).map((row, index) => (
+              <CreativeCard
+                key={`${row.platform}:${row.creativeId}:${row.adId}`}
+                row={row}
+                rank={index}
+                showWinner={SORTS[sort].value(row) > 0}
+                showCampaign
+              />
+            ))}
+          </div>
+          {rows.length > 24 && (
+            <p className="border-t border-border px-5 py-3 text-center text-[10.5px] text-text-muted">
+              {lang === "ar"
+                ? `معروض أفضل 24 من ${fmtNum(rows.length)} كرياتيف حسب الاختيار الحالي.`
+                : `Showing the best 24 of ${fmtNum(rows.length)} creatives for the current ranking.`}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function CourseCreativeStat({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-surface px-3 py-2.5">
+      <div>
+        <p className="text-[9.5px] text-text-muted">{label}</p>
+        <p className="num mt-0.5 text-base font-bold text-text">{value}</p>
+      </div>
+      <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand-soft text-brand">
+        {icon}
+      </span>
+    </div>
+  );
+}
+
+function formatCreativeSortValue(row: CreativeAnalyticsRow, sort: CreativeSort) {
+  if (sort === "won") return fmtNum(row.won);
+  if (sort === "leads") return fmtNum(row.crmLeads);
+  if (sort === "ctr") return fmtPct(row.ctrAll, 2);
+  if (sort === "spend") return row.spend === null ? "—" : fmtUSD(row.spend);
+  return row.roas === null ? "—" : `${row.roas.toFixed(2)}×`;
 }

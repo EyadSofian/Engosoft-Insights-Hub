@@ -5,31 +5,26 @@ import {
   BadgeDollarSign,
   BarChart3,
   BellRing,
+  BookOpenCheck,
   CalendarDays,
   CircleDollarSign,
   GraduationCap,
   History,
   Info,
+  LayoutGrid,
   Leaf,
   ReceiptText,
   Search,
+  Sparkles,
   ShoppingCart,
   Target,
   TrendingDown,
   TriangleAlert,
   Users,
 } from "lucide-react";
-import { DataTable, type Col } from "@/components/DataTable";
 import { FilterSummary } from "@/components/ads/FilterSummary";
-import {
-  DeltaBadge,
-  EmptyState,
-  ErrorState,
-  KpiCard,
-  Notice,
-  Pill,
-  Skeleton,
-} from "@/components/ui-bits";
+import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery";
+import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
@@ -383,169 +378,25 @@ function Courses() {
   // One description per figure, built from the course rows already on screen.
   const courseTotals = courseMetrics(courses, linked, lang);
 
-  const columns: Col<CourseAgg>[] = [
-    {
-      key: "name",
-      header: lang === "ar" ? "الدورة" : "Course",
-      label: lang === "ar" ? "الدورة" : "Course",
-      sticky: true,
-      always: true,
-      width: "220px",
-      minWidth: "220px",
-      sortValue: (row) => row.name,
-      render: (row) => (
-        <div className="flex max-w-[240px] items-start gap-2">
-          <span
-            className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-            style={{
-              background: selectedCourse?.key === row.key ? "var(--brand)" : "var(--border)",
-            }}
-          />
-          <div className="min-w-0">
-            <div className="truncate font-semibold text-text" title={row.name}>
-              {row.name || "—"}
-            </div>
-            {row.mainCategory && (
-              <div className="mt-0.5 truncate text-[11px] text-text-muted" title={row.mainCategory}>
-                {row.mainCategory}
-              </div>
-            )}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "spend",
-      header: lang === "ar" ? "مصروف عليها" : "Ad spend",
-      label: lang === "ar" ? "مصروف عليها" : "Ad spend",
-      align: "center",
-      minWidth: "112px",
-      sortValue: (row) => row.spend,
-      render: (row) => <span className="num font-medium">{fmtUSD(row.spend)}</span>,
-    },
-    {
-      key: "crmLeads",
-      header: lang === "ar" ? "الليدز" : "CRM leads",
-      label: lang === "ar" ? "الليدز" : "CRM leads",
-      align: "center",
-      minWidth: "92px",
-      sortValue: (row) => row.crmLeads,
-      render: (row) => <span className="num">{fmtNum(row.crmLeads)}</span>,
-    },
-    {
-      key: "lost",
-      header: lang === "ar" ? "Lost" : "Lost",
-      label: lang === "ar" ? "الفرص المؤرشفة Lost" : "Archived Lost",
-      align: "center",
-      minWidth: "92px",
-      sortValue: (row) => row.lost,
-      render: (row) => <span className="num text-danger">{fmtNum(row.lost)}</span>,
-    },
-    {
-      key: "won",
-      header: lang === "ar" ? "Won" : "Won",
-      label: lang === "ar" ? "الصفقات المكسبة" : "Won deals",
-      align: "center",
-      minWidth: "88px",
-      sortValue: (row) => row.won,
-      render: (row) => <span className="num text-success">{fmtNum(row.won)}</span>,
-    },
-    {
-      key: "salesOrders",
-      header: lang === "ar" ? "أوامر البيع" : "Sales orders",
-      label: lang === "ar" ? "أوامر البيع" : "Sales orders",
-      align: "center",
-      minWidth: "112px",
-      sortValue: (row) => row.salesOrders,
-      render: (row) => <span className="num font-medium">{fmtNum(row.salesOrders)}</span>,
-    },
-    {
-      key: "invoices",
-      header: lang === "ar" ? "الفواتير" : "Paid invoices",
-      label: lang === "ar" ? "الفواتير" : "Paid invoices",
-      align: "center",
-      minWidth: "100px",
-      sortValue: (row) => row.invoices,
-      render: (row) => <span className="num font-medium">{fmtNum(row.invoices)}</span>,
-    },
-    {
-      key: "revenue",
-      header: lang === "ar" ? "المحصل" : "Collected revenue",
-      label: lang === "ar" ? "المحصل" : "Collected revenue",
-      align: "center",
-      minWidth: "122px",
-      sortValue: (row) => row.revenue,
-      render: (row) => <span className="num font-semibold">{fmtUSD(row.revenue)}</span>,
-    },
-    {
-      key: "roas",
-      header: "ROAS",
-      label: "ROAS",
-      align: "center",
-      minWidth: "88px",
-      sortValue: (row) => row.roas ?? -1,
-      render: (row) =>
-        row.spend > 0 && row.roas !== null ? (
-          <Pill tone={row.roas >= 2 ? "success" : row.roas >= 1 ? "warning" : "danger"}>
-            {fmtRoas(row.roas)}
-          </Pill>
-        ) : (
-          <span className="text-text-subtle">—</span>
-        ),
-    },
-    {
-      key: "platformLeads",
-      header: lang === "ar" ? "ليدز المنصات" : "Platform leads",
-      label: lang === "ar" ? "ليدز المنصات" : "Platform leads",
-      align: "center",
-      minWidth: "112px",
-      hideByDefault: true,
-      sortValue: (row) => row.platformLeads ?? -1,
-      render: (row) => <span className="num">{fmtNum(row.platformLeads)}</span>,
-    },
-    {
-      key: "conversionRate",
-      header: lang === "ar" ? "نسبة الإغلاق" : "Close rate",
-      label: lang === "ar" ? "نسبة الإغلاق" : "Close rate",
-      align: "center",
-      minWidth: "104px",
-      hideByDefault: true,
-      sortValue: (row) => row.conversionRate ?? -1,
-      render: (row) => <span className="num">{fmtPct(row.conversionRate)}</span>,
-    },
-  ];
-
   return (
     <div className="page-sections">
       <DashboardPageHeader
         flush
         icon={<GraduationCap size={20} />}
-        title={lang === "ar" ? "الدورات" : "Courses"}
+        title={lang === "ar" ? "مركز أداء الكورسات" : "Course performance center"}
         subtitle={
           organicScope
             ? lang === "ar"
               ? "كل دورة من مصادر Odoo غير المدفوعة، وتحتها حملات الأورجانيك المسجلة ومقارنتها شهرًا بشهر."
               : "Each course from non-paid Odoo sources, with its recorded Organic campaigns and month-to-month comparison."
             : lang === "ar"
-              ? "كل دورة في صف واحد، وتحتها الحملات الشغالة والقديمة ومقارنة شهر بشهر."
-              : "One row per course, with current campaigns, campaign history and month-to-month comparison."
+              ? "اختار الكورس، شوف أفضل الكرياتيفات الشغّالة فورًا، وبعدها أداء الحملات والمبيعات في مكان واحد."
+              : "Choose a course, see its best live creatives first, then review campaign and sales performance in one place."
         }
         period={reportingPeriod}
       />
 
       <FilterSummary />
-
-      {leadAlerts.isLoading || !leadAlerts.data ? (
-        <Skeleton className="h-[250px]" />
-      ) : leadAlerts.error ? (
-        <Notice tone="danger" icon={<TriangleAlert size={17} />}>
-          {lang === "ar"
-            ? `تعذّر تحميل مراقبة الليدز اليومية: ${(leadAlerts.error as Error).message}`
-            : `Daily lead monitor failed: ${(leadAlerts.error as Error).message}`}
-        </Notice>
-      ) : (
-        <CourseLeadMonitor report={leadAlerts.data} />
-      )}
 
       {isLoading || !data ? (
         <>
@@ -600,129 +451,20 @@ function Courses() {
                         : "Every campaign card states the attribution source it relied on.",
                     technical:
                       lang === "ar"
-                        ? "الترتيب: اسم الإعلان، ثم اسم مجموعة الإعلانات، ثم اسم الحملة، وأخيراً الدورة الغالبة في ليدز الحملة. الليدز من CRM، وأوامر البيع من Full Invoiced Orders، والفواتير والإيراد من الفواتير المدفوعة."
-                        : "Order: ad name, then ad-set name, then campaign name, then the campaign's dominant CRM course. Leads come from CRM, sales orders from Full Invoiced Orders, invoices and revenue from Paid Invoices.",
+                        ? "اسم الحملة هو الأساس، ثم الدورة المرتبطة بأداء الحملة. اسم الكرياتيف والإعلان والمجموعة يُستخدم كاكتشاف احتياطي إذا لم تكن الحملة مصنفة. الليدز من CRM والإيراد من الفواتير المدفوعة."
+                        : "Campaign name is authoritative, followed by the campaign's joined course. Creative, ad and ad-set names are discovery fallbacks only when the campaign is unclassified. Leads come from CRM and revenue from paid invoices.",
                   },
             ]}
           />
 
-          <div className="md:hidden">
-            <div className="mb-3 flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-brand">
-              <Search size={16} className="shrink-0 text-text-subtle" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={lang === "ar" ? "ابحث عن دورة" : "Search courses"}
-                className="min-w-0 flex-1 bg-transparent py-2 text-sm text-text outline-none"
-              />
-            </div>
-
-            {visibleCourses.length ? (
-              <div className="space-y-3">
-                {visibleCourses.map((course) => {
-                  const selected = selectedCourse?.key === course.key;
-                  return (
-                    <button
-                      type="button"
-                      key={course.key}
-                      onClick={() => setSelectedKey(course.key)}
-                      className={`card w-full overflow-hidden p-4 text-start transition-colors ${
-                        selected ? "border-brand bg-brand-soft/40" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
-                        <div className="min-w-0">
-                          <h2
-                            className="truncate text-sm font-semibold text-text"
-                            title={course.name}
-                          >
-                            {course.name}
-                          </h2>
-                          {course.mainCategory && (
-                            <p className="mt-0.5 truncate text-[11px] text-text-muted">
-                              {course.mainCategory}
-                            </p>
-                          )}
-                        </div>
-                        <Pill tone={course.spend > 0 ? "brand" : "neutral"}>
-                          {fmtUSD(course.spend)}
-                        </Pill>
-                      </div>
-
-                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-                        <MobileMetric
-                          label={lang === "ar" ? "الليدز" : "Leads"}
-                          value={fmtNum(course.crmLeads)}
-                        />
-                        <MobileMetric label="Lost" value={fmtNum(course.lost)} />
-                        <MobileMetric label="Won" value={fmtNum(course.won)} />
-                        <MobileMetric
-                          label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
-                          value={fmtNum(course.salesOrders)}
-                        />
-                        <MobileMetric
-                          label={lang === "ar" ? "الفواتير" : "Paid invoices"}
-                          value={fmtNum(course.invoices)}
-                        />
-                        <MobileMetric
-                          label={lang === "ar" ? "المحصل" : "Revenue"}
-                          value={fmtUSD(course.revenue)}
-                        />
-                      </dl>
-                      <p className="mt-3 text-[11px] font-medium text-brand">
-                        {selected
-                          ? lang === "ar"
-                            ? "تفاصيل الدورة ظاهرة تحت"
-                            : "Course detail shown below"
-                          : lang === "ar"
-                            ? "اضغط لعرض الحملات والمقارنة"
-                            : "Tap for campaigns and comparison"}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="card">
-                <EmptyState
-                  label={lang === "ar" ? "مفيش دورة مطابقة للبحث" : "No matching course"}
-                  compact
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="hidden md:block">
-            <DataTable
-              rows={courses}
-              cols={columns}
-              searchable={(row) => `${row.name} ${row.mainCategory}`}
-              search={search}
-              onSearchChange={setSearch}
-              onRowClick={(row) => setSelectedKey(row.key)}
-              initialSort={{ key: "spend", dir: -1 }}
-              pageSize={30}
-              maxHeight={680}
-              columnChooser
-              toolbar={
-                <span className="text-xs text-text-muted">
-                  {lang === "ar" ? "اضغط أي دورة للتفاصيل" : "Select a course for detail"}
-                </span>
-              }
-              csvFilename="engosoft-courses"
-              csvRow={(row) => ({
-                [lang === "ar" ? "الدورة" : "Course"]: row.name,
-                [lang === "ar" ? "مصروف عليها" : "Ad spend"]: row.spend,
-                [lang === "ar" ? "الليدز" : "CRM leads"]: row.crmLeads,
-                Lost: row.lost,
-                Won: row.won,
-                [lang === "ar" ? "أوامر البيع" : "Sales orders"]: row.salesOrders,
-                [lang === "ar" ? "الفواتير" : "Paid invoices"]: row.invoices,
-                [lang === "ar" ? "المحصل" : "Collected revenue"]: row.revenue,
-                ROAS: row.roas ?? "",
-              })}
-            />
-          </div>
+          <CoursePortfolioNavigator
+            courses={visibleCourses}
+            totalCourses={courses.length}
+            selectedKey={selectedCourse?.key ?? ""}
+            search={search}
+            onSearchChange={setSearch}
+            onSelect={setSelectedKey}
+          />
 
           {selectedCourse && (
             <CourseDetailPanel
@@ -733,10 +475,309 @@ function Courses() {
               organicScope={organicScope}
             />
           )}
+
+          {leadAlerts.isLoading || !leadAlerts.data ? (
+            <Skeleton className="h-[250px]" />
+          ) : leadAlerts.error ? (
+            <Notice tone="danger" icon={<TriangleAlert size={17} />}>
+              {lang === "ar"
+                ? `تعذّر تحميل مراقبة الليدز اليومية: ${(leadAlerts.error as Error).message}`
+                : `Daily lead monitor failed: ${(leadAlerts.error as Error).message}`}
+            </Notice>
+          ) : (
+            <CourseLeadMonitor report={leadAlerts.data} />
+          )}
         </>
       )}
     </div>
   );
+}
+
+type CourseRank = "revenue" | "spend" | "won" | "leads" | "roas";
+
+const COURSE_RANKS: Record<
+  CourseRank,
+  { ar: string; en: string; value: (course: CourseAgg) => number }
+> = {
+  revenue: { ar: "الإيراد", en: "Revenue", value: (course) => course.revenue },
+  spend: { ar: "الإنفاق", en: "Spend", value: (course) => course.spend },
+  won: { ar: "الصفقات", en: "Won", value: (course) => course.won },
+  leads: { ar: "الليدز", en: "Leads", value: (course) => course.crmLeads },
+  roas: { ar: "العائد", en: "ROAS", value: (course) => course.roas ?? -1 },
+};
+
+function CoursePortfolioNavigator({
+  courses,
+  totalCourses,
+  selectedKey,
+  search,
+  onSearchChange,
+  onSelect,
+}: {
+  courses: CourseAgg[];
+  totalCourses: number;
+  selectedKey: string;
+  search: string;
+  onSearchChange: (value: string) => void;
+  onSelect: (key: string) => void;
+}) {
+  const { lang } = useI18n();
+  const [rank, setRank] = useState<CourseRank>("revenue");
+  const [expanded, setExpanded] = useState(false);
+  const ranked = useMemo(
+    () =>
+      [...courses].sort(
+        (a, b) =>
+          COURSE_RANKS[rank].value(b) - COURSE_RANKS[rank].value(a) ||
+          b.revenue - a.revenue ||
+          a.name.localeCompare(b.name),
+      ),
+    [courses, rank],
+  );
+  const initial = ranked.slice(0, 9);
+  const selected = ranked.find((course) => course.key === selectedKey) ?? null;
+  const visible =
+    search.trim() || expanded
+      ? ranked
+      : selected && !initial.some((course) => course.key === selected.key)
+        ? [selected, ...initial.slice(0, 8)]
+        : initial;
+  const peak = Math.max(
+    1,
+    ...ranked.map((course) => Math.max(0, COURSE_RANKS[rank].value(course))),
+  );
+
+  const selectCourse = (key: string) => {
+    onSelect(key);
+    requestAnimationFrame(() =>
+      document
+        .getElementById("course-detail")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+      <div
+        className="relative overflow-hidden border-b border-border px-4 py-5 sm:px-6"
+        style={{
+          background:
+            "linear-gradient(115deg, color-mix(in oklab, var(--brand) 13%, var(--surface)), var(--surface) 46%, color-mix(in oklab, var(--warning) 7%, var(--surface)))",
+        }}
+      >
+        <div className="absolute -start-12 -top-16 h-44 w-44 rounded-full border-[28px] border-brand/5" />
+        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/20">
+                <LayoutGrid size={20} />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
+                  {lang === "ar" ? "Course command center" : "Course command center"}
+                </p>
+                <h2 className="text-lg font-bold text-text sm:text-xl">
+                  {lang === "ar" ? "اختار الكورس وخُد القرار" : "Choose a course and decide"}
+                </h2>
+              </div>
+            </div>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-text-muted">
+              {lang === "ar"
+                ? "كل كورس في بطاقة واحدة. افتحه لتشوف فورًا أفضل الإعلانات والكرياتيفات الشغّالة، ثم أداء الحملات والتاريخ."
+                : "One card per course. Open it to see live winning creatives first, followed by campaign performance and history."}
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto">
+            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-surface/90 px-3 shadow-sm xl:w-64">
+              <Search size={15} className="shrink-0 text-brand" />
+              <input
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder={lang === "ar" ? "ابحث: CFM، PMP، BIM…" : "Search CFM, PMP, BIM…"}
+                className="min-w-0 flex-1 bg-transparent text-xs text-text outline-none placeholder:text-text-subtle"
+              />
+              <span className="num text-[10px] text-text-subtle">{fmtNum(totalCourses)}</span>
+            </label>
+            <div className="flex overflow-x-auto rounded-xl border border-border bg-surface/90 p-1 shadow-sm">
+              {(Object.keys(COURSE_RANKS) as CourseRank[]).map((key) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setRank(key)}
+                  aria-pressed={rank === key}
+                  className={`min-h-8 shrink-0 rounded-lg px-2.5 text-[10px] font-bold transition-colors ${
+                    rank === key
+                      ? "bg-brand text-white"
+                      : "text-text-muted hover:bg-surface-2 hover:text-text"
+                  }`}
+                >
+                  {COURSE_RANKS[key][lang]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {visible.length ? (
+        <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3 sm:p-5">
+          {visible.map((course) => {
+            const selected = selectedKey === course.key;
+            const rankPosition = ranked.findIndex((row) => row.key === course.key) + 1;
+            const rankValue = COURSE_RANKS[rank].value(course);
+            const progress = Math.max(3, Math.min(100, (Math.max(0, rankValue) / peak) * 100));
+            return (
+              <button
+                type="button"
+                key={course.key}
+                onClick={() => selectCourse(course.key)}
+                aria-pressed={selected}
+                className={`group relative overflow-hidden rounded-2xl border p-4 text-start transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                  selected
+                    ? "border-brand bg-brand-soft/35 shadow-sm ring-1 ring-brand/15"
+                    : "border-border bg-surface hover:border-brand/30"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span
+                      className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[11px] font-bold ${
+                        rankPosition === 1
+                          ? "bg-amber-400 text-amber-950"
+                          : "bg-surface-2 text-text-muted"
+                      }`}
+                    >
+                      {rankPosition}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-bold text-text" title={course.name}>
+                        {course.name}
+                      </h3>
+                      <p
+                        className="truncate text-[10px] text-text-muted"
+                        title={course.mainCategory}
+                      >
+                        {course.mainCategory || (lang === "ar" ? "غير مصنف" : "Uncategorised")}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold ${
+                      course.spend > 0
+                        ? "bg-emerald-500/10 text-emerald-700"
+                        : "bg-surface-2 text-text-subtle"
+                    }`}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                    {course.spend > 0
+                      ? lang === "ar"
+                        ? "عليه حملات"
+                        : "Campaigns"
+                      : lang === "ar"
+                        ? "بدون صرف"
+                        : "No spend"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                  <CourseCardMetric
+                    label={lang === "ar" ? "المحصل" : "Revenue"}
+                    value={fmtUSD(course.revenue)}
+                    strong
+                  />
+                  <CourseCardMetric
+                    label={lang === "ar" ? "الإنفاق" : "Spend"}
+                    value={fmtUSD(course.spend)}
+                  />
+                  <CourseCardMetric
+                    label={lang === "ar" ? "Won" : "Won"}
+                    value={fmtNum(course.won)}
+                  />
+                  <CourseCardMetric label="ROAS" value={fmtRoas(course.roas)} />
+                </div>
+
+                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                  <span
+                    className="block h-full rounded-full bg-brand transition-[width] duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                  <span className="font-semibold text-text-muted">
+                    {COURSE_RANKS[rank][lang]}: {formatCourseRankValue(course, rank)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-bold text-brand">
+                    <Sparkles size={10} />
+                    {selected
+                      ? lang === "ar"
+                        ? "مفتوح الآن"
+                        : "Open now"
+                      : lang === "ar"
+                        ? "أفضل الكرياتيفات"
+                        : "Best creatives"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="p-5">
+          <EmptyState
+            label={lang === "ar" ? "مفيش كورس مطابق للبحث" : "No matching course"}
+            compact
+          />
+        </div>
+      )}
+
+      {!search.trim() && ranked.length > 9 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-border bg-surface-2/35 px-4 text-xs font-bold text-brand hover:bg-brand-soft/30"
+        >
+          <BookOpenCheck size={15} />
+          {expanded
+            ? lang === "ar"
+              ? "اعرض أهم 9 كورسات فقط"
+              : "Show the top 9 only"
+            : lang === "ar"
+              ? `اعرض كل الكورسات (${fmtNum(ranked.length)})`
+              : `Show all courses (${fmtNum(ranked.length)})`}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function CourseCardMetric({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9.5px] text-text-muted">{label}</div>
+      <div
+        className={`num mt-0.5 truncate text-sm text-text ${strong ? "font-bold" : "font-semibold"}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function formatCourseRankValue(course: CourseAgg, rank: CourseRank) {
+  if (rank === "revenue") return fmtUSD(course.revenue);
+  if (rank === "spend") return fmtUSD(course.spend);
+  if (rank === "won") return fmtNum(course.won);
+  if (rank === "leads") return fmtNum(course.crmLeads);
+  return fmtRoas(course.roas);
 }
 
 function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
@@ -1262,6 +1303,8 @@ function CourseDetailPanel({
           </div>
         )}
       </div>
+
+      {!organicScope && <CourseCreativeGallery courseName={course.name} />}
 
       {!organicScope && (
         <div>
