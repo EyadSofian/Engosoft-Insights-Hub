@@ -48,6 +48,7 @@ export type NexusPageType =
   | "media_plan"
   | "social_media"
   | "organic"
+  | "attribution"
   | "guide"
   | "other";
 
@@ -100,6 +101,7 @@ export function pageTypeFor(path: string): NexusPageType {
     "media-plan": "media_plan",
     "social-media": "social_media",
     organic: "organic",
+    attribution: "attribution",
     guide: "guide",
     // Legacy bookmarks that redirect into Accounting.
     "full-invoiced": "accounting",
@@ -253,7 +255,7 @@ export function contextPreamble(context: NexusPageContext): string {
   const put = (key: string, value: string | undefined | null) => {
     if (!value) return;
     const clean = String(value)
-      .replace(/[\][\[{}<>\n\r"]/g, " ")
+      .replace(/[\][{}<>\n\r"]/g, " ")
       .trim()
       .slice(0, 120);
     if (!clean) return;

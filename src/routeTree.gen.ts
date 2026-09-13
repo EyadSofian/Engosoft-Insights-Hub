@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountingRouteImport } from './routes/accounting'
 import { Route as AdsRouteImport } from './routes/ads'
+import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
@@ -66,6 +67,10 @@ import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-lead
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
+import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
+import { Route as ApiAttributionSummaryRouteImport } from './routes/api/attribution.summary'
+import { Route as ApiAttributionTokensRouteImport } from './routes/api/attribution.tokens'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
@@ -103,6 +108,11 @@ const AccountingRoute = AccountingRouteImport.update({
 const AdsRoute = AdsRouteImport.update({
   id: '/ads',
   path: '/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttributionRoute = AttributionRouteImport.update({
+  id: '/attribution',
+  path: '/attribution',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CampaignsRoute = CampaignsRouteImport.update({
@@ -377,6 +387,27 @@ const ApiYoyRoute = ApiYoyRouteImport.update({
   path: '/api/yoy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttributionConversationsRoute =
+  ApiAttributionConversationsRouteImport.update({
+    id: '/api/attribution/conversations',
+    path: '/api/attribution/conversations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionHealthRoute = ApiAttributionHealthRouteImport.update({
+  id: '/api/attribution/health',
+  path: '/api/attribution/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionSummaryRoute = ApiAttributionSummaryRouteImport.update({
+  id: '/api/attribution/summary',
+  path: '/api/attribution/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionTokensRoute = ApiAttributionTokensRouteImport.update({
+  id: '/api/attribution/tokens',
+  path: '/api/attribution/tokens',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
   id: '/api/auth/sso',
   path: '/api/auth/sso',
@@ -499,6 +530,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
@@ -553,6 +585,10 @@ export interface FileRoutesByFullPath {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -581,6 +617,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
@@ -635,6 +672,10 @@ export interface FileRoutesByTo {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -664,6 +705,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
@@ -718,6 +760,10 @@ export interface FileRoutesById {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
@@ -748,6 +794,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
@@ -802,6 +849,10 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
@@ -830,6 +881,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
@@ -884,6 +936,10 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
@@ -912,6 +968,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
@@ -966,6 +1023,10 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
@@ -995,6 +1056,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountingRoute: typeof AccountingRoute
   AdsRoute: typeof AdsRoute
+  AttributionRoute: typeof AttributionRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
@@ -1049,6 +1111,10 @@ export interface RootRouteChildren {
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
+  ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
+  ApiAttributionSummaryRoute: typeof ApiAttributionSummaryRoute
+  ApiAttributionTokensRoute: typeof ApiAttributionTokensRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
@@ -1095,6 +1161,13 @@ declare module '@tanstack/react-router' {
       path: '/ads'
       fullPath: '/ads'
       preLoaderRoute: typeof AdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attribution': {
+      id: '/attribution'
+      path: '/attribution'
+      fullPath: '/attribution'
+      preLoaderRoute: typeof AttributionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns': {
@@ -1475,6 +1548,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/attribution/conversations': {
+      id: '/api/attribution/conversations'
+      path: '/api/attribution/conversations'
+      fullPath: '/api/attribution/conversations'
+      preLoaderRoute: typeof ApiAttributionConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/health': {
+      id: '/api/attribution/health'
+      path: '/api/attribution/health'
+      fullPath: '/api/attribution/health'
+      preLoaderRoute: typeof ApiAttributionHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/summary': {
+      id: '/api/attribution/summary'
+      path: '/api/attribution/summary'
+      fullPath: '/api/attribution/summary'
+      preLoaderRoute: typeof ApiAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/tokens': {
+      id: '/api/attribution/tokens'
+      path: '/api/attribution/tokens'
+      fullPath: '/api/attribution/tokens'
+      preLoaderRoute: typeof ApiAttributionTokensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/sso': {
       id: '/api/auth/sso'
       path: '/api/auth/sso'
@@ -1643,6 +1744,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountingRoute: AccountingRoute,
   AdsRoute: AdsRoute,
+  AttributionRoute: AttributionRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
@@ -1697,6 +1799,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
+  ApiAttributionHealthRoute: ApiAttributionHealthRoute,
+  ApiAttributionSummaryRoute: ApiAttributionSummaryRoute,
+  ApiAttributionTokensRoute: ApiAttributionTokensRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,

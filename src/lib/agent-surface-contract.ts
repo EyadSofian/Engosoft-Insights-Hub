@@ -32,11 +32,7 @@
 export const AGENT_CONTRACT_VERSION = "1.0.0";
 
 export type SurfaceStatus =
-  | "CONNECTED"
-  | "PARTIAL"
-  | "MISSING"
-  | "NOT_AGENT_SAFE"
-  | "NOT_APPLICABLE";
+  "CONNECTED" | "PARTIAL" | "MISSING" | "NOT_AGENT_SAFE" | "NOT_APPLICABLE";
 
 export type SurfaceOperation = "summary" | "list" | "detail" | "compare" | "trend" | "search";
 
@@ -1096,6 +1092,84 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
   },
   {
+    id: "attribution",
+    routes: ["/attribution"],
+    section: "campaigns",
+    title: t("إسناد محادثات واتساب", "Conversation attribution"),
+    status: "CONNECTED",
+    sensitivity: "personal",
+    views: [],
+    operations: ["summary", "list"],
+    filters: [
+      ...PERIOD_FILTERS,
+      "platform",
+      "source",
+      "medium",
+      "campaignId",
+      "adsetId",
+      "adId",
+      "branchId",
+      "inboxId",
+      "agentId",
+      "method",
+      "confidence",
+      "crmStatus",
+    ],
+    entities: ["campaign", "source"],
+    sources: [
+      {
+        endpoint: "/api/attribution/summary",
+        as: "root",
+        required: true,
+        operations: ["summary"],
+        why: "Evidence-backed attribution totals, campaign breakdowns, spend coverage and trend.",
+        summaryPaths: ["totals", "campaigns", "trend"],
+      },
+      {
+        endpoint: "/api/attribution/conversations",
+        as: "root",
+        required: true,
+        operations: ["list"],
+        why: "The bounded conversation rows behind attribution totals and CRM outcomes.",
+        summaryPaths: ["total"],
+      },
+    ],
+    rows: [
+      {
+        collection: "rows",
+        kind: "conversation attribution",
+        fields: [
+          "conversation_id",
+          "latest_touch_at",
+          "platform",
+          "source",
+          "medium",
+          "campaign_name",
+          "campaign_id",
+          "branch_name",
+          "branch_id",
+          "attribution_method",
+          "confidence",
+          "crm_status",
+          "crm_won",
+          "revenue",
+        ],
+        limit: 50,
+      },
+    ],
+    freshnessPaths: ["trend"],
+    caveats: [
+      t(
+        "المصدر غير المعروف يفضل غير معروف؛ النظام لا يحوله تلقائيًا إلى أورجانيك.",
+        "Unknown attribution stays unknown; the system never silently reclassifies it as organic.",
+      ),
+      t(
+        "الصرف وCPL وCPA وROAS لا يظهروا إلا عند تطابق معرّف الحملة تطابقًا دقيقًا.",
+        "Spend, CPL, CPA and ROAS appear only when campaign IDs match exactly.",
+      ),
+    ],
+  },
+  {
     id: "organic",
     routes: ["/organic"],
     section: "social",
@@ -1195,7 +1269,11 @@ export function contractForRoute(pathname: string): SurfaceContract | null {
  */
 export function sourcesFor(
   surface: SurfaceContract,
-  options: { view?: string | null; operation?: SurfaceOperation; args?: Record<string, string> } = {},
+  options: {
+    view?: string | null;
+    operation?: SurfaceOperation;
+    args?: Record<string, string>;
+  } = {},
 ): SurfaceSource[] {
   const { view = null, operation = "summary", args = {} } = options;
   /**

@@ -84,9 +84,9 @@ const phoneEvidenceCache = new Map<
   { expiresAt: number; value: ChatwootPhoneConversationEvidence[] }
 >();
 const phoneEvidenceInFlight = new Map<string, Promise<ChatwootPhoneConversationEvidence[]>>();
-let storedPhoneEvidencePromise:
-  | Promise<Map<string, { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }>>
-  | null = null;
+let storedPhoneEvidencePromise: Promise<
+  Map<string, { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }>
+> | null = null;
 let storedPhoneEvidenceExpiresAt = 0;
 let requestNotBefore = 0;
 
@@ -136,9 +136,10 @@ async function request(path: string, init?: RequestInit, attempt = 0): Promise<u
   });
   if (response.status === 429 && attempt < 3) {
     const retryAfter = Number(response.headers.get("retry-after"));
-    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-      ? Math.min(15_000, retryAfter * 1_000)
-      : Math.min(12_000, 1_500 * 2 ** attempt);
+    const waitMs =
+      Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(15_000, retryAfter * 1_000)
+        : Math.min(12_000, 1_500 * 2 ** attempt);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     return request(path, init, attempt + 1);
   }
@@ -157,7 +158,11 @@ function unix(value: unknown): number {
 }
 
 function isClosedChatStatus(value: unknown): boolean {
-  return ["resolved", "closed"].includes(String(value || "").trim().toLowerCase());
+  return ["resolved", "closed"].includes(
+    String(value || "")
+      .trim()
+      .toLowerCase(),
+  );
 }
 
 function isAwaitingReply(row: Record<string, unknown>): boolean {
@@ -222,10 +227,7 @@ function parseStoredPhoneEvidence(value: string): ChatwootPhoneConversationEvide
 
 async function readStoredPhoneEvidence() {
   if (!databaseConfigured()) {
-    return new Map<
-      string,
-      { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }
-    >();
+    return new Map<string, { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }>();
   }
   if (storedPhoneEvidencePromise && storedPhoneEvidenceExpiresAt > Date.now()) {
     return storedPhoneEvidencePromise;
@@ -347,7 +349,9 @@ async function loadPhoneEvidence(phoneKey: string): Promise<ChatwootPhoneConvers
           .filter((row): row is ChatwootPhoneConversationEvidence => Boolean(row));
       }),
     );
-    const value = conversations.flat().sort((left, right) => right.lastActivityAt - left.lastActivityAt);
+    const value = conversations
+      .flat()
+      .sort((left, right) => right.lastActivityAt - left.lastActivityAt);
     phoneEvidenceCache.set(phoneKey, { expiresAt: Date.now() + PHONE_EVIDENCE_TTL_MS, value });
     return value;
   })().finally(() => phoneEvidenceInFlight.delete(phoneKey));
@@ -380,10 +384,7 @@ export async function getChatwootPhoneConversationEvidence(
   let storageError: string | null = null;
   const stored = await readStoredPhoneEvidence().catch((error) => {
     storageError = error instanceof Error ? error.message : "Chatwoot cache is unavailable";
-    return new Map<
-      string,
-      { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }
-    >();
+    return new Map<string, { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }>();
   });
   const staleBefore = Date.now() - STORED_PHONE_EVIDENCE_TTL_MS;
   const remoteCandidates: string[] = [];
@@ -482,12 +483,7 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
   const contact = object(root.contact) || metaSender || object(root.sender);
   const contactInbox = object(conversation.contact_inbox);
   const phoneKey = chatwootPhoneKey(
-    String(
-      contact?.phone_number ||
-        metaSender?.phone_number ||
-        contactInbox?.source_id ||
-        "",
-    ),
+    String(contact?.phone_number || metaSender?.phone_number || contactInbox?.source_id || ""),
   );
   const conversationId = Number(conversation.id || conversation.display_id);
   if (!phoneKey || !Number.isInteger(conversationId) || conversationId <= 0) {
@@ -499,11 +495,7 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
   }
 
   const saved = await readStoredPhoneEvidence().catch(
-    () =>
-      new Map<
-        string,
-        { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }
-      >(),
+    () => new Map<string, { refreshedAt: number; value: ChatwootPhoneConversationEvidence[] }>(),
   );
   const existingRows = saved.get(phoneKey)?.value ?? phoneEvidenceCache.get(phoneKey)?.value ?? [];
   const previous = existingRows.find((row) => row.conversationId === conversationId);
@@ -513,8 +505,9 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
     : [];
   const eventMessage = event.startsWith("message_") ? root : messages.at(-1) || null;
   const messageType = String(eventMessage?.message_type ?? "").toLowerCase();
-  const senderType = String(eventMessage?.sender_type || object(eventMessage?.sender)?.type || "")
-    .toLowerCase();
+  const senderType = String(
+    eventMessage?.sender_type || object(eventMessage?.sender)?.type || "",
+  ).toLowerCase();
   const incoming = messageType === "0" || messageType === "incoming" || senderType === "contact";
   const outgoing =
     messageType === "1" ||
@@ -538,16 +531,16 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
   const next: ChatwootPhoneConversationEvidence = {
     phoneKey,
     contactId: Number(contact?.id || previous?.contactId || 0),
-    contactName: String(contact?.name || contact?.available_name || previous?.contactName || "").trim(),
+    contactName: String(
+      contact?.name || contact?.available_name || previous?.contactName || "",
+    ).trim(),
     conversationId,
     status,
     assigneeId: numberOrNull(assignee?.id) ?? previous?.assigneeId ?? null,
     assigneeName: String(
       assignee?.available_name || assignee?.name || previous?.assigneeName || "",
     ).trim(),
-    agentNames: [
-      ...new Set([...(previous?.agentNames ?? []), eventAgentName].filter(Boolean)),
-    ],
+    agentNames: [...new Set([...(previous?.agentNames ?? []), eventAgentName].filter(Boolean))],
     lastActivityAt: activityAt,
     agentContactedAt: Math.max(
       previous?.agentContactedAt ?? 0,
@@ -560,7 +553,7 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
     awaitingReply: isClosedChatStatus(status)
       ? false
       : privateMessage || (!incoming && !outgoing)
-        ? previous?.awaitingReply ?? false
+        ? (previous?.awaitingReply ?? false)
         : incoming,
     url: `${cfg.baseUrl}/app/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${conversationId}`,
   };
@@ -574,6 +567,82 @@ export async function ingestChatwootPhoneWebhook(payload: unknown): Promise<{
     value: rows,
   });
   return { accepted: true, phoneKey, conversationId };
+}
+
+/**
+ * Attribution sync deliberately uses these small, rate-limited helpers instead
+ * of a second Chatwoot client. The label endpoint replaces the entire label
+ * set, so callers must read, merge and compare before calling the setter.
+ */
+export async function getChatwootConversationLabels(conversationId: number): Promise<string[]> {
+  if (!Number.isInteger(conversationId) || conversationId <= 0) {
+    throw new Error("A valid Chatwoot conversation id is required");
+  }
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/labels`,
+    ),
+  );
+  return Array.isArray(response?.payload)
+    ? response.payload.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+}
+
+export async function replaceChatwootConversationLabels(
+  conversationId: number,
+  labels: string[],
+): Promise<void> {
+  if (!Number.isInteger(conversationId) || conversationId <= 0) {
+    throw new Error("A valid Chatwoot conversation id is required");
+  }
+  const cfg = config();
+  await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/labels`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        labels: [...new Set(labels.map((value) => value.trim()).filter(Boolean))],
+      }),
+    },
+  );
+}
+
+/**
+ * Reads only a single conversation's custom attributes. This is used by the
+ * attribution projector to avoid an update/write webhook loop. It is never
+ * used by dashboard aggregates and does not enumerate conversations.
+ */
+export async function getChatwootConversationCustomAttributes(
+  conversationId: number,
+): Promise<Record<string, unknown>> {
+  if (!Number.isInteger(conversationId) || conversationId <= 0) {
+    throw new Error("A valid Chatwoot conversation id is required");
+  }
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}`,
+    ),
+  );
+  return object(response?.custom_attributes) || {};
+}
+
+export async function mergeChatwootConversationCustomAttributes(
+  conversationId: number,
+  customAttributes: Record<string, string>,
+): Promise<void> {
+  if (!Number.isInteger(conversationId) || conversationId <= 0) {
+    throw new Error("A valid Chatwoot conversation id is required");
+  }
+  const cfg = config();
+  await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/custom_attributes`,
+    {
+      method: "POST",
+      body: JSON.stringify({ custom_attributes: customAttributes, merge: true }),
+    },
+  );
 }
 
 function isoStart(date: string) {
