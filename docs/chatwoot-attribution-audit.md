@@ -93,8 +93,10 @@ Authenticated account API findings:
   were inspected only in masked form. No branch mapping is configured or inferred.
 - 746 account labels exist. Existing source-like labels include `facebook` and
   `instagram`, but there is no managed attribution label namespace.
-- There are no conversation custom-attribute definitions, 67 contact definitions, and
-  no attribution-oriented contact definition except a pre-existing campaign field.
+- The audit found no conversation custom-attribute definitions, 67 contact definitions,
+  and no attribution-oriented contact definition except a pre-existing campaign field.
+  The staged rollout then created the 15 reviewed conversation definitions listed in
+  the UX plan; a repeat dry-run confirmed that none remain missing.
 - Seven account-level outgoing webhooks are registered. The existing
   `Engosoft Insights lead sync` webhook already targets the production Insights
   endpoint and subscribes to `conversation_created`, `conversation_updated`,
@@ -300,3 +302,36 @@ contact, token or ad secret.
   with no local match remains exact referral attribution with unresolved enrichment.
 - Historical conversations that never stored referral/token evidence remain `unknown`,
   not retroactively organic or paid.
+
+## P. Production rollout verification — 2026-09-13
+
+- The attribution commits were pushed to both the dedicated attribution branch and
+  `main`; Railway built and deployed the same `main` revision successfully.
+- `/api/attribution/health`, `/api/attribution/summary`,
+  `/api/attribution/conversations`, and `/attribution` all responded successfully from
+  the public Railway domain and created/queried the PostgreSQL schema.
+- The existing Chatwoot webhook began delivering real account events immediately.
+  Sanitized database aggregates confirmed processed `conversation_created` and inbound
+  `message_created` events plus ignored non-attribution updates, with no failures or
+  pending work. No contact, message, phone, or conversation value was printed.
+- A synthetic outbound event was sent twice to the production webhook. The first result
+  was accepted with `duplicate: false`; the second was accepted with `duplicate: true`;
+  the durable health counter increased to one. The single synthetic event row was then
+  removed by its exact reserved conversation/message ID, leaving real data untouched.
+- An unsigned request returned HTTP 401. The real configured webhook's legacy secret
+  matches Railway, and native HMAC support remains staged until its signing key is
+  verified on an actual delivery.
+- Chatwoot now has all 15 reviewed conversation attribution definitions. Railway moved
+  from capture-only to `CHATWOOT_ATTRIBUTION_SYNC_MODE=attributes`; managed labels remain
+  disabled until their separate rollout stage.
+- A bounded 1–13 September backfill scanned 50 recently active conversations and created
+  194 previously unseen inbound-message projections. Those historical messages contained
+  no source evidence, so the 47 resulting conversation rows remain explicitly `unknown`;
+  no campaign or spend was fabricated. Chatwoot attribute write-back was disabled for this
+  historical pass. A discovered message-pagination overlap was corrected, and only the
+  affected backfill duplicate counters were cleared.
+- The complete Vitest suite passed (30 files, 676 tests), together with attribution
+  fixtures, the bounded Chatwoot architecture test, TypeScript, targeted ESLint,
+  production build, and browser verification of the page and KPI drill-down. The
+  percentage fixture also verifies that a complete unknown share is rendered as 100%,
+  rather than as its underlying ratio value of 1.

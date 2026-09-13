@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import {
+  attributionPercentage,
   managedAttributionLabels,
   normalizeChatwootAttribution,
   verifyAttributionTrackingToken,
@@ -18,6 +19,10 @@ process.env.CHATWOOT_API_TOKEN = "test-token";
 process.env.CHATWOOT_ATTRIBUTION_BRANCH_MAP_JSON = JSON.stringify({
   inboxes: { 15: { id: "riyadh", name: "Riyadh" } },
 });
+
+assert.equal(attributionPercentage(48, 48), 100);
+assert.equal(attributionPercentage(1, 4), 25);
+assert.equal(attributionPercentage(0, 0), null);
 
 const signedToken = (nonce) =>
   `${nonce}.${createHmac("sha256", process.env.CHATWOOT_ATTRIBUTION_TOKEN_SECRET)

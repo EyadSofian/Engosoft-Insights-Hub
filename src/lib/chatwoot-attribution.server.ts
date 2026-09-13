@@ -1266,6 +1266,10 @@ async function metaSpendForCampaigns(
   };
 }
 
+export function attributionPercentage(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? (numerator / denominator) * 100 : null;
+}
+
 export async function getAttributionSummary(filters: AttributionFilters = {}) {
   if (!databaseConfigured()) {
     return {
@@ -1371,7 +1375,7 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
       lost: Number(totals.lost || 0),
       revenue:
         totals.revenue === null || totals.revenue === undefined ? null : Number(totals.revenue),
-      unknownRate: conversations ? Number(totals.unknown_conversations || 0) / conversations : null,
+      unknownRate: attributionPercentage(Number(totals.unknown_conversations || 0), conversations),
       spend: spend.total,
       spendAvailable: spend.available,
       spendCoveredConversations,

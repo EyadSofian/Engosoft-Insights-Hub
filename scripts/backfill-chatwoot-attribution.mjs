@@ -130,9 +130,12 @@ async function messagesFor(conversationId) {
     const rows = arrayFrom(payload);
     if (!rows.length) break;
     collected.push(...rows);
-    const lastId = rows.at(-1)?.id;
-    if (!lastId || String(lastId) === before || rows.length < 20) break;
-    before = String(lastId);
+    // Chatwoot returns each page in ascending order. Its `before` cursor must
+    // therefore use the oldest (first) message, otherwise the next request
+    // overlaps the current page and creates avoidable duplicate deliveries.
+    const oldestId = rows.at(0)?.id;
+    if (!oldestId || String(oldestId) === before || rows.length < 20) break;
+    before = String(oldestId);
   }
   return collected;
 }
@@ -227,7 +230,9 @@ console.log(
       to,
       dateField,
       conversationsProcessed: state.processed,
-      evidenceBackedInboundMessages: state.projected,
+      ...(apply
+        ? { projectedInboundMessages: state.projected }
+        : { attributableInboundMessages: state.projected }),
       skippedOutsideWindow: state.skipped,
       nextPage: state.nextPage,
       checkpoint: stateFile,
