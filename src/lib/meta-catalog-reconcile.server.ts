@@ -171,7 +171,8 @@ async function loadCandidates(): Promise<ReconcileCandidate[]> {
             COALESCE(ads.campaign_id,'') AS campaign_id,
             COALESCE(ads.adset_id,'') AS adset_id,
             cr.row_data IS NOT NULL AS has_creative_row,
-            COALESCE(cr.row_data ? 'Lead Form ID', false) AS current_schema,
+            -- "Lead Form Source" arrived with the page-post form fallback; older rows are re-read.
+            COALESCE(cr.row_data ? 'Lead Form Source', false) AS current_schema,
             COALESCE(cr.row_data->>'__synced_at','') AS synced_at,
             f.reason AS last_failure
        FROM ids
