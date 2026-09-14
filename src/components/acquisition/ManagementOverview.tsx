@@ -1,0 +1,650 @@
+import type { ReactNode } from "react";
+import {
+  ArrowRight,
+  BadgeDollarSign,
+  CheckCircle2,
+  CircleDashed,
+  DollarSign,
+  Filter,
+  Gauge,
+  Image as ImageIcon,
+  Megaphone,
+  Scale,
+  ShieldCheck,
+  Target,
+  Trophy,
+  Users,
+} from "lucide-react";
+import { KpiRow, PageSection } from "@/components/dashboard-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { Card, Pill } from "@/components/ui-bits";
+import type { Kpi, KpiFormat, KpiStatus } from "@/lib/closed-loop-kpis";
+import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import type { ClosedLoopResponse } from "./ClosedLoop";
+
+/**
+ * The first screen of Acquisition, for a manager rather than an analyst.
+ *
+ * Every figure comes from the server's scoped KPI objects, so the card, its
+ * definition and its numerator/denominator can never disagree. A figure whose
+ * source is not connected or not yet synced says so in words; it is never
+ * drawn as 0.
+ */
+
+type Lang = "ar" | "en";
+
+export const STATUS_TEXT: Record<Exclude<KpiStatus, "ok">, { en: string; ar: string }> = {
+  no_denominator: { en: "Nothing to divide by", ar: "لا يوجد مقام للقسمة" },
+  pending_sync: { en: "Pending sync", ar: "بانتظار المزامنة" },
+  not_connected: { en: "Not connected", ar: "غير متصل" },
+  historical_evidence_missing: {
+    en: "Historical evidence missing",
+    ar: "الدليل التاريخي غير متوفر",
+  },
+};
+
+export function formatKpiValue(value: number, format: KpiFormat): string {
+  switch (format) {
+    case "usd":
+      return fmtUSD(value);
+    case "ratio":
+      return `${value.toFixed(2)}×`;
+    case "percent":
+      return fmtPct(value * 100, 1);
+    default:
+      return fmtNum(value);
+  }
+}
+
+/** A KPI's value, or the reason it has none. Never a zero standing in for "unknown". */
+export function kpiDisplay(kpi: Kpi | undefined, lang: Lang): string {
+  if (!kpi) return lang === "ar" ? "غير متوفر" : "Unavailable";
+  if (kpi.status !== "ok" || kpi.value === null) {
+    return STATUS_TEXT[kpi.status === "ok" ? "no_denominator" : kpi.status][lang];
+  }
+  return formatKpiValue(kpi.value, kpi.format);
+}
+
+function KpiFigure({
+  kpi,
+  index,
+  icon,
+  tone,
+  sub,
+  loading,
+  hero,
+}: {
+  kpi: Kpi | undefined;
+  index: number;
+  icon: ReactNode;
+  tone: "violet" | "mint" | "sky" | "amber" | "rose";
+  sub?: string;
+  loading: boolean;
+  hero?: boolean;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const label = kpi ? (A ? kpi.label.ar : kpi.label.en) : "—";
+  const unavailable = kpi && (kpi.status !== "ok" || kpi.value === null);
+  const supporting =
+    kpi?.numerator && kpi.denominator
+      ? [
+          {
+            key: "numerator",
+            label: A ? kpi.numerator.label.ar : kpi.numerator.label.en,
+            value: formatKpiValue(kpi.numerator.value, kpi.numerator.format),
+          },
+          {
+            key: "denominator",
+            label: A ? kpi.denominator.label.ar : kpi.denominator.label.en,
+            value: formatKpiValue(kpi.denominator.value, kpi.denominator.format),
+          },
+        ]
+      : undefined;
+  return (
+    <MetricDetailTrigger
+      detail={{
+        id: `acquisition_performance.overview.${kpi?.key ?? index}`,
+        title: label,
+        value: kpiDisplay(kpi, lang),
+        tone: unavailable ? "slate" : tone,
+        icon,
+        definition: kpi ? (A ? kpi.definition.ar : kpi.definition.en) : "",
+        formula: kpi?.formula,
+        supporting,
+        caveat:
+          unavailable && kpi
+            ? A
+              ? `لا يوجد رقم: ${STATUS_TEXT[kpi.status === "ok" ? "no_denominator" : kpi.status].ar}. لا يُعرض صفر مكانه.`
+              : `No figure: ${STATUS_TEXT[kpi.status === "ok" ? "no_denominator" : kpi.status].en}. A zero is never shown in its place.`
+            : undefined,
+      }}
+      card={{ index, sub, subWrap: true, loading, hero, valueWrap: Boolean(unavailable) }}
+    />
+  );
+}
+
+export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const k = data?.kpis;
+  const shown = (key: string) => (k?.[key] ? kpiDisplay(k[key], lang) : "—");
+  return (
+    <PageSection
+      level="headline"
+      title={A ? "من الإعلان إلى الإيراد" : "From ad to revenue"}
+      hint={
+        A
+          ? "العملاء والمبيعات والإيراد للعملاء الذين نعرف إعلانهم بالضبط. اضغط أي رقم لترى كيف حُسب."
+          : "Leads, sales and revenue for leads we can trace to their exact ad. Press any figure to see how it was calculated."
+      }
+    >
+      <KpiRow>
+        <KpiFigure
+          kpi={k?.adSpend}
+          index={0}
+          icon={<DollarSign size={17} />}
+          tone="amber"
+          loading={loading}
+          sub={
+            A
+              ? `منها ${shown("trackedSpend")} على حملات متتبَّعة`
+              : `${shown("trackedSpend")} on tracked campaigns`
+          }
+        />
+        <KpiFigure
+          kpi={k?.leads}
+          index={1}
+          icon={<Users size={17} />}
+          tone="violet"
+          loading={loading}
+          sub={
+            A
+              ? `${shown("trackedLeads")} من إعلانات متتبَّعة`
+              : `${shown("trackedLeads")} from tracked ads`
+          }
+        />
+        <KpiFigure
+          kpi={k?.crmMatched}
+          index={2}
+          icon={<ShieldCheck size={17} />}
+          tone="sky"
+          loading={loading}
+          sub={
+            A ? `${shown("crmMatchRate")} من كل العملاء` : `${shown("crmMatchRate")} of all leads`
+          }
+        />
+        <KpiFigure
+          kpi={k?.qualified}
+          index={3}
+          icon={<Target size={17} />}
+          tone="sky"
+          loading={loading}
+          sub={
+            A
+              ? `معدل التأهيل ${shown("qualificationRate")}`
+              : `${shown("qualificationRate")} qualification rate`
+          }
+        />
+        <KpiFigure
+          kpi={k?.won}
+          index={4}
+          icon={<Trophy size={17} />}
+          tone="mint"
+          loading={loading}
+          sub={A ? `معدل الفوز ${shown("winRate")}` : `${shown("winRate")} win rate`}
+        />
+        <KpiFigure
+          kpi={k?.revenue}
+          index={5}
+          icon={<BadgeDollarSign size={17} />}
+          tone="mint"
+          loading={loading}
+          hero
+          sub={A ? `${shown("revenuePerLead")} لكل عميل` : `${shown("revenuePerLead")} per lead`}
+        />
+        <KpiFigure
+          kpi={k?.roasAllSpend}
+          index={6}
+          icon={<Gauge size={17} />}
+          tone="violet"
+          loading={loading}
+          sub={
+            A
+              ? `${shown("roasTracked")} على الحملات المتتبَّعة`
+              : `${shown("roasTracked")} on tracked campaigns`
+          }
+        />
+        <KpiFigure
+          kpi={k?.costPerCustomerAll}
+          index={7}
+          icon={<Scale size={17} />}
+          tone="rose"
+          loading={loading}
+          sub={
+            A
+              ? `${shown("costPerCustomerTracked")} على الحملات المتتبَّعة`
+              : `${shown("costPerCustomerTracked")} on tracked campaigns`
+          }
+        />
+      </KpiRow>
+    </PageSection>
+  );
+}
+
+export function SimpleFunnel({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const k = data?.kpis;
+  const clicks = data?.totals?.clicks ?? 0;
+  const steps: { key: string; label: string; value: string; count?: number; note?: string }[] = [
+    {
+      key: "spend",
+      label: A ? "صرف الإعلانات" : "Ad spend",
+      value: kpiDisplay(k?.adSpend, lang),
+      note: clicks ? (A ? `${fmtNum(clicks)} نقرة` : `${fmtNum(clicks)} clicks`) : undefined,
+    },
+    {
+      key: "leads",
+      label: A ? "عملاء من إعلانات متتبَّعة" : "Leads from tracked ads",
+      value: kpiDisplay(k?.trackedLeads, lang),
+      count: k?.trackedLeads?.value ?? undefined,
+    },
+    {
+      key: "matched",
+      label: A ? "مطابق في CRM" : "CRM matched",
+      value: kpiDisplay(k?.crmMatched, lang),
+      count: k?.crmMatched?.value ?? undefined,
+    },
+    {
+      key: "qualified",
+      label: A ? "مؤهل" : "Qualified",
+      value: kpiDisplay(k?.qualified, lang),
+      count: k?.qualified?.value ?? undefined,
+    },
+    {
+      key: "won",
+      label: A ? "مكسوب" : "Won",
+      value: kpiDisplay(k?.won, lang),
+      count: k?.won?.value ?? undefined,
+    },
+    {
+      key: "revenue",
+      label: A ? "إيراد مدفوع" : "Paid revenue",
+      value: kpiDisplay(k?.revenue, lang),
+    },
+  ];
+  return (
+    <PageSection
+      level="insight"
+      title={A ? "رحلة العميل" : "Customer journey"}
+      icon={<Filter size={16} />}
+      tone="sky"
+      hint={
+        A
+          ? "كل خطوة نسبة من الخطوة التي قبلها. العملاء هنا هم من نعرف إعلانهم بالضبط."
+          : "Each step is a share of the step before it. Leads here are those whose exact ad is known."
+      }
+    >
+      <Card padded>
+        <ol className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          {steps.map((step, index) => {
+            const previous = steps[index - 1]?.count;
+            const rate =
+              step.count !== undefined && previous ? (step.count / previous) * 100 : null;
+            return (
+              <li key={step.key} className="relative rounded-xl bg-surface-2 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  {step.label}
+                </div>
+                <div className="num mt-1 text-lg font-bold text-text">
+                  {loading ? "…" : step.value}
+                </div>
+                <div className="mt-0.5 min-h-4 text-[11px] text-text-muted">
+                  {rate !== null && rate <= 100
+                    ? A
+                      ? `${fmtPct(rate, 1)} من السابق`
+                      : `${fmtPct(rate, 1)} of previous`
+                    : (step.note ?? "")}
+                </div>
+                {index < steps.length - 1 ? (
+                  <ArrowRight
+                    size={14}
+                    aria-hidden
+                    className="absolute -end-2.5 top-1/2 hidden -translate-y-1/2 text-text-subtle xl:block rtl:rotate-180"
+                  />
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
+    </PageSection>
+  );
+}
+
+const PLATFORM_NAME: Record<string, { en: string; ar: string }> = {
+  facebook: { en: "Facebook", ar: "فيسبوك" },
+  instagram: { en: "Instagram", ar: "إنستغرام" },
+  messenger: { en: "Messenger", ar: "ماسنجر" },
+  audience_network: { en: "Audience Network", ar: "شبكة الجمهور" },
+  meta: { en: "Meta", ar: "Meta" },
+  whatsapp: { en: "WhatsApp", ar: "واتساب" },
+  unknown: { en: "Unknown platform", ar: "منصة غير معروفة" },
+};
+const ENTITY_NAME: Record<string, { en: string; ar: string }> = {
+  meta_lead: { en: "Instant form", ar: "نموذج فوري" },
+  chatwoot_conversation: { en: "Conversation", ar: "محادثة" },
+  landing_submission: { en: "Landing page form", ar: "نموذج صفحة هبوط" },
+};
+
+export function BestPerformers({
+  data,
+  loading,
+  onOpenCreative,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+  onOpenCreative: (id: string) => void;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const i = data?.insights;
+  const roas = (value: number | null | undefined) => (value == null ? "—" : `${value.toFixed(2)}×`);
+  const card = (props: {
+    icon: ReactNode;
+    eyebrow: string;
+    title: ReactNode;
+    value: string;
+    lines: string[];
+    thumbnail?: string;
+    onClick?: () => void;
+  }) => (
+    <Card
+      padded
+      className={props.onClick ? "cursor-pointer transition-colors hover:border-brand" : ""}
+    >
+      <div
+        role={props.onClick ? "button" : undefined}
+        tabIndex={props.onClick ? 0 : undefined}
+        onClick={props.onClick}
+        onKeyDown={(event) => {
+          if (props.onClick && (event.key === "Enter" || event.key === " ")) props.onClick();
+        }}
+        className="flex gap-3"
+      >
+        {props.thumbnail !== undefined ? (
+          props.thumbnail ? (
+            <img
+              src={props.thumbnail}
+              alt=""
+              loading="lazy"
+              className="h-16 w-16 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-muted">
+              <ImageIcon size={18} />
+            </div>
+          )
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            {props.icon}
+            {props.eyebrow}
+          </div>
+          <div className="mt-1 line-clamp-2 text-sm font-semibold text-text">{props.title}</div>
+          <div className="num mt-1 text-lg font-bold text-text">{loading ? "…" : props.value}</div>
+          {props.lines.map((line) => (
+            <div key={line} className="text-xs text-text-muted">
+              {line}
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+  const none = A ? "لا توجد بيانات كافية في الفترة" : "Not enough data in this period";
+  const source = i?.bestLeadSource;
+  return (
+    <PageSection
+      level="insight"
+      title={A ? "الأفضل في الفترة" : "Best in this period"}
+      icon={<Trophy size={16} />}
+      tone="mint"
+      hint={A ? "مرتبة بالإيراد المدفوع." : "Ranked by paid revenue."}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        {card({
+          icon: <ImageIcon size={12} />,
+          eyebrow: A ? "أفضل مادة إعلانية" : "Best creative",
+          title: i?.bestCreative?.creativeName || none,
+          value: i?.bestCreative ? fmtUSD(i.bestCreative.revenue) : "—",
+          lines: i?.bestCreative
+            ? [
+                `${fmtNum(i.bestCreative.won)} ${A ? "عميل مكسوب" : "won"} · ROAS ${roas(i.bestCreative.roas)}`,
+                `${fmtNum(i.bestCreative.leads)} ${A ? "عميل" : "leads"} · ${A ? "صرف" : "spend"} ${fmtUSD(i.bestCreative.spend)}`,
+              ]
+            : [],
+          thumbnail: i?.bestCreative ? (i.bestCreative.thumbnailUrl ?? "") : undefined,
+          onClick: i?.bestCreative ? () => onOpenCreative(i.bestCreative!.creativeId) : undefined,
+        })}
+        {card({
+          icon: <Megaphone size={12} />,
+          eyebrow: A ? "أفضل حملة" : "Best campaign",
+          title: i?.bestCampaign?.campaignName || none,
+          value: i?.bestCampaign ? fmtUSD(i.bestCampaign.revenue) : "—",
+          lines: i?.bestCampaign
+            ? [
+                `${fmtNum(i.bestCampaign.won)} ${A ? "عميل مكسوب" : "won"} · ROAS ${roas(i.bestCampaign.roas)}`,
+                `${fmtNum(i.bestCampaign.leads)} ${A ? "عميل" : "leads"} · ${A ? "صرف" : "spend"} ${fmtUSD(i.bestCampaign.spend)}`,
+              ]
+            : [],
+        })}
+        {card({
+          icon: <Users size={12} />,
+          eyebrow: A ? "أفضل مصدر للعملاء" : "Best lead source",
+          title: source
+            ? `${(A ? PLATFORM_NAME[source.sourcePlatform]?.ar : PLATFORM_NAME[source.sourcePlatform]?.en) ?? source.sourcePlatform} · ${(A ? ENTITY_NAME[source.entityType]?.ar : ENTITY_NAME[source.entityType]?.en) ?? source.entityType}`
+            : none,
+          value: source ? fmtUSD(source.metrics.revenue) : "—",
+          lines: source
+            ? [
+                `${fmtNum(source.metrics.won)} ${A ? "عميل مكسوب" : "won"} · ${fmtNum(source.metrics.leads)} ${A ? "عميل" : "leads"}`,
+              ]
+            : [],
+        })}
+      </div>
+    </PageSection>
+  );
+}
+
+export function CheapVersusQuality({
+  data,
+  loading,
+  onOpenCreative,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+  onOpenCreative: (id: string) => void;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const pair = data?.insights?.cheapVersusQuality;
+  if (!pair && !loading) return null;
+  const side = (
+    row: NonNullable<typeof pair>["cheapest"] | undefined,
+    title: string,
+    tone: "rose" | "mint",
+  ) => (
+    <button
+      type="button"
+      onClick={() => row && onOpenCreative(row.creativeId)}
+      className={`flex w-full gap-3 rounded-xl border p-3 text-start transition-colors hover:border-brand ${
+        tone === "mint" ? "border-success/40 bg-success/5" : "border-danger/40 bg-danger/5"
+      }`}
+    >
+      {row?.thumbnailUrl ? (
+        <img
+          src={row.thumbnailUrl}
+          alt=""
+          loading="lazy"
+          className="h-16 w-16 shrink-0 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-muted">
+          <ImageIcon size={18} />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+          {title}
+        </div>
+        <div className="line-clamp-1 text-sm font-semibold text-text">
+          {row?.creativeName ?? "…"}
+        </div>
+        <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-4">
+          <div>
+            <dt className="text-text-muted">{A ? "تكلفة العميل" : "Cost per lead"}</dt>
+            <dd className="num font-semibold">{row?.cpl == null ? "—" : fmtUSD(row.cpl)}</dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">{A ? "مكسوب" : "Won"}</dt>
+            <dd className="num font-semibold">{row ? fmtNum(row.won) : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">{A ? "إيراد لكل عميل" : "Revenue per lead"}</dt>
+            <dd className="num font-semibold">
+              {row?.revenuePerLead == null ? "—" : fmtUSD(row.revenuePerLead)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-text-muted">ROAS</dt>
+            <dd className="num font-semibold">
+              {row?.roas == null ? "—" : `${row.roas.toFixed(2)}×`}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </button>
+  );
+  return (
+    <PageSection
+      level="insight"
+      title={
+        A ? "العميل الرخيص ليس بالضرورة عميلًا جيدًا" : "Cheap leads are not always good leads"
+      }
+      icon={<Scale size={16} />}
+      tone="amber"
+      hint={
+        A
+          ? "بين المواد التي جاءت بـ100 عميل أو أكثر: الأقل تكلفة لكل عميل مقابل الأعلى إيرادًا لكل عميل."
+          : "Among creatives with 100 or more leads: the lowest cost per lead against the highest revenue per lead."
+      }
+    >
+      <div className="grid gap-3 lg:grid-cols-2">
+        {side(pair?.cheapest, A ? "الأرخص لكل عميل" : "Cheapest per lead", "rose")}
+        {side(pair?.bestQuality, A ? "الأعلى إيرادًا لكل عميل" : "Most revenue per lead", "mint")}
+      </div>
+    </PageSection>
+  );
+}
+
+/** A coverage share that never rounds an incomplete source up to 100%. */
+export function coveragePercent(numerator: number, denominator: number): string {
+  const value = (numerator / denominator) * 100;
+  const oneDecimal = Math.round(value * 10) / 10;
+  if (numerator < denominator && oneDecimal >= 100) return fmtPct(Math.floor(value * 100) / 100, 2);
+  return fmtPct(value, 1);
+}
+
+const COVERAGE_ICON: Record<KpiStatus, ReactNode> = {
+  ok: <CheckCircle2 size={14} className="text-success" />,
+  no_denominator: <CircleDashed size={14} className="text-text-muted" />,
+  pending_sync: <CircleDashed size={14} className="text-warning" />,
+  not_connected: <CircleDashed size={14} className="text-danger" />,
+  historical_evidence_missing: <CircleDashed size={14} className="text-warning" />,
+};
+
+export function DataCoverageCard({
+  data,
+  loading,
+  onViewDetails,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+  onViewDetails?: () => void;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  return (
+    <PageSection
+      level="insight"
+      title={A ? "تغطية البيانات" : "Data coverage"}
+      icon={<ShieldCheck size={16} />}
+      tone="sky"
+      hint={
+        A
+          ? "إلى أي حد نستطيع تتبع العملاء. النسبة تُحسب فقط حيث يوجد مصدر متصل."
+          : "How much of the journey we can trace. A percentage is shown only where the source is connected."
+      }
+      action={
+        onViewDetails ? (
+          <button
+            type="button"
+            onClick={onViewDetails}
+            className="text-xs font-semibold text-brand hover:underline"
+          >
+            {A ? "عرض التفاصيل التقنية" : "View technical details"}
+          </button>
+        ) : undefined
+      }
+    >
+      <Card padded>
+        <ul className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+          {(data?.coverageSummary ?? []).map((item) => {
+            const connected = item.status === "ok";
+            const partialHistory = item.status === "historical_evidence_missing";
+            const valueText = loading
+              ? "…"
+              : connected && item.denominator
+                ? coveragePercent(item.numerator, item.denominator)
+                : partialHistory
+                  ? A
+                    ? "جزئي"
+                    : "Partial"
+                  : STATUS_TEXT[item.status === "ok" ? "no_denominator" : item.status][lang];
+            return (
+              <li key={item.key} className="flex items-start gap-2">
+                <span className="mt-0.5">{COVERAGE_ICON[item.status]}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm text-text">{A ? item.label.ar : item.label.en}</span>
+                    <span
+                      className={`num text-sm font-bold ${connected ? "text-text" : "text-text-muted"}`}
+                    >
+                      {valueText}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-text-muted">
+                    {connected && item.denominator
+                      ? `${fmtNum(item.numerator)} / ${fmtNum(item.denominator)} · `
+                      : ""}
+                    {A ? item.note.ar : item.note.en}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {data?.sources?.leadAdsDirect === "not_connected" ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
+            <Pill tone="warning">{A ? "غير متصل" : "Not connected"}</Pill>
+            {A
+              ? "صلاحية Meta Lead Ads (أسماء النماذج وإجاباتها) غير مفعلة؛ باقي الأرقام لا تتأثر."
+              : "Meta Lead Ads access (form names and answers) is not connected; the other figures are unaffected."}
+          </div>
+        ) : null}
+      </Card>
+    </PageSection>
+  );
+}

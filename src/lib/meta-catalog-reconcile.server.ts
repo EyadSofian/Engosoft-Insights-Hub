@@ -9,6 +9,7 @@ import {
   graphUsagePercent,
   isThrottleError,
   reconcileTargets,
+  redactMetaSecrets,
   type ReconcileCandidate,
 } from "./meta-catalog-reconcile";
 import type { AdCreative } from "./types";
@@ -240,12 +241,7 @@ async function graphGet(url: URL, token: string) {
   return { ok: response.ok, status: response.status, usage, payload };
 }
 
-const redact = (message: string, token: string) =>
-  message
-    .split(token)
-    .join("<redacted>")
-    .replace(/access_token=[^&\s]+/gi, "access_token=<redacted>")
-    .slice(0, 240);
+const redact = redactMetaSecrets;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

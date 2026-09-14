@@ -74,9 +74,11 @@ import { Route as ApiAcquisitionClosedLoopRouteImport } from './routes/api/acqui
 import { Route as ApiAcquisitionClosedLoopRefreshRouteImport } from './routes/api/acquisition.closed-loop-refresh'
 import { Route as ApiAcquisitionCreativeDetailRouteImport } from './routes/api/acquisition.creative-detail'
 import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
+import { Route as ApiAcquisitionInferredLinksRouteImport } from './routes/api/acquisition.inferred-links'
 import { Route as ApiAcquisitionPerformanceRouteImport } from './routes/api/acquisition.performance'
 import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
 import { Route as ApiAttributionChatwootFactsBackfillRouteImport } from './routes/api/attribution.chatwoot-facts-backfill'
+import { Route as ApiAttributionChatwootReconcileRouteImport } from './routes/api/attribution.chatwoot-reconcile'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
 import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
 import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
@@ -444,6 +446,12 @@ const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
   path: '/api/acquisition/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionInferredLinksRoute =
+  ApiAcquisitionInferredLinksRouteImport.update({
+    id: '/api/acquisition/inferred-links',
+    path: '/api/acquisition/inferred-links',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAcquisitionPerformanceRoute =
   ApiAcquisitionPerformanceRouteImport.update({
     id: '/api/acquisition/performance',
@@ -459,6 +467,12 @@ const ApiAttributionChatwootFactsBackfillRoute =
   ApiAttributionChatwootFactsBackfillRouteImport.update({
     id: '/api/attribution/chatwoot-facts-backfill',
     path: '/api/attribution/chatwoot-facts-backfill',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionChatwootReconcileRoute =
+  ApiAttributionChatwootReconcileRouteImport.update({
+    id: '/api/attribution/chatwoot-reconcile',
+    path: '/api/attribution/chatwoot-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiAttributionConversationsRoute =
@@ -716,9 +730,11 @@ export interface FileRoutesByFullPath {
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
   '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -822,9 +838,11 @@ export interface FileRoutesByTo {
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
   '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -929,9 +947,11 @@ export interface FileRoutesById {
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
   '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -1037,9 +1057,11 @@ export interface FileRouteTypes {
     | '/api/acquisition/closed-loop-refresh'
     | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1143,9 +1165,11 @@ export interface FileRouteTypes {
     | '/api/acquisition/closed-loop-refresh'
     | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1249,9 +1273,11 @@ export interface FileRouteTypes {
     | '/api/acquisition/closed-loop-refresh'
     | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1356,9 +1382,11 @@ export interface RootRouteChildren {
   ApiAcquisitionClosedLoopRefreshRoute: typeof ApiAcquisitionClosedLoopRefreshRoute
   ApiAcquisitionCreativeDetailRoute: typeof ApiAcquisitionCreativeDetailRoute
   ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
+  ApiAcquisitionInferredLinksRoute: typeof ApiAcquisitionInferredLinksRoute
   ApiAcquisitionPerformanceRoute: typeof ApiAcquisitionPerformanceRoute
   ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
   ApiAttributionChatwootFactsBackfillRoute: typeof ApiAttributionChatwootFactsBackfillRoute
+  ApiAttributionChatwootReconcileRoute: typeof ApiAttributionChatwootReconcileRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
   ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
   ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
@@ -1854,6 +1882,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAcquisitionEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/acquisition/inferred-links': {
+      id: '/api/acquisition/inferred-links'
+      path: '/api/acquisition/inferred-links'
+      fullPath: '/api/acquisition/inferred-links'
+      preLoaderRoute: typeof ApiAcquisitionInferredLinksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/acquisition/performance': {
       id: '/api/acquisition/performance'
       path: '/api/acquisition/performance'
@@ -1873,6 +1908,13 @@ declare module '@tanstack/react-router' {
       path: '/api/attribution/chatwoot-facts-backfill'
       fullPath: '/api/attribution/chatwoot-facts-backfill'
       preLoaderRoute: typeof ApiAttributionChatwootFactsBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/chatwoot-reconcile': {
+      id: '/api/attribution/chatwoot-reconcile'
+      path: '/api/attribution/chatwoot-reconcile'
+      fullPath: '/api/attribution/chatwoot-reconcile'
+      preLoaderRoute: typeof ApiAttributionChatwootReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/attribution/conversations': {
@@ -2196,10 +2238,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAcquisitionClosedLoopRefreshRoute: ApiAcquisitionClosedLoopRefreshRoute,
   ApiAcquisitionCreativeDetailRoute: ApiAcquisitionCreativeDetailRoute,
   ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
+  ApiAcquisitionInferredLinksRoute: ApiAcquisitionInferredLinksRoute,
   ApiAcquisitionPerformanceRoute: ApiAcquisitionPerformanceRoute,
   ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
   ApiAttributionChatwootFactsBackfillRoute:
     ApiAttributionChatwootFactsBackfillRoute,
+  ApiAttributionChatwootReconcileRoute: ApiAttributionChatwootReconcileRoute,
   ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
   ApiAttributionHealthRoute: ApiAttributionHealthRoute,
   ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,

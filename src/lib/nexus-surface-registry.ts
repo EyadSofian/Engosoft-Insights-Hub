@@ -464,6 +464,15 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         summary: q("الهامش بعد التكاليف.", "Margin after costs."),
         sections: ["kpis"],
       },
+      {
+        id: "marketing",
+        title: q("أداء المبيعات من التسويق", "Sales performance"),
+        summary: q(
+          "كل صفقة ومصدرها وحملتها وإعلانها ومادتها والإيراد المدفوع، مؤرخة بتاريخ وصول العميل.",
+          "Each deal with its source, campaign, ad, creative and paid revenue, dated by when the lead arrived.",
+        ),
+        sections: ["kpis"],
+      },
     ],
     sections: [{ id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["accounting.revenue"] }],
     elements: commonElements("accounting"),
@@ -742,91 +751,46 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         id: "overview",
         title: q("نظرة عامة", "Overview"),
         summary: q(
-          "تغطية المعرّفات والقمع المغلق من الإعلان للإيراد، واستحواذ اليوم والفترة حسب القناة.",
-          "Identifier coverage, the closed funnel from ad to revenue, and today's and the period's acquisitions by channel.",
+          "الصرف والعملاء والمطابقون والمؤهلون والمكسوبون والإيراد المدفوع والعائد، مع الأفضل وتغطية البيانات.",
+          "Spend, leads, CRM matched, qualified, won, paid revenue and ROAS, with the best performers and data coverage.",
         ),
-        sections: ["closed_loop", "today", "breakdowns"],
-      },
-      {
-        id: "campaigns",
-        title: q("الحملات", "Campaigns"),
-        summary: q(
-          "كل حملة بمعرّفها: الصرف والعملاء والمطابقون في CRM وعروض الأسعار والفوز والإيراد وROAS.",
-          "Each campaign by ID: spend, leads, CRM-matched, quotations, wins, revenue and ROAS.",
-        ),
-        sections: ["hierarchy"],
-      },
-      {
-        id: "adsets",
-        title: q("مجموعات الإعلانات", "Ad sets"),
-        summary: q(
-          "نفس مقاييس الجودة والإيراد لكل مجموعة إعلان، مع النزول من الحملة.",
-          "The same quality and revenue metrics for each ad set, drilled down from its campaign.",
-        ),
-        sections: ["hierarchy"],
+        sections: ["closed_loop", "today"],
       },
       {
         id: "ads",
-        title: q("الإعلانات", "Ads"),
+        title: q("الإعلانات والمواد", "Ads & creatives"),
         summary: q(
-          "كل إعلان بمعرّفه ونتائجه في CRM والمبيعات، ومنه تُفتح مادته الإعلانية.",
-          "Each ad by ID with its CRM and sales results; opens its creative.",
+          "من الحملة إلى مجموعة الإعلان إلى الإعلان إلى المادة وأصولها، مع الصرف والعملاء والفوز والإيراد.",
+          "Campaign to ad set to ad to creative and its assets, with spend, leads, wins and revenue.",
         ),
-        sections: ["hierarchy"],
+        sections: ["hierarchy", "assets"],
       },
       {
-        id: "creatives",
-        title: q("المواد الإعلانية", "Creatives"),
+        id: "leads",
+        title: q("العملاء والجودة", "Leads & quality"),
         summary: q(
-          "جودة كل مادة إعلانية: تكلفة العميل والعميل المؤهل والفوز والإيراد وROAS، مع صفحة تفصيل.",
-          "Quality per creative: cost per lead and per qualified lead, wins, revenue and ROAS, with a detail page.",
+          "عملاء اليوم والفترة، ونماذج Meta، وصفحات الهبوط، وجودة العملاء لا عددهم.",
+          "Today's and the period's leads, Meta forms, landing pages, and lead quality rather than volume.",
         ),
-        sections: ["hierarchy"],
-      },
-      {
-        id: "assets",
-        title: q("الأصول", "Assets"),
-        summary: q(
-          "الفيديوهات والصور المستخدمة داخل المواد الإعلانية، كمؤشر تقارير وليس إسنادًا.",
-          "Videos and images used inside creatives, as a reporting signal rather than attribution.",
-        ),
-        sections: ["assets"],
-      },
-      {
-        id: "forms",
-        title: q("نماذج العملاء", "Lead forms"),
-        summary: q(
-          "عملاء نماذج Meta الفورية حسب النموذج والحملة والإعلان والمادة.",
-          "Meta instant-form leads by form, campaign, ad and creative.",
-        ),
-        sections: ["forms"],
-      },
-      {
-        id: "landing",
-        title: q("صفحات الهبوط", "Landing pages"),
-        summary: q(
-          "المشاهدات والزوار والإرسالات ومعدل التحويل لكل صفحة هبوط متتبعة.",
-          "Views, visitors, submissions and conversion rate for each tracked landing page.",
-        ),
-        sections: ["landing"],
-      },
-      {
-        id: "quality",
-        title: q("جودة العملاء", "Lead quality"),
-        summary: q(
-          "ترتيب المصادر بجودة العميل وليس بعدده: الأرخص مقابل الأعلى تأهيلًا وفوزًا.",
-          "Sources ranked by lead quality, not volume: cheapest against best-qualifying and best-winning.",
-        ),
-        sections: ["quality"],
+        sections: ["forms", "landing", "quality", "breakdowns"],
       },
       {
         id: "sales",
-        title: q("نتائج المبيعات", "Sales outcomes"),
+        title: q("المبيعات والإيراد", "Sales & revenue"),
         summary: q(
-          "كل عميل مرتبط بمعرّف دقيق وحالته في CRM وأمر البيع والفاتورة والإيراد المدفوع.",
-          "Every exactly linked lead with its CRM status, sale order, invoice and paid revenue.",
+          "نتائج CRM والصفقات المكسوبة وأوامر البيع والفواتير والإيراد المدفوع لكل عميل متتبَّع.",
+          "CRM outcomes, won deals, sales orders, invoices and paid revenue for every tracked lead.",
         ),
         sections: ["sales"],
+      },
+      {
+        id: "coverage",
+        title: q("تغطية البيانات", "Data coverage"),
+        summary: q(
+          "إلى أي حد نتتبع الحملة والمادة والنموذج وCRM والرسائل، مع التفاصيل التقنية عند الطلب.",
+          "How far campaign, creative, form, CRM and messaging tracking reaches, with technical details on request.",
+        ),
+        sections: ["closed_loop"],
       },
     ],
     sections: [

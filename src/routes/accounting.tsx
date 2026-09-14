@@ -58,8 +58,25 @@ import { useApi } from "@/lib/use-api";
 import { useFiltersData } from "@/components/TopBar";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
+import { SalesPerformance } from "@/components/acquisition/SalesPerformance";
 
-export const Route = createFileRoute("/accounting")({ component: Accounting });
+type AccountingView = "summary" | "months" | "profitability" | "marketing";
+const ACCOUNTING_VIEWS: readonly AccountingView[] = [
+  "summary",
+  "months",
+  "profitability",
+  "marketing",
+];
+
+export const Route = createFileRoute("/accounting")({
+  validateSearch: (search: Record<string, unknown>): { view?: AccountingView } => {
+    const view = typeof search.view === "string" ? search.view : "";
+    return (ACCOUNTING_VIEWS as readonly string[]).includes(view) && view !== "summary"
+      ? { view: view as AccountingView }
+      : {};
+  },
+  component: Accounting,
+});
 
 interface AccountingDetail {
   id: string;
@@ -131,7 +148,10 @@ function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
-  const [view, setView] = useState<"summary" | "months" | "profitability">("summary");
+  const initialView = Route.useSearch().view;
+  const [view, setView] = useState<"summary" | "months" | "profitability" | "marketing">(
+    initialView ?? "summary",
+  );
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
   useRegisterNexusView("accounting", { tab: view });
@@ -450,11 +470,20 @@ function Accounting() {
               value: "profitability",
               label: lang === "ar" ? "الربحية" : "Profitability",
             },
+            {
+              value: "marketing",
+              label:
+                lang === "ar"
+                  ? "أداء المبيعات من التسويق"
+                  : "Sales performance (marketing → revenue)",
+            },
           ]}
         />
       </div>
 
-      {isLoading || !data ? (
+      {view === "marketing" ? (
+        <SalesPerformance />
+      ) : isLoading || !data ? (
         <>
           <Skeleton className="h-28" />
           <Skeleton className="h-96" />

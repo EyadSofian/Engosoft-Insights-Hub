@@ -17,6 +17,8 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Card, Pill, Segmented } from "@/components/ui-bits";
 import { nameWithId } from "@/components/attribution/acquisition-labels";
 import type { ClosedLoopGrain, FunnelStep, GrainRow, QualityMetrics } from "@/lib/closed-loop";
+import type { Kpi, KpiStatus } from "@/lib/closed-loop-kpis";
+import { kpiDisplay } from "./ManagementOverview";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 
@@ -102,6 +104,36 @@ export interface ClosedLoopResponse {
     assets: number;
     videoAssets: number;
     imageAssets: number;
+    imageAssetsWithUrl?: number;
+    copyVariations?: number;
+    adsWithLeadForm?: number;
+    leadForms?: number;
+  };
+  kpis?: Record<string, Kpi>;
+  coverageSummary?: {
+    key: string;
+    label: { en: string; ar: string };
+    numerator: number;
+    denominator: number;
+    status: KpiStatus;
+    note: { en: string; ar: string };
+  }[];
+  sources?: {
+    leadAdsDirect: KpiStatus;
+    messaging: KpiStatus;
+    metaAdsSyncedThrough: string;
+    catalogReconciledAt: string | null;
+  };
+  insights?: {
+    bestCampaign: CreativeGrainRow | null;
+    bestCreative: CreativeGrainRow | null;
+    bestLeadSource: {
+      key: string;
+      sourcePlatform: string;
+      entityType: string;
+      metrics: QualityMetrics;
+    } | null;
+    cheapVersusQuality: { cheapest: CreativeGrainRow; bestQuality: CreativeGrainRow } | null;
   };
   crm?: {
     records: number;
@@ -427,7 +459,11 @@ export function ClosedLoopSalesBridge() {
             loading={isLoading}
             title={A ? "إيراد مرتبط بإعلان" : "Ad-linked paid revenue"}
             value={fmtUSD(e?.revenue ?? 0)}
-            sub={`ROAS ${e?.roas == null ? "—" : e.roas.toFixed(2)} · ${A ? "صرف" : "spend"} ${fmtUSD(e?.spend ?? 0)}`}
+            sub={
+              A
+                ? `العائد على كل الصرف ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · على الحملات المتتبَّعة ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
+                : `ROAS on all ad spend ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · on tracked campaigns ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
+            }
             definition={
               A
                 ? "الإيراد المدفوع لأوامر بيع فرص CRM المرتبطة بعميل إعلان بمعرّف المزود."
@@ -467,7 +503,7 @@ export function ClosedLoopSalesBridge() {
             loading={isLoading}
             title={A ? "أوامر بيع من إعلان" : "Sale orders from ads"}
             value={fmtNum(e?.saleOrders)}
-            sub={`${A ? "فواتير" : "invoices"} ${fmtNum(e?.invoices)} · CAC ${e?.cac == null ? "—" : fmtUSD(e.cac)}`}
+            sub={`${A ? "فواتير" : "invoices"} ${fmtNum(e?.invoices)} · ${A ? "تكلفة العميل المكسوب (كل الصرف)" : "cost per customer (all ad spend)"} ${kpiDisplay(data?.kpis?.costPerCustomerAll, lang)}`}
             definition={
               A
                 ? "أوامر بيع مؤكدة مرتبطة بالفرصة عبر opportunity_id في Odoo."
@@ -503,9 +539,17 @@ export function ClosedLoopSalesBridge() {
               {fmtUSD(top.revenue)} · {fmtNum(top.won)} {A ? "فوز" : "won"}
             </span>
           ) : null}
-          <a href="/acquisition" className="ms-auto font-semibold text-brand hover:underline">
-            {A ? "التحليل الكامل حسب الحملة والمادة ←" : "Full analysis by campaign and creative →"}
-          </a>
+          <span className="ms-auto flex flex-wrap gap-3">
+            <a
+              href="/accounting?view=marketing"
+              className="font-semibold text-brand hover:underline"
+            >
+              {A ? "أداء المبيعات من التسويق ←" : "Sales performance →"}
+            </a>
+            <a href="/acquisition" className="font-semibold text-brand hover:underline">
+              {A ? "التحليل حسب الحملة والمادة ←" : "By campaign and creative →"}
+            </a>
+          </span>
         </Card>
       </div>
     </PageSection>
@@ -607,13 +651,56 @@ export function ClosedLoopFunnel({
 
 /* --- shared metric columns --------------------------------------------------- */
 
+/** What a manager decides on. Every other metric is one click away in the column chooser. */
+const CORE_METRICS = new Set<keyof QualityMetrics>([
+  "spend",
+  "leads",
+  "qualified",
+  "won",
+  "revenue",
+  "roas",
+  "cac",
+]);
+
+const METRIC_DEFINITION: Partial<Record<keyof QualityMetrics, { en: string; ar: string }>> = {
+  spend: {
+    en: "Meta ad spend on this entity's exact ID.",
+    ar: "صرف Meta على المعرّف الدقيق لهذا العنصر.",
+  },
+  leads: {
+    en: "Leads traced to this entity's exact ID.",
+    ar: "العملاء المتتبَّعون إلى المعرّف الدقيق لهذا العنصر.",
+  },
+  crmMatched: { en: "Leads matched to a CRM record.", ar: "العملاء المطابقون لسجل CRM." },
+  qualified: {
+    en: "Matched leads meeting the CRM qualification rule.",
+    ar: "العملاء المطابقون المستوفون لقاعدة التأهيل في CRM.",
+  },
+  won: { en: "CRM opportunities marked Won.", ar: "فرص CRM المسجلة كفوز." },
+  revenue: {
+    en: "Paid invoice revenue of these leads.",
+    ar: "إيراد الفواتير المدفوعة لهؤلاء العملاء.",
+  },
+  roas: { en: "Paid revenue ÷ ad spend of this entity.", ar: "الإيراد المدفوع ÷ صرف هذا العنصر." },
+  cac: { en: "Ad spend ÷ customers won.", ar: "صرف الإعلانات ÷ العملاء المكسوبون." },
+  cpl: { en: "Ad spend ÷ leads.", ar: "صرف الإعلانات ÷ العملاء." },
+  winRate: {
+    en: "Customers won ÷ CRM-matched leads.",
+    ar: "العملاء المكسوبون ÷ العملاء المطابقون في CRM.",
+  },
+  revenuePerLead: { en: "Paid revenue ÷ leads.", ar: "الإيراد المدفوع ÷ العملاء." },
+};
+
 type MetricKey = keyof QualityMetrics;
 
 function metricColumns<T>(
   A: boolean,
   get: (row: T) => QualityMetrics,
   keys: MetricKey[],
+  /** False while Meta spend is not synced for the period: spend then reads "Pending sync", never $0. */
+  spendAvailable = true,
 ): Col<T>[] {
+  const pending = A ? "بانتظار المزامنة" : "Pending sync";
   const defs: Record<
     MetricKey,
     { en: string; ar: string; render: (m: QualityMetrics) => string; hide?: boolean }
@@ -634,14 +721,18 @@ function metricColumns<T>(
     interested: { en: "Interested", ar: "مهتم", render: (m) => fmtNum(m.interested) },
     qualified: { en: "Qualified", ar: "مؤهل", render: (m) => fmtNum(m.qualified) },
     quotations: { en: "Quotations", ar: "عروض أسعار", render: (m) => fmtNum(m.quotations) },
-    won: { en: "Won", ar: "مغلق بنجاح", render: (m) => fmtNum(m.won) },
+    won: { en: "Customers won", ar: "عملاء مكسوبون", render: (m) => fmtNum(m.won) },
     saleOrders: { en: "Sales orders", ar: "أوامر البيع", render: (m) => fmtNum(m.saleOrders) },
     invoices: { en: "Invoices", ar: "الفواتير", render: (m) => fmtNum(m.invoices) },
-    revenue: { en: "Revenue", ar: "الإيراد", render: (m) => fmtUSD(m.revenue) },
-    spend: { en: "Spend", ar: "الصرف", render: (m) => (m.spend ? fmtUSD(m.spend) : "—") },
+    revenue: { en: "Paid revenue", ar: "الإيراد المدفوع", render: (m) => fmtUSD(m.revenue) },
+    spend: {
+      en: "Ad spend",
+      ar: "صرف الإعلانات",
+      render: (m) => (spendAvailable ? fmtUSD(m.spend) : pending),
+    },
     impressions: { en: "Impressions", ar: "الظهور", render: (m) => fmtNum(m.impressions) },
     clicks: { en: "Clicks", ar: "النقرات", render: (m) => fmtNum(m.clicks) },
-    cpl: { en: "CPL", ar: "تكلفة العميل", render: (m) => money(m.cpl) },
+    cpl: { en: "Cost per lead", ar: "تكلفة العميل", render: (m) => money(m.cpl) },
     costPerInterested: {
       en: "Cost / interested",
       ar: "تكلفة المهتم",
@@ -657,7 +748,7 @@ function metricColumns<T>(
       ar: "تكلفة عرض السعر",
       render: (m) => money(m.costPerQuotation),
     },
-    cac: { en: "CAC (cost / won)", ar: "تكلفة العميل المغلق", render: (m) => money(m.cac) },
+    cac: { en: "Cost per customer", ar: "تكلفة العميل المكسوب", render: (m) => money(m.cac) },
     interestRate: {
       en: "Matched → interested",
       ar: "مطابق ← مهتم",
@@ -692,6 +783,8 @@ function metricColumns<T>(
   return keys.map((key) => ({
     key,
     header: A ? defs[key].ar : defs[key].en,
+    headerTitle: A ? METRIC_DEFINITION[key]?.ar : METRIC_DEFINITION[key]?.en,
+    hideByDefault: !CORE_METRICS.has(key),
     align: "right" as const,
     render: (row: T) => defs[key].render(get(row)),
     sortValue: (row: T) => {
@@ -848,7 +941,29 @@ export function GrainPerformance({
         ];
   const cols: Col<CreativeGrainRow>[] = [
     ...identity,
-    ...metricColumns<CreativeGrainRow>(A, (row) => row, QUALITY_KEYS),
+    ...metricColumns<CreativeGrainRow>(
+      A,
+      (row) => row,
+      QUALITY_KEYS,
+      data?.kpis?.adSpend ? data.kpis.adSpend.status === "ok" : true,
+    ),
+    // Technical IDs, off by default: available from the column chooser.
+    {
+      key: "metaId",
+      header: A ? "معرّف Meta" : "Meta ID",
+      hideByDefault: true,
+      render: (row) => (
+        <span className="font-mono text-[11px] text-text-muted">
+          {grain === "creative"
+            ? row.creativeId
+            : grain === "ad"
+              ? row.adId
+              : grain === "adset"
+                ? row.adsetId
+                : row.campaignId}
+        </span>
+      ),
+    },
     {
       key: "records",
       header: A ? "السجلات" : "Records",
@@ -954,6 +1069,10 @@ export function AssetPerformance({
   const { lang } = useI18n();
   const A = lang === "ar";
   type AssetRow = NonNullable<ClosedLoopResponse["assets"]>[number];
+  const assetsPerCreative = new Map<string, number>();
+  for (const row of data?.assets ?? []) {
+    assetsPerCreative.set(row.creativeId, (assetsPerCreative.get(row.creativeId) ?? 0) + 1);
+  }
   const cols: Col<AssetRow>[] = [
     {
       key: "preview",
@@ -976,12 +1095,9 @@ export function AssetPerformance({
       header: A ? "الأصل" : "Asset",
       sticky: true,
       render: (row) => (
-        <div>
-          <div className="text-text">
-            {row.assetType === "video" ? (A ? "فيديو" : "Video") : A ? "صورة" : "Image"}
-          </div>
-          <div className="font-mono text-[11px] text-text-muted">{row.assetId}</div>
-        </div>
+        <span className="text-text" title={`ID ${row.assetId}`}>
+          {row.assetType === "video" ? (A ? "فيديو" : "Video") : A ? "صورة" : "Image"}
+        </span>
       ),
     },
     {
@@ -1000,10 +1116,25 @@ export function AssetPerformance({
     },
     {
       key: "level",
-      header: A ? "مستوى الإسناد" : "Attribution level",
-      render: () => (
-        <Pill tone="neutral">{A ? "تقريري (من المادة)" : "Reporting (from creative)"}</Pill>
-      ),
+      header: A ? "ماذا تعني الأرقام" : "What the figures mean",
+      render: (row) =>
+        (assetsPerCreative.get(row.creativeId) ?? 0) <= 1 ? (
+          <Pill tone="success">
+            {A ? "نتيجة المادة (الأصل الوحيد فيها)" : "Creative result (its only asset)"}
+          </Pill>
+        ) : (
+          <Pill tone="neutral">
+            {A
+              ? "إسناد الأصل غير متاح — إجمالي المادة"
+              : "Asset attribution unavailable — creative total"}
+          </Pill>
+        ),
+    },
+    {
+      key: "assetId",
+      header: A ? "معرّف الأصل" : "Asset ID",
+      hideByDefault: true,
+      render: (row) => <span className="font-mono text-[11px]">{row.assetId}</span>,
     },
     {
       key: "spend",
@@ -1021,14 +1152,14 @@ export function AssetPerformance({
     },
     {
       key: "won",
-      header: A ? "مغلق" : "Won",
+      header: A ? "مكسوب (المادة)" : "Creative won",
       align: "right",
       render: (row) => fmtNum(row.won),
       sortValue: (row) => row.won,
     },
     {
       key: "revenue",
-      header: A ? "الإيراد" : "Revenue",
+      header: A ? "إيراد المادة المدفوع" : "Creative paid revenue",
       align: "right",
       render: (row) => fmtUSD(row.revenue),
       sortValue: (row) => row.revenue,
@@ -1045,14 +1176,45 @@ export function AssetPerformance({
           : "Videos and images with a Meta ID. Meta attributes results to the ad and creative, not to one asset, so an asset shows its creative's results as reporting context only."
       }
     >
-      <DataTable
-        rows={data?.assets ?? []}
-        cols={cols}
-        loading={loading}
-        rowKey={(row) => `${row.creativeId}:${row.assetType}:${row.assetId}`}
-        csvFilename="engosoft-creative-assets.csv"
-        searchable={(row) => `${row.assetId} ${row.creativeName} ${row.creativeId}`}
-      />
+      <div className="space-y-3">
+        <Card padded className="grid gap-2 text-xs text-text-muted sm:grid-cols-3">
+          <div>
+            <b className="text-text">{A ? "إسناد دقيق للمادة" : "Exact creative attribution"}</b>
+            <div>
+              {A
+                ? "العميل مرتبط بإعلانه ومادته بمعرّف Meta."
+                : "A lead is tied to its ad and creative by Meta ID."}
+            </div>
+          </div>
+          <div>
+            <b className="text-text">{A ? "تقارير الأصل" : "Asset reporting"}</b>
+            <div>
+              {A
+                ? "صورة أو فيديو داخل المادة، مع أرقام المادة كسياق فقط."
+                : "An image or video inside a creative, shown with the creative's figures as context."}
+            </div>
+          </div>
+          <div>
+            <b className="text-text">
+              {A ? "إسناد الأصل غير متاح" : "Asset attribution unavailable"}
+            </b>
+            <div>
+              {A
+                ? "Meta لا تُرجع نتائج لكل صورة أو عنوان داخل المادة المرنة، فلا يُنسب بيع لأصل بعينه."
+                : "Meta returns no result per image or headline inside a flexible creative, so no sale is credited to one asset."}
+            </div>
+          </div>
+        </Card>
+        <DataTable
+          rows={data?.assets ?? []}
+          cols={cols}
+          loading={loading}
+          columnChooser
+          rowKey={(row) => `${row.creativeId}:${row.assetType}:${row.assetId}`}
+          csvFilename="engosoft-creative-assets.csv"
+          searchable={(row) => `${row.assetId} ${row.creativeName} ${row.creativeId}`}
+        />
+      </div>
     </PageSection>
   );
 }
@@ -1169,6 +1331,58 @@ export function LeadQuality({
 
 /* --- sales outcomes ----------------------------------------------------------- */
 
+const STAGE_LABEL: Record<string, { en: string; ar: string }> = {
+  preparation: { en: "Preparation", ar: "تحضير" },
+  new: { en: "New", ar: "جديد" },
+  open: { en: "In progress", ar: "قيد المتابعة" },
+  quotation: { en: "Quotation", ar: "عرض سعر" },
+  won: { en: "Won", ar: "مكسوب" },
+  lost: { en: "Lost", ar: "خسارة" },
+};
+
+const SOURCE_LABEL = (row: OutcomeRecord, A: boolean): string => {
+  const platform =
+    {
+      facebook: "Facebook",
+      instagram: "Instagram",
+      messenger: "Messenger",
+      audience_network: "Audience Network",
+    }[row.sourcePlatform] ??
+    (row.sourcePlatform && row.sourcePlatform !== "unknown" ? row.sourcePlatform : "");
+  const kind =
+    row.entityType === "meta_lead"
+      ? A
+        ? "نموذج فوري"
+        : "Instant form"
+      : row.destinationChannel === "whatsapp"
+        ? A
+          ? "واتساب"
+          : "WhatsApp"
+        : row.destinationChannel === "messenger"
+          ? A
+            ? "ماسنجر"
+            : "Messenger"
+          : row.destinationChannel === "website_chat"
+            ? A
+              ? "دردشة الموقع"
+              : "Website chat"
+            : row.entityType === "landing_submission"
+              ? A
+                ? "صفحة هبوط"
+                : "Landing page"
+              : A
+                ? "غير معروف"
+                : "Unknown";
+  return platform ? `${platform} · ${kind}` : kind;
+};
+
+const CONFIDENCE_LABEL: Record<string, { en: string; ar: string }> = {
+  exact: { en: "Tracked exactly", ar: "متتبَّع بدقة" },
+  declared: { en: "Declared in CRM", ar: "مُعلن في CRM" },
+  inferred: { en: "Inferred", ar: "مستنتج" },
+  unknown: { en: "Unknown source", ar: "مصدر غير معروف" },
+};
+
 export function outcomeColumns(
   A: boolean,
   onOpenCreative?: (id: string) => void,
@@ -1176,40 +1390,40 @@ export function outcomeColumns(
   return [
     {
       key: "date",
-      header: A ? "التاريخ" : "Date",
+      header: A ? "تاريخ وصول العميل" : "Lead date",
       always: true,
       sticky: true,
-      render: (row) => row.occurredAt,
+      render: (row) => row.occurredAt.slice(0, 10),
       sortValue: (row) => row.occurredAt,
     },
     {
       key: "source",
-      header: A ? "المصدر" : "Source",
-      render: (row) =>
-        `${row.entityType === "meta_lead" ? (A ? "نموذج Meta" : "Meta form") : row.destinationChannel} · ${row.sourcePlatform}`,
+      header: A ? "مصدر العميل" : "Lead source",
+      render: (row) => SOURCE_LABEL(row, A),
     },
     {
       key: "campaign",
       header: A ? "الحملة" : "Campaign",
-      minWidth: "240px",
+      minWidth: "220px",
       render: (row) => nameWithId(row.campaignName, row.campaignId),
+      sortValue: (row) => row.campaignName,
     },
     {
       key: "adset",
-      header: A ? "المجموعة" : "Ad set",
+      header: A ? "مجموعة الإعلان" : "Ad set",
       hideByDefault: true,
       render: (row) => nameWithId(row.adsetName, row.adsetId),
     },
     {
       key: "ad",
       header: A ? "الإعلان" : "Ad",
-      minWidth: "240px",
+      minWidth: "200px",
       render: (row) => nameWithId(row.adName, row.adId),
     },
     {
       key: "creative",
-      header: A ? "المادة" : "Creative",
-      minWidth: "240px",
+      header: A ? "المادة الإعلانية" : "Creative",
+      minWidth: "220px",
       render: (row) =>
         row.creativeId && onOpenCreative ? (
           <button
@@ -1224,8 +1438,76 @@ export function outcomeColumns(
         ),
     },
     {
+      key: "stage",
+      header: A ? "مرحلة CRM" : "CRM stage",
+      render: (row) =>
+        (A ? STAGE_LABEL[row.stageKey]?.ar : STAGE_LABEL[row.stageKey]?.en) ??
+        (row.stageKey || "—"),
+      sortValue: (row) => row.stageKey,
+    },
+    {
+      key: "salesperson",
+      header: A ? "المندوب" : "Salesperson",
+      render: (row) => row.salesperson || "—",
+      sortValue: (row) => row.salesperson,
+    },
+    {
+      key: "result",
+      header: A ? "النتيجة" : "Won / lost",
+      render: (row) =>
+        row.won ? (
+          <Pill tone="success">{A ? "مكسوب" : "Won"}</Pill>
+        ) : row.lost ? (
+          <Pill tone="danger">{A ? "خسارة" : "Lost"}</Pill>
+        ) : (
+          <span className="text-text-muted">{A ? "مفتوح" : "Open"}</span>
+        ),
+      sortValue: (row) => (row.won ? 2 : row.lost ? 0 : 1),
+    },
+    {
+      key: "orders",
+      header: A ? "أوامر البيع" : "Orders",
+      align: "right",
+      render: (row) => fmtNum(row.saleOrderIds.length),
+      sortValue: (row) => row.saleOrderIds.length,
+    },
+    {
+      key: "invoices",
+      header: A ? "فواتير مدفوعة" : "Paid invoices",
+      align: "right",
+      render: (row) => fmtNum(row.invoiceCount),
+      sortValue: (row) => row.invoiceCount,
+    },
+    {
+      key: "revenue",
+      header: A ? "الإيراد المدفوع" : "Paid revenue",
+      align: "right",
+      render: (row) => fmtUSD(row.revenue),
+      sortValue: (row) => row.revenue,
+    },
+    {
+      key: "course",
+      header: A ? "الدورة" : "Course",
+      hideByDefault: true,
+      render: (row) => row.course || "—",
+    },
+    {
+      key: "progress",
+      header: A ? "التقدم" : "Progress",
+      hideByDefault: true,
+      render: (row) =>
+        [
+          row.interested && (A ? "مهتم" : "Interested"),
+          row.qualified && (A ? "مؤهل" : "Qualified"),
+          row.quotation && (A ? "عرض سعر" : "Quotation"),
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
+    },
+    {
       key: "confidence",
-      header: A ? "الإسناد" : "Attribution",
+      header: A ? "دقة الإسناد" : "Attribution",
+      hideByDefault: true,
       render: (row) => (
         <Pill
           tone={
@@ -1236,13 +1518,16 @@ export function outcomeColumns(
                 : "neutral"
           }
         >
-          {row.attributionConfidence}
+          {(A
+            ? CONFIDENCE_LABEL[row.attributionConfidence]?.ar
+            : CONFIDENCE_LABEL[row.attributionConfidence]?.en) ?? row.attributionConfidence}
         </Pill>
       ),
     },
     {
       key: "crm",
-      header: A ? "سجل CRM" : "CRM record",
+      header: A ? "رقم سجل CRM" : "CRM record",
+      hideByDefault: true,
       render: (row) => (
         <div>
           <div className="font-mono text-xs">#{row.crmLeadId}</div>
@@ -1252,50 +1537,6 @@ export function outcomeColumns(
           </div>
         </div>
       ),
-    },
-    {
-      key: "stage",
-      header: A ? "المرحلة" : "Stage",
-      render: (row) => `${row.stageKey || "—"} · ${row.businessStatus || "—"}`,
-    },
-    {
-      key: "progress",
-      header: A ? "التقدم" : "Progress",
-      render: (row) =>
-        [
-          row.interested && (A ? "مهتم" : "Interested"),
-          row.qualified && (A ? "مؤهل" : "Qualified"),
-          row.quotation && (A ? "عرض سعر" : "Quotation"),
-          row.won && (A ? "مغلق" : "Won"),
-          row.lost && (A ? "خسارة" : "Lost"),
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
-    },
-    {
-      key: "salesperson",
-      header: A ? "المندوب" : "Salesperson",
-      render: (row) => (
-        <div>
-          <div>{row.salesperson || "—"}</div>
-          <div className="text-[11px] text-text-muted">{row.salesTeam}</div>
-        </div>
-      ),
-      sortValue: (row) => row.salesperson,
-    },
-    { key: "course", header: A ? "الدورة" : "Course", render: (row) => row.course || "—" },
-    {
-      key: "orders",
-      header: A ? "أوامر / فواتير" : "Orders / invoices",
-      align: "right",
-      render: (row) => `${fmtNum(row.saleOrderIds.length)} / ${fmtNum(row.invoiceCount)}`,
-    },
-    {
-      key: "revenue",
-      header: A ? "الإيراد المدفوع" : "Paid revenue",
-      align: "right",
-      render: (row) => (row.revenue ? fmtUSD(row.revenue) : "—"),
-      sortValue: (row) => row.revenue,
     },
   ];
 }
@@ -1671,5 +1912,200 @@ export function CreativeDetail({
         </div>
       )}
     </DetailPanel>
+  );
+}
+
+/* --- inferred link audit ---------------------------------------------------- */
+
+interface InferredLinkAuditResponse {
+  configured: boolean;
+  links?: number;
+  conversations?: number;
+  crmRecords?: number;
+  window?: { fromDays: number; toDays: number; rule: string };
+  dayGap?: { sameDay: number; withinWeek: number; withinMonth: number; outsideWindow: number };
+  ambiguity?: { phoneKeyWithOtherCrmRecords: number; conversationsWithSeveralLinks: number };
+  duplicateRisk?: { crmRecordsClaimedBySeveralConversations: number };
+  outcomes?: { won: number; revenue: number };
+  rows?: {
+    acquisitionEventId: string;
+    crmLeadId: string;
+    businessStatus: string;
+    dayGap: number | null;
+    phoneCandidates: number;
+  }[];
+}
+
+export function InferredLinkAudit() {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const { data, isLoading } = useApi<InferredLinkAuditResponse>("/api/acquisition/inferred-links");
+  const facts: [string, string][] = data?.configured
+    ? [
+        [A ? "روابط مستنتجة" : "Inferred links", fmtNum(data.links)],
+        [A ? "محادثات" : "Conversations", fmtNum(data.conversations)],
+        [A ? "سجلات CRM" : "CRM records", fmtNum(data.crmRecords)],
+        [A ? "نفس اليوم" : "Same day", fmtNum(data.dayGap?.sameDay)],
+        [A ? "خلال أسبوع" : "Within a week", fmtNum(data.dayGap?.withinWeek)],
+        [A ? "خلال شهر" : "Within a month", fmtNum(data.dayGap?.withinMonth)],
+        [
+          A ? "الهاتف مرتبط بسجلات CRM أخرى" : "Phone key with other CRM records",
+          fmtNum(data.ambiguity?.phoneKeyWithOtherCrmRecords),
+        ],
+        [
+          A ? "سجل CRM لأكثر من محادثة" : "CRM record claimed by several conversations",
+          fmtNum(data.duplicateRisk?.crmRecordsClaimedBySeveralConversations),
+        ],
+        [
+          A ? "مكسوب (غير محسوب في الدقيق)" : "Won (never counted as exact)",
+          fmtNum(data.outcomes?.won),
+        ],
+      ]
+    : [];
+  return (
+    <PageSection
+      title={A ? "تدقيق الروابط المستنتجة" : "Inferred link audit"}
+      icon={<Link2 size={16} />}
+      tone="amber"
+      hint={
+        A
+          ? "روابط بالهاتف بين محادثة وسجل CRM، مقبولة فقط إذا أُنشئ السجل من يوم قبل المحادثة حتى 30 يومًا بعدها. لا تُرفع أبدًا إلى دقيق ولا تدخل مؤشرات الإدارة."
+          : "Phone-key links between a conversation and a CRM record, accepted only when the record was created from one day before to 30 days after the conversation. Never promoted to exact and never used in management KPIs."
+      }
+    >
+      <div className="space-y-3">
+        <Card padded>
+          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-3">
+            {(isLoading ? [] : facts).map(([label, value]) => (
+              <div key={label} className="flex items-baseline justify-between gap-2 text-sm">
+                <dt className="text-text-muted">{label}</dt>
+                <dd className="num font-semibold">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+        <DataTable
+          rows={data?.rows ?? []}
+          loading={isLoading}
+          rowKey={(row) => `${row.acquisitionEventId}|${row.crmLeadId}`}
+          cols={[
+            {
+              key: "conversation",
+              header: A ? "المحادثة" : "Conversation",
+              render: (row) => row.acquisitionEventId.replace("chatwoot_conversation:", "#"),
+            },
+            {
+              key: "crm",
+              header: A ? "سجل CRM" : "CRM record",
+              render: (row) => `#${row.crmLeadId}`,
+            },
+            {
+              key: "status",
+              header: A ? "الحالة" : "Status",
+              render: (row) => row.businessStatus || "—",
+            },
+            {
+              key: "gap",
+              header: A ? "فرق الأيام" : "Day gap",
+              align: "right",
+              render: (row) => (row.dayGap == null ? "—" : fmtNum(row.dayGap)),
+              sortValue: (row) => row.dayGap ?? -99,
+            },
+            {
+              key: "candidates",
+              header: A ? "سجلات بنفس الهاتف" : "CRM records on the phone key",
+              align: "right",
+              render: (row) => fmtNum(row.phoneCandidates),
+              sortValue: (row) => row.phoneCandidates,
+            },
+          ]}
+          csvFilename="engosoft-inferred-crm-links.csv"
+        />
+      </div>
+    </PageSection>
+  );
+}
+
+/* --- Chatwoot attribution health -------------------------------------------- */
+
+interface ChatwootHealthResponse {
+  configured: boolean;
+  running?: boolean;
+  pipeline?: {
+    attribution_rows?: number;
+    failed_events?: number;
+    stuck_events?: number;
+    processed_without_row?: number;
+    unknown_without_reason?: number;
+  };
+  reconciliation?: Record<string, number>;
+  lastRun?: {
+    status: string;
+    updated_at: string;
+    summary: { message?: string; windowDays?: number };
+  } | null;
+}
+
+export function ChatwootAttributionHealth() {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const { data, isLoading } = useApi<ChatwootHealthResponse>("/api/attribution/chatwoot-reconcile");
+  const p = data?.pipeline ?? {};
+  const r = data?.reconciliation ?? {};
+  const rows: [string, number | undefined, boolean][] = [
+    [A ? "صفوف إسناد المحادثات" : "Conversation attribution rows", p.attribution_rows, false],
+    [
+      A ? "محادثات بلا صف رغم وصول رسالة" : "Missing rows found (inbound message, no row)",
+      r.replayable,
+      true,
+    ],
+    [A ? "صفوف أعيد بناؤها" : "Rows rebuilt from Chatwoot", r.replayed, false],
+    [
+      A ? "محادثات بلا رسالة واردة (لا يلزم صف)" : "No inbound message (no row needed)",
+      r.no_inbound_message,
+      false,
+    ],
+    [A ? "أحداث فشلت معالجتها" : "Failed webhook events", p.failed_events, true],
+    [A ? "أحداث عالقة" : "Stuck webhook events", p.stuck_events, true],
+    [A ? "أحداث معالجة بلا صف" : "Processed events without a row", p.processed_without_row, true],
+    [A ? "غير معروف بلا سبب" : "Unknown without a reason", p.unknown_without_reason, true],
+  ];
+  return (
+    <PageSection
+      title={A ? "صحة إسناد محادثات Chatwoot" : "Chatwoot attribution health"}
+      icon={<ShieldCheck size={16} />}
+      tone="sky"
+      hint={
+        A
+          ? "كل 6 ساعات تُقارن محادثات Chatwoot بصفوف الإسناد؛ أي محادثة لها رسالة واردة بلا صف يُعاد بناؤها في قاعدة البيانات فقط وتُسجل كـ«لم يصل الـwebhook»."
+          : "Every 6 hours Chatwoot conversations are compared with attribution rows; a conversation with an inbound message and no row is rebuilt in the database only and recorded as webhook_delivery_missed."
+      }
+    >
+      <Card padded>
+        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          {rows.map(([label, value, alarm]) => (
+            <div key={label} className="flex items-baseline justify-between gap-2 text-sm">
+              <dt className="text-text-muted">{label}</dt>
+              <dd className={`num font-semibold ${alarm && (value ?? 0) > 0 ? "text-danger" : ""}`}>
+                {isLoading
+                  ? "…"
+                  : value === undefined
+                    ? A
+                      ? "لم يُفحص بعد"
+                      : "Not checked yet"
+                    : fmtNum(value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {data?.lastRun?.summary?.message ? (
+          <div className="mt-3 border-t border-border pt-3 text-xs text-text-muted">
+            {A ? "آخر فحص: " : "Last check: "}
+            {String(data.lastRun.updated_at).replace("T", " ").slice(0, 16)} —{" "}
+            {data.lastRun.summary.message}
+          </div>
+        ) : null}
+      </Card>
+    </PageSection>
   );
 }

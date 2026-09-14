@@ -51,12 +51,19 @@ export function label(map: Record<string, Copy>, key: string, A: boolean): strin
   return copy ? (A ? copy.ar : copy.en) : key || "—";
 }
 
+/**
+ * An entity by its business name. The provider ID stays reachable (hover, and
+ * the detail views) but is not printed under every name: managers read names.
+ * Only a nameless entity shows its ID, because then the ID is all there is.
+ */
 export function nameWithId(name: string, id: string) {
   if (!name && !id) return "—";
+  if (!name) {
+    return <span className="font-mono text-[11px] text-text-muted">ID {id}</span>;
+  }
   return (
-    <div>
-      <div className="text-text">{name || "—"}</div>
-      {id ? <div className="font-mono text-[11px] text-text-muted">{id}</div> : null}
-    </div>
+    <span className="text-text" title={id ? `ID ${id}` : undefined}>
+      {name}
+    </span>
   );
 }
