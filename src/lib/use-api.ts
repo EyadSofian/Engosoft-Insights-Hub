@@ -24,6 +24,9 @@ export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
     enabled: options.enabled ?? true,
     queryFn: async () => {
       const res = await fetch(url);
+      if (res.status === 401) {
+        throw new Error("Your sign-in session has ended. Reload the page to sign in again.");
+      }
       if (!res.ok) {
         // Routes that fail on purpose (a missing integration, an upstream that
         // is down) send `{ error }`. Surfacing it beats "Request failed: 503",

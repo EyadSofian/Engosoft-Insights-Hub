@@ -55,8 +55,8 @@ export async function parseFilters(request: Request): Promise<GlobalFilters> {
   return filters;
 }
 
-export function json(data: unknown): Response {
-  return Response.json(data, { headers: { "cache-control": "no-store" } });
+export function json(data: unknown, status = 200): Response {
+  return Response.json(data, { status, headers: { "cache-control": "no-store" } });
 }
 
 /** Detail endpoints cap payload size so a page can't ship 18k rows to a phone. */

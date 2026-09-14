@@ -111,6 +111,10 @@ export interface AdCreative {
   creativeId: string;
   /** Human-readable creative label from the ad platform. */
   creativeName: string;
+  /** Stable Meta story identity used to resolve click-to-message referral source IDs. */
+  effectiveObjectStoryId?: string;
+  /** Provider post/story identity when Meta exposes it separately. */
+  sourcePostId?: string;
   creativeType: string;
   /** Normalized presentation family used by the dashboard gallery. */
   mediaType: string;

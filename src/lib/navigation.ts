@@ -10,6 +10,7 @@ import {
   Leaf,
   Megaphone,
   MessagesSquare,
+  MapPinned,
   Receipt,
   TrendingDown,
   Users,
@@ -69,6 +70,18 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
       { to: "/ads", key: "ads_tech", icon: BarChart3, tabLabel: { ar: "الإعلانات", en: "Ads" } },
+      {
+        to: "/attribution",
+        key: "attribution",
+        icon: MapPinned,
+        tabLabel: { ar: "إسناد المحادثات", en: "Attribution" },
+      },
+      {
+        to: "/landing-pages",
+        key: "landing_pages",
+        icon: Globe2,
+        tabLabel: { ar: "صفحات الهبوط", en: "Landing pages" },
+      },
       {
         to: "/website",
         key: "website",

@@ -12,10 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountingRouteImport } from './routes/accounting'
 import { Route as AdsRouteImport } from './routes/ads'
+import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
+import { Route as LandingPagesRouteImport } from './routes/landing-pages'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
@@ -54,6 +56,7 @@ import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
+import { Route as ApiMetaDestinationMixRouteImport } from './routes/api/meta-destination-mix'
 import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
@@ -66,9 +69,23 @@ import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-lead
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
+import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
+import { Route as ApiAttributionChatwootFactsBackfillRouteImport } from './routes/api/attribution.chatwoot-facts-backfill'
+import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
+import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
+import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
+import { Route as ApiAttributionSummaryRouteImport } from './routes/api/attribution.summary'
+import { Route as ApiAttributionTokensRouteImport } from './routes/api/attribution.tokens'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
+import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
+import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
+import { Route as ApiMetaLeadgenWebhookRouteImport } from './routes/api/meta.leadgen-webhook'
+import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
 import { Route as ApiPricingBooksRouteImport } from './routes/api/pricing.books'
@@ -87,6 +104,7 @@ import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/te
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
 import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
+import { Route as ApiMetaLeadAdsOperationsRouteImport } from './routes/api/meta.lead-ads.operations'
 import { Route as ApiPricingImportPreviewRouteImport } from './routes/api/pricing.import.preview'
 import { Route as ApiPricingInvoicesMovementRouteImport } from './routes/api/pricing.invoices.$movement'
 
@@ -103,6 +121,11 @@ const AccountingRoute = AccountingRouteImport.update({
 const AdsRoute = AdsRouteImport.update({
   id: '/ads',
   path: '/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttributionRoute = AttributionRouteImport.update({
+  id: '/attribution',
+  path: '/attribution',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CampaignsRoute = CampaignsRouteImport.update({
@@ -123,6 +146,11 @@ const FullInvoicedRoute = FullInvoicedRouteImport.update({
 const GuideRoute = GuideRouteImport.update({
   id: '/guide',
   path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingPagesRoute = LandingPagesRouteImport.update({
+  id: '/landing-pages',
+  path: '/landing-pages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -317,6 +345,11 @@ const ApiMediaPlanActivityRoute = ApiMediaPlanActivityRouteImport.update({
   path: '/api/media-plan-activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaDestinationMixRoute = ApiMetaDestinationMixRouteImport.update({
+  id: '/api/meta-destination-mix',
+  path: '/api/meta-destination-mix',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrganicRoute = ApiOrganicRouteImport.update({
   id: '/api/organic',
   path: '/api/organic',
@@ -377,6 +410,59 @@ const ApiYoyRoute = ApiYoyRouteImport.update({
   path: '/api/yoy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
+  id: '/api/acquisition/events',
+  path: '/api/acquisition/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAcquisitionSummaryRoute = ApiAcquisitionSummaryRouteImport.update({
+  id: '/api/acquisition/summary',
+  path: '/api/acquisition/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionChatwootFactsBackfillRoute =
+  ApiAttributionChatwootFactsBackfillRouteImport.update({
+    id: '/api/attribution/chatwoot-facts-backfill',
+    path: '/api/attribution/chatwoot-facts-backfill',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionConversationsRoute =
+  ApiAttributionConversationsRouteImport.update({
+    id: '/api/attribution/conversations',
+    path: '/api/attribution/conversations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionHealthRoute = ApiAttributionHealthRouteImport.update({
+  id: '/api/attribution/health',
+  path: '/api/attribution/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionMetaHealthRoute =
+  ApiAttributionMetaHealthRouteImport.update({
+    id: '/api/attribution/meta-health',
+    path: '/api/attribution/meta-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionSummaryRoute = ApiAttributionSummaryRouteImport.update({
+  id: '/api/attribution/summary',
+  path: '/api/attribution/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionTokensRoute = ApiAttributionTokensRouteImport.update({
+  id: '/api/attribution/tokens',
+  path: '/api/attribution/tokens',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
   id: '/api/auth/sso',
   path: '/api/auth/sso',
@@ -392,6 +478,29 @@ const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   path: '/api/ingest/dataset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLandingAttributionEventsRoute =
+  ApiLandingAttributionEventsRouteImport.update({
+    id: '/api/landing-attribution/events',
+    path: '/api/landing-attribution/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiLandingAttributionSummaryRoute =
+  ApiLandingAttributionSummaryRouteImport.update({
+    id: '/api/landing-attribution/summary',
+    path: '/api/landing-attribution/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMetaLeadgenWebhookRoute = ApiMetaLeadgenWebhookRouteImport.update({
+  id: '/api/meta/leadgen-webhook',
+  path: '/api/meta/leadgen-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaWhatsappAttributionWebhookRoute =
+  ApiMetaWhatsappAttributionWebhookRouteImport.update({
+    id: '/api/meta/whatsapp-attribution-webhook',
+    path: '/api/meta/whatsapp-attribution-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPricesAdviceRoute = ApiPricesAdviceRouteImport.update({
   id: '/api/prices/advice',
   path: '/api/prices/advice',
@@ -483,6 +592,12 @@ const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
   path: '/api/telegram/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaLeadAdsOperationsRoute =
+  ApiMetaLeadAdsOperationsRouteImport.update({
+    id: '/api/meta/lead-ads/operations',
+    path: '/api/meta/lead-ads/operations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPricingImportPreviewRoute = ApiPricingImportPreviewRouteImport.update({
   id: '/api/pricing/import/preview',
   path: '/api/pricing/import/preview',
@@ -499,10 +614,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -541,6 +658,7 @@ export interface FileRoutesByFullPath {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -553,9 +671,23 @@ export interface FileRoutesByFullPath {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -574,6 +706,7 @@ export interface FileRoutesByFullPath {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -581,10 +714,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -623,6 +758,7 @@ export interface FileRoutesByTo {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -635,9 +771,23 @@ export interface FileRoutesByTo {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -656,6 +806,7 @@ export interface FileRoutesByTo {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -664,10 +815,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
   '/ads': typeof AdsRoute
+  '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -706,6 +859,7 @@ export interface FileRoutesById {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
   '/api/products': typeof ApiProductsRoute
@@ -718,9 +872,23 @@ export interface FileRoutesById {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
+  '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
+  '/api/attribution/summary': typeof ApiAttributionSummaryRoute
+  '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -739,6 +907,7 @@ export interface FileRoutesById {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -748,10 +917,12 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -790,6 +961,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -802,9 +974,23 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/meta-health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -823,6 +1009,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesByTo: FileRoutesByTo
@@ -830,10 +1017,12 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -872,6 +1061,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -884,9 +1074,23 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/meta-health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -905,6 +1109,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   id:
@@ -912,10 +1117,12 @@ export interface FileRouteTypes {
     | '/'
     | '/accounting'
     | '/ads'
+    | '/attribution'
     | '/campaigns'
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -954,6 +1161,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
     | '/api/products'
@@ -966,9 +1174,23 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/conversations'
+    | '/api/attribution/health'
+    | '/api/attribution/meta-health'
+    | '/api/attribution/summary'
+    | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -987,6 +1209,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesById: FileRoutesById
@@ -995,10 +1218,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountingRoute: typeof AccountingRoute
   AdsRoute: typeof AdsRoute
+  AttributionRoute: typeof AttributionRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
+  LandingPagesRoute: typeof LandingPagesRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
@@ -1037,6 +1262,7 @@ export interface RootRouteChildren {
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
+  ApiMetaDestinationMixRoute: typeof ApiMetaDestinationMixRoute
   ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
   ApiProductsRoute: typeof ApiProductsRoute
@@ -1049,9 +1275,23 @@ export interface RootRouteChildren {
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
+  ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
+  ApiAttributionChatwootFactsBackfillRoute: typeof ApiAttributionChatwootFactsBackfillRoute
+  ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
+  ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
+  ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
+  ApiAttributionSummaryRoute: typeof ApiAttributionSummaryRoute
+  ApiAttributionTokensRoute: typeof ApiAttributionTokensRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
+  ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
+  ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
+  ApiMetaLeadgenWebhookRoute: typeof ApiMetaLeadgenWebhookRoute
+  ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
   ApiPricingBooksRoute: typeof ApiPricingBooksRoute
@@ -1070,6 +1310,7 @@ export interface RootRouteChildren {
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
   ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
+  ApiMetaLeadAdsOperationsRoute: typeof ApiMetaLeadAdsOperationsRoute
   ApiPricingImportPreviewRoute: typeof ApiPricingImportPreviewRoute
   ApiPricingInvoicesMovementRoute: typeof ApiPricingInvoicesMovementRoute
 }
@@ -1095,6 +1336,13 @@ declare module '@tanstack/react-router' {
       path: '/ads'
       fullPath: '/ads'
       preLoaderRoute: typeof AdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attribution': {
+      id: '/attribution'
+      path: '/attribution'
+      fullPath: '/attribution'
+      preLoaderRoute: typeof AttributionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns': {
@@ -1123,6 +1371,13 @@ declare module '@tanstack/react-router' {
       path: '/guide'
       fullPath: '/guide'
       preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing-pages': {
+      id: '/landing-pages'
+      path: '/landing-pages'
+      fullPath: '/landing-pages'
+      preLoaderRoute: typeof LandingPagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -1391,6 +1646,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaPlanActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta-destination-mix': {
+      id: '/api/meta-destination-mix'
+      path: '/api/meta-destination-mix'
+      fullPath: '/api/meta-destination-mix'
+      preLoaderRoute: typeof ApiMetaDestinationMixRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organic': {
       id: '/api/organic'
       path: '/api/organic'
@@ -1475,6 +1737,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/acquisition/events': {
+      id: '/api/acquisition/events'
+      path: '/api/acquisition/events'
+      fullPath: '/api/acquisition/events'
+      preLoaderRoute: typeof ApiAcquisitionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/summary': {
+      id: '/api/acquisition/summary'
+      path: '/api/acquisition/summary'
+      fullPath: '/api/acquisition/summary'
+      preLoaderRoute: typeof ApiAcquisitionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/chatwoot-facts-backfill': {
+      id: '/api/attribution/chatwoot-facts-backfill'
+      path: '/api/attribution/chatwoot-facts-backfill'
+      fullPath: '/api/attribution/chatwoot-facts-backfill'
+      preLoaderRoute: typeof ApiAttributionChatwootFactsBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/conversations': {
+      id: '/api/attribution/conversations'
+      path: '/api/attribution/conversations'
+      fullPath: '/api/attribution/conversations'
+      preLoaderRoute: typeof ApiAttributionConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/health': {
+      id: '/api/attribution/health'
+      path: '/api/attribution/health'
+      fullPath: '/api/attribution/health'
+      preLoaderRoute: typeof ApiAttributionHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/meta-health': {
+      id: '/api/attribution/meta-health'
+      path: '/api/attribution/meta-health'
+      fullPath: '/api/attribution/meta-health'
+      preLoaderRoute: typeof ApiAttributionMetaHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/summary': {
+      id: '/api/attribution/summary'
+      path: '/api/attribution/summary'
+      fullPath: '/api/attribution/summary'
+      preLoaderRoute: typeof ApiAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/tokens': {
+      id: '/api/attribution/tokens'
+      path: '/api/attribution/tokens'
+      fullPath: '/api/attribution/tokens'
+      preLoaderRoute: typeof ApiAttributionTokensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/sso': {
       id: '/api/auth/sso'
       path: '/api/auth/sso'
@@ -1494,6 +1826,34 @@ declare module '@tanstack/react-router' {
       path: '/api/ingest/dataset'
       fullPath: '/api/ingest/dataset'
       preLoaderRoute: typeof ApiIngestDatasetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/landing-attribution/events': {
+      id: '/api/landing-attribution/events'
+      path: '/api/landing-attribution/events'
+      fullPath: '/api/landing-attribution/events'
+      preLoaderRoute: typeof ApiLandingAttributionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/landing-attribution/summary': {
+      id: '/api/landing-attribution/summary'
+      path: '/api/landing-attribution/summary'
+      fullPath: '/api/landing-attribution/summary'
+      preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/leadgen-webhook': {
+      id: '/api/meta/leadgen-webhook'
+      path: '/api/meta/leadgen-webhook'
+      fullPath: '/api/meta/leadgen-webhook'
+      preLoaderRoute: typeof ApiMetaLeadgenWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/whatsapp-attribution-webhook': {
+      id: '/api/meta/whatsapp-attribution-webhook'
+      path: '/api/meta/whatsapp-attribution-webhook'
+      fullPath: '/api/meta/whatsapp-attribution-webhook'
+      preLoaderRoute: typeof ApiMetaWhatsappAttributionWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/prices/advice': {
@@ -1622,6 +1982,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/lead-ads/operations': {
+      id: '/api/meta/lead-ads/operations'
+      path: '/api/meta/lead-ads/operations'
+      fullPath: '/api/meta/lead-ads/operations'
+      preLoaderRoute: typeof ApiMetaLeadAdsOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pricing/import/preview': {
       id: '/api/pricing/import/preview'
       path: '/api/pricing/import/preview'
@@ -1643,10 +2010,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountingRoute: AccountingRoute,
   AdsRoute: AdsRoute,
+  AttributionRoute: AttributionRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
+  LandingPagesRoute: LandingPagesRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   MediaBuyersRoute: MediaBuyersRoute,
@@ -1685,6 +2054,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
+  ApiMetaDestinationMixRoute: ApiMetaDestinationMixRoute,
   ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,
   ApiProductsRoute: ApiProductsRoute,
@@ -1697,9 +2067,25 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
+  ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
+  ApiAttributionChatwootFactsBackfillRoute:
+    ApiAttributionChatwootFactsBackfillRoute,
+  ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
+  ApiAttributionHealthRoute: ApiAttributionHealthRoute,
+  ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,
+  ApiAttributionSummaryRoute: ApiAttributionSummaryRoute,
+  ApiAttributionTokensRoute: ApiAttributionTokensRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
+  ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
+  ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
+  ApiMetaLeadgenWebhookRoute: ApiMetaLeadgenWebhookRoute,
+  ApiMetaWhatsappAttributionWebhookRoute:
+    ApiMetaWhatsappAttributionWebhookRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,
   ApiPricesCatalogRoute: ApiPricesCatalogRoute,
   ApiPricingBooksRoute: ApiPricingBooksRoute,
@@ -1718,6 +2104,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
   ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
+  ApiMetaLeadAdsOperationsRoute: ApiMetaLeadAdsOperationsRoute,
   ApiPricingImportPreviewRoute: ApiPricingImportPreviewRoute,
   ApiPricingInvoicesMovementRoute: ApiPricingInvoicesMovementRoute,
 }
