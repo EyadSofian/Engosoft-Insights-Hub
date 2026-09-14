@@ -16,6 +16,7 @@ import {
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
+import { AcquisitionOverviewSection } from "@/components/attribution/AcquisitionOverviewSection";
 import { MetaDestinationMixSection } from "@/components/attribution/MetaDestinationMixSection";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { FunnelBars } from "@/components/ui-bits";
@@ -629,18 +630,20 @@ function Attribution() {
     <PageSections>
       <DashboardPageHeader
         icon={<MessagesSquare size={22} />}
-        title={A ? "إسناد المحادثات متعدد القنوات" : "Multi-channel conversation attribution"}
+        title={A ? "إسناد الاستحواذ" : "Acquisition attribution"}
         subtitle={
           A
-            ? "إسناد على مستوى المحادثة من دليل دقيق فقط. تقارير Meta الإجمالية معروضة منفصلة في آخر الصفحة ولا تُحتسب هنا."
-            : "Conversation-level attribution from exact evidence only. Meta's aggregate reporting is shown separately at the end and is never counted here."
+            ? "كل عميل ومحادثة وإرسال جديد من دليل المزود. تفاصيل المحادثات تليه، وتقارير Meta الإجمالية منفصلة في آخر الصفحة."
+            : "Every new lead, conversation and landing submission from provider evidence. Conversation-level detail follows; Meta's aggregate reporting is shown separately at the end."
         }
         period={period}
         tone="violet"
       />
 
+      <AcquisitionOverviewSection />
+
       <PageSection
-        title={A ? "فلاتر الإسناد" : "Attribution filters"}
+        title={A ? "إسناد المحادثات: الفلاتر" : "Conversation-level attribution filters"}
         hint={
           A ? "الحملة والإعلان يُطابقان بالمعرّف الدقيق." : "Campaign and ad filters use exact IDs."
         }

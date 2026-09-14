@@ -13,6 +13,10 @@ void import("./lib/meta-message-attribution.server")
   .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
   .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
 
+void import("./lib/meta-leadgen.server")
+  .then(({ startMetaLeadAdsWorker }) => startMetaLeadAdsWorker())
+  .catch((error) => console.error("[meta-lead-ads] worker bootstrap failed:", error));
+
 /**
  * Pull the data snapshot into memory while the process is starting, rather than
  * inside the first request that needs it.
