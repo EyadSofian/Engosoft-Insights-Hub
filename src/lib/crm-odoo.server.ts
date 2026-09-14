@@ -244,13 +244,19 @@ function contractRecord(
   };
 }
 
-const PIPELINE_STAGE_XMLIDS: Record<string, CrmStageKey> = {
-  stage_preparation: "preparation",
-  stage_new: "new",
-  stage_open: "open",
-  stage_quotation_sent: "quotation",
-  stage_won: "won",
-  stage_lost: "lost",
+// `get_external_id` returns one stable XMLID for a record. Preparation and
+// Quotation Sent predate the redesign and retain their documented core XMLID
+// aliases, so they must be treated exactly like their 1.26 aliases. Do not
+// fall back to stage names: names are translated and were historically reused.
+const PIPELINE_STAGE_EXTERNAL_IDS: Record<string, CrmStageKey> = {
+  "crm_pipeline_redesign.stage_preparation": "preparation",
+  "crm.stage_lead1": "preparation",
+  "crm_pipeline_redesign.stage_new": "new",
+  "crm_pipeline_redesign.stage_open": "open",
+  "crm_pipeline_redesign.stage_quotation_sent": "quotation",
+  "crm.stage_lead4": "quotation",
+  "crm_pipeline_redesign.stage_won": "won",
+  "crm_pipeline_redesign.stage_lost": "lost",
 };
 
 /**
@@ -258,8 +264,9 @@ const PIPELINE_STAGE_XMLIDS: Record<string, CrmStageKey> = {
  *
  * `ir.model.data` is intentionally restricted for the reporting service
  * account in production, even though the same account can read crm.stage.
- * Odoo's model-level `get_external_id` exposes exactly the XMLID mapping we
- * need without widening that account's access to system metadata.
+ * Odoo's model-level `get_external_id` exposes a stable XMLID without widening
+ * that account's access to system metadata. The mapping includes documented
+ * legacy aliases where a stage has more than one XMLID.
  */
 async function loadStageKeys(): Promise<Map<number, CrmStageKey>> {
   const stages = await searchRead<{ id: number }>("crm.stage", [], ["id"], {
@@ -276,11 +283,9 @@ async function loadStageKeys(): Promise<Map<number, CrmStageKey>> {
   return new Map(
     stages.map((stage) => {
       const externalId = externalIds[String(stage.id)];
-      const xmlidName =
-        typeof externalId === "string" && externalId.startsWith("crm_pipeline_redesign.")
-          ? externalId.slice("crm_pipeline_redesign.".length)
-          : "";
-      return [stage.id, PIPELINE_STAGE_XMLIDS[xmlidName] ?? "other"];
+      const stageKey =
+        typeof externalId === "string" ? PIPELINE_STAGE_EXTERNAL_IDS[externalId] : undefined;
+      return [stage.id, stageKey ?? "other"];
     }),
   );
 }
