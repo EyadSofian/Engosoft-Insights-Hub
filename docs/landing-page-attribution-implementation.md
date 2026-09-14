@@ -24,6 +24,8 @@ This branch adds an Insights-only collector and dashboard. It has no Odoo client
 
 Discovery was read-only: GitHub source inspection and HTTP headers only. No live form was submitted, Chatwoot conversation created, Railway deployment made, or production webhook added.
 
+Railway was also inspected read-only: `Engosoft-Insights-Hub` is online with an online Postgres resource, but the project currently exposes only one linked environment, `production`. There is no existing staging environment to receive the required single-page canary, so no deployment or database schema action was attempted.
+
 ## Delivered Phase A code
 
 - `src/lib/landing-attribution.ts`: shared parser, deterministic normalization, referrer classification, and precedence.
