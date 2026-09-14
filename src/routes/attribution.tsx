@@ -16,6 +16,7 @@ import {
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
+import { MetaDestinationMixSection } from "@/components/attribution/MetaDestinationMixSection";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { FunnelBars } from "@/components/ui-bits";
 import { useApi } from "@/lib/use-api";
@@ -575,7 +576,7 @@ function Attribution() {
     },
     {
       key: "spend",
-      header: A ? "الصرف" : "Spend",
+      header: A ? "الصرف المطابق" : "Matched spend",
       align: "right",
       render: (row) => fmtUSD(row.spend),
       sortValue: (row) => row.spend ?? -1,
@@ -631,8 +632,8 @@ function Attribution() {
         title={A ? "إسناد المحادثات متعدد القنوات" : "Multi-channel conversation attribution"}
         subtitle={
           A
-            ? "من الإعلان أو الرابط إلى المحادثة ثم نتيجة CRM، دون افتراض مصدر غير مثبت."
-            : "From ad or link to conversation and CRM outcome, without inventing unproven sources."
+            ? "إسناد على مستوى المحادثة من دليل دقيق فقط. تقارير Meta الإجمالية معروضة منفصلة في آخر الصفحة ولا تُحتسب هنا."
+            : "Conversation-level attribution from exact evidence only. Meta's aggregate reporting is shown separately at the end and is never counted here."
         }
         period={period}
         tone="violet"
@@ -1024,6 +1025,8 @@ function Attribution() {
           }
         />
       </PageSection>
+
+      <MetaDestinationMixSection />
     </PageSections>
   );
 }
