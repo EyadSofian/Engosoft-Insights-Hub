@@ -253,6 +253,38 @@ const PIPELINE_STAGE_XMLIDS: Record<string, CrmStageKey> = {
   stage_lost: "lost",
 };
 
+/**
+ * Resolve stable stage XMLIDs through the stage model itself.
+ *
+ * `ir.model.data` is intentionally restricted for the reporting service
+ * account in production, even though the same account can read crm.stage.
+ * Odoo's model-level `get_external_id` exposes exactly the XMLID mapping we
+ * need without widening that account's access to system metadata.
+ */
+async function loadStageKeys(): Promise<Map<number, CrmStageKey>> {
+  const stages = await searchRead<{ id: number }>("crm.stage", [], ["id"], {
+    context: { active_test: false },
+  });
+  if (!stages.length) return new Map();
+
+  const externalIds = await odooCall<Record<string, string | false>>(
+    "crm.stage",
+    "get_external_id",
+    [stages.map((stage) => stage.id)],
+    { context: { active_test: false } },
+  );
+  return new Map(
+    stages.map((stage) => {
+      const externalId = externalIds[String(stage.id)];
+      const xmlidName =
+        typeof externalId === "string" && externalId.startsWith("crm_pipeline_redesign.")
+          ? externalId.slice("crm_pipeline_redesign.".length)
+          : "";
+      return [stage.id, PIPELINE_STAGE_XMLIDS[xmlidName] ?? "other"];
+    }),
+  );
+}
+
 function actualStageKey(lead: OdooCrmLead, stageKeys: Map<number, CrmStageKey>): CrmStageKey {
   const mappedStage = stageKeys.get(m2oId(lead.stage_id));
   if (lead.stage_is_lost || mappedStage === "lost") return "lost";
@@ -501,27 +533,15 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
     ),
   ];
 
-  const [activeCandidates, inactiveCandidates, stageRefs] = await Promise.all([
+  const [activeCandidates, inactiveCandidates, stageKeys] = await Promise.all([
     searchRead<OdooCrmLead>("crm.lead", activeDomain, fields, {
       context: { active_test: false },
     }),
     searchRead<OdooCrmLead>("crm.lead", inactiveDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<{ id: number; name: string; res_id: number }>(
-      "ir.model.data",
-      [
-        ["model", "=", "crm.stage"],
-        ["module", "=", "crm_pipeline_redesign"],
-        ["name", "in", Object.keys(PIPELINE_STAGE_XMLIDS)],
-      ],
-      ["name", "res_id"],
-      { context: { active_test: false } },
-    ),
+    loadStageKeys(),
   ]);
-  const stageKeys = new Map<number, CrmStageKey>(
-    stageRefs.map((ref) => [Number(ref.res_id), PIPELINE_STAGE_XMLIDS[ref.name] ?? "other"]),
-  );
   const productIds = [
     ...new Set(
       [...activeCandidates, ...inactiveCandidates]
