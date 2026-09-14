@@ -308,56 +308,6 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
     const imageHashesByAccount = new Map<string, Set<string>>();
     let throttled = false;
 
-    for (let index = 0; index < plan.targets.length && !throttled; index += BATCH_SIZE) {
-      const batch = plan.targets.slice(index, index + BATCH_SIZE);
-      const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
-      url.searchParams.set("ids", batch.map((candidate) => candidate.adId).join(","));
-      url.searchParams.set("fields", META_CREATIVE_AD_FIELDS);
-      summary.requested += batch.length;
-
-      let result;
-      try {
-        result = await graphGet(url, token);
-      } catch (error) {
-        summary.failed += batch.length;
-        const reason = `request_failed: ${redact(error instanceof Error ? error.message : String(error), token)}`;
-        summary.failureReasons[reason] = (summary.failureReasons[reason] ?? 0) + batch.length;
-        continue;
-      }
-      const rootError = result.payload.error as Row | undefined;
-      if (rootError) {
-        if (isThrottleError(rootError)) {
-          throttled = true;
-          summary.requested -= batch.length;
-          summary.message = `Meta throttled the read (${s(rootError.code)}); progress is saved and the next run resumes.`;
-          break;
-        }
-        // A batch-level error usually means one bad ID poisoned the batch:
-        // retry those IDs one by one so good ads are not lost with it.
-        for (const candidate of batch) {
-          const single = new URL(`https://graph.facebook.com/${apiVersion}/${candidate.adId}`);
-          single.searchParams.set("fields", META_CREATIVE_AD_FIELDS);
-          const one = await graphGet(single, token).catch(() => null);
-          await handleEntry(candidate, one?.payload ?? { error: { message: "request failed" } });
-          await sleep(250);
-        }
-      } else {
-        for (const candidate of batch) {
-          await handleEntry(
-            candidate,
-            (result.payload[candidate.adId] as Row) ?? { error: { message: "not returned" } },
-          );
-        }
-      }
-      await flushBatch();
-      await writeState("running", summary);
-      if (result.usage >= 75) {
-        await sleep(60_000);
-      } else {
-        await sleep(PAUSE_MS);
-      }
-    }
-
     const pendingRows: { creative: AdCreative; existed: boolean }[] = [];
     async function flushBatch() {
       if (!pendingRows.length) return;
@@ -422,6 +372,56 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
         const set = imageHashesByAccount.get(account) ?? new Set<string>();
         set.add(asset.id);
         imageHashesByAccount.set(account, set);
+      }
+    }
+
+    for (let index = 0; index < plan.targets.length && !throttled; index += BATCH_SIZE) {
+      const batch = plan.targets.slice(index, index + BATCH_SIZE);
+      const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
+      url.searchParams.set("ids", batch.map((candidate) => candidate.adId).join(","));
+      url.searchParams.set("fields", META_CREATIVE_AD_FIELDS);
+      summary.requested += batch.length;
+
+      let result;
+      try {
+        result = await graphGet(url, token);
+      } catch (error) {
+        summary.failed += batch.length;
+        const reason = `request_failed: ${redact(error instanceof Error ? error.message : String(error), token)}`;
+        summary.failureReasons[reason] = (summary.failureReasons[reason] ?? 0) + batch.length;
+        continue;
+      }
+      const rootError = result.payload.error as Row | undefined;
+      if (rootError) {
+        if (isThrottleError(rootError)) {
+          throttled = true;
+          summary.requested -= batch.length;
+          summary.message = `Meta throttled the read (${s(rootError.code)}); progress is saved and the next run resumes.`;
+          break;
+        }
+        // A batch-level error usually means one bad ID poisoned the batch:
+        // retry those IDs one by one so good ads are not lost with it.
+        for (const candidate of batch) {
+          const single = new URL(`https://graph.facebook.com/${apiVersion}/${candidate.adId}`);
+          single.searchParams.set("fields", META_CREATIVE_AD_FIELDS);
+          const one = await graphGet(single, token).catch(() => null);
+          await handleEntry(candidate, one?.payload ?? { error: { message: "request failed" } });
+          await sleep(250);
+        }
+      } else {
+        for (const candidate of batch) {
+          await handleEntry(
+            candidate,
+            (result.payload[candidate.adId] as Row) ?? { error: { message: "not returned" } },
+          );
+        }
+      }
+      await flushBatch();
+      await writeState("running", summary);
+      if (result.usage >= 75) {
+        await sleep(60_000);
+      } else {
+        await sleep(PAUSE_MS);
       }
     }
 
