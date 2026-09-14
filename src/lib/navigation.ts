@@ -77,6 +77,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         tabLabel: { ar: "إسناد المحادثات", en: "Attribution" },
       },
       {
+        to: "/landing-pages",
+        key: "landing_pages",
+        icon: Globe2,
+        tabLabel: { ar: "صفحات الهبوط", en: "Landing pages" },
+      },
+      {
         to: "/website",
         key: "website",
         icon: Globe2,

@@ -31,6 +31,7 @@ export const DICT = {
   media_plan: { ar: "خطة الميديا الشهرية", en: "Monthly media plan" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
   attribution: { ar: "إسناد المحادثات", en: "Conversation attribution" },
+  landing_pages: { ar: "صفحات الهبوط", en: "Landing pages" },
   accounting: { ar: "الحسابات", en: "Accounting" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
   leads: { ar: "العملاء المحتملون", en: "Leads (CRM)" },

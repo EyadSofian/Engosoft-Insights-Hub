@@ -17,6 +17,7 @@ import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
+import { Route as LandingPagesRouteImport } from './routes/landing-pages'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
@@ -74,6 +75,8 @@ import { Route as ApiAttributionTokensRouteImport } from './routes/api/attributi
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
+import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
+import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
 import { Route as ApiPricingBooksRouteImport } from './routes/api/pricing.books'
@@ -133,6 +136,11 @@ const FullInvoicedRoute = FullInvoicedRouteImport.update({
 const GuideRoute = GuideRouteImport.update({
   id: '/guide',
   path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingPagesRoute = LandingPagesRouteImport.update({
+  id: '/landing-pages',
+  path: '/landing-pages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -423,6 +431,18 @@ const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   path: '/api/ingest/dataset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLandingAttributionEventsRoute =
+  ApiLandingAttributionEventsRouteImport.update({
+    id: '/api/landing-attribution/events',
+    path: '/api/landing-attribution/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiLandingAttributionSummaryRoute =
+  ApiLandingAttributionSummaryRouteImport.update({
+    id: '/api/landing-attribution/summary',
+    path: '/api/landing-attribution/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPricesAdviceRoute = ApiPricesAdviceRouteImport.update({
   id: '/api/prices/advice',
   path: '/api/prices/advice',
@@ -535,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -592,6 +613,8 @@ export interface FileRoutesByFullPath {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -622,6 +645,7 @@ export interface FileRoutesByTo {
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -679,6 +703,8 @@ export interface FileRoutesByTo {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -710,6 +736,7 @@ export interface FileRoutesById {
   '/courses': typeof CoursesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/media-buyers': typeof MediaBuyersRoute
@@ -767,6 +794,8 @@ export interface FileRoutesById {
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -799,6 +828,7 @@ export interface FileRouteTypes {
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -856,6 +886,8 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -886,6 +918,7 @@ export interface FileRouteTypes {
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -943,6 +976,8 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -973,6 +1008,7 @@ export interface FileRouteTypes {
     | '/courses'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
     | '/leads'
     | '/lost'
     | '/media-buyers'
@@ -1030,6 +1066,8 @@ export interface FileRouteTypes {
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -1061,6 +1099,7 @@ export interface RootRouteChildren {
   CoursesRoute: typeof CoursesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
+  LandingPagesRoute: typeof LandingPagesRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
@@ -1118,6 +1157,8 @@ export interface RootRouteChildren {
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
+  ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
+  ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
   ApiPricingBooksRoute: typeof ApiPricingBooksRoute
@@ -1196,6 +1237,13 @@ declare module '@tanstack/react-router' {
       path: '/guide'
       fullPath: '/guide'
       preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing-pages': {
+      id: '/landing-pages'
+      path: '/landing-pages'
+      fullPath: '/landing-pages'
+      preLoaderRoute: typeof LandingPagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -1597,6 +1645,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestDatasetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/landing-attribution/events': {
+      id: '/api/landing-attribution/events'
+      path: '/api/landing-attribution/events'
+      fullPath: '/api/landing-attribution/events'
+      preLoaderRoute: typeof ApiLandingAttributionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/landing-attribution/summary': {
+      id: '/api/landing-attribution/summary'
+      path: '/api/landing-attribution/summary'
+      fullPath: '/api/landing-attribution/summary'
+      preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/prices/advice': {
       id: '/api/prices/advice'
       path: '/api/prices/advice'
@@ -1749,6 +1811,7 @@ const rootRouteChildren: RootRouteChildren = {
   CoursesRoute: CoursesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
+  LandingPagesRoute: LandingPagesRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   MediaBuyersRoute: MediaBuyersRoute,
@@ -1806,6 +1869,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
+  ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
+  ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,
   ApiPricesCatalogRoute: ApiPricesCatalogRoute,
   ApiPricingBooksRoute: ApiPricingBooksRoute,

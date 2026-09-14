@@ -35,6 +35,7 @@
     "test:employee-display-name": "node --experimental-strip-types scripts/test-employee-display-name.mjs",
     "test:chatwoot": "node --experimental-strip-types scripts/test-chatwoot-architecture.mjs",
     "test:chatwoot-attribution": "vite-node scripts/test-chatwoot-attribution.mjs",
+    "test:landing-attribution": "vite-node scripts/test-landing-attribution.mjs",
     "backfill:chatwoot-attribution": "vite-node scripts/backfill-chatwoot-attribution.mjs",
     "provision:chatwoot-attribution": "node scripts/provision-chatwoot-attribution.mjs",
     "purge:chatwoot-attribution": "vite-node scripts/purge-chatwoot-attribution.mjs",
