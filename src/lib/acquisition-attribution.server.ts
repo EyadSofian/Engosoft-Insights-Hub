@@ -1,5 +1,10 @@
 import { Pool } from "pg";
-import { ACQUISITION_COUNTED_ENTITIES } from "./acquisition-attribution";
+import {
+  chatwootChannelSql,
+  sourcePlatformSql,
+  summarizeAcquisitionGroups,
+  type AcquisitionGroup,
+} from "./acquisition-attribution";
 
 /**
  * Unified acquisition attribution.
@@ -58,17 +63,20 @@ async function existingSources(): Promise<{
   leads: boolean;
   conversations: boolean;
   landing: boolean;
+  dashboardRows: boolean;
 }> {
   const result = await getPool().query<Row>(
     `SELECT to_regclass('public.meta_lead_acquisitions') AS leads,
             to_regclass('public.chatwoot_conversation_attribution') AS conversations,
-            to_regclass('public.landing_attribution_sessions') AS landing`,
+            to_regclass('public.landing_attribution_sessions') AS landing,
+            to_regclass('public.dashboard_rows') AS dashboard_rows`,
   );
   const row = result.rows[0] ?? {};
   return {
     leads: Boolean(row.leads),
     conversations: Boolean(row.conversations),
     landing: Boolean(row.landing),
+    dashboardRows: Boolean(row.dashboard_rows),
   };
 }
 
@@ -82,7 +90,7 @@ const COLUMNS = `acquisition_event_id, entity_type, entity_id, source_type, sour
   unknown_reason, crm_status, crm_won, revenue`;
 
 const META_LEADS_SQL = `
-  SELECT 'meta_lead:' || lead_id, 'meta_lead', lead_id, source_type, source_platform, 'meta_instant_form',
+  SELECT 'meta_lead:' || lead_id, 'meta_lead', lead_id, source_type, ${sourcePlatformSql("source_platform")}, 'meta_instant_form',
     'meta_lead:' || lead_id, '', lead_id, page_id, page_name, form_id, form_name,
     '', '', '', account_id, campaign_id, campaign_name,
     adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, '',
@@ -91,27 +99,26 @@ const META_LEADS_SQL = `
     unknown_reason, NULL::text, NULL::boolean, NULL::numeric
   FROM meta_lead_acquisitions`;
 
-// Mirrors chatwootSourceType / chatwootDestinationChannel in acquisition-attribution.ts.
-const CONVERSATIONS_SQL = `
-  SELECT 'chatwoot_conversation:' || c.conversation_id, 'chatwoot_conversation', c.conversation_id::text,
-    CASE
+// Mirrors chatwootSourceType in acquisition-attribution.ts.
+const CONVERSATION_SOURCE_TYPE = `CASE
       WHEN c.attribution_method IN ('meta_whatsapp_referral','meta_messenger_referral','meta_instagram_referral') THEN c.attribution_method
-      WHEN c.attribution_method = 'meta_referral' AND resolved.channel = 'Channel::Whatsapp' THEN 'meta_whatsapp_referral'
-      WHEN c.attribution_method = 'meta_referral' AND resolved.channel = 'Channel::FacebookPage' THEN 'meta_messenger_referral'
-      WHEN c.attribution_method = 'meta_referral' AND resolved.channel = 'Channel::Instagram' THEN 'meta_instagram_referral'
+      WHEN c.attribution_method = 'meta_referral' AND resolved.destination = 'whatsapp' THEN 'meta_whatsapp_referral'
+      WHEN c.attribution_method = 'meta_referral' AND resolved.destination = 'messenger' THEN 'meta_messenger_referral'
+      WHEN c.attribution_method = 'meta_referral' AND resolved.destination = 'instagram_dm' THEN 'meta_instagram_referral'
       WHEN c.attribution_method IN ('utm','signed_tracking_token','referrer') THEN 'website_chat'
       WHEN c.attribution_method = 'organic_direct' AND c.confidence = 'exact' THEN 'direct_or_organic'
       ELSE 'unknown'
+    END`;
+
+const CONVERSATIONS_SQL = `
+  SELECT 'chatwoot_conversation:' || c.conversation_id, 'chatwoot_conversation', c.conversation_id::text,
+    ${CONVERSATION_SOURCE_TYPE},
+    CASE ${CONVERSATION_SOURCE_TYPE}
+      WHEN 'unknown' THEN 'unknown'
+      WHEN 'direct_or_organic' THEN 'direct'
+      ELSE ${sourcePlatformSql("COALESCE(NULLIF(c.platform,''), NULLIF(c.source,''), NULLIF(c.utm_source,''))")}
     END,
-    COALESCE(NULLIF(c.platform,''), NULLIF(c.source,''), ''),
-    CASE resolved.channel
-      WHEN 'Channel::Whatsapp' THEN 'whatsapp'
-      WHEN 'Channel::FacebookPage' THEN 'messenger'
-      WHEN 'Channel::Instagram' THEN 'instagram_dm'
-      WHEN 'Channel::WebWidget' THEN 'website_chat'
-      WHEN 'Channel::Api' THEN 'website_chat'
-      ELSE 'unknown'
-    END,
+    resolved.destination,
     '', c.provider_message_id, '', c.destination_page_id, '', '', '',
     '', '', '', '', c.campaign_id, c.campaign_name,
     c.adset_id, c.adset_name, c.ad_id, c.ad_name, c.creative_id, c.creative_name, c.placement,
@@ -121,16 +128,20 @@ const CONVERSATIONS_SQL = `
     c.crm_status, c.crm_won, c.revenue
   FROM chatwoot_conversation_attribution c
   CROSS JOIN LATERAL (
-    SELECT COALESCE(NULLIF(c.channel,''),
-      (SELECT max(x.channel) FROM chatwoot_conversation_attribution x WHERE x.inbox_id = c.inbox_id AND x.channel <> '')) AS channel
+    SELECT ${chatwootChannelSql(
+      `COALESCE(NULLIF(c.channel,''),
+        (SELECT max(x.channel) FROM chatwoot_conversation_attribution x WHERE x.inbox_id = c.inbox_id AND x.channel <> ''))`,
+    )} AS destination
   ) resolved`;
 
 function landingSql(entity: "landing_submission" | "landing_visit"): string {
   const submission = entity === "landing_submission";
   return `
   SELECT '${entity}:' || session_id, '${entity}', ${submission ? "COALESCE(submission_id, session_id)" : "session_id"},
-    '${submission ? "landing_page_form" : "landing_page_visit"}',
-    COALESCE(NULLIF(first_source,''), ''), 'landing_page',
+    CASE COALESCE(first_attribution_method, 'unknown') WHEN 'unknown' THEN 'unknown'
+      ELSE '${submission ? "landing_page_form" : "landing_page_visit"}' END,
+    CASE WHEN first_attribution_method = 'direct' THEN 'direct' ELSE ${sourcePlatformSql("first_source")} END,
+    'landing_page',
     '', '', '', '', '', '', '',
     landing_page_id, COALESCE(landing_page_name,''), COALESCE(first_touch->>'landingPageUrl',''), '', '', '',
     '', '', '', '', '', '', '',
@@ -143,7 +154,7 @@ function landingSql(entity: "landing_submission" | "landing_visit"): string {
   FROM landing_attribution_sessions${submission ? " WHERE submitted_at IS NOT NULL" : ""}`;
 }
 
-async function eventsCte(): Promise<string | null> {
+async function eventsCte(): Promise<{ cte: string | null; dashboardRows: boolean }> {
   const sources = await existingSources();
   const parts = [
     sources.leads ? META_LEADS_SQL : "",
@@ -151,8 +162,12 @@ async function eventsCte(): Promise<string | null> {
     sources.landing ? landingSql("landing_submission") : "",
     sources.landing ? landingSql("landing_visit") : "",
   ].filter(Boolean);
-  if (!parts.length) return null;
-  return `WITH acquisition_events (${COLUMNS}) AS (${parts.join("\n  UNION ALL\n")})`;
+  return {
+    cte: parts.length
+      ? `WITH acquisition_events (${COLUMNS}) AS (${parts.join("\n  UNION ALL\n")})`
+      : null,
+    dashboardRows: sources.dashboardRows,
+  };
 }
 
 function where(filters: AcquisitionFilters): { sql: string; params: unknown[] } {
@@ -180,45 +195,71 @@ function where(filters: AcquisitionFilters): { sql: string; params: unknown[] } 
   return { sql: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "", params };
 }
 
-const COUNTED = ACQUISITION_COUNTED_ENTITIES.map((entity) => `'${entity}'`).join(",");
+/** A synced sheet cell as a number, or 0 when it is blank or not numeric. */
+function numericCell(key: string): string {
+  const cell = `replace(btrim(COALESCE(row_data->>'${key}', '')), ',', '')`;
+  return `(CASE WHEN ${cell} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN ${cell}::numeric ELSE 0 END)`;
+}
+
+/**
+ * The window and ID filters that also make sense for synced ad-platform rows.
+ * Values are validated by DATE and ID above before they are inlined.
+ */
+function adRowsWhere(filters: AcquisitionFilters): string {
+  const clauses: string[] = [];
+  if (filters.from && DATE.test(filters.from))
+    clauses.push(`record_date >= '${filters.from}'::date`);
+  if (filters.to && DATE.test(filters.to)) clauses.push(`record_date <= '${filters.to}'::date`);
+  for (const [key, column] of [
+    ["campaignId", "__campaign_id"],
+    ["adsetId", "__adset_id"],
+    ["adId", "__ad_id"],
+  ] as const) {
+    const value = filters[key];
+    if (value && ID.test(value)) clauses.push(`row_data->>'${column}' = '${value}'`);
+  }
+  return clauses.map((clause) => ` AND ${clause}`).join("");
+}
+
+export interface MetaAggregateLeads {
+  available: boolean;
+  /** Meta-reported on-Facebook lead-form results. Aggregate only; never individual leads. */
+  platformLeads: number;
+  campaigns: number;
+  from: string | null;
+  to: string | null;
+  /** Filters that describe individual events and cannot narrow an aggregate report. */
+  ignoredFilters: string[];
+}
 
 export async function getAcquisitionSummary(filters: AcquisitionFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false };
-  const cte = await eventsCte();
+  const { cte, dashboardRows } = await eventsCte();
   if (!cte) return { configured: true, empty: true };
   const { sql, params } = where(filters);
-  const filtered = `${cte}, filtered AS (SELECT * FROM acquisition_events ${sql})`;
-  const [totals, breakdown, campaigns, forms, trend] = await Promise.all([
-    getPool().query<Row>(
-      `${filtered}
-       SELECT
-         count(*) FILTER (WHERE entity_type IN (${COUNTED}))::int AS acquisition_events,
-         count(*) FILTER (WHERE entity_type='meta_lead')::int AS meta_instant_form_leads,
-         count(*) FILTER (WHERE entity_type='chatwoot_conversation' AND destination_channel IN ('whatsapp','messenger','instagram_dm'))::int AS messaging_conversations,
-         count(*) FILTER (WHERE entity_type='chatwoot_conversation' AND destination_channel='whatsapp')::int AS whatsapp_conversations,
-         count(*) FILTER (WHERE entity_type='chatwoot_conversation' AND destination_channel='messenger')::int AS messenger_conversations,
-         count(*) FILTER (WHERE entity_type='chatwoot_conversation' AND destination_channel='instagram_dm')::int AS instagram_conversations,
-         count(*) FILTER (WHERE entity_type='chatwoot_conversation' AND destination_channel IN ('website_chat','unknown'))::int AS other_conversations,
-         count(*) FILTER (WHERE entity_type='landing_submission')::int AS landing_submissions,
-         count(*) FILTER (WHERE entity_type='landing_visit')::int AS landing_visits,
-         count(*) FILTER (WHERE entity_type IN (${COUNTED}) AND attribution_confidence='exact' AND campaign_id<>'')::int AS exact_attributed,
-         count(*) FILTER (WHERE entity_type IN (${COUNTED}) AND source_type='unknown')::int AS unknown,
-         count(*) FILTER (WHERE entity_type IN (${COUNTED}) AND source_type='direct_or_organic')::int AS organic_direct
-       FROM filtered`,
-      params,
-    ),
+  const adWhere = adRowsWhere(filters);
+  const spendCampaigns = dashboardRows
+    ? `SELECT DISTINCT row_data->>'__campaign_id' AS campaign_id FROM dashboard_rows
+        WHERE dataset IN ('meta_ads','snap_ads') AND COALESCE(row_data->>'__campaign_id','') <> ''
+          AND ${numericCell("Spend (Cost)")} > 0${adWhere}`
+    : `SELECT NULL::text AS campaign_id WHERE false`;
+  const filtered = `${cte}, filtered AS (SELECT * FROM acquisition_events ${sql}), spend_campaigns AS (${spendCampaigns})`;
+
+  const [groups, campaigns, forms, trend, adRows] = await Promise.all([
     getPool().query<Row>(
       `${filtered}
        SELECT entity_type, source_type, destination_channel, source_platform, count(*)::int AS events,
-              count(*) FILTER (WHERE attribution_confidence='exact' AND campaign_id<>'')::int AS exact
-         FROM filtered GROUP BY 1,2,3,4 ORDER BY events DESC LIMIT 200`,
+              count(*) FILTER (WHERE attribution_confidence='exact' AND campaign_id<>'')::int AS exact,
+              count(*) FILTER (WHERE attribution_confidence='exact' AND campaign_id<>''
+                AND campaign_id IN (SELECT campaign_id FROM spend_campaigns))::int AS spend_covered
+         FROM filtered GROUP BY 1,2,3,4 ORDER BY events DESC`,
       params,
     ),
     getPool().query<Row>(
       `${filtered}
        SELECT campaign_id, max(campaign_name) AS campaign_name, adset_id, max(adset_name) AS adset_name,
               ad_id, max(ad_name) AS ad_name, entity_type, destination_channel, count(*)::int AS events
-         FROM filtered WHERE campaign_id <> '' AND entity_type IN (${COUNTED})
+         FROM filtered WHERE campaign_id <> '' AND entity_type <> 'landing_visit'
         GROUP BY campaign_id, adset_id, ad_id, entity_type, destination_channel
         ORDER BY events DESC LIMIT 1000`,
       params,
@@ -240,14 +281,51 @@ export async function getAcquisitionSummary(filters: AcquisitionFilters = {}) {
          FROM filtered WHERE occurred_at IS NOT NULL GROUP BY 1,2 ORDER BY 1`,
       params,
     ),
+    dashboardRows
+      ? getPool().query<Row>(
+          `SELECT count(*) FILTER (WHERE ${numericCell("Spend (Cost)")} > 0)::int AS spend_rows,
+                  count(*) FILTER (WHERE dataset = 'meta_ads')::int AS meta_rows,
+                  COALESCE(round(sum(${numericCell("Leads (on facebook Leads)")}) FILTER (WHERE dataset = 'meta_ads')), 0)::int AS platform_leads,
+                  count(DISTINCT row_data->>'__campaign_id')
+                    FILTER (WHERE dataset = 'meta_ads' AND ${numericCell("Leads (on facebook Leads)")} > 0)::int AS lead_campaigns,
+                  to_char(min(record_date) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS from_date,
+                  to_char(max(record_date) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS to_date
+             FROM dashboard_rows WHERE dataset IN ('meta_ads','snap_ads')${adWhere}`,
+        )
+      : Promise.resolve({ rows: [] as Row[] }),
   ]);
+
+  const breakdown = groups.rows.map((row) => ({
+    entity_type: String(row.entity_type ?? ""),
+    source_type: String(row.source_type ?? ""),
+    destination_channel: String(row.destination_channel ?? ""),
+    source_platform: String(row.source_platform ?? ""),
+    events: Number(row.events ?? 0),
+    exact: Number(row.exact ?? 0),
+    spend_covered: Number(row.spend_covered ?? 0),
+  })) satisfies AcquisitionGroup[];
+  const ad = adRows.rows[0] ?? {};
+  const spendDataAvailable = Number(ad.spend_rows ?? 0) > 0;
+  const metaAggregate: MetaAggregateLeads = {
+    available: Number(ad.meta_rows ?? 0) > 0,
+    platformLeads: Number(ad.platform_leads ?? 0),
+    campaigns: Number(ad.lead_campaigns ?? 0),
+    from: (ad.from_date as string) || null,
+    to: (ad.to_date as string) || null,
+    ignoredFilters: (["entityType", "sourceType", "destination", "formId"] as const).filter((key) =>
+      Boolean(filters[key]),
+    ),
+  };
+
   return {
     configured: true,
-    totals: totals.rows[0],
-    breakdown: breakdown.rows,
+    cards: summarizeAcquisitionGroups(breakdown, { spendDataAvailable }),
+    breakdown,
     campaigns: campaigns.rows,
     forms: forms.rows,
     trend: trend.rows,
+    spendDataAvailable,
+    metaAggregate,
     // Spend and CRM outcomes for Meta leads are shown only once an exact join is proven.
     formOutcomesAvailable: false,
   };
@@ -263,7 +341,7 @@ function chatwootConversationUrl(conversationId: string): string | null {
 
 export async function getAcquisitionEvents(filters: AcquisitionFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false, total: 0, rows: [] };
-  const cte = await eventsCte();
+  const { cte } = await eventsCte();
   if (!cte) return { configured: true, total: 0, rows: [] };
   const { sql, params } = where(filters);
   const limit = Math.min(Math.max(Number(filters.limit) || 500, 1), 2000);
