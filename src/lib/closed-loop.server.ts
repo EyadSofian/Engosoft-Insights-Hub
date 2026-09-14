@@ -1693,3 +1693,99 @@ export async function getCreativeDetail(
     };
   });
 }
+
+/**
+ * Audit of every inferred (phone-key) CRM link: how far apart the two dates
+ * are, whether the conversation had other CRM candidates, and whether one CRM
+ * record is claimed by several conversations. Counts and IDs only, no phone
+ * numbers. Inferred links never feed exact KPIs; this shows how safe they are.
+ */
+export async function getInferredLinkAudit() {
+  if (!acquisitionDatabaseConfigured()) return { configured: false as const };
+  await ensureClosedLoopSchema();
+  const pool = getPool();
+  const hasConversations = Boolean(
+    (await pool.query<Row>(`SELECT to_regclass('public.chatwoot_conversation_attribution') AS t`))
+      .rows[0]?.t,
+  );
+  if (!hasConversations) return { configured: true as const, links: 0 };
+  const result = await pool.query<Row>(
+    `WITH inferred AS (
+       SELECT l.acquisition_event_id, l.crm_lead_id, l.is_primary, o.business_status, o.won,
+              o.revenue_paid_usd, o.created_at AS crm_created_at, c.first_touch_at,
+              jsonb_array_length(c.crm_lead_ids) AS phone_candidates,
+              ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
+                - (c.first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date) AS day_gap
+         FROM acquisition_crm_links l
+         JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+         LEFT JOIN chatwoot_conversation_attribution c
+           ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
+        WHERE l.match_confidence = 'inferred'
+     ),
+     shared AS (SELECT crm_lead_id FROM inferred GROUP BY crm_lead_id HAVING count(*) > 1),
+     multi AS (SELECT acquisition_event_id FROM inferred GROUP BY acquisition_event_id HAVING count(*) > 1)
+     SELECT count(*)::int AS links,
+            count(*) FILTER (WHERE is_primary)::int AS primary_links,
+            count(DISTINCT acquisition_event_id)::int AS conversations,
+            count(DISTINCT crm_lead_id)::int AS crm_records,
+            count(*) FILTER (WHERE day_gap BETWEEN -1 AND 0)::int AS same_day,
+            count(*) FILTER (WHERE day_gap BETWEEN 1 AND 7)::int AS within_week,
+            count(*) FILTER (WHERE day_gap BETWEEN 8 AND 30)::int AS within_month,
+            count(*) FILTER (WHERE day_gap IS NULL OR day_gap < -1 OR day_gap > 30)::int AS outside_window,
+            count(*) FILTER (WHERE phone_candidates > 1)::int AS phone_key_with_other_crm_records,
+            (SELECT count(*)::int FROM multi) AS conversations_with_several_links,
+            (SELECT count(*)::int FROM shared) AS crm_records_claimed_by_several_conversations,
+            count(*) FILTER (WHERE won)::int AS won,
+            COALESCE(sum(revenue_paid_usd) FILTER (WHERE is_primary), 0) AS revenue
+       FROM inferred`,
+  );
+  const sample = await pool.query<Row>(
+    `SELECT l.acquisition_event_id, l.crm_lead_id, o.business_status,
+            ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
+              - (c.first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date) AS day_gap,
+            jsonb_array_length(c.crm_lead_ids) AS phone_candidates
+       FROM acquisition_crm_links l
+       JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+       LEFT JOIN chatwoot_conversation_attribution c
+         ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
+      WHERE l.match_confidence = 'inferred'
+      ORDER BY phone_candidates DESC NULLS LAST, day_gap DESC NULLS LAST
+      LIMIT 200`,
+  );
+  const r = result.rows[0] ?? {};
+  return {
+    configured: true as const,
+    method: "chatwoot_phone_key",
+    window: {
+      fromDays: -1,
+      toDays: 30,
+      rule: "CRM record created between one day before and 30 days after the conversation started.",
+    },
+    links: n(r.links),
+    primaryLinks: n(r.primary_links),
+    conversations: n(r.conversations),
+    crmRecords: n(r.crm_records),
+    dayGap: {
+      sameDay: n(r.same_day),
+      withinWeek: n(r.within_week),
+      withinMonth: n(r.within_month),
+      outsideWindow: n(r.outside_window),
+    },
+    ambiguity: {
+      phoneKeyWithOtherCrmRecords: n(r.phone_key_with_other_crm_records),
+      conversationsWithSeveralLinks: n(r.conversations_with_several_links),
+    },
+    duplicateRisk: {
+      crmRecordsClaimedBySeveralConversations: n(r.crm_records_claimed_by_several_conversations),
+    },
+    outcomes: { won: n(r.won), revenue: n(r.revenue) },
+    promotedToExact: 0,
+    rows: sample.rows.map((row) => ({
+      acquisitionEventId: s(row.acquisition_event_id),
+      crmLeadId: s(row.crm_lead_id),
+      businessStatus: s(row.business_status),
+      dayGap: row.day_gap == null ? null : n(row.day_gap),
+      phoneCandidates: n(row.phone_candidates),
+    })),
+  };
+}

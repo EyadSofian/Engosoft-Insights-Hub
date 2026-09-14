@@ -86,3 +86,12 @@ export function graphUsagePercent(headers: {
   }
   return values.length ? Math.max(...values) : 0;
 }
+
+/** Strips a token (and any access_token query value) out of text before it is stored or logged. */
+export function redactMetaSecrets(message: string, token: string): string {
+  const withoutToken = token ? message.split(token).join("<redacted>") : message;
+  return withoutToken
+    .replace(/access_token=[^&\s"]+/gi, "access_token=<redacted>")
+    .replace(/appsecret_proof=[^&\s"]+/gi, "appsecret_proof=<redacted>")
+    .slice(0, 240);
+}

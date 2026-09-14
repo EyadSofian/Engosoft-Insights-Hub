@@ -311,7 +311,7 @@ function Crumb({ children, onClear }: { children: ReactNode; onClear: () => void
   );
 }
 
-export type AcquisitionPerformanceView = "overview" | "landing" | "forms";
+export type AcquisitionPerformanceView = "overview" | "today" | "technical" | "landing" | "forms";
 
 export function AcquisitionPerformance({
   view = "overview",
@@ -349,6 +349,20 @@ export function AcquisitionPerformance({
           {before}
           <TodaySection data={data} loading={isLoading} A={A} />
           <PeriodKpis data={data} loading={isLoading} A={A} />
+          <MessagingAcquisition data={data} loading={isLoading} A={A} />
+          <SourceDestinationMatrix data={data} loading={isLoading} A={A} />
+        </>
+      ) : null}
+      {view === "today" ? (
+        <>
+          <TodaySection data={data} loading={isLoading} A={A} />
+          <PeriodKpis data={data} loading={isLoading} A={A} />
+        </>
+      ) : null}
+      {view === "technical" ? (
+        <>
+          <ProviderEvidence blockers={data?.blockers} loading={isLoading} A={A} />
+          {before}
           <MessagingAcquisition data={data} loading={isLoading} A={A} />
           <SourceDestinationMatrix data={data} loading={isLoading} A={A} />
         </>

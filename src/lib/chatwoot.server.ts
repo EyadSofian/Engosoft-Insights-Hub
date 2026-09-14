@@ -1017,3 +1017,45 @@ import {
   readDashboardDataset,
   writeDashboardDataset,
 } from "./dashboard-db.server.ts";
+
+/**
+ * One page (25) of the account's conversations, newest first by creation.
+ * Read-only; used by the attribution reconciliation to find conversations the
+ * webhook never delivered.
+ */
+export async function listChatwootConversationsPage(
+  page: number,
+): Promise<Record<string, unknown>[]> {
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations?status=all&assignee_type=all&sort_by=created_at_desc&page=${Math.max(1, Math.floor(page))}`,
+    ),
+  );
+  const data = object(response?.data);
+  const payload = data?.payload ?? response?.payload;
+  return Array.isArray(payload)
+    ? payload
+        .map((row) => object(row))
+        .filter((row): row is Record<string, unknown> => Boolean(row))
+    : [];
+}
+
+/** Messages of one conversation (Chatwoot returns the latest 20, older with `before`). Read-only. */
+export async function listChatwootConversationMessages(
+  conversationId: number,
+  before?: number,
+): Promise<Record<string, unknown>[]> {
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${conversationId}/messages${before ? `?before=${before}` : ""}`,
+    ),
+  );
+  const payload = response?.payload;
+  return Array.isArray(payload)
+    ? payload
+        .map((row) => object(row))
+        .filter((row): row is Record<string, unknown> => Boolean(row))
+    : [];
+}

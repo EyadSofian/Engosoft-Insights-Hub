@@ -1102,6 +1102,12 @@ export async function processChatwootAttributionEvent(input: {
   payload: unknown;
   rawBody: string;
   deliveryId?: string;
+  /**
+   * A reconstructed event for a conversation whose webhook never arrived. It
+   * projects the attribution row only: no Chatwoot write and no Meta
+   * correlation, and an unknown result records why the evidence is missing.
+   */
+  replay?: { unknownReason: string };
 }): Promise<{
   accepted: boolean;
   duplicate: boolean;
@@ -1226,6 +1232,27 @@ export async function processChatwootAttributionEvent(input: {
     );
     const crm = await crmMatch(finalCandidate.phoneKey);
     await upsertConversationProjection(finalCandidate.conversationId!, finalCandidate, crm);
+    if (input.replay) {
+      await db.query(
+        `UPDATE chatwoot_conversation_attribution
+            SET unknown_reason = $2, updated_at = now()
+          WHERE conversation_id = $1 AND attribution_method = 'unknown'
+            AND unknown_reason IN ('', $3)`,
+        [finalCandidate.conversationId, input.replay.unknownReason, REFERRAL_EVIDENCE_MISSING],
+      );
+      await db.query(
+        `UPDATE chatwoot_event_inbox
+            SET status = 'processed', locked_at = NULL, processed_at = now(), last_error = ''
+          WHERE id = $1`,
+        [eventId],
+      );
+      return {
+        accepted: true,
+        duplicate,
+        projected: Boolean(touch.rows[0]),
+        conversationId: finalCandidate.conversationId,
+      };
+    }
     if (finalCandidate.trackingToken) {
       await db.query(
         `UPDATE chatwoot_attribution_tokens

@@ -77,7 +77,12 @@ describe("the registry describes reality", () => {
     // Discovered by audit: these four pages switch analytical views without
     // changing the pathname, so a path alone cannot say what the user sees.
     expect(surfaceById("website")!.views).toEqual(["owner", "campaigns", "operations"]);
-    expect(surfaceById("accounting")!.views).toEqual(["summary", "months", "profitability"]);
+    expect(surfaceById("accounting")!.views).toEqual([
+      "summary",
+      "months",
+      "profitability",
+      "marketing",
+    ]);
     expect(surfaceById("courses")!.views).toEqual(["campaigns", "alerts", "all"]);
     expect(surfaceById("lost")!.views).toEqual(["team", "course"]);
   });
