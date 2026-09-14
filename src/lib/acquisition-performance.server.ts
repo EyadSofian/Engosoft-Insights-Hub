@@ -184,15 +184,16 @@ async function blockers() {
       (await pool.query<Row>(`SELECT to_regclass($1) AS present`, [`public.${name}`])).rows[0]
         ?.present,
     );
-  const [touches, messageEvents, leadgenEvents, leadRows] = await Promise.all([
+  const [touches, messageEvents, leadgenEvents, leadRows, crmLinks] = await Promise.all([
     table("chatwoot_attribution_touches"),
     table("meta_message_attribution_events"),
     table("meta_leadgen_events"),
     table("meta_lead_acquisitions"),
+    table("acquisition_crm_links"),
   ]);
   const one = async (present: boolean, sql: string) =>
     present ? ((await pool.query<Row>(sql)).rows[0] ?? {}) : {};
-  const [touch, message, leadgen, leads] = await Promise.all([
+  const [touch, message, leadgen, leads, carried] = await Promise.all([
     one(
       touches,
       `SELECT count(*)::int AS total,
@@ -210,6 +211,11 @@ async function blockers() {
       `SELECT count(*)::int AS total, max(received_at) AS latest FROM meta_leadgen_events`,
     ),
     one(leadRows, `SELECT count(*)::int AS total FROM meta_lead_acquisitions`),
+    one(
+      crmLinks,
+      `SELECT count(*)::int AS total FROM acquisition_crm_links
+        WHERE is_primary AND match_method = 'crm_carried_provider_lead_id'`,
+    ),
   ]);
   const leadAdsTokenConfigured = Boolean(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim());
   const items: { id: string; ok: boolean; en: string; ar: string }[] = [
@@ -227,13 +233,13 @@ async function blockers() {
     },
     {
       id: "meta_lead_ads",
-      ok: n(leads.total) > 0,
+      ok: n(leads.total) > 0 || n(carried.total) > 0,
       en: leadAdsTokenConfigured
-        ? `Meta Lead Ads: ${n(leadgen.total)} webhook events and ${n(leads.total)} lead records stored.`
-        : `Meta Lead Ads: META_LEAD_ADS_ACCESS_TOKEN is not configured, so ${n(leads.total)} instant-form lead records exist. Meta's aggregate lead totals are shown separately.`,
+        ? `Meta Lead Ads: ${n(leadgen.total)} webhook events and ${n(leads.total)} lead records stored; ${n(carried.total)} more instant-form leads carried into the CRM with their Meta lead ID.`
+        : `Meta Lead Ads: META_LEAD_ADS_ACCESS_TOKEN is not configured, so no form ID or answers arrive from Meta directly. ${n(carried.total)} instant-form leads are still exact through the Meta lead and ad IDs the CRM integration carries; the form ID stays unknown for them.`,
       ar: leadAdsTokenConfigured
-        ? `Meta Lead Ads: ${n(leadgen.total)} حدث webhook و${n(leads.total)} سجل عميل.`
-        : `Meta Lead Ads: لم يُضبط META_LEAD_ADS_ACCESS_TOKEN، لذلك يوجد ${n(leads.total)} سجل عميل فعلي. أرقام Meta المجمّعة معروضة منفصلة.`,
+        ? `Meta Lead Ads: ${n(leadgen.total)} حدث webhook و${n(leads.total)} سجل عميل، و${n(carried.total)} عميل نموذج آخر وصل إلى CRM بمعرّف عميل Meta.`
+        : `Meta Lead Ads: لم يُضبط META_LEAD_ADS_ACCESS_TOKEN، لذلك لا يصل معرّف النموذج أو الإجابات من Meta مباشرة. ${n(carried.total)} عميل نموذج ما زالوا دقيقين عبر معرّف عميل Meta ومعرّف الإعلان المحمولين في CRM، ويبقى معرّف النموذج غير معروف لهم.`,
     },
   ];
   return items;

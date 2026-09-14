@@ -57,6 +57,7 @@ import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
 import { useFiltersData } from "@/components/TopBar";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
 
 export const Route = createFileRoute("/accounting")({ component: Accounting });
 
@@ -489,6 +490,8 @@ function Accounting() {
                   card={{ index: 4, valueWrap: true, sub: fmtUSDExact(data.summary.creditNoteUsd) }}
                 />
               </KpiRow>
+
+              <ClosedLoopSalesBridge />
 
               <details className="group card overflow-hidden">
                 <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">

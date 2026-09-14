@@ -17,10 +17,28 @@ export interface SalesAttributionRow {
   leadToInvoiceRate: number | null;
 }
 
+/**
+ * How a CRM row reached its campaign on this legacy report.
+ *
+ * Nothing here is `exact`: exact means a provider-issued lead or ad ID linked
+ * through the acquisition graph, which lives in /api/acquisition/closed-loop.
+ * A campaign ID typed onto the CRM row is `declared`; a campaign resolved from
+ * its name alone is `inferred`; no campaign at all is `unknown`.
+ */
+export type SalesAttributionConfidence = "declared" | "inferred" | "unknown";
+
+export interface SalesCampaignAttribution {
+  confidence: SalesAttributionConfidence;
+  declaredLeads: number;
+  inferredLeads: number;
+  unknownLeads: number;
+}
+
 export interface SalesCampaignRow extends SalesAttributionRow {
   platforms: Platform[];
   spend: number;
   roas: number | null;
+  attribution: SalesCampaignAttribution;
 }
 
 interface MutableBucket {
@@ -36,6 +54,9 @@ interface MutableBucket {
   invoices: Set<string>;
   revenue: number;
   spend: number;
+  declaredLeads: number;
+  inferredLeads: number;
+  unknownLeads: number;
 }
 
 const UNKNOWN_KEY = "__unattributed__";
@@ -81,6 +102,9 @@ function blankBucket(key: string, name: string): MutableBucket {
     invoices: new Set(),
     revenue: 0,
     spend: 0,
+    declaredLeads: 0,
+    inferredLeads: 0,
+    unknownLeads: 0,
   };
 }
 
@@ -136,6 +160,35 @@ function campaignIdentity(
   return { key, name: campaignName || "—" };
 }
 
+export function campaignConfidence(row: {
+  campaignId?: string;
+  campaignName?: string;
+}): SalesAttributionConfidence {
+  if (row.campaignId?.trim()) return "declared";
+  if (row.campaignName?.trim()) return "inferred";
+  return "unknown";
+}
+
+function countConfidence(
+  bucket: MutableBucket,
+  row: { campaignId?: string; campaignName?: string },
+) {
+  const confidence = campaignConfidence(row);
+  if (confidence === "declared") bucket.declaredLeads += 1;
+  else if (confidence === "inferred") bucket.inferredLeads += 1;
+  else bucket.unknownLeads += 1;
+}
+
+/** A campaign row is only as strong as its weakest material share of leads. */
+export function bucketConfidence(counts: {
+  declaredLeads: number;
+  inferredLeads: number;
+  unknownLeads: number;
+}): SalesAttributionConfidence {
+  if (counts.declaredLeads === 0 && counts.inferredLeads === 0) return "unknown";
+  return counts.inferredLeads > 0 ? "inferred" : "declared";
+}
+
 function recordLead(bucket: MutableBucket, row: CrmLeadRow) {
   bucket.leads += 1;
   if (reachedInterest(row)) bucket.interested += 1;
@@ -185,7 +238,9 @@ export function buildSalesFunnel(data: FilteredData, filters: GlobalFilters) {
     recordLead(at(sourceBuckets, source.key, source.name), lead);
 
     const campaign = campaignIdentity(lead.campaignKey, lead.campaignName);
-    recordLead(at(campaignBuckets, campaign.key, campaign.name), lead);
+    const campaignBucket = at(campaignBuckets, campaign.key, campaign.name);
+    recordLead(campaignBucket, lead);
+    countConfidence(campaignBucket, lead);
   }
 
   for (const lead of authoritativeLostLeads(data)) {
@@ -198,6 +253,7 @@ export function buildSalesFunnel(data: FilteredData, filters: GlobalFilters) {
     const campaignBucket = at(campaignBuckets, campaign.key, campaign.name);
     campaignBucket.leads += 1;
     campaignBucket.lost += 1;
+    countConfidence(campaignBucket, lead);
   }
 
   for (const order of data.invoiced) {
@@ -235,6 +291,12 @@ export function buildSalesFunnel(data: FilteredData, filters: GlobalFilters) {
       platforms: [...bucket.platforms].sort(),
       spend: bucket.spend,
       roas: div(bucket.revenue, bucket.spend),
+      attribution: {
+        confidence: bucketConfidence(bucket),
+        declaredLeads: bucket.declaredLeads,
+        inferredLeads: bucket.inferredLeads,
+        unknownLeads: bucket.unknownLeads,
+      },
     }))
     .sort(
       (a, b) =>
@@ -269,6 +331,8 @@ export function buildSalesFunnel(data: FilteredData, filters: GlobalFilters) {
       salesOrderBasis: "distinct_full_invoiced_order_ref",
       invoiceBasis: "distinct_paid_accounting_movement",
       revenueBasis: "paid_accounting_usd",
+      campaignAttributionBasis: "legacy_crm_campaign_fields_declared_or_name_inferred",
+      exactAttributionSource: "/api/acquisition/closed-loop",
       dateBasis: filters.dateBasis === "invoice" ? "invoice" : "payment",
     },
   };

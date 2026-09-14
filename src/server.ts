@@ -13,6 +13,10 @@ void import("./lib/meta-message-attribution.server")
   .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
   .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
 
+void import("./lib/closed-loop.server")
+  .then(({ startClosedLoopWorker }) => startClosedLoopWorker())
+  .catch((error) => console.error("[closed-loop] worker bootstrap failed:", error));
+
 void import("./lib/meta-leadgen.server")
   .then(({ startMetaLeadAdsWorker }) => startMetaLeadAdsWorker())
   .catch((error) => console.error("[meta-lead-ads] worker bootstrap failed:", error));
