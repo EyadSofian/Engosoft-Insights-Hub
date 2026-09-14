@@ -126,7 +126,7 @@ async function reconcile(options: {
   try {
     let done = false;
     for (let page = 1; !done && page <= 250; page += 1) {
-      const conversations = await listChatwootConversationsPage(page);
+      const conversations = await withRetry(() => listChatwootConversationsPage(page));
       summary.pages = page;
       if (!conversations.length) break;
       const inWindow = conversations.filter((row) => Number(row.created_at ?? 0) >= since);
@@ -169,9 +169,15 @@ async function reconcile(options: {
           state = "no_inbound_message";
           detail = "unchanged since last check";
         } else if (!hasRow) {
-          const messages = await collectMessages(id);
-          const inbound = firstInboundMessage(messages);
-          state = classifyConversation({ hasRow, firstInbound: inbound });
+          let messages: Json[] | null = null;
+          try {
+            messages = await withRetry(() => collectMessages(id));
+          } catch (error) {
+            state = "failed";
+            detail = `messages unreadable: ${(error instanceof Error ? error.message : String(error)).slice(0, 160)}`;
+          }
+          const inbound = messages ? firstInboundMessage(messages) : null;
+          if (messages) state = classifyConversation({ hasRow, firstInbound: inbound });
           if (state === "replayable" && inbound && !dryRun) {
             try {
               const payload = replayPayload(conversation as Json, inbound);
@@ -219,6 +225,26 @@ async function reconcile(options: {
     await saveState(summary).catch(() => undefined);
     return summary;
   }
+}
+
+/** Chatwoot answers 502/504 under load; a transient failure must not end the whole run. */
+async function withRetry<T>(task: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      if (
+        !/HTTP (50[234])|timeout|aborted|fetch failed/i.test(
+          String((error as Error)?.message ?? error),
+        )
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+    }
+  }
+  throw lastError;
 }
 
 /** Up to five pages back, enough to reach the first inbound message of a normal conversation. */

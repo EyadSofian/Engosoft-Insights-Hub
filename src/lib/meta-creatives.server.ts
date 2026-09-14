@@ -374,6 +374,55 @@ async function fetchBatch(
   }
 }
 
+const THUMBNAIL_SIZE = "600";
+const THUMBNAIL_BATCH = 50;
+
+/**
+ * Meta returns a 64×64 thumbnail when a creative is read through its ad and
+ * honours `thumbnail_width/height` only when the creative is read directly. A
+ * card showing the creative needs the larger one, so read those directly in
+ * batches and swap them in. A failure keeps the small thumbnail.
+ */
+export async function enlargeCreativeThumbnails(
+  creatives: AdCreative[],
+  token: string,
+  apiVersion: string,
+): Promise<number> {
+  const ids = [...new Set(creatives.map((creative) => creative.creativeId).filter(Boolean))];
+  const large = new Map<string, string>();
+  for (let index = 0; index < ids.length; index += THUMBNAIL_BATCH) {
+    const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
+    url.searchParams.set("ids", ids.slice(index, index + THUMBNAIL_BATCH).join(","));
+    url.searchParams.set("fields", "thumbnail_url");
+    url.searchParams.set("thumbnail_width", THUMBNAIL_SIZE);
+    url.searchParams.set("thumbnail_height", THUMBNAIL_SIZE);
+    url.searchParams.set("access_token", token);
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      const payload = object(await response.json());
+      if (!response.ok || Object.keys(object(payload.error)).length) continue;
+      for (const [id, entry] of Object.entries(payload)) {
+        const thumbnail = httpUrl(object(entry).thumbnail_url);
+        if (thumbnail) large.set(id, thumbnail);
+      }
+    } catch {
+      // Keep the thumbnails Meta already gave.
+    }
+  }
+  let replaced = 0;
+  for (const creative of creatives) {
+    const thumbnail = large.get(creative.creativeId);
+    if (!thumbnail) continue;
+    creative.thumbnailUrl = thumbnail;
+    replaced += 1;
+  }
+  return replaced;
+}
+
 const emptyResult = (configured: boolean, message: string): MetaCreativeSyncResult => ({
   configured,
   ok: false,
@@ -469,6 +518,7 @@ export async function syncMetaCreativesDirect(
       }
     }
 
+    await enlargeCreativeThumbnails(fetched, token, apiVersion);
     for (const creative of fetched) {
       memory.set(creative.adId, { expiresAt: now + CACHE_MS, creative });
     }
