@@ -700,3 +700,17 @@ export function closedLoopFunnel(input: {
     return step;
   });
 }
+
+/**
+ * A creative name a person can read. Dynamic catalog creatives are named by
+ * their template (`{{product.name}} 2026-02-21-…`); show the headline instead,
+ * or say what it is. The provider ID never changes.
+ */
+export function readableCreativeName(name: string, headline = ""): string {
+  const raw = clean(name);
+  if (!/\{\{[^}]+\}\}/.test(raw)) return raw;
+  const title = clean(headline);
+  if (title && !/\{\{[^}]+\}\}/.test(title)) return title;
+  const suffix = raw.replace(/\{\{[^}]+\}\}/g, "").trim();
+  return `Dynamic catalog creative${suffix ? ` ${suffix}` : ""}`;
+}

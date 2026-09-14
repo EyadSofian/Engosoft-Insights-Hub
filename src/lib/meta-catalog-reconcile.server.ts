@@ -4,6 +4,7 @@ import {
   META_CREATIVE_AD_FIELDS,
   creativeStorageRow,
   enlargeCreativeThumbnails,
+  resolvePostLeadForms,
   normalizeMetaGraphAd,
 } from "./meta-creatives.server";
 import {
@@ -180,7 +181,9 @@ async function loadCandidates(): Promise<ReconcileCandidate[]> {
           WHERE dataset = 'meta_ad_creatives' AND row_data->>'__ad_id' = ids.ad_id
           ORDER BY row_data->>'__synced_at' DESC LIMIT 1
        ) cr ON true
-       LEFT JOIN meta_catalog_reconcile_failures f ON f.ad_id = ids.ad_id`,
+       -- A throttling error is not a verdict on the ad: it is retried next run.
+       LEFT JOIN meta_catalog_reconcile_failures f ON f.ad_id = ids.ad_id
+        AND f.reason NOT IN ('meta_error_4','meta_error_17','meta_error_32','meta_error_613')`,
   );
   return result.rows.map((row) => ({
     adId: s(row.ad_id),
@@ -309,11 +312,24 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
     async function flushBatch() {
       if (!pendingRows.length) return;
       const rows = pendingRows.splice(0);
-      await enlargeCreativeThumbnails(
-        rows.map((entry) => entry.creative),
-        token,
-        apiVersion,
-      );
+      const creatives = rows.map((entry) => entry.creative);
+      await enlargeCreativeThumbnails(creatives, token, apiVersion);
+      await resolvePostLeadForms(creatives, token, apiVersion);
+      for (const creative of creatives) {
+        if (!creative.leadFormId) continue;
+        summary.leadForms += 1;
+        await pool.query(
+          `INSERT INTO meta_ad_lead_forms (ad_id, creative_id, form_id, source) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (ad_id) DO UPDATE SET creative_id = EXCLUDED.creative_id, form_id = EXCLUDED.form_id,
+             source = EXCLUDED.source, observed_at = now()`,
+          [
+            creative.adId,
+            creative.creativeId,
+            creative.leadFormId,
+            creative.leadFormSource ?? "creative_call_to_action",
+          ],
+        );
+      }
       await writeDashboardDataset(
         "meta_ad_creatives",
         rows.map((entry) => creativeStorageRow(entry.creative)),
@@ -331,6 +347,12 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
 
     async function handleEntry(candidate: ReconcileCandidate, entry: Row) {
       const error = entry.error as Row | undefined;
+      if (error && isThrottleError(error)) {
+        // Throttled, not unreadable: leave it for the next run.
+        throttled = true;
+        summary.message = `Meta throttled the read (${s(error.code)}); progress is saved and the next run resumes.`;
+        return;
+      }
       if (error) {
         summary.failed += 1;
         const reason = failureReason(error);
@@ -360,14 +382,6 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
       await pool.query(`DELETE FROM meta_catalog_reconcile_failures WHERE ad_id = $1`, [
         candidate.adId,
       ]);
-      if (creative.leadFormId) {
-        summary.leadForms += 1;
-        await pool.query(
-          `INSERT INTO meta_ad_lead_forms (ad_id, creative_id, form_id) VALUES ($1, $2, $3)
-           ON CONFLICT (ad_id) DO UPDATE SET creative_id = EXCLUDED.creative_id, form_id = EXCLUDED.form_id, observed_at = now()`,
-          [creative.adId, creative.creativeId, creative.leadFormId],
-        );
-      }
       const account = creative.accountId;
       for (const asset of creative.assets ?? []) {
         if (asset.type !== "image" || !account) continue;

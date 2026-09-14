@@ -125,6 +125,8 @@ export interface AdCreative {
    * from the lead record itself.
    */
   leadFormId?: string;
+  /** Where the form ID was read: the creative's call to action, or the existing page post the ad promotes. */
+  leadFormSource?: "creative_call_to_action" | "post_call_to_action";
   /** Text variations in a flexible/dynamic creative. Reporting metadata only. */
   assetMetadata?: { titles: string[]; bodies: string[]; linkUrls: string[] };
   creativeType: string;

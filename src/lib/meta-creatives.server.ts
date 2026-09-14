@@ -258,6 +258,7 @@ export function normalizeMetaGraphAd(
     imageHash,
     assets: feedAssets,
     leadFormId,
+    leadFormSource: leadFormId ? "creative_call_to_action" : undefined,
     assetMetadata,
     permalinkUrl: httpUrl(creative.instagram_permalink_url),
     landingPageUrl: httpUrl(
@@ -303,6 +304,9 @@ export function creativeStorageRow(creative: AdCreative): Record<string, unknown
     "Creative Image Hash": creative.imageHash || "",
     "Creative Assets": JSON.stringify(creative.assets ?? []),
     "Lead Form ID": creative.leadFormId || "",
+    "Lead Form Source": creative.leadFormId
+      ? creative.leadFormSource || "creative_call_to_action"
+      : "",
     "Creative Asset Metadata": JSON.stringify(
       creative.assetMetadata ?? { titles: [], bodies: [], linkUrls: [] },
     ),
@@ -423,6 +427,79 @@ export async function enlargeCreativeThumbnails(
   return replaced;
 }
 
+const pageTokens = new Map<string, { token: string; expiresAt: number }>();
+
+/**
+ * An ad that promotes an existing page post keeps its instant form on the
+ * post's call to action, not in the creative spec. Reading the post needs a
+ * page access token, derived at runtime from the system-user token and kept in
+ * memory only (never stored, logged or returned).
+ */
+export async function resolvePostLeadForms(
+  creatives: AdCreative[],
+  token: string,
+  apiVersion: string,
+): Promise<number> {
+  const byPage = new Map<string, AdCreative[]>();
+  for (const creative of creatives) {
+    const story = creative.effectiveObjectStoryId || "";
+    if (creative.leadFormId || !/^\d+_\d+$/.test(story)) continue;
+    const page = story.split("_")[0]!;
+    byPage.set(page, [...(byPage.get(page) ?? []), creative]);
+  }
+  let resolved = 0;
+  for (const [page, list] of byPage) {
+    let pageToken = pageTokens.get(page);
+    if (!pageToken || pageToken.expiresAt < Date.now()) {
+      try {
+        const url = new URL(`https://graph.facebook.com/${apiVersion}/${page}`);
+        url.searchParams.set("fields", "access_token");
+        url.searchParams.set("access_token", token);
+        const payload = object(
+          await (
+            await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+          ).json(),
+        );
+        const value = text(payload.access_token);
+        if (!value) continue;
+        pageToken = { token: value, expiresAt: Date.now() + 50 * 60_000 };
+        pageTokens.set(page, pageToken);
+      } catch {
+        continue;
+      }
+    }
+    for (let index = 0; index < list.length; index += THUMBNAIL_BATCH) {
+      const chunk = list.slice(index, index + THUMBNAIL_BATCH);
+      const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
+      url.searchParams.set(
+        "ids",
+        [...new Set(chunk.map((creative) => creative.effectiveObjectStoryId))].join(","),
+      );
+      url.searchParams.set("fields", "call_to_action");
+      url.searchParams.set("access_token", pageToken.token);
+      try {
+        const payload = object(
+          await (
+            await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+          ).json(),
+        );
+        if (Object.keys(object(payload.error)).length) continue;
+        for (const creative of chunk) {
+          const cta = object(object(payload[creative.effectiveObjectStoryId || ""]).call_to_action);
+          const formId = text(object(cta.value).lead_gen_form_id);
+          if (!formId) continue;
+          creative.leadFormId = formId;
+          creative.leadFormSource = "post_call_to_action";
+          resolved += 1;
+        }
+      } catch {
+        // Keep the creative without a form: it stays "form unknown".
+      }
+    }
+  }
+  return resolved;
+}
+
 const emptyResult = (configured: boolean, message: string): MetaCreativeSyncResult => ({
   configured,
   ok: false,
@@ -519,6 +596,7 @@ export async function syncMetaCreativesDirect(
     }
 
     await enlargeCreativeThumbnails(fetched, token, apiVersion);
+    await resolvePostLeadForms(fetched, token, apiVersion);
     for (const creative of fetched) {
       memory.set(creative.adId, { expiresAt: now + CACHE_MS, creative });
     }

@@ -20,6 +20,7 @@ import {
   finalizeMetrics,
   linkAcquisitionsToCrm,
   rankByLeadQuality,
+  readableCreativeName,
   rollupByGrain,
   type AcquisitionFactRow,
   type AcquisitionIdentity,
@@ -1042,7 +1043,7 @@ async function loadFacts(range: { from: string; to: string }): Promise<FactRecor
       adId: s(row.ad_id),
       adName: s(row.ad_name),
       creativeId: s(row.creative_id),
-      creativeName: s(row.creative_name),
+      creativeName: readableCreativeName(s(row.creative_name)),
       formId: s(row.form_id),
       landingPageId: s(row.landing_page_id),
       course: s(row.course),
@@ -1235,7 +1236,7 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
         mediaType: s(m?.media_type),
         videoId: s(m?.video_id),
         headline: s(m?.headline),
-        creativeName: row.creativeName || s(m?.creative_name),
+        creativeName: readableCreativeName(row.creativeName || s(m?.creative_name), s(m?.headline)),
       });
     }
     // Names for spend-only rows come from the Meta graph, never from CRM text.
@@ -1252,7 +1253,8 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
       if (s(row.campaign_id)) names.campaign.set(s(row.campaign_id), s(row.campaign_name));
       if (s(row.adset_id)) names.adset.set(s(row.adset_id), s(row.adset_name));
       if (s(row.ad_id)) names.ad.set(s(row.ad_id), s(row.ad_name));
-      if (s(row.creative_id)) names.creative.set(s(row.creative_id), s(row.creative_name));
+      if (s(row.creative_id))
+        names.creative.set(s(row.creative_id), readableCreativeName(s(row.creative_name)));
     }
     for (const grain of CLOSED_LOOP_GRAINS) {
       for (const row of grains[grain]) {
@@ -1649,7 +1651,7 @@ export async function getCreativeDetail(
       period: range,
       creative: {
         creativeId: id,
-        creativeName: s(first.creative_name),
+        creativeName: readableCreativeName(s(first.creative_name), s(first.headline)),
         mediaType: s(first.media_type),
         headline: s(first.headline),
         thumbnailUrl: s(first.thumbnail_url) || s(first.image_url),
