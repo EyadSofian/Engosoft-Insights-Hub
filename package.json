@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "vite dev",
+    "prebuild": "npm run build:landing-tracker",
     "build": "vite build",
+    "build:landing-tracker": "node scripts/build-landing-tracker.mjs",
     "build:dev": "vite build --mode development",
     "start": "node .output/server/index.mjs",
     "preview": "vite preview",

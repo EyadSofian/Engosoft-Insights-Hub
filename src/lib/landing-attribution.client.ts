@@ -25,6 +25,8 @@ export interface LandingEventOptions {
   formId?: string;
   /** Required by the server for a durable conversion dedupe key. */
   submissionId?: string;
+  /** See {@link CaptureOptions.preserveLatestTouch}. */
+  preserveLatestTouch?: boolean;
 }
 
 const PREFIX = "engosoft.landing-attribution.v1";
@@ -73,8 +75,8 @@ function pageUrl(): string {
   return url.toString();
 }
 
-function storageTouch(key: string): LandingTouch | null {
-  const raw = safeGet(window.localStorage, key);
+function storageTouch(storage: Storage | null, key: string): LandingTouch | null {
+  const raw = safeGet(storage, key);
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as LandingTouch;
@@ -84,27 +86,46 @@ function storageTouch(key: string): LandingTouch | null {
   }
 }
 
+export interface CaptureOptions {
+  /**
+   * Reuse this session's stored latest touch for the same landing page instead
+   * of re-reading the URL. A server-side form redirect (for example Odoo's
+   * `?success=true`) drops the UTMs, and must not overwrite the paid touch.
+   */
+  preserveLatestTouch?: boolean;
+}
+
 /** Capture, preserve first touch, and refresh latest touch for the current browser session. */
 export function captureLandingAttribution(
   config: LandingAttributionConfig = currentConfig as LandingAttributionConfig,
+  options: CaptureOptions = {},
 ): LandingAttributionCapture | null {
   try {
     if (!canUseBrowser() || !config?.landingPageId?.trim()) return null;
     currentConfig = config;
+    const landingPageId = config.landingPageId.trim();
     const visitorId = stableId(window.localStorage, `${PREFIX}.visitor-id`);
     const sessionId = stableId(window.sessionStorage, `${PREFIX}.session-id`);
-    const latestTouch = makeLandingTouch({
-      landingPageId: config.landingPageId.trim(),
-      landingPageName: config.landingPageName,
-      landingPageSlug: config.landingPageSlug,
-      landingPageUrl: pageUrl(),
-      landingPagePath: window.location.pathname,
-      referrer: document.referrer || null,
-    });
+    const latestKey = `${PREFIX}.latest-touch`;
+    const storedLatest = options.preserveLatestTouch
+      ? storageTouch(window.sessionStorage, latestKey)
+      : null;
+    const latestTouch =
+      storedLatest?.landingPageId === landingPageId
+        ? storedLatest
+        : makeLandingTouch({
+            landingPageId,
+            landingPageName: config.landingPageName,
+            landingPageSlug: config.landingPageSlug,
+            landingPageUrl: pageUrl(),
+            landingPagePath: window.location.pathname,
+            referrer: document.referrer || null,
+          });
     const firstKey = `${PREFIX}.first-touch`;
-    const firstTouch = storageTouch(firstKey) ?? latestTouch;
-    if (!storageTouch(firstKey)) safeSet(window.localStorage, firstKey, JSON.stringify(firstTouch));
-    safeSet(window.sessionStorage, `${PREFIX}.latest-touch`, JSON.stringify(latestTouch));
+    const firstTouch = storageTouch(window.localStorage, firstKey) ?? latestTouch;
+    if (!storageTouch(window.localStorage, firstKey))
+      safeSet(window.localStorage, firstKey, JSON.stringify(firstTouch));
+    safeSet(window.sessionStorage, latestKey, JSON.stringify(latestTouch));
     return { visitorId, sessionId, firstTouch, latestTouch };
   } catch {
     return null;
@@ -122,14 +143,26 @@ function sentKey(
   return `${PREFIX}.viewed.${capture.sessionId}.${capture.latestTouch.landingPageId}.${capture.latestTouch.landingPagePath}`;
 }
 
+function isCrossOrigin(endpoint: string): boolean {
+  try {
+    return new URL(endpoint, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 function transmit(endpoint: string, payload: unknown): void {
   try {
     const body = JSON.stringify(payload);
-    const blob = new Blob([body], { type: "application/json" });
+    // A cross-origin JSON beacon is not CORS-safelisted, so browsers refuse it or
+    // demand a preflight a beacon cannot perform. text/plain needs neither, and
+    // the collector parses the body regardless of its declared content type.
+    const type = isCrossOrigin(endpoint) ? "text/plain;charset=UTF-8" : "application/json";
+    const blob = new Blob([body], { type });
     if (navigator.sendBeacon?.(endpoint, blob)) return;
     void fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": type },
       body,
       keepalive: true,
       credentials: "omit",
@@ -151,7 +184,9 @@ export function trackLandingEvent(
   try {
     if (!LANDING_EVENT_TYPES.includes(eventType) || !config?.landingPageId?.trim()) return;
     if (eventType === "form_submitted" && !options.submissionId?.trim()) return;
-    const capture = captureLandingAttribution(config);
+    const capture = captureLandingAttribution(config, {
+      preserveLatestTouch: options.preserveLatestTouch,
+    });
     if (!capture) return;
     const key = sentKey(eventType, capture, options);
     if (safeGet(eventType === "form_submitted" ? window.localStorage : window.sessionStorage, key))
