@@ -1,13 +1,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Pool } from "pg";
 import {
-  getChatwootConversationCustomAttributes,
   getChatwootConversationLabels,
-  mergeChatwootConversationCustomAttributes,
   replaceChatwootConversationLabels,
+  updateChatwootConversationAttributes,
   chatwootPhoneKey,
 } from "./chatwoot.server";
 import {
+  CHATWOOT_ATTRIBUTION_KEYS,
   REFERRAL_EVIDENCE_MISSING,
   buildChatwootAttributionAttributes,
   planChatwootAttributionUpdate,
@@ -1072,11 +1072,11 @@ async function syncChatwoot(candidate: NormalizedAttribution, entity: MetaEntity
       utmContent: candidate.utmContent,
       utmTerm: candidate.utmTerm,
     });
-    const current = await getChatwootConversationCustomAttributes(candidate.conversationId);
-    const changed = planChatwootAttributionUpdate(current, wanted, "live");
-    if (Object.keys(changed).length) {
-      await mergeChatwootConversationCustomAttributes(candidate.conversationId, changed);
-    }
+    await updateChatwootConversationAttributes(
+      candidate.conversationId,
+      (latest) => planChatwootAttributionUpdate(latest, wanted, "live"),
+      { ownedKeys: CHATWOOT_ATTRIBUTION_KEYS },
+    );
   }
   if (mode === "labels" || mode === "both") {
     const current = await getChatwootConversationLabels(candidate.conversationId);

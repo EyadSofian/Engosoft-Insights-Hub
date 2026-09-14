@@ -1,12 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Pool } from "pg";
 import {
-  getChatwootConversationCustomAttributes,
   getChatwootConversationLabels,
-  mergeChatwootConversationCustomAttributes,
   replaceChatwootConversationLabels,
+  updateChatwootConversationAttributes,
 } from "./chatwoot.server";
 import {
+  CHATWOOT_ATTRIBUTION_KEYS,
   buildChatwootAttributionAttributes,
   planChatwootAttributionUpdate,
 } from "./chatwoot-attribution-attributes";
@@ -741,10 +741,11 @@ async function syncCanonicalToChatwoot(
       utmContent: row.utm_content,
       utmTerm: row.utm_term,
     });
-    const current = await getChatwootConversationCustomAttributes(conversationId);
-    const changed = planChatwootAttributionUpdate(current, wanted, "live");
-    if (Object.keys(changed).length)
-      await mergeChatwootConversationCustomAttributes(conversationId, changed);
+    await updateChatwootConversationAttributes(
+      conversationId,
+      (latest) => planChatwootAttributionUpdate(latest, wanted, "live"),
+      { ownedKeys: CHATWOOT_ATTRIBUTION_KEYS },
+    );
   }
   if (mode === "labels" || mode === "both") {
     const clean = (value: string) =>

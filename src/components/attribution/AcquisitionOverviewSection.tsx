@@ -262,12 +262,14 @@ function metrics(cards: Cards | undefined, aggregate: MetaAggregate | undefined,
       tone: "violet",
       icon: <Layers size={17} />,
       definition: A
-        ? "كل كيانات بيانات الاستحواذ الموحدة: عملاء Meta ومحادثات Chatwoot وزيارات وإرسالات صفحات الهبوط."
-        : "Every entity in the unified acquisition dataset: Meta leads, Chatwoot conversations, landing visits and landing submissions.",
-      formula: A ? "مجموع أحداث كل صفوف الجدول" : "Sum of events across every table row",
+        ? "عملاء Meta ومحادثات Chatwoot وإرسالات صفحات الهبوط. الزيارات حركة مرور وليست استحواذًا."
+        : "Meta leads, Chatwoot conversations and landing submissions. Landing visits are traffic, not acquisitions.",
+      formula: A
+        ? "meta_lead + chatwoot_conversation + landing_submission"
+        : "meta_lead + chatwoot_conversation + landing_submission",
       caveat: A
-        ? "الجلسة التي أرسلت نموذجًا تُعد زيارة وإرسالًا معًا."
-        : "A landing session that submitted a form counts as both a visit and a submission.",
+        ? "صفوف الزيارات تظهر في الجدول لكنها لا تُحسب هنا."
+        : "Landing visit rows appear in the table but are not counted here.",
     }),
     messaging: detail({
       id: "acquisition.messaging_conversations",
@@ -336,8 +338,10 @@ function metrics(cards: Cards | undefined, aggregate: MetaAggregate | undefined,
       value: fmtNum(cards?.knownSourceEvents),
       tone: "mint",
       icon: <CheckCircle2 size={17} />,
-      definition: A ? "أحداث نوع مصدرها ليس unknown." : "Events whose source type is not unknown.",
-      formula: A ? "الإجمالي − غير المعروفة" : "Total − unknown",
+      definition: A
+        ? "أحداث استحواذ نوع مصدرها ليس unknown."
+        : "Acquisition events whose source type is not unknown.",
+      formula: A ? "إجمالي الاستحواذ − غير المعروفة" : "Total acquisitions − unknown",
     }),
     unknown: detail({
       id: "acquisition.unknown",
@@ -346,8 +350,8 @@ function metrics(cards: Cards | undefined, aggregate: MetaAggregate | undefined,
       tone: "rose",
       icon: <HelpCircle size={17} />,
       definition: A
-        ? "أحداث نوع مصدرها unknown. لا تُسمى عضوية دون دليل."
-        : "Events whose source type is unknown. Never relabelled organic.",
+        ? "أحداث استحواذ نوع مصدرها unknown. لا تُسمى عضوية دون دليل."
+        : "Acquisition events whose source type is unknown. Never relabelled organic.",
       breakdowns: [byEntity, byChannel],
     }),
     spendCovered: detail({
@@ -378,9 +382,11 @@ function metrics(cards: Cards | undefined, aggregate: MetaAggregate | undefined,
       tone: "violet",
       icon: <Percent size={17} />,
       definition: A
-        ? "نسبة الأحداث ذات الإسناد الدقيق من إجمالي أحداث الاستحواذ."
-        : "Share of all acquisition events with exact attribution.",
-      formula: A ? "إسناد دقيق ÷ إجمالي الأحداث" : "Exact attribution ÷ total acquisition events",
+        ? "نسبة الاستحواذات ذات الإسناد الدقيق من إجمالي الاستحواذ. الزيارات خارج المقام."
+        : "Share of acquisitions with exact attribution. Landing visits are not in the denominator.",
+      formula: A
+        ? "استحواذات بإسناد دقيق ÷ إجمالي أحداث الاستحواذ"
+        : "Exact attributed acquisitions ÷ total acquisition events",
     }),
     aggregateLeads: {
       id: "acquisition.meta_leads_aggregate",
@@ -701,7 +707,11 @@ export function AcquisitionOverviewSection() {
           <KpiRow>
             <MetricDetailTrigger
               detail={detail.total}
-              card={{ index: 0, sub: A ? "كل صفوف الجدول" : "Every table row", loading }}
+              card={{
+                index: 0,
+                sub: A ? "عملاء + محادثات + إرسالات" : "Leads + conversations + submissions",
+                loading,
+              }}
             />
             <MetricDetailTrigger
               detail={detail.messaging}

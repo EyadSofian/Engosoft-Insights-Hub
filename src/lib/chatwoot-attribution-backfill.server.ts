@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import {
   CHATWOOT_ATTRIBUTION_DEFINITIONS,
+  CHATWOOT_ATTRIBUTION_KEYS,
   HISTORICAL_EVIDENCE_MISSING,
   buildChatwootAttributionAttributes,
   hasAttributionEvidence,
@@ -14,7 +15,7 @@ import {
   getChatwootConversationCustomAttributes,
   listChatwootConversationAttributeKeys,
   listChatwootInboxes,
-  mergeChatwootConversationCustomAttributes,
+  updateChatwootConversationAttributes,
 } from "./chatwoot.server";
 
 /**
@@ -234,10 +235,20 @@ export async function backfillChatwootAttributionFacts(
     });
     // Proven conversations only gain the inbox facts; their attribution is left as it is.
     const wanted = proven ? pick(built, FACT_KEYS) : built;
-    let changes: Record<string, string>;
+    let changes: Record<string, unknown>;
     try {
-      const current = await getChatwootConversationCustomAttributes(row.conversation_id);
-      changes = planChatwootAttributionUpdate(current, wanted, "backfill");
+      if (dryRun) {
+        const current = await getChatwootConversationCustomAttributes(row.conversation_id);
+        changes = planChatwootAttributionUpdate(current, wanted, "backfill");
+      } else {
+        // Serialized, re-read immediately before the write, and limited to attribution keys.
+        const result = await updateChatwootConversationAttributes(
+          row.conversation_id,
+          (latest) => planChatwootAttributionUpdate(latest, wanted, "backfill"),
+          { ownedKeys: CHATWOOT_ATTRIBUTION_KEYS },
+        );
+        changes = result.written;
+      }
     } catch (error) {
       report.chatwoot.failures += 1;
       if (report.chatwoot.failureSamples.length < 10)
@@ -256,21 +267,7 @@ export async function backfillChatwootAttributionFacts(
     if (changes.attribution_method) report.chatwoot.methodPopulated += 1;
     if (changes.attribution_confidence) report.chatwoot.confidencePopulated += 1;
     if (changes.attribution_unknown_reason) report.chatwoot.unknownReasonPopulated += 1;
-    if (dryRun) {
-      report.chatwoot.conversationsUpdated += 1;
-      continue;
-    }
-    try {
-      await mergeChatwootConversationCustomAttributes(row.conversation_id, changes);
-      report.chatwoot.conversationsUpdated += 1;
-    } catch (error) {
-      report.chatwoot.failures += 1;
-      if (report.chatwoot.failureSamples.length < 10)
-        report.chatwoot.failureSamples.push({
-          conversationId: row.conversation_id,
-          error: message(error),
-        });
-    }
+    report.chatwoot.conversationsUpdated += 1;
   }
   return report;
 }
