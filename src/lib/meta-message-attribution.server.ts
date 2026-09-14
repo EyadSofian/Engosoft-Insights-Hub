@@ -7,6 +7,10 @@ import {
   replaceChatwootConversationLabels,
 } from "./chatwoot.server";
 import {
+  buildChatwootAttributionAttributes,
+  planChatwootAttributionUpdate,
+} from "./chatwoot-attribution-attributes";
+import {
   databaseConfigured,
   readDashboardDatasets,
   type DashboardRow,
@@ -717,32 +721,28 @@ async function syncCanonicalToChatwoot(
   const allowAll = text(process.env.META_ATTRIBUTION_SYNC_ALLOW_ALL).toLowerCase() === "true";
   if (!allowAll && (!canary || canary !== conversationId)) return;
   if (mode === "attributes" || mode === "both") {
-    const wanted = Object.fromEntries(
-      Object.entries({
-        attribution_source: row.platform,
-        attribution_channel: row.channel,
-        attribution_campaign: row.campaign_name,
-        meta_campaign_id: row.campaign_id,
-        meta_adset_id: row.adset_id,
-        meta_ad_id: row.ad_id,
-        meta_creative_id: row.creative_id,
-        meta_campaign_name: row.campaign_name,
-        meta_adset_name: row.adset_name,
-        meta_ad_name: row.ad_name,
-        utm_source: row.utm_source,
-        utm_medium: row.utm_medium,
-        utm_campaign: row.utm_campaign,
-        utm_content: row.utm_content,
-        utm_term: row.utm_term,
-        ctwa_clid: row.ctwa_clid,
-        attribution_method: row.attribution_method,
-        attribution_confidence: row.confidence,
-      }).filter(([, value]) => Boolean(value)),
-    );
+    const wanted = buildChatwootAttributionAttributes({
+      channel: row.channel,
+      branch: row.branch_name || row.branch_id,
+      attributionMethod: row.attribution_method,
+      confidence: row.confidence,
+      unknownReason: row.unknown_reason,
+      source: row.platform,
+      medium: row.medium,
+      campaignName: row.campaign_name,
+      campaignId: row.campaign_id,
+      adsetId: row.adset_id,
+      adId: row.ad_id,
+      creativeId: row.creative_id,
+      ctwaClid: row.ctwa_clid,
+      utmSource: row.utm_source,
+      utmMedium: row.utm_medium,
+      utmCampaign: row.utm_campaign,
+      utmContent: row.utm_content,
+      utmTerm: row.utm_term,
+    });
     const current = await getChatwootConversationCustomAttributes(conversationId);
-    const changed = Object.fromEntries(
-      Object.entries(wanted).filter(([key, value]) => text(current[key]) !== value),
-    );
+    const changed = planChatwootAttributionUpdate(current, wanted, "live");
     if (Object.keys(changed).length)
       await mergeChatwootConversationCustomAttributes(conversationId, changed);
   }
@@ -792,16 +792,17 @@ async function projectConversation(conversationId: number): Promise<Record<strin
   const x = acquisition.rows[0],
     last = latest.rows[0];
   if (!x || !last) return null;
-  await db.query(
+  const updated = await db.query<Record<string, string>>(
     `UPDATE chatwoot_conversation_attribution SET
       first_touch_id=$2,latest_touch_id=$3,first_touch_at=$4,latest_touch_at=$5,
       chatwoot_message_id=$6,provider_message_id=$7,destination_phone_number_id=$8,destination_page_id=$9,
-      channel=$10,platform=$11,source=$12,medium=$13,campaign_id=$14,campaign_name=$15,
+      channel=COALESCE(NULLIF($10,''),channel),platform=$11,source=$12,medium=$13,campaign_id=$14,campaign_name=$15,
       adset_id=$16,adset_name=$17,ad_id=$18,ad_name=$19,creative_id=$20,creative_name=$21,
       placement=$22,utm_source=$23,utm_medium=$24,utm_campaign=$25,utm_content=$26,utm_term=$27,
       referral_source_id=$28,ctwa_clid=$29,attribution_method=$30,confidence=$31,
-      attribution_scope=$32,unknown_reason=$33,updated_at=now()
-     WHERE conversation_id=$1`,
+      attribution_scope=$32,
+      unknown_reason=CASE WHEN $30='unknown' AND $33='' THEN unknown_reason ELSE $33 END,updated_at=now()
+     WHERE conversation_id=$1 RETURNING *`,
     [
       conversationId,
       x.id,
@@ -838,7 +839,8 @@ async function projectConversation(conversationId: number): Promise<Record<strin
       x.unknown_reason,
     ],
   );
-  return x;
+  // Sync from the stored conversation, which also carries channel and branch facts.
+  return updated.rows[0] ?? x;
 }
 
 async function processEvent(event: Record<string, string>): Promise<boolean> {

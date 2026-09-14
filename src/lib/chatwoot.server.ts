@@ -645,6 +645,73 @@ export async function mergeChatwootConversationCustomAttributes(
   );
 }
 
+export interface ChatwootInboxSummary {
+  id: number;
+  channelType: string;
+  name: string;
+}
+
+/** The account's inboxes and their channel types: the trusted inbox → channel mapping. */
+export async function listChatwootInboxes(): Promise<ChatwootInboxSummary[]> {
+  const cfg = config();
+  const response = object(
+    await request(`/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/inboxes`),
+  );
+  const rows = Array.isArray(response?.payload) ? response.payload : [];
+  return rows
+    .map((row) => object(row))
+    .filter((row): row is Record<string, unknown> => Boolean(row))
+    .map((row) => ({
+      id: Number(row.id),
+      channelType: String(row.channel_type || "").trim(),
+      name: String(row.name || "").trim(),
+    }))
+    .filter((row) => Number.isInteger(row.id) && row.id > 0);
+}
+
+/** Keys of the conversation custom attributes defined in the account. */
+export async function listChatwootConversationAttributeKeys(): Promise<string[]> {
+  const cfg = config();
+  const response = await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions?attribute_model=0`,
+  );
+  const rows = Array.isArray(response)
+    ? response
+    : Array.isArray(object(response)?.payload)
+      ? (object(response)?.payload as unknown[])
+      : [];
+  return rows
+    .map((row) => object(row))
+    .filter(
+      (row): row is Record<string, unknown> =>
+        Boolean(row) && ["conversation_attribute", 0, "0"].includes(row?.attribute_model as never),
+    )
+    .map((row) => String(row.attribute_key || "").trim())
+    .filter(Boolean);
+}
+
+/** Adds one text conversation attribute definition. It never edits an existing one. */
+export async function createChatwootConversationAttributeDefinition(input: {
+  key: string;
+  name: string;
+  description: string;
+}): Promise<void> {
+  const cfg = config();
+  await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        attribute_display_name: input.name,
+        attribute_key: input.key,
+        attribute_description: input.description,
+        attribute_display_type: 0,
+        attribute_model: 0,
+      }),
+    },
+  );
+}
+
 function isoStart(date: string) {
   return `${date}T00:00:00.000Z`;
 }

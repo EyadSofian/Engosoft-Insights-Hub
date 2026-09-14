@@ -56,20 +56,115 @@ export const ACQUISITION_COUNTED_ENTITIES: readonly AcquisitionEntityType[] = [
   "landing_submission",
 ];
 
+/**
+ * Chatwoot stores its own channel type (`Channel::Whatsapp`), while the Meta
+ * listener stores the canonical value (`whatsapp`). Both mean the same inbox.
+ */
+const CHANNEL_ALIASES: Record<string, DestinationChannel> = {
+  "Channel::Whatsapp": "whatsapp",
+  "Channel::FacebookPage": "messenger",
+  "Channel::Instagram": "instagram_dm",
+  "Channel::WebWidget": "website_chat",
+  "Channel::Api": "website_chat",
+  whatsapp: "whatsapp",
+  messenger: "messenger",
+  instagram_dm: "instagram_dm",
+  website_chat: "website_chat",
+};
+
 export function chatwootDestinationChannel(channel: string): DestinationChannel {
-  switch (channel.trim()) {
-    case "Channel::Whatsapp":
-      return "whatsapp";
-    case "Channel::FacebookPage":
-      return "messenger";
-    case "Channel::Instagram":
-      return "instagram_dm";
-    case "Channel::WebWidget":
-    case "Channel::Api":
-      return "website_chat";
-    default:
-      return "unknown";
-  }
+  return CHANNEL_ALIASES[channel.trim()] ?? "unknown";
+}
+
+/** SQL twin of `chatwootDestinationChannel`, generated from the same table. */
+export function chatwootChannelSql(expression: string): string {
+  const cases = Object.entries(CHANNEL_ALIASES)
+    .map(([alias, channel]) => `WHEN '${alias}' THEN '${channel}'`)
+    .join(" ");
+  return `(CASE btrim(COALESCE(${expression}, '')) ${cases} ELSE 'unknown' END)`;
+}
+
+/**
+ * Source platforms are a closed vocabulary. Raw provider values are mapped here,
+ * so Meta's `{{site_source_name}}` codes (fb, ig, msg, an) and referrer hosts
+ * never reach the dashboard as labels. A value that is present but unrecognised
+ * is `other`; no value at all is `unknown`.
+ */
+export const SOURCE_PLATFORMS = [
+  "facebook",
+  "instagram",
+  "messenger",
+  "whatsapp",
+  "audience_network",
+  "google",
+  "tiktok",
+  "snapchat",
+  "website",
+  "direct",
+  "other",
+  "unknown",
+] as const;
+
+export type SourcePlatform = (typeof SOURCE_PLATFORMS)[number];
+
+export const PLATFORM_ALIASES: Readonly<Record<string, SourcePlatform>> = {
+  facebook: "facebook",
+  fb: "facebook",
+  "facebook.com": "facebook",
+  "m.facebook.com": "facebook",
+  "l.facebook.com": "facebook",
+  "lm.facebook.com": "facebook",
+  "web.facebook.com": "facebook",
+  instagram: "instagram",
+  ig: "instagram",
+  "instagram.com": "instagram",
+  "l.instagram.com": "instagram",
+  messenger: "messenger",
+  msg: "messenger",
+  "messenger.com": "messenger",
+  whatsapp: "whatsapp",
+  wa: "whatsapp",
+  "whatsapp.com": "whatsapp",
+  audience_network: "audience_network",
+  an: "audience_network",
+  google: "google",
+  "google.com": "google",
+  tiktok: "tiktok",
+  "tiktok.com": "tiktok",
+  snapchat: "snapchat",
+  snap: "snapchat",
+  "snapchat.com": "snapchat",
+  website: "website",
+  web: "website",
+  site: "website",
+  engosoft: "website",
+  "engosoft.com": "website",
+  direct: "direct",
+  "(direct)": "direct",
+  other: "other",
+  unknown: "unknown",
+  meta: "unknown",
+  "(not set)": "unknown",
+};
+
+export function normalizeSourcePlatform(
+  value: string | null | undefined,
+  blank: SourcePlatform = "unknown",
+): SourcePlatform {
+  const key = (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "");
+  if (!key) return blank;
+  return PLATFORM_ALIASES[key] ?? "other";
+}
+
+/** SQL twin of `normalizeSourcePlatform`, generated from the same alias table. */
+export function sourcePlatformSql(expression: string, blank: SourcePlatform = "unknown"): string {
+  const cases = Object.entries(PLATFORM_ALIASES)
+    .map(([alias, platform]) => `WHEN '${alias}' THEN '${platform}'`)
+    .join(" ");
+  return `(CASE regexp_replace(lower(btrim(COALESCE(${expression}, ''))), '^www\\.', '') WHEN '' THEN '${blank}' ${cases} ELSE 'other' END)`;
 }
 
 const META_REFERRAL_SOURCE: Record<string, AcquisitionSourceType> = {
@@ -112,4 +207,82 @@ export function metaLeadSourceType(scope: "paid" | "organic" | "unknown"): Acqui
 /** Exact means provider-issued identifiers resolved the campaign; nothing weaker counts. */
 export function isExactAttribution(input: { confidence: string; campaignId: string }): boolean {
   return input.confidence === "exact" && input.campaignId.trim().length > 0;
+}
+
+/** One row of the grouped acquisition dataset, exactly as the table shows it. */
+export interface AcquisitionGroup {
+  entity_type: string;
+  source_type: string;
+  destination_channel: string;
+  source_platform: string;
+  events: number;
+  exact: number;
+  spend_covered: number;
+}
+
+export interface AcquisitionCards {
+  totalEvents: number;
+  messagingConversations: number;
+  metaInstantFormLeads: number;
+  landingVisits: number;
+  landingSubmissions: number;
+  exactAttribution: number;
+  knownSourceEvents: number;
+  unknownEvents: number;
+  /** Null when no spend data exists to compare against, not when the count is zero. */
+  spendCoveredEvents: number | null;
+  /** Exact attribution ÷ total events, as a 0–1 ratio. Null only when there are no events. */
+  attributionRate: number | null;
+  eventsByEntity: Record<string, number>;
+  conversationsByChannel: Record<string, number>;
+  eventsByPlatform: Record<string, number>;
+}
+
+const whole = (value: unknown): number => Math.max(0, Math.round(Number(value) || 0));
+
+function bump(target: Record<string, number>, key: string, value: number) {
+  target[key] = (target[key] ?? 0) + value;
+}
+
+/**
+ * Every headline card is a sum over the grouped rows the table renders, so a
+ * card can never disagree with the table beneath it.
+ */
+export function summarizeAcquisitionGroups(
+  groups: readonly AcquisitionGroup[],
+  options: { spendDataAvailable: boolean },
+): AcquisitionCards {
+  const cards: AcquisitionCards = {
+    totalEvents: 0,
+    messagingConversations: 0,
+    metaInstantFormLeads: 0,
+    landingVisits: 0,
+    landingSubmissions: 0,
+    exactAttribution: 0,
+    knownSourceEvents: 0,
+    unknownEvents: 0,
+    spendCoveredEvents: options.spendDataAvailable ? 0 : null,
+    attributionRate: null,
+    eventsByEntity: {},
+    conversationsByChannel: {},
+    eventsByPlatform: {},
+  };
+  for (const group of groups) {
+    const events = whole(group.events);
+    cards.totalEvents += events;
+    cards.exactAttribution += whole(group.exact);
+    if (cards.spendCoveredEvents !== null) cards.spendCoveredEvents += whole(group.spend_covered);
+    if (group.source_type === "unknown") cards.unknownEvents += events;
+    else cards.knownSourceEvents += events;
+    bump(cards.eventsByEntity, group.entity_type, events);
+    bump(cards.eventsByPlatform, group.source_platform || "unknown", events);
+    if (group.entity_type === "chatwoot_conversation") {
+      cards.messagingConversations += events;
+      bump(cards.conversationsByChannel, group.destination_channel || "unknown", events);
+    } else if (group.entity_type === "meta_lead") cards.metaInstantFormLeads += events;
+    else if (group.entity_type === "landing_visit") cards.landingVisits += events;
+    else if (group.entity_type === "landing_submission") cards.landingSubmissions += events;
+  }
+  cards.attributionRate = cards.totalEvents ? cards.exactAttribution / cards.totalEvents : null;
+  return cards;
 }

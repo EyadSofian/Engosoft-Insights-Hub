@@ -1,41 +1,58 @@
 import {
+  BarChart3,
+  CheckCircle2,
   DollarSign,
+  Eye,
   FileText,
   HelpCircle,
   Layers,
   MessagesSquare,
   MousePointerClick,
+  Percent,
   ShieldCheck,
 } from "lucide-react";
 import { DataTable, type Col } from "@/components/DataTable";
 import { KpiRow, PageSection } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Card, Pill } from "@/components/ui-bits";
-import { fmtNum, fmtUSD, useI18n } from "@/lib/i18n";
-import type { MetricDetail } from "@/lib/metric-detail";
+import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useApi } from "@/lib/use-api";
 
 /**
- * Unified acquisition attribution. Each entity type keeps its own count:
- * a Meta lead, a Chatwoot conversation, a landing submission and a landing
- * visit are different things and are never added into one another.
+ * Unified acquisition attribution.
+ *
+ * Every event-level card is a sum over the grouped rows the table below renders,
+ * computed once on the server, so the cards and the table cannot disagree.
+ * Meta's own aggregate lead reporting sits in its own, separately labelled row
+ * and is never added to event counts.
  */
 
 type Copy = { en: string; ar: string };
 
-interface Totals {
-  acquisition_events: number;
-  meta_instant_form_leads: number;
-  messaging_conversations: number;
-  whatsapp_conversations: number;
-  messenger_conversations: number;
-  instagram_conversations: number;
-  other_conversations: number;
-  landing_submissions: number;
-  landing_visits: number;
-  exact_attributed: number;
-  unknown: number;
-  organic_direct: number;
+interface Cards {
+  totalEvents: number;
+  messagingConversations: number;
+  metaInstantFormLeads: number;
+  landingVisits: number;
+  landingSubmissions: number;
+  exactAttribution: number;
+  knownSourceEvents: number;
+  unknownEvents: number;
+  spendCoveredEvents: number | null;
+  attributionRate: number | null;
+  eventsByEntity: Record<string, number>;
+  conversationsByChannel: Record<string, number>;
+  eventsByPlatform: Record<string, number>;
+}
+
+interface MetaAggregate {
+  available: boolean;
+  platformLeads: number;
+  campaigns: number;
+  from: string | null;
+  to: string | null;
+  ignoredFilters: string[];
 }
 
 interface BreakdownRow {
@@ -45,6 +62,7 @@ interface BreakdownRow {
   source_platform: string;
   events: number;
   exact: number;
+  spend_covered: number;
 }
 
 interface CampaignRow {
@@ -77,10 +95,12 @@ interface FormRow {
 interface SummaryResponse {
   configured: boolean;
   empty?: boolean;
-  totals?: Totals;
+  cards?: Cards;
   breakdown?: BreakdownRow[];
   campaigns?: CampaignRow[];
   forms?: FormRow[];
+  spendDataAvailable?: boolean;
+  metaAggregate?: MetaAggregate;
 }
 
 interface EventRow {
@@ -124,7 +144,7 @@ interface EventsResponse {
 }
 
 const ENTITY: Record<string, Copy> = {
-  meta_lead: { en: "Meta instant form lead", ar: "عميل نموذج Meta الفوري" },
+  meta_lead: { en: "Meta instant form lead", ar: "عميل Meta Lead Form" },
   chatwoot_conversation: { en: "Chatwoot conversation", ar: "محادثة Chatwoot" },
   landing_submission: { en: "Landing submission", ar: "إرسال صفحة هبوط" },
   landing_visit: { en: "Landing visit", ar: "زيارة صفحة هبوط" },
@@ -152,6 +172,21 @@ const SOURCE: Record<string, Copy> = {
   unknown: { en: "Unknown", ar: "غير معروف" },
 };
 
+const PLATFORM: Record<string, Copy> = {
+  facebook: { en: "Facebook", ar: "فيسبوك" },
+  instagram: { en: "Instagram", ar: "إنستغرام" },
+  messenger: { en: "Messenger", ar: "ماسنجر" },
+  whatsapp: { en: "WhatsApp", ar: "واتساب" },
+  audience_network: { en: "Meta Audience Network", ar: "شبكة جمهور Meta" },
+  google: { en: "Google", ar: "جوجل" },
+  tiktok: { en: "TikTok", ar: "تيك توك" },
+  snapchat: { en: "Snapchat", ar: "سناب شات" },
+  website: { en: "Website", ar: "الموقع" },
+  direct: { en: "Direct", ar: "مباشر" },
+  other: { en: "Other", ar: "أخرى" },
+  unknown: { en: "Unknown", ar: "غير معروف" },
+};
+
 const n = (value: unknown): number => Number(value ?? 0) || 0;
 
 function label(map: Record<string, Copy>, key: string, A: boolean): string {
@@ -169,130 +204,209 @@ function nameWithId(name: string, id: string) {
   );
 }
 
-function metrics(totals: Totals | undefined, summary: SummaryResponse | undefined, A: boolean) {
-  const byDestination = new Map<string, number>();
-  for (const row of summary?.breakdown ?? []) {
-    if (row.entity_type === "landing_visit") continue;
-    const key =
-      row.entity_type === "chatwoot_conversation" ? row.destination_channel : row.entity_type;
-    byDestination.set(key, (byDestination.get(key) ?? 0) + n(row.events));
-  }
-  const destinationBreakdown = {
-    id: "destinations",
-    title: A ? "حسب نوع الاستحواذ" : "By acquisition type",
-    rows: [...byDestination.entries()]
+function breakdown(
+  id: string,
+  title: string,
+  values: Record<string, number> | undefined,
+  map: Record<string, Copy>,
+  A: boolean,
+): MetricBreakdownGroup {
+  return {
+    id,
+    title,
+    rows: Object.entries(values ?? {})
+      .filter(([, value]) => value > 0)
       .sort((a, b) => b[1] - a[1])
-      .map(([key, value]) => ({
-        key,
-        label: ENTITY[key] ? label(ENTITY, key, A) : label(DESTINATION, key, A),
-        value,
-        display: fmtNum(value),
-      })),
-    emptyLabel: A ? "لا توجد أحداث في الفترة" : "No acquisition events in this period",
+      .map(([key, value]) => ({ key, label: label(map, key, A), value, display: fmtNum(value) })),
+    emptyLabel: A ? "لا توجد أحداث في الفترة" : "No events in this period",
   };
-  const detail = (
-    item: Omit<MetricDetail, "breakdowns"> & { breakdowns?: MetricDetail["breakdowns"] },
-  ) => ({ breakdowns: [destinationBreakdown], ...item }) as MetricDetail;
+}
+
+function metrics(cards: Cards | undefined, aggregate: MetaAggregate | undefined, A: boolean) {
+  const byEntity = breakdown(
+    "entities",
+    A ? "حسب نوع الكيان" : "By entity type",
+    cards?.eventsByEntity,
+    ENTITY,
+    A,
+  );
+  const byPlatform = breakdown(
+    "platforms",
+    A ? "حسب المنصة" : "By platform",
+    cards?.eventsByPlatform,
+    PLATFORM,
+    A,
+  );
+  const byChannel = breakdown(
+    "channels",
+    A ? "حسب القناة" : "By channel",
+    cards?.conversationsByChannel,
+    DESTINATION,
+    A,
+  );
+  const eventLevel = A
+    ? "فعلي: يُحسب من صفوف جدول الاستحواذ نفسه."
+    : "Event-level: summed from the same rows as the acquisition table.";
+  const detail = (item: MetricDetail): MetricDetail => ({
+    breakdowns: [byEntity, byPlatform],
+    ...item,
+  });
+  const period =
+    aggregate?.from && aggregate?.to ? `${aggregate.from} → ${aggregate.to}` : A ? "—" : "—";
+
   return {
     total: detail({
       id: "acquisition.total_events",
       title: A ? "إجمالي أحداث الاستحواذ" : "Total acquisition events",
-      value: fmtNum(totals?.acquisition_events),
+      value: fmtNum(cards?.totalEvents),
       tone: "violet",
       icon: <Layers size={17} />,
       definition: A
-        ? "عملاء نماذج Meta ومحادثات Chatwoot وإرسالات صفحات الهبوط، كل منها يُعد مرة واحدة."
-        : "Meta instant-form leads, Chatwoot conversations and landing submissions, each counted once.",
+        ? "كل كيانات بيانات الاستحواذ الموحدة: عملاء Meta ومحادثات Chatwoot وزيارات وإرسالات صفحات الهبوط."
+        : "Every entity in the unified acquisition dataset: Meta leads, Chatwoot conversations, landing visits and landing submissions.",
+      formula: A ? "مجموع أحداث كل صفوف الجدول" : "Sum of events across every table row",
       caveat: A
-        ? "زيارات صفحات الهبوط لا تُحتسب كاستحواذ."
-        : "Landing visits are traffic and are not counted.",
-    }),
-    leads: detail({
-      id: "acquisition.meta_leads",
-      title: A ? "عملاء نموذج Meta الفوري" : "Meta instant form leads",
-      value: fmtNum(totals?.meta_instant_form_leads),
-      tone: "sky",
-      icon: <FileText size={17} />,
-      definition: A
-        ? "سجلات عملاء حقيقية من Meta بمعرّف العميل والنموذج والإعلان."
-        : "Real Meta lead records with their own lead, form and ad IDs.",
-      caveat: A
-        ? "لا تُستخدم أرقام العملاء الإجمالية من Meta كسجلات فردية."
-        : "Meta's aggregate lead counts are never turned into individual rows.",
+        ? "الجلسة التي أرسلت نموذجًا تُعد زيارة وإرسالًا معًا."
+        : "A landing session that submitted a form counts as both a visit and a submission.",
     }),
     messaging: detail({
       id: "acquisition.messaging_conversations",
       title: A ? "محادثات المراسلة" : "Messaging conversations",
-      value: fmtNum(totals?.messaging_conversations),
+      value: fmtNum(cards?.messagingConversations),
       tone: "mint",
       icon: <MessagesSquare size={17} />,
       definition: A
-        ? "محادثات Chatwoot عبر واتساب وماسنجر ورسائل إنستغرام."
-        : "Chatwoot conversations on WhatsApp, Messenger and Instagram DM.",
-      supporting: [
-        { key: "whatsapp", label: "WhatsApp", value: fmtNum(totals?.whatsapp_conversations) },
-        { key: "messenger", label: "Messenger", value: fmtNum(totals?.messenger_conversations) },
-        { key: "instagram", label: "Instagram DM", value: fmtNum(totals?.instagram_conversations) },
-      ],
+        ? "كل محادثات Chatwoot (نوع الكيان chatwoot_conversation) على كل القنوات."
+        : "Every Chatwoot conversation (entity type chatwoot_conversation) on every channel.",
+      caveat: eventLevel,
+      breakdowns: [byChannel, byPlatform],
     }),
-    landing: detail({
+    leads: detail({
+      id: "acquisition.meta_leads_exact",
+      title: A ? "عملاء Meta Lead Forms" : "Meta instant form leads",
+      value: fmtNum(cards?.metaInstantFormLeads),
+      tone: "sky",
+      icon: <FileText size={17} />,
+      definition: A
+        ? "فعلي: سجلات عملاء Meta حقيقية بمعرّف العميل (نوع الكيان meta_lead)."
+        : "Event-level: real Meta lead records with their own lead ID (entity type meta_lead).",
+      caveat: A
+        ? "أرقام Meta المجمّعة معروضة منفصلة ولا تُحوَّل إلى سجلات فردية."
+        : "Meta's aggregate lead totals are shown separately and are never turned into records.",
+    }),
+    visits: detail({
+      id: "acquisition.landing_visits",
+      title: A ? "زيارات صفحات الهبوط" : "Landing page visits",
+      value: fmtNum(cards?.landingVisits),
+      tone: "amber",
+      icon: <Eye size={17} />,
+      definition: A
+        ? "جلسات صفحات الهبوط المسجلة (نوع الكيان landing_visit)."
+        : "Recorded landing page sessions (entity type landing_visit).",
+      caveat: eventLevel,
+    }),
+    submissions: detail({
       id: "acquisition.landing_submissions",
-      title: A ? "إرسالات صفحات الهبوط" : "Landing submissions",
-      value: fmtNum(totals?.landing_submissions),
+      title: A ? "إرسالات صفحات الهبوط" : "Landing page submissions",
+      value: fmtNum(cards?.landingSubmissions),
       tone: "amber",
       icon: <MousePointerClick size={17} />,
       definition: A
-        ? "نماذج صفحات الهبوط التي أكد Odoo نجاح إرسالها."
-        : "Landing page forms Odoo confirmed as successfully submitted.",
-      supporting: [
-        {
-          key: "visits",
-          label: A ? "زيارات (منفصلة)" : "Visits (separate)",
-          value: fmtNum(totals?.landing_visits),
-        },
-      ],
+        ? "نماذج صفحات الهبوط التي أكد Odoo نجاح إرسالها (نوع الكيان landing_submission)."
+        : "Landing page forms Odoo confirmed as submitted (entity type landing_submission).",
+      caveat: eventLevel,
     }),
     exact: detail({
       id: "acquisition.exact_attributed",
-      title: A ? "إسناد دقيق" : "Exact attributed",
-      value: fmtNum(totals?.exact_attributed),
+      title: A ? "إسناد دقيق" : "Exact attribution",
+      value: fmtNum(cards?.exactAttribution),
       tone: "sky",
       icon: <ShieldCheck size={17} />,
       definition: A
         ? "أحداث حُل فيها معرّف الحملة من دليل المزود مباشرة."
-        : "Events whose campaign ID was resolved from provider evidence.",
+        : "Events whose campaign ID was proven by provider evidence.",
       formula: A ? "ثقة exact ومعرّف حملة موجود" : "confidence = exact and a campaign ID present",
+      caveat: A
+        ? "UTM والمُحيل يُعدان مصدرًا معروفًا لكن ليس إسنادًا دقيقًا."
+        : "UTM and referrer evidence count as a known source, not exact attribution.",
+    }),
+    known: detail({
+      id: "acquisition.known_source",
+      title: A ? "أحداث معروفة المصدر" : "Known-source events",
+      value: fmtNum(cards?.knownSourceEvents),
+      tone: "mint",
+      icon: <CheckCircle2 size={17} />,
+      definition: A ? "أحداث نوع مصدرها ليس unknown." : "Events whose source type is not unknown.",
+      formula: A ? "الإجمالي − غير المعروفة" : "Total − unknown",
     }),
     unknown: detail({
       id: "acquisition.unknown",
-      title: A ? "غير معروف" : "Unknown",
-      value: fmtNum(totals?.unknown),
+      title: A ? "أحداث غير معروفة" : "Unknown events",
+      value: fmtNum(cards?.unknownEvents),
       tone: "rose",
       icon: <HelpCircle size={17} />,
       definition: A
-        ? "أحداث بلا دليل مصدر كافٍ. لا تُسمى عضوية دون دليل."
-        : "Events without enough source evidence. Never relabelled organic.",
-      supporting: [
-        {
-          key: "organic",
-          label: A ? "مباشر أو عضوي مثبت" : "Proven direct or organic",
-          value: fmtNum(totals?.organic_direct),
-        },
-      ],
+        ? "أحداث نوع مصدرها unknown. لا تُسمى عضوية دون دليل."
+        : "Events whose source type is unknown. Never relabelled organic.",
+      breakdowns: [byEntity, byChannel],
     }),
     spendCovered: detail({
       id: "acquisition.spend_covered",
       title: A ? "أحداث مغطاة بالصرف" : "Spend-covered events",
-      value: "—",
+      value: fmtNum(cards?.spendCoveredEvents),
       tone: "amber",
       icon: <DollarSign size={17} />,
       definition: A
-        ? "أحداث يطابق معرّف حملتها صرفًا مسجلًا تطابقًا دقيقًا."
-        : "Events whose campaign ID exactly matches recorded spend.",
-      caveat: A
-        ? "يظهر الرقم بعد إثبات ربط الصرف الدقيق لكل نوع استحواذ."
-        : "Shown once an exact spend join is proven for each acquisition type.",
+        ? "أحداث دقيقة الإسناد لحملتها صرف مسجل في بيانات الإعلانات المتزامنة للفترة نفسها."
+        : "Exactly attributed events whose campaign has recorded spend in the synced ad data for the same period.",
+      caveat:
+        cards && cards.spendCoveredEvents === null
+          ? A
+            ? "لا توجد بيانات صرف متزامنة للمقارنة."
+            : "No synced spend data to compare against."
+          : A
+            ? "الربط بمعرّف الحملة فقط، وليس بالاسم."
+            : "Joined on campaign ID only, never by name.",
     }),
+    rate: detail({
+      id: "acquisition.attribution_rate",
+      title: A ? "نسبة الإسناد" : "Attribution rate",
+      value:
+        cards?.attributionRate === null || cards?.attributionRate === undefined
+          ? "—"
+          : fmtPct(cards.attributionRate * 100, 1),
+      tone: "violet",
+      icon: <Percent size={17} />,
+      definition: A
+        ? "نسبة الأحداث ذات الإسناد الدقيق من إجمالي أحداث الاستحواذ."
+        : "Share of all acquisition events with exact attribution.",
+      formula: A ? "إسناد دقيق ÷ إجمالي الأحداث" : "Exact attribution ÷ total acquisition events",
+    }),
+    aggregateLeads: {
+      id: "acquisition.meta_leads_aggregate",
+      title: A ? "عملاء Meta (مجمّع من Meta)" : "Meta leads (aggregate)",
+      value: aggregate?.available ? fmtNum(aggregate.platformLeads) : "—",
+      tone: "sky",
+      icon: <BarChart3 size={17} />,
+      definition: A
+        ? "نتائج نماذج العملاء كما تُبلغ عنها Meta في تقارير الإعلانات. رقم مجمّع وليس سجلات عملاء."
+        : "Lead-form results as Meta reports them in ad insights. An aggregate, not lead records.",
+      formula: A ? "مجموع Leads (on facebook Leads)" : "Sum of Leads (on facebook Leads)",
+      caveat: A
+        ? `فترة بيانات Meta: ${period}. لا يُضاف إلى إجمالي الأحداث ولا يُحسب في نسبة الإسناد.`
+        : `Meta data period: ${period}. Never added to event totals or the attribution rate.`,
+    } satisfies MetricDetail,
+    aggregateCampaigns: {
+      id: "acquisition.meta_lead_campaigns_aggregate",
+      title: A ? "حملات بها عملاء (مجمّع من Meta)" : "Campaigns with leads (aggregate)",
+      value: aggregate?.available ? fmtNum(aggregate.campaigns) : "—",
+      tone: "sky",
+      icon: <BarChart3 size={17} />,
+      definition: A
+        ? "عدد الحملات التي أبلغت Meta عن نتائج نماذج عملاء لها في الفترة."
+        : "Campaigns for which Meta reported lead-form results in the period.",
+      caveat: A ? `فترة بيانات Meta: ${period}.` : `Meta data period: ${period}.`,
+    } satisfies MetricDetail,
   };
 }
 
@@ -301,9 +415,12 @@ export function AcquisitionOverviewSection() {
   const A = lang === "ar";
   const summary = useApi<SummaryResponse>("/api/acquisition/summary");
   const events = useApi<EventsResponse>("/api/acquisition/events?limit=500");
-  const totals = summary.data?.totals;
-  const detail = metrics(totals, summary.data, A);
+  const cards = summary.data?.cards;
+  const aggregate = summary.data?.metaAggregate;
+  const detail = metrics(cards, aggregate, A);
   const loading = summary.isLoading;
+  const aggregatePeriod =
+    aggregate?.from && aggregate?.to ? `${aggregate.from} → ${aggregate.to}` : "";
 
   const breakdownCols: Col<BreakdownRow>[] = [
     {
@@ -322,7 +439,7 @@ export function AcquisitionOverviewSection() {
     {
       key: "platform",
       header: A ? "المنصة" : "Platform",
-      render: (row) => row.source_platform || "—",
+      render: (row) => label(PLATFORM, row.source_platform, A),
       sortValue: (row) => row.source_platform,
     },
     {
@@ -344,6 +461,13 @@ export function AcquisitionOverviewSection() {
       align: "right",
       render: (row) => fmtNum(row.exact),
       sortValue: (row) => n(row.exact),
+    },
+    {
+      key: "spend",
+      header: A ? "مغطى بالصرف" : "Spend-covered",
+      align: "right",
+      render: (row) => (summary.data?.spendDataAvailable ? fmtNum(row.spend_covered) : "—"),
+      sortValue: (row) => n(row.spend_covered),
     },
   ];
 
@@ -371,7 +495,7 @@ export function AcquisitionOverviewSection() {
     {
       key: "platform",
       header: A ? "المنصة" : "Platform",
-      render: (row) => row.source_platform || "—",
+      render: (row) => label(PLATFORM, row.source_platform, A),
       sortValue: (row) => row.source_platform,
     },
     {
@@ -561,54 +685,97 @@ export function AcquisitionOverviewSection() {
         tone="violet"
         hint={
           A
-            ? "دليل المزود فقط. CRM لاحق ولا يحدد المصدر. الكيانات لا تُجمع معًا."
-            : "Provider evidence only. CRM is downstream and never decides the source. Entities are never added together."
+            ? "دليل المزود فقط. CRM لاحق ولا يحدد المصدر. البطاقات تُحسب من صفوف الجدول نفسه."
+            : "Provider evidence only. CRM is downstream and never decides the source. Cards are summed from the table rows."
         }
       >
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Pill tone="brand">{A ? "عملاء Meta ≠ محادثات" : "Meta leads ≠ conversations"}</Pill>
-            <Pill>{A ? "الزيارات ليست استحواذ" : "Visits are not acquisitions"}</Pill>
-            <Pill tone="warning">{A ? "بلا دليل = غير معروف" : "No evidence = unknown"}</Pill>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="success">{A ? "فعلي" : "Event-level"}</Pill>
+            <span className="text-xs text-text-muted">
+              {A
+                ? "سجل لكل حدث: عميل أو محادثة أو زيارة أو إرسال. بلا دليل = غير معروف."
+                : "One record per event: a lead, conversation, visit or submission. No evidence = unknown."}
+            </span>
           </div>
           <KpiRow>
             <MetricDetailTrigger
               detail={detail.total}
+              card={{ index: 0, sub: A ? "كل صفوف الجدول" : "Every table row", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.messaging}
               card={{
-                index: 0,
-                sub: A ? "عملاء + محادثات + إرسالات" : "Leads + conversations + submissions",
+                index: 1,
+                sub: A ? "واتساب · ماسنجر · الموقع" : "WhatsApp · Messenger · website",
                 loading,
               }}
             />
             <MetricDetailTrigger
               detail={detail.leads}
-              card={{ index: 1, sub: A ? "سجلات Meta فعلية" : "Real Meta lead records", loading }}
+              card={{ index: 2, sub: A ? "فعلي · سجل لكل عميل" : "Event-level records", loading }}
             />
             <MetricDetailTrigger
-              detail={detail.messaging}
+              detail={detail.visits}
+              card={{ index: 3, sub: A ? "جلسات مسجلة" : "Recorded sessions", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.submissions}
+              card={{ index: 4, sub: A ? "إرسال مؤكد من Odoo" : "Confirmed by Odoo", loading }}
+            />
+          </KpiRow>
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={detail.exact}
+              card={{ index: 5, sub: A ? "معرّف حملة من المزود" : "Provider campaign ID", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.known}
+              card={{ index: 6, sub: A ? "نوع مصدر محدد" : "Source type identified", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.unknown}
+              card={{ index: 7, sub: A ? "ليست عضوية" : "Not called organic", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.spendCovered}
               card={{
-                index: 2,
-                sub: A ? "واتساب · ماسنجر · إنستغرام" : "WhatsApp · Messenger · Instagram DM",
+                index: 8,
+                sub: summary.data?.spendDataAvailable
+                  ? A
+                    ? "حملة دقيقة لها صرف مسجل"
+                    : "Exact campaign with recorded spend"
+                  : A
+                    ? "لا توجد بيانات صرف"
+                    : "No spend data",
                 loading,
               }}
             />
             <MetricDetailTrigger
-              detail={detail.landing}
-              card={{ index: 3, sub: A ? "إرسال مؤكد من Odoo" : "Confirmed by Odoo", loading }}
-            />
-            <MetricDetailTrigger
-              detail={detail.exact}
-              card={{ index: 4, sub: A ? "معرّف حملة من المزود" : "Provider campaign ID", loading }}
-            />
-            <MetricDetailTrigger
-              detail={detail.unknown}
-              card={{ index: 5, sub: A ? "ليست عضوية" : "Not called organic", loading }}
-            />
-            <MetricDetailTrigger
-              detail={detail.spendCovered}
-              card={{ index: 6, sub: A ? "بانتظار ربط دقيق" : "Awaiting exact join", loading }}
+              detail={detail.rate}
+              card={{ index: 9, sub: A ? "دقيق ÷ الإجمالي" : "Exact ÷ total", loading }}
             />
           </KpiRow>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <Pill tone="brand">{A ? "مجمّع من Meta" : "Aggregate from Meta"}</Pill>
+            <span className="text-xs text-text-muted">
+              {A
+                ? `تقارير المنصة وليست أحداثًا فردية، ولا تُضاف إلى الأرقام أعلاه${aggregatePeriod ? ` · ${aggregatePeriod}` : ""}.`
+                : `Platform reporting, not individual events, and never added to the figures above${aggregatePeriod ? ` · ${aggregatePeriod}` : ""}.`}
+            </span>
+          </div>
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={detail.aggregateLeads}
+              card={{ index: 10, sub: A ? "مجمّع من Meta" : "Meta-reported", loading }}
+            />
+            <MetricDetailTrigger
+              detail={detail.aggregateCampaigns}
+              card={{ index: 11, sub: A ? "مجمّع من Meta" : "Meta-reported", loading }}
+            />
+          </KpiRow>
+
           <DataTable
             rows={summary.data?.breakdown || []}
             cols={breakdownCols}

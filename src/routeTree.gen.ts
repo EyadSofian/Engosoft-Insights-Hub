@@ -71,6 +71,7 @@ import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
 import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
+import { Route as ApiAttributionChatwootFactsBackfillRouteImport } from './routes/api/attribution.chatwoot-facts-backfill'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
 import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
 import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
@@ -419,6 +420,12 @@ const ApiAcquisitionSummaryRoute = ApiAcquisitionSummaryRouteImport.update({
   path: '/api/acquisition/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttributionChatwootFactsBackfillRoute =
+  ApiAttributionChatwootFactsBackfillRouteImport.update({
+    id: '/api/attribution/chatwoot-facts-backfill',
+    path: '/api/attribution/chatwoot-facts-backfill',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAttributionConversationsRoute =
   ApiAttributionConversationsRouteImport.update({
     id: '/api/attribution/conversations',
@@ -666,6 +673,7 @@ export interface FileRoutesByFullPath {
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -765,6 +773,7 @@ export interface FileRoutesByTo {
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -865,6 +874,7 @@ export interface FileRoutesById {
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
@@ -966,6 +976,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/acquisition/events'
     | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1065,6 +1076,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/acquisition/events'
     | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1164,6 +1176,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/acquisition/events'
     | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
@@ -1264,6 +1277,7 @@ export interface RootRouteChildren {
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
   ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
+  ApiAttributionChatwootFactsBackfillRoute: typeof ApiAttributionChatwootFactsBackfillRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
   ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
   ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
@@ -1737,6 +1751,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAcquisitionSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/attribution/chatwoot-facts-backfill': {
+      id: '/api/attribution/chatwoot-facts-backfill'
+      path: '/api/attribution/chatwoot-facts-backfill'
+      fullPath: '/api/attribution/chatwoot-facts-backfill'
+      preLoaderRoute: typeof ApiAttributionChatwootFactsBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/attribution/conversations': {
       id: '/api/attribution/conversations'
       path: '/api/attribution/conversations'
@@ -2048,6 +2069,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiYoyRoute: ApiYoyRoute,
   ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
   ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
+  ApiAttributionChatwootFactsBackfillRoute:
+    ApiAttributionChatwootFactsBackfillRoute,
   ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
   ApiAttributionHealthRoute: ApiAttributionHealthRoute,
   ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,
