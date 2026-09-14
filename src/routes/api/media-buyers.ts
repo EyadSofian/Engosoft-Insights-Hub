@@ -1,20 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-type Owner = "sayed" | "shazly";
-
-const BUYERS: Record<Owner, { name: string; token: string }> = {
-  sayed: { name: "Sayed", token: "SAYED" },
-  shazly: { name: "Shazly", token: "SH" },
-};
-
-function ownerOf(name: string): Owner | "ambiguous" | null {
-  const sayed = /(^|[^a-z0-9])sayed([^a-z0-9]|$)/i.test(name);
-  const shazly = /(^|[^a-z0-9])sh([^a-z0-9]|$)/i.test(name);
-  if (sayed && shazly) return "ambiguous";
-  if (sayed) return "sayed";
-  if (shazly) return "shazly";
-  return null;
-}
+import {
+  MEDIA_BUYERS as BUYERS,
+  mediaBuyerOf as ownerOf,
+  type MediaBuyerId as Owner,
+} from "@/lib/media-buyers";
 
 export const Route = createFileRoute("/api/media-buyers")({
   server: {

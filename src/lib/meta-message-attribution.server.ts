@@ -10,6 +10,7 @@ import {
   buildChatwootAttributionAttributes,
   planChatwootAttributionUpdate,
 } from "./chatwoot-attribution-attributes";
+import { configuredCustomerType, configuredMarketer } from "./chatwoot-attribution-context.server";
 import {
   databaseConfigured,
   readDashboardDatasets,
@@ -732,8 +733,13 @@ async function syncCanonicalToChatwoot(
       campaignName: row.campaign_name,
       campaignId: row.campaign_id,
       adsetId: row.adset_id,
+      adsetName: row.adset_name,
       adId: row.ad_id,
+      adName: row.ad_name,
       creativeId: row.creative_id,
+      creativeName: row.creative_name,
+      marketer: configuredMarketer(row.campaign_id),
+      customerType: configuredCustomerType(row.inbox_id),
       ctwaClid: row.ctwa_clid,
       utmSource: row.utm_source,
       utmMedium: row.utm_medium,

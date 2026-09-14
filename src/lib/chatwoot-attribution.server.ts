@@ -12,6 +12,7 @@ import {
   buildChatwootAttributionAttributes,
   planChatwootAttributionUpdate,
 } from "./chatwoot-attribution-attributes";
+import { configuredCustomerType, configuredMarketer } from "./chatwoot-attribution-context.server";
 import {
   databaseConfigured,
   readDashboardDatasets,
@@ -1063,9 +1064,13 @@ async function syncChatwoot(candidate: NormalizedAttribution, entity: MetaEntity
       campaignName: entity.campaignName,
       campaignId: entity.campaignId,
       adsetId: entity.adsetId,
+      adsetName: entity.adsetName,
       adId: entity.adId,
+      adName: entity.adName,
       creativeId: entity.creativeId,
       ctwaClid: candidate.ctwaClid,
+      marketer: configuredMarketer(entity.campaignId),
+      customerType: configuredCustomerType(candidate.inboxId),
       utmSource: candidate.utmSource,
       utmMedium: candidate.utmMedium,
       utmCampaign: candidate.utmCampaign,

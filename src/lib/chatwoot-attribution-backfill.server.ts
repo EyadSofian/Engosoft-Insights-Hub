@@ -6,15 +6,20 @@ import {
   buildChatwootAttributionAttributes,
   hasAttributionEvidence,
   planChatwootAttributionUpdate,
-  type ChatwootAttributionAttributes,
 } from "./chatwoot-attribution-attributes";
 import { inboxBranchMappingConfigured, resolveInboxBranch } from "./chatwoot-attribution.server";
+import {
+  configuredCustomerType,
+  configuredMarketer,
+  customerTypeRulesConfigured,
+} from "./chatwoot-attribution-context.server";
 import {
   chatwootConfigured,
   createChatwootConversationAttributeDefinition,
   getChatwootConversationCustomAttributes,
-  listChatwootConversationAttributeKeys,
+  listChatwootConversationAttributeDefinitions,
   listChatwootInboxes,
+  renameChatwootConversationAttributeDefinition,
   updateChatwootConversationAttributes,
 } from "./chatwoot.server";
 
@@ -49,14 +54,6 @@ function getPool(): Pool {
   return pool;
 }
 
-const FACT_KEYS = ["attribution_channel", "engosoft_branch"] as const;
-
-const DESCRIPTIONS: Record<string, string> = {
-  attribution_channel: "Messaging channel proven by the Chatwoot inbox.",
-  meta_creative_id: "Meta creative ID resolved from a provider referral.",
-  attribution_unknown_reason: "Why marketing attribution is unknown for this conversation.",
-};
-
 interface ConversationFacts {
   conversation_id: number;
   inbox_id: number | null;
@@ -67,8 +64,21 @@ interface ConversationFacts {
   confidence: string;
   unknown_reason: string;
   campaign_id: string;
+  campaign_name: string;
+  adset_id: string;
+  adset_name: string;
   ad_id: string;
+  ad_name: string;
+  creative_id: string;
+  creative_name: string;
   ctwa_clid: string;
+  platform: string;
+  medium: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  utm_term: string;
 }
 
 export interface ChatwootFactsBackfillReport {
@@ -79,6 +89,7 @@ export interface ChatwootFactsBackfillReport {
   totalConversations: number;
   scanned: number;
   branchMappingConfigured: boolean;
+  customerTypeRulesConfigured: boolean;
   database: { channelPopulated: number; branchPopulated: number; unknownReasonPopulated: number };
   chatwoot: {
     skipped: boolean;
@@ -89,21 +100,25 @@ export interface ChatwootFactsBackfillReport {
     methodPopulated: number;
     confidencePopulated: number;
     unknownReasonPopulated: number;
+    marketerPopulated: number;
+    customerSourcePopulated: number;
+    customerTypePopulated: number;
+    campaignPopulated: number;
+    adsetPopulated: number;
+    adPopulated: number;
+    ctwaPopulated: number;
     failures: number;
     failureSamples: { conversationId: number; error: string }[];
   };
   campaignFieldsUntouched: number;
   exactAttributionPreserved: number;
-  definitions: { missing: string[]; created: string[] };
-}
-
-function pick(
-  attributes: ChatwootAttributionAttributes,
-  keys: readonly string[],
-): ChatwootAttributionAttributes {
-  return Object.fromEntries(
-    Object.entries(attributes).filter(([key]) => keys.includes(key)),
-  ) as ChatwootAttributionAttributes;
+  definitions: {
+    before: number;
+    missing: string[];
+    created: string[];
+    relabel: string[];
+    relabeled: string[];
+  };
 }
 
 function message(error: unknown): string {
@@ -127,6 +142,7 @@ export async function backfillChatwootAttributionFacts(
     totalConversations: 0,
     scanned: 0,
     branchMappingConfigured: inboxBranchMappingConfigured(),
+    customerTypeRulesConfigured: customerTypeRulesConfigured(),
     database: { channelPopulated: 0, branchPopulated: 0, unknownReasonPopulated: 0 },
     chatwoot: {
       skipped: !syncChatwoot,
@@ -137,12 +153,19 @@ export async function backfillChatwootAttributionFacts(
       methodPopulated: 0,
       confidencePopulated: 0,
       unknownReasonPopulated: 0,
+      marketerPopulated: 0,
+      customerSourcePopulated: 0,
+      customerTypePopulated: 0,
+      campaignPopulated: 0,
+      adsetPopulated: 0,
+      adPopulated: 0,
+      ctwaPopulated: 0,
       failures: 0,
       failureSamples: [],
     },
     campaignFieldsUntouched: 0,
     exactAttributionPreserved: 0,
-    definitions: { missing: [], created: [] },
+    definitions: { before: 0, missing: [], created: [], relabel: [], relabeled: [] },
   };
 
   const inboxChannels = new Map<number, string>();
@@ -151,19 +174,30 @@ export async function backfillChatwootAttributionFacts(
   }
 
   if (syncChatwoot && offset === 0) {
-    const defined = new Set(await listChatwootConversationAttributeKeys());
-    report.definitions.missing = CHATWOOT_ATTRIBUTION_DEFINITIONS.map((item) => item.key).filter(
-      (key) => !defined.has(key),
+    const defined = new Map(
+      (await listChatwootConversationAttributeDefinitions()).map((item) => [item.key, item]),
     );
+    report.definitions.before = defined.size;
+    for (const definition of CHATWOOT_ATTRIBUTION_DEFINITIONS) {
+      const current = defined.get(definition.key);
+      if (!current) report.definitions.missing.push(definition.key);
+      else if (current.name !== definition.name) report.definitions.relabel.push(definition.key);
+    }
     if (!dryRun) {
       for (const definition of CHATWOOT_ATTRIBUTION_DEFINITIONS) {
-        if (defined.has(definition.key)) continue;
-        await createChatwootConversationAttributeDefinition({
-          key: definition.key,
-          name: definition.name,
-          description: DESCRIPTIONS[definition.key] ?? definition.name,
-        });
-        report.definitions.created.push(definition.key);
+        const current = defined.get(definition.key);
+        if (!current) {
+          await createChatwootConversationAttributeDefinition({
+            key: definition.key,
+            name: definition.name,
+            description: definition.description,
+          });
+          report.definitions.created.push(definition.key);
+        } else if (current.name !== definition.name) {
+          // Only the label of an attribution-owned definition changes; its key and values stay.
+          await renameChatwootConversationAttributeDefinition(current.id, definition.name);
+          report.definitions.relabeled.push(definition.key);
+        }
       }
     }
   }
@@ -174,7 +208,9 @@ export async function backfillChatwootAttributionFacts(
     ),
     db.query<ConversationFacts>(
       `SELECT conversation_id::int AS conversation_id, inbox_id::int AS inbox_id, channel, branch_id, branch_name,
-              attribution_method, confidence, unknown_reason, campaign_id, ad_id, ctwa_clid
+              attribution_method, confidence, unknown_reason, campaign_id, campaign_name, adset_id,
+              adset_name, ad_id, ad_name, creative_id, creative_name, ctwa_clid, platform, medium,
+              utm_source, utm_medium, utm_campaign, utm_content, utm_term
          FROM chatwoot_conversation_attribution
         ORDER BY conversation_id ASC
         LIMIT $1 OFFSET $2`,
@@ -225,16 +261,34 @@ export async function backfillChatwootAttributionFacts(
     }
 
     if (!syncChatwoot) continue;
-    const built = buildChatwootAttributionAttributes({
+    // Stored exact evidence travels with the row; the planner never lets it, or anything
+    // weaker, replace attribution that is already on the conversation.
+    const wanted = buildChatwootAttributionAttributes({
       channel,
       branch,
       attributionMethod: proven ? row.attribution_method : "unknown",
       confidence: row.confidence,
       unknownReason: row.unknown_reason,
       historical: true,
+      source: row.platform,
+      medium: row.medium,
+      campaignId: row.campaign_id,
+      campaignName: row.campaign_name,
+      adsetId: row.adset_id,
+      adsetName: row.adset_name,
+      adId: row.ad_id,
+      adName: row.ad_name,
+      creativeId: row.creative_id,
+      creativeName: row.creative_name,
+      ctwaClid: row.ctwa_clid,
+      utmSource: row.utm_source,
+      utmMedium: row.utm_medium,
+      utmCampaign: row.utm_campaign,
+      utmContent: row.utm_content,
+      utmTerm: row.utm_term,
+      marketer: configuredMarketer(row.campaign_id),
+      customerType: configuredCustomerType(row.inbox_id),
     });
-    // Proven conversations only gain the inbox facts; their attribution is left as it is.
-    const wanted = proven ? pick(built, FACT_KEYS) : built;
     let changes: Record<string, unknown>;
     try {
       if (dryRun) {
@@ -267,6 +321,13 @@ export async function backfillChatwootAttributionFacts(
     if (changes.attribution_method) report.chatwoot.methodPopulated += 1;
     if (changes.attribution_confidence) report.chatwoot.confidencePopulated += 1;
     if (changes.attribution_unknown_reason) report.chatwoot.unknownReasonPopulated += 1;
+    if (changes.marketer_name) report.chatwoot.marketerPopulated += 1;
+    if (changes.customer_source) report.chatwoot.customerSourcePopulated += 1;
+    if (changes.customer_type) report.chatwoot.customerTypePopulated += 1;
+    if (changes.meta_campaign_id) report.chatwoot.campaignPopulated += 1;
+    if (changes.meta_adset_id) report.chatwoot.adsetPopulated += 1;
+    if (changes.meta_ad_id) report.chatwoot.adPopulated += 1;
+    if (changes.ctwa_clid) report.chatwoot.ctwaPopulated += 1;
     report.chatwoot.conversationsUpdated += 1;
   }
   return report;
