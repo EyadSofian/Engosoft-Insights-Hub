@@ -69,16 +69,21 @@ import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-lead
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
+import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
 import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
 import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
 import { Route as ApiAttributionSummaryRouteImport } from './routes/api/attribution.summary'
 import { Route as ApiAttributionTokensRouteImport } from './routes/api/attribution.tokens'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
 import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
+import { Route as ApiMetaLeadgenWebhookRouteImport } from './routes/api/meta.leadgen-webhook'
 import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
@@ -98,6 +103,7 @@ import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/te
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
 import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
+import { Route as ApiMetaLeadAdsOperationsRouteImport } from './routes/api/meta.lead-ads.operations'
 import { Route as ApiPricingImportPreviewRouteImport } from './routes/api/pricing.import.preview'
 import { Route as ApiPricingInvoicesMovementRouteImport } from './routes/api/pricing.invoices.$movement'
 
@@ -403,6 +409,16 @@ const ApiYoyRoute = ApiYoyRouteImport.update({
   path: '/api/yoy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
+  id: '/api/acquisition/events',
+  path: '/api/acquisition/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAcquisitionSummaryRoute = ApiAcquisitionSummaryRouteImport.update({
+  id: '/api/acquisition/summary',
+  path: '/api/acquisition/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAttributionConversationsRoute =
   ApiAttributionConversationsRouteImport.update({
     id: '/api/attribution/conversations',
@@ -428,6 +444,16 @@ const ApiAttributionSummaryRoute = ApiAttributionSummaryRouteImport.update({
 const ApiAttributionTokensRoute = ApiAttributionTokensRouteImport.update({
   id: '/api/attribution/tokens',
   path: '/api/attribution/tokens',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
@@ -457,6 +483,11 @@ const ApiLandingAttributionSummaryRoute =
     path: '/api/landing-attribution/summary',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiMetaLeadgenWebhookRoute = ApiMetaLeadgenWebhookRouteImport.update({
+  id: '/api/meta/leadgen-webhook',
+  path: '/api/meta/leadgen-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaWhatsappAttributionWebhookRoute =
   ApiMetaWhatsappAttributionWebhookRouteImport.update({
     id: '/api/meta/whatsapp-attribution-webhook',
@@ -554,6 +585,12 @@ const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
   path: '/api/telegram/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaLeadAdsOperationsRoute =
+  ApiMetaLeadAdsOperationsRouteImport.update({
+    id: '/api/meta/lead-ads/operations',
+    path: '/api/meta/lead-ads/operations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPricingImportPreviewRoute = ApiPricingImportPreviewRouteImport.update({
   id: '/api/pricing/import/preview',
   path: '/api/pricing/import/preview',
@@ -627,16 +664,21 @@ export interface FileRoutesByFullPath {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -656,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -720,16 +763,21 @@ export interface FileRoutesByTo {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -749,6 +797,7 @@ export interface FileRoutesByTo {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -814,16 +863,21 @@ export interface FileRoutesById {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -843,6 +897,7 @@ export interface FileRoutesById {
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -909,16 +964,21 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -938,6 +998,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesByTo: FileRoutesByTo
@@ -1002,16 +1063,21 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1031,6 +1097,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   id:
@@ -1095,16 +1162,21 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/events'
+    | '/api/acquisition/summary'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1124,6 +1196,7 @@ export interface FileRouteTypes {
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesById: FileRoutesById
@@ -1189,16 +1262,21 @@ export interface RootRouteChildren {
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
+  ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
   ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
   ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
   ApiAttributionSummaryRoute: typeof ApiAttributionSummaryRoute
   ApiAttributionTokensRoute: typeof ApiAttributionTokensRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
   ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
+  ApiMetaLeadgenWebhookRoute: typeof ApiMetaLeadgenWebhookRoute
   ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
@@ -1218,6 +1296,7 @@ export interface RootRouteChildren {
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
   ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
+  ApiMetaLeadAdsOperationsRoute: typeof ApiMetaLeadAdsOperationsRoute
   ApiPricingImportPreviewRoute: typeof ApiPricingImportPreviewRoute
   ApiPricingInvoicesMovementRoute: typeof ApiPricingInvoicesMovementRoute
 }
@@ -1644,6 +1723,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/acquisition/events': {
+      id: '/api/acquisition/events'
+      path: '/api/acquisition/events'
+      fullPath: '/api/acquisition/events'
+      preLoaderRoute: typeof ApiAcquisitionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/summary': {
+      id: '/api/acquisition/summary'
+      path: '/api/acquisition/summary'
+      fullPath: '/api/acquisition/summary'
+      preLoaderRoute: typeof ApiAcquisitionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/attribution/conversations': {
       id: '/api/attribution/conversations'
       path: '/api/attribution/conversations'
@@ -1679,6 +1772,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAttributionTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/sso': {
       id: '/api/auth/sso'
       path: '/api/auth/sso'
@@ -1712,6 +1819,13 @@ declare module '@tanstack/react-router' {
       path: '/api/landing-attribution/summary'
       fullPath: '/api/landing-attribution/summary'
       preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/leadgen-webhook': {
+      id: '/api/meta/leadgen-webhook'
+      path: '/api/meta/leadgen-webhook'
+      fullPath: '/api/meta/leadgen-webhook'
+      preLoaderRoute: typeof ApiMetaLeadgenWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta/whatsapp-attribution-webhook': {
@@ -1847,6 +1961,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/lead-ads/operations': {
+      id: '/api/meta/lead-ads/operations'
+      path: '/api/meta/lead-ads/operations'
+      fullPath: '/api/meta/lead-ads/operations'
+      preLoaderRoute: typeof ApiMetaLeadAdsOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pricing/import/preview': {
       id: '/api/pricing/import/preview'
       path: '/api/pricing/import/preview'
@@ -1925,16 +2046,21 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
+  ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
   ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
   ApiAttributionHealthRoute: ApiAttributionHealthRoute,
   ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,
   ApiAttributionSummaryRoute: ApiAttributionSummaryRoute,
   ApiAttributionTokensRoute: ApiAttributionTokensRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
   ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
+  ApiMetaLeadgenWebhookRoute: ApiMetaLeadgenWebhookRoute,
   ApiMetaWhatsappAttributionWebhookRoute:
     ApiMetaWhatsappAttributionWebhookRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,
@@ -1955,6 +2081,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
   ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
+  ApiMetaLeadAdsOperationsRoute: ApiMetaLeadAdsOperationsRoute,
   ApiPricingImportPreviewRoute: ApiPricingImportPreviewRoute,
   ApiPricingInvoicesMovementRoute: ApiPricingInvoicesMovementRoute,
 }
