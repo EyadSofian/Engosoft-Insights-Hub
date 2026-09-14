@@ -1094,7 +1094,7 @@ export function businessSignals(
 
   let risk: BusinessSignals["risk"];
   if (data.fetchErrors.length || data.staleTabs.length) {
-    // This card used to print the raw connector errors — "Archived Lost
+    // This card used to print the raw connector errors — "CRM Lost
     // unavailable: direct Odoo is not configured or could not be reached" —
     // into an executive summary. The count and the consequence are what a
     // reader here can act on; the connector names are stated in full in the

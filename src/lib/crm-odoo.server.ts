@@ -1,10 +1,9 @@
 // Server-only authoritative CRM reader.
 //
-// CRM and Lost are two disjoint Odoo populations:
-//   - CRM: active records assigned to a real user, excluding any Lost/Closed
-//     Lost stage and the non-commercial Old Auto Dialer stage.
-//   - Lost: archived opportunities (active=false, probability=0) handled by an
-//     internal user backed by an Employee record and carrying a Lost Reason.
+// CRM and Lost are two disjoint Odoo populations under the 1.26 contract:
+//   - CRM: active Leads plus active open/Won Opportunities.
+//   - Lost: archived Leads with a reason, active Lost-stage Opportunities, and
+//     historical archived Lost Opportunities.
 //
 // Credentials stay in environment variables and are consumed by odoo.server.
 // This module deliberately returns sheet-shaped rows so the existing campaign,
@@ -19,6 +18,13 @@ import {
   type Domain,
   type M2O,
 } from "./odoo.server";
+import {
+  crmBusinessStatus,
+  isCanonicalLost,
+  isCrmRecordType,
+  type CrmContractRecord,
+  type CrmStageKey,
+} from "./crm-contract";
 
 export type CrmRawRow = Record<string, string>;
 
@@ -38,32 +44,32 @@ interface OdooCrmLead {
   priority?: string | false;
   phone?: string | false;
   mobile?: string | false;
+  email_from?: string | false;
   user_id?: M2O;
   team_id?: M2O;
   stage_id?: M2O;
   company_id?: M2O;
   campaign_id?: M2O;
   source_id?: M2O;
+  medium_id?: M2O;
+  lang_id?: M2O;
   lost_reason_id?: M2O;
+  lost_category_id?: M2O;
+  stage_is_lost?: boolean;
+  stage_is_won?: boolean;
   create_date?: string | false;
   write_date?: string | false;
   date_last_stage_update?: string | false;
   date_closed?: string | false;
+  lost_verification_date?: string | false;
+  won_date?: string | false;
+  date_conversion?: string | false;
   probability?: number;
+  automated_probability?: number;
+  closing_duration_days?: number;
+  product_ids?: number[];
+  tag_ids?: number[];
   [key: string]: unknown;
-}
-
-interface OdooUser {
-  id: number;
-  name: string;
-  share: boolean;
-  active: boolean;
-}
-
-interface OdooEmployee {
-  id: number;
-  user_id: M2O;
-  active: boolean;
 }
 
 export interface CrmExclusionDiagnostics {
@@ -107,24 +113,6 @@ const normalize = (value: unknown): string =>
     .toLowerCase()
     .replace(/[_–—/\\().?:]+/g, " ")
     .replace(/\s+/g, " ");
-
-const PUBLIC_TECHNICAL_USER_NAMES = new Set(["public user for ksa - engosoft"]);
-
-function isTechnicalIdentity(name: string, includeEngosoftDomain: boolean): boolean {
-  const normalized = normalize(name);
-  if (PUBLIC_TECHNICAL_USER_NAMES.has(normalized)) return true;
-  if (includeEngosoftDomain && normalized === "engosoft.com") return true;
-  return /\b(public|portal|website|system|technical)\s+user\b|\bbot\b/.test(normalized);
-}
-
-function isExcludedCrmStage(stage: string): boolean {
-  const normalized = normalize(stage);
-  if (normalized === "old auto dialer") return true;
-  if (normalized === "lost" || normalized === "closed lost" || normalized === "close lost")
-    return true;
-  if (/(^|\s)lost($|\s)/.test(normalized)) return true;
-  return /مفقود|خاسر|ضائع|خسارة/.test(normalized);
-}
 
 function display(value: unknown): string {
   if (value === false || value === null || value === undefined) return "";
@@ -213,27 +201,22 @@ function customFieldPlan(metadata: Record<string, OdooField>): CustomFields {
     ),
     campaignName: resolveField(
       metadata,
-      ["x_studio_campaign_name", "x_campaign_name"],
+      ["campaign_name", "x_studio_campaign_name", "x_campaign_name"],
       ["Campaign Name", "اسم الحملة"],
     ),
     campaignId: resolveField(
       metadata,
-      ["x_studio_campaign_id", "x_campaign_id"],
+      ["campaign_id2", "x_studio_campaign_id", "x_campaign_id"],
       ["Campaign ID", "معرف الحملة"],
     ),
     courseCategories: resolveField(
       metadata,
-      [
-        "x_studio_course_categories",
-        "x_course_categories",
-        "course_categories",
-        "course_category_ids",
-      ],
+      ["x_studio_course_categories"],
       ["Course Categories", "Course Category"],
     ),
     callingReply: resolveField(
       metadata,
-      ["x_studio_calling_reply", "x_calling_reply", "calling_reply"],
+      ["x_studio_answered", "x_studio_calling_reply", "x_calling_reply", "calling_reply"],
       ["Calling reply?", "Calling Reply", "Call Reply"],
     ),
   };
@@ -243,13 +226,65 @@ function custom(lead: OdooCrmLead, field: string): string {
   return field ? display(lead[field]) : "";
 }
 
-function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
+function contractRecord(lead: OdooCrmLead): CrmContractRecord {
+  return {
+    type: normalize(lead.type),
+    active: lead.active !== false,
+    stageIsLost: lead.stage_is_lost === true,
+    stageIsWon: lead.stage_is_won === true,
+    hasLostReason: m2oId(lead.lost_reason_id) > 0,
+  };
+}
+
+const PIPELINE_STAGE_XMLIDS: Record<string, CrmStageKey> = {
+  stage_preparation: "preparation",
+  stage_new: "new",
+  stage_open: "open",
+  stage_quotation_sent: "quotation",
+  stage_won: "won",
+  stage_lost: "lost",
+};
+
+function actualStageKey(lead: OdooCrmLead, stageKeys: Map<number, CrmStageKey>): CrmStageKey {
+  if (lead.stage_is_lost) return "lost";
+  if (lead.stage_is_won) return "won";
+  return stageKeys.get(m2oId(lead.stage_id)) ?? "other";
+}
+
+function lossDate(lead: OdooCrmLead): string {
+  return normalize(lead.type) === "opportunity"
+    ? dateTime(lead.lost_verification_date) ||
+        dateTime(lead.date_last_stage_update) ||
+        dateTime(lead.date_closed)
+    : dateTime(lead.date_closed) || dateTime(lead.write_date);
+}
+
+function priorityLabel(lead: OdooCrmLead): string {
+  const business = display(lead.priority2);
+  if (business) return { "0": "Cold", "1": "Intermediate", "2": "Hot" }[business] ?? business;
+  const core = display(lead.priority);
+  return { "0": "Low", "1": "Medium", "2": "High", "3": "Very High" }[core] ?? core;
+}
+
+function commonRaw(
+  lead: OdooCrmLead,
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
   const rawStage = m2oName(lead.stage_id);
   const rawSource = m2oName(lead.source_id);
   const rawCourse = custom(lead, fields.courseCategories);
+  const contract = contractRecord(lead);
+  const status = crmBusinessStatus(contract);
   return {
     __odoo_id: String(lead.id),
     __odoo_write_date: dateTime(lead.write_date),
+    "Record Type": contract.type,
+    "Record Active": String(contract.active),
+    "Business Status": status ?? "archived",
+    "Stage Key": actualStageKey(lead, stageKeys),
     "Ad Name": custom(lead, fields.adName),
     "Ad ID": custom(lead, fields.adId),
     "Ad Set Name": custom(lead, fields.adsetName),
@@ -262,6 +297,7 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
     Phone: display(lead.phone),
     Mobile: display(lead.mobile),
+    Email: display(lead.email_from),
     Salesperson: m2oName(lead.user_id),
     "فريق المبيعات": m2oName(lead.team_id),
     "Sales Team": m2oName(lead.team_id),
@@ -271,96 +307,81 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "أنشئ في": dateTime(lead.create_date),
     "التاريخ المقفل": dateTime(lead.date_closed),
     "Closing Date": date(lead.date_closed),
+    "Lost Date": lossDate(lead),
+    "Won Date": dateTime(lead.won_date),
+    "Conversion Date": dateTime(lead.date_conversion),
     Source: rawSource,
     "cleaned Source": rawSource.split("[")[0].trim(),
+    Medium: m2oName(lead.medium_id as M2O),
+    "Communication Language": m2oName(lead.lang_id as M2O),
     "Course Categories": rawCourse,
     Course: rawCourse,
+    Courses: (lead.product_ids ?? [])
+      .map((id) => productNames.get(Number(id)) ?? "")
+      .filter(Boolean)
+      .join(", "),
     "Main Category": "",
-    Priority: display(lead.priority),
+    Priority: priorityLabel(lead),
+    Probability: String(lead.probability ?? 0),
+    "Automated Probability": String(lead.automated_probability ?? 0),
+    "Closing Duration Days": String(lead.closing_duration_days ?? 0),
+    "Ready to Convert": display(lead.x_studio_ready_to_convert_1),
+    "Lead Segment": m2oName(lead.lead_segment_id as M2O),
+    "Open Status": m2oName(lead.open_status_id as M2O),
+    "Closing Won Channel": m2oName(lead.closing_channel_id as M2O),
+    "Lost Category": m2oName(lead.lost_category_id),
+    "Inventory Bucket": display(lead.inventory_bucket),
+    "Course Language": display(lead.course_languages),
+    "Course Type": display(lead.course_type),
+    "Customer Type": display(lead.customer_type),
+    "Job Type": display(lead.x_studio_customer_type_1),
+    "How Found Us": display(lead.x_studio_how_found_us),
+    Company: m2oName(lead.company_id),
+    Tags: (lead.tag_ids ?? [])
+      .map((id) => tagNames.get(Number(id)) ?? "")
+      .filter(Boolean)
+      .join(", "),
+    "Target Name": display(lead.target_name),
+    "Resign Target": display(lead.resign_target),
+    "Facebook Lead ID": display(lead.fb_lead_id),
+    "Validate Closed Lost Reason": display(lead.x_studio_validate_closed_reason),
     "Calling reply?": custom(lead, fields.callingReply),
     "سبب الضياع": m2oName(lead.lost_reason_id),
     "Date\r": date(lead.create_date),
-    نشط: "true",
+    نشط: String(contract.active),
   };
 }
 
-function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
-  const rawStage = m2oName(lead.stage_id);
-  const rawSource = m2oName(lead.source_id);
-  const rawCourse = custom(lead, fields.courseCategories);
-  return {
-    __odoo_id: String(lead.id),
-    __odoo_write_date: dateTime(lead.write_date),
-    "Ad Name": custom(lead, fields.adName),
-    "Ad ID": custom(lead, fields.adId),
-    "Ad Set Name": custom(lead, fields.adsetName),
-    "Ad Set ID": custom(lead, fields.adsetId),
-    "Campaign Name": m2oName(lead.campaign_id) || custom(lead, fields.campaignName),
-    "Campaign ID": custom(lead, fields.campaignId),
-    "اسم جهة الاتصال":
-      display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
-    Phone: display(lead.phone),
-    Mobile: display(lead.mobile),
-    "مندوب المبيعات": m2oName(lead.user_id),
-    "فريق المبيعات": m2oName(lead.team_id),
-    المرحلة: rawStage,
-    "Cleaned Stage": rawStage,
-    "أنشئ في": dateTime(lead.create_date),
-    "التاريخ المقفل": dateTime(lead.date_closed),
-    "Closing Date": date(lead.date_closed),
-    "Course Categories": rawCourse,
-    Course: rawCourse,
-    "Main Category": "",
-    "سبب الضياع": m2oName(lead.lost_reason_id),
-    المصدر: rawSource,
-    "cleaned Source": rawSource.split("[")[0].trim(),
-    "Date\r": date(lead.create_date),
-    نشط: "false",
-  };
-}
-
-function validateActiveIdentity(lead: OdooCrmLead, diagnostics: CrmExclusionDiagnostics): boolean {
-  const userId = m2oId(lead.user_id);
-  if (!userId) {
-    diagnostics.unassigned++;
-    return false;
-  }
-  // The accepted CRM reference keeps the normal `engosoft.com` assignee but
-  // excludes public/portal/website identities. Historical CRM leads are not
-  // required to have a current hr.employee record.
-  if (isTechnicalIdentity(m2oName(lead.user_id), false)) {
-    diagnostics.technicalIdentity++;
-    return false;
-  }
-  return true;
-}
-
-function validateLostIdentity(
+function toCrmRaw(
   lead: OdooCrmLead,
-  users: Map<number, OdooUser>,
-  employeeUserIds: Set<number>,
-  diagnostics: CrmExclusionDiagnostics,
-): boolean {
-  const userId = m2oId(lead.user_id);
-  if (!userId) {
-    diagnostics.unassigned++;
-    return false;
-  }
-  const user = users.get(userId);
-  const displayName = user?.name || m2oName(lead.user_id);
-  if (isTechnicalIdentity(displayName, true)) {
-    diagnostics.technicalIdentity++;
-    return false;
-  }
-  if (!user || user.share) {
-    diagnostics.nonInternalUser++;
-    return false;
-  }
-  if (!employeeUserIds.has(userId)) {
-    diagnostics.noEmployee++;
-    return false;
-  }
-  return true;
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
+  return commonRaw(lead, fields, stageKeys, productNames, tagNames);
+}
+
+function toLostRaw(
+  lead: OdooCrmLead,
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
+  const raw = commonRaw(lead, fields, stageKeys, productNames, tagNames);
+  const canonicalLostDate = lossDate(lead);
+  return {
+    ...raw,
+    "مندوب المبيعات": raw.Salesperson,
+    المرحلة: raw.Stage,
+    المصدر: raw.Source,
+    // `date_closed` is empty for active Lost-stage Opportunities in 1.26.
+    // Keep the raw value above for audit, but use the canonical per-type date
+    // for movement reporting and the Lost workspace.
+    "Closing Date": canonicalLostDate.slice(0, 10),
+    "Lost Date": canonicalLostDate,
+  };
 }
 
 /**
@@ -384,18 +405,46 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
     "priority",
     "phone",
     "mobile",
+    "email_from",
     "user_id",
     "team_id",
     "stage_id",
     "company_id",
     "campaign_id",
     "source_id",
+    "medium_id",
+    "lang_id",
     "lost_reason_id",
+    "lost_category_id",
+    "stage_is_lost",
+    "stage_is_won",
     "create_date",
     "write_date",
     "date_last_stage_update",
     "date_closed",
+    "lost_verification_date",
+    "won_date",
+    "date_conversion",
     "probability",
+    "automated_probability",
+    "closing_duration_days",
+    "product_ids",
+    "tag_ids",
+    "priority2",
+    "x_studio_ready_to_convert_1",
+    "lead_segment_id",
+    "open_status_id",
+    "closing_channel_id",
+    "inventory_bucket",
+    "course_languages",
+    "course_type",
+    "customer_type",
+    "x_studio_customer_type_1",
+    "x_studio_how_found_us",
+    "target_name",
+    "resign_target",
+    "fb_lead_id",
+    "x_studio_validate_closed_reason",
   ];
   const fields = [
     ...new Set([
@@ -410,72 +459,127 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const floor = `${floorDay.toISOString().slice(0, 10)} 00:00:00`;
   const activeDomain: Domain = [
     ["active", "=", true],
+    "|",
+    "|",
     ["create_date", ">=", floor],
+    ["lost_verification_date", ">=", floor],
+    ["date_last_stage_update", ">=", floor],
   ];
-  const lostDomain: Domain = [
+  const inactiveDomain: Domain = [
     ["active", "=", false],
-    ["probability", "=", 0],
-    // Pull both marketing cohorts (create_date) and operational closures
-    // (date_closed). The dashboard keeps the two questions separate.
+    "|",
+    "|",
     "|",
     ["create_date", ">=", floor],
     ["date_closed", ">=", floor],
+    ["lost_verification_date", ">=", floor],
+    ["date_last_stage_update", ">=", floor],
   ];
 
-  const [activeCandidates, lostCandidates, rawUsers, employees] = await Promise.all([
+  const [activeCandidates, inactiveCandidates, stageRefs] = await Promise.all([
     searchRead<OdooCrmLead>("crm.lead", activeDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<OdooCrmLead>("crm.lead", lostDomain, fields, {
+    searchRead<OdooCrmLead>("crm.lead", inactiveDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<OdooUser>("res.users", [["share", "=", false]], ["name", "share", "active"], {
-      context: { active_test: false },
-    }),
-    searchRead<OdooEmployee>("hr.employee", [], ["user_id", "active"], {
-      context: { active_test: false },
-    }),
+    searchRead<{ id: number; name: string; res_id: number }>(
+      "ir.model.data",
+      [
+        ["model", "=", "crm.stage"],
+        ["module", "=", "crm_pipeline_redesign"],
+        ["name", "in", Object.keys(PIPELINE_STAGE_XMLIDS)],
+      ],
+      ["name", "res_id"],
+      { context: { active_test: false } },
+    ),
   ]);
-
-  const users = new Map(rawUsers.map((user) => [user.id, user]));
-  const employeeUserIds = new Set(
-    employees.map((employee) => m2oId(employee.user_id)).filter(Boolean),
+  const stageKeys = new Map<number, CrmStageKey>(
+    stageRefs.map((ref) => [Number(ref.res_id), PIPELINE_STAGE_XMLIDS[ref.name] ?? "other"]),
   );
+  const productIds = [
+    ...new Set(
+      [...activeCandidates, ...inactiveCandidates]
+        .flatMap((lead) => lead.product_ids ?? [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
+  const tagIds = [
+    ...new Set(
+      [...activeCandidates, ...inactiveCandidates]
+        .flatMap((lead) => lead.tag_ids ?? [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
+  const [products, tags] = await Promise.all([
+    productIds.length
+      ? searchRead<{ id: number; display_name?: string }>(
+          "product.product",
+          [["id", "in", productIds]],
+          ["display_name"],
+          { context: { active_test: false } },
+        )
+      : [],
+    tagIds.length
+      ? searchRead<{ id: number; display_name?: string }>(
+          "crm.tag",
+          [["id", "in", tagIds]],
+          ["display_name"],
+          { context: { active_test: false } },
+        )
+      : [],
+  ]);
+  const productNames = new Map(products.map((product) => [product.id, product.display_name ?? ""]));
+  const tagNames = new Map(tags.map((tag) => [tag.id, tag.display_name ?? ""]));
 
   const crmDiagnostics = emptyDiagnostics();
   const activeInPeriod = activeCandidates.filter((lead) => date(lead.create_date) >= cfg.startDate);
   crmDiagnostics.candidates = activeInPeriod.length;
   const crm = activeInPeriod
     .filter((lead) => {
-      if (!validateActiveIdentity(lead, crmDiagnostics)) return false;
-      if (isExcludedCrmStage(m2oName(lead.stage_id))) {
+      const contract = contractRecord(lead);
+      if (!isCrmRecordType(contract.type)) {
+        crmDiagnostics.wrongType++;
+        return false;
+      }
+      // Operational dashboard scope mirrors the Leads/Pipeline actions.
+      if (display(lead.inventory_bucket)) {
         crmDiagnostics.excludedStage++;
         return false;
       }
+      // The Lost population owns active Lost-stage Opportunities so the two
+      // arrays stay disjoint and all downstream denominators remain exact.
+      if (isCanonicalLost(contract)) return false;
       return true;
     })
-    .map((lead) => toCrmRaw(lead, customFields));
+    .map((lead) => toCrmRaw(lead, customFields, stageKeys, productNames, tagNames));
   crmDiagnostics.accepted = crm.length;
 
   const lostDiagnostics = emptyDiagnostics();
-  const lostInPeriod = lostCandidates.filter(
-    (lead) => date(lead.create_date) >= cfg.startDate || date(lead.date_closed) >= cfg.startDate,
+  const lostInPeriod = [...activeCandidates, ...inactiveCandidates].filter(
+    (lead) =>
+      date(lead.create_date) >= cfg.startDate ||
+      date(lead.date_closed) >= cfg.startDate ||
+      date(lead.lost_verification_date) >= cfg.startDate ||
+      date(lead.date_last_stage_update) >= cfg.startDate,
   );
   lostDiagnostics.candidates = lostInPeriod.length;
   const lost = lostInPeriod
     .filter((lead) => {
-      if (!validateLostIdentity(lead, users, employeeUserIds, lostDiagnostics)) return false;
-      if (normalize(lead.type) !== "opportunity") {
+      const contract = contractRecord(lead);
+      if (!isCrmRecordType(contract.type)) {
         lostDiagnostics.wrongType++;
         return false;
       }
-      if (!m2oId(lead.lost_reason_id)) {
-        lostDiagnostics.missingLostReason++;
+      if (display(lead.inventory_bucket)) {
+        lostDiagnostics.excludedStage++;
         return false;
       }
-      return true;
+      return isCanonicalLost(contract);
     })
-    .map((lead) => toLostRaw(lead, customFields));
+    .map((lead) => toLostRaw(lead, customFields, stageKeys, productNames, tagNames));
   lostDiagnostics.accepted = lost.length;
 
   return {

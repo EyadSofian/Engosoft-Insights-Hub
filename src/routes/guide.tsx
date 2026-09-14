@@ -193,8 +193,8 @@ function GuidePage() {
           }
           description={
             ar
-              ? "العملاء المحتملون يعرض CRM الحالي. تحليل الـLost التسويقي يمشي بتاريخ إنشاء الليد عشان يقيس جودة ليدز نفس الفترة، وتحت منه حركة مستقلة للي اتقفل Lost بتاريخ الإغلاق. Won المؤرشف لا يتحسب Lost."
-              : "Leads shows current CRM. Marketing Lost follows lead creation date to measure the same acquisition cohort; a separate movement card shows what closed Lost by close date. Archived Won is never counted as Lost."
+              ? "مركز إدارة العملاء يعرض كل الـstages والـOpen Status والـWon والـLost حسب CRM 1.26. تحليل الـLost يمشي بتاريخ إنشاء الليد للكوهورت، ومعه حركة مستقلة بتاريخ الخسارة المناسب لكل نوع سجل."
+              : "The CRM command center shows every stage, Open Status, Won and CRM 1.26 Lost. Lost analysis follows creation date for cohort quality and keeps a separate movement view using the correct loss date for each record type."
           }
           to="/lost"
         >

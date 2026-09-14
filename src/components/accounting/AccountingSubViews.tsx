@@ -1627,7 +1627,10 @@ function TargetUnitsDashboard({
         key: "outside-target",
         label: lang === "ar" ? "خارج حساب التارجت" : "Outside target calculation",
         value: fmtUSDFull(outsideTargetRevenue),
-        hint: lang === "ar" ? `${fmtNum(untargeted.length)} موظف بلا تارجت منشور` : `${fmtNum(untargeted.length)} employees without a published target`,
+        hint:
+          lang === "ar"
+            ? `${fmtNum(untargeted.length)} موظف بلا تارجت منشور`
+            : `${fmtNum(untargeted.length)} employees without a published target`,
       },
       {
         key: "target-members",
@@ -1637,7 +1640,10 @@ function TargetUnitsDashboard({
     ],
     records: untargeted.length
       ? {
-          title: lang === "ar" ? "تحصيل ظاهر في الإيراد لكنه خارج التارجت" : "Collections in revenue but outside target",
+          title:
+            lang === "ar"
+              ? "تحصيل ظاهر في الإيراد لكنه خارج التارجت"
+              : "Collections in revenue but outside target",
           hint:
             lang === "ar"
               ? "هؤلاء الموظفون لهم تحصيل في الفترة، لكن ملف التارجت لا يضع لهم تارجت. لذلك يظهروا في إجمالي الإيراد ولا يدخلوا في نسبة التحقيق."
@@ -1797,7 +1803,11 @@ function TargetHeadlineMetric({
       )}
     </button>
   );
-  return detail ? <MetricDrilldown detail={detail}>{(open) => metric(open)}</MetricDrilldown> : metric();
+  return detail ? (
+    <MetricDrilldown detail={detail}>{(open) => metric(open)}</MetricDrilldown>
+  ) : (
+    metric()
+  );
 }
 
 function TargetUnitCard({
@@ -3622,8 +3632,8 @@ function AgentPerformanceSheet({
                 }
               >
                 {lang === "ar"
-                  ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر Archived Lost؛ النسب الحالية استرشادية فقط."
-                  : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until Archived Lost returns; current rates are directional only."}
+                  ? "المبيعات وتوزيع الليدز متاحان، لكن تقييم أفضل تحويل والكورس المحتاج دعم متوقف مؤقتًا حتى يعود مصدر CRM Lost؛ النسب الحالية استرشادية فقط."
+                  : "Sales and lead distribution remain available, but best-conversion and needs-support judgments are paused until CRM Lost returns; current rates are directional only."}
               </Notice>
             )}
 

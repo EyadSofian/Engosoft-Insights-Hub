@@ -1,917 +1,1436 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeft, BadgeDollarSign, CircleCheckBig, Clock3, PhoneCall, Users } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  Archive,
+  ArrowLeft,
+  BadgeCheck,
+  Boxes,
+  BriefcaseBusiness,
+  ChevronLeft,
+  CircleDot,
+  FileText,
+  Filter,
+  Layers3,
+  MessageCircleMore,
+  Sparkles,
+  Target,
+  Trophy,
+  UserRoundCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { useApi } from "@/lib/use-api";
-import { fmtDate, fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
-import { BarList, Card, ErrorState, Pill, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
+import { BarList, Card, ErrorState, Pill, Skeleton } from "@/components/ui-bits";
 import {
   DashboardPageHeader,
+  DataHealthSummary,
   KpiRow,
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
+import { DataTable, type Col } from "@/components/DataTable";
 import { MetricDetailTrigger } from "@/components/metric-detail";
-import { standardMetrics } from "@/components/standard-metrics";
+import type {
+  CrmBusinessStatus,
+  CrmRecordType,
+  CrmStageKey,
+  DataHealth,
+  Grouped,
+} from "@/lib/types";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
-import { AdSetOriginBadge } from "@/components/metric-bits";
-import { DataTable, type Col } from "@/components/DataTable";
-import type { AdSetOrigin, DataHealth, Grouped, Totals } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
-export const Route = createFileRoute("/leads")({ component: Leads });
+export const Route = createFileRoute("/leads")({ component: CrmWorkspace });
 
-type WorkspaceTab = "overview" | "breakdowns" | "records";
-type BreakdownKey = "stage" | "source" | "course" | "campaign" | "team" | "salesperson";
+type WorkspaceView = "all" | "leads" | "pipeline" | "won" | "lost";
+type FacetKey =
+  | "byType"
+  | "bySource"
+  | "byTeam"
+  | "byCourse"
+  | "byPriority"
+  | "byLeadSegment"
+  | "byOpenStatus"
+  | "byCallingReply"
+  | "byClosingChannel"
+  | "byLostCategory"
+  | "byLostReason"
+  | "byPreviousStage"
+  | "byCourseLanguage"
+  | "byCourseType"
+  | "byCustomerType";
 
-interface LeadRow {
+type Facets = Record<FacetKey, Grouped[]>;
+
+interface CrmWorkspaceRow {
+  id: string;
   createdAt: string;
   contact: string;
-  campaign: string;
-  adName: string;
-  adset: string;
-  adsetOrigin: AdSetOrigin;
-  course: string;
+  phone: string;
+  mobile: string;
+  email: string;
+  recordType: CrmRecordType;
+  active: boolean;
+  status: CrmBusinessStatus;
+  stageKey: CrmStageKey;
+  displayStageKey: CrmStageKey;
   stage: string;
   source: string;
+  medium: string;
+  communicationLanguage: string;
+  campaign: string;
+  campaignId: string;
+  adName: string;
+  adId: string;
+  adset: string;
+  course: string;
+  courses: string;
   salesperson: string;
   salesTeam: string;
-  subTeam: string;
+  probability: number;
+  automatedProbability: number;
+  closingDurationDays: number | null;
   priority: string;
+  readyToConvert: boolean;
+  leadSegment: string;
+  openStatus: string;
+  closingChannel: string;
+  lostCategory: string;
+  lossReason: string;
+  inventoryBucket: string;
+  courseLanguage: string;
+  courseType: string;
+  customerType: string;
+  callingReply: string;
+  jobType: string;
+  howFoundUs: string;
+  company: string;
+  tags: string;
+  targetName: string;
+  resignTarget: string;
+  facebookLeadId: string;
+  validateClosedReason: string;
+  lastStageUpdate: string;
+  wonDate: string;
+  lostDate: string;
+  conversionDate: string;
   closedAt: string;
   daysToClose: number | null;
 }
 
-interface OriginCohort {
-  key: "campaign" | "other";
-  leads: number;
-  won: number;
-  lost: number;
-  conversionRate: number | null;
-  lostRate: number | null;
-  revenue: number;
-  avgCloseDays: number | null;
-  closeSample: number;
-}
-
-interface AttributionRow {
-  key: string;
-  name: string;
-  leads: number;
-  interested: number;
-  quotations: number;
-  won: number;
-  lost: number;
-  salesOrders: number;
-  invoices: number;
-  revenue: number;
-  leadToWonRate: number | null;
-  leadToInvoiceRate: number | null;
-}
-
 interface Resp {
-  totals: Totals;
-  pipeline: { followUp: number; fresh: number; stalled: number; activeDeals: number };
-  salesFunnel: {
-    funnel: {
-      leads: number;
-      interested: number;
-      quotations: number;
-      won: number;
-      salesOrders: number;
-      invoices: number;
-    };
-    sources: AttributionRow[];
-    campaigns: (AttributionRow & { spend: number; roas: number | null })[];
+  contractVersion: string;
+  summary: {
+    total: number;
+    activeLeads: number;
+    openOpportunities: number;
+    won: number;
+    lost: number;
+    lostLeads: number;
+    lostOpportunities: number;
+    currentLostOpportunities: number;
+    historicalLostOpportunities: number;
+    readyToConvert: number;
+    unsourced: number;
   };
-  origin: { cohorts: OriginCohort[]; otherBySource: Grouped[] };
-  byStage: Grouped[];
-  bySource: Grouped[];
-  byCourse: Grouped[];
-  byTeam: Grouped[];
-  bySubTeam: Grouped[];
-  bySalesperson: Grouped[];
-  byCampaign: Grouped[];
-  byPriority: Grouped[];
-  byMonth: Grouped[];
-  detail: { rows: LeadRow[]; total: number; truncated: boolean };
+  stages: {
+    key: Exclude<CrmStageKey, "other">;
+    count: number;
+    leads: number;
+    opportunities: number;
+    active: number;
+  }[];
+  facets: Facets;
+  stageFacets: Partial<Record<CrmStageKey, Facets>>;
+  statusFacets: Record<WorkspaceView | "activeLeads" | "ready", Facets>;
+  detail: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
   health: DataHealth;
 }
 
-interface CallsResp {
-  available: boolean;
-  error?: string;
-  totals?: {
-    calls: number;
-    answered: number;
-    answerRate: number | null;
-    analyzed: number;
-    needsReview: number;
-    talkSeconds: number;
-    averageScore: number | null;
-  };
-  topEmployees?: {
-    key: string;
-    name: string;
-    extension: string;
-    totalCalls: number;
-    answeredCalls: number;
-  }[];
+const STAGES: Exclude<CrmStageKey, "other">[] = [
+  "preparation",
+  "new",
+  "open",
+  "quotation",
+  "won",
+  "lost",
+];
+
+const STAGE_COLOR: Record<Exclude<CrmStageKey, "other">, string> = {
+  preparation: "var(--slate-strong)",
+  new: "var(--sky-strong)",
+  open: "var(--violet-strong)",
+  quotation: "var(--amber-strong)",
+  won: "var(--mint-strong)",
+  lost: "var(--rose-strong)",
+};
+
+function stageIcon(stage: Exclude<CrmStageKey, "other">, size = 17) {
+  const props = { size, strokeWidth: 2.2 };
+  if (stage === "preparation") return <Archive {...props} />;
+  if (stage === "new") return <Sparkles {...props} />;
+  if (stage === "open") return <MessageCircleMore {...props} />;
+  if (stage === "quotation") return <FileText {...props} />;
+  if (stage === "won") return <Trophy {...props} />;
+  return <XCircle {...props} />;
 }
 
-const rate = (numerator: number, denominator: number) =>
-  denominator > 0 ? (numerator / denominator) * 100 : null;
+function stageCopy(stage: Exclude<CrmStageKey, "other">, lang: "ar" | "en") {
+  const ar = {
+    preparation: {
+      name: "التجهيز",
+      note: "مساحة إدارية للحصر، وليست نقطة دخول العميل الجديد.",
+      fields: ["Inventory Bucket", "Lead Segment", "Sales Team"],
+    },
+    new: {
+      name: "جديد",
+      note: "نقطة الدخول الافتراضية لكل عميل جديد عادي.",
+      fields: ["Source", "Lead Segment", "Priority", "Ready to Convert"],
+    },
+    open: {
+      name: "مفتوح",
+      note: "مرحلة العمل والمتابعة؛ الـOpen Status يوضح حالة التواصل الحالية.",
+      fields: ["Open Status", "Calling reply?", "Last Stage Update", "Salesperson"],
+    },
+    quotation: {
+      name: "عرض سعر",
+      note: "فرصة وصلت للعرض التجاري قبل الحسم.",
+      fields: ["Course", "Course Language", "Course Type", "Probability"],
+    },
+    won: {
+      name: "رابحة",
+      note: "فرصة نشطة داخل Won stage؛ لا نعتمد على probability أو won_status.",
+      fields: ["Closing Won Channel", "Won Date", "Customer Type", "Days to Close"],
+    },
+    lost: {
+      name: "ضائعة",
+      note: "Lost Lead مؤرشف مع stage محفوظ؛ Lost Opportunity داخل Lost stage.",
+      fields: ["Lost Category", "Lost Reason", "Lost Date", "Actual Odoo Stage"],
+    },
+  } as const;
+  const en = {
+    preparation: {
+      name: "Preparation",
+      note: "A management inventory area, not the normal entry point.",
+      fields: ["Inventory Bucket", "Lead Segment", "Sales Team"],
+    },
+    new: {
+      name: "New",
+      note: "The default entry stage for ordinary new records.",
+      fields: ["Source", "Lead Segment", "Priority", "Ready to Convert"],
+    },
+    open: {
+      name: "Open",
+      note: "The working stage; Open Status carries the current contact state.",
+      fields: ["Open Status", "Calling reply?", "Last Stage Update", "Salesperson"],
+    },
+    quotation: {
+      name: "Quotation Sent",
+      note: "An opportunity that has reached the commercial offer.",
+      fields: ["Course", "Course Language", "Course Type", "Probability"],
+    },
+    won: {
+      name: "Won",
+      note: "An active Opportunity in a Won stage; probability and won_status are not used.",
+      fields: ["Closing Won Channel", "Won Date", "Customer Type", "Days to Close"],
+    },
+    lost: {
+      name: "Lost",
+      note: "Lost Leads are archived in place; Lost Opportunities occupy the Lost stage.",
+      fields: ["Lost Category", "Lost Reason", "Lost Date", "Actual Odoo Stage"],
+    },
+  } as const;
+  return (lang === "ar" ? ar : en)[stage];
+}
 
-function Leads() {
-  const reportingPeriod = useReportingPeriod();
-  const { t, lang } = useI18n();
-  const [tab, setTab] = useState<WorkspaceTab>("overview");
-  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
-  // have something to resolve against. Ids and state only — no figures.
-  useRegisterNexusView("leads", { tab: tab });
-  const [breakdown, setBreakdown] = useState<BreakdownKey>("course");
+function statusTone(status: CrmBusinessStatus): "brand" | "warning" | "success" | "danger" {
+  if (status === "lead") return "brand";
+  if (status === "open") return "warning";
+  if (status === "won") return "success";
+  return "danger";
+}
+
+function statusLabel(status: CrmBusinessStatus, lang: "ar" | "en") {
+  const labels = {
+    lead: { ar: "Lead", en: "Lead" },
+    open: { ar: "فرصة مفتوحة", en: "Open opportunity" },
+    won: { ar: "رابحة", en: "Won" },
+    lost: { ar: "ضائعة", en: "Lost" },
+  };
+  return labels[status][lang];
+}
+
+function CrmWorkspace() {
+  const { lang } = useI18n();
+  const period = useReportingPeriod();
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/leads");
-  const calls = useApi<CallsResp>("/api/crm-calls");
+  const [view, setView] = useState<WorkspaceView>("all");
+  const [stage, setStage] = useState<Exclude<CrmStageKey, "other"> | null>(null);
 
-  const breakdownRows = useMemo(() => {
+  useRegisterNexusView("leads", { tab: view, parameters: { stage: stage ?? "all" } });
+
+  const visibleRows = useMemo(() => {
     if (!data) return [];
-    return {
-      stage: data.byStage,
-      source: data.bySource,
-      course: data.byCourse,
-      campaign: data.byCampaign,
-      team: data.byTeam,
-      salesperson: data.bySalesperson,
-    }[breakdown];
-  }, [breakdown, data]);
+    return data.detail.rows.filter((row) => {
+      if (stage && row.displayStageKey !== stage) return false;
+      if (view === "leads" && row.recordType !== "lead") return false;
+      if (view === "pipeline" && row.status !== "lead" && row.status !== "open") return false;
+      if (view === "won" && row.status !== "won") return false;
+      if (view === "lost" && row.status !== "lost") return false;
+      return true;
+    });
+  }, [data, stage, view]);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  const cols: Col<LeadRow>[] = [
+  if (isLoading || !data) {
+    return (
+      <PageSections>
+        <Skeleton className="h-20" />
+        <Skeleton className="h-44" />
+        <Skeleton className="h-[520px]" />
+      </PageSections>
+    );
+  }
+
+  const A = lang === "ar";
+  const summary = data.summary;
+  const tabs: { key: WorkspaceView; label: string; count: number; icon: ReactNode }[] = [
     {
-      key: "createdAt",
-      header: t("created"),
-      sticky: true,
-      width: "120px",
-      sortValue: (r) => r.createdAt,
-      render: (r) => fmtDate(r.createdAt, lang),
+      key: "all",
+      label: A ? "كل الـCRM" : "All CRM",
+      count: summary.total,
+      icon: <Boxes size={15} />,
     },
     {
-      key: "contact",
-      header: t("contact"),
-      sortValue: (r) => r.contact,
-      render: (r) => (
-        <span className="block max-w-[160px] truncate" title={r.contact}>
-          {r.contact || "—"}
-        </span>
-      ),
+      key: "leads",
+      label: A ? "العملاء" : "Leads",
+      count: summary.activeLeads + summary.lostLeads,
+      icon: <Users size={15} />,
     },
     {
-      key: "stage",
-      header: t("stage"),
-      sortValue: (r) => r.stage,
-      render: (r) => (
-        <Pill tone={r.stage.toLowerCase().includes("won") ? "success" : "neutral"}>
-          {r.stage || "—"}
-        </Pill>
-      ),
+      key: "pipeline",
+      label: A ? "المسار المفتوح" : "Open pipeline",
+      count: summary.activeLeads + summary.openOpportunities,
+      icon: <Target size={15} />,
     },
+    { key: "won", label: A ? "الرابحة" : "Won", count: summary.won, icon: <Trophy size={15} /> },
     {
-      key: "course",
-      header: t("course"),
-      sortValue: (r) => r.course,
-      render: (r) => r.course || "—",
-    },
-    {
-      key: "source",
-      header: t("source"),
-      sortValue: (r) => r.source,
-      render: (r) => r.source || "—",
-    },
-    {
-      key: "campaign",
-      header: t("campaign"),
-      sortValue: (r) => r.campaign,
-      render: (r) => (
-        <span className="block max-w-[190px] truncate" title={r.campaign}>
-          {r.campaign || "—"}
-        </span>
-      ),
-    },
-    {
-      key: "adset",
-      header: t("ad_set"),
-      sortValue: (r) => r.adset,
-      render: (r) => (
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          <span className="max-w-[140px] truncate" title={r.adset}>
-            {r.adset || "—"}
-          </span>
-          <AdSetOriginBadge origin={r.adsetOrigin} />
-        </span>
-      ),
-    },
-    {
-      key: "salesperson",
-      header: t("salesperson"),
-      sortValue: (r) => r.salesperson,
-      render: (r) => (
-        <span className="block max-w-[160px] truncate" title={r.salesperson}>
-          {r.salesperson || "—"}
-        </span>
-      ),
-    },
-    {
-      key: "salesTeam",
-      header: t("sales_team"),
-      sortValue: (r) => r.salesTeam,
-      render: (r) => r.salesTeam || "—",
+      key: "lost",
+      label: A ? "الضائعة" : "Lost",
+      count: summary.lost,
+      icon: <XCircle size={15} />,
     },
   ];
 
-  const tabOptions: { key: WorkspaceTab; ar: string; en: string }[] = [
-    { key: "overview", ar: "الملخص والقرارات", en: "Overview & actions" },
-    { key: "breakdowns", ar: "التحليل", en: "Breakdowns" },
-    { key: "records", ar: "سجل العملاء", en: "Lead records" },
-  ];
+  const breakdown = (id: string, title: string, rows: Grouped[]): MetricBreakdownGroup => ({
+    id,
+    title,
+    rows: rows.slice(0, 6).map((row) => ({
+      key: row.label || "—",
+      label: row.label === "—" ? (A ? "غير محدد" : "Not set") : row.label,
+      value: row.count,
+      display: fmtNum(row.count),
+      meta: fmtPct(row.share, 0),
+    })),
+  });
+  const records = (
+    title: string,
+    rows: CrmWorkspaceRow[],
+  ): NonNullable<MetricDetail["records"]> => ({
+    title,
+    rows: rows.slice(0, 8).map((row) => ({
+      key: row.id,
+      title: row.contact || `#${row.id}`,
+      subtitle: `${row.recordType === "lead" ? "Lead" : "Opportunity"} · ${row.stage || "—"}`,
+      value: row.salesperson || row.salesTeam || undefined,
+    })),
+    emptyLabel: A ? "لا توجد سجلات في هذا التحديد." : "No records in this selection.",
+  });
+  const metricDetails: Record<"all" | "leads" | "open" | "ready" | "won" | "lost", MetricDetail> = {
+    all: {
+      id: "crm-total",
+      title: A ? "كل سجلات الـCRM" : "All CRM records",
+      value: fmtNum(summary.total),
+      tone: "sky",
+      icon: <Layers3 size={17} />,
+      definition: A
+        ? "كل السجلات النشطة غير Lost، مضافًا إليها كل حالات Lost المؤكدة حسب عقد 1.26."
+        : "Every active non-Lost record plus every confirmed Lost record under the 1.26 contract.",
+      formula: A ? "Active non-Lost CRM + Canonical Lost" : "Active non-Lost CRM + canonical Lost",
+      breakdowns: [
+        breakdown("crm-type", A ? "حسب نوع السجل" : "By record type", data.facets.byType),
+        breakdown("crm-source", A ? "حسب المصدر" : "By source", data.facets.bySource),
+      ],
+      supporting: [
+        {
+          key: "leads",
+          label: A ? "Leads نشطة" : "Active Leads",
+          value: fmtNum(summary.activeLeads),
+        },
+        {
+          key: "opportunities",
+          label: A ? "فرص مفتوحة" : "Open opportunities",
+          value: fmtNum(summary.openOpportunities),
+        },
+        { key: "won", label: "Won", value: fmtNum(summary.won) },
+        { key: "lost", label: "Lost", value: fmtNum(summary.lost) },
+      ],
+      records: records(A ? "أحدث سجلات CRM" : "Latest CRM records", data.detail.rows),
+      report: { to: "/leads", label: A ? "فتح مركز الـCRM" : "Open CRM center" },
+    },
+    leads: {
+      id: "crm-active-leads",
+      title: A ? "Leads نشطة" : "Active Leads",
+      value: fmtNum(summary.activeLeads),
+      tone: "cyan",
+      icon: <Users size={17} />,
+      definition: A
+        ? "السجلات التي نوعها الحالي Lead وما زالت active؛ الـLost Leads لا تدخل هنا."
+        : "Records whose current type is Lead and remain active; Lost Leads are separate.",
+      formula: "type = lead AND active = true",
+      breakdowns: [
+        breakdown(
+          "lead-segment",
+          A ? "حسب شريحة العميل" : "By lead segment",
+          data.statusFacets.activeLeads.byLeadSegment,
+        ),
+        breakdown(
+          "lead-source",
+          A ? "حسب المصدر" : "By source",
+          data.statusFacets.activeLeads.bySource,
+        ),
+      ],
+      supporting: [
+        {
+          key: "ready",
+          label: A ? "جاهز للتحويل" : "Ready to convert",
+          value: fmtNum(summary.readyToConvert),
+        },
+        { key: "lost-leads", label: "Lost Leads", value: fmtNum(summary.lostLeads) },
+      ],
+      records: records(
+        A ? "أحدث الـLeads النشطة" : "Latest active Leads",
+        data.detail.rows.filter((row) => row.recordType === "lead" && row.active),
+      ),
+      report: { to: "/leads", label: A ? "فتح سجل الـLeads" : "Open Leads workspace" },
+    },
+    open: {
+      id: "crm-open-opportunities",
+      title: A ? "Opportunities مفتوحة" : "Open Opportunities",
+      value: fmtNum(summary.openOpportunities),
+      tone: "violet",
+      icon: <Target size={17} />,
+      definition: A
+        ? "Opportunities نشطة ليست في Won stage ولا Lost stage."
+        : "Active Opportunities in neither a Won nor the Lost stage.",
+      formula: "type = opportunity AND active = true AND NOT Won AND NOT Lost",
+      breakdowns: [
+        breakdown("open-status", "Open Status", data.statusFacets.pipeline.byOpenStatus),
+        breakdown("open-team", A ? "حسب الفريق" : "By team", data.statusFacets.pipeline.byTeam),
+      ],
+      records: records(
+        A ? "أحدث الفرص المفتوحة" : "Latest open Opportunities",
+        data.detail.rows.filter((row) => row.status === "open"),
+      ),
+      report: { to: "/leads", label: A ? "فتح المسار المفتوح" : "Open pipeline workspace" },
+    },
+    ready: {
+      id: "crm-ready-to-convert",
+      title: A ? "جاهز للتحويل" : "Ready to convert",
+      value: fmtNum(summary.readyToConvert),
+      tone: "amber",
+      icon: <UserRoundCheck size={17} />,
+      definition: A
+        ? "Active Leads التي تحمل القيمة المخزنة Yes صراحة؛ القيمة الفارغة ليست No."
+        : "Active Leads with the explicitly stored value Yes; an empty value is unmarked, not No.",
+      formula: "type = lead AND active = true AND x_studio_ready_to_convert_1 = Yes",
+      breakdowns: [
+        breakdown(
+          "ready-segment",
+          A ? "حسب شريحة العميل" : "By lead segment",
+          data.statusFacets.ready.byLeadSegment,
+        ),
+        breakdown("ready-team", A ? "حسب الفريق" : "By team", data.statusFacets.ready.byTeam),
+      ],
+      records: records(
+        A ? "الـLeads الجاهزة للتحويل" : "Leads ready to convert",
+        data.detail.rows.filter((row) => row.recordType === "lead" && row.readyToConvert),
+      ),
+      report: { to: "/leads", label: A ? "فتح سجل الـLeads" : "Open Leads workspace" },
+    },
+    won: {
+      id: "crm-won-opportunities",
+      title: "Won",
+      value: fmtNum(summary.won),
+      tone: "mint",
+      icon: <Trophy size={17} />,
+      definition: A
+        ? "Opportunity نشطة في stage معلّم عليها is_won؛ probability وwon_status ليسا مصدر الحكم."
+        : "An active Opportunity in a stage marked is_won; probability and won_status are not authorities.",
+      formula: "type = opportunity AND active = true AND stage_is_won = true",
+      breakdowns: [
+        breakdown("won-channel", "Closing Won Channel", data.statusFacets.won.byClosingChannel),
+        breakdown("won-course", A ? "حسب الدورة" : "By course", data.statusFacets.won.byCourse),
+      ],
+      records: records(
+        A ? "أحدث الفرص الرابحة" : "Latest Won Opportunities",
+        data.detail.rows.filter((row) => row.status === "won"),
+      ),
+      report: { to: "/leads", label: A ? "فتح Won" : "Open Won workspace" },
+    },
+    lost: {
+      id: "crm-lost-canonical",
+      title: "Lost",
+      value: fmtNum(summary.lost),
+      tone: "rose",
+      icon: <XCircle size={17} />,
+      definition: A
+        ? "Lost Lead مؤرشف ومعه سبب؛ Lost Opportunity حالية داخل Lost stage، مع الاحتفاظ بالتاريخ المؤرشف."
+        : "A Lost Lead is archived with a reason; a current Lost Opportunity is active in the Lost stage, with archived history retained.",
+      formula: A
+        ? "قواعد مختلفة حسب type — لا نستخدم اسم الـstage المترجم"
+        : "Type-specific rules; translated stage names are never used",
+      caveat:
+        data.health.lostAuthority === "unavailable"
+          ? A
+            ? "مصدر Lost الموثوق غير متاح الآن؛ لا تعتبر الصفر نتيجة أعمال."
+            : "The authoritative Lost source is unavailable; do not treat zero as a business result."
+          : undefined,
+      breakdowns: [
+        breakdown(
+          "lost-category",
+          A ? "حسب فئة الخسارة" : "By Lost category",
+          data.statusFacets.lost.byLostCategory,
+        ),
+        breakdown(
+          "lost-reason",
+          A ? "حسب سبب الخسارة" : "By Lost reason",
+          data.statusFacets.lost.byLostReason,
+        ),
+      ],
+      supporting: [
+        { key: "lost-leads", label: "Lost Leads", value: fmtNum(summary.lostLeads) },
+        {
+          key: "lost-opportunities",
+          label: "Lost Opportunities",
+          value: fmtNum(summary.lostOpportunities),
+        },
+        {
+          key: "current-lost",
+          label: A ? "فرص Lost حالية" : "Current Lost-stage opps",
+          value: fmtNum(summary.currentLostOpportunities),
+        },
+      ],
+      records: records(
+        A ? "أحدث حالات Lost" : "Latest Lost records",
+        data.detail.rows.filter((row) => row.status === "lost"),
+      ),
+      report: { to: "/lost", label: A ? "فتح تحليل Lost" : "Open Lost analysis" },
+    },
+  };
+
+  const selectView = (next: WorkspaceView) => {
+    setView(next);
+    setStage(next === "won" ? "won" : next === "lost" ? "lost" : null);
+  };
+  const selectStage = (next: Exclude<CrmStageKey, "other">) => {
+    setStage((current) => (current === next ? null : next));
+    if (next === "won") setView("won");
+    else if (next === "lost") setView("lost");
+    else setView("all");
+  };
+
+  const activeFacets = stage
+    ? (data.stageFacets[stage] ?? data.facets)
+    : (data.statusFacets?.[view] ?? data.facets);
+  const lens = lensFor(stage, view, A);
+  const selectedStage = stage ? stageCopy(stage, lang) : null;
 
   return (
     <div>
       <DashboardPageHeader
         flush
-        icon={<Users size={20} />}
-        title={lang === "ar" ? "CRM — إدارة العملاء" : "CRM — Customer management"}
+        icon={<BriefcaseBusiness size={21} />}
+        title={A ? "مركز إدارة العملاء" : "CRM command center"}
         subtitle={
-          lang === "ar"
-            ? "البيع الحقيقي من الفواتير، وحالة الـCRM ظاهرة منفصلة، والمكالمات من PBX."
-            : "Paid invoices define sales; CRM stages and PBX calls remain visible as separate signals."
+          A
+            ? "صورة واحدة لكل Lead وOpportunity: المرحلة، حالة المتابعة، والنتيجة النهائية حسب عقد Odoo الجديد."
+            : "One operational view of every Lead and Opportunity: stage, follow-up status and final outcome under the new Odoo contract."
         }
-        period={reportingPeriod}
+        period={period}
+        actions={
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-mint-border bg-mint-surface px-2.5 py-1.5 text-[11px] font-bold text-mint-ink">
+            <BadgeCheck size={13} /> CRM {data.contractVersion}
+          </span>
+        }
       />
 
       <PageSections className="gap-after-header">
-        {isLoading || !data ? (
-          <>
-            <Skeleton className="h-48" />
-            <Skeleton className="h-96" />
-          </>
-        ) : (
-          <>
-            <PageSection
-              level="headline"
-              aria-label={lang === "ar" ? "مؤشرات إدارة العملاء" : "CRM headline figures"}
-            >
-              <CrmHeadline data={data} />
-            </PageSection>
+        {data.health.crmAuthority !== "odoo-direct" && (
+          <DataHealthSummary
+            issues={[
+              {
+                tone: "warning",
+                message: A
+                  ? "الـCRM معروض من آخر نسخة متاحة."
+                  : "CRM is using the latest available copy.",
+                impact: A
+                  ? "قد تتأخر أحدث تغييرات المراحل والحالات حتى عودة الاتصال المباشر."
+                  : "The latest stage and status changes may lag until the direct connection returns.",
+                technical: `CRM authority: ${data.health.crmAuthority}`,
+              },
+            ]}
+          />
+        )}
 
-            <div className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:w-fit">
-              {tabOptions.map((option) => (
+        <PageSection level="headline" aria-label={A ? "مؤشرات الـCRM" : "CRM headline figures"}>
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={metricDetails.all}
+              card={{
+                index: 0,
+                hero: true,
+                sub: A
+                  ? `${fmtNum(summary.unsourced)} بدون مصدر — مسموح`
+                  : `${fmtNum(summary.unsourced)} unsourced — valid`,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.leads}
+              card={{
+                index: 1,
+                sub: A
+                  ? `${fmtNum(summary.readyToConvert)} جاهز للتحويل`
+                  : `${fmtNum(summary.readyToConvert)} ready to convert`,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.open}
+              card={{ index: 2, sub: A ? "قبل Won أو Lost" : "Before Won or Lost" }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.ready}
+              card={{ index: 3, sub: A ? "القيمة Yes فقط" : "Only the stored Yes value" }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.won}
+              card={{ index: 4, sub: A ? "من Won stage" : "From the Won stage" }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.lost}
+              card={{
+                index: 5,
+                sub: A
+                  ? `${fmtNum(summary.lostLeads)} Leads · ${fmtNum(summary.lostOpportunities)} فرص`
+                  : `${fmtNum(summary.lostLeads)} Leads · ${fmtNum(summary.lostOpportunities)} opportunities`,
+              }}
+            />
+          </KpiRow>
+        </PageSection>
+
+        <PageSection
+          level="primary"
+          title={A ? "مسار الـCRM" : "CRM flow"}
+          hint={
+            A
+              ? "اضغط على أي مرحلة لعرض الحقول والسجلات الخاصة بها."
+              : "Select a stage to inspect its fields and records."
+          }
+          icon={<Layers3 size={17} />}
+        >
+          <Card padded={false} className="overflow-hidden">
+            <div className="hscroll flex gap-1 border-b border-border bg-surface-2/75 p-2">
+              {tabs.map((tab) => (
                 <button
-                  key={option.key}
+                  key={tab.key}
                   type="button"
-                  onClick={() => setTab(option.key)}
-                  className={`shrink-0 rounded-xl px-4 py-2 text-[13.5px] font-bold transition-colors ${tab === option.key ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
+                  onClick={() => selectView(tab.key)}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-all ${view === tab.key ? "bg-text text-surface shadow-sm" : "text-text-muted hover:bg-surface hover:text-text"}`}
                 >
-                  {option[lang]}
+                  {tab.icon}
+                  {tab.label}
+                  <span
+                    className={`num rounded-full px-1.5 py-0.5 text-[10px] ${view === tab.key ? "bg-white/15 text-white" : "bg-surface-3 text-text-muted"}`}
+                  >
+                    {fmtNum(tab.count)}
+                  </span>
                 </button>
               ))}
             </div>
 
-            {tab === "overview" && (
-              <div className="space-y-4">
-                <div className="card-grid xl:grid-cols-[0.9fr_1.4fr]">
-                  <PipelineCard data={data} />
-                  <QualityTable rows={data.salesFunnel.campaigns} />
-                </div>
-                <div id="calls" className="card-grid xl:grid-cols-[1.15fr_0.85fr]">
-                  <CallsPanel state={calls} />
-                  <SourceConversion rows={data.salesFunnel.sources} />
-                </div>
-              </div>
-            )}
-
-            {tab === "breakdowns" && (
-              <Card>
-                <SectionTitle
-                  hint={
-                    lang === "ar"
-                      ? "بدل ستة مربعات في نفس الوقت: اختار سؤالًا واحدًا واقرأ ترتيبه."
-                      : "Choose one business question instead of scanning six cards at once."
-                  }
-                >
-                  {lang === "ar" ? "توزيع العملاء" : "Lead breakdown"}
-                </SectionTitle>
-                <div className="hscroll mb-5 flex gap-2">
-                  {(
-                    [
-                      ["stage", t("by_stage")],
-                      ["source", t("by_source")],
-                      ["course", t("by_course")],
-                      ["campaign", t("by_campaign")],
-                      ["team", t("by_team")],
-                      ["salesperson", t("by_salesperson")],
-                    ] as [BreakdownKey, string][]
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setBreakdown(key)}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${breakdown === key ? "border-brand bg-brand-soft text-brand" : "border-border text-text-muted hover:bg-surface-2"}`}
+            <div className="crm-stage-rail grid min-w-[780px] grid-cols-6 gap-0 overflow-x-auto p-3 sm:p-4">
+              {STAGES.map((key, index) => {
+                const value = data.stages.find((item) => item.key === key);
+                const copy = stageCopy(key, lang);
+                const selected = stage === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => selectStage(key)}
+                    aria-pressed={selected}
+                    className={`group relative min-h-[116px] border-y border-s-0 bg-surface px-3 py-3 text-start transition-all first:rounded-s-2xl first:border-s last:rounded-e-2xl ${selected ? "z-10 -translate-y-1 border-border-strong shadow-md" : "border-border hover:-translate-y-0.5 hover:bg-surface-2"}`}
+                    style={{
+                      borderTopColor: selected ? STAGE_COLOR[key] : undefined,
+                      borderTopWidth: selected ? 3 : 1,
+                    }}
+                  >
+                    {index < STAGES.length - 1 && (
+                      <span className="absolute top-[30px] z-20 size-2.5 rotate-45 border-e border-t border-border bg-inherit ltr:-right-1.5 rtl:-left-1.5" />
+                    )}
+                    <span
+                      className="mb-3 grid size-8 place-items-center rounded-xl text-white shadow-sm"
+                      style={{ background: STAGE_COLOR[key] }}
                     >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="max-w-4xl">
-                  <BarList
-                    items={breakdownRows.slice(0, 12).map((row) => ({
-                      label: row.label,
-                      value: row.count,
-                      meta: (
-                        <span>
-                          <span className="num">{fmtNum(row.count)}</span>
-                          <span className="num ms-1.5 text-[11px] text-text-muted">
-                            ({fmtPct(row.share, 1)})
-                          </span>
-                        </span>
-                      ),
-                    }))}
-                    format={fmtNum}
-                  />
-                </div>
-              </Card>
-            )}
+                      {stageIcon(key)}
+                    </span>
+                    <span className="block text-[12px] font-bold text-text">{copy.name}</span>
+                    <span className="num mt-1 block text-[25px] font-bold leading-none text-text">
+                      {fmtNum(value?.count ?? 0)}
+                    </span>
+                    <span className="mt-2 block text-[10px] text-text-muted">
+                      {fmtNum(value?.leads ?? 0)} {A ? "Lead" : "leads"} ·{" "}
+                      {fmtNum(value?.opportunities ?? 0)} {A ? "فرصة" : "opps"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </PageSection>
 
-            {tab === "records" && (
-              <DataTable
-                rows={data.detail.rows}
-                cols={cols}
-                searchable={(r) =>
-                  `${r.contact} ${r.campaign} ${r.course} ${r.salesperson} ${r.source}`
-                }
-                initialSort={{ key: "createdAt", dir: -1 }}
-                csvFilename="engosoft-crm-leads"
-                maxHeight={680}
-                truncatedNote={
-                  data.detail.truncated
-                    ? lang === "ar"
-                      ? `معروض ${fmtNum(data.detail.rows.length)} من ${fmtNum(data.detail.total)} صف.`
-                      : `Showing ${fmtNum(data.detail.rows.length)} of ${fmtNum(data.detail.total)} rows.`
-                    : undefined
-                }
-                csvRow={(r) => ({
-                  created: r.createdAt,
-                  contact: r.contact,
-                  stage: r.stage,
-                  course: r.course,
-                  source: r.source,
-                  campaign: r.campaign,
-                  ad_name: r.adName,
-                  ad_set: r.adset,
-                  salesperson: r.salesperson,
-                  sales_team: r.salesTeam,
-                })}
-              />
-            )}
-          </>
+        {(selectedStage || view === "lost") && (
+          <PageSection level="insight" aria-label={A ? "تعريف الحالة" : "Status definition"}>
+            <div
+              className="relative overflow-hidden rounded-2xl border p-4 sm:p-5"
+              style={{
+                borderColor: STAGE_COLOR[stage ?? "lost"],
+                background: `color-mix(in oklab, ${STAGE_COLOR[stage ?? "lost"]} 7%, var(--surface))`,
+              }}
+            >
+              <div className="flex flex-wrap items-start gap-4">
+                <span
+                  className="grid size-11 shrink-0 place-items-center rounded-2xl text-white"
+                  style={{ background: STAGE_COLOR[stage ?? "lost"] }}
+                >
+                  {stageIcon(stage ?? "lost", 20)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-[17px] font-bold text-text">
+                      {selectedStage?.name ??
+                        (A ? "تعريف Lost في 1.26" : "Lost definition in 1.26")}
+                    </h2>
+                    {stage === "lost" || view === "lost" ? (
+                      <Pill tone="danger">{A ? "قاعدتان مختلفتان" : "Two distinct rules"}</Pill>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 max-w-3xl text-[12.5px] leading-6 text-text-muted">
+                    {selectedStage?.note ??
+                      (A
+                        ? "Lead الضائع: active=false ومعه Lost Reason والـstage يظل كما كان. Opportunity الضائعة: active=true وداخل Lost stage."
+                        : "Lost Lead: active=false with a Lost Reason and its stage preserved. Lost Opportunity: active=true in the Lost stage.")}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(selectedStage?.fields ?? stageCopy("lost", lang).fields).map((field) => (
+                      <span
+                        key={field}
+                        className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[10.5px] font-semibold text-text-muted"
+                      >
+                        {field}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {(stage === "lost" || view === "lost") && (
+                  <div className="grid min-w-[260px] grid-cols-2 gap-2">
+                    <MiniStat label={A ? "Lost Leads" : "Lost Leads"} value={summary.lostLeads} />
+                    <MiniStat
+                      label={A ? "Lost Opportunities" : "Lost Opportunities"}
+                      value={summary.lostOpportunities}
+                    />
+                    <MiniStat
+                      label={A ? "فرص حالية" : "Current opps"}
+                      value={summary.currentLostOpportunities}
+                    />
+                    <MiniStat
+                      label={A ? "فرص تاريخية" : "Historical opps"}
+                      value={summary.historicalLostOpportunities}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </PageSection>
         )}
+
+        <PageSection
+          level="primary"
+          title={A ? "الحقول التي تشرح الحالة" : "Fields that explain this state"}
+          hint={
+            A
+              ? "كل توزيع محسوب من نفس السكان الظاهرين في التحديد الحالي."
+              : "Every distribution follows the current workspace selection."
+          }
+          icon={<Filter size={17} />}
+        >
+          <div className="card-grid lg:grid-cols-3">
+            {lens.map((item) => (
+              <FacetCard
+                key={item.key}
+                title={item.label}
+                rows={activeFacets[item.key]}
+                empty={A ? "غير محدد" : "Not set"}
+                color={item.color}
+              />
+            ))}
+          </div>
+        </PageSection>
+
+        <PageSection
+          level="records"
+          title={
+            A
+              ? `السجلات المطابقة · ${fmtNum(visibleRows.length)}`
+              : `Matching records · ${fmtNum(visibleRows.length)}`
+          }
+          hint={
+            A
+              ? "فعّل الأعمدة الإضافية لرؤية كل حقول الـCRM المتاحة."
+              : "Turn on optional columns to inspect every available CRM field."
+          }
+          action={
+            stage || view !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setView("all");
+                  setStage(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text"
+              >
+                <Filter size={12} /> {A ? "مسح التحديد" : "Clear selection"}
+              </button>
+            ) : undefined
+          }
+        >
+          <CrmRecords
+            rows={visibleRows}
+            total={data.detail.total}
+            truncated={data.detail.truncated}
+          />
+        </PageSection>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3 text-[11.5px] text-text-muted">
+          <span className="inline-flex items-center gap-2">
+            <CircleDot size={13} className="text-mint-strong" />
+            {A
+              ? "التصنيف مبني على type + active + Lost Reason + XMLID للـstage، وليس على اسم المرحلة أو won_status."
+              : "Classification uses type + active + Lost Reason + stage XMLID, never translated stage names or won_status."}
+          </span>
+          <Link
+            to="/lost"
+            className="inline-flex items-center gap-1 font-bold text-brand hover:underline"
+          >
+            {A ? "فتح تحليل Lost المتقدم" : "Open advanced Lost analysis"}
+            {A ? <ArrowLeft size={13} /> : <ChevronLeft className="rotate-180" size={13} />}
+          </Link>
+        </div>
       </PageSections>
     </div>
   );
 }
 
-/** A ranked distribution the CRM already returned, as a drill-down section. */
-function groupSection(
-  id: string,
-  title: string,
-  rows: Grouped[],
-  lang: "ar" | "en",
-  tone: MetricBreakdownGroup["rows"][number]["tone"] = "sky",
-): MetricBreakdownGroup {
-  return {
-    id,
-    title,
-    rows: rows
-      .slice()
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((group) => ({
-        key: group.label,
-        label: group.label,
-        value: group.count,
-        display: fmtNum(group.count),
-        meta: fmtPct(group.share, 1),
-        tone,
-      })),
-    emptyLabel: lang === "ar" ? "لا توجد بيانات في الفترة" : "Nothing in this period",
-  };
-}
-
-/**
- * What each CRM headline figure is made of.
- *
- * The page already fetches every distribution it needs — by stage, source,
- * course, campaign, team and salesperson — so the drill-downs are a re-shaping
- * of data on screen rather than a second round of requests.
- */
-function crmMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
-  const A = lang === "ar";
-  const T = data.totals;
-  const invoiceConversion = rate(T.orders, T.totalLeads);
-  const base = standardMetrics({ totals: T, surface: "leads", lang });
-
-  const leads: MetricDetail = {
-    ...base.leads,
-    title: A ? "إجمالي العملاء المحتملين" : "All leads",
-    breakdowns: [
-      groupSection("sources", A ? "حسب المصدر" : "By source", data.bySource, lang),
-      groupSection("courses", A ? "حسب الدورة" : "By course", data.byCourse, lang, "amber"),
-      groupSection("campaigns", A ? "حسب الحملة" : "By campaign", data.byCampaign, lang, "rose"),
-      groupSection("stages", A ? "حسب المرحلة" : "By stage", data.byStage, lang, "violet"),
-    ],
-    records: {
-      title: A ? "التوزيع على الفرق" : "How the teams split it",
-      hint: A
-        ? "سياسة الخصوصية تمنع عرض بيانات عميل بعينه هنا؛ سجل العملاء موجود في تبويب السجلات."
-        : "Privacy policy keeps individual lead details out of here; the record list lives in the Records tab.",
-      rows: data.byTeam.slice(0, 5).map((team) => ({
-        key: team.label,
-        title: team.label,
-        value: fmtNum(team.count),
-        meta: fmtPct(team.share, 1),
-      })),
-    },
-    report: undefined,
-  };
-
-  const paid: MetricDetail = {
-    id: "leads.revenue",
-    title: A ? "صفقات مدفوعة" : "Paid deals",
-    value: fmtNum(T.orders),
-    tone: "violet",
-    icon: <BadgeDollarSign size={16} />,
-    definition: A
-      ? "عدد الفواتير المدفوعة المميزة في الفترة. هذا هو تعريف البيع المعتمد هنا — لا مرحلة الـCRM."
-      : "Distinct paid invoices in the period. This is the approved definition of a sale here — not a CRM stage.",
-    formula: A
-      ? `${fmtNum(T.orders)} فاتورة ÷ ${fmtNum(T.totalLeads)} عميل = ${fmtPct(invoiceConversion, 1)} تحويل حقيقي.`
-      : `${fmtNum(T.orders)} invoices ÷ ${fmtNum(T.totalLeads)} leads = ${fmtPct(invoiceConversion, 1)} paid conversion.`,
-    supporting: [
-      {
-        key: "revenue",
-        label: A ? "الإيراد المحصّل" : "Collected revenue",
-        value: fmtUSD(T.revenue),
-      },
-      {
-        key: "avg",
-        label: A ? "متوسط الفاتورة" : "Average invoice",
-        value: fmtUSDFull(T.avgOrder),
-      },
-      { key: "won", label: A ? "صفقات CRM رابحة" : "CRM won deals", value: fmtNum(T.won) },
-      {
-        key: "conversion",
-        label: A ? "التحويل الحقيقي" : "Paid conversion",
-        value: fmtPct(invoiceConversion, 1),
-      },
-    ],
-    breakdowns: [
-      {
-        id: "campaigns",
-        title: A ? "أعلى الحملات إيرادًا" : "Campaigns with the most revenue",
-        rows: data.salesFunnel.campaigns
-          .slice()
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
-          .map((row) => ({
-            key: row.key,
-            label: row.name,
-            value: row.revenue,
-            display: fmtUSD(row.revenue),
-            meta: `${fmtNum(row.invoices)} ${A ? "فاتورة" : "inv."}`,
-            tone: "mint" as const,
-          })),
-        emptyLabel: A ? "لا توجد حملة بإيراد" : "No campaign carries revenue",
-      },
-      {
-        id: "sources",
-        title: A ? "أعلى المصادر إيرادًا" : "Sources with the most revenue",
-        rows: data.salesFunnel.sources
-          .slice()
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
-          .map((row) => ({
-            key: row.key,
-            label: row.name,
-            value: row.revenue,
-            display: fmtUSD(row.revenue),
-            meta: `${fmtNum(row.invoices)} ${A ? "فاتورة" : "inv."}`,
-            tone: "mint" as const,
-          })),
-        emptyLabel: A ? "لا يوجد مصدر بإيراد" : "No source carries revenue",
-      },
-    ],
-    report: { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" },
-  };
-
-  const conversion: MetricDetail = {
-    id: "leads.conversion",
-    title: A ? "التحويل الحقيقي" : "Paid conversion",
-    value: fmtPct(invoiceConversion, 1),
-    tone: "mint",
-    icon: <CircleCheckBig size={16} />,
-    definition: A
-      ? "نسبة العملاء الذين انتهى بهم الأمر إلى فاتورة مدفوعة. تُقاس على الفواتير لا على مرحلة الـCRM، لأن المرحلة رأي والفاتورة واقعة."
-      : "The share of leads that ended in a paid invoice. Measured on invoices, not CRM stage: a stage is an opinion and an invoice is a fact.",
-    formula: A
-      ? `${fmtNum(T.orders)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(invoiceConversion, 1)}.`
-      : `${fmtNum(T.orders)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(invoiceConversion, 1)}.`,
-    supporting: [
-      {
-        key: "invoices",
-        label: A ? "البسط · فواتير" : "Numerator · invoices",
-        value: fmtNum(T.orders),
-      },
-      {
-        key: "leads",
-        label: A ? "المقام · كل الليدز" : "Denominator · all leads",
-        value: fmtNum(T.totalLeads),
-      },
-      {
-        key: "crm",
-        label: A ? "تحويل CRM" : "CRM conversion",
-        value: fmtPct(T.conversionRate, 1),
-      },
-      { key: "won", label: A ? "صفقات رابحة" : "Won deals", value: fmtNum(T.won) },
-    ],
-    breakdowns: [
-      {
-        id: "sources",
-        title: A ? "التحويل حسب المصدر" : "Conversion by source",
-        rows: data.salesFunnel.sources
-          .filter((row) => row.leads > 0)
-          .slice(0, 5)
-          .map((row) => ({
-            key: row.key,
-            label: row.name,
-            value: rate(row.invoices, row.leads) ?? 0,
-            display: fmtPct(rate(row.invoices, row.leads), 1),
-            meta: `${fmtNum(row.invoices)} / ${fmtNum(row.leads)}`,
-            tone: "mint" as const,
-          })),
-        emptyLabel: A ? "لا توجد مصادر بعملاء" : "No source carries leads",
-      },
-    ],
-  };
-
-  const followUp: MetricDetail = {
-    id: "leads.followUp",
-    title: A ? "قيد المتابعة" : "Follow-up",
-    value: fmtNum(data.pipeline.followUp),
-    tone: "violet",
-    icon: <Clock3 size={16} />,
-    definition: A
-      ? "العملاء الذين ما زالوا داخل المسار فعليًا: بعد استبعاد الصفقات الرابحة والصفوف القديمة أو غير الصالحة."
-      : "Leads genuinely still in the pipeline: won deals and stale or junk rows removed.",
-    formula: A
-      ? `من إجمالي ${fmtNum(T.totalLeads)} عميل: ${fmtNum(data.pipeline.followUp)} قيد المتابعة، ${fmtNum(data.pipeline.fresh)} جديد، ${fmtNum(data.pipeline.stalled)} متوقف.`
-      : `Of ${fmtNum(T.totalLeads)} leads: ${fmtNum(data.pipeline.followUp)} in follow-up, ${fmtNum(data.pipeline.fresh)} fresh, ${fmtNum(data.pipeline.stalled)} stalled.`,
-    supporting: [
-      { key: "fresh", label: A ? "جديد" : "Fresh", value: fmtNum(data.pipeline.fresh) },
-      { key: "stalled", label: A ? "متوقف" : "Stalled", value: fmtNum(data.pipeline.stalled) },
-      {
-        key: "active",
-        label: A ? "صفقات نشطة" : "Active deals",
-        value: fmtNum(data.pipeline.activeDeals),
-      },
-      { key: "lost", label: A ? "ضائعة" : "Lost", value: fmtNum(T.lost) },
-    ],
-    breakdowns: [
-      groupSection("stages", A ? "حسب المرحلة" : "By stage", data.byStage, lang, "violet"),
-      groupSection(
-        "salespeople",
-        A ? "حسب الموظف" : "By salesperson",
-        data.bySalesperson,
-        lang,
-        "violet",
-      ),
-    ],
-  };
-
-  const lost: MetricDetail = {
-    ...standardMetrics({ totals: T, surface: "leads", lang }).lost,
-    title: A ? "صفقات ضائعة" : "Closed Lost",
-    breakdowns: [
-      groupSection("teams", A ? "حسب الفريق" : "By team", data.byTeam, lang, "rose"),
-      groupSection("courses", A ? "حسب الدورة" : "By course", data.byCourse, lang, "rose"),
-    ],
-    report: { to: "/lost", label: A ? "فتح تحليل الخسائر" : "Open the Lost analysis" },
-  };
-
-  return { leads, paid, conversion, followUp, lost };
-}
-
-/**
- * The CRM's five headline figures.
- *
- * Same five numbers the navy "control room" carried, on the shared KPI card so
- * this page's first row matches every other report's. Each one now opens what
- * it is made of, from the distributions the page already holds.
- */
-function CrmHeadline({ data }: { data: Resp }) {
-  const { lang } = useI18n();
-  const metrics = crmMetrics(data, lang);
-
+function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <KpiRow>
-      <MetricDetailTrigger
-        detail={metrics.leads}
-        card={{ index: 0, sub: lang === "ar" ? "CRM + Lost المؤكد" : "CRM + confirmed Lost" }}
-      />
-      <MetricDetailTrigger
-        detail={metrics.paid}
-        card={{
-          index: 1,
-          hero: true,
-          sub: lang === "ar" ? "عدد الفواتير المميزة" : "Distinct paid invoices",
-        }}
-      />
-      <MetricDetailTrigger
-        detail={metrics.conversion}
-        card={{ index: 2, sub: lang === "ar" ? "الفواتير ÷ كل الليدز" : "Invoices ÷ all leads" }}
-      />
-      <MetricDetailTrigger
-        detail={metrics.followUp}
-        card={{
-          index: 3,
-          sub: lang === "ar" ? "من غير Won وبيانات قديمة" : "Excludes Won and junk",
-        }}
-      />
-      <MetricDetailTrigger
-        detail={metrics.lost}
-        card={{ index: 4, sub: fmtPct(data.totals.lostRate, 1) }}
-      />
-    </KpiRow>
-  );
-}
-
-function PipelineCard({ data }: { data: Resp }) {
-  const { lang } = useI18n();
-  const items = [
-    [lang === "ar" ? "كل الليدز" : "All leads", data.totals.totalLeads, "var(--chart-1)"],
-    [lang === "ar" ? "قيد المتابعة" : "Follow-up", data.pipeline.followUp, "var(--accent)"],
-    [lang === "ar" ? "صفقات نشطة" : "Active deals", data.pipeline.activeDeals, "var(--warning)"],
-    [lang === "ar" ? "فواتير مدفوعة" : "Paid invoices", data.totals.orders, "var(--success)"],
-    ["Closed Lost", data.totals.lost, "var(--danger)"],
-  ] as const;
-  const peak = Math.max(...items.map((item) => item[1]), 1);
-  return (
-    <Card>
-      <SectionTitle
-        hint={
-          lang === "ar"
-            ? "الفاتورة هي البيع؛ Won يظل حالة CRM فقط."
-            : "A paid invoice is the sale; Won remains a CRM-stage signal."
-        }
-      >
-        {lang === "ar" ? "مسار القرار" : "Decision funnel"}
-      </SectionTitle>
-      <div className="space-y-3">
-        {items.map(([label, value, color]) => (
-          <div key={label}>
-            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
-              <span className="text-text-muted">{label}</span>
-              <span className="num font-semibold text-text">{fmtNum(value)}</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${Math.max(2, (value / peak) * 100)}%`, background: color }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
-        <Mini label={lang === "ar" ? "جديدة" : "Fresh"} value={data.pipeline.fresh} />
-        <Mini label={lang === "ar" ? "متوقفة" : "Stalled"} value={data.pipeline.stalled} />
-        <Mini label="CRM Won" value={data.totals.won} />
-      </div>
-    </Card>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="num text-lg font-semibold text-text">{fmtNum(value)}</div>
-      <div className="text-[10px] text-text-muted">{label}</div>
+    <div className="rounded-xl border border-border bg-surface/85 px-3 py-2">
+      <div className="text-[9.5px] font-semibold text-text-muted">{label}</div>
+      <div className="num mt-1 text-lg font-bold text-text">{fmtNum(value)}</div>
     </div>
   );
 }
 
-function QualityTable({ rows }: { rows: AttributionRow[] }) {
-  const { lang } = useI18n();
-  const ranked = [...rows]
-    .filter((row) => row.key !== "__unattributed__" && row.leads >= 20)
-    .sort((a, b) => (b.leadToInvoiceRate ?? 0) - (a.leadToInvoiceRate ?? 0) || a.lost - b.lost)
-    .slice(0, 8);
-  return (
-    <Card>
-      <SectionTitle
-        hint={
-          lang === "ar"
-            ? "ترتيب شفاف: الفواتير ÷ الليدز، وبجواره Lost. أقل من 20 ليد مستبعد من الترتيب."
-            : "Transparent ranking: invoices ÷ leads beside Lost; fewer than 20 leads are excluded."
-        }
-      >
-        {lang === "ar" ? "جودة الليدز حسب الحملة" : "Lead quality by campaign"}
-      </SectionTitle>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-[11px] text-text-muted">
-              <th className="pb-2 text-start">{lang === "ar" ? "الحملة" : "Campaign"}</th>
-              <th className="pb-2 text-end">{lang === "ar" ? "ليدز" : "Leads"}</th>
-              <th className="pb-2 text-end">{lang === "ar" ? "فواتير" : "Invoices"}</th>
-              <th className="pb-2 text-end">{lang === "ar" ? "التحويل" : "Conversion"}</th>
-              <th className="pb-2 text-end">Lost</th>
-              <th className="pb-2 text-end">{lang === "ar" ? "الحكم" : "Verdict"}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranked.map((row) => {
-              const lostRate = rate(row.lost, row.leads);
-              const strong = (row.leadToInvoiceRate ?? 0) >= 10 && (lostRate ?? 100) <= 25;
-              const weak = (row.leadToInvoiceRate ?? 0) < 5 || (lostRate ?? 0) > 35;
-              return (
-                <tr key={row.key} className="border-b border-border/70 last:border-0">
-                  <td
-                    className="max-w-[250px] truncate py-3 pe-4 font-medium text-text"
-                    title={row.name}
-                  >
-                    {row.name}
-                  </td>
-                  <td className="num py-3 text-end">{fmtNum(row.leads)}</td>
-                  <td className="num py-3 text-end">{fmtNum(row.invoices)}</td>
-                  <td className="num py-3 text-end font-semibold">
-                    {fmtPct(row.leadToInvoiceRate, 1)}
-                  </td>
-                  <td className="num py-3 text-end text-text-muted">{fmtPct(lostRate, 1)}</td>
-                  <td className="py-3 text-end">
-                    <Pill tone={strong ? "success" : weak ? "danger" : "warning"}>
-                      {strong
-                        ? lang === "ar"
-                          ? "قوية"
-                          : "Strong"
-                        : weak
-                          ? lang === "ar"
-                            ? "ضعيفة"
-                            : "Weak"
-                          : lang === "ar"
-                            ? "متابعة"
-                            : "Watch"}
-                    </Pill>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
+function lensFor(
+  stage: Exclude<CrmStageKey, "other"> | null,
+  view: WorkspaceView,
+  A: boolean,
+): { key: FacetKey; label: string; color: string }[] {
+  const labels: Record<FacetKey, [string, string]> = {
+    byType: ["نوع السجل", "Record type"],
+    bySource: ["المصدر", "Source"],
+    byTeam: ["فريق المبيعات", "Sales team"],
+    byCourse: ["الدورة", "Course"],
+    byPriority: ["الأولوية", "Priority"],
+    byLeadSegment: ["شريحة العميل", "Lead segment"],
+    byOpenStatus: ["حالة Open", "Open status"],
+    byCallingReply: ["نتيجة الاتصال", "Calling reply"],
+    byClosingChannel: ["قناة الإغلاق الرابح", "Closing Won channel"],
+    byLostCategory: ["فئة الخسارة", "Lost category"],
+    byLostReason: ["سبب الخسارة", "Lost reason"],
+    byPreviousStage: ["المرحلة الفعلية في Odoo", "Actual Odoo stage"],
+    byCourseLanguage: ["لغة الدورة", "Course language"],
+    byCourseType: ["نوع الدورة", "Course type"],
+    byCustomerType: ["نوع العميل", "Customer type"],
+  };
+  const keys: FacetKey[] =
+    stage === "preparation"
+      ? ["byLeadSegment", "byTeam", "byType"]
+      : stage === "new"
+        ? ["bySource", "byLeadSegment", "byPriority"]
+        : stage === "open"
+          ? ["byOpenStatus", "byCallingReply", "byTeam"]
+          : stage === "quotation"
+            ? ["byCourse", "byCourseLanguage", "byCourseType"]
+            : stage === "won" || view === "won"
+              ? ["byClosingChannel", "byCourse", "byCustomerType"]
+              : stage === "lost" || view === "lost"
+                ? ["byLostCategory", "byLostReason", "byPreviousStage"]
+                : view === "leads"
+                  ? ["byLeadSegment", "bySource", "byPriority"]
+                  : view === "pipeline"
+                    ? ["byOpenStatus", "byTeam", "byCourse"]
+                    : ["byType", "bySource", "byTeam"];
+  return keys.map((key, index) => ({
+    key,
+    label: labels[key][A ? 0 : 1],
+    color: ["var(--brand)", "var(--violet-strong)", "var(--amber-strong)"][index],
+  }));
 }
 
-function CallsPanel({ state }: { state: ReturnType<typeof useApi<CallsResp>> }) {
-  const { lang } = useI18n();
-  const totals = state.data?.totals;
-  return (
-    <Card className="relative overflow-hidden">
-      <SectionTitle
-        action={
-          <Link
-            to="/teams"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-brand"
-          >
-            {lang === "ar" ? "أداء الموظفين" : "Employee performance"}
-            <ArrowLeft size={13} />
-          </Link>
-        }
-        hint={
-          lang === "ar"
-            ? "من Engosoft Calls Hub وYeastar، ويتحمل منفصلًا حتى لا يؤخر CRM."
-            : "From Engosoft Calls Hub and Yeastar, loaded independently so CRM stays fast."
-        }
-      >
-        <span className="inline-flex items-center gap-2">
-          <PhoneCall size={17} className="text-brand" />
-          {lang === "ar" ? "المكالمات والمتابعة" : "Calls & follow-up"}
-        </span>
-      </SectionTitle>
-      {state.isLoading ? (
-        <Skeleton className="h-28" />
-      ) : !state.data?.available || !totals ? (
-        <div className="rounded-xl bg-warning-soft p-4 text-sm text-warning">
-          {lang === "ar"
-            ? "بيانات المكالمات غير متاحة مؤقتًا؛ أرقام CRM مازالت شغالة."
-            : "Calls are temporarily unavailable; CRM figures remain available."}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <CallMetric
-              label={lang === "ar" ? "كل المكالمات" : "All calls"}
-              value={fmtNum(totals.calls)}
-            />
-            <CallMetric
-              label={lang === "ar" ? "تم الرد" : "Answered"}
-              value={fmtNum(totals.answered)}
-            />
-            <CallMetric
-              label={lang === "ar" ? "نسبة الرد" : "Answer rate"}
-              value={fmtPct(totals.answerRate, 1)}
-            />
-            <CallMetric
-              label={lang === "ar" ? "تحتاج مراجعة" : "Needs review"}
-              value={fmtNum(totals.needsReview)}
-              danger={totals.needsReview > 0}
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {state.data.topEmployees?.map((employee) => (
-              <span
-                key={employee.key}
-                className="rounded-full border border-border bg-surface-2 px-3 py-1.5 text-[11px] text-text-muted"
-              >
-                <b className="text-text">{employee.name}</b> ·{" "}
-                <span className="num">{fmtNum(employee.totalCalls)}</span>
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function CallMetric({
-  label,
-  value,
-  danger = false,
+function FacetCard({
+  title,
+  rows,
+  empty,
+  color,
 }: {
-  label: string;
-  value: string;
-  danger?: boolean;
+  title: string;
+  rows: Grouped[];
+  empty: string;
+  color: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-      <div className="text-[10px] text-text-muted">{label}</div>
-      <div className={`num mt-1 text-xl font-semibold ${danger ? "text-danger" : "text-text"}`}>
-        {value}
+    <Card>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-bold text-text">{title}</h3>
+        <span className="size-2 rounded-full" style={{ background: color }} />
       </div>
-    </div>
+      <BarList
+        items={rows.slice(0, 6).map((row) => ({
+          label: row.label === "—" ? empty : row.label,
+          value: row.count,
+          meta: (
+            <span className="num text-[10.5px] text-text-muted">
+              {fmtNum(row.count)} · {fmtPct(row.share, 0)}
+            </span>
+          ),
+        }))}
+        format={fmtNum}
+        color={color}
+      />
+    </Card>
   );
 }
 
-function SourceConversion({ rows }: { rows: AttributionRow[] }) {
+function CrmRecords({
+  rows,
+  total,
+  truncated,
+}: {
+  rows: CrmWorkspaceRow[];
+  total: number;
+  truncated: boolean;
+}) {
   const { lang } = useI18n();
-  const ranked = [...rows]
-    .filter((row) => row.key !== "__unattributed__" && row.name !== "—" && row.leads >= 20)
-    .sort((a, b) => (b.leadToInvoiceRate ?? 0) - (a.leadToInvoiceRate ?? 0))
-    .slice(0, 6);
+  const A = lang === "ar";
+  const cols: Col<CrmWorkspaceRow>[] = [
+    {
+      key: "createdAt",
+      header: A ? "تاريخ الإنشاء" : "Created",
+      render: (row) => fmtDate(row.createdAt, lang),
+      sortValue: (row) => row.createdAt,
+      sticky: true,
+      always: true,
+      width: "118px",
+      group: "identity",
+    },
+    {
+      key: "contact",
+      header: A ? "العميل" : "Customer",
+      render: (row) => (
+        <span className="block max-w-[170px] truncate" title={row.contact}>
+          {row.contact || "—"}
+        </span>
+      ),
+      sortValue: (row) => row.contact,
+      group: "identity",
+    },
+    {
+      key: "phone",
+      header: A ? "الهاتف" : "Phone",
+      render: (row) => row.phone || row.mobile || "—",
+      sortValue: (row) => row.phone || row.mobile,
+      group: "identity",
+      hideByDefault: true,
+    },
+    {
+      key: "email",
+      header: A ? "البريد" : "Email",
+      render: (row) => row.email || "—",
+      sortValue: (row) => row.email,
+      group: "identity",
+      hideByDefault: true,
+    },
+    {
+      key: "recordType",
+      header: A ? "النوع" : "Type",
+      render: (row) => (
+        <Pill tone="neutral">{row.recordType === "lead" ? "Lead" : "Opportunity"}</Pill>
+      ),
+      sortValue: (row) => row.recordType,
+      group: "state",
+    },
+    {
+      key: "status",
+      header: A ? "النتيجة" : "Status",
+      render: (row) => <Pill tone={statusTone(row.status)}>{statusLabel(row.status, lang)}</Pill>,
+      sortValue: (row) => row.status,
+      group: "state",
+    },
+    {
+      key: "active",
+      header: A ? "نشط" : "Active",
+      render: (row) => (row.active ? "Yes" : "No"),
+      sortValue: (row) => Number(row.active),
+      group: "state",
+      hideByDefault: true,
+    },
+    {
+      key: "stage",
+      header: A ? "Odoo Stage" : "Odoo stage",
+      render: (row) => (
+        <span className="block max-w-[150px]">
+          <span className="block truncate" title={row.stage}>
+            {row.stage || "—"}
+          </span>
+          {row.status === "lost" && row.recordType === "lead" && (
+            <span className="block text-[9.5px] text-danger">
+              {A ? "مرحلة محفوظة قبل الأرشفة" : "preserved before archive"}
+            </span>
+          )}
+        </span>
+      ),
+      sortValue: (row) => row.stage,
+      group: "state",
+    },
+    {
+      key: "openStatus",
+      header: "Open Status",
+      render: (row) => row.openStatus || "—",
+      sortValue: (row) => row.openStatus,
+      group: "qualification",
+    },
+    {
+      key: "leadSegment",
+      header: "Lead Segment",
+      render: (row) => row.leadSegment || "—",
+      sortValue: (row) => row.leadSegment,
+      group: "qualification",
+    },
+    {
+      key: "priority",
+      header: A ? "الأولوية" : "Priority",
+      render: (row) => row.priority || "—",
+      sortValue: (row) => row.priority,
+      group: "qualification",
+    },
+    {
+      key: "probability",
+      header: A ? "الاحتمالية" : "Probability",
+      render: (row) => fmtPct(row.probability, 0),
+      sortValue: (row) => row.probability,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "automatedProbability",
+      header: A ? "الاحتمالية الآلية" : "Automated probability",
+      render: (row) => fmtPct(row.automatedProbability, 0),
+      sortValue: (row) => row.automatedProbability,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "ready",
+      header: A ? "جاهز للتحويل" : "Ready",
+      render: (row) =>
+        row.readyToConvert ? (
+          <Pill tone="success">Yes</Pill>
+        ) : (
+          <span className="text-text-subtle">—</span>
+        ),
+      sortValue: (row) => Number(row.readyToConvert),
+      group: "qualification",
+    },
+    {
+      key: "callingReply",
+      header: A ? "نتيجة الاتصال" : "Calling reply",
+      render: (row) => row.callingReply || "—",
+      sortValue: (row) => row.callingReply,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "tags",
+      header: A ? "الوسوم" : "Tags",
+      render: (row) => row.tags || "—",
+      sortValue: (row) => row.tags,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "jobType",
+      header: A ? "نوع الوظيفة" : "Job type",
+      render: (row) => row.jobType || "—",
+      sortValue: (row) => row.jobType,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "howFoundUs",
+      header: A ? "كيف عرفنا؟" : "How found us?",
+      render: (row) => row.howFoundUs || "—",
+      sortValue: (row) => row.howFoundUs,
+      group: "qualification",
+      hideByDefault: true,
+    },
+    {
+      key: "course",
+      header: A ? "الدورة" : "Course",
+      render: (row) => (
+        <span className="block max-w-[170px] truncate" title={row.course}>
+          {row.course || "—"}
+        </span>
+      ),
+      sortValue: (row) => row.course,
+      group: "commercial",
+    },
+    {
+      key: "courseLanguage",
+      header: A ? "لغة الدورة" : "Course language",
+      render: (row) => row.courseLanguage || "—",
+      sortValue: (row) => row.courseLanguage,
+      group: "commercial",
+      hideByDefault: true,
+    },
+    {
+      key: "courses",
+      header: A ? "الكورسات" : "Courses",
+      render: (row) => row.courses || "—",
+      sortValue: (row) => row.courses,
+      group: "commercial",
+      hideByDefault: true,
+    },
+    {
+      key: "courseType",
+      header: A ? "نوع الدورة" : "Course type",
+      render: (row) => row.courseType || "—",
+      sortValue: (row) => row.courseType,
+      group: "commercial",
+      hideByDefault: true,
+    },
+    {
+      key: "customerType",
+      header: A ? "نوع العميل" : "Customer type",
+      render: (row) => row.customerType || "—",
+      sortValue: (row) => row.customerType,
+      group: "commercial",
+      hideByDefault: true,
+    },
+    {
+      key: "communicationLanguage",
+      header: A ? "لغة التواصل" : "Communication language",
+      render: (row) => row.communicationLanguage || "—",
+      sortValue: (row) => row.communicationLanguage,
+      group: "commercial",
+      hideByDefault: true,
+    },
+    {
+      key: "source",
+      header: A ? "المصدر" : "Source",
+      render: (row) => row.source || <Pill tone="warning">{A ? "بدون مصدر" : "No source"}</Pill>,
+      sortValue: (row) => row.source,
+      group: "ownership",
+    },
+    {
+      key: "medium",
+      header: A ? "الوسيط" : "Medium",
+      render: (row) => row.medium || "—",
+      sortValue: (row) => row.medium,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "campaign",
+      header: A ? "الحملة" : "Campaign",
+      render: (row) => row.campaign || "—",
+      sortValue: (row) => row.campaign,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "campaignId",
+      header: A ? "معرّف الحملة" : "Campaign ID",
+      render: (row) => row.campaignId || "—",
+      sortValue: (row) => row.campaignId,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "adset",
+      header: A ? "مجموعة الإعلانات" : "Ad set",
+      render: (row) => row.adset || "—",
+      sortValue: (row) => row.adset,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "adName",
+      header: A ? "الإعلان" : "Ad",
+      render: (row) => row.adName || "—",
+      sortValue: (row) => row.adName,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "adId",
+      header: A ? "معرّف الإعلان" : "Ad ID",
+      render: (row) => row.adId || "—",
+      sortValue: (row) => row.adId,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "facebookLeadId",
+      header: A ? "معرّف Facebook Lead" : "Facebook Lead ID",
+      render: (row) => row.facebookLeadId || "—",
+      sortValue: (row) => row.facebookLeadId,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "inventoryBucket",
+      header: A ? "مخزن البيانات" : "Data inventory",
+      render: (row) => row.inventoryBucket || "—",
+      sortValue: (row) => row.inventoryBucket,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "salesTeam",
+      header: A ? "الفريق" : "Team",
+      render: (row) => row.salesTeam || "—",
+      sortValue: (row) => row.salesTeam,
+      group: "ownership",
+    },
+    {
+      key: "salesperson",
+      header: A ? "الموظف" : "Salesperson",
+      render: (row) => (
+        <span className="block max-w-[150px] truncate" title={row.salesperson}>
+          {row.salesperson || "—"}
+        </span>
+      ),
+      sortValue: (row) => row.salesperson,
+      group: "ownership",
+    },
+    {
+      key: "company",
+      header: A ? "الشركة" : "Company",
+      render: (row) => row.company || "—",
+      sortValue: (row) => row.company,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "targetName",
+      header: A ? "اسم التارجت" : "Target name",
+      render: (row) => row.targetName || "—",
+      sortValue: (row) => row.targetName,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "resignTarget",
+      header: A ? "إعادة تعيين التارجت" : "Resign target",
+      render: (row) => row.resignTarget || "—",
+      sortValue: (row) => row.resignTarget,
+      group: "ownership",
+      hideByDefault: true,
+    },
+    {
+      key: "closingChannel",
+      header: "Closing Won Channel",
+      render: (row) => row.closingChannel || "—",
+      sortValue: (row) => row.closingChannel,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "lostCategory",
+      header: "Lost Category",
+      render: (row) => row.lostCategory || "—",
+      sortValue: (row) => row.lostCategory,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "lossReason",
+      header: "Lost Reason",
+      render: (row) => (
+        <span className="block max-w-[180px] truncate" title={row.lossReason}>
+          {row.lossReason || "—"}
+        </span>
+      ),
+      sortValue: (row) => row.lossReason,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "resultDate",
+      header: A ? "تاريخ النتيجة" : "Outcome date",
+      render: (row) =>
+        fmtDate(
+          row.status === "lost"
+            ? row.lostDate
+            : row.status === "won"
+              ? row.wonDate
+              : row.lastStageUpdate,
+          lang,
+        ),
+      sortValue: (row) =>
+        row.status === "lost"
+          ? row.lostDate
+          : row.status === "won"
+            ? row.wonDate
+            : row.lastStageUpdate,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "conversionDate",
+      header: A ? "تاريخ التحويل" : "Conversion date",
+      render: (row) => fmtDate(row.conversionDate, lang),
+      sortValue: (row) => row.conversionDate,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "closingDurationDays",
+      header: A ? "مدة الإغلاق" : "Closing duration",
+      render: (row) =>
+        row.closingDurationDays === null
+          ? "—"
+          : A
+            ? `${fmtNum(row.closingDurationDays)} يوم`
+            : `${fmtNum(row.closingDurationDays)} days`,
+      sortValue: (row) => row.closingDurationDays ?? -1,
+      group: "outcome",
+      hideByDefault: true,
+    },
+    {
+      key: "validateClosedReason",
+      header: A ? "مراجعة سبب Lost" : "Lost reason validation",
+      render: (row) => row.validateClosedReason || "—",
+      sortValue: (row) => row.validateClosedReason,
+      group: "outcome",
+      hideByDefault: true,
+    },
+  ];
+
   return (
-    <Card>
-      <SectionTitle
-        hint={
-          lang === "ar"
-            ? "على أساس الفواتير المدفوعة، وليس مرحلة Won."
-            : "Based on paid invoices, not the Won stage."
-        }
-      >
-        {lang === "ar" ? "أعلى مصادر تحويلًا" : "Highest-converting sources"}
-      </SectionTitle>
-      <div className="space-y-2.5">
-        {ranked.map((row, index) => (
-          <div
-            key={row.key}
-            className="flex items-center gap-3 rounded-xl border border-border p-3"
-          >
-            <span className="num grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-bold text-brand">
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-text">{row.name}</div>
-              <div className="mt-0.5 text-[10px] text-text-muted">
-                {fmtNum(row.invoices)} {lang === "ar" ? "فاتورة من" : "invoices from"}{" "}
-                {fmtNum(row.leads)} {lang === "ar" ? "ليد" : "leads"}
-              </div>
-            </div>
-            <span className="num text-sm font-bold text-success">
-              {fmtPct(row.leadToInvoiceRate, 1)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </Card>
+    <DataTable
+      rows={rows}
+      cols={cols}
+      columnChooser
+      groupLabels={{
+        identity: A ? "الهوية" : "Identity",
+        state: A ? "الحالة" : "State",
+        qualification: A ? "التأهيل والمتابعة" : "Qualification & follow-up",
+        commercial: A ? "التجاري" : "Commercial",
+        ownership: A ? "المصدر والملكية" : "Source & ownership",
+        outcome: A ? "النتيجة" : "Outcome",
+      }}
+      searchable={(row) =>
+        `${row.contact} ${row.phone} ${row.mobile} ${row.email} ${row.stage} ${row.openStatus} ${row.leadSegment} ${row.source} ${row.medium} ${row.campaign} ${row.adset} ${row.adName} ${row.course} ${row.courses} ${row.tags} ${row.salesTeam} ${row.salesperson} ${row.lostCategory} ${row.lossReason}`
+      }
+      initialSort={{ key: "createdAt", dir: -1 }}
+      maxHeight={680}
+      csvFilename="engosoft-crm-1.26"
+      truncatedNote={
+        truncated
+          ? A
+            ? `السجل التفصيلي مفلتر داخل أحدث ٣٬٠٠٠ صف من أصل ${fmtNum(total)}؛ الأرقام والتوزيعات بالأعلى كاملة.`
+            : `Detail filters the latest 3,000 of ${fmtNum(total)} rows; totals and distributions above are complete.`
+          : undefined
+      }
+      emptyState={
+        <div className="grid min-h-40 place-items-center text-sm text-text-muted">
+          {A ? "لا توجد سجلات تطابق هذا التحديد." : "No records match this selection."}
+        </div>
+      }
+      csvRow={(row) => ({
+        id: row.id,
+        created_at: row.createdAt,
+        customer: row.contact,
+        phone: row.phone,
+        mobile: row.mobile,
+        email: row.email,
+        record_type: row.recordType,
+        active: String(row.active),
+        business_status: row.status,
+        odoo_stage: row.stage,
+        open_status: row.openStatus,
+        lead_segment: row.leadSegment,
+        priority: row.priority,
+        probability: row.probability,
+        automated_probability: row.automatedProbability,
+        ready_to_convert: row.readyToConvert ? "Yes" : "",
+        calling_reply: row.callingReply,
+        course: row.course,
+        courses: row.courses,
+        course_language: row.courseLanguage,
+        course_type: row.courseType,
+        source: row.source,
+        medium: row.medium,
+        communication_language: row.communicationLanguage,
+        campaign: row.campaign,
+        campaign_id: row.campaignId,
+        ad_set: row.adset,
+        ad_name: row.adName,
+        ad_id: row.adId,
+        facebook_lead_id: row.facebookLeadId,
+        sales_team: row.salesTeam,
+        salesperson: row.salesperson,
+        company: row.company,
+        tags: row.tags,
+        target_name: row.targetName,
+        resign_target: row.resignTarget,
+        data_inventory: row.inventoryBucket,
+        customer_type: row.customerType,
+        job_type: row.jobType,
+        how_found_us: row.howFoundUs,
+        closing_won_channel: row.closingChannel,
+        lost_category: row.lostCategory,
+        lost_reason: row.lossReason,
+        lost_date: row.lostDate,
+        won_date: row.wonDate,
+        conversion_date: row.conversionDate,
+        closing_duration_days: row.closingDurationDays ?? "",
+        validate_closed_lost_reason: row.validateClosedReason,
+      })}
+    />
   );
 }

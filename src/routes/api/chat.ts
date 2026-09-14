@@ -231,8 +231,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("total leads", "إجمالي العملاء", "كم عميل")) {
             return ar
-              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM بدون Lost + ${totals.lost} Lost مؤرشف${totals.archivedWon > 0 ? ` + ${totals.archivedWon} Won مؤرشف` : ""}. Leads المبلّغ عنها من منصات الإعلان: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
-              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} non-lost CRM + ${totals.lost} archived Lost${totals.archivedWon > 0 ? ` + ${totals.archivedWon} archived Won` : ""}. Ad-platform-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
+              ? `إجمالي العملاء: **${totals.totalLeads}** = ${totals.crmLeads} CRM نشط غير Lost + ${totals.lost} Lost حسب عقد CRM 1.26. Leads المبلّغ عنها من منصات الإعلان: **${totals.platformLeads ?? EM}**، Won: **${totals.won}**.`
+              : `Total leads: **${totals.totalLeads}** = ${totals.crmLeads} active non-Lost CRM + ${totals.lost} canonical CRM 1.26 Lost. Ad-platform-reported leads: **${totals.platformLeads ?? EM}**, won: **${totals.won}**.`;
           }
           if (
             has(
@@ -257,8 +257,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("فين الليدز", "الليدز منين", "أجيب الليدز", "اجيب الليدز", "where are leads")) {
             return ar
-              ? "افتح **جودة وأعداد الليدز ← العملاء المحتملون** من [هنا](/leads). الليدز الحالية من CRM في Odoo، أما Lost فمن أرشيف Odoo المباشر وتلاقيه في [تحليل الخسائر](/lost)."
-              : "Open **Lead quality → Leads** [here](/leads). Current leads come from Odoo CRM; archived Lost is read directly from Odoo and appears in [Lost Analysis](/lost).";
+              ? "افتح **مركز إدارة العملاء** من [هنا](/leads). هتلاقي كل الـstages والـOpen Status والـWon والـLost بتعريف CRM 1.26، والتحليل المتقدم للخسائر في [تحليل الخسائر](/lost)."
+              : "Open the **CRM command center** [here](/leads) for every stage, Open Status, Won and CRM 1.26 Lost; advanced loss analysis is [here](/lost).";
           }
           if (
             has("فين الدورات", "الدورات منين", "أجيب الدورات", "اجيب الدورات", "where are courses")
@@ -274,8 +274,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("conversion", "نسبة الإغلاق", "نسبة الاغلاق", "معدل التحويل")) {
             return ar
-              ? `نسبة الإغلاق: **${pct(totals.conversionRate)}** (${totals.won} من ${totals.totalLeads}). نسبة الضياع: ${pct(totals.lostRate)} (${totals.lost} من Lost Analysis فقط).`
-              : `Conversion rate: **${pct(totals.conversionRate)}** (${totals.won} of ${totals.totalLeads}). Lost rate: ${pct(totals.lostRate)} (${totals.lost} from Lost Analysis only).`;
+              ? `نسبة الإغلاق: **${pct(totals.conversionRate)}** (${totals.won} من ${totals.totalLeads}). نسبة الضياع: ${pct(totals.lostRate)} (${totals.lost} حالة حسب عقد CRM 1.26).`
+              : `Conversion rate: **${pct(totals.conversionRate)}** (${totals.won} of ${totals.totalLeads}). Lost rate: ${pct(totals.lostRate)} (${totals.lost} records under CRM 1.26).`;
           }
           if (has("close time", "زمن الإغلاق", "مدة الإغلاق", "كم يوم")) {
             return ar
@@ -305,9 +305,9 @@ export const Route = createFileRoute("/api/chat")({
           definitions: {
             cpl: "total ad spend ÷ leads reported by Meta and Snapchat.",
             cpa: "total ad spend ÷ won deals.",
-            lost: "Lost Analysis only. CRM stage Lost is excluded.",
+            lost: "CRM 1.26: Lost Lead = inactive with Lost Reason; current Lost Opportunity = active in the XMLID-resolved Lost stage; archived Opportunity history is retained.",
             navigation:
-              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. Lead quality: /leads. Archived Lost: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Monthly media plan: /media-plan. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
+              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. CRM command center: /leads. Lost analysis: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Monthly media plan: /media-plan. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
             revenue: "Accounting.USD Paid filtered by Payment Date at invoice product-line grain.",
             roas: "Accounting.USD Paid revenue ÷ total ad spend. attributedRoas uses campaign-linked Accounting revenue.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",

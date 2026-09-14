@@ -35,6 +35,7 @@ import {
   mainCategoryForCourse,
 } from "./course-taxonomy";
 import { isArchivedWonStage } from "./archived-won";
+import { CRM_CONTRACT_VERSION } from "./crm-contract";
 import { decideSnapshotRead } from "./snapshot-freshness";
 import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-freshness";
 import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
@@ -56,6 +57,9 @@ import type {
   CampaignObjective,
   CampaignOperationalState,
   CrmLeadRow,
+  CrmBusinessStatus,
+  CrmRecordType,
+  CrmStageKey,
   DataHealth,
   InvoicedRow,
   LostRow,
@@ -229,6 +233,31 @@ function num(v: unknown): number {
   return isFinite(n) ? n : 0;
 }
 
+function crmRecordType(v: unknown, fallback: CrmRecordType): CrmRecordType {
+  return str(v).toLowerCase() === "lead" ? "lead" : fallback;
+}
+
+function crmStageKey(v: unknown): CrmStageKey {
+  const key = str(v).toLowerCase();
+  return key === "preparation" ||
+    key === "new" ||
+    key === "open" ||
+    key === "quotation" ||
+    key === "won" ||
+    key === "lost"
+    ? key
+    : "other";
+}
+
+function crmBusinessStatus(v: unknown, recordType: CrmRecordType, won: boolean): CrmBusinessStatus {
+  const status = str(v).toLowerCase();
+  if (status === "lead" || status === "open" || status === "won" || status === "lost") {
+    return status;
+  }
+  if (won) return "won";
+  return recordType === "lead" ? "lead" : "open";
+}
+
 /**
  * Return the first populated value without treating numeric zero as missing.
  * Financial exports legitimately contain zero-value lines, so `a || b` is not
@@ -375,11 +404,9 @@ export function normalizeSource(s: string): string {
  * Stages that must never enter the reportable lead population, whichever tab
  * they arrive on. Compared against the lower-cased `Cleaned Stage`.
  *
- * `lost` — the business definition of a loss is an archived opportunity, and
- *   those live in Lost Analysis. A CRM row carrying stage Lost is the same deal
- *   counted twice. The upstream sync is supposed to withhold these rows, but it
- *   has shipped them twice now (4,227 reappeared on 2026-07-27), so the guard
- *   lives here as well: one wrong workflow edit must not move a headline number.
+ * `lost` — the canonical direct reader routes current Lost-stage Opportunities
+ *   into the disjoint Lost population. A legacy CRM sheet row carrying the same
+ *   stage is therefore a duplicate and is still withheld here.
  * `old auto dialer` — automated dialler residue, not commercial leads. Excluded
  *   from the total on the data analyst's instruction.
  */
@@ -962,8 +989,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       }
     };
 
-    // CRM keeps the canonical Power BI tab as its stable reporting boundary,
-    // while Archived Lost is audited directly in Odoo on every cache refresh.
+    // CRM keeps the canonical Power BI tab as its migration boundary, while
+    // the 1.26 canonical Lost population is audited directly in Odoo.
     // The direct read starts beside the other remote work so it does not add a
     // second serial wait to page loading.
     const directCrmWithTimeout = async () => {
@@ -1004,9 +1031,16 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         Date.now() - syncedAt < maxAgeMs
       );
     };
+    const crmStoredUsesCurrentContract =
+      crmStored?.metadata.contractVersion === CRM_CONTRACT_VERSION;
+    const lostStoredUsesCurrentContract =
+      lostStored?.metadata.contractVersion === CRM_CONTRACT_VERSION;
+    const lostStoredIsUsable = lostStoredUsesCurrentContract && lostStored?.status === "success";
     const directCrmAttempted =
       odooConfigured() &&
       (refreshRemoteSources ||
+        !crmStoredUsesCurrentContract ||
+        !lostStoredUsesCurrentContract ||
         !storedIsFresh(crmStored, DIRECT_ODOO_REFRESH_MS) ||
         !storedIsFresh(lostStored, DIRECT_ODOO_REFRESH_MS));
     const directCrmPromise: Promise<{
@@ -1153,8 +1187,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         ? Promise.resolve([])
         : safeFetch(TAB.accounting, looksLikeAccountingExport),
       websiteSalesStored?.rows.length ? Promise.resolve([]) : safeFetch(TAB.websiteSales),
-      // Archived Lost is an Odoo/PostgreSQL fact table. The old Sheet did not
-      // carry a reliable Close Date, so it is never used as a reporting fallback.
+      // Canonical Lost is an Odoo/PostgreSQL fact table. The old Sheet did not
+      // carry type-aware loss dates, so it is never used as a reporting fallback.
       lostStored?.rows.length ? Promise.resolve(lostStored.rows) : Promise.resolve([]),
       safeFetch(TAB.tiktok, looksLikeAdsExport),
       safeTikTok(),
@@ -1471,16 +1505,16 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     };
 
     let crmRaw: Raw[] = crmFallbackRaw;
-    // Archived Lost is fail-closed. Direct Odoo owns the live population and
-    // PostgreSQL retains the last successful archive when Odoo is unavailable.
-    let lostRaw: Raw[] = lostStored?.rows.length ? lostStored.rows : [];
+    // Canonical Lost is fail-closed. Direct Odoo owns the live population and
+    // PostgreSQL retains the last successful snapshot when Odoo is unavailable.
+    let lostRaw: Raw[] = lostStoredIsUsable ? (lostStored?.rows ?? []) : [];
     const directCrm = await directCrmPromise;
     let crmAuthority: DataHealth["crmAuthority"] = crmStored?.rows.length
       ? "postgres-last-good"
       : crmSheetRaw.length
         ? "google-sheet"
         : "google-sheet-fallback";
-    let lostAuthority: DataHealth["lostAuthority"] = lostStored?.rows.length
+    let lostAuthority: DataHealth["lostAuthority"] = lostStoredIsUsable
       ? "postgres-last-good"
       : "unavailable";
     let crmExclusions = blankExclusions();
@@ -1488,7 +1522,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const directCrmComplete = !!directCrm.value && directCrm.value.crm.length > 0;
     // Comparing the legacy sheet and Odoo row counts is not a valid completeness
     // test. A successful non-empty Odoo read is the direct archive authority.
-    const directLostComplete = !!directCrm.value && directCrm.value.lost.length > 0;
+    const directLostComplete = !!directCrm.value;
 
     // Odoo now owns the CRM population. PostgreSQL holds its last successful
     // snapshot; Google is only the one-time migration fallback/enrichment.
@@ -1500,7 +1534,11 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         await writeDashboardDataset("crm", crmRaw, {
           mode: "replace",
           syncedAt: new Date().toISOString(),
-          metadata: { source: "odoo-direct", rows: crmRaw.length },
+          metadata: {
+            source: "odoo-direct",
+            rows: crmRaw.length,
+            contractVersion: CRM_CONTRACT_VERSION,
+          },
         }).catch(() => {
           fetchErrors.push("PostgreSQL CRM: last-good write failed.");
         });
@@ -1515,9 +1553,9 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       );
     }
 
-    // Lost is an operational archive, so only Odoo's current population is
-    // reportable. The Google tab remains available for reconciliation only;
-    // it is never promoted into dashboard facts because it has no Close Date.
+    // Lost is a type-aware 1.26 population, so only Odoo's current contract is
+    // reportable. The legacy Google tab cannot distinguish the Lead and
+    // Opportunity rules and is never promoted into dashboard facts.
     if (directCrm.value && directLostComplete) {
       lostRaw = enrichDirectRows(directCrm.value.lost, lostSheetRaw);
       lostAuthority = "odoo-direct";
@@ -1529,18 +1567,19 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           metadata: {
             source: "odoo-direct",
             rows: lostRaw.length,
+            contractVersion: CRM_CONTRACT_VERSION,
             dateBasis: "creation_date",
-            movementDate: "close_date",
+            movementDate: "canonical_lost_date",
           },
         }).catch(() => {
-          fetchErrors.push("PostgreSQL Archived Lost: last-good write failed.");
+          fetchErrors.push("PostgreSQL CRM Lost: last-good write failed.");
         });
       }
-    } else if (!lostStored?.rows.length) {
+    } else if (!lostStoredIsUsable) {
       fetchErrors.push(
         directCrm.value
-          ? "Archived Lost unavailable: direct Odoo returned no reportable closed opportunities. No legacy fallback was shown."
-          : "Archived Lost unavailable: direct Odoo is not configured or could not be reached. No legacy fallback was shown.",
+          ? "CRM Lost unavailable: direct Odoo returned no canonical Lost records. No legacy fallback was shown."
+          : "CRM Lost unavailable: direct Odoo is not configured or could not be reached. No legacy fallback was shown.",
       );
     }
 
@@ -2102,10 +2141,18 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         const campaignName = str(r["Campaign Name"]);
         const campaignId = str(r["Campaign ID"]);
         const cleanedStage = str(r["Cleaned Stage"]) || str(r["Stage"]);
+        const recordType = crmRecordType(r["Record Type"], "opportunity");
+        const won = isArchivedWonStage(cleanedStage) || str(r["Business Status"]) === "won";
         const source = str(r["cleaned Source"]) || str(r["Source"]);
         const course = canonicalCourse(str(r["Course"]) || str(r["Course Categories"]));
         return {
           id: str(r["__odoo_id"]),
+          recordType,
+          active: str(r["Record Active"])
+            ? str(r["Record Active"]).toLowerCase() !== "false"
+            : true,
+          businessStatus: crmBusinessStatus(r["Business Status"], recordType, won),
+          stageKey: crmStageKey(r["Stage Key"]),
           createdAt,
           closedAt,
           daysToClose: closedAt ? daysBetween(createdAt, closedAt) : null,
@@ -2131,6 +2178,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           // the Sales Team and Source columns above already use.
           phone: str(r["Phone"]) || str(r["رقم الهاتف"]),
           mobile: str(r["Mobile"]) || str(r["الهاتف المحمول"]),
+          email: str(r["Email"]),
           salesperson: str(r["Salesperson"]),
           salesTeam: str(r["Sales Team"]) || str(r["فريق المبيعات"]),
           subTeam: str(r["فريق المبيعات"]),
@@ -2141,20 +2189,47 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           // Not `=== "won"`: that relies on the `Cleaned Stage` helper column
           // being present, and the raw Odoo stage is `Won / ربح`. A workbook
           // shipped without that column would silently zero every win.
-          isWon: isArchivedWonStage(cleanedStage),
-          isLost: cleanedStage.toLowerCase() === "lost",
+          isWon: won,
+          isLost: false,
           source,
+          medium: str(r["Medium"]),
+          communicationLanguage: str(r["Communication Language"]),
           sourceKey: normalizeSource(source),
           course,
+          courses: str(r["Courses"]),
           mainCategory: canonicalMainCategory(str(r["Main Category"]), course),
           priority: str(r["Priority"]),
+          probability: num(r["Probability"]),
+          automatedProbability: num(r["Automated Probability"]),
+          closingDurationDays:
+            str(r["Closing Duration Days"]) === "" ? null : num(r["Closing Duration Days"]),
+          readyToConvert: str(r["Ready to Convert"]) === "Yes",
+          leadSegment: str(r["Lead Segment"]),
+          openStatus: str(r["Open Status"]),
+          closingChannel: str(r["Closing Won Channel"]),
+          lostCategory: str(r["Lost Category"]),
+          lossReason: str(r["سبب الضياع"]),
+          inventoryBucket: str(r["Inventory Bucket"]),
+          courseLanguage: str(r["Course Language"]),
+          courseType: str(r["Course Type"]),
+          customerType: str(r["Customer Type"]),
+          jobType: str(r["Job Type"]),
+          howFoundUs: str(r["How Found Us"]),
+          company: str(r["Company"]),
+          tags: str(r["Tags"]),
+          targetName: str(r["Target Name"]),
+          resignTarget: str(r["Resign Target"]),
+          facebookLeadId: str(r["Facebook Lead ID"]),
+          validateClosedReason: str(r["Validate Closed Lost Reason"]),
+          wonDate: parseDate(r["Won Date"]),
+          lostDate: parseDate(r["Lost Date"]),
+          conversionDate: parseDate(r["Conversion Date"]),
           fromCampaign: !!campaignName || !!campaignId,
         };
       })
-      // Lost Analysis is the only authoritative source for lost opportunities,
-      // and dialler residue is not a commercial lead. Both are dropped here so
-      // the reportable population is correct even when the upstream sync ships
-      // them — which it has done twice.
+      // Canonical Lost rows are kept in the disjoint Lost dataset. This guard
+      // also protects migration snapshots created before the 1.26 fields were
+      // added, while dialler residue remains outside the commercial population.
       .filter((row) => {
         const stage = row.cleanedStage.trim().toLowerCase();
         if (!isExcludedCrmStage(stage)) return true;
@@ -2474,12 +2549,20 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         const resolvedAdset = adsets.resolve(adId, adName);
         const source = str(r["cleaned Source"]) || str(r["المصدر"]);
         const course = canonicalCourse(str(r["Course"]) || str(r["Course Categories"]));
+        const recordType = crmRecordType(r["Record Type"], "opportunity");
         return {
           id: str(r["__odoo_id"]),
+          recordType,
+          active: str(r["Record Active"])
+            ? str(r["Record Active"]).toLowerCase() !== "false"
+            : false,
+          businessStatus: "lost" as const,
+          stageKey: crmStageKey(r["Stage Key"]),
           contact: str(r["اسم جهة الاتصال"]),
           // Same dual spelling as the CRM tab above.
           phone: str(r["Phone"]) || str(r["رقم الهاتف"]),
           mobile: str(r["Mobile"]) || str(r["الهاتف المحمول"]),
+          email: str(r["Email"]),
           campaignName,
           campaignId,
           campaignKey: keys.key(campaignId, campaignName),
@@ -2488,14 +2571,47 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           adset: str(r["Ad Set Name"]) || resolvedAdset.adset,
           lossReason: str(r["سبب الضياع"]),
           course,
+          courses: str(r["Courses"]),
           mainCategory: canonicalMainCategory(str(r["Main Category"]), course),
           salesTeam: str(r["فريق المبيعات"]),
           salesperson: str(r["مندوب المبيعات"]),
           source,
+          medium: str(r["Medium"]),
+          communicationLanguage: str(r["Communication Language"]),
           sourceKey: normalizeSource(source),
           stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
           createdAt: parseDate(r["أنشئ في"]),
           closeDate: parseDate(r["Closing Date"]) || parseDate(r["التاريخ المقفل"]),
+          lostDate:
+            parseDate(r["Lost Date"]) ||
+            parseDate(r["Closing Date"]) ||
+            parseDate(r["التاريخ المقفل"]),
+          lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
+          lostCategory: str(r["Lost Category"]),
+          probability: num(r["Probability"]),
+          automatedProbability: num(r["Automated Probability"]),
+          closingDurationDays:
+            str(r["Closing Duration Days"]) === "" ? null : num(r["Closing Duration Days"]),
+          readyToConvert: str(r["Ready to Convert"]) === "Yes",
+          leadSegment: str(r["Lead Segment"]),
+          openStatus: str(r["Open Status"]),
+          closingChannel: str(r["Closing Won Channel"]),
+          inventoryBucket: str(r["Inventory Bucket"]),
+          courseLanguage: str(r["Course Language"]),
+          courseType: str(r["Course Type"]),
+          customerType: str(r["Customer Type"]),
+          priority: str(r["Priority"]),
+          callingReply: str(r["Calling reply?"]),
+          jobType: str(r["Job Type"]),
+          howFoundUs: str(r["How Found Us"]),
+          company: str(r["Company"]),
+          tags: str(r["Tags"]),
+          targetName: str(r["Target Name"]),
+          resignTarget: str(r["Resign Target"]),
+          facebookLeadId: str(r["Facebook Lead ID"]),
+          validateClosedReason: str(r["Validate Closed Lost Reason"]),
+          wonDate: parseDate(r["Won Date"]),
+          conversionDate: parseDate(r["Conversion Date"]),
         };
       })
       // Dialler residue is excluded from the lead total on both tabs, otherwise
@@ -2774,12 +2890,16 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         key: "lost",
         label:
           lostAuthority === "odoo-direct"
-            ? "Odoo Archived CRM (direct)"
-            : "Odoo Archived CRM (PostgreSQL last-good)",
+            ? "Odoo CRM Lost 1.26 (direct)"
+            : lostAuthority === "postgres-last-good"
+              ? "Odoo CRM Lost 1.26 (PostgreSQL last-good)"
+              : "Odoo CRM Lost 1.26 (unavailable)",
         syncedAt:
           lostAuthority === "odoo-direct"
             ? new Date().toISOString()
-            : lostStored?.syncedAt || asIso(maxOf(lostRaw, "__odoo_write_date")),
+            : lostAuthority === "postgres-last-good"
+              ? lostStored?.syncedAt || asIso(maxOf(lostRaw, "__odoo_write_date"))
+              : "",
       },
     ].filter((s) => !!s.syncedAt);
 
@@ -3011,7 +3131,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       emptied(next.ads, "ads");
     if (empty && previous) {
       // Dataset-level fallbacks above already preserve every healthy source.
-      // A named non-critical error (for example Archived Lost being temporarily
+      // A named non-critical error (for example CRM Lost being temporarily
       // unavailable) must not freeze Meta, Accounting and every other source at
       // the previous snapshot. Only reject the reload when a previously
       // populated critical dataset actually became empty.

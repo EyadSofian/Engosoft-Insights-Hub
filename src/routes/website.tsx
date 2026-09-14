@@ -263,8 +263,8 @@ function websiteMetrics(
       tone: "sky",
       icon: <Globe2 size={16} />,
       definition: A
-        ? "العملاء الذين وصلوا من الموقع داخل الفترة: صفوف CRM النشطة، بالإضافة إلى الصفقات الضائعة المؤرشفة."
-        : "Leads that arrived from the website inside the period: active CRM rows plus the archived losses.",
+        ? "العملاء الذين وصلوا من الموقع داخل الفترة: صفوف CRM النشطة غير Lost، بالإضافة إلى حالات Lost حسب عقد CRM 1.26."
+        : "Leads that arrived from the website inside the period: active non-Lost CRM rows plus canonical CRM 1.26 losses.",
       formula: `${fmtNum(data.leadSources.activeCrm)} + ${fmtNum(data.leadSources.archivedLost)} = ${fmtNum(T.leads)}`,
       supporting: leadFacts,
       breakdowns: [
@@ -500,9 +500,9 @@ function Website() {
           salesShort: "سيلز",
           averageSheetOrder: "متوسط الأوردر",
           activeCrm: "ليد نشط من Odoo CRM",
-          archivedLost: "Lost مؤكد من الأرشيف",
+          archivedLost: "Lost مؤكد حسب CRM 1.26",
           wonDefinition: "من Odoo CRM وحالته Won",
-          lostDefinition: "من Lost Analysis المؤرشف فقط",
+          lostDefinition: "Lost Lead مؤرشف بسبب + Lost Opportunity في Lost stage",
           openDefinition: "نشط في CRM وغير Won",
           notContactedDefinition: "جزء من المفتوح: لا يوجد رد ناجح",
           dataThrough: "البيانات المعروضة حتى",
@@ -581,9 +581,10 @@ function Website() {
           salesShort: "Sales",
           averageSheetOrder: "Average order",
           activeCrm: "active leads from Odoo CRM",
-          archivedLost: "confirmed archived lost",
+          archivedLost: "confirmed CRM 1.26 Lost",
           wonDefinition: "Odoo CRM leads whose status is Won",
-          lostDefinition: "Archived Lost Analysis only",
+          lostDefinition:
+            "Lost Lead: archived with a reason · Lost Opportunity: active in the Lost stage",
           openDefinition: "Active CRM leads excluding Won",
           notContactedDefinition: "Subset of open leads with no successful reply",
           dataThrough: "Data shown through",

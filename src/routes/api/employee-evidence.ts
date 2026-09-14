@@ -7,10 +7,9 @@ export const Route = createFileRoute("/api/employee-evidence")({
     handlers: {
       GET: async ({ request }) => {
         const { parseFilters, json, capped } = await import("@/lib/api.server");
-        const { getFiltered } = await import("@/lib/metrics.server");
+        const { authoritativeLostLeads, getFiltered } = await import("@/lib/metrics.server");
         const { normalizePersonName } = await import("@/lib/person-name");
         const { odooConfig } = await import("@/lib/odoo.server");
-        const { isArchivedWonStage } = await import("@/lib/archived-won");
         const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
         const { callCanCoverLead } = await import("@/lib/uncalled-leads");
         const { chatwootConfigured, getChatwootAgentConversationEvidence } =
@@ -113,7 +112,7 @@ export const Route = createFileRoute("/api/employee-evidence")({
               url: leadUrl(row.id),
             }),
           );
-        const archivedLeads = data.lost
+        const archivedLeads = authoritativeLostLeads(data)
           .filter((row) => normalizePersonName(row.salesperson) === employeeKey)
           .map((row) =>
             withCallEvidence({
@@ -123,7 +122,7 @@ export const Route = createFileRoute("/api/employee-evidence")({
               stage: row.stage,
               course: row.course,
               createdAt: row.createdAt,
-              outcome: isArchivedWonStage(row.stage) ? ("won" as const) : ("lost" as const),
+              outcome: "lost" as const,
               url: leadUrl(row.id),
             }),
           );

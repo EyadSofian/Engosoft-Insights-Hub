@@ -384,16 +384,16 @@ export const DICT = {
     en: "Rows excluded from the lead total",
   },
   excluded_stages_note: {
-    ar: "هذه الصفوف موجودة في الشيت لكنها خارج التعريف المعتمد: مرحلة Lost مكانها تبويب Lost Analysis وحده، و Old Auto Dialer ليست عملاء تجاريين. وجود Lost هنا يعني أن مزامنة n8n ترسل صفوفاً لا يجب أن ترسلها.",
-    en: "These rows exist in the sheet but fall outside the approved definition: stage Lost belongs to Lost Analysis alone, and Old Auto Dialer rows are not commercial leads. Any Lost here means the n8n sync is shipping rows it should withhold.",
+    ar: "هذه صفوف قديمة من fallback الشيت خرجت من السكان التشغيليين. Lost الحالي يُصنّف مباشرة من Odoo حسب نوع السجل، وOld Auto Dialer ليس مساراً تجارياً.",
+    en: "These legacy fallback rows sit outside the operational population. Current Lost is classified directly from Odoo by record type, and Old Auto Dialer is not a commercial pipeline.",
   },
   missing_spend_tab_note: {
     ar: "تكلفة هذه المنصة غائبة عن الملف، فتظهر تكلفة العميل وتكلفة الصفقة أقل من الحقيقة ويظهر العائد أعلى منها. الأرقام تصبح صحيحة فور إضافة تبويب إنفاق لها.",
     en: "This platform's cost is missing from the workbook, so CPL and CPA read low and ROAS reads high. The numbers become correct as soon as it has a spend tab.",
   },
   lost_population_note: {
-    ar: "جدول الخسائر وتصنيف المرحلة «ضائع» في النظام مجموعتان مختلفتان من الصفوف، ولا تتطابق أعدادهما.",
-    en: 'The Lost tab and CRM stage "Lost" are two different row populations; their counts do not match.',
+    ar: "Lost في CRM 1.26 له قاعدتان: الـLead مؤرشف بسبب والـOpportunity داخل Lost stage؛ التاب يجمعهما دون تكرار.",
+    en: "CRM 1.26 has two Lost rules: an archived Lead with a reason and an Opportunity in the Lost stage; the tab combines them without duplication.",
   },
 
   // yoy

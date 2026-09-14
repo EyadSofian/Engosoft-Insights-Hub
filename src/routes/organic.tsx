@@ -1264,8 +1264,8 @@ function Organic() {
                     : "—",
                   detail: !lostAvailable
                     ? lang === "ar"
-                      ? "يظهر بعد رجوع مصدر Archived Lost"
-                      : "available when Archived Lost recovers"
+                      ? "يظهر بعد رجوع مصدر CRM Lost"
+                      : "available when CRM Lost recovers"
                     : lang === "ar"
                       ? `بين الدورات التي لديها 20 ليد على الأقل`
                       : "among courses with at least 20 leads",

@@ -13,7 +13,6 @@ import {
 } from "./sheet-cache.server";
 import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
-import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { PLATFORMS } from "./constants";
@@ -598,7 +597,7 @@ function closeStats(rows: CrmLeadRow[]): { avg: Maybe; sample: number } {
 
 /* --- lead population -------------------------------------------------------- */
 
-/** Every archived CRM row, deduplicated by Odoo id. */
+/** Every stored CRM 1.26 Lost row, deduplicated by Odoo id. */
 export function archivedCrmLeads(data: FilteredData): LostRow[] {
   const seen = new Set<string>();
   return data.lost.filter((row, index) => {
@@ -610,7 +609,7 @@ export function archivedCrmLeads(data: FilteredData): LostRow[] {
 }
 
 /**
- * Reporting date for the archived population.
+ * Reporting date for the canonical Lost population.
  *
  * Marketing Lost reporting follows the lead's Odoo creation date so the loss is
  * attributed to the acquisition cohort that produced it. Close Date remains
@@ -623,24 +622,13 @@ export function archivedLostReportingDate(
   return row.createdAt;
 }
 
-const isArchivedWon = (row: LostRow): boolean => isArchivedWonStage(row.stage);
-
 /**
- * The authoritative Lost population.
- *
- * CRM stage text never participates. The handful of archived rows still marked
- * Won remain valid leads/denominator rows but cannot also be losses.
+ * The authoritative 1.26 Lost population. Direct Odoo classification already
+ * applies the distinct Lead and Opportunity rules. Stored snapshots are only
+ * admitted when their metadata carries the same contract version.
  */
 export function authoritativeLostLeads(data: FilteredData): LostRow[] {
-  return archivedCrmLeads(data).filter((row) => !isArchivedWon(row));
-}
-
-/**
- * Does this archived row count as a win? See `archived-won.ts` for the rule and
- * for the campaign that exposed its absence.
- */
-export function archivedWinCounter(data: FilteredData): (row: LostRow) => boolean {
-  return archivedWinFilter(data.crm);
+  return archivedCrmLeads(data);
 }
 
 /* --- totals ---------------------------------------------------------------- */
@@ -685,22 +673,21 @@ export function computeTotals(data: FilteredData): Totals {
     (a) => a.impressions,
   );
 
-  const allArchived = archivedCrmLeads(data);
-  const archived = allArchived.filter((row) => !isArchivedWon(row));
-  const archivedWon = allArchived.length - archived.length;
+  const lostRows = authoritativeLostLeads(data);
+  const allLostRows = lostRows;
+  const archivedWon = 0;
   const crmLeads = crm.length;
-  const totalLeads = crmLeads + allArchived.length;
-  // Archived rows keep their campaign columns, so a paid lead that was later
-  // archived as lost still belongs in the paid denominator.
+  const totalLeads = crmLeads + allLostRows.length;
+  // Canonical Lost rows keep their campaign columns, so losses remain in the
+  // acquisition denominator whether the record is archived or in Lost stage.
   const leadsFromCampaign =
     crm.filter((c) => c.fromCampaign).length +
-    allArchived.filter((l) => !!l.campaignName || !!l.campaignId).length;
-  const won =
-    crm.filter((c) => c.isWon).length + allArchived.filter(archivedWinCounter(data)).length;
+    allLostRows.filter((l) => !!l.campaignName || !!l.campaignId).length;
+  const won = crm.filter((c) => c.isWon).length;
   const lostInCrm = 0;
-  const lost = archived.length;
-  // Close time stays on CRM rows: archived rows carry no closing date, and
-  // padding the sample with zeros would drag the average toward nothing.
+  const lost = lostRows.length;
+  // Close time stays on active CRM rows; Lost movement has its own canonical
+  // date report and must not pad this sample with zeros.
   const { avg: avgCloseDays, sample: closeSample } = closeStats(crm);
 
   // Money has exactly one primary source: Accounting.USD Paid, dated by
@@ -758,7 +745,7 @@ export function computeTotals(data: FilteredData): Totals {
     platformLeads,
 
     crmLeads,
-    archivedLeads: allArchived.length,
+    archivedLeads: allLostRows.length,
     totalLeads,
     leadsFromCampaign,
     leadsOther: totalLeads - leadsFromCampaign,
@@ -929,17 +916,15 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     if (!b.course && c.course) b.course = c.course;
   }
 
-  // Lost counts and their denominators come exclusively from the authoritative
-  // archived population. CRM stage text never increments this counter.
-  const archivedWin = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  // Lost counts and their denominators come from the canonical type-aware
+  // population. Stage display text never decides this counter.
+  for (const l of authoritativeLostLeads(data)) {
     const dimension = dimensions.fromFact(l, grain);
     if (!dimension.key || (grain === "campaign" && !l.campaignKey)) continue;
     if (grain !== "campaign" && !l.adName && !l.adId) continue;
     const b = touch(dimension);
     b.crmLeads++;
-    if (archivedWin(l)) b.won++;
-    else if (!isArchivedWon(l)) b.lost++;
+    b.lost++;
     if (!b.course && l.course) b.course = l.course;
   }
 
@@ -1598,12 +1583,10 @@ export function dailyTrend(
     e.leads++;
     if (c.isWon) e.won++;
   }
-  const archivedWinOnDay = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     const date = archivedLostReportingDate(l, data.snapshot);
     if (!date) continue;
     at(date).leads++;
-    if (archivedWinOnDay(l)) at(date).won++;
   }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
@@ -1720,13 +1703,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     }
   }
 
-  const archivedWinForCourse = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     if (!l.course) continue;
     const a = get(l.course, l.mainCategory);
     a.crmLeads++;
-    if (archivedWinForCourse(l)) a.won++;
-    else if (!isArchivedWon(l)) a.lost++;
+    a.lost++;
   }
 
   // Ad/ad-set/campaign names are more precise than campaign-level lead inference.
@@ -1842,15 +1823,11 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
   }
 
-  const archivedWinForTeam = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     const teamName = l.salesTeam || "—";
     const t = getTeam(teamName);
-    const win = archivedWinForTeam(l);
-    const loss = !isArchivedWon(l);
     t.agg.crmLeads++;
-    if (win) t.agg.won++;
-    else if (loss) t.agg.lost++;
+    t.agg.lost++;
     const person = l.salesperson || "—";
     let p = t.people.get(person);
     if (!p) {
@@ -1858,8 +1835,7 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
       t.people.set(person, p);
     }
     p.agg.crmLeads++;
-    if (win) p.agg.won++;
-    else if (loss) p.agg.lost++;
+    p.agg.lost++;
   }
 
   // Paid accounting rows carry salesperson/team and are the authoritative
@@ -1976,14 +1952,15 @@ function matrix<T>(
 /* --- lost ------------------------------------------------------------------- */
 
 /**
- * Every Lost breakdown and rate uses the same authoritative archived
- * population. Active CRM stage text is intentionally absent from this path.
+ * Every Lost breakdown and rate uses the same canonical type-aware population.
  */
 export function computeLost(data: FilteredData): LostBreakdown {
   const rows = authoritativeLostLeads(data);
   const labels = data.snapshot.sourceLabels;
   const monthOf = (d: string) => (d ? d.slice(0, 7) : "—");
   return {
+    byCategory: groupBy(rows, (r) => r.lostCategory || "—"),
+    byType: groupBy(rows, (r) => (r.recordType === "lead" ? "Lead" : "Opportunity")),
     byReason: groupBy(rows, (r) => r.lossReason || "—"),
     byCourse: groupBy(rows, (r) => r.course || "—"),
     byMonth: groupBy(rows, (r) => monthOf(archivedLostReportingDate(r, data.snapshot))).sort(
@@ -2026,10 +2003,8 @@ export function computeLeadOrigin(data: FilteredData): {
   cohorts: OriginCohort[];
   otherBySource: Grouped[];
 } {
-  // Archived lost leads belong to a cohort too, otherwise this card reports a
-  // near-zero lost count while the Lost page reports hundreds.
-  const archived = archivedCrmLeads(data);
-  const archivedWin = archivedWinCounter(data);
+  // Canonical Lost records belong to their acquisition cohort too.
+  const archived = authoritativeLostLeads(data);
   const build = (
     key: "campaign" | "other",
     rows: CrmLeadRow[],
@@ -2038,8 +2013,8 @@ export function computeLeadOrigin(data: FilteredData): {
   ): OriginCohort => {
     const { avg, sample } = closeStats(rows);
     const leads = rows.length + archivedRows.length;
-    const won = rows.filter((r) => r.isWon).length + archivedRows.filter(archivedWin).length;
-    const lost = archivedRows.filter((row) => !isArchivedWon(row)).length;
+    const won = rows.filter((r) => r.isWon).length;
+    const lost = archivedRows.length;
     return {
       key,
       leads,
@@ -2354,26 +2329,18 @@ export function execSummary(
   const ar: string[] = [];
 
   en.push(
-    `Between ${window} you spent ${money(t.spend)}. The clean lead population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} non-lost CRM rows plus ${t.archivedLeads.toLocaleString("en-US")} archived rows from Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}).`,
+    `Between ${window} you spent ${money(t.spend)}. The reportable CRM population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} active non-Lost records plus ${t.lost.toLocaleString("en-US")} canonical losses under CRM 1.26. ${t.won.toLocaleString("en-US")} closed Won (${pctStr(t.conversionRate)}).`,
   );
   ar.push(
-    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. إجمالي العملاء النظيف ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} من CRM بعد استبعاد Stage=Lost، مضافاً إليهم ${t.archivedLeads.toLocaleString("en-US")} صفاً مؤرشفاً من Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). أُغلق ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
+    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. سكان الـCRM القابلون للتقرير ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} سجل نشط غير Lost، ومعهم ${t.lost.toLocaleString("en-US")} حالة خسارة حسب عقد CRM 1.26. أُغلق Won عدد ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
   );
 
   if (t.lostArchived > 0) {
-    const wonNoteEn =
-      t.archivedWon > 0
-        ? ` ${t.archivedWon} archived rows are still marked Won in Odoo: they count as leads and as wins, never as losses.`
-        : "";
-    const wonNoteAr =
-      t.archivedWon > 0
-        ? ` وهناك ${t.archivedWon} صفاً مؤرشفاً ما زالت حالته Won في أودو، فيُحتسب ضمن العملاء وضمن الصفقات الرابحة، ولا يُحتسب ضياعاً.`
-        : "";
     en.push(
-      `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.${wonNoteEn}`,
+      `All ${t.lostArchived.toLocaleString("en-US")} losses follow the CRM 1.26 split: archived Leads with a reason, current Opportunities in the Lost stage, and archived Opportunity history.`,
     );
     ar.push(
-      `كل الصفقات الضائعة وعددها ${t.lostArchived.toLocaleString("en-US")} مأخوذة من Lost Analysis فقط، وتم استبعاد Stage=Lost من CRM من كل المؤشرات والرسوم.${wonNoteAr}`,
+      `كل حالات الخسارة وعددها ${t.lostArchived.toLocaleString("en-US")} تتبع تقسيم CRM 1.26: Leads مؤرشفة بسبب، وOpportunities حالية داخل Lost stage، مع تاريخ الفرص المؤرشفة.`,
     );
   }
 

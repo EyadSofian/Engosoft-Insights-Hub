@@ -10,7 +10,6 @@ export const Route = createFileRoute("/api/lost")({
           computeLost,
           computeTotals,
           authoritativeLostLeads,
-          archivedCrmLeads,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
@@ -20,7 +19,7 @@ export const Route = createFileRoute("/api/lost")({
         const labels = data.snapshot.sourceLabels;
 
         const lostRows = authoritativeLostLeads(data);
-        const archivedRows = archivedCrmLeads(data);
+        const canonicalRows = authoritativeLostLeads(data);
         const closedLostRows = authoritativeLostLeads(closedData);
         const createdInsideWindow = (createdAt: string) => {
           if (!createdAt) return false;
@@ -34,16 +33,16 @@ export const Route = createFileRoute("/api/lost")({
           createdInsideWindow(row.createdAt),
         );
 
-        // Each team's denominator is its clean CRM population plus that team's
-        // archived losses. The numerator is never inferred from CRM stage text.
+        // Each team's denominator is its active non-Lost population plus that
+        // team's canonical 1.26 losses. The two arrays are disjoint by design.
         const leadsByTeam = new Map<string, number>();
         const lostByTeam = new Map<string, number>();
         for (const c of data.crm) {
           const k = c.salesTeam || "—";
           leadsByTeam.set(k, (leadsByTeam.get(k) ?? 0) + 1);
         }
-        for (const archived of archivedRows) {
-          const k = archived.salesTeam || "—";
+        for (const lost of canonicalRows) {
+          const k = lost.salesTeam || "—";
           leadsByTeam.set(k, (leadsByTeam.get(k) ?? 0) + 1);
         }
         for (const lost of lostRows) {
@@ -67,11 +66,23 @@ export const Route = createFileRoute("/api/lost")({
             createdInPeriod: closedCreatedInPeriod.length,
             campaignCreatedInPeriod: closedCreatedInPeriod.filter(hasCampaign).length,
             fromOlderCohorts: closedLostRows.length - closedCreatedInPeriod.length,
+            lostLeads: closedLostRows.filter((row) => row.recordType === "lead").length,
+            lostOpportunities: closedLostRows.filter((row) => row.recordType === "opportunity")
+              .length,
+            currentOpportunities: closedLostRows.filter(
+              (row) => row.recordType === "opportunity" && row.active,
+            ).length,
+            historicalOpportunities: closedLostRows.filter(
+              (row) => row.recordType === "opportunity" && !row.active,
+            ).length,
           },
           detail: capped(
             lostRows.map((l) => ({
               createdAt: l.createdAt,
-              closeDate: l.closeDate,
+              closeDate: l.lostDate || l.closeDate,
+              recordType: l.recordType,
+              active: l.active,
+              category: l.lostCategory,
               reportingDate: archivedLostReportingDate(l, data.snapshot),
               campaign: l.campaignName,
               adName: l.adName,

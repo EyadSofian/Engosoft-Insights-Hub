@@ -5,9 +5,8 @@ export const Route = createFileRoute("/api/organic")({
     handlers: {
       GET: async ({ request }) => {
         const {
-          archivedCrmLeads,
           archivedLostReportingDate,
-          archivedWinCounter,
+          authoritativeLostLeads,
           computeCourses,
           computeTeams,
           computeTotals,
@@ -39,7 +38,6 @@ export const Route = createFileRoute("/api/organic")({
         const courses = computeCourses(data);
         const teams = computeTeams(data);
         const people = teams.flatMap((team) => team.people ?? []);
-        const archivedWon = archivedWinCounter(data);
         const rate = (part: number, total: number) => {
           const value = div(part, total);
           return value === null ? null : value * 100;
@@ -82,11 +80,10 @@ export const Route = createFileRoute("/api/organic")({
           source.leads += 1;
           if (row.isWon) source.won += 1;
         }
-        for (const row of archivedCrmLeads(data)) {
+        for (const row of authoritativeLostLeads(data)) {
           const source = sourceAt(row.sourceKey, row.source);
           source.leads += 1;
-          if (archivedWon(row)) source.won += 1;
-          else source.lost += 1;
+          source.lost += 1;
         }
         for (const row of data.accounting) {
           const source = sourceAt(row.sourceKey, row.source);
@@ -169,12 +166,11 @@ export const Route = createFileRoute("/api/organic")({
           if (row.isWon) campaign.won += 1;
           addDimensions(campaign, row.sourceKey, row.source, row.course);
         }
-        for (const row of archivedCrmLeads(data)) {
+        for (const row of authoritativeLostLeads(data)) {
           const campaign = campaignAt(row.campaignKey || row.campaignId, row.campaignName);
           if (!campaign) continue;
           campaign.leads += 1;
-          if (archivedWon(row)) campaign.won += 1;
-          else campaign.lost += 1;
+          campaign.lost += 1;
           addDimensions(campaign, row.sourceKey, row.source, row.course);
         }
         for (const row of data.accounting) {
@@ -244,12 +240,11 @@ export const Route = createFileRoute("/api/organic")({
           month.leads += 1;
           if (row.isWon) month.won += 1;
         }
-        for (const row of archivedCrmLeads(data)) {
+        for (const row of authoritativeLostLeads(data)) {
           const month = monthAt(archivedLostReportingDate(row, data.snapshot));
           if (!month) continue;
           month.leads += 1;
-          if (archivedWon(row)) month.won += 1;
-          else month.lost += 1;
+          month.lost += 1;
         }
         for (const row of data.accounting) {
           const month = monthAt(

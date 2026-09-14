@@ -259,7 +259,7 @@ check(
   "odoo-direct",
 );
 check(
-  "Archived Lost is direct Odoo or safely unavailable with zero rows",
+  "Canonical CRM Lost is direct Odoo or safely unavailable with zero rows",
   filters.health?.lostAuthority === "odoo-direct" ||
     (filters.health?.lostAuthority === "unavailable" && lost.detail.rows.length === 0),
   { authority: filters.health?.lostAuthority, rows: lost.detail.rows.length },
@@ -300,13 +300,13 @@ check(
   lost.breakdown.total,
 );
 check(
-  "Total leads = non-lost CRM + every archived Lost Analysis row",
+  "Total CRM intake = active non-Lost CRM + canonical Lost outcomes",
   totals.totalLeads === totals.crmLeads + totals.archivedLeads,
   totals.totalLeads,
   totals.crmLeads + totals.archivedLeads,
 );
 check(
-  "Archived Lost Analysis rows = Lost + archived Won",
+  "Outcome-only rows = canonical Lost + legacy archived-Won migration rows",
   totals.archivedLeads === totals.lost + totals.archivedWon,
   totals.archivedLeads,
   totals.lost + totals.archivedWon,
@@ -405,7 +405,7 @@ check(
   "number",
 );
 check(
-  "Website lead equation (active CRM + archived Lost)",
+  "Website lead equation (active CRM + canonical Lost)",
   website.totals.leads === website.leadSources.activeCrm + website.leadSources.archivedLost,
   website.totals.leads,
   website.leadSources.activeCrm + website.leadSources.archivedLost,

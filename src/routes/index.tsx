@@ -589,12 +589,12 @@ function Overview() {
       tone: "info",
       message:
         lang === "ar"
-          ? "الصفقات الضائعة تأتي من مصدر واحد معتمد فقط."
-          : "Lost deals come from one approved source only.",
+          ? "الصفقات الضائعة مصنفة بعقد CRM 1.26 المعتمد."
+          : "Lost deals follow the approved CRM 1.26 contract.",
       technical:
         lang === "ar"
-          ? `Lost Analysis: ${fmtNum(T.lostArchived)} صفقة مؤرشفة${T.archivedWon > 0 ? ` · ${fmtNum(T.archivedWon)} صفاً مؤرشفاً حالته Won يدخل في إجمالي الليدز والصفقات الرابحة ولا يدخل في Lost` : ""}. أي صف Stage=Lost في CRM مستبعد تماماً.`
-          : `Lost Analysis: ${fmtNum(T.lostArchived)} archived losses${T.archivedWon > 0 ? ` · ${fmtNum(T.archivedWon)} archived Won rows counted in total leads and wins, not in Lost` : ""}. CRM Stage=Lost rows are fully excluded.`,
+          ? `Lost: ${fmtNum(T.lostArchived)} حالة. Lost Lead = مؤرشف ومعه Lost Reason؛ Lost Opportunity = داخل Lost stage، مع إضافة التاريخ المؤرشف.`
+          : `Lost: ${fmtNum(T.lostArchived)} records. Lost Lead = archived with a Lost Reason; Lost Opportunity = in the Lost stage, plus archived history.`,
     });
   }
 

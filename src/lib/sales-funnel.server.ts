@@ -1,7 +1,6 @@
 import { normalizeName, normalizeSource } from "./sheet-cache.server";
-import { archivedCrmLeads, computeTotals, div, type FilteredData } from "./metrics.server";
+import { authoritativeLostLeads, computeTotals, div, type FilteredData } from "./metrics.server";
 import type { CrmLeadRow, GlobalFilters, Platform } from "./types";
-import { crmWonIds, isArchivedWonStage } from "./archived-won";
 
 export interface SalesAttributionRow {
   key: string;
@@ -189,28 +188,16 @@ export function buildSalesFunnel(data: FilteredData, filters: GlobalFilters) {
     recordLead(at(campaignBuckets, campaign.key, campaign.name), lead);
   }
 
-  // An archived row whose stage is still Won is a closed win, not a loss and
-  // not a lead sitting in limbo.
-  //
-  // The shared rule is used rather than this file's `stageKey`, which collapses
-  // the bilingual `Won / ربح` to `won ربح` and so matched no archived win at
-  // all — every one of them fell through to the loss counter.
-  const alreadyCounted = crmWonIds(data.crm);
-  for (const lead of archivedCrmLeads(data)) {
-    const won = isArchivedWonStage(lead.stage);
-    if (won && lead.id && alreadyCounted.has(lead.id)) continue;
-
+  for (const lead of authoritativeLostLeads(data)) {
     const source = sourceIdentity(lead.sourceKey, lead.source, labels);
     const sourceBucket = at(sourceBuckets, source.key, source.name);
     sourceBucket.leads += 1;
-    if (won) sourceBucket.won += 1;
-    else sourceBucket.lost += 1;
+    sourceBucket.lost += 1;
 
     const campaign = campaignIdentity(lead.campaignKey, lead.campaignName);
     const campaignBucket = at(campaignBuckets, campaign.key, campaign.name);
     campaignBucket.leads += 1;
-    if (won) campaignBucket.won += 1;
-    else campaignBucket.lost += 1;
+    campaignBucket.lost += 1;
   }
 
   for (const order of data.invoiced) {

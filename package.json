@@ -48,6 +48,7 @@
     "test:response-compression": "node --experimental-strip-types scripts/test-response-compression.mjs",
     "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs",
     "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs",
+    "test:crm-contract": "node --experimental-strip-types scripts/test-crm-contract.mjs",
     "test:weekend-analysis": "node --experimental-strip-types scripts/test-weekend-analysis.mjs",
     "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs",
     "test:campaign-return-band": "node --experimental-strip-types scripts/test-campaign-return-band.mjs",

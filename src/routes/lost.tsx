@@ -8,6 +8,7 @@ import {
   Card,
   ErrorState,
   Notice,
+  Pill,
   SectionTitle,
   Segmented,
   Skeleton,
@@ -23,11 +24,15 @@ import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-c
 
 export const Route = createFileRoute("/lost")({ component: Lost });
 
-type ShareView = "reason" | "course" | "team" | "salesperson" | "source" | "month";
+type ShareView =
+  "category" | "reason" | "type" | "course" | "team" | "salesperson" | "source" | "month";
 
 interface LostRowView {
   createdAt: string;
   closeDate: string;
+  recordType: "lead" | "opportunity";
+  active: boolean;
+  category: string;
   reportingDate: string;
   campaign: string;
   adName: string;
@@ -50,6 +55,10 @@ interface Resp {
     createdInPeriod: number;
     campaignCreatedInPeriod: number;
     fromOlderCohorts: number;
+    lostLeads: number;
+    lostOpportunities: number;
+    currentOpportunities: number;
+    historicalOpportunities: number;
   };
   detail: { rows: LostRowView[]; total: number; truncated: boolean };
   health: DataHealth;
@@ -95,6 +104,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
   const topReason = B.byReason[0] ?? null;
 
   const common = [
+    lostSection("categories", A ? "فئات الخسارة" : "Loss categories", B.byCategory, lang),
     lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", B.byReason, lang),
     lostSection("teams", A ? "أكثر الفرق تأثرًا" : "Most affected teams", B.byTeam, lang),
     lostSection("courses", A ? "أكثر الدورات تأثرًا" : "Most affected courses", B.byCourse, lang),
@@ -109,8 +119,8 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
       tone: "rose",
       icon: <TrendingDown size={16} />,
       definition: A
-        ? "العملاء الذين أُنشئوا داخل الفترة وانتهت صفقتهم بالخسارة، من مصدر الخسائر المعتمد وحده."
-        : "Leads created inside the window whose deal ended as lost, from the approved Lost source only.",
+        ? "كل حالات Lost المطابقة لعقد CRM 1.26: الـLead المؤرشف بسبب، والـOpportunity الموجودة في Lost stage، مع التاريخ القديم المؤرشف."
+        : "Every loss under CRM 1.26: archived Leads with a reason, Opportunities in the Lost stage, plus archived historical losses.",
       formula: A
         ? `${fmtNum(B.total)} صفقة ضائعة، محسوبة بتاريخ إنشاء الليد لا بتاريخ إغلاقه.`
         : `${fmtNum(B.total)} lost deals, counted on the lead's creation date and not on its close date.`,
@@ -190,8 +200,8 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
       tone: "amber",
       icon: <CalendarClock size={16} />,
       definition: A
-        ? "الصفقات التي أُغلقت خاسرة داخل الفترة أيًا كان تاريخ إنشائها. هذا مقياس عمل الفترة، بخلاف الرقم المجاور الذي يقيس كوهورت الليدز."
-        : "Deals closed as lost inside the window, whatever their creation date. This measures the period's work, unlike the figure beside it, which measures the period's lead cohort.",
+        ? "حالات Lost التي سُجل تاريخ خسارتها داخل الفترة: date_closed للـLeads وlost_verification_date للـOpportunities."
+        : "Losses dated inside the window: date_closed for Leads and lost_verification_date for Opportunities.",
       formula: A
         ? `منها ${fmtNum(M.createdInPeriod)} أُنشئت داخل الفترة و${fmtNum(M.fromOlderCohorts)} من كوهورتات أقدم.`
         : `Of these, ${fmtNum(M.createdInPeriod)} were created inside the window and ${fmtNum(M.fromOlderCohorts)} came from older cohorts.`,
@@ -213,7 +223,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
         },
         { key: "cohort", label: A ? "كوهورت الفترة" : "Cohort lost", value: fmtNum(B.total) },
       ],
-      breakdowns: common.slice(0, 3),
+      breakdowns: common.slice(0, 4),
     },
     reason: {
       id: "lost.reason",
@@ -240,7 +250,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
             },
           ]
         : undefined,
-      breakdowns: [common[0], common[2]],
+      breakdowns: [common[1], common[0]],
     },
   };
 }
@@ -276,6 +286,22 @@ function Lost() {
       width: "120px",
       sortValue: (r) => r.closeDate,
       render: (r) => fmtDate(r.closeDate, lang),
+    },
+    {
+      key: "recordType",
+      header: lang === "ar" ? "النوع" : "Type",
+      sortValue: (r) => r.recordType,
+      render: (r) => (
+        <Pill tone={r.recordType === "lead" ? "brand" : "warning"}>
+          {r.recordType === "lead" ? "Lead" : "Opportunity"}
+        </Pill>
+      ),
+    },
+    {
+      key: "category",
+      header: lang === "ar" ? "فئة الخسارة" : "Lost category",
+      sortValue: (r) => r.category,
+      render: (r) => r.category || "—",
     },
     {
       key: "reason",
@@ -339,8 +365,8 @@ function Lost() {
         title={t("lost")}
         subtitle={
           lang === "ar"
-            ? "تحليل جودة التسويق حسب تاريخ دخول الليد، وحركة الإغلاق ظاهرة لوحدها"
-            : "Marketing quality by lead creation date, with closures reported separately"
+            ? "Lost Leads وLost Opportunities بقواعد CRM 1.26، مع فصل الكوهورت عن حركة الخسارة"
+            : "Lost Leads and Opportunities under CRM 1.26, separating cohort quality from loss movement"
         }
         period={reportingPeriod}
       />
@@ -373,8 +399,8 @@ function Lost() {
                       : "The approved Lost source is unavailable, so the report stops rather than showing a misleading zero.",
                   technical:
                     lang === "ar"
-                      ? "Archived Lost غير متاح من Odoo مباشرة ولا من آخر نسخة مخزّنة."
-                      : "Archived Lost is unavailable from Odoo directly and from the last stored snapshot.",
+                      ? "Canonical CRM Lost غير متاح من Odoo مباشرة ولا من آخر نسخة مخزّنة."
+                      : "Canonical CRM Lost is unavailable from Odoo directly and from the last stored snapshot.",
                 },
               ]}
             />
@@ -394,8 +420,8 @@ function Lost() {
                       : "The data is present and is not counted as zero, but the newest rows may be missing.",
                   technical:
                     lang === "ar"
-                      ? "المصدر المباشر Odoo Archived Lost متعذر مؤقتاً؛ يتم استخدام النسخة المخزّنة."
-                      : "The direct Odoo Archived Lost source is temporarily unreachable; the stored snapshot is in use.",
+                      ? "مصدر Odoo CRM المباشر متعذر مؤقتاً؛ يتم استخدام آخر لقطة صحيحة لتصنيف Lost."
+                      : "The direct Odoo CRM source is temporarily unreachable; the last valid Lost classification is in use.",
                 },
               ]}
             />
@@ -421,7 +447,10 @@ function Lost() {
             />
             <MetricDetailTrigger
               detail={metrics!.closed}
-              card={{ index: 2, sub: lang === "ar" ? "حسب تاريخ الإغلاق" : "By close date" }}
+              card={{
+                index: 2,
+                sub: lang === "ar" ? "حسب تاريخ Lost المعتمد" : "By canonical Lost date",
+              }}
             />
             <MetricDetailTrigger
               detail={metrics!.reason}
@@ -452,23 +481,20 @@ function Lost() {
             </SectionTitle>
             <p className="mb-4 text-sm leading-7 text-text-muted">
               {lang === "ar"
-                ? `خلال الفترة اتقفل ${fmtNum(data.closureMovement.closedLost)} ليد Lost. منهم ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} جايين من Campaign واتعملوا أصلًا في نفس الفترة، و${fmtNum(data.closureMovement.fromOlderCohorts)} كانوا ليدز أقدم واتقفلوا دلوقتي.`
-                : `${fmtNum(data.closureMovement.closedLost)} leads closed Lost in the period. ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} were campaign leads created in the same period, while ${fmtNum(data.closureMovement.fromOlderCohorts)} came from older cohorts.`}
+                ? `خلال الفترة اتسجل ${fmtNum(data.closureMovement.closedLost)} حالة Lost: ${fmtNum(data.closureMovement.lostLeads)} Leads و${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. منها ${fmtNum(data.closureMovement.currentOpportunities)} فرصة حالية داخل Lost stage.`
+                : `${fmtNum(data.closureMovement.closedLost)} losses were dated in the period: ${fmtNum(data.closureMovement.lostLeads)} Leads and ${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. ${fmtNum(data.closureMovement.currentOpportunities)} are current Opportunities in the Lost stage.`}
             </p>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {[
                 [lang === "ar" ? "اتقفل Lost" : "Closed Lost", data.closureMovement.closedLost],
+                [lang === "ar" ? "Lost Leads" : "Lost Leads", data.closureMovement.lostLeads],
                 [
-                  lang === "ar" ? "عليه Campaign" : "With campaign",
-                  data.closureMovement.fromCampaign,
+                  lang === "ar" ? "Lost Opportunities" : "Lost Opportunities",
+                  data.closureMovement.lostOpportunities,
                 ],
                 [
-                  lang === "ar" ? "اتعمل في نفس الفترة" : "Created in period",
-                  data.closureMovement.createdInPeriod,
-                ],
-                [
-                  lang === "ar" ? "Campaign من نفس الفترة" : "Period campaign cohort",
-                  data.closureMovement.campaignCreatedInPeriod,
+                  lang === "ar" ? "فرص حالية في Lost" : "Current Lost-stage opps",
+                  data.closureMovement.currentOpportunities,
                 ],
               ].map(([label, value]) => (
                 <div
@@ -497,6 +523,8 @@ function Lost() {
             <div className="hscroll mb-5 flex gap-2">
               {(
                 [
+                  ["category", lang === "ar" ? "فئة الخسارة" : "Lost category"],
+                  ["type", "Lead / Opportunity"],
                   ["reason", t("loss_reason")],
                   ["course", t("by_course")],
                   ["team", t("by_team")],
@@ -585,7 +613,7 @@ function Lost() {
                 rows={data.detail.rows}
                 cols={cols}
                 searchable={(r) =>
-                  `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
+                  `${r.category} ${r.reason} ${r.recordType} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
                 }
                 initialSort={{ key: "reportingDate", dir: -1 }}
                 csvFilename="engosoft-lost"
@@ -594,6 +622,9 @@ function Lost() {
                   created: r.createdAt,
                   close_date: r.closeDate,
                   reporting_date: r.reportingDate,
+                  record_type: r.recordType,
+                  active: String(r.active),
+                  lost_category: r.category,
                   reason: r.reason,
                   course: r.course,
                   main_category: r.mainCategory,
@@ -615,7 +646,9 @@ function Lost() {
 
 function shareRows(breakdown: LostBreakdown, view: ShareView): Grouped[] {
   return {
+    category: breakdown.byCategory,
     reason: breakdown.byReason,
+    type: breakdown.byType,
     course: breakdown.byCourse,
     team: breakdown.byTeam,
     salesperson: breakdown.bySalesperson,

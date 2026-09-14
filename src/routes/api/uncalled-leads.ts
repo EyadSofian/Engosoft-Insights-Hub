@@ -171,7 +171,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
 
         /**
          * This is an action queue, not a historical funnel. Closed Won and every
-         * archived Lost row are deliberately excluded before severity is
+         * canonical Lost row are deliberately excluded before severity is
          * calculated; a closed record can still belong in reports, but it can
          * never be an employee's current "critical follow-up".
          */

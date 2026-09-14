@@ -352,7 +352,7 @@ export function PerfExplorer({
   spendNote?: string;
   /** Campaigns the live platform-status collector says are eligible to run now. */
   activeCampaignStates?: CampaignOperationalState[];
-  /** False while the direct Odoo Lost archive is unavailable. */
+  /** False while the canonical Odoo CRM Lost population is unavailable. */
   lostAvailable?: boolean;
   title?: string;
   subtitle?: string;
@@ -606,8 +606,8 @@ export function PerfExplorer({
           style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
         >
           {lang === "ar"
-            ? "بيانات Archived Lost مش متاحة لا من Odoo ولا من النسخة الآمنة؛ علشان مانضللكش، الحملات الناضجة مش هتظهر «ناجحة» لحد ما المصدر يرجع."
-            : "Archived Lost is unavailable from both Odoo and the safe snapshot. To avoid a misleading result, mature campaigns will not be marked Successful until the source recovers."}
+            ? "بيانات CRM Lost مش متاحة لا من Odoo ولا من النسخة الآمنة؛ علشان مانضللكش، الحملات الناضجة مش هتظهر «ناجحة» لحد ما المصدر يرجع."
+            : "CRM Lost is unavailable from both Odoo and the safe snapshot. To avoid a misleading result, mature campaigns will not be marked Successful until the source recovers."}
         </p>
       )}
       {decisionMode && activePlatformCount > evaluatedLiveCount && (
