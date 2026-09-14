@@ -70,6 +70,9 @@ import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-lead
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAcquisitionClosedLoopRouteImport } from './routes/api/acquisition.closed-loop'
+import { Route as ApiAcquisitionClosedLoopRefreshRouteImport } from './routes/api/acquisition.closed-loop-refresh'
+import { Route as ApiAcquisitionCreativeDetailRouteImport } from './routes/api/acquisition.creative-detail'
 import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
 import { Route as ApiAcquisitionPerformanceRouteImport } from './routes/api/acquisition.performance'
 import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
@@ -417,6 +420,24 @@ const ApiYoyRoute = ApiYoyRouteImport.update({
   path: '/api/yoy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionClosedLoopRoute =
+  ApiAcquisitionClosedLoopRouteImport.update({
+    id: '/api/acquisition/closed-loop',
+    path: '/api/acquisition/closed-loop',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionClosedLoopRefreshRoute =
+  ApiAcquisitionClosedLoopRefreshRouteImport.update({
+    id: '/api/acquisition/closed-loop-refresh',
+    path: '/api/acquisition/closed-loop-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionCreativeDetailRoute =
+  ApiAcquisitionCreativeDetailRouteImport.update({
+    id: '/api/acquisition/creative-detail',
+    path: '/api/acquisition/creative-detail',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
   id: '/api/acquisition/events',
   path: '/api/acquisition/events',
@@ -685,6 +706,9 @@ export interface FileRoutesByFullPath {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
@@ -787,6 +811,9 @@ export interface FileRoutesByTo {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
@@ -890,6 +917,9 @@ export interface FileRoutesById {
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
   '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
@@ -994,6 +1024,9 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
@@ -1096,6 +1129,9 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
@@ -1198,6 +1234,9 @@ export interface FileRouteTypes {
     | '/api/website'
     | '/api/weekend'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
     | '/api/acquisition/events'
     | '/api/acquisition/performance'
     | '/api/acquisition/summary'
@@ -1301,6 +1340,9 @@ export interface RootRouteChildren {
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAcquisitionClosedLoopRoute: typeof ApiAcquisitionClosedLoopRoute
+  ApiAcquisitionClosedLoopRefreshRoute: typeof ApiAcquisitionClosedLoopRefreshRoute
+  ApiAcquisitionCreativeDetailRoute: typeof ApiAcquisitionCreativeDetailRoute
   ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
   ApiAcquisitionPerformanceRoute: typeof ApiAcquisitionPerformanceRoute
   ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
@@ -1771,6 +1813,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/acquisition/closed-loop': {
+      id: '/api/acquisition/closed-loop'
+      path: '/api/acquisition/closed-loop'
+      fullPath: '/api/acquisition/closed-loop'
+      preLoaderRoute: typeof ApiAcquisitionClosedLoopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/closed-loop-refresh': {
+      id: '/api/acquisition/closed-loop-refresh'
+      path: '/api/acquisition/closed-loop-refresh'
+      fullPath: '/api/acquisition/closed-loop-refresh'
+      preLoaderRoute: typeof ApiAcquisitionClosedLoopRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/creative-detail': {
+      id: '/api/acquisition/creative-detail'
+      path: '/api/acquisition/creative-detail'
+      fullPath: '/api/acquisition/creative-detail'
+      preLoaderRoute: typeof ApiAcquisitionCreativeDetailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/acquisition/events': {
       id: '/api/acquisition/events'
       path: '/api/acquisition/events'
@@ -2109,6 +2172,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAcquisitionClosedLoopRoute: ApiAcquisitionClosedLoopRoute,
+  ApiAcquisitionClosedLoopRefreshRoute: ApiAcquisitionClosedLoopRefreshRoute,
+  ApiAcquisitionCreativeDetailRoute: ApiAcquisitionCreativeDetailRoute,
   ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
   ApiAcquisitionPerformanceRoute: ApiAcquisitionPerformanceRoute,
   ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,

@@ -64,12 +64,16 @@ async function existingSources(): Promise<{
   conversations: boolean;
   landing: boolean;
   dashboardRows: boolean;
+  crmMetaLeads: boolean;
 }> {
   const result = await getPool().query<Row>(
     `SELECT to_regclass('public.meta_lead_acquisitions') AS leads,
             to_regclass('public.chatwoot_conversation_attribution') AS conversations,
             to_regclass('public.landing_attribution_sessions') AS landing,
-            to_regclass('public.dashboard_rows') AS dashboard_rows`,
+            to_regclass('public.dashboard_rows') AS dashboard_rows,
+            to_regclass('public.acquisition_crm_links') IS NOT NULL
+              AND to_regclass('public.crm_lead_outcomes') IS NOT NULL
+              AND to_regclass('public.meta_entity_graph') IS NOT NULL AS crm_meta_leads`,
   );
   const row = result.rows[0] ?? {};
   return {
@@ -77,6 +81,7 @@ async function existingSources(): Promise<{
     conversations: Boolean(row.conversations),
     landing: Boolean(row.landing),
     dashboardRows: Boolean(row.dashboard_rows),
+    crmMetaLeads: row.crm_meta_leads === true,
   };
 }
 
@@ -98,6 +103,38 @@ const META_LEADS_SQL = `
     attribution_method, attribution_confidence, attribution_scope, occurred_at, received_at, processed_at,
     unknown_reason, NULL::text, NULL::boolean, NULL::numeric
   FROM meta_lead_acquisitions`;
+
+/**
+ * Meta instant-form leads the CRM already holds with Meta's own lead ID (the
+ * Lead Ads → Odoo integration writes `fb_lead_id` and the ad ID). Exact only when
+ * the synced Meta catalog resolves that ad; the hierarchy then comes from the
+ * catalog, never from the lead's campaign text. A lead the Insights Lead Ads
+ * ingestion stored itself keeps that record instead.
+ */
+function crmMetaLeadsSql(directLeads: boolean): string {
+  return `
+  SELECT 'meta_lead:' || o.facebook_lead_id, 'meta_lead', o.facebook_lead_id, 'meta_instant_form',
+    ${sourcePlatformSql("o.source")}, 'meta_instant_form',
+    'meta_lead:' || o.facebook_lead_id, '', o.facebook_lead_id, '', '', '', '',
+    '', '', '', COALESCE(g.account_id, ''), COALESCE(g.campaign_id, o.crm_campaign_id), COALESCE(g.campaign_name, ''),
+    COALESCE(g.adset_id, ''), COALESCE(g.adset_name, ''), COALESCE(g.ad_id, o.ad_id), COALESCE(g.ad_name, ''),
+    COALESCE(g.creative_id, ''), COALESCE(g.creative_name, ''), '',
+    '', '', '', '', '', '', '',
+    'crm_carried_meta_lead_id',
+    CASE WHEN g.ad_id IS NOT NULL THEN 'exact'
+         WHEN o.ad_id <> '' OR o.crm_campaign_id <> '' THEN 'declared' ELSE 'unknown' END,
+    'paid', o.created_at, o.created_at, o.refreshed_at,
+    CASE WHEN g.ad_id IS NOT NULL THEN '' WHEN o.ad_id <> '' THEN 'ad_not_in_meta_catalog' ELSE 'no_ad_id' END,
+    o.business_status, o.won, o.revenue_paid_usd
+  FROM acquisition_crm_links l
+  JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+  LEFT JOIN meta_entity_graph g ON o.ad_id <> '' AND g.ad_id = o.ad_id
+  WHERE l.is_primary AND l.match_method = 'crm_carried_provider_lead_id'${
+    directLeads
+      ? " AND NOT EXISTS (SELECT 1 FROM meta_lead_acquisitions m WHERE m.lead_id = o.facebook_lead_id)"
+      : ""
+  }`;
+}
 
 // Mirrors chatwootSourceType in acquisition-attribution.ts.
 const CONVERSATION_SOURCE_TYPE = `CASE
@@ -158,6 +195,7 @@ export async function eventsCte(): Promise<{ cte: string | null; dashboardRows: 
   const sources = await existingSources();
   const parts = [
     sources.leads ? META_LEADS_SQL : "",
+    sources.crmMetaLeads ? crmMetaLeadsSql(sources.leads) : "",
     sources.conversations ? CONVERSATIONS_SQL : "",
     sources.landing ? landingSql("landing_submission") : "",
     sources.landing ? landingSql("landing_visit") : "",

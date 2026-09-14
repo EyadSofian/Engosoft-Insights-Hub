@@ -737,8 +737,140 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       "كم عميلًا ورسالة وصلت اليوم وفي الفترة، ومن أين بالضبط: القناة والحملة والإعلان والمادة وصفحة الهبوط ونموذج Meta.",
       "How many leads and messages arrived today and in the period, and exactly where from: channel, campaign, ad, creative, landing page and Meta form.",
     ),
-    tabs: [],
+    tabs: [
+      {
+        id: "overview",
+        title: q("نظرة عامة", "Overview"),
+        summary: q(
+          "تغطية المعرّفات والقمع المغلق من الإعلان للإيراد، واستحواذ اليوم والفترة حسب القناة.",
+          "Identifier coverage, the closed funnel from ad to revenue, and today's and the period's acquisitions by channel.",
+        ),
+        sections: ["closed_loop", "today", "breakdowns"],
+      },
+      {
+        id: "campaigns",
+        title: q("الحملات", "Campaigns"),
+        summary: q(
+          "كل حملة بمعرّفها: الصرف والعملاء والمطابقون في CRM وعروض الأسعار والفوز والإيراد وROAS.",
+          "Each campaign by ID: spend, leads, CRM-matched, quotations, wins, revenue and ROAS.",
+        ),
+        sections: ["hierarchy"],
+      },
+      {
+        id: "adsets",
+        title: q("مجموعات الإعلانات", "Ad sets"),
+        summary: q(
+          "نفس مقاييس الجودة والإيراد لكل مجموعة إعلان، مع النزول من الحملة.",
+          "The same quality and revenue metrics for each ad set, drilled down from its campaign.",
+        ),
+        sections: ["hierarchy"],
+      },
+      {
+        id: "ads",
+        title: q("الإعلانات", "Ads"),
+        summary: q(
+          "كل إعلان بمعرّفه ونتائجه في CRM والمبيعات، ومنه تُفتح مادته الإعلانية.",
+          "Each ad by ID with its CRM and sales results; opens its creative.",
+        ),
+        sections: ["hierarchy"],
+      },
+      {
+        id: "creatives",
+        title: q("المواد الإعلانية", "Creatives"),
+        summary: q(
+          "جودة كل مادة إعلانية: تكلفة العميل والعميل المؤهل والفوز والإيراد وROAS، مع صفحة تفصيل.",
+          "Quality per creative: cost per lead and per qualified lead, wins, revenue and ROAS, with a detail page.",
+        ),
+        sections: ["hierarchy"],
+      },
+      {
+        id: "assets",
+        title: q("الأصول", "Assets"),
+        summary: q(
+          "الفيديوهات والصور المستخدمة داخل المواد الإعلانية، كمؤشر تقارير وليس إسنادًا.",
+          "Videos and images used inside creatives, as a reporting signal rather than attribution.",
+        ),
+        sections: ["assets"],
+      },
+      {
+        id: "forms",
+        title: q("نماذج العملاء", "Lead forms"),
+        summary: q(
+          "عملاء نماذج Meta الفورية حسب النموذج والحملة والإعلان والمادة.",
+          "Meta instant-form leads by form, campaign, ad and creative.",
+        ),
+        sections: ["forms"],
+      },
+      {
+        id: "landing",
+        title: q("صفحات الهبوط", "Landing pages"),
+        summary: q(
+          "المشاهدات والزوار والإرسالات ومعدل التحويل لكل صفحة هبوط متتبعة.",
+          "Views, visitors, submissions and conversion rate for each tracked landing page.",
+        ),
+        sections: ["landing"],
+      },
+      {
+        id: "quality",
+        title: q("جودة العملاء", "Lead quality"),
+        summary: q(
+          "ترتيب المصادر بجودة العميل وليس بعدده: الأرخص مقابل الأعلى تأهيلًا وفوزًا.",
+          "Sources ranked by lead quality, not volume: cheapest against best-qualifying and best-winning.",
+        ),
+        sections: ["quality"],
+      },
+      {
+        id: "sales",
+        title: q("نتائج المبيعات", "Sales outcomes"),
+        summary: q(
+          "كل عميل مرتبط بمعرّف دقيق وحالته في CRM وأمر البيع والفاتورة والإيراد المدفوع.",
+          "Every exactly linked lead with its CRM status, sale order, invoice and paid revenue.",
+        ),
+        sections: ["sales"],
+      },
+    ],
     sections: [
+      {
+        id: "closed_loop",
+        title: q("الربط المغلق", "Closed loop"),
+        elements: [
+          "acquisition_performance.closed_loop_coverage",
+          "acquisition_performance.closed_loop_funnel",
+        ],
+      },
+      {
+        id: "hierarchy",
+        title: q("هرم Meta", "Meta hierarchy"),
+        elements: [
+          "acquisition_performance.campaign_table",
+          "acquisition_performance.creative_table",
+        ],
+      },
+      {
+        id: "assets",
+        title: q("الأصول", "Assets"),
+        elements: ["acquisition_performance.asset_table"],
+      },
+      {
+        id: "forms",
+        title: q("نماذج Meta", "Meta forms"),
+        elements: [],
+      },
+      {
+        id: "landing",
+        title: q("صفحات الهبوط", "Landing pages"),
+        elements: ["acquisition_performance.landing_pages"],
+      },
+      {
+        id: "quality",
+        title: q("جودة العملاء", "Lead quality"),
+        elements: ["acquisition_performance.lead_quality"],
+      },
+      {
+        id: "sales",
+        title: q("نتائج المبيعات", "Sales outcomes"),
+        elements: ["acquisition_performance.sales_outcomes"],
+      },
       {
         id: "today",
         title: q("اليوم", "Today"),
@@ -746,12 +878,8 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       },
       {
         id: "breakdowns",
-        title: q("التفصيل", "Breakdowns"),
-        elements: [
-          "acquisition_performance.campaign_table",
-          "acquisition_performance.creative_table",
-          "acquisition_performance.landing_pages",
-        ],
+        title: q("القنوات والوجهات", "Channels and destinations"),
+        elements: [],
       },
     ],
     elements: [
@@ -788,8 +916,8 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         type: "table",
         title: q("أداء الحملات", "Campaign performance"),
         meaning: q(
-          "الاستحواذ الدقيق والصرف وتكلفة الاستحواذ لكل حملة ومجموعة إعلان وإعلان ومادة.",
-          "Exact acquisitions, spend and cost per acquisition for each campaign, ad set, ad and creative.",
+          "الاستحواذ الدقيق والصرف ثم نتائجه في CRM والمبيعات لكل حملة ومجموعة إعلان وإعلان، بالمعرّف فقط.",
+          "Exact acquisitions and spend, then their CRM and sales results, for each campaign, ad set and ad, by ID only.",
         ),
         sourceCapability: "acquisition_performance",
         periodSensitive: true,
@@ -803,8 +931,8 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         type: "table",
         title: q("أداء المواد الإعلانية", "Creative performance"),
         meaning: q(
-          "المحادثات وعملاء النماذج والإرسالات المرتبطة بمعرّف كل مادة إعلانية.",
-          "Conversations, form leads and submissions linked to each creative ID.",
+          "العملاء المرتبطون بمعرّف كل مادة إعلانية ونسبة تأهيلهم وفوزهم والإيراد وROAS.",
+          "Leads linked to each creative ID, with qualification, win rate, revenue and ROAS.",
         ),
         sourceCapability: "acquisition_performance",
         periodSensitive: true,
@@ -824,9 +952,85 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         filterSensitive: true,
         questions: [q("أنهي صفحة هبوط بتحوّل أحسن؟", "Which landing page converts best?")],
       },
+      {
+        id: "acquisition_performance.closed_loop_coverage",
+        type: "kpi",
+        title: q("تغطية الربط المغلق", "Closed-loop coverage"),
+        meaning: q(
+          "نسبة الاستحواذ الذي يحمل معرّف حملة ومجموعة وإعلان ومادة ونموذج، ونسبة المطابق منه في CRM.",
+          "The share of acquisitions carrying a campaign, ad set, ad, creative and form ID, and the share matched in the CRM.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: false,
+        questions: [
+          q(
+            "كام في المية من العملاء مربوطين بالمبيعات؟",
+            "What share of leads is linked to sales?",
+          ),
+        ],
+      },
+      {
+        id: "acquisition_performance.closed_loop_funnel",
+        type: "chart",
+        title: q("القمع من الإعلان للإيراد", "Ad-to-revenue funnel"),
+        meaning: q(
+          "الصرف ثم العملاء ثم المطابقون في CRM ثم المهتمون والمؤهلون وعروض الأسعار والفوز والفواتير والإيراد المدفوع.",
+          "Spend, leads, CRM-matched, interested, qualified, quotations, wins, invoices and paid revenue.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [q("فين بنخسر العملاء في القمع؟", "Where do leads drop out of the funnel?")],
+      },
+      {
+        id: "acquisition_performance.asset_table",
+        type: "table",
+        title: q("أداء الأصول", "Asset performance"),
+        meaning: q(
+          "الفيديوهات والصور داخل المواد الإعلانية مع نتائج المادة التي تحتويها، كتقارير فقط.",
+          "Videos and images inside creatives with the results of the creative that holds them, as reporting only.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [q("أنهي فيديو في أحسن كريتيف؟", "Which video is in the best creative?")],
+      },
+      {
+        id: "acquisition_performance.lead_quality",
+        type: "table",
+        title: q("ترتيب جودة العملاء", "Lead quality ranking"),
+        meaning: q(
+          "المصادر مرتبة بنسبة التأهيل والفوز والإيراد لكل عميل، وليس بأقل تكلفة عميل.",
+          "Sources ranked by qualification, win rate and revenue per lead, not by lowest cost per lead.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q(
+            "أنهي كريتيف بيجيب عملاء بيشتروا فعلًا؟",
+            "Which creative brings leads who actually buy?",
+          ),
+        ],
+      },
+      {
+        id: "acquisition_performance.sales_outcomes",
+        type: "table",
+        title: q("نتائج المبيعات", "Sales outcomes"),
+        meaning: q(
+          "كل عميل مرتبط بمعرّف دقيق مع مرحلته في CRM والمسؤول وأمر البيع والفاتورة والإيراد المدفوع.",
+          "Each exactly linked lead with its CRM stage, salesperson, sale order, invoice and paid revenue.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [q("مين كسب من عملاء الحملة دي؟", "Who won deals from this campaign's leads?")],
+      },
     ],
     suggestedQuestions: [
       q("جالنا كام عميل ورسالة النهارده؟", "How many leads and messages came in today?"),
+      q("أنهي كريتيف جاب أعلى إيراد؟", "Which creative brought the most revenue?"),
       q("ليه الإسناد الدقيق صفر؟", "Why is exact attribution zero?"),
     ],
   },

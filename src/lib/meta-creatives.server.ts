@@ -134,6 +134,39 @@ export function normalizeMetaGraphAd(
     video.image_url,
     imageUrl,
   );
+  const imageHash =
+    text(creative.image_hash) ||
+    text(link.image_hash) ||
+    text(photo.image_hash) ||
+    text(assetImages[0]?.hash);
+  // Provider asset identities only: video IDs and image hashes. Meta attributes
+  // results to the ad and creative, so these are reporting context, not grains.
+  const feedAssets = [
+    ...(videoId
+      ? [{ type: "video" as const, id: videoId, thumbnailUrl: text(creative.thumbnail_url) }]
+      : []),
+    ...(imageHash ? [{ type: "image" as const, id: imageHash, url: imageUrl }] : []),
+    ...assetVideos
+      .map((asset) => ({
+        type: "video" as const,
+        id: text(asset.video_id),
+        thumbnailUrl: text(asset.thumbnail_url),
+      }))
+      .filter((asset) => asset.id),
+    ...assetImages
+      .map((asset) => ({ type: "image" as const, id: text(asset.hash), url: text(asset.url) }))
+      .filter((asset) => asset.id),
+    ...children
+      .map((child) => ({
+        type: "image" as const,
+        id: text(child.image_hash),
+        url: text(child.picture),
+      }))
+      .filter((asset) => asset.id),
+  ].filter(
+    (asset, index, all) =>
+      all.findIndex((other) => other.type === asset.type && other.id === asset.id) === index,
+  );
   const isCarousel = children.length > 1 || assetImages.length + assetVideos.length > 1;
   const mediaType = isCarousel ? "carousel" : videoId ? "video" : imageUrl ? "image" : "text";
   const headline =
@@ -176,6 +209,8 @@ export function normalizeMetaGraphAd(
     thumbnailUrl,
     videoUrl: "",
     videoId,
+    imageHash,
+    assets: feedAssets,
     permalinkUrl: httpUrl(creative.instagram_permalink_url),
     landingPageUrl: httpUrl(
       link.link,
@@ -217,6 +252,8 @@ function storageRow(creative: AdCreative): Record<string, unknown> {
     "Creative Thumbnail URL": creative.thumbnailUrl,
     "Creative Video URL": creative.videoUrl,
     "Creative Video ID": creative.videoId,
+    "Creative Image Hash": creative.imageHash || "",
+    "Creative Assets": JSON.stringify(creative.assets ?? []),
     "Creative Permalink URL": creative.permalinkUrl,
     "Creative Landing Page URL": creative.landingPageUrl,
     "Creative Status": creative.status,

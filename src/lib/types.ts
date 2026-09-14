@@ -115,6 +115,10 @@ export interface AdCreative {
   effectiveObjectStoryId?: string;
   /** Provider post/story identity when Meta exposes it separately. */
   sourcePostId?: string;
+  /** Meta image hash of the primary image, when Meta returned one. */
+  imageHash?: string;
+  /** Every video and image asset in `asset_feed_spec`/`object_story_spec`, by provider ID. */
+  assets?: { type: "video" | "image"; id: string; url?: string; thumbnailUrl?: string }[];
   creativeType: string;
   /** Normalized presentation family used by the dashboard gallery. */
   mediaType: string;

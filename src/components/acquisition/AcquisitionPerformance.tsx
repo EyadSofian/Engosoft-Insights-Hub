@@ -9,7 +9,6 @@ import {
   FileText,
   Globe2,
   HelpCircle,
-  Image as ImageIcon,
   Layers,
   MessagesSquare,
   MousePointerClick,
@@ -246,22 +245,11 @@ const METHOD: Record<string, Copy> = {
   unknown: { en: "Unknown", ar: "غير معروف" },
 };
 
-const GRAIN_NEXT: Record<PerformanceGrain, PerformanceGrain | null> = {
-  campaign: "adset",
-  adset: "ad",
-  ad: "creative",
-  creative: null,
-};
-
 const n = (value: unknown): number => Number(value ?? 0) || 0;
 const money = (value: number | null | undefined) => (value == null ? "—" : fmtUSD(value));
 const rate = (value: number | null | undefined) => (value == null ? "—" : fmtPct(value * 100, 1));
 const costPer = (spend: number, events: number) =>
   spend > 0 && events > 0 ? Math.round((spend / events) * 100) / 100 : null;
-
-function listLabel(values: string[], map: Record<string, Copy>, A: boolean) {
-  return values.length ? values.map((value) => label(map, value, A)).join(" · ") : "—";
-}
 
 /** A headline figure that opens its own definition, like every card on the dashboard. */
 function Figure({
@@ -323,7 +311,16 @@ function Crumb({ children, onClear }: { children: ReactNode; onClear: () => void
   );
 }
 
-export function AcquisitionPerformance() {
+export type AcquisitionPerformanceView = "overview" | "landing" | "forms";
+
+export function AcquisitionPerformance({
+  view = "overview",
+  before,
+}: {
+  view?: AcquisitionPerformanceView;
+  /** Rendered after the provider evidence, before the view's own sections. */
+  before?: ReactNode;
+}) {
   const { lang } = useI18n();
   const A = lang === "ar";
   const { data, isLoading, error } = useApi<PerformanceResponse>("/api/acquisition/performance");
@@ -346,15 +343,18 @@ export function AcquisitionPerformance() {
 
   return (
     <>
-      <ProviderEvidence blockers={data?.blockers} loading={isLoading} A={A} />
-      <TodaySection data={data} loading={isLoading} A={A} />
-      <PeriodKpis data={data} loading={isLoading} A={A} />
-      <CampaignPerformance data={data} loading={isLoading} A={A} />
-      <CreativePerformance data={data} loading={isLoading} A={A} />
-      <MessagingAcquisition data={data} loading={isLoading} A={A} />
-      <LandingPerformance data={data} loading={isLoading} A={A} />
-      <MetaFormAnalysis data={data} loading={isLoading} A={A} />
-      <SourceDestinationMatrix data={data} loading={isLoading} A={A} />
+      {view === "overview" ? (
+        <>
+          <ProviderEvidence blockers={data?.blockers} loading={isLoading} A={A} />
+          {before}
+          <TodaySection data={data} loading={isLoading} A={A} />
+          <PeriodKpis data={data} loading={isLoading} A={A} />
+          <MessagingAcquisition data={data} loading={isLoading} A={A} />
+          <SourceDestinationMatrix data={data} loading={isLoading} A={A} />
+        </>
+      ) : null}
+      {view === "landing" ? <LandingPerformance data={data} loading={isLoading} A={A} /> : null}
+      {view === "forms" ? <MetaFormAnalysis data={data} loading={isLoading} A={A} /> : null}
     </>
   );
 }
@@ -901,393 +901,6 @@ function PeriodKpis({ data, loading, A }: SectionProps) {
             : "EXACT = provider-issued campaign ID · DECLARED = UTM or tracking token · INFERRED = referrer · UNKNOWN = no evidence · AGGREGATE META = platform reporting, not events."}
         </Card>
       </div>
-    </PageSection>
-  );
-}
-
-function CampaignPerformance({ data, loading, A }: SectionProps) {
-  const [grain, setGrain] = useState<PerformanceGrain>("campaign");
-  const [parents, setParents] = useState<{ campaign?: PerfRow; adset?: PerfRow; ad?: PerfRow }>({});
-  const [onlyExact, setOnlyExact] = useState(false);
-  const unmatched = data?.unmatched;
-
-  const rows = useMemo(
-    () =>
-      (data?.hierarchy?.[grain] ?? []).filter(
-        (row) =>
-          (!parents.campaign || row.campaign_id === parents.campaign.campaign_id) &&
-          (!parents.adset || row.adset_id === parents.adset.adset_id) &&
-          (!parents.ad || row.ad_id === parents.ad.ad_id) &&
-          (!onlyExact || row.exact_acquisitions > 0),
-      ),
-    [data, grain, parents, onlyExact],
-  );
-
-  const drill = (row: PerfRow) => {
-    const next = GRAIN_NEXT[grain];
-    if (!next) return;
-    setParents((current) => ({ ...current, [grain]: row }));
-    setGrain(next);
-  };
-  const clearFrom = (level: "campaign" | "adset" | "ad") => {
-    const order = ["campaign", "adset", "ad"] as const;
-    const keep = order.slice(0, order.indexOf(level));
-    setParents((current) => Object.fromEntries(keep.map((key) => [key, current[key]])));
-    setGrain(level);
-  };
-
-  const cols: Col<PerfRow>[] = [
-    {
-      key: "campaign",
-      header: A ? "الحملة" : "Campaign",
-      always: true,
-      sticky: true,
-      render: (row) => nameWithId(row.campaign_name, row.campaign_id),
-      sortValue: (row) => row.campaign_name || row.campaign_id,
-    },
-    ...(grain !== "campaign"
-      ? [
-          {
-            key: "adset",
-            header: A ? "مجموعة الإعلان" : "Ad set",
-            render: (row: PerfRow) => nameWithId(row.adset_name, row.adset_id),
-            sortValue: (row: PerfRow) => row.adset_name || row.adset_id,
-          },
-        ]
-      : []),
-    ...(grain === "ad" || grain === "creative"
-      ? [
-          {
-            key: "ad",
-            header: A ? "الإعلان" : "Ad",
-            render: (row: PerfRow) => nameWithId(row.ad_name, row.ad_id),
-            sortValue: (row: PerfRow) => row.ad_name || row.ad_id,
-          },
-        ]
-      : []),
-    ...(grain === "creative"
-      ? [
-          {
-            key: "creative",
-            header: A ? "المادة الإعلانية" : "Creative",
-            render: (row: PerfRow) => nameWithId(row.creative_name, row.creative_id),
-            sortValue: (row: PerfRow) => row.creative_name || row.creative_id,
-          },
-        ]
-      : []),
-    {
-      key: "platform",
-      header: A ? "منصة المصدر" : "Source platform",
-      render: (row) => listLabel(row.platforms, PLATFORM, A),
-    },
-    {
-      key: "destination",
-      header: A ? "الوجهة" : "Destination",
-      render: (row) => listLabel(row.destinations, DESTINATION, A),
-    },
-    {
-      key: "conversations",
-      header: A ? "المحادثات" : "Conversations",
-      align: "right",
-      render: (row) => fmtNum(row.conversations),
-      sortValue: (row) => row.conversations,
-    },
-    {
-      key: "leads",
-      header: A ? "عملاء Meta" : "Meta leads",
-      align: "right",
-      render: (row) => fmtNum(row.meta_leads),
-      sortValue: (row) => row.meta_leads,
-    },
-    {
-      key: "visits",
-      header: A ? "زيارات الهبوط" : "Landing visits",
-      align: "right",
-      render: (row) => fmtNum(row.landing_visits),
-      sortValue: (row) => row.landing_visits,
-    },
-    {
-      key: "submissions",
-      header: A ? "إرسالات الهبوط" : "Landing submissions",
-      align: "right",
-      render: (row) => fmtNum(row.landing_submissions),
-      sortValue: (row) => row.landing_submissions,
-    },
-    {
-      key: "exact",
-      header: A ? "إجمالي الاستحواذ الدقيق" : "Total exact acquisitions",
-      align: "right",
-      render: (row) => <span className="font-semibold">{fmtNum(row.exact_acquisitions)}</span>,
-      sortValue: (row) => row.exact_acquisitions,
-    },
-    {
-      key: "spend",
-      header: A ? "الصرف" : "Spend",
-      align: "right",
-      render: (row) => (row.has_spend_rows ? fmtUSD(row.spend) : "—"),
-      sortValue: (row) => row.spend,
-    },
-    {
-      key: "cpa",
-      header: "CPL / CPA",
-      align: "right",
-      render: (row) => money(row.cost_per_acquisition),
-      sortValue: (row) => row.cost_per_acquisition ?? Number.MAX_SAFE_INTEGER,
-    },
-    {
-      key: "aggregate",
-      header: A ? "عملاء Meta (مجمّع)" : "Meta leads (aggregate)",
-      align: "right",
-      hideByDefault: true,
-      render: (row) => fmtNum(row.platform_leads_aggregate),
-      sortValue: (row) => row.platform_leads_aggregate,
-    },
-  ];
-
-  const grainLabels: Record<PerformanceGrain, string> = {
-    campaign: A ? "الحملة" : "Campaign",
-    adset: A ? "مجموعة الإعلان" : "Ad set",
-    ad: A ? "الإعلان" : "Ad",
-    creative: A ? "المادة" : "Creative",
-  };
-
-  return (
-    <PageSection
-      title={A ? "أداء الحملات" : "Campaign performance"}
-      icon={<Target size={16} />}
-      tone="violet"
-      hint={
-        A
-          ? "الاستحواذ يُنسب بالمعرّف الدقيق فقط. الصرف من بيانات Meta المتزامنة. اضغط صفًا للنزول: حملة ← مجموعة ← إعلان ← مادة."
-          : "Acquisitions are credited by exact ID only. Spend is from synced Meta ad data. Click a row to drill: campaign → ad set → ad → creative."
-      }
-    >
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Segmented
-            value={grain}
-            onChange={(value) => setGrain(value)}
-            options={(["campaign", "adset", "ad", "creative"] as const).map((value) => ({
-              value,
-              label: grainLabels[value],
-            }))}
-          />
-          {parents.campaign ? (
-            <Crumb onClear={() => clearFrom("campaign")}>
-              {parents.campaign.campaign_name || parents.campaign.campaign_id}
-            </Crumb>
-          ) : null}
-          {parents.adset ? (
-            <Crumb onClear={() => clearFrom("adset")}>
-              {parents.adset.adset_name || parents.adset.adset_id}
-            </Crumb>
-          ) : null}
-          {parents.ad ? (
-            <Crumb onClear={() => clearFrom("ad")}>{parents.ad.ad_name || parents.ad.ad_id}</Crumb>
-          ) : null}
-          <label className="ms-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
-            <input
-              type="checkbox"
-              checked={onlyExact}
-              onChange={(event) => setOnlyExact(event.target.checked)}
-            />
-            {A ? "صفوف بها استحواذ دقيق فقط" : "Only rows with exact acquisitions"}
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Pill tone="warning">
-            {A
-              ? `${fmtNum(unmatched?.withoutExactCampaign)} استحواذ بلا حملة دقيقة`
-              : `${fmtNum(unmatched?.withoutExactCampaign)} acquisitions without an exact campaign`}
-          </Pill>
-          <Pill tone="neutral">
-            {A
-              ? `${fmtNum(unmatched?.exactWithoutSpendRows)} دقيق بلا صفوف صرف`
-              : `${fmtNum(unmatched?.exactWithoutSpendRows)} exact with no synced spend rows`}
-          </Pill>
-          <Pill tone="neutral">
-            {A
-              ? `${fmtNum(unmatched?.spendingCampaignsWithoutAcquisitions)} حملة تصرف بلا استحواذ دقيق · ${money(unmatched?.spendWithoutAcquisitions)}`
-              : `${fmtNum(unmatched?.spendingCampaignsWithoutAcquisitions)} spending campaigns without exact acquisitions · ${money(unmatched?.spendWithoutAcquisitions)}`}
-          </Pill>
-        </div>
-        <DataTable
-          rows={rows}
-          cols={cols}
-          loading={loading}
-          onRowClick={GRAIN_NEXT[grain] ? drill : undefined}
-          searchable={(row) =>
-            `${row.campaign_name} ${row.campaign_id} ${row.adset_name} ${row.adset_id} ${row.ad_name} ${row.ad_id} ${row.creative_name} ${row.creative_id}`
-          }
-          rowKey={(row) => `${row.campaign_id}:${row.adset_id}:${row.ad_id}:${row.creative_id}`}
-          csvFilename={`engosoft-acquisition-${grain}.csv`}
-        />
-      </div>
-    </PageSection>
-  );
-}
-
-interface CreativeAgg {
-  creative_id: string;
-  creative_name: string;
-  campaigns: Map<string, string>;
-  adsets: Map<string, string>;
-  ads: Map<string, string>;
-  platforms: Set<string>;
-  placements: Set<string>;
-  spend: number;
-  conversations: number;
-  meta_leads: number;
-  landing_submissions: number;
-  exact: number;
-}
-
-function namesCell(values: Map<string, string>, A: boolean) {
-  const entries = [...values.entries()];
-  if (!entries.length) return "—";
-  const [id, name] = entries[0];
-  return (
-    <div>
-      {nameWithId(name, id)}
-      {entries.length > 1 ? (
-        <div className="text-[11px] text-text-muted">
-          {A ? `+${entries.length - 1} أخرى` : `+${entries.length - 1} more`}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CreativePerformance({ data, loading, A }: SectionProps) {
-  const creatives = useMemo(() => {
-    const map = new Map<string, CreativeAgg>();
-    for (const row of data?.hierarchy?.creative ?? []) {
-      if (!row.creative_id) continue;
-      const item = map.get(row.creative_id) ?? {
-        creative_id: row.creative_id,
-        creative_name: row.creative_name,
-        campaigns: new Map(),
-        adsets: new Map(),
-        ads: new Map(),
-        platforms: new Set<string>(),
-        placements: new Set<string>(),
-        spend: 0,
-        conversations: 0,
-        meta_leads: 0,
-        landing_submissions: 0,
-        exact: 0,
-      };
-      item.creative_name ||= row.creative_name;
-      if (row.campaign_id) item.campaigns.set(row.campaign_id, row.campaign_name);
-      if (row.adset_id) item.adsets.set(row.adset_id, row.adset_name);
-      if (row.ad_id) item.ads.set(row.ad_id, row.ad_name);
-      row.platforms.forEach((value) => item.platforms.add(value));
-      row.placements.forEach((value) => item.placements.add(value));
-      item.spend += row.spend;
-      item.conversations += row.conversations;
-      item.meta_leads += row.meta_leads;
-      item.landing_submissions += row.landing_submissions;
-      item.exact += row.exact_acquisitions;
-      map.set(row.creative_id, item);
-    }
-    return [...map.values()].sort((a, b) => b.exact - a.exact || b.spend - a.spend);
-  }, [data]);
-
-  const cols: Col<CreativeAgg>[] = [
-    {
-      key: "creative",
-      header: A ? "المادة الإعلانية" : "Creative",
-      always: true,
-      sticky: true,
-      render: (row) => nameWithId(row.creative_name, row.creative_id),
-      sortValue: (row) => row.creative_name || row.creative_id,
-    },
-    {
-      key: "campaign",
-      header: A ? "الحملة" : "Campaign",
-      render: (row) => namesCell(row.campaigns, A),
-    },
-    {
-      key: "adset",
-      header: A ? "مجموعة الإعلان" : "Ad set",
-      render: (row) => namesCell(row.adsets, A),
-    },
-    { key: "ad", header: A ? "الإعلان" : "Ad", render: (row) => namesCell(row.ads, A) },
-    {
-      key: "platform",
-      header: A ? "المنصة" : "Platform",
-      render: (row) => (row.platforms.size ? listLabel([...row.platforms], PLATFORM, A) : "Meta"),
-    },
-    {
-      key: "placement",
-      header: A ? "الموضع" : "Placement",
-      render: (row) => (row.placements.size ? [...row.placements].join(" · ") : "—"),
-    },
-    {
-      key: "spend",
-      header: A ? "الصرف" : "Spend",
-      align: "right",
-      render: (row) => fmtUSD(row.spend),
-      sortValue: (row) => row.spend,
-    },
-    {
-      key: "conversations",
-      header: A ? "محادثات" : "Messaging conversations",
-      align: "right",
-      render: (row) => fmtNum(row.conversations),
-      sortValue: (row) => row.conversations,
-    },
-    {
-      key: "leads",
-      header: A ? "عملاء نماذج Meta" : "Meta lead form leads",
-      align: "right",
-      render: (row) => fmtNum(row.meta_leads),
-      sortValue: (row) => row.meta_leads,
-    },
-    {
-      key: "submissions",
-      header: A ? "إرسالات الهبوط" : "Landing submissions",
-      align: "right",
-      render: (row) => fmtNum(row.landing_submissions),
-      sortValue: (row) => row.landing_submissions,
-    },
-    {
-      key: "total",
-      header: A ? "إجمالي الاستحواذ" : "Total acquisitions",
-      align: "right",
-      render: (row) => <span className="font-semibold">{fmtNum(row.exact)}</span>,
-      sortValue: (row) => row.exact,
-    },
-    {
-      key: "cpa",
-      header: "CPL / CPA",
-      align: "right",
-      render: (row) => money(costPer(row.spend, row.exact)),
-      sortValue: (row) => costPer(row.spend, row.exact) ?? Number.MAX_SAFE_INTEGER,
-    },
-  ];
-
-  return (
-    <PageSection
-      title={A ? "أداء المواد الإعلانية" : "Creative performance"}
-      icon={<ImageIcon size={16} />}
-      tone="mint"
-      hint={
-        A
-          ? "كل مادة لها معرّف Meta. تُحسب فقط الأحداث المرتبطة بمعرّف المادة نفسه؛ بلا معرّف لا يوجد تخمين."
-          : "Every creative with a Meta creative ID. Only events linked to that exact creative ID count; without an ID nothing is guessed."
-      }
-    >
-      <DataTable
-        rows={creatives}
-        cols={cols}
-        loading={loading}
-        searchable={(row) =>
-          `${row.creative_name} ${row.creative_id} ${[...row.campaigns.values()].join(" ")} ${[...row.ads.values()].join(" ")}`
-        }
-        rowKey={(row) => row.creative_id}
-        csvFilename="engosoft-creative-performance.csv"
-      />
     </PageSection>
   );
 }
