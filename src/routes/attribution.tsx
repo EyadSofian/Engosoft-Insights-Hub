@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   BarChart3,
   DollarSign,
@@ -29,6 +30,8 @@ interface AttributionTotals {
   conversations: number;
   attributedConversations: number;
   metaCtwaConversations: number;
+  paidCampaignConversations: number;
+  organicDirectConversations: number;
   unknownConversations: number;
   exactConversations: number;
   uniqueContacts: number;
@@ -44,21 +47,34 @@ interface AttributionTotals {
   roas: number | null;
 }
 
+interface AttributionCampaign {
+  platform: string;
+  source: string;
+  medium: string;
+  campaign_id: string;
+  campaign_name: string;
+  adset_id: string;
+  adset_name: string;
+  ad_id: string;
+  ad_name: string;
+  conversations: number;
+  crmLeads: number;
+  won: number;
+  lost: number;
+  revenue: number | null;
+  spend: number | null;
+  costPerAttributedConversation: number | null;
+  conversionRate: number | null;
+  cpa: number | null;
+  roas: number | null;
+}
+
 interface AttributionSummary {
   configured: boolean;
   totals: AttributionTotals | null;
-  campaigns: {
-    platform: string;
-    source: string;
-    medium: string;
-    campaign_id: string;
-    campaign_name: string;
-    branch_id: string;
-    conversations: number;
-    won: number;
-    revenue: number | null;
-  }[];
+  campaigns: AttributionCampaign[];
   sources: {
+    channel: string;
     platform: string;
     source: string;
     medium: string;
@@ -80,16 +96,31 @@ interface AttributionConversation {
   conversation_id: number;
   latest_touch_at: string | null;
   platform: string;
+  channel: string;
   source: string;
   medium: string;
   campaign_name: string;
   campaign_id: string;
+  adset_name: string;
+  adset_id: string;
+  ad_name: string;
+  ad_id: string;
+  creative_name: string;
+  creative_id: string;
+  placement: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  utm_term: string;
   branch_name: string;
   branch_id: string;
   attribution_method: string;
   confidence: string;
+  unknown_reason: string;
   crm_status: string;
   crm_won: boolean;
+  crm_lost: boolean;
   revenue: number | null;
   chatwootUrl: string | null;
 }
@@ -113,7 +144,7 @@ function attributionMetrics(
       label: row.campaign_name || row.campaign_id || row.source || (ar ? "غير معروف" : "Unknown"),
       value: row.conversations,
       display: fmtNum(row.conversations),
-      meta: [row.platform, row.branch_id].filter(Boolean).join(" · "),
+      meta: row.platform,
     })),
     moreTo: "/attribution",
     moreLabel: ar ? "عرض تقرير الإسناد" : "Open attribution report",
@@ -169,8 +200,8 @@ function attributionMetrics(
         ? "محادثات معها دليل مصدر قابل للمراجعة: CTWA أو UTM أو توكن تتبع."
         : "Conversations with reviewable CTWA, UTM, or tracking-token evidence.",
       formula: ar
-        ? "المحادثات التي طريقة إسنادها ليست unknown"
-        : "Conversations whose method is not unknown",
+        ? "المحادثات التي تحمل دليل مزوّد أو UTM أو رابط إحالة أو توكن موثوق"
+        : "Conversations with provider, UTM, referral-link, or trusted-token evidence",
       supporting: [
         {
           key: "exact",
@@ -184,6 +215,32 @@ function attributionMetrics(
         },
       ],
       breakdowns: [campaignBreakdown],
+      report,
+    },
+    paidCampaigns: {
+      id: "attribution.paid_campaigns",
+      title: ar ? "محادثات حملات مدفوعة" : "Paid campaign conversations",
+      value: fmtNum(totals?.paidCampaignConversations),
+      tone: "mint",
+      icon: <Target size={17} />,
+      definition: ar
+        ? "محادثات تحمل دليل Meta أصليًا وتم حل معرّف حملتها بدقة."
+        : "Conversations with native Meta evidence and an exactly resolved campaign ID.",
+      caveat: ar
+        ? "القناة وحدها لا تُصنّف المحادثة كإعلان مدفوع."
+        : "Channel alone never classifies a conversation as paid.",
+      breakdowns: [campaignBreakdown],
+      report,
+    },
+    organicDirect: {
+      id: "attribution.organic_direct",
+      title: ar ? "عضوي / مباشر" : "Organic / direct",
+      value: fmtNum(totals?.organicDirectConversations),
+      tone: "sky",
+      icon: <MessagesSquare size={17} />,
+      definition: ar
+        ? "القناة معروفة، لكن رسالة المزوّد لا تحمل إحالة إعلان مدفوع."
+        : "The channel is known but the provider message carries no paid referral.",
       report,
     },
     ctwa: {
@@ -275,7 +332,7 @@ function attributionMetrics(
     },
     cpl: {
       id: "attribution.cpl",
-      title: ar ? "CPL — محادثة واتساب" : "CPL — WhatsApp conversation",
+      title: ar ? "تكلفة المحادثة المنسوبة" : "Cost / attributed conversation",
       value: totals?.spendAvailable ? fmtUSD(totals.costPerConversation) : "—",
       tone: "sky",
       icon: <Target size={17} />,
@@ -334,7 +391,28 @@ function Attribution() {
   const { lang } = useI18n();
   const filters = useFilters();
   const reportingPeriod = useReportingPeriod();
-  const query = buildQuery(filters);
+  const [localFilters, setLocalFilters] = useState({
+    channel: "",
+    platform: "",
+    source: "",
+    medium: "",
+    campaignId: "",
+    adsetId: "",
+    adId: "",
+    inboxId: "",
+    branchId: "",
+    method: "",
+    confidence: "",
+    unknownReason: "",
+  });
+  const baseQuery = buildQuery(filters);
+  const queryParams = new URLSearchParams(
+    baseQuery.startsWith("?") ? baseQuery.slice(1) : baseQuery,
+  );
+  for (const [key, value] of Object.entries(localFilters)) {
+    if (value) queryParams.set(key, value);
+  }
+  const query = queryParams.size ? `?${queryParams.toString()}` : "";
   const summary = useApi<AttributionSummary>(`/api/attribution/summary${query}`);
   const conversations = useApi<AttributionConversationsResponse>(
     `/api/attribution/conversations?limit=100${query ? `&${query.slice(1)}` : ""}`,
@@ -344,6 +422,8 @@ function Attribution() {
   const A = lang === "ar";
   const period = reportingPeriod || (A ? "كل البيانات المسجلة" : "All recorded data");
   const metrics = attributionMetrics(totals, data, A);
+  const updateLocalFilter = (key: keyof typeof localFilters, value: string) =>
+    setLocalFilters((current) => ({ ...current, [key]: value }));
 
   const cols: Col<AttributionConversation>[] = [
     {
@@ -367,6 +447,12 @@ function Attribution() {
         ),
     },
     {
+      key: "channel",
+      header: A ? "القناة" : "Channel",
+      render: (row) => row.channel || "—",
+      sortValue: (row) => row.channel,
+    },
+    {
       key: "source",
       header: A ? "المصدر" : "Source",
       render: (row) => [row.platform || row.source || "—", row.medium].filter(Boolean).join(" · "),
@@ -377,6 +463,46 @@ function Attribution() {
       header: A ? "الحملة" : "Campaign",
       render: (row) => row.campaign_name || row.campaign_id || "—",
       sortValue: (row) => row.campaign_name || row.campaign_id,
+    },
+    {
+      key: "adset",
+      header: A ? "مجموعة الإعلانات" : "Ad Set",
+      render: (row) => row.adset_name || row.adset_id || "—",
+      sortValue: (row) => row.adset_name || row.adset_id,
+    },
+    {
+      key: "ad",
+      header: A ? "الإعلان" : "Ad",
+      render: (row) => row.ad_name || row.ad_id || "—",
+      sortValue: (row) => row.ad_name || row.ad_id,
+    },
+    {
+      key: "creative",
+      header: A ? "المادة الإعلانية" : "Creative",
+      render: (row) => row.creative_name || row.creative_id || "—",
+      sortValue: (row) => row.creative_name || row.creative_id,
+    },
+    {
+      key: "placement",
+      header: A ? "الموضع" : "Placement",
+      render: (row) => row.placement || "—",
+      sortValue: (row) => row.placement,
+    },
+    {
+      key: "utm",
+      header: "UTM",
+      render: (row) =>
+        [row.utm_source, row.utm_medium, row.utm_campaign, row.utm_content, row.utm_term]
+          .filter(Boolean)
+          .join(" · ") || "—",
+      sortValue: (row) =>
+        `${row.utm_source}:${row.utm_medium}:${row.utm_campaign}:${row.utm_content}:${row.utm_term}`,
+    },
+    {
+      key: "method",
+      header: A ? "الطريقة" : "Method",
+      render: (row) => row.attribution_method || "unknown",
+      sortValue: (row) => row.attribution_method,
     },
     {
       key: "branch",
@@ -393,8 +519,17 @@ function Attribution() {
     {
       key: "crm",
       header: "CRM",
-      render: (row) => (row.crm_won ? (A ? "مغلق بنجاح" : "Won") : row.crm_status || "—"),
-      sortValue: (row) => `${row.crm_won}:${row.crm_status}`,
+      render: (row) =>
+        row.crm_won
+          ? A
+            ? "مغلق بنجاح"
+            : "Won"
+          : row.crm_lost
+            ? A
+              ? "خسارة"
+              : "Lost"
+            : row.crm_status || "—",
+      sortValue: (row) => `${row.crm_won}:${row.crm_lost}:${row.crm_status}`,
     },
     {
       key: "revenue",
@@ -405,11 +540,95 @@ function Attribution() {
     },
   ];
 
+  const campaignCols: Col<AttributionCampaign>[] = [
+    {
+      key: "platform",
+      header: A ? "المنصة" : "Platform",
+      always: true,
+      render: (row) => row.platform || row.source || "—",
+      sortValue: (row) => row.platform || row.source,
+    },
+    {
+      key: "campaign",
+      header: A ? "الحملة" : "Campaign",
+      render: (row) => row.campaign_name || row.campaign_id || "—",
+      sortValue: (row) => row.campaign_name || row.campaign_id,
+    },
+    {
+      key: "adset",
+      header: A ? "مجموعة الإعلان" : "Ad Set",
+      render: (row) => row.adset_name || row.adset_id || "—",
+      sortValue: (row) => row.adset_name || row.adset_id,
+    },
+    {
+      key: "ad",
+      header: A ? "الإعلان" : "Ad",
+      render: (row) => row.ad_name || row.ad_id || "—",
+      sortValue: (row) => row.ad_name || row.ad_id,
+    },
+    {
+      key: "conversations",
+      header: A ? "المحادثات" : "Conversations",
+      align: "right",
+      render: (row) => fmtNum(row.conversations),
+      sortValue: (row) => row.conversations,
+    },
+    {
+      key: "spend",
+      header: A ? "الصرف" : "Spend",
+      align: "right",
+      render: (row) => fmtUSD(row.spend),
+      sortValue: (row) => row.spend ?? -1,
+    },
+    {
+      key: "cost",
+      header: A ? "تكلفة المحادثة" : "Cost / conversation",
+      align: "right",
+      render: (row) => fmtUSD(row.costPerAttributedConversation),
+      sortValue: (row) => row.costPerAttributedConversation ?? -1,
+    },
+    {
+      key: "crm",
+      header: "CRM",
+      align: "right",
+      render: (row) => `${fmtNum(row.crmLeads)} · ${fmtNum(row.won)}W · ${fmtNum(row.lost)}L`,
+      sortValue: (row) => row.crmLeads,
+    },
+    {
+      key: "conversion",
+      header: A ? "التحويل" : "Conversion",
+      align: "right",
+      render: (row) => fmtPct(row.conversionRate, 1),
+      sortValue: (row) => row.conversionRate ?? -1,
+    },
+    {
+      key: "revenue",
+      header: A ? "الإيراد" : "Revenue",
+      align: "right",
+      render: (row) => fmtUSD(row.revenue),
+      sortValue: (row) => row.revenue ?? -1,
+    },
+    {
+      key: "cpa",
+      header: "CPA",
+      align: "right",
+      render: (row) => fmtUSD(row.cpa),
+      sortValue: (row) => row.cpa ?? -1,
+    },
+    {
+      key: "roas",
+      header: "ROAS",
+      align: "right",
+      render: (row) => (row.roas === null ? "—" : `${row.roas.toFixed(2)}×`),
+      sortValue: (row) => row.roas ?? -1,
+    },
+  ];
+
   return (
     <PageSections>
       <DashboardPageHeader
         icon={<MessagesSquare size={22} />}
-        title={A ? "إسناد محادثات واتساب" : "Conversation attribution"}
+        title={A ? "إسناد المحادثات متعدد القنوات" : "Multi-channel conversation attribution"}
         subtitle={
           A
             ? "من الإعلان أو الرابط إلى المحادثة ثم نتيجة CRM، دون افتراض مصدر غير مثبت."
@@ -418,6 +637,103 @@ function Attribution() {
         period={period}
         tone="violet"
       />
+
+      <PageSection
+        title={A ? "فلاتر الإسناد" : "Attribution filters"}
+        hint={
+          A ? "الحملة والإعلان يُطابقان بالمعرّف الدقيق." : "Campaign and ad filters use exact IDs."
+        }
+        tone="sky"
+      >
+        <div className="card grid gap-3 p-3.5 sm:grid-cols-2 sm:p-5 lg:grid-cols-5">
+          {(
+            [
+              ["channel", A ? "القناة" : "Channel", ["", "whatsapp", "messenger", "instagram_dm"]],
+              [
+                "platform",
+                A ? "منصة المصدر" : "Source platform",
+                ["", "meta", "facebook", "instagram", "website", "direct_or_unknown"],
+              ],
+              [
+                "method",
+                A ? "طريقة الإسناد" : "Method",
+                [
+                  "",
+                  "meta_whatsapp_referral",
+                  "meta_messenger_referral",
+                  "meta_instagram_referral",
+                  "meta_referral",
+                  "signed_tracking_token",
+                  "utm",
+                  "referrer",
+                  "inbox_only",
+                  "inbox_mapping",
+                  "manual",
+                  "unknown",
+                ],
+              ],
+              [
+                "confidence",
+                A ? "الثقة" : "Confidence",
+                ["", "exact", "strong", "inferred", "unknown"],
+              ],
+              [
+                "unknownReason",
+                A ? "سبب عدم المعرفة" : "Unknown reason",
+                [
+                  "",
+                  "no_paid_referral",
+                  "provider_message_unmatched",
+                  "meta_source_id_unresolved",
+                  "meta_identity_missing",
+                  "no_utm",
+                  "organic_direct",
+                  "unsupported_channel",
+                  "historical_evidence_missing",
+                  "chatwoot_payload_missing",
+                ],
+              ],
+            ] as const
+          ).map(([key, label, options]) => (
+            <label key={key} className="grid gap-1 text-xs font-semibold text-text-muted">
+              {label}
+              <select
+                value={localFilters[key]}
+                onChange={(event) => updateLocalFilter(key, event.target.value)}
+                className="min-h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand"
+              >
+                {options.map((option) => (
+                  <option key={option || "all"} value={option}>
+                    {option || (A ? "الكل" : "All")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          {(
+            [
+              ["campaignId", A ? "معرّف الحملة" : "Campaign ID"],
+              ["adsetId", A ? "معرّف مجموعة الإعلان" : "Ad Set ID"],
+              ["adId", A ? "معرّف الإعلان" : "Ad ID"],
+              ["source", A ? "المصدر" : "Source"],
+              ["medium", A ? "الوسيط" : "Medium"],
+              ["inboxId", "Inbox ID"],
+              ["branchId", A ? "معرّف الفرع" : "Branch ID"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="grid gap-1 text-xs font-semibold text-text-muted">
+              {label}
+              <input
+                value={localFilters[key]}
+                onChange={(event) => updateLocalFilter(key, event.target.value.trim())}
+                inputMode={key.endsWith("Id") ? "numeric" : "text"}
+                className="min-h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-brand"
+                placeholder={A ? "الكل" : "All"}
+              />
+            </label>
+          ))}
+        </div>
+      </PageSection>
 
       <PageSection level="headline" aria-label={A ? "مؤشرات الإسناد" : "Attribution metrics"}>
         <KpiRow>
@@ -438,9 +754,25 @@ function Attribution() {
             }}
           />
           <MetricDetailTrigger
-            detail={metrics.ctwa}
+            detail={metrics.paidCampaigns}
             card={{
               index: 2,
+              sub: A ? "معرّف حملة Meta مُثبت" : "Resolved Meta campaign ID",
+              loading: summary.isLoading,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={metrics.organicDirect}
+            card={{
+              index: 3,
+              sub: A ? "قناة معروفة دون إحالة مدفوعة" : "Known channel, no paid referral",
+              loading: summary.isLoading,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={metrics.ctwa}
+            card={{
+              index: 4,
               sub: A ? "إحالات Meta الأصلية" : "Native Meta referrals",
               loading: summary.isLoading,
             }}
@@ -448,7 +780,7 @@ function Attribution() {
           <MetricDetailTrigger
             detail={metrics.unknownRate}
             card={{
-              index: 3,
+              index: 5,
               sub: A ? "حالة قابلة للقياس وليست أورجانيك" : "Measured, not silently called organic",
               loading: summary.isLoading,
             }}
@@ -531,6 +863,18 @@ function Attribution() {
             showValues
           />
         </div>
+        <DataTable
+          rows={data?.campaigns || []}
+          cols={campaignCols}
+          loading={summary.isLoading}
+          searchable={(row) =>
+            `${row.platform} ${row.campaign_name} ${row.campaign_id} ${row.adset_name} ${row.adset_id} ${row.ad_name} ${row.ad_id}`
+          }
+          csvFilename="engosoft-attribution-campaign-drilldown.csv"
+          rowKey={(row) =>
+            `${row.platform}:${row.source}:${row.medium}:${row.campaign_id}:${row.adset_id}:${row.ad_id}`
+          }
+        />
       </PageSection>
 
       <PageSection
@@ -585,7 +929,7 @@ function Attribution() {
             <HBarChart
               data={(data?.sources || []).slice(0, 10).map((row) => ({
                 label:
-                  [row.platform, row.source, row.medium].filter(Boolean).join(" · ") ||
+                  [row.platform, "→", row.channel, row.medium].filter(Boolean).join(" ") ||
                   (A ? "غير معروف" : "Unknown"),
                 value: row.conversations,
               }))}
@@ -667,7 +1011,7 @@ function Attribution() {
           cols={cols}
           loading={conversations.isLoading}
           searchable={(row) =>
-            `${row.conversation_id} ${row.platform} ${row.source} ${row.campaign_name} ${row.branch_name}`
+            `${row.conversation_id} ${row.channel} ${row.platform} ${row.source} ${row.campaign_name} ${row.campaign_id} ${row.adset_name} ${row.adset_id} ${row.ad_name} ${row.ad_id} ${row.creative_name} ${row.creative_id} ${row.placement} ${row.utm_source} ${row.utm_medium} ${row.utm_campaign} ${row.utm_content} ${row.utm_term} ${row.unknown_reason} ${row.branch_name}`
           }
           csvFilename="engosoft-conversation-attribution.csv"
           rowKey={(row) => String(row.conversation_id)}

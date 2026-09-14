@@ -9,6 +9,10 @@ import { startScheduler } from "./lib/scheduler.server";
 // early unless both Telegram variables are present.
 startScheduler();
 
+void import("./lib/meta-message-attribution.server")
+  .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
+  .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
+
 /**
  * Pull the data snapshot into memory while the process is starting, rather than
  * inside the first request that needs it.

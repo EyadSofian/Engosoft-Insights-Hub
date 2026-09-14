@@ -6,6 +6,7 @@ function filters(request: Request) {
   return {
     from: params.get("from") || undefined,
     to: params.get("to") || undefined,
+    channel: params.get("channel") || undefined,
     platform: params.get("platform") || undefined,
     source: params.get("source") || undefined,
     medium: params.get("medium") || undefined,
@@ -17,6 +18,7 @@ function filters(request: Request) {
     agentId: params.get("agentId") || undefined,
     method: params.get("method") || undefined,
     confidence: params.get("confidence") || undefined,
+    unknownReason: params.get("unknownReason") || undefined,
     crmStatus: params.get("crmStatus") || undefined,
   };
 }

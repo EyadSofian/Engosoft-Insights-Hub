@@ -78,12 +78,12 @@ const httpUrl = (...values: unknown[]): string => {
 export function metaCreativeHasContent(creative: AdCreative): boolean {
   return Boolean(
     creative.imageUrl ||
-      creative.thumbnailUrl ||
-      creative.videoUrl ||
-      creative.videoId ||
-      creative.headline ||
-      creative.body ||
-      creative.permalinkUrl,
+    creative.thumbnailUrl ||
+    creative.videoUrl ||
+    creative.videoId ||
+    creative.headline ||
+    creative.body ||
+    creative.permalinkUrl,
   );
 }
 
@@ -118,8 +118,7 @@ export function normalizeMetaGraphAd(
   const assetVideos = list(assets.videos);
   const children = list(link.child_attachments);
 
-  const videoId =
-    text(creative.video_id) || text(video.video_id) || text(assetVideos[0]?.video_id);
+  const videoId = text(creative.video_id) || text(video.video_id) || text(assetVideos[0]?.video_id);
   const imageUrl = httpUrl(
     creative.image_url,
     link.picture,
@@ -160,6 +159,14 @@ export function normalizeMetaGraphAd(
     adId,
     creativeId,
     creativeName: text(creative.name) || fallback.creativeName || text(raw.name),
+    effectiveObjectStoryId:
+      text(creative.effective_object_story_id) || fallback.effectiveObjectStoryId || "",
+    sourcePostId:
+      text(creative.object_story_id) ||
+      text(object(story.link_data).post_id) ||
+      text(object(story.video_data).post_id) ||
+      fallback.sourcePostId ||
+      "",
     creativeType: isCarousel ? "carousel" : mediaType,
     mediaType,
     headline,
@@ -200,6 +207,8 @@ function storageRow(creative: AdCreative): Record<string, unknown> {
     __creative_id: creative.creativeId,
     "Creative ID": creative.creativeId,
     "Creative Name": creative.creativeName,
+    effective_object_story_id: creative.effectiveObjectStoryId || "",
+    source_post_id: creative.sourcePostId || "",
     "Creative Type": creative.creativeType,
     "Media Type": creative.mediaType,
     "Creative Headline": creative.headline,
@@ -358,9 +367,9 @@ export async function syncMetaCreativesDirect(
     // dashboard visit into an API burst against every Engosoft ad account.
     for (let index = 0; index < batches.length; index += 3) {
       const settled = await Promise.all(
-        batches.slice(index, index + 3).map((batch) =>
-          fetchBatch(batch, token, apiVersion, syncedAt),
-        ),
+        batches
+          .slice(index, index + 3)
+          .map((batch) => fetchBatch(batch, token, apiVersion, syncedAt)),
       );
       for (const result of settled) {
         fetched.push(...result.creatives);
@@ -377,21 +386,17 @@ export async function syncMetaCreativesDirect(
     let persisted = false;
     if (fetched.length && databaseConfigured()) {
       try {
-        await writeDashboardDataset(
-          "meta_ad_creatives",
-          fetched.map(storageRow),
-          {
-            mode: "upsert",
-            syncedAt,
-            metadata: {
-              source: "meta-graph-api-direct",
-              grain: "ad-creative",
-              requested: targets.length,
-              fetched: fetched.length,
-              failed,
-            },
+        await writeDashboardDataset("meta_ad_creatives", fetched.map(storageRow), {
+          mode: "upsert",
+          syncedAt,
+          metadata: {
+            source: "meta-graph-api-direct",
+            grain: "ad-creative",
+            requested: targets.length,
+            fetched: fetched.length,
+            failed,
           },
-        );
+        });
         persisted = true;
       } catch (error) {
         errors.push(`PostgreSQL last-good write failed: ${safeError(error, token)}`);
@@ -411,7 +416,7 @@ export async function syncMetaCreativesDirect(
       fetched: fetched.length,
       failed,
       persisted,
-      syncedAt: fetched.length ? syncedAt : cached[0]?.syncedAt ?? "",
+      syncedAt: fetched.length ? syncedAt : (cached[0]?.syncedAt ?? ""),
       message,
     };
   })().finally(() => inflight.delete(key));
