@@ -93,6 +93,33 @@ function freshCreative(creative: AdCreative, now: number): boolean {
   return Number.isFinite(syncedAt) && now - syncedAt < CACHE_MS;
 }
 
+/**
+ * The lead form an instant-form ad collects into. Meta keeps it on the call to
+ * action of whichever story spec the creative uses, or on the asset feed of a
+ * flexible creative.
+ */
+export function leadFormIdOf(creativeValue: unknown): string {
+  const creative = object(creativeValue);
+  const story = object(creative.object_story_spec);
+  const specs = [story.link_data, story.video_data, story.template_data, story.photo_data].map(
+    object,
+  );
+  for (const spec of specs) {
+    const value = object(object(spec.call_to_action).value);
+    const id = text(value.lead_gen_form_id);
+    if (id) return id;
+    for (const child of list(spec.child_attachments)) {
+      const childId = text(object(object(child.call_to_action).value).lead_gen_form_id);
+      if (childId) return childId;
+    }
+  }
+  for (const action of list(object(creative.asset_feed_spec).call_to_actions)) {
+    const id = text(object(action.value).lead_gen_form_id);
+    if (id) return id;
+  }
+  return "";
+}
+
 /** Pure normalizer kept exported so Meta response changes are fixture-tested. */
 export function normalizeMetaGraphAd(
   rawValue: unknown,
@@ -163,10 +190,29 @@ export function normalizeMetaGraphAd(
         url: text(child.picture),
       }))
       .filter((asset) => asset.id),
+    ...children
+      .map((child) => ({
+        type: "video" as const,
+        id: text(child.video_id),
+        thumbnailUrl: text(child.picture),
+      }))
+      .filter((asset) => asset.id),
   ].filter(
     (asset, index, all) =>
       all.findIndex((other) => other.type === asset.type && other.id === asset.id) === index,
   );
+  const leadFormId = leadFormIdOf(creative);
+  const assetMetadata = {
+    titles: list(assets.titles)
+      .map((entry) => text(entry.text))
+      .filter(Boolean),
+    bodies: list(assets.bodies)
+      .map((entry) => text(entry.text))
+      .filter(Boolean),
+    linkUrls: list(assets.link_urls)
+      .map((entry) => text(entry.website_url) || text(entry.display_url))
+      .filter(Boolean),
+  };
   const isCarousel = children.length > 1 || assetImages.length + assetVideos.length > 1;
   const mediaType = isCarousel ? "carousel" : videoId ? "video" : imageUrl ? "image" : "text";
   const headline =
@@ -211,6 +257,8 @@ export function normalizeMetaGraphAd(
     videoId,
     imageHash,
     assets: feedAssets,
+    leadFormId,
+    assetMetadata,
     permalinkUrl: httpUrl(creative.instagram_permalink_url),
     landingPageUrl: httpUrl(
       link.link,
@@ -227,7 +275,7 @@ export function normalizeMetaGraphAd(
   };
 }
 
-function storageRow(creative: AdCreative): Record<string, unknown> {
+export function creativeStorageRow(creative: AdCreative): Record<string, unknown> {
   return {
     __creative_key: `${creative.accountId}|${creative.adId}|${creative.creativeId}`,
     __account_id: creative.accountId,
@@ -254,6 +302,10 @@ function storageRow(creative: AdCreative): Record<string, unknown> {
     "Creative Video ID": creative.videoId,
     "Creative Image Hash": creative.imageHash || "",
     "Creative Assets": JSON.stringify(creative.assets ?? []),
+    "Lead Form ID": creative.leadFormId || "",
+    "Creative Asset Metadata": JSON.stringify(
+      creative.assetMetadata ?? { titles: [], bodies: [], linkUrls: [] },
+    ),
     "Creative Permalink URL": creative.permalinkUrl,
     "Creative Landing Page URL": creative.landingPageUrl,
     "Creative Status": creative.status,
@@ -333,6 +385,8 @@ const emptyResult = (configured: boolean, message: string): MetaCreativeSyncResu
   syncedAt: "",
   message,
 });
+
+export { AD_FIELDS as META_CREATIVE_AD_FIELDS };
 
 export async function syncMetaCreativesDirect(
   input: readonly AdCreative[],
@@ -423,7 +477,7 @@ export async function syncMetaCreativesDirect(
     let persisted = false;
     if (fetched.length && databaseConfigured()) {
       try {
-        await writeDashboardDataset("meta_ad_creatives", fetched.map(storageRow), {
+        await writeDashboardDataset("meta_ad_creatives", fetched.map(creativeStorageRow), {
           mode: "upsert",
           syncedAt,
           metadata: {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   BUSINESS_TIME_ZONE,
   acquisitionDatabaseConfigured,
@@ -34,6 +35,7 @@ import {
   type SaleOrderLink,
   type SpendRow,
 } from "./closed-loop";
+import { cheapVersusQuality, closedLoopKpis, type KpiStatus } from "./closed-loop-kpis";
 
 /**
  * Closed-loop Marketing → Sales identity graph.
@@ -88,6 +90,8 @@ export function ensureClosedLoopSchema(): Promise<void> {
          permalink_url text NOT NULL DEFAULT '',
          refreshed_at timestamptz NOT NULL DEFAULT now()
        );
+       ALTER TABLE meta_entity_graph ADD COLUMN IF NOT EXISTS lead_form_id text NOT NULL DEFAULT '';
+       ALTER TABLE meta_entity_graph ADD COLUMN IF NOT EXISTS page_id text NOT NULL DEFAULT '';
        CREATE INDEX IF NOT EXISTS meta_entity_graph_creative_idx ON meta_entity_graph (creative_id);
        CREATE INDEX IF NOT EXISTS meta_entity_graph_campaign_idx ON meta_entity_graph (campaign_id, adset_id);
 
@@ -103,6 +107,7 @@ export function ensureClosedLoopSchema(): Promise<void> {
          attribution_level text NOT NULL DEFAULT 'reporting',
          PRIMARY KEY (creative_id, asset_type, asset_id)
        );
+       ALTER TABLE meta_creative_assets ADD COLUMN IF NOT EXISTS asset_text text NOT NULL DEFAULT '';
 
        CREATE TABLE IF NOT EXISTS crm_sale_order_links (
          sale_order_id text PRIMARY KEY,
@@ -201,14 +206,19 @@ interface GraphRow {
   landingPageUrl: string;
   permalinkUrl: string;
   feedAssets: { type: "video" | "image"; id: string; url?: string; thumbnailUrl?: string }[];
+  leadFormId: string;
+  pageId: string;
+  assetMetadata: { titles: string[]; bodies: string[]; linkUrls: string[] };
 }
 
 async function loadMetaGraph(): Promise<GraphRow[]> {
   const pool = getPool();
-  const [creatives, ads] = await Promise.all([
+  const [creatives, ads, images] = await Promise.all([
+    // Oldest first, so the most recent read of an ad's creative wins.
     pool.query<Row>(
       `SELECT row_data FROM dashboard_rows WHERE dataset = 'meta_ad_creatives'
-         AND COALESCE(row_data->>'__ad_id','') <> ''`,
+         AND COALESCE(row_data->>'__ad_id','') <> ''
+       ORDER BY row_data->>'__synced_at' ASC NULLS FIRST`,
     ),
     pool.query<Row>(
       `SELECT DISTINCT ON (row_data->>'__ad_id') row_data
@@ -216,7 +226,13 @@ async function loadMetaGraph(): Promise<GraphRow[]> {
         WHERE dataset = 'meta_ads' AND COALESCE(row_data->>'__ad_id','') <> ''
         ORDER BY row_data->>'__ad_id', ${AD_ROW_DATE} DESC NULLS LAST`,
     ),
+    pool
+      .query<Row>(`SELECT account_id, image_hash, url FROM meta_image_assets WHERE url <> ''`)
+      .catch(() => ({ rows: [] as Row[] })),
   ]);
+  const imageUrl = new Map(
+    images.rows.map((row) => [`${s(row.account_id)}|${s(row.image_hash)}`, s(row.url)]),
+  );
   const graph = new Map<string, GraphRow>();
   const blank = (adId: string): GraphRow => ({
     adId,
@@ -239,6 +255,9 @@ async function loadMetaGraph(): Promise<GraphRow[]> {
     landingPageUrl: "",
     permalinkUrl: "",
     feedAssets: [],
+    leadFormId: "",
+    pageId: "",
+    assetMetadata: { titles: [], bodies: [], linkUrls: [] },
   });
   // Ad insight rows first: they carry the hierarchy for every delivered ad.
   for (const { row_data } of ads.rows) {
@@ -278,13 +297,38 @@ async function loadMetaGraph(): Promise<GraphRow[]> {
     row.sourcePostId = s(r.source_post_id);
     row.landingPageUrl = s(r["Creative Landing Page URL"]);
     row.permalinkUrl = s(r["Creative Permalink URL"]);
+    row.leadFormId = s(r["Lead Form ID"]);
     try {
       const parsed = JSON.parse(s(r["Creative Assets"]) || "[]");
       if (Array.isArray(parsed)) row.feedAssets = parsed;
     } catch {
       row.feedAssets = [];
     }
+    try {
+      const parsed = JSON.parse(s(r["Creative Asset Metadata"]) || "{}") as Row;
+      const strings = (value: unknown) =>
+        Array.isArray(value) ? value.map((entry) => s(entry)).filter(Boolean) : [];
+      row.assetMetadata = {
+        titles: strings(parsed.titles),
+        bodies: strings(parsed.bodies),
+        linkUrls: strings(parsed.linkUrls),
+      };
+    } catch {
+      row.assetMetadata = { titles: [], bodies: [], linkUrls: [] };
+    }
     graph.set(adId, row);
+  }
+  for (const row of graph.values()) {
+    // A story ID is `<page id>_<post id>`: the page is part of the provider identity.
+    row.pageId = row.effectiveObjectStoryId.includes("_")
+      ? row.effectiveObjectStoryId.split("_")[0]!
+      : "";
+    const account = row.accountId.startsWith("act_") ? row.accountId : `act_${row.accountId}`;
+    const resolve = (hash: string) => (hash ? (imageUrl.get(`${account}|${hash}`) ?? "") : "");
+    if (row.imageHash && !row.imageUrl) row.imageUrl = resolve(row.imageHash);
+    row.feedAssets = row.feedAssets.map((asset) =>
+      asset.type === "image" && !asset.url ? { ...asset, url: resolve(asset.id) } : asset,
+    );
   }
   return [...graph.values()];
 }
@@ -585,6 +629,28 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
         }),
       );
     }
+    for (const row of graph) {
+      if (!row.creativeId) continue;
+      const text = [
+        ...row.assetMetadata.titles.map((value) => ["title", value] as const),
+        ...row.assetMetadata.bodies.map((value) => ["body", value] as const),
+        ...row.assetMetadata.linkUrls.map((value) => ["link_url", value] as const),
+      ];
+      for (const [type, value] of text) {
+        assets.push({
+          creativeId: row.creativeId,
+          adId: row.adId,
+          assetType: type as CreativeAsset["assetType"],
+          assetId: `text:${createHash("sha1").update(value).digest("hex").slice(0, 16)}`,
+          videoId: "",
+          imageHash: "",
+          assetUrl: type === "link_url" ? value : "",
+          thumbnailUrl: "",
+          attributionLevel: "metadata",
+          assetText: type === "link_url" ? "" : value.slice(0, 500),
+        });
+      }
+    }
     const uniqueAssets = [
       ...new Map(
         assets.map((asset) => [`${asset.creativeId}|${asset.assetType}|${asset.assetId}`, asset]),
@@ -620,6 +686,8 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           { name: "source_post_id", type: "text" },
           { name: "landing_page_url", type: "text" },
           { name: "permalink_url", type: "text" },
+          { name: "lead_form_id", type: "text" },
+          { name: "page_id", type: "text" },
         ],
         graph.map((row) => [
           row.adId,
@@ -641,6 +709,8 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           row.sourcePostId,
           row.landingPageUrl,
           row.permalinkUrl,
+          row.leadFormId,
+          row.pageId,
         ]),
       );
       await bulkInsert(
@@ -655,6 +725,8 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           { name: "image_hash", type: "text" },
           { name: "asset_url", type: "text" },
           { name: "thumbnail_url", type: "text" },
+          { name: "attribution_level", type: "text" },
+          { name: "asset_text", type: "text" },
         ],
         uniqueAssets.map((asset) => [
           asset.creativeId,
@@ -665,6 +737,8 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           asset.imageHash,
           asset.assetUrl,
           asset.thumbnailUrl,
+          asset.attributionLevel,
+          asset.assetText ?? "",
         ]),
       );
       if (sales.orders) {
@@ -841,9 +915,34 @@ export function startClosedLoopWorker() {
         error instanceof Error ? error.message : error,
       ),
     );
+  // Migrate at boot: readers of the acquisition layer depend on these columns.
+  ensureClosedLoopSchema().catch((error) =>
+    console.error(
+      "[closed-loop] schema migration failed:",
+      error instanceof Error ? error.message : error,
+    ),
+  );
   setTimeout(run, 90_000).unref?.();
   worker = setInterval(run, minutes * 60_000);
   worker.unref?.();
+
+  // Incremental catalog reconciliation: new ads, old-schema rows and rows not
+  // re-read for a week. Bounded per run; a full historical pass is an admin POST.
+  const reconcileHours = Number(process.env.META_CATALOG_RECONCILE_HOURS ?? 6);
+  if (Number.isFinite(reconcileHours) && reconcileHours > 0) {
+    const reconcile = () =>
+      import("./meta-catalog-reconcile.server")
+        .then(({ runMetaCatalogReconcile }) => runMetaCatalogReconcile({ maxAds: 400 }))
+        .then((summary) => (summary.fetched > 0 ? refreshClosedLoop() : undefined))
+        .catch((error) =>
+          console.error(
+            "[catalog-reconcile] scheduled run failed:",
+            error instanceof Error ? error.message : error,
+          ),
+        );
+    setTimeout(reconcile, 5 * 60_000).unref?.();
+    setInterval(reconcile, reconcileHours * 3_600_000).unref?.();
+  }
 }
 
 /* --- read model -------------------------------------------------------------- */
@@ -988,6 +1087,37 @@ async function loadSpend(range: { from: string; to: string }): Promise<SpendRow[
   }));
 }
 
+/** What each upstream source can and cannot currently supply. Counts only. */
+async function loadSourceStatus() {
+  const pool = getPool();
+  const table = async (name: string) =>
+    Boolean((await pool.query<Row>(`SELECT to_regclass($1) AS t`, [`public.${name}`])).rows[0]?.t);
+  const [events, reconcile] = await Promise.all([
+    table("meta_message_attribution_events"),
+    table("meta_catalog_reconcile_state"),
+  ]);
+  const [messaging, adsSync, reconciled] = await Promise.all([
+    events
+      ? pool.query<Row>(
+          `SELECT count(*) FILTER (WHERE status = 'resolved')::int AS resolved FROM meta_message_attribution_events`,
+        )
+      : Promise.resolve({ rows: [{ resolved: 0 }] as Row[] }),
+    pool.query<Row>(
+      `SELECT to_char((synced_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date, 'YYYY-MM-DD') AS through
+         FROM dashboard_sync_state WHERE dataset = 'meta_ads'`,
+    ),
+    reconcile
+      ? pool.query<Row>(`SELECT finished_at FROM meta_catalog_reconcile_state WHERE id = 1`)
+      : Promise.resolve({ rows: [] as Row[] }),
+  ]);
+  return {
+    messagingResolved: n(messaging.rows[0]?.resolved),
+    metaAdsSyncedThrough: s(adsSync.rows[0]?.through),
+    catalogReconciledAt: reconciled.rows[0]?.finished_at ?? null,
+    leadAdsTokenConfigured: Boolean(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim()),
+  };
+}
+
 const DIMENSIONS = [
   "platform",
   "campaign",
@@ -1060,7 +1190,7 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
   return cached(`closed-loop|${range.from}|${range.to}`, async () => {
     await ensureClosedLoopSchema();
     const pool = getPool();
-    const [facts, spend, graphRows, catalog, refresh, crmTotals] = await Promise.all([
+    const [facts, spend, graphRows, catalog, refresh, crmTotals, sources] = await Promise.all([
       loadFacts(range),
       loadSpend(range),
       pool.query<Row>(
@@ -1073,9 +1203,13 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
                 count(DISTINCT adset_id) FILTER (WHERE adset_id <> '')::int AS adsets,
                 count(*)::int AS ads,
                 count(DISTINCT creative_id) FILTER (WHERE creative_id <> '')::int AS creatives,
-                (SELECT count(*)::int FROM meta_creative_assets) AS assets,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type IN ('video','image')) AS assets,
                 (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'video') AS video_assets,
-                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'image') AS image_assets
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'image') AS image_assets,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'image' AND (asset_url <> '' OR thumbnail_url <> '')) AS image_assets_with_url,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE attribution_level = 'metadata') AS copy_variations,
+                count(*) FILTER (WHERE lead_form_id <> '')::int AS ads_with_form,
+                count(DISTINCT lead_form_id) FILTER (WHERE lead_form_id <> '')::int AS forms
            FROM meta_entity_graph`,
       ),
       closedLoopRefreshState(),
@@ -1087,6 +1221,7 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
            FROM crm_lead_outcomes`,
         [range.from, range.to],
       ),
+      loadSourceStatus(),
     ]);
 
     const media = new Map(graphRows.rows.map((row) => [s(row.creative_id), row]));
@@ -1129,7 +1264,8 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
     }
 
     const assets = await pool.query<Row>(
-      `SELECT creative_id, asset_type, asset_id, asset_url, thumbnail_url FROM meta_creative_assets`,
+      `SELECT creative_id, asset_type, asset_id, asset_url, thumbnail_url FROM meta_creative_assets
+        WHERE asset_type IN ('video','image')`,
     );
     const creativeById = new Map(grains.creative.map((row) => [row.creativeId, row]));
     const assetRows = assets.rows
@@ -1203,17 +1339,150 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
     );
 
     const coverage = coverageOf(facts);
+    const metaLeads = facts.filter((fact) => fact.entityType === "meta_lead");
+    const metaCoverage = coverageOf(metaLeads);
+    const conversations = facts.filter((fact) => fact.entityType === "chatwoot_conversation");
+    const trackedSpend = exactTotals.spend;
+    const kpis = closedLoopKpis({
+      all: totals,
+      tracked: exactTotals,
+      totalSpend: totals.spend,
+      trackedSpend,
+      // A period with no Meta rows is zero only if Meta was synced after it ended.
+      spendSynced: spend.length > 0 || sources.metaAdsSyncedThrough >= range.to,
+      crmSynced: Boolean(refresh.finishedAt),
+    });
+    const messagingStatus: KpiStatus = sources.messagingResolved > 0 ? "ok" : "not_connected";
+    const coverageSummary = [
+      {
+        key: "meta_lead_attribution",
+        label: { en: "Meta lead attribution", ar: "إسناد عملاء Meta" },
+        numerator: metaCoverage.withAdId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: {
+          en: "Instant-form leads whose exact campaign, ad set and ad are known.",
+          ar: "عملاء النماذج الفورية المعروف حملتهم ومجموعتهم وإعلانهم بالضبط.",
+        },
+      },
+      {
+        key: "creative_attribution",
+        label: { en: "Creative attribution", ar: "إسناد المادة الإعلانية" },
+        numerator: metaCoverage.withCreativeId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: {
+          en: "Leads whose ad's creative Meta still returns.",
+          ar: "العملاء الذين ما زالت Meta تُرجع المادة الإعلانية لإعلانهم.",
+        },
+      },
+      {
+        key: "form_attribution",
+        label: { en: "Lead form", ar: "نموذج العميل" },
+        numerator: metaCoverage.withFormId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: sources.leadAdsTokenConfigured
+          ? {
+              en: "Form from the lead record or from the ad's form setting.",
+              ar: "النموذج من سجل العميل أو من إعداد نموذج الإعلان.",
+            }
+          : {
+              en: "Form taken from the ad's form setting. Form names and answers need Meta Lead Ads access, which is not connected.",
+              ar: "النموذج مأخوذ من إعداد نموذج الإعلان. أسماء النماذج والإجابات تحتاج صلاحية Meta Lead Ads وهي غير متصلة.",
+            },
+      },
+      {
+        key: "crm_match",
+        label: { en: "CRM match", ar: "المطابقة في CRM" },
+        numerator: metaCoverage.crmMatchedExact,
+        denominator: metaCoverage.total,
+        status: (refresh.finishedAt
+          ? metaCoverage.total
+            ? "ok"
+            : "no_denominator"
+          : "pending_sync") as KpiStatus,
+        note: {
+          en: "Leads matched to a CRM record by Meta's lead ID.",
+          ar: "عملاء مطابقون لسجل CRM بمعرّف العميل من Meta.",
+        },
+      },
+      {
+        key: "messaging_attribution",
+        label: {
+          en: "Messaging attribution (WhatsApp, Messenger, Instagram)",
+          ar: "إسناد الرسائل (واتساب وماسنجر وإنستغرام)",
+        },
+        numerator: conversations.filter((fact) => fact.attributionConfidence === "exact").length,
+        denominator: conversations.length,
+        status: messagingStatus,
+        note:
+          messagingStatus === "ok"
+            ? {
+                en: "Conversations with an exact ad referral from Meta.",
+                ar: "محادثات لها إحالة إعلان دقيقة من Meta.",
+              }
+            : {
+                en: "Meta is not delivering message referrals to the attribution listener yet, so conversation sources are unknown.",
+                ar: "Meta لا ترسل إحالات الرسائل إلى مستقبل الإسناد بعد، لذلك مصدر المحادثات غير معروف.",
+              },
+      },
+      {
+        key: "historical_chatwoot",
+        label: { en: "Historical conversations", ar: "المحادثات السابقة" },
+        numerator: conversations.filter((fact) => fact.attributionConfidence !== "unknown").length,
+        denominator: conversations.length,
+        status: "historical_evidence_missing" as KpiStatus,
+        note: {
+          en: "Conversations recorded before referral capture keep an unknown source: the evidence was never stored.",
+          ar: "المحادثات المسجلة قبل التقاط الإحالة يبقى مصدرها غير معروف: الدليل لم يُحفظ أصلًا.",
+        },
+      },
+    ];
     // Rates and ROAS need a sample big enough to mean something.
     const MIN_MATCHED = 20;
     const MIN_SPEND = 100;
     const best = (score: (row: GrainRow) => number, rows = grains.creative) =>
       [...rows].filter((row) => score(row) > 0).sort((a, b) => score(b) - score(a))[0] ?? null;
 
+    const leadSources = new Map<string, { key: string; metrics: QualityMetrics }>();
+    for (const fact of facts.filter((row) => row.attributionConfidence === "exact")) {
+      const key = `${fact.sourcePlatform || "unknown"}|${fact.entityType}`;
+      const bucket = leadSources.get(key) ?? { key, metrics: emptyMetrics() };
+      addFact(bucket.metrics, fact);
+      leadSources.set(key, bucket);
+    }
+    const bestLeadSource =
+      [...leadSources.values()]
+        .map((bucket) => ({
+          key: bucket.key,
+          sourcePlatform: bucket.key.split("|")[0]!,
+          entityType: bucket.key.split("|")[1]!,
+          metrics: finalizeMetrics(bucket.metrics),
+        }))
+        .sort(
+          (a, b) => b.metrics.revenue - a.metrics.revenue || b.metrics.leads - a.metrics.leads,
+        )[0] ?? null;
+
     return {
       configured: true as const,
       period: range,
       businessTimeZone: BUSINESS_TIME_ZONE,
       refresh,
+      kpis,
+      coverageSummary,
+      sources: {
+        leadAdsDirect: sources.leadAdsTokenConfigured ? "ok" : "not_connected",
+        messaging: messagingStatus,
+        metaAdsSyncedThrough: sources.metaAdsSyncedThrough,
+        catalogReconciledAt: sources.catalogReconciledAt,
+      },
+      insights: {
+        bestCampaign: best((row) => row.revenue, grains.campaign),
+        bestCreative: best((row) => row.revenue),
+        bestLeadSource,
+        cheapVersusQuality: cheapVersusQuality(grains.creative),
+      },
       marketing: {
         campaigns: n(catalog.rows[0]?.campaigns),
         adsets: n(catalog.rows[0]?.adsets),
@@ -1222,6 +1491,10 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
         assets: n(catalog.rows[0]?.assets),
         videoAssets: n(catalog.rows[0]?.video_assets),
         imageAssets: n(catalog.rows[0]?.image_assets),
+        imageAssetsWithUrl: n(catalog.rows[0]?.image_assets_with_url),
+        copyVariations: n(catalog.rows[0]?.copy_variations),
+        adsWithLeadForm: n(catalog.rows[0]?.ads_with_form),
+        leadForms: n(catalog.rows[0]?.forms),
       },
       crm: {
         records: n(crmTotals.rows[0]?.crm_records),

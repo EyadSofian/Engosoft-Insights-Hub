@@ -122,19 +122,22 @@ export interface CreativeMedia {
 export interface CreativeAsset {
   creativeId: string;
   adId: string;
-  assetType: "video" | "image";
-  /** Provider asset identity: a Meta video ID or image hash. Empty when Meta gave none. */
+  /** Media assets carry a provider ID; text assets are flexible-creative copy variations. */
+  assetType: "video" | "image" | "title" | "body" | "link_url";
+  /** Provider asset identity: a Meta video ID or image hash, or `text:<hash>` for copy. */
   assetId: string;
   videoId: string;
   imageHash: string;
   assetUrl: string;
   thumbnailUrl: string;
   /**
-   * Always "reporting". Meta attributes a lead to an ad and its creative, not to
-   * one image or video inside it, so an asset inherits its creative's results as
-   * reporting context and is never an exact attribution grain.
+   * "reporting" for a video or image: Meta attributes a lead to an ad and its
+   * creative, not to one asset inside it, so an asset inherits its creative's
+   * results as reporting context and is never an exact attribution grain.
+   * "metadata" for copy variations: no per-asset result exists at all.
    */
-  attributionLevel: "reporting";
+  attributionLevel: "reporting" | "metadata";
+  assetText?: string;
 }
 
 export function creativeAssets(media: CreativeMedia): CreativeAsset[] {

@@ -73,7 +73,9 @@ async function existingSources(): Promise<{
             to_regclass('public.dashboard_rows') AS dashboard_rows,
             to_regclass('public.acquisition_crm_links') IS NOT NULL
               AND to_regclass('public.crm_lead_outcomes') IS NOT NULL
-              AND to_regclass('public.meta_entity_graph') IS NOT NULL AS crm_meta_leads`,
+              AND EXISTS (SELECT 1 FROM information_schema.columns
+                           WHERE table_schema = 'public' AND table_name = 'meta_entity_graph'
+                             AND column_name = 'lead_form_id') AS crm_meta_leads`,
   );
   const row = result.rows[0] ?? {};
   return {
@@ -110,12 +112,16 @@ const META_LEADS_SQL = `
  * the synced Meta catalog resolves that ad; the hierarchy then comes from the
  * catalog, never from the lead's campaign text. A lead the Insights Lead Ads
  * ingestion stored itself keeps that record instead.
+ *
+ * The form ID here is the instant form configured on the lead's ad (read from
+ * the ad's creative), not a field of the lead record: attribution_method
+ * `crm_carried_meta_lead_id` marks that source wherever form coverage is shown.
  */
 function crmMetaLeadsSql(directLeads: boolean): string {
   return `
   SELECT 'meta_lead:' || o.facebook_lead_id, 'meta_lead', o.facebook_lead_id, 'meta_instant_form',
     ${sourcePlatformSql("o.source")}, 'meta_instant_form',
-    'meta_lead:' || o.facebook_lead_id, '', o.facebook_lead_id, '', '', '', '',
+    'meta_lead:' || o.facebook_lead_id, '', o.facebook_lead_id, COALESCE(g.page_id, ''), '', COALESCE(g.lead_form_id, ''), '',
     '', '', '', COALESCE(g.account_id, ''), COALESCE(g.campaign_id, o.crm_campaign_id), COALESCE(g.campaign_name, ''),
     COALESCE(g.adset_id, ''), COALESCE(g.adset_name, ''), COALESCE(g.ad_id, o.ad_id), COALESCE(g.ad_name, ''),
     COALESCE(g.creative_id, ''), COALESCE(g.creative_name, ''), '',

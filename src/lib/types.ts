@@ -119,6 +119,14 @@ export interface AdCreative {
   imageHash?: string;
   /** Every video and image asset in `asset_feed_spec`/`object_story_spec`, by provider ID. */
   assets?: { type: "video" | "image"; id: string; url?: string; thumbnailUrl?: string }[];
+  /**
+   * The instant form configured on the ad's creative call to action. It is the
+   * form a lead on this ad was submitted through, read from the ad setting, not
+   * from the lead record itself.
+   */
+  leadFormId?: string;
+  /** Text variations in a flexible/dynamic creative. Reporting metadata only. */
+  assetMetadata?: { titles: string[]; bodies: string[]; linkUrls: string[] };
   creativeType: string;
   /** Normalized presentation family used by the dashboard gallery. */
   mediaType: string;
