@@ -225,3 +225,63 @@ describe("rate limits", () => {
     expect(graphUsagePercent({ app: "not json" })).toBe(0);
   });
 });
+
+describe("readable creative names", () => {
+  it("replaces a dynamic catalog template name with the headline", async () => {
+    const { readableCreativeName } = await import("../../src/lib/closed-loop");
+    expect(readableCreativeName("{{product.name}} 2026-02-21-3d46", "BIM Track")).toBe("BIM Track");
+    expect(readableCreativeName("{{product.name}} 2026-02-21-3d46", "")).toBe(
+      "Dynamic catalog creative 2026-02-21-3d46",
+    );
+    expect(readableCreativeName("CMRP… خطوتك لمنصب قيادي", "x")).toBe("CMRP… خطوتك لمنصب قيادي");
+  });
+});
+
+describe("throttling is not a verdict on an ad", () => {
+  it("does not skip an ad whose last failure was throttling (handled by the candidate query)", () => {
+    // The SQL drops throttle reasons from lastFailure, so the planner sees none.
+    const plan = reconcileTargets([candidate({ hasCreativeRow: false, lastFailure: "" })], {
+      maxAds: 5,
+      force: false,
+    });
+    expect(plan.targets).toHaveLength(1);
+  });
+});
+
+describe("lead form on the promoted page post", () => {
+  it("reads the form from the post's call to action with a runtime page token", async () => {
+    const { resolvePostLeadForms } = await import("../../src/lib/meta-creatives.server");
+    const calls: string[] = [];
+    const fetchStub = async (input: URL | string) => {
+      const url = new URL(String(input));
+      calls.push(url.pathname + "?" + url.searchParams.get("fields"));
+      if (url.searchParams.get("fields") === "access_token") {
+        return new Response(JSON.stringify({ access_token: "PAGE-TOKEN" }));
+      }
+      return new Response(
+        JSON.stringify({
+          "125287657625184_1057282089773373": {
+            call_to_action: { type: "SIGN_UP", value: { lead_gen_form_id: "1184376073153560" } },
+          },
+        }),
+      );
+    };
+    const original = globalThis.fetch;
+    globalThis.fetch = fetchStub as unknown as typeof fetch;
+    try {
+      const creative = {
+        ...blank("120232272536520712"),
+        creativeId: "cr1",
+        effectiveObjectStoryId: "125287657625184_1057282089773373",
+      };
+      const resolved = await resolvePostLeadForms([creative], "SYSTEM-TOKEN", "v25.0");
+      expect(resolved).toBe(1);
+      expect(creative.leadFormId).toBe("1184376073153560");
+      expect(creative.leadFormSource).toBe("post_call_to_action");
+      expect(JSON.stringify(creative)).not.toContain("PAGE-TOKEN");
+      expect(calls[0]).toContain("/125287657625184");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
