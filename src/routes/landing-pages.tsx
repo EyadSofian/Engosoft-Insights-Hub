@@ -72,6 +72,11 @@ interface LandingSummary {
   } | null;
 }
 
+/** The summary API returns ratios (0–1); `fmtPct` formats values already in percent. */
+function ratioPct(value: number | null | undefined): string {
+  return fmtPct(value === null || value === undefined ? value : value * 100, 1);
+}
+
 function dateBefore(days: number): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() - days);
@@ -179,7 +184,7 @@ function LandingPages() {
       key: "cvr",
       header: A ? "تحويل المشاهدة" : "View CVR",
       align: "right",
-      render: (row) => fmtPct(row.viewToSubmissionRate, 1),
+      render: (row) => ratioPct(row.viewToSubmissionRate),
       sortValue: (row) => row.viewToSubmissionRate ?? -1,
     },
     {
@@ -294,7 +299,7 @@ function LandingPages() {
           <KpiCard
             label={A ? "بدء الفورم" : "Form starts"}
             value={fmtNum(totals?.formStarts)}
-            sub={`${A ? "مشاهدة ← بدء" : "View → start"}: ${fmtPct(totals?.viewToStartRate, 1)}`}
+            sub={`${A ? "مشاهدة ← بدء" : "View → start"}: ${ratioPct(totals?.viewToStartRate)}`}
             icon={<FileCheck2 size={17} />}
             tone="amber"
             loading={summary.isLoading}
@@ -303,7 +308,7 @@ function LandingPages() {
           <KpiCard
             label={A ? "الإرسالات" : "Submissions"}
             value={fmtNum(totals?.submissions)}
-            sub={`${A ? "بدء ← إرسال" : "Start → submit"}: ${fmtPct(totals?.startToSubmissionRate, 1)}`}
+            sub={`${A ? "بدء ← إرسال" : "Start → submit"}: ${ratioPct(totals?.startToSubmissionRate)}`}
             icon={<Send size={17} />}
             tone="mint"
             loading={summary.isLoading}
@@ -311,7 +316,7 @@ function LandingPages() {
           />
           <KpiCard
             label={A ? "تحويل المشاهدة" : "View CVR"}
-            value={fmtPct(totals?.viewToSubmissionRate, 1)}
+            value={ratioPct(totals?.viewToSubmissionRate)}
             sub={A ? "الإرسالات ÷ المشاهدات" : "Submissions ÷ views"}
             icon={<BarChart3 size={17} />}
             tone="rose"
