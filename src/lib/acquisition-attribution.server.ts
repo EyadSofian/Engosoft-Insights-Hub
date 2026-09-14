@@ -201,6 +201,17 @@ function numericCell(key: string): string {
   return `(CASE WHEN ${cell} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN ${cell}::numeric ELSE 0 END)`;
 }
 
+const ISO_DAY = `'^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])'`;
+
+/**
+ * A synced ad row's day. Older Meta rows carry their date only in the sheet's
+ * `التاريخ` cell and have no stored record_date, so reading record_date alone
+ * would drop them from any date window.
+ */
+const AD_ROW_DATE = `COALESCE(record_date,
+  CASE WHEN row_data->>'التاريخ' ~ ${ISO_DAY} THEN left(row_data->>'التاريخ', 10)::date END,
+  CASE WHEN row_data->>'Date' ~ ${ISO_DAY} THEN left(row_data->>'Date', 10)::date END)`;
+
 /**
  * The window and ID filters that also make sense for synced ad-platform rows.
  * Values are validated by DATE and ID above before they are inlined.
@@ -208,8 +219,8 @@ function numericCell(key: string): string {
 function adRowsWhere(filters: AcquisitionFilters): string {
   const clauses: string[] = [];
   if (filters.from && DATE.test(filters.from))
-    clauses.push(`record_date >= '${filters.from}'::date`);
-  if (filters.to && DATE.test(filters.to)) clauses.push(`record_date <= '${filters.to}'::date`);
+    clauses.push(`${AD_ROW_DATE} >= '${filters.from}'::date`);
+  if (filters.to && DATE.test(filters.to)) clauses.push(`${AD_ROW_DATE} <= '${filters.to}'::date`);
   for (const [key, column] of [
     ["campaignId", "__campaign_id"],
     ["adsetId", "__adset_id"],
@@ -288,8 +299,8 @@ export async function getAcquisitionSummary(filters: AcquisitionFilters = {}) {
                   COALESCE(round(sum(${numericCell("Leads (on facebook Leads)")}) FILTER (WHERE dataset = 'meta_ads')), 0)::int AS platform_leads,
                   count(DISTINCT row_data->>'__campaign_id')
                     FILTER (WHERE dataset = 'meta_ads' AND ${numericCell("Leads (on facebook Leads)")} > 0)::int AS lead_campaigns,
-                  to_char(min(record_date) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS from_date,
-                  to_char(max(record_date) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS to_date
+                  to_char(min(${AD_ROW_DATE}) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS from_date,
+                  to_char(max(${AD_ROW_DATE}) FILTER (WHERE dataset = 'meta_ads'), 'YYYY-MM-DD') AS to_date
              FROM dashboard_rows WHERE dataset IN ('meta_ads','snap_ads')${adWhere}`,
         )
       : Promise.resolve({ rows: [] as Row[] }),

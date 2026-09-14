@@ -628,6 +628,13 @@ export async function getChatwootConversationCustomAttributes(
   return object(response?.custom_attributes) || {};
 }
 
+/**
+ * Chatwoot's custom_attributes endpoint replaces the conversation's whole
+ * attribute hash; it has no merge mode. Sending only the changed keys would
+ * delete every other attribute, including ones agents or bots set. So the
+ * merge happens here: the current attributes are re-read immediately before
+ * the write and sent back with the changes applied.
+ */
 export async function mergeChatwootConversationCustomAttributes(
   conversationId: number,
   customAttributes: Record<string, string>,
@@ -635,12 +642,14 @@ export async function mergeChatwootConversationCustomAttributes(
   if (!Number.isInteger(conversationId) || conversationId <= 0) {
     throw new Error("A valid Chatwoot conversation id is required");
   }
+  if (!Object.keys(customAttributes).length) return;
+  const current = await getChatwootConversationCustomAttributes(conversationId);
   const cfg = config();
   await request(
     `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/custom_attributes`,
     {
       method: "POST",
-      body: JSON.stringify({ custom_attributes: customAttributes, merge: true }),
+      body: JSON.stringify({ custom_attributes: { ...current, ...customAttributes } }),
     },
   );
 }
