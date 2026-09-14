@@ -796,6 +796,7 @@ export function GrainPerformance({
           {
             key: "creative",
             header: A ? "المادة" : "Creative",
+            minWidth: "240px",
             sticky: true,
             render: (row) => (
               <button
@@ -816,6 +817,7 @@ export function GrainPerformance({
           {
             key: "campaign",
             header: A ? "الحملة" : "Campaign",
+            minWidth: "240px",
             always: true,
             sticky: true,
             render: (row) => nameWithId(row.campaignName, row.campaignId),
@@ -826,6 +828,7 @@ export function GrainPerformance({
                 {
                   key: "adset",
                   header: A ? "مجموعة الإعلان" : "Ad set",
+                  minWidth: "240px",
                   render: (row: CreativeGrainRow) => nameWithId(row.adsetName, row.adsetId),
                   sortValue: (row: CreativeGrainRow) => row.adsetName,
                 },
@@ -836,6 +839,7 @@ export function GrainPerformance({
                 {
                   key: "ad",
                   header: A ? "الإعلان" : "Ad",
+                  minWidth: "240px",
                   render: (row: CreativeGrainRow) => nameWithId(row.adName, row.adId),
                   sortValue: (row: CreativeGrainRow) => row.adName,
                 },
@@ -983,6 +987,7 @@ export function AssetPerformance({
     {
       key: "creative",
       header: A ? "المادة" : "Creative",
+      minWidth: "240px",
       render: (row) => (
         <button
           type="button"
@@ -1186,6 +1191,7 @@ export function outcomeColumns(
     {
       key: "campaign",
       header: A ? "الحملة" : "Campaign",
+      minWidth: "240px",
       render: (row) => nameWithId(row.campaignName, row.campaignId),
     },
     {
@@ -1194,10 +1200,16 @@ export function outcomeColumns(
       hideByDefault: true,
       render: (row) => nameWithId(row.adsetName, row.adsetId),
     },
-    { key: "ad", header: A ? "الإعلان" : "Ad", render: (row) => nameWithId(row.adName, row.adId) },
+    {
+      key: "ad",
+      header: A ? "الإعلان" : "Ad",
+      minWidth: "240px",
+      render: (row) => nameWithId(row.adName, row.adId),
+    },
     {
       key: "creative",
       header: A ? "المادة" : "Creative",
+      minWidth: "240px",
       render: (row) =>
         row.creativeId && onOpenCreative ? (
           <button
