@@ -3,6 +3,7 @@ import { writeDashboardDataset } from "./dashboard-db.server";
 import {
   META_CREATIVE_AD_FIELDS,
   creativeStorageRow,
+  enlargeCreativeThumbnails,
   normalizeMetaGraphAd,
 } from "./meta-creatives.server";
 import {
@@ -308,6 +309,11 @@ async function reconcile(options: { maxAds?: number; force?: boolean }): Promise
     async function flushBatch() {
       if (!pendingRows.length) return;
       const rows = pendingRows.splice(0);
+      await enlargeCreativeThumbnails(
+        rows.map((entry) => entry.creative),
+        token,
+        apiVersion,
+      );
       await writeDashboardDataset(
         "meta_ad_creatives",
         rows.map((entry) => creativeStorageRow(entry.creative)),
