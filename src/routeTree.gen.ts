@@ -89,6 +89,7 @@ import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.we
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
 import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
+import { Route as ApiMetaCatalogReconcileRouteImport } from './routes/api/meta.catalog-reconcile'
 import { Route as ApiMetaLeadgenWebhookRouteImport } from './routes/api/meta.leadgen-webhook'
 import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
@@ -524,6 +525,11 @@ const ApiLandingAttributionSummaryRoute =
     path: '/api/landing-attribution/summary',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiMetaCatalogReconcileRoute = ApiMetaCatalogReconcileRouteImport.update({
+  id: '/api/meta/catalog-reconcile',
+  path: '/api/meta/catalog-reconcile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaLeadgenWebhookRoute = ApiMetaLeadgenWebhookRouteImport.update({
   id: '/api/meta/leadgen-webhook',
   path: '/api/meta/leadgen-webhook',
@@ -725,6 +731,7 @@ export interface FileRoutesByFullPath {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
@@ -830,6 +837,7 @@ export interface FileRoutesByTo {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
@@ -936,6 +944,7 @@ export interface FileRoutesById {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
@@ -1043,6 +1052,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
     | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
@@ -1148,6 +1158,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
     | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
@@ -1253,6 +1264,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
     | '/api/meta/leadgen-webhook'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
@@ -1359,6 +1371,7 @@ export interface RootRouteChildren {
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
   ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
+  ApiMetaCatalogReconcileRoute: typeof ApiMetaCatalogReconcileRoute
   ApiMetaLeadgenWebhookRoute: typeof ApiMetaLeadgenWebhookRoute
   ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
@@ -1946,6 +1959,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/catalog-reconcile': {
+      id: '/api/meta/catalog-reconcile'
+      path: '/api/meta/catalog-reconcile'
+      fullPath: '/api/meta/catalog-reconcile'
+      preLoaderRoute: typeof ApiMetaCatalogReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/meta/leadgen-webhook': {
       id: '/api/meta/leadgen-webhook'
       path: '/api/meta/leadgen-webhook'
@@ -2192,6 +2212,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
   ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
+  ApiMetaCatalogReconcileRoute: ApiMetaCatalogReconcileRoute,
   ApiMetaLeadgenWebhookRoute: ApiMetaLeadgenWebhookRoute,
   ApiMetaWhatsappAttributionWebhookRoute:
     ApiMetaWhatsappAttributionWebhookRoute,
