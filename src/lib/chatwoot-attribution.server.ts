@@ -15,9 +15,13 @@ import {
 
 export type AttributionMethod =
   | "meta_referral"
+  | "meta_whatsapp_referral"
+  | "meta_messenger_referral"
+  | "meta_instagram_referral"
   | "signed_tracking_token"
   | "utm"
   | "referrer"
+  | "inbox_only"
   | "inbox_mapping"
   | "manual"
   | "unknown";
@@ -28,6 +32,7 @@ export interface NormalizedAttribution {
   eventType: string;
   conversationId: number | null;
   messageId: number | null;
+  providerMessageId: string;
   contactId: number | null;
   inboxId: number | null;
   agentId: number | null;
@@ -102,6 +107,9 @@ interface CrmMatch {
 
 const MAX_EVIDENCE_TEXT = 1_000;
 const DEFAULT_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+// The legacy Chatwoot webhook owns only these labels. The Meta sidecar owns
+// channel:/campaign: labels, so preserving them here prevents the two writers
+// from deleting each other's state when both integrations are enabled.
 const MANAGED_LABEL_PREFIXES = ["src:", "medium:", "branch:"];
 
 /** Verifies Chatwoot's current per-webhook signature over the unparsed body. */
@@ -171,6 +179,7 @@ async function ensureSchema(): Promise<void> {
           event_type text NOT NULL,
           conversation_id bigint,
           message_id bigint,
+          provider_message_id text,
           contact_id bigint,
           inbox_id bigint,
           occurred_at timestamptz NOT NULL,
@@ -185,12 +194,15 @@ async function ensureSchema(): Promise<void> {
           last_error text NOT NULL DEFAULT ''
         );
         ALTER TABLE chatwoot_event_inbox ADD COLUMN IF NOT EXISTS locked_at timestamptz;
+        ALTER TABLE chatwoot_event_inbox ADD COLUMN IF NOT EXISTS provider_message_id text;
         ALTER TABLE chatwoot_event_inbox
           ADD COLUMN IF NOT EXISTS duplicate_deliveries integer NOT NULL DEFAULT 0;
         CREATE INDEX IF NOT EXISTS chatwoot_event_inbox_status_received_idx
           ON chatwoot_event_inbox (status, received_at DESC);
         CREATE INDEX IF NOT EXISTS chatwoot_event_inbox_conversation_idx
           ON chatwoot_event_inbox (conversation_id, occurred_at DESC);
+        CREATE INDEX IF NOT EXISTS chatwoot_event_inbox_provider_message_idx
+          ON chatwoot_event_inbox (provider_message_id) WHERE provider_message_id IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS chatwoot_attribution_touches (
           id bigserial PRIMARY KEY,
@@ -198,6 +210,9 @@ async function ensureSchema(): Promise<void> {
           contact_id bigint,
           inbox_id bigint,
           message_id bigint,
+          provider_message_id text NOT NULL DEFAULT '',
+          destination_phone_number_id text NOT NULL DEFAULT '',
+          destination_page_id text NOT NULL DEFAULT '',
           event_id bigint REFERENCES chatwoot_event_inbox(id) ON DELETE SET NULL,
           phone_key text NOT NULL DEFAULT '',
           channel text NOT NULL DEFAULT '',
@@ -237,6 +252,20 @@ async function ensureSchema(): Promise<void> {
           ON chatwoot_attribution_touches (campaign_id, adset_id, ad_id);
         CREATE INDEX IF NOT EXISTS chatwoot_attribution_touches_contact_idx
           ON chatwoot_attribution_touches (contact_id, phone_key);
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS provider_message_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS destination_phone_number_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS destination_page_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS creative_name text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS placement text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS attribution_scope text NOT NULL DEFAULT 'conversation';
+        ALTER TABLE chatwoot_attribution_touches
+          ADD COLUMN IF NOT EXISTS unknown_reason text NOT NULL DEFAULT '';
 
         CREATE TABLE IF NOT EXISTS chatwoot_conversation_attribution (
           conversation_id bigint PRIMARY KEY,
@@ -248,6 +277,10 @@ async function ensureSchema(): Promise<void> {
           latest_touch_id bigint REFERENCES chatwoot_attribution_touches(id) ON DELETE SET NULL,
           first_touch_at timestamptz,
           latest_touch_at timestamptz,
+          chatwoot_message_id bigint,
+          provider_message_id text NOT NULL DEFAULT '',
+          destination_phone_number_id text NOT NULL DEFAULT '',
+          destination_page_id text NOT NULL DEFAULT '',
           channel text NOT NULL DEFAULT '',
           platform text NOT NULL DEFAULT '',
           source text NOT NULL DEFAULT '',
@@ -258,6 +291,18 @@ async function ensureSchema(): Promise<void> {
           adset_name text NOT NULL DEFAULT '',
           ad_id text NOT NULL DEFAULT '',
           ad_name text NOT NULL DEFAULT '',
+          creative_id text NOT NULL DEFAULT '',
+          creative_name text NOT NULL DEFAULT '',
+          placement text NOT NULL DEFAULT '',
+          utm_source text NOT NULL DEFAULT '',
+          utm_medium text NOT NULL DEFAULT '',
+          utm_campaign text NOT NULL DEFAULT '',
+          utm_content text NOT NULL DEFAULT '',
+          utm_term text NOT NULL DEFAULT '',
+          referral_source_id text NOT NULL DEFAULT '',
+          ctwa_clid text NOT NULL DEFAULT '',
+          attribution_scope text NOT NULL DEFAULT 'conversation',
+          unknown_reason text NOT NULL DEFAULT '',
           branch_id text NOT NULL DEFAULT '',
           branch_name text NOT NULL DEFAULT '',
           attribution_method text NOT NULL DEFAULT 'unknown',
@@ -273,6 +318,38 @@ async function ensureSchema(): Promise<void> {
           ON chatwoot_conversation_attribution (latest_touch_at DESC);
         CREATE INDEX IF NOT EXISTS chatwoot_conversation_attribution_filters_idx
           ON chatwoot_conversation_attribution (platform, source, medium, branch_id);
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS creative_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS creative_name text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS placement text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS utm_source text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS utm_medium text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS utm_campaign text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS utm_content text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS utm_term text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS unknown_reason text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS chatwoot_message_id bigint;
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS provider_message_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS destination_phone_number_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS destination_page_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS referral_source_id text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS ctwa_clid text NOT NULL DEFAULT '';
+        ALTER TABLE chatwoot_conversation_attribution
+          ADD COLUMN IF NOT EXISTS attribution_scope text NOT NULL DEFAULT 'conversation';
 
         CREATE TABLE IF NOT EXISTS chatwoot_attribution_tokens (
           token text PRIMARY KEY,
@@ -490,6 +567,7 @@ export function normalizeChatwootAttribution(payload: unknown): NormalizedAttrib
   const messageType = numberOrNull(message.id) ? message : root;
   const conversationId = numberOrNull(conversation.id || root.conversation_id);
   const messageId = numberOrNull(messageType.id);
+  const providerMessageId = first(messageType, ["source_id", "sourceId"]);
   const inboxId = numberOrNull(inbox.id || conversation.inbox_id || root.inbox_id);
   const contactId = numberOrNull(contact.id || conversation.contact_id || root.contact_id);
   const conversationMeta = object(conversation.meta);
@@ -524,6 +602,7 @@ export function normalizeChatwootAttribution(payload: unknown): NormalizedAttrib
     eventType,
     conversationId,
     messageId,
+    providerMessageId,
     contactId,
     inboxId,
     agentId,
@@ -766,6 +845,7 @@ function evidenceHash(candidate: NormalizedAttribution, entity: MetaEntity): str
       entity,
       branchId: candidate.branchId,
       messageId: candidate.messageId,
+      providerMessageId: candidate.providerMessageId,
     }),
   );
 }
@@ -814,6 +894,7 @@ function rowValues(
     candidate.contactId,
     candidate.inboxId,
     candidate.messageId,
+    candidate.providerMessageId,
     eventId,
     candidate.phoneKey,
     candidate.channel,
@@ -867,10 +948,12 @@ async function upsertConversationProjection(
       conversation_id, contact_id, inbox_id, agent_id, phone_key,
       first_touch_id, latest_touch_id, first_touch_at, latest_touch_at,
       channel, platform, source, medium, campaign_id, campaign_name,
-      adset_id, adset_name, ad_id, ad_name, branch_id, branch_name,
-      attribution_method, confidence, crm_lead_ids, crm_status, crm_won, crm_lost, revenue, updated_at
+      adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, placement,
+      utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+      branch_id, branch_name, attribution_method, confidence, unknown_reason,
+      crm_lead_ids, crm_status, crm_won, crm_lost, revenue, updated_at
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb,$25,$26,$27,$28,now()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33::jsonb,$34,$35,$36,$37,now()
     ) ON CONFLICT (conversation_id) DO UPDATE SET
       contact_id = EXCLUDED.contact_id, inbox_id = EXCLUDED.inbox_id, agent_id = EXCLUDED.agent_id,
       phone_key = EXCLUDED.phone_key, first_touch_id = EXCLUDED.first_touch_id,
@@ -879,8 +962,13 @@ async function upsertConversationProjection(
       platform = EXCLUDED.platform, source = EXCLUDED.source, medium = EXCLUDED.medium,
       campaign_id = EXCLUDED.campaign_id, campaign_name = EXCLUDED.campaign_name,
       adset_id = EXCLUDED.adset_id, adset_name = EXCLUDED.adset_name, ad_id = EXCLUDED.ad_id,
-      ad_name = EXCLUDED.ad_name, branch_id = EXCLUDED.branch_id, branch_name = EXCLUDED.branch_name,
+      ad_name = EXCLUDED.ad_name, creative_id = EXCLUDED.creative_id,
+      creative_name = EXCLUDED.creative_name, placement = EXCLUDED.placement,
+      utm_source = EXCLUDED.utm_source, utm_medium = EXCLUDED.utm_medium,
+      utm_campaign = EXCLUDED.utm_campaign, utm_content = EXCLUDED.utm_content,
+      utm_term = EXCLUDED.utm_term, branch_id = EXCLUDED.branch_id, branch_name = EXCLUDED.branch_name,
       attribution_method = EXCLUDED.attribution_method, confidence = EXCLUDED.confidence,
+      unknown_reason = EXCLUDED.unknown_reason,
       crm_lead_ids = EXCLUDED.crm_lead_ids, crm_status = EXCLUDED.crm_status,
       crm_won = EXCLUDED.crm_won, crm_lost = EXCLUDED.crm_lost, revenue = EXCLUDED.revenue, updated_at = now()`,
     [
@@ -893,20 +981,29 @@ async function upsertConversationProjection(
       latestTouch.id,
       firstTouch.occurred_at,
       latestTouch.occurred_at,
-      latestTouch.channel,
-      latestTouch.platform,
-      latestTouch.source,
-      latestTouch.medium,
-      latestTouch.campaign_id,
-      latestTouch.campaign_name,
-      latestTouch.adset_id,
-      latestTouch.adset_name,
-      latestTouch.ad_id,
-      latestTouch.ad_name,
-      latestTouch.branch_id,
-      latestTouch.branch_name,
-      latestTouch.attribution_method,
-      latestTouch.confidence,
+      firstTouch.channel,
+      firstTouch.platform,
+      firstTouch.source,
+      firstTouch.medium,
+      firstTouch.campaign_id,
+      firstTouch.campaign_name,
+      firstTouch.adset_id,
+      firstTouch.adset_name,
+      firstTouch.ad_id,
+      firstTouch.ad_name,
+      firstTouch.creative_id,
+      firstTouch.creative_name,
+      firstTouch.placement,
+      firstTouch.utm_source,
+      firstTouch.utm_medium,
+      firstTouch.utm_campaign,
+      firstTouch.utm_content,
+      firstTouch.utm_term,
+      firstTouch.branch_id,
+      firstTouch.branch_name,
+      firstTouch.attribution_method,
+      firstTouch.confidence,
+      firstTouch.unknown_reason,
       JSON.stringify(crm.ids),
       crm.status,
       crm.won,
@@ -1008,9 +1105,9 @@ export async function processChatwootAttributionEvent(input: {
   const db = getPool();
   const inserted = await db.query<{ id: string }>(
     `INSERT INTO chatwoot_event_inbox (
-      event_key, dedupe_key, delivery_id, event_type, conversation_id, message_id, contact_id, inbox_id,
+      event_key, dedupe_key, delivery_id, event_type, conversation_id, message_id, provider_message_id, contact_id, inbox_id,
       occurred_at, payload_hash, evidence
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
     ON CONFLICT DO NOTHING RETURNING id`,
     [
       eventKey,
@@ -1019,6 +1116,7 @@ export async function processChatwootAttributionEvent(input: {
       candidate.eventType,
       candidate.conversationId,
       candidate.messageId,
+      candidate.providerMessageId || null,
       candidate.contactId,
       candidate.inboxId,
       candidate.occurredAt,
@@ -1103,13 +1201,13 @@ export async function processChatwootAttributionEvent(input: {
     const values = rowValues(finalCandidate, entity, eventId, finalHash);
     const touch = await db.query<{ id: string }>(
       `INSERT INTO chatwoot_attribution_touches (
-        conversation_id, contact_id, inbox_id, message_id, event_id, phone_key, channel, platform, source, medium,
+        conversation_id, contact_id, inbox_id, message_id, provider_message_id, event_id, phone_key, channel, platform, source, medium,
         utm_source, utm_medium, utm_campaign, utm_content, utm_term, campaign_id, campaign_name, adset_id,
         adset_name, ad_id, ad_name, creative_id, ctwa_clid, referral_source_id, referral_source_type,
         referral_source_url, referral_headline, branch_id, branch_name, attribution_method, confidence,
         evidence_hash, evidence, occurred_at
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33::jsonb,$34
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34::jsonb,$35
       ) ON CONFLICT (conversation_id, message_id, evidence_hash) DO NOTHING RETURNING id`,
       values,
     );
@@ -1124,6 +1222,17 @@ export async function processChatwootAttributionEvent(input: {
       );
     }
     await syncChatwoot(finalCandidate, entity);
+    if (finalCandidate.providerMessageId) {
+      void import("./meta-message-attribution.server")
+        .then(({ processMetaAttributionForProviderMessage }) =>
+          processMetaAttributionForProviderMessage(finalCandidate.providerMessageId),
+        )
+        .catch((error) =>
+          console.error("[meta-attribution] deferred correlation failed", {
+            message: error instanceof Error ? error.message.slice(0, 240) : "processing failed",
+          }),
+        );
+    }
     await db.query(
       `UPDATE chatwoot_event_inbox
           SET status = 'processed', locked_at = NULL, processed_at = now(), last_error = ''
@@ -1177,6 +1286,7 @@ export async function createAttributionTrackingToken(
 interface AttributionFilters {
   from?: string;
   to?: string;
+  channel?: string;
   platform?: string;
   source?: string;
   medium?: string;
@@ -1188,6 +1298,7 @@ interface AttributionFilters {
   agentId?: string;
   method?: string;
   confidence?: string;
+  unknownReason?: string;
   crmStatus?: string;
 }
 
@@ -1208,6 +1319,7 @@ function sqlFilters(filters: AttributionFilters, alias = "c") {
     predicates.push(`${alias}.latest_touch_at <= $${values.length}::timestamptz`);
   }
   add("platform", filters.platform);
+  add("channel", filters.channel);
   add("source", filters.source);
   add("medium", filters.medium);
   add("campaign_id", filters.campaignId);
@@ -1218,6 +1330,7 @@ function sqlFilters(filters: AttributionFilters, alias = "c") {
   add("agent_id", filters.agentId);
   add("attribution_method", filters.method);
   add("confidence", filters.confidence);
+  add("unknown_reason", filters.unknownReason);
   add("crm_status", filters.crmStatus);
   return { where: predicates.join(" AND "), values };
 }
@@ -1241,11 +1354,18 @@ function dateKey(value: string): string {
 async function metaSpendForCampaigns(
   campaigns: Record<string, string>[],
   filters: AttributionFilters,
-): Promise<{ available: boolean; total: number | null; byCampaignId: Map<string, number> }> {
+): Promise<{
+  available: boolean;
+  total: number | null;
+  byCampaignId: Map<string, number>;
+  byAdId: Map<string, number>;
+}> {
   const ids = new Set(campaigns.map((row) => row.campaign_id).filter(Boolean));
-  if (!ids.size) return { available: false, total: null, byCampaignId: new Map() };
+  if (!ids.size)
+    return { available: false, total: null, byCampaignId: new Map(), byAdId: new Map() };
   const { metaAds } = await importedRows();
   const byCampaignId = new Map<string, number>();
+  const byAdId = new Map<string, number>();
   for (const row of metaAds) {
     const campaignId = scalar(row, ["__campaign_id", "Campaign ID", "campaignId", "campaign_id"]);
     if (!ids.has(campaignId)) continue;
@@ -1257,12 +1377,15 @@ async function metaSpendForCampaigns(
     const spend = amount(scalar(row, ["Spend (Cost)", "Spend", "spend", "Cost", "cost"]));
     if (spend === null) continue;
     byCampaignId.set(campaignId, (byCampaignId.get(campaignId) || 0) + spend);
+    const adId = scalar(row, ["__ad_id", "Ad ID", "adId", "ad_id"]);
+    if (adId) byAdId.set(adId, (byAdId.get(adId) || 0) + spend);
   }
-  if (!byCampaignId.size) return { available: false, total: null, byCampaignId };
+  if (!byCampaignId.size) return { available: false, total: null, byCampaignId, byAdId };
   return {
     available: true,
     total: [...byCampaignId.values()].reduce((sum, value) => sum + value, 0),
     byCampaignId,
+    byAdId,
   };
 }
 
@@ -1289,9 +1412,11 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
       db.query<Record<string, string>>(
         `SELECT
         count(*)::int AS conversations,
-        count(*) FILTER (WHERE attribution_method <> 'unknown')::int AS attributed_conversations,
-        count(*) FILTER (WHERE attribution_method = 'meta_referral')::int AS meta_ctwa_conversations,
-        count(*) FILTER (WHERE attribution_method = 'unknown')::int AS unknown_conversations,
+        count(*) FILTER (WHERE attribution_method NOT IN ('unknown','inbox_only','inbox_mapping'))::int AS attributed_conversations,
+        count(*) FILTER (WHERE attribution_method IN ('meta_referral','meta_whatsapp_referral'))::int AS meta_ctwa_conversations,
+        count(*) FILTER (WHERE attribution_method IN ('meta_referral','meta_whatsapp_referral','meta_messenger_referral','meta_instagram_referral') AND campaign_id <> '')::int AS paid_campaign_conversations,
+        count(*) FILTER (WHERE attribution_method IN ('inbox_only','inbox_mapping') OR unknown_reason IN ('organic_direct','no_paid_referral'))::int AS organic_direct_conversations,
+        count(*) FILTER (WHERE attribution_method = 'unknown' OR unknown_reason IN ('meta_source_id_unresolved','meta_identity_missing','unsupported_channel','historical_evidence_missing','chatwoot_payload_missing'))::int AS unknown_conversations,
         count(*) FILTER (WHERE confidence = 'exact')::int AS exact_conversations,
         count(*) FILTER (WHERE confidence = 'inferred')::int AS inferred_conversations,
         count(DISTINCT NULLIF(contact_id, 0))::int AS unique_contacts,
@@ -1303,19 +1428,23 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
         values,
       ),
       db.query<Record<string, string>>(
-        `SELECT platform, source, medium, campaign_id, campaign_name, adset_id, ad_id, branch_id,
-              count(*)::int AS conversations, count(*) FILTER (WHERE crm_won)::int AS won, sum(revenue) AS revenue
+        `SELECT platform, source, medium, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name,
+              count(*)::int AS conversations,
+              coalesce(sum(jsonb_array_length(crm_lead_ids)),0)::int AS crm_leads,
+              count(*) FILTER (WHERE crm_won)::int AS won,
+              count(*) FILTER (WHERE crm_lost)::int AS lost,
+              sum(revenue) AS revenue
          FROM chatwoot_conversation_attribution c WHERE ${where}
-        GROUP BY platform, source, medium, campaign_id, campaign_name, adset_id, ad_id, branch_id
+        GROUP BY platform, source, medium, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name
         ORDER BY conversations DESC, campaign_name ASC LIMIT 100`,
         values,
       ),
       db.query<Record<string, string>>(
-        `SELECT platform, source, medium, count(*)::int AS conversations,
+        `SELECT channel, platform, source, medium, count(*)::int AS conversations,
               count(*) FILTER (WHERE crm_won)::int AS won, sum(revenue) AS revenue
          FROM chatwoot_conversation_attribution c WHERE ${where}
-        GROUP BY platform, source, medium
-        ORDER BY conversations DESC, platform ASC, source ASC`,
+        GROUP BY channel, platform, source, medium
+        ORDER BY conversations DESC, platform ASC, channel ASC, source ASC`,
         values,
       ),
       db.query<Record<string, string>>(
@@ -1329,7 +1458,7 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
       db.query<Record<string, string>>(
         `SELECT to_char(latest_touch_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
               count(*)::int AS conversations,
-              count(*) FILTER (WHERE attribution_method = 'unknown')::int AS unknown_conversations
+              count(*) FILTER (WHERE attribution_method = 'unknown' OR unknown_reason IN ('meta_source_id_unresolved','meta_identity_missing','unsupported_channel','historical_evidence_missing','chatwoot_payload_missing'))::int AS unknown_conversations
          FROM chatwoot_conversation_attribution c WHERE ${where}
         GROUP BY 1 ORDER BY 1`,
         values,
@@ -1341,6 +1470,7 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
     available: false,
     total: null as number | null,
     byCampaignId: new Map<string, number>(),
+    byAdId: new Map<string, number>(),
   };
   try {
     spend = await metaSpendForCampaigns(campaignsResult.rows, filters);
@@ -1366,6 +1496,8 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
       conversations,
       attributedConversations: Number(totals.attributed_conversations || 0),
       metaCtwaConversations: Number(totals.meta_ctwa_conversations || 0),
+      paidCampaignConversations: Number(totals.paid_campaign_conversations || 0),
+      organicDirectConversations: Number(totals.organic_direct_conversations || 0),
       unknownConversations: Number(totals.unknown_conversations || 0),
       exactConversations: Number(totals.exact_conversations || 0),
       inferredConversations: Number(totals.inferred_conversations || 0),
@@ -1387,13 +1519,32 @@ export async function getAttributionSummary(filters: AttributionFilters = {}) {
         spend.total !== null && spendCoveredWon > 0 ? spend.total / spendCoveredWon : null,
       roas: spend.total !== null && spend.total > 0 ? spendCoveredRevenue / spend.total : null,
     },
-    campaigns: campaignsResult.rows.map((row) => ({
-      ...row,
-      conversations: Number(row.conversations || 0),
-      won: Number(row.won || 0),
-      revenue: row.revenue === null || row.revenue === undefined ? null : Number(row.revenue),
-      spend: spend.byCampaignId.get(row.campaign_id) ?? null,
-    })),
+    campaigns: campaignsResult.rows.map((row) => {
+      // Ad-grain reporting uses ad_id. Campaign-grain rows use campaign_id.
+      const exactSpend = row.ad_id
+        ? spend.byAdId.get(row.ad_id)
+        : spend.byCampaignId.get(row.campaign_id);
+      const rowSpend = exactSpend ?? null;
+      const rowConversations = Number(row.conversations || 0);
+      const rowWon = Number(row.won || 0);
+      const rowRevenue =
+        row.revenue === null || row.revenue === undefined ? null : Number(row.revenue);
+      return {
+        ...row,
+        conversations: rowConversations,
+        crmLeads: Number(row.crm_leads || 0),
+        won: rowWon,
+        lost: Number(row.lost || 0),
+        revenue: rowRevenue,
+        spend: rowSpend,
+        costPerAttributedConversation:
+          rowSpend !== null && rowConversations > 0 ? rowSpend / rowConversations : null,
+        conversionRate: attributionPercentage(rowWon, rowConversations),
+        cpa: rowSpend !== null && rowWon > 0 ? rowSpend / rowWon : null,
+        roas:
+          rowSpend !== null && rowSpend > 0 && rowRevenue !== null ? rowRevenue / rowSpend : null,
+      };
+    }),
     sources: sourcesResult.rows.map((row) => ({
       ...row,
       conversations: Number(row.conversations || 0),
@@ -1429,8 +1580,11 @@ export async function getAttributionConversations(
   );
   values.push(limit, offset);
   const rows = await db.query<Record<string, unknown>>(
-    `SELECT conversation_id, latest_touch_at, platform, source, medium, campaign_id, campaign_name,
-            branch_id, branch_name, attribution_method, confidence, crm_status, crm_won, revenue
+    `SELECT conversation_id, latest_touch_at, channel, platform, source, medium, campaign_id, campaign_name,
+            adset_id, adset_name, ad_id, ad_name, creative_id, creative_name, placement,
+            utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+            branch_id, branch_name, attribution_method, confidence, unknown_reason,
+            crm_status, crm_won, crm_lost, revenue
        FROM chatwoot_conversation_attribution c WHERE ${where}
       ORDER BY latest_touch_at DESC NULLS LAST LIMIT $${values.length - 1} OFFSET $${values.length}`,
     values,

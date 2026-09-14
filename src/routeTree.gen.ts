@@ -70,6 +70,7 @@ import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
 import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
+import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
 import { Route as ApiAttributionSummaryRouteImport } from './routes/api/attribution.summary'
 import { Route as ApiAttributionTokensRouteImport } from './routes/api/attribution.tokens'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
@@ -77,6 +78,7 @@ import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.we
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
 import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
 import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
+import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
 import { Route as ApiPricingBooksRouteImport } from './routes/api/pricing.books'
@@ -406,6 +408,12 @@ const ApiAttributionHealthRoute = ApiAttributionHealthRouteImport.update({
   path: '/api/attribution/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttributionMetaHealthRoute =
+  ApiAttributionMetaHealthRouteImport.update({
+    id: '/api/attribution/meta-health',
+    path: '/api/attribution/meta-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAttributionSummaryRoute = ApiAttributionSummaryRouteImport.update({
   id: '/api/attribution/summary',
   path: '/api/attribution/summary',
@@ -441,6 +449,12 @@ const ApiLandingAttributionSummaryRoute =
   ApiLandingAttributionSummaryRouteImport.update({
     id: '/api/landing-attribution/summary',
     path: '/api/landing-attribution/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMetaWhatsappAttributionWebhookRoute =
+  ApiMetaWhatsappAttributionWebhookRouteImport.update({
+    id: '/api/meta/whatsapp-attribution-webhook',
+    path: '/api/meta/whatsapp-attribution-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPricesAdviceRoute = ApiPricesAdviceRouteImport.update({
@@ -608,6 +622,7 @@ export interface FileRoutesByFullPath {
   '/api/yoy': typeof ApiYoyRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
@@ -615,6 +630,7 @@ export interface FileRoutesByFullPath {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -698,6 +714,7 @@ export interface FileRoutesByTo {
   '/api/yoy': typeof ApiYoyRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
@@ -705,6 +722,7 @@ export interface FileRoutesByTo {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -789,6 +807,7 @@ export interface FileRoutesById {
   '/api/yoy': typeof ApiYoyRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
+  '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
@@ -796,6 +815,7 @@ export interface FileRoutesById {
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
   '/api/pricing/books': typeof ApiPricingBooksRoute
@@ -881,6 +901,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
+    | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
     | '/api/auth/sso'
@@ -888,6 +909,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -971,6 +993,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
+    | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
     | '/api/auth/sso'
@@ -978,6 +1001,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -1061,6 +1085,7 @@ export interface FileRouteTypes {
     | '/api/yoy'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
+    | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
     | '/api/auth/sso'
@@ -1068,6 +1093,7 @@ export interface FileRouteTypes {
     | '/api/ingest/dataset'
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
+    | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
     | '/api/pricing/books'
@@ -1152,6 +1178,7 @@ export interface RootRouteChildren {
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
   ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
+  ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
   ApiAttributionSummaryRoute: typeof ApiAttributionSummaryRoute
   ApiAttributionTokensRoute: typeof ApiAttributionTokensRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
@@ -1159,6 +1186,7 @@ export interface RootRouteChildren {
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
   ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
   ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
+  ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
   ApiPricingBooksRoute: typeof ApiPricingBooksRoute
@@ -1610,6 +1638,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAttributionHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/attribution/meta-health': {
+      id: '/api/attribution/meta-health'
+      path: '/api/attribution/meta-health'
+      fullPath: '/api/attribution/meta-health'
+      preLoaderRoute: typeof ApiAttributionMetaHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/attribution/summary': {
       id: '/api/attribution/summary'
       path: '/api/attribution/summary'
@@ -1657,6 +1692,13 @@ declare module '@tanstack/react-router' {
       path: '/api/landing-attribution/summary'
       fullPath: '/api/landing-attribution/summary'
       preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/whatsapp-attribution-webhook': {
+      id: '/api/meta/whatsapp-attribution-webhook'
+      path: '/api/meta/whatsapp-attribution-webhook'
+      fullPath: '/api/meta/whatsapp-attribution-webhook'
+      preLoaderRoute: typeof ApiMetaWhatsappAttributionWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/prices/advice': {
@@ -1864,6 +1906,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiYoyRoute: ApiYoyRoute,
   ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
   ApiAttributionHealthRoute: ApiAttributionHealthRoute,
+  ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,
   ApiAttributionSummaryRoute: ApiAttributionSummaryRoute,
   ApiAttributionTokensRoute: ApiAttributionTokensRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
@@ -1871,6 +1914,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
   ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
   ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
+  ApiMetaWhatsappAttributionWebhookRoute:
+    ApiMetaWhatsappAttributionWebhookRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,
   ApiPricesCatalogRoute: ApiPricesCatalogRoute,
   ApiPricingBooksRoute: ApiPricingBooksRoute,

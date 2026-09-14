@@ -13,11 +13,16 @@ if (!baseUrl || !accountId || !token) {
 
 const definitions = [
   ["attribution_source", "Attribution source"],
+  ["attribution_channel", "Attribution channel"],
   ["attribution_medium", "Attribution medium"],
   ["attribution_campaign", "Attribution campaign"],
   ["meta_campaign_id", "Meta campaign ID"],
   ["meta_adset_id", "Meta ad set ID"],
   ["meta_ad_id", "Meta ad ID"],
+  ["meta_creative_id", "Meta creative ID"],
+  ["meta_campaign_name", "Meta campaign name"],
+  ["meta_adset_name", "Meta ad set name"],
+  ["meta_ad_name", "Meta ad name"],
   ["ctwa_clid", "CTWA click ID"],
   ["engosoft_branch", "Engosoft branch"],
   ["attribution_method", "Attribution method"],

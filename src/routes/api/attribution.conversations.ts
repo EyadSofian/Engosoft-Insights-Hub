@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/attribution/conversations")({
           await getAttributionConversations({
             from: params.get("from") || undefined,
             to: params.get("to") || undefined,
+            channel: params.get("channel") || undefined,
             platform: params.get("platform") || undefined,
             source: params.get("source") || undefined,
             medium: params.get("medium") || undefined,
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/api/attribution/conversations")({
             agentId: params.get("agentId") || undefined,
             method: params.get("method") || undefined,
             confidence: params.get("confidence") || undefined,
+            unknownReason: params.get("unknownReason") || undefined,
             crmStatus: params.get("crmStatus") || undefined,
             limit: Number(params.get("limit") || 100),
             offset: Number(params.get("offset") || 0),

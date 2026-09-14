@@ -56,6 +56,8 @@ describe("Meta creative normalization", () => {
         creative: {
           id: "creative_7",
           name: "PMP creative",
+          effective_object_story_id: "page_1_post_7",
+          object_story_id: "post_7",
           title: "Become PMP certified",
           body: "Join the next live group.",
           thumbnail_url: "https://scontent.example/preview.jpg",
@@ -77,6 +79,8 @@ describe("Meta creative normalization", () => {
       body: "Join the next live group.",
       imageUrl: "https://scontent.example/preview.jpg",
       landingPageUrl: "https://engosoft.com/pmp",
+      effectiveObjectStoryId: "page_1_post_7",
+      sourcePostId: "post_7",
       status: "ACTIVE",
     });
   });
