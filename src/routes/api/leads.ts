@@ -179,6 +179,13 @@ export const Route = createFileRoute("/api/leads")({
             historicalLostOpportunities: lostRows.filter(
               (row) => row.recordType === "opportunity" && !row.active,
             ).length,
+            // Never infer a canonical Odoo stage from a legacy translated
+            // label. Keeping this count visible prevents an old snapshot from
+            // making New/Open/Quotation look like real business zeroes.
+            unmappedOperationalStages: activeRows.filter(
+              (row) =>
+                (row.status === "lead" || row.status === "open") && row.stageKey === "other",
+            ).length,
             readyToConvert: activeRows.filter(
               (row) => row.recordType === "lead" && row.readyToConvert,
             ).length,

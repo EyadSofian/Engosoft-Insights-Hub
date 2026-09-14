@@ -132,6 +132,7 @@ interface Resp {
     lostOpportunities: number;
     currentLostOpportunities: number;
     historicalLostOpportunities: number;
+    unmappedOperationalStages: number;
     readyToConvert: number;
     unsourced: number;
   };
@@ -548,6 +549,36 @@ function CrmWorkspace() {
     : (data.statusFacets?.[view] ?? data.facets);
   const lens = lensFor(stage, view, A);
   const selectedStage = stage ? stageCopy(stage, lang) : null;
+  const crmHealthIssues = [
+    ...(data.health.crmAuthority !== "odoo-direct"
+      ? [
+          {
+            tone: "warning" as const,
+            message: A
+              ? "الـCRM معروض من آخر نسخة متاحة."
+              : "CRM is using the latest available copy.",
+            impact: A
+              ? "قد تتأخر أحدث تغييرات المراحل والحالات حتى عودة الاتصال المباشر."
+              : "The latest stage and status changes may lag until the direct connection returns.",
+            technical: `CRM authority: ${data.health.crmAuthority}`,
+          },
+        ]
+      : []),
+    ...(summary.unmappedOperationalStages > 0
+      ? [
+          {
+            tone: "warning" as const,
+            message: A
+              ? `${fmtNum(summary.unmappedOperationalStages)} فرصة/Lead مفتوحة لا تحمل XMLID للمرحلة في النسخة الحالية.`
+              : `${fmtNum(summary.unmappedOperationalStages)} open CRM records do not carry a stage XMLID in the current snapshot.`,
+            impact: A
+              ? "لن نوزّعها على جديد أو مفتوح أو عرض سعر بالتخمين؛ الأصفار في هذه المراحل ليست نتيجة أعمال."
+              : "They are not guessed into New, Open, or Quotation; zeroes in those lanes are not business results.",
+            technical: "Awaiting an XMLID-backed Odoo CRM snapshot.",
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div>
@@ -569,22 +600,7 @@ function CrmWorkspace() {
       />
 
       <PageSections className="gap-after-header">
-        {data.health.crmAuthority !== "odoo-direct" && (
-          <DataHealthSummary
-            issues={[
-              {
-                tone: "warning",
-                message: A
-                  ? "الـCRM معروض من آخر نسخة متاحة."
-                  : "CRM is using the latest available copy.",
-                impact: A
-                  ? "قد تتأخر أحدث تغييرات المراحل والحالات حتى عودة الاتصال المباشر."
-                  : "The latest stage and status changes may lag until the direct connection returns.",
-                technical: `CRM authority: ${data.health.crmAuthority}`,
-              },
-            ]}
-          />
-        )}
+        {crmHealthIssues.length > 0 && <DataHealthSummary issues={crmHealthIssues} />}
 
         <PageSection level="headline" aria-label={A ? "مؤشرات الـCRM" : "CRM headline figures"}>
           <KpiRow>
@@ -699,6 +715,21 @@ function CrmWorkspace() {
                 );
               })}
             </div>
+            {summary.unmappedOperationalStages > 0 && (
+              <div
+                role="status"
+                className="border-t border-amber-border bg-amber-surface px-4 py-3 text-[12px] leading-5 text-amber-ink"
+              >
+                <strong>
+                  {A
+                    ? `${fmtNum(summary.unmappedOperationalStages)} سجلًا مفتوحًا خارج توزيع المراحل.`
+                    : `${fmtNum(summary.unmappedOperationalStages)} open records are outside the stage distribution.`}
+                </strong>{" "}
+                {A
+                  ? "الـsnapshot الحالي لا يحمل XMLID للمرحلة؛ لا نخمّن المرحلة من اسمها."
+                  : "The current snapshot has no stage XMLID, so the dashboard does not guess from a stage name."}
+              </div>
+            )}
           </Card>
         </PageSection>
 

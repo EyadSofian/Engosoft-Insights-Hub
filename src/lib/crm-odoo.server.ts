@@ -226,12 +226,20 @@ function custom(lead: OdooCrmLead, field: string): string {
   return field ? display(lead[field]) : "";
 }
 
-function contractRecord(lead: OdooCrmLead): CrmContractRecord {
+function contractRecord(
+  lead: OdooCrmLead,
+  stageKeys?: Map<number, CrmStageKey>,
+): CrmContractRecord {
+  // The redesigned module publishes stable XMLIDs for every lifecycle stage.
+  // Some Odoo installations do not expose the optional computed
+  // `stage_is_lost`/`stage_is_won` fields on crm.lead, so the XMLID mapping is
+  // the durable authority rather than letting those records fall into `other`.
+  const mappedStage = stageKeys?.get(m2oId(lead.stage_id));
   return {
     type: normalize(lead.type),
     active: lead.active !== false,
-    stageIsLost: lead.stage_is_lost === true,
-    stageIsWon: lead.stage_is_won === true,
+    stageIsLost: lead.stage_is_lost === true || mappedStage === "lost",
+    stageIsWon: lead.stage_is_won === true || mappedStage === "won",
     hasLostReason: m2oId(lead.lost_reason_id) > 0,
   };
 }
@@ -246,9 +254,28 @@ const PIPELINE_STAGE_XMLIDS: Record<string, CrmStageKey> = {
 };
 
 function actualStageKey(lead: OdooCrmLead, stageKeys: Map<number, CrmStageKey>): CrmStageKey {
-  if (lead.stage_is_lost) return "lost";
-  if (lead.stage_is_won) return "won";
-  return stageKeys.get(m2oId(lead.stage_id)) ?? "other";
+  const mappedStage = stageKeys.get(m2oId(lead.stage_id));
+  if (lead.stage_is_lost || mappedStage === "lost") return "lost";
+  if (lead.stage_is_won || mappedStage === "won") return "won";
+  return mappedStage ?? "other";
+}
+
+/**
+ * Build an Odoo OR domain using only fields that the live model publishes.
+ * `lost_verification_date` belongs to the redesigned module and is optional
+ * during a rollout; mentioning an absent field makes the whole search_read
+ * fail, which had silently forced production back onto its old snapshot.
+ */
+function dateSinceDomain(
+  metadata: Record<string, OdooField>,
+  candidates: string[],
+  floor: string,
+): Domain {
+  const clauses = candidates
+    .filter((field) => Boolean(metadata[field]))
+    .map((field) => [field, ">=", floor]);
+  if (clauses.length <= 1) return clauses;
+  return [...Array(clauses.length - 1).fill("|"), ...clauses];
 }
 
 function lossDate(lead: OdooCrmLead): string {
@@ -276,7 +303,7 @@ function commonRaw(
   const rawStage = m2oName(lead.stage_id);
   const rawSource = m2oName(lead.source_id);
   const rawCourse = custom(lead, fields.courseCategories);
-  const contract = contractRecord(lead);
+  const contract = contractRecord(lead, stageKeys);
   const status = crmBusinessStatus(contract);
   return {
     __odoo_id: String(lead.id),
@@ -459,21 +486,19 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const floor = `${floorDay.toISOString().slice(0, 10)} 00:00:00`;
   const activeDomain: Domain = [
     ["active", "=", true],
-    "|",
-    "|",
-    ["create_date", ">=", floor],
-    ["lost_verification_date", ">=", floor],
-    ["date_last_stage_update", ">=", floor],
+    ...dateSinceDomain(
+      metadata,
+      ["create_date", "lost_verification_date", "date_last_stage_update"],
+      floor,
+    ),
   ];
   const inactiveDomain: Domain = [
     ["active", "=", false],
-    "|",
-    "|",
-    "|",
-    ["create_date", ">=", floor],
-    ["date_closed", ">=", floor],
-    ["lost_verification_date", ">=", floor],
-    ["date_last_stage_update", ">=", floor],
+    ...dateSinceDomain(
+      metadata,
+      ["create_date", "date_closed", "lost_verification_date", "date_last_stage_update"],
+      floor,
+    ),
   ];
 
   const [activeCandidates, inactiveCandidates, stageRefs] = await Promise.all([
@@ -539,7 +564,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   crmDiagnostics.candidates = activeInPeriod.length;
   const crm = activeInPeriod
     .filter((lead) => {
-      const contract = contractRecord(lead);
+      const contract = contractRecord(lead, stageKeys);
       if (!isCrmRecordType(contract.type)) {
         crmDiagnostics.wrongType++;
         return false;
@@ -568,7 +593,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   lostDiagnostics.candidates = lostInPeriod.length;
   const lost = lostInPeriod
     .filter((lead) => {
-      const contract = contractRecord(lead);
+      const contract = contractRecord(lead, stageKeys);
       if (!isCrmRecordType(contract.type)) {
         lostDiagnostics.wrongType++;
         return false;
