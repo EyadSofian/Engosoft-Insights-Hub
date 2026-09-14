@@ -176,6 +176,50 @@ describe("updateChatwootConversationAttributes", () => {
     });
   });
 
+  it("keeps both a bot key and an attribution key when they are written at the same time", async () => {
+    server = fakeChatwoot({ bp_conv_id: "conv_1", api_campaign_status: "sent" });
+    vi.stubGlobal("fetch", server.fetchMock);
+    let botWrote = false;
+    server.onPost(() => {
+      if (botWrote) return;
+      botWrote = true;
+      // The Majed bridge read the hash before our write and posts its own flag afterwards.
+      server.externalWrite({
+        bp_conv_id: "conv_1",
+        api_campaign_status: "sent",
+        majed_welcome_sent: "true",
+      });
+    });
+    await updateChatwootConversationAttributes(
+      42,
+      () => ({ attribution_channel: "website_chat", customer_source: "website_chat" }),
+      owned,
+    );
+    expect(server.state()).toEqual({
+      bp_conv_id: "conv_1",
+      api_campaign_status: "sent",
+      majed_welcome_sent: "true",
+      attribution_channel: "website_chat",
+      customer_source: "website_chat",
+    });
+  });
+
+  it("never erases a proven value with a blank", async () => {
+    server = fakeChatwoot({ meta_campaign_id: "120250553509150718", majed_welcome_sent: "true" });
+    vi.stubGlobal("fetch", server.fetchMock);
+    const result = await updateChatwootConversationAttributes(
+      42,
+      () => ({ meta_campaign_id: "", attribution_channel: "whatsapp" }),
+      owned,
+    );
+    expect(result.written).toEqual({ attribution_channel: "whatsapp" });
+    expect(server.state()).toEqual({
+      meta_campaign_id: "120250553509150718",
+      majed_welcome_sent: "true",
+      attribution_channel: "whatsapp",
+    });
+  });
+
   it("does not write when nothing changes", async () => {
     server = fakeChatwoot({ ...BOT_KEYS, attribution_channel: "whatsapp" });
     vi.stubGlobal("fetch", server.fetchMock);

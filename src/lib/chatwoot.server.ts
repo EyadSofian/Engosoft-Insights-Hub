@@ -785,6 +785,51 @@ export async function createChatwootConversationAttributeDefinition(input: {
   );
 }
 
+export interface ChatwootAttributeDefinitionSummary {
+  id: number;
+  key: string;
+  name: string;
+}
+
+/** Conversation attribute definitions with their IDs and display names. */
+export async function listChatwootConversationAttributeDefinitions(): Promise<
+  ChatwootAttributeDefinitionSummary[]
+> {
+  const cfg = config();
+  const response = await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions?attribute_model=0`,
+  );
+  const rows = Array.isArray(response)
+    ? response
+    : Array.isArray(object(response)?.payload)
+      ? (object(response)?.payload as unknown[])
+      : [];
+  return rows
+    .map((row) => object(row))
+    .filter(
+      (row): row is Record<string, unknown> =>
+        Boolean(row) && ["conversation_attribute", 0, "0"].includes(row?.attribute_model as never),
+    )
+    .map((row) => ({
+      id: Number(row.id),
+      key: String(row.attribute_key || "").trim(),
+      name: String(row.attribute_display_name || "").trim(),
+    }))
+    .filter((row) => Number.isInteger(row.id) && row.id > 0 && row.key);
+}
+
+/** Changes only the display label of an existing definition; its key and values stay as they are. */
+export async function renameChatwootConversationAttributeDefinition(
+  id: number,
+  name: string,
+): Promise<void> {
+  const cfg = config();
+  await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions/${encodeURIComponent(String(id))}`,
+    { method: "PATCH", body: JSON.stringify({ attribute_display_name: name }) },
+  );
+}
+
 function isoStart(date: string) {
   return `${date}T00:00:00.000Z`;
 }
