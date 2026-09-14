@@ -35,7 +35,7 @@ import {
   mainCategoryForCourse,
 } from "./course-taxonomy";
 import { isArchivedWonStage } from "./archived-won";
-import { CRM_CONTRACT_VERSION } from "./crm-contract";
+import { CRM_CONTRACT_VERSION, CRM_SNAPSHOT_REVISION } from "./crm-contract";
 import { decideSnapshotRead } from "./snapshot-freshness";
 import { datasetFreshnessAlerts, type StoredDatasetState } from "./dataset-freshness";
 import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
@@ -1031,16 +1031,20 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         Date.now() - syncedAt < maxAgeMs
       );
     };
-    const crmStoredUsesCurrentContract =
-      crmStored?.metadata.contractVersion === CRM_CONTRACT_VERSION;
     const lostStoredUsesCurrentContract =
       lostStored?.metadata.contractVersion === CRM_CONTRACT_VERSION;
     const lostStoredIsUsable = lostStoredUsesCurrentContract && lostStored?.status === "success";
+    // Stage lanes are classified when a snapshot is written. A snapshot from
+    // another classification revision stays a usable fallback, but it is never
+    // fresh: otherwise a stage-mapping fix would keep serving the previous
+    // build's lanes for the whole refresh window after deploy.
+    const storedUsesCurrentRevision = (snapshot: DatasetSnapshot | null): boolean =>
+      snapshot?.metadata.snapshotRevision === CRM_SNAPSHOT_REVISION;
     const directCrmAttempted =
       odooConfigured() &&
       (refreshRemoteSources ||
-        !crmStoredUsesCurrentContract ||
-        !lostStoredUsesCurrentContract ||
+        !storedUsesCurrentRevision(crmStored) ||
+        !storedUsesCurrentRevision(lostStored) ||
         !storedIsFresh(crmStored, DIRECT_ODOO_REFRESH_MS) ||
         !storedIsFresh(lostStored, DIRECT_ODOO_REFRESH_MS));
     const directCrmPromise: Promise<{
@@ -1538,6 +1542,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
             source: "odoo-direct",
             rows: crmRaw.length,
             contractVersion: CRM_CONTRACT_VERSION,
+            snapshotRevision: CRM_SNAPSHOT_REVISION,
           },
         }).catch(() => {
           fetchErrors.push("PostgreSQL CRM: last-good write failed.");
@@ -1568,6 +1573,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
             source: "odoo-direct",
             rows: lostRaw.length,
             contractVersion: CRM_CONTRACT_VERSION,
+            snapshotRevision: CRM_SNAPSHOT_REVISION,
             dateBasis: "creation_date",
             movementDate: "canonical_lost_date",
           },

@@ -20,6 +20,7 @@ import {
 } from "./odoo.server";
 import {
   crmBusinessStatus,
+  crmStageKeyForExternalId,
   isCanonicalLost,
   isCrmRecordType,
   type CrmContractRecord,
@@ -244,21 +245,6 @@ function contractRecord(
   };
 }
 
-// `get_external_id` returns one stable XMLID for a record. Preparation and
-// Quotation Sent predate the redesign and retain their documented core XMLID
-// aliases, so they must be treated exactly like their 1.26 aliases. Do not
-// fall back to stage names: names are translated and were historically reused.
-const PIPELINE_STAGE_EXTERNAL_IDS: Record<string, CrmStageKey> = {
-  "crm_pipeline_redesign.stage_preparation": "preparation",
-  "crm.stage_lead1": "preparation",
-  "crm_pipeline_redesign.stage_new": "new",
-  "crm_pipeline_redesign.stage_open": "open",
-  "crm_pipeline_redesign.stage_quotation_sent": "quotation",
-  "crm.stage_lead4": "quotation",
-  "crm_pipeline_redesign.stage_won": "won",
-  "crm_pipeline_redesign.stage_lost": "lost",
-};
-
 /**
  * Resolve stable stage XMLIDs through the stage model itself.
  *
@@ -281,12 +267,7 @@ async function loadStageKeys(): Promise<Map<number, CrmStageKey>> {
     { context: { active_test: false } },
   );
   return new Map(
-    stages.map((stage) => {
-      const externalId = externalIds[String(stage.id)];
-      const stageKey =
-        typeof externalId === "string" ? PIPELINE_STAGE_EXTERNAL_IDS[externalId] : undefined;
-      return [stage.id, stageKey ?? "other"];
-    }),
+    stages.map((stage) => [stage.id, crmStageKeyForExternalId(externalIds[String(stage.id)])]),
   );
 }
 

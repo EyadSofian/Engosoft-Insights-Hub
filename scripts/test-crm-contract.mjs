@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import {
   CRM_CONTRACT_VERSION,
+  CRM_SNAPSHOT_REVISION,
+  CRM_STAGE_EXTERNAL_IDS,
   crmBusinessStatus,
+  crmSnapshotRevision,
+  crmStageKeyForExternalId,
   isCanonicalLost,
   isCanonicalWon,
 } from "../src/lib/crm-contract.ts";
@@ -60,6 +64,38 @@ assert.equal(
   isCanonicalWon(record({ type: "lead", stageIsWon: true })),
   false,
   "a Lead is never a canonical Won Opportunity",
+);
+
+assert.equal(crmStageKeyForExternalId("crm_pipeline_redesign.stage_quotation_sent"), "quotation");
+assert.equal(
+  crmStageKeyForExternalId("crm.stage_lead4"),
+  "quotation",
+  "Quotation Sent is also published under its documented core XMLID",
+);
+assert.equal(
+  crmStageKeyForExternalId("crm.stage_lead1"),
+  "preparation",
+  "Preparation is also published under its documented core XMLID",
+);
+assert.equal(
+  crmStageKeyForExternalId("crm.stage_lead2"),
+  "other",
+  "a retired stage is not a lifecycle lane",
+);
+assert.equal(crmStageKeyForExternalId(false), "other", "a stage without an XMLID is never guessed");
+
+assert.ok(CRM_SNAPSHOT_REVISION.startsWith(`${CRM_CONTRACT_VERSION}|`));
+assert.notEqual(
+  crmSnapshotRevision(
+    new Map([...CRM_STAGE_EXTERNAL_IDS].filter(([xmlid]) => xmlid !== "crm.stage_lead4")),
+  ),
+  CRM_SNAPSHOT_REVISION,
+  "a snapshot classified by an earlier stage table is not current",
+);
+assert.equal(
+  crmSnapshotRevision(new Map([...CRM_STAGE_EXTERNAL_IDS].reverse())),
+  CRM_SNAPSHOT_REVISION,
+  "the revision does not depend on table order",
 );
 
 console.log("CRM 1.26 contract tests passed");

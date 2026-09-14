@@ -183,8 +183,7 @@ export const Route = createFileRoute("/api/leads")({
             // label. Keeping this count visible prevents an old snapshot from
             // making New/Open/Quotation look like real business zeroes.
             unmappedOperationalStages: activeRows.filter(
-              (row) =>
-                (row.status === "lead" || row.status === "open") && row.stageKey === "other",
+              (row) => (row.status === "lead" || row.status === "open") && row.stageKey === "other",
             ).length,
             readyToConvert: activeRows.filter(
               (row) => row.recordType === "lead" && row.readyToConvert,
@@ -208,6 +207,7 @@ export const Route = createFileRoute("/api/leads")({
             pipeline: facets(
               workspaceRows.filter((row) => row.status === "lead" || row.status === "open"),
             ),
+            open: facets(workspaceRows.filter((row) => row.status === "open")),
             won: facets(workspaceRows.filter((row) => row.status === "won")),
             lost: facets(workspaceRows.filter((row) => row.status === "lost")),
           },

@@ -20,6 +20,45 @@ export interface CrmContractRecord {
   hasLostReason: boolean;
 }
 
+/**
+ * Lifecycle stages by stable XMLID. Odoo's `get_external_id` returns one XMLID
+ * per stage, and Preparation / Quotation Sent predate the redesign, so their
+ * documented core aliases must resolve to the same lane. Never map stage names:
+ * they are translated and were historically reused.
+ */
+export const CRM_STAGE_EXTERNAL_IDS: ReadonlyMap<string, CrmStageKey> = new Map<
+  string,
+  Exclude<CrmStageKey, "other">
+>([
+  ["crm_pipeline_redesign.stage_preparation", "preparation"],
+  ["crm.stage_lead1", "preparation"],
+  ["crm_pipeline_redesign.stage_new", "new"],
+  ["crm_pipeline_redesign.stage_open", "open"],
+  ["crm_pipeline_redesign.stage_quotation_sent", "quotation"],
+  ["crm.stage_lead4", "quotation"],
+  ["crm_pipeline_redesign.stage_won", "won"],
+  ["crm_pipeline_redesign.stage_lost", "lost"],
+]);
+
+export function crmStageKeyForExternalId(externalId: unknown): CrmStageKey {
+  return (typeof externalId === "string" && CRM_STAGE_EXTERNAL_IDS.get(externalId)) || "other";
+}
+
+/**
+ * Identity of the classification baked into stored CRM/Lost snapshots. The
+ * stage table is part of it, so a deploy that changes how stages resolve
+ * re-reads Odoo instead of serving lanes classified by the previous build for
+ * the whole direct-refresh window.
+ */
+export function crmSnapshotRevision(
+  stageExternalIds: ReadonlyMap<string, CrmStageKey> = CRM_STAGE_EXTERNAL_IDS,
+): string {
+  const stages = [...stageExternalIds].map(([xmlid, key]) => `${xmlid}=${key}`).sort();
+  return [CRM_CONTRACT_VERSION, ...stages].join("|");
+}
+
+export const CRM_SNAPSHOT_REVISION = crmSnapshotRevision();
+
 export function isCrmRecordType(type: string): type is CrmRecordType {
   return type === "lead" || type === "opportunity";
 }

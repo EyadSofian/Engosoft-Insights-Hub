@@ -145,7 +145,7 @@ interface Resp {
   }[];
   facets: Facets;
   stageFacets: Partial<Record<CrmStageKey, Facets>>;
-  statusFacets: Record<WorkspaceView | "activeLeads" | "ready", Facets>;
+  statusFacets: Record<WorkspaceView | "activeLeads" | "ready" | "open", Facets>;
   detail: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
   health: DataHealth;
 }
@@ -429,8 +429,8 @@ function CrmWorkspace() {
         : "Active Opportunities in neither a Won nor the Lost stage.",
       formula: "type = opportunity AND active = true AND NOT Won AND NOT Lost",
       breakdowns: [
-        breakdown("open-status", "Open Status", data.statusFacets.pipeline.byOpenStatus),
-        breakdown("open-team", A ? "حسب الفريق" : "By team", data.statusFacets.pipeline.byTeam),
+        breakdown("open-status", "Open Status", data.statusFacets.open.byOpenStatus),
+        breakdown("open-team", A ? "حسب الفريق" : "By team", data.statusFacets.open.byTeam),
       ],
       records: records(
         A ? "أحدث الفرص المفتوحة" : "Latest open Opportunities",
@@ -458,7 +458,9 @@ function CrmWorkspace() {
       ],
       records: records(
         A ? "الـLeads الجاهزة للتحويل" : "Leads ready to convert",
-        data.detail.rows.filter((row) => row.recordType === "lead" && row.readyToConvert),
+        data.detail.rows.filter(
+          (row) => row.recordType === "lead" && row.active && row.readyToConvert,
+        ),
       ),
       report: { to: "/leads", label: A ? "فتح سجل الـLeads" : "Open Leads workspace" },
     },
@@ -569,12 +571,13 @@ function CrmWorkspace() {
           {
             tone: "warning" as const,
             message: A
-              ? `${fmtNum(summary.unmappedOperationalStages)} فرصة/Lead مفتوحة لا تحمل XMLID للمرحلة في النسخة الحالية.`
-              : `${fmtNum(summary.unmappedOperationalStages)} open CRM records do not carry a stage XMLID in the current snapshot.`,
+              ? `${fmtNum(summary.unmappedOperationalStages)} فرصة/Lead مفتوحة غير مربوطة بمرحلة من مراحل الـCRM.`
+              : `${fmtNum(summary.unmappedOperationalStages)} open CRM records are not mapped to a lifecycle stage.`,
             impact: A
               ? "لن نوزّعها على جديد أو مفتوح أو عرض سعر بالتخمين؛ الأصفار في هذه المراحل ليست نتيجة أعمال."
               : "They are not guessed into New, Open, or Quotation; zeroes in those lanes are not business results.",
-            technical: "Awaiting an XMLID-backed Odoo CRM snapshot.",
+            technical:
+              "Stage XMLID is outside the lifecycle table, or the snapshot was classified by another revision.",
           },
         ]
       : []),
@@ -726,8 +729,8 @@ function CrmWorkspace() {
                     : `${fmtNum(summary.unmappedOperationalStages)} open records are outside the stage distribution.`}
                 </strong>{" "}
                 {A
-                  ? "الـsnapshot الحالي لا يحمل XMLID للمرحلة؛ لا نخمّن المرحلة من اسمها."
-                  : "The current snapshot has no stage XMLID, so the dashboard does not guess from a stage name."}
+                  ? "مرحلتها ليست من مراحل الـCRM المعرّفة بـXMLID في هذه النسخة؛ لا نخمّن المرحلة من اسمها."
+                  : "Their stage does not resolve to a lifecycle XMLID in this snapshot, so the dashboard does not guess from a stage name."}
               </div>
             )}
           </Card>
