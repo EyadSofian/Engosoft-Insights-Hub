@@ -18,6 +18,17 @@ import { Card, Pill } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useApi } from "@/lib/use-api";
+import {
+  DESTINATION,
+  ENTITY,
+  PLATFORM,
+  SOURCE,
+  label,
+  nameWithId,
+  type Copy,
+} from "./acquisition-labels";
+
+const n = (value: unknown): number => Number(value ?? 0) || 0;
 
 /**
  * Unified acquisition attribution.
@@ -27,8 +38,6 @@ import { useApi } from "@/lib/use-api";
  * Meta's own aggregate lead reporting sits in its own, separately labelled row
  * and is never added to event counts.
  */
-
-type Copy = { en: string; ar: string };
 
 interface Cards {
   totalEvents: number;
@@ -141,67 +150,6 @@ interface EventsResponse {
   configured: boolean;
   total: number;
   rows: EventRow[];
-}
-
-const ENTITY: Record<string, Copy> = {
-  meta_lead: { en: "Meta instant form lead", ar: "عميل Meta Lead Form" },
-  chatwoot_conversation: { en: "Chatwoot conversation", ar: "محادثة Chatwoot" },
-  landing_submission: { en: "Landing submission", ar: "إرسال صفحة هبوط" },
-  landing_visit: { en: "Landing visit", ar: "زيارة صفحة هبوط" },
-};
-
-const DESTINATION: Record<string, Copy> = {
-  meta_instant_form: { en: "Meta instant form", ar: "نموذج Meta الفوري" },
-  whatsapp: { en: "WhatsApp", ar: "واتساب" },
-  messenger: { en: "Messenger", ar: "ماسنجر" },
-  instagram_dm: { en: "Instagram DM", ar: "رسائل إنستغرام" },
-  website_chat: { en: "Website chat", ar: "دردشة الموقع" },
-  landing_page: { en: "Landing page", ar: "صفحة هبوط" },
-  unknown: { en: "Unknown", ar: "غير معروف" },
-};
-
-const SOURCE: Record<string, Copy> = {
-  meta_instant_form: { en: "Meta instant form", ar: "نموذج Meta الفوري" },
-  meta_whatsapp_referral: { en: "Meta ad → WhatsApp", ar: "إعلان Meta ← واتساب" },
-  meta_messenger_referral: { en: "Meta ad → Messenger", ar: "إعلان Meta ← ماسنجر" },
-  meta_instagram_referral: { en: "Meta ad → Instagram DM", ar: "إعلان Meta ← إنستغرام" },
-  landing_page_form: { en: "Landing page form", ar: "نموذج صفحة الهبوط" },
-  landing_page_visit: { en: "Landing page visit", ar: "زيارة صفحة الهبوط" },
-  website_chat: { en: "Website chat", ar: "دردشة الموقع" },
-  direct_or_organic: { en: "Direct or organic", ar: "مباشر أو عضوي" },
-  unknown: { en: "Unknown", ar: "غير معروف" },
-};
-
-const PLATFORM: Record<string, Copy> = {
-  facebook: { en: "Facebook", ar: "فيسبوك" },
-  instagram: { en: "Instagram", ar: "إنستغرام" },
-  messenger: { en: "Messenger", ar: "ماسنجر" },
-  whatsapp: { en: "WhatsApp", ar: "واتساب" },
-  audience_network: { en: "Meta Audience Network", ar: "شبكة جمهور Meta" },
-  google: { en: "Google", ar: "جوجل" },
-  tiktok: { en: "TikTok", ar: "تيك توك" },
-  snapchat: { en: "Snapchat", ar: "سناب شات" },
-  website: { en: "Website", ar: "الموقع" },
-  direct: { en: "Direct", ar: "مباشر" },
-  other: { en: "Other", ar: "أخرى" },
-  unknown: { en: "Unknown", ar: "غير معروف" },
-};
-
-const n = (value: unknown): number => Number(value ?? 0) || 0;
-
-function label(map: Record<string, Copy>, key: string, A: boolean): string {
-  const copy = map[key];
-  return copy ? (A ? copy.ar : copy.en) : key || "—";
-}
-
-function nameWithId(name: string, id: string) {
-  if (!name && !id) return "—";
-  return (
-    <div>
-      <div className="text-text">{name || "—"}</div>
-      {id ? <div className="font-mono text-[11px] text-text-muted">{id}</div> : null}
-    </div>
-  );
 }
 
 function breakdown(

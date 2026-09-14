@@ -140,7 +140,7 @@ describe("the registry describes reality", () => {
 describe("coverage is reported honestly", () => {
   it("counts the visible analytical surfaces", () => {
     const analytical = INSIGHTS_SURFACES.filter((s) => s.status !== "NOT_APPLICABLE");
-    expect(analytical).toHaveLength(17);
+    expect(analytical).toHaveLength(18);
   });
 
   it("names why anything is less than fully connected", () => {

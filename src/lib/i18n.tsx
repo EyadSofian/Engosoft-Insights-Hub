@@ -30,6 +30,7 @@ export const DICT = {
   media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
   media_plan: { ar: "خطة الميديا الشهرية", en: "Monthly media plan" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
+  acquisition_performance: { ar: "تحليل أداء الاستحواذ", en: "Acquisition performance" },
   attribution: { ar: "إسناد المحادثات", en: "Conversation attribution" },
   landing_pages: { ar: "صفحات الهبوط", en: "Landing pages" },
   accounting: { ar: "الحسابات", en: "Accounting" },

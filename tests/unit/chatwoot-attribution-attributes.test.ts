@@ -65,11 +65,12 @@ describe("customerSourceFor", () => {
       customerSourceFor({ attributionMethod, channel });
     expect(source("meta_whatsapp_referral", "Channel::Whatsapp")).toBe("click_to_whatsapp");
     expect(source("meta_referral", "whatsapp")).toBe("click_to_whatsapp");
-    expect(source("unknown", "Channel::Whatsapp")).toBe("unknown");
+    expect(source("unknown", "Channel::Whatsapp")).toBe("whatsapp");
     expect(source("unknown", "Channel::FacebookPage")).toBe("messenger");
     expect(source("unknown", "Channel::Instagram")).toBe("instagram_dm");
     expect(source("unknown", "Channel::Api")).toBe("website_chat");
     expect(source("unknown", "Channel::WebWidget")).toBe("website_chat");
+    expect(source("unknown", "Channel::Email")).toBe("unknown");
     expect(
       customerSourceFor({
         attributionMethod: "organic_direct",
@@ -93,7 +94,7 @@ describe("buildChatwootAttributionAttributes", () => {
     ).toEqual({
       attribution_channel: "whatsapp",
       engosoft_branch: "KSA",
-      customer_source: "unknown",
+      customer_source: "whatsapp",
       customer_type: "unknown",
       attribution_method: "unknown",
       attribution_confidence: "unknown",
@@ -231,7 +232,7 @@ describe("planChatwootAttributionUpdate", () => {
     expect(changes).toEqual({
       attribution_channel: "whatsapp",
       engosoft_branch: "KSA",
-      customer_source: "unknown",
+      customer_source: "whatsapp",
       customer_type: "unknown",
       attribution_unknown_reason: "historical_evidence_missing",
     });
@@ -284,6 +285,57 @@ describe("planChatwootAttributionUpdate", () => {
     expect(changes).not.toHaveProperty("marketer_name");
     expect(changes).not.toHaveProperty("customer_source");
     expect(changes).not.toHaveProperty("customer_type");
+  });
+
+  it("fills a known channel's source on a new conversation without inventing campaign data", () => {
+    for (const [channel, customerSource] of [
+      ["Channel::Whatsapp", "whatsapp"],
+      ["Channel::FacebookPage", "messenger"],
+      ["Channel::Instagram", "instagram_dm"],
+      ["Channel::WebWidget", "website_chat"],
+    ] as const) {
+      const wanted = buildChatwootAttributionAttributes({
+        channel,
+        attributionMethod: "unknown",
+        confidence: "unknown",
+      });
+      const changes = planChatwootAttributionUpdate(
+        { customer_source: "unknown", customer_type: "" },
+        wanted,
+        "live",
+      );
+      expect(changes).toMatchObject({ customer_source: customerSource, customer_type: "unknown" });
+      for (const key of ["meta_campaign_id", "meta_adset_id", "meta_ad_id", "meta_creative_id"])
+        expect(changes).not.toHaveProperty(key);
+    }
+  });
+
+  it("upgrades a channel-only WhatsApp source once a click-to-WhatsApp referral proves it", () => {
+    expect(
+      planChatwootAttributionUpdate(
+        {
+          attribution_method: "unknown",
+          attribution_confidence: "unknown",
+          customer_source: "whatsapp",
+        },
+        exact,
+        "live",
+      ),
+    ).toMatchObject({
+      customer_source: "click_to_whatsapp",
+      meta_creative_id: "120250553509150721",
+    });
+    expect(
+      planChatwootAttributionUpdate(
+        {
+          attribution_method: "meta_whatsapp_referral",
+          attribution_confidence: "exact",
+          meta_campaign_id: "1",
+        },
+        unknownHistorical,
+        "live",
+      ),
+    ).not.toHaveProperty("customer_source");
   });
 
   it("lets new exact evidence replace unknown markers and upgrade an unknown source", () => {
