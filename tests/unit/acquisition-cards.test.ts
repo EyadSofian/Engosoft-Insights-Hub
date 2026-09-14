@@ -86,14 +86,15 @@ describe("summarizeAcquisitionGroups", () => {
 
   it("derives every card from the same rows the table shows", () => {
     const cards = summarizeAcquisitionGroups(groups, { spendDataAvailable: true });
-    const tableTotal = groups.reduce((sum, row) => sum + row.events, 0);
-    expect(cards.totalEvents).toBe(tableTotal);
+    const acquisitionRows = groups.filter((row) => row.entity_type !== "landing_visit");
+    expect(cards.totalEvents).toBe(acquisitionRows.reduce((sum, row) => sum + row.events, 0));
+    expect(cards.totalEvents).toBe(385);
     expect(cards.messagingConversations).toBe(384);
     expect(cards.landingVisits).toBe(5);
     expect(cards.landingSubmissions).toBe(1);
     expect(cards.metaInstantFormLeads).toBe(0);
     expect(cards.knownSourceEvents + cards.unknownEvents).toBe(cards.totalEvents);
-    expect(cards.knownSourceEvents).toBe(6);
+    expect(cards.knownSourceEvents).toBe(1);
     expect(cards.conversationsByChannel).toEqual({
       whatsapp: 293,
       messenger: 45,
@@ -112,7 +113,7 @@ describe("summarizeAcquisitionGroups", () => {
     expect(summarizeAcquisitionGroups([], { spendDataAvailable: true }).attributionRate).toBeNull();
   });
 
-  it("computes the attribution rate from exact events over all events", () => {
+  it("computes the attribution rate from exact acquisitions over acquisitions only", () => {
     const cards = summarizeAcquisitionGroups(
       [
         group({
@@ -123,11 +124,20 @@ describe("summarizeAcquisitionGroups", () => {
           spend_covered: 25,
         }),
         group({ events: 70 }),
+        group({
+          entity_type: "landing_visit",
+          source_type: "landing_page_visit",
+          destination_channel: "landing_page",
+          events: 900,
+        }),
       ],
       { spendDataAvailable: true },
     );
     expect(cards.metaInstantFormLeads).toBe(30);
+    expect(cards.totalEvents).toBe(100);
+    expect(cards.landingVisits).toBe(900);
     expect(cards.attributionRate).toBeCloseTo(0.27);
     expect(cards.spendCoveredEvents).toBe(25);
+    expect(cards.eventsByPlatform).not.toHaveProperty("landing_page");
   });
 });

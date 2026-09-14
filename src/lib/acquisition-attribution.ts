@@ -221,6 +221,7 @@ export interface AcquisitionGroup {
 }
 
 export interface AcquisitionCards {
+  /** Meta leads + Chatwoot conversations + landing submissions. Landing visits are traffic and excluded. */
   totalEvents: number;
   messagingConversations: number;
   metaInstantFormLeads: number;
@@ -246,7 +247,9 @@ function bump(target: Record<string, number>, key: string, value: number) {
 
 /**
  * Every headline card is a sum over the grouped rows the table renders, so a
- * card can never disagree with the table beneath it.
+ * card can never disagree with the table beneath it. Landing visits keep their
+ * own card but are traffic, not acquisitions, so they stay out of the total,
+ * the known/unknown split, exact attribution, spend coverage and the rate.
  */
 export function summarizeAcquisitionGroups(
   groups: readonly AcquisitionGroup[],
@@ -269,18 +272,21 @@ export function summarizeAcquisitionGroups(
   };
   for (const group of groups) {
     const events = whole(group.events);
+    bump(cards.eventsByEntity, group.entity_type, events);
+    if (group.entity_type === "landing_visit") cards.landingVisits += events;
+    if (!ACQUISITION_COUNTED_ENTITIES.includes(group.entity_type as AcquisitionEntityType))
+      continue;
+
     cards.totalEvents += events;
     cards.exactAttribution += whole(group.exact);
     if (cards.spendCoveredEvents !== null) cards.spendCoveredEvents += whole(group.spend_covered);
     if (group.source_type === "unknown") cards.unknownEvents += events;
     else cards.knownSourceEvents += events;
-    bump(cards.eventsByEntity, group.entity_type, events);
     bump(cards.eventsByPlatform, group.source_platform || "unknown", events);
     if (group.entity_type === "chatwoot_conversation") {
       cards.messagingConversations += events;
       bump(cards.conversationsByChannel, group.destination_channel || "unknown", events);
     } else if (group.entity_type === "meta_lead") cards.metaInstantFormLeads += events;
-    else if (group.entity_type === "landing_visit") cards.landingVisits += events;
     else if (group.entity_type === "landing_submission") cards.landingSubmissions += events;
   }
   cards.attributionRate = cards.totalEvents ? cards.exactAttribution / cards.totalEvents : null;
