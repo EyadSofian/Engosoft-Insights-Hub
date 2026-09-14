@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountingRouteImport } from './routes/accounting'
+import { Route as AcquisitionRouteImport } from './routes/acquisition'
 import { Route as AdsRouteImport } from './routes/ads'
 import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
@@ -70,6 +71,7 @@ import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
+import { Route as ApiAcquisitionPerformanceRouteImport } from './routes/api/acquisition.performance'
 import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
 import { Route as ApiAttributionChatwootFactsBackfillRouteImport } from './routes/api/attribution.chatwoot-facts-backfill'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
@@ -116,6 +118,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountingRoute = AccountingRouteImport.update({
   id: '/accounting',
   path: '/accounting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcquisitionRoute = AcquisitionRouteImport.update({
+  id: '/acquisition',
+  path: '/acquisition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdsRoute = AdsRouteImport.update({
@@ -415,6 +422,12 @@ const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
   path: '/api/acquisition/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionPerformanceRoute =
+  ApiAcquisitionPerformanceRouteImport.update({
+    id: '/api/acquisition/performance',
+    path: '/api/acquisition/performance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAcquisitionSummaryRoute = ApiAcquisitionSummaryRouteImport.update({
   id: '/api/acquisition/summary',
   path: '/api/acquisition/summary',
@@ -613,6 +626,7 @@ const ApiPricingInvoicesMovementRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
@@ -672,6 +686,7 @@ export interface FileRoutesByFullPath {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
@@ -713,6 +728,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
@@ -772,6 +788,7 @@ export interface FileRoutesByTo {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
@@ -814,6 +831,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
@@ -873,6 +891,7 @@ export interface FileRoutesById {
   '/api/weekend': typeof ApiWeekendRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
   '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
   '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
@@ -916,6 +935,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
@@ -975,6 +995,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/acquisition/events'
+    | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
@@ -1016,6 +1037,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
@@ -1075,6 +1097,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/acquisition/events'
+    | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
@@ -1116,6 +1139,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
@@ -1175,6 +1199,7 @@ export interface FileRouteTypes {
     | '/api/weekend'
     | '/api/yoy'
     | '/api/acquisition/events'
+    | '/api/acquisition/performance'
     | '/api/acquisition/summary'
     | '/api/attribution/chatwoot-facts-backfill'
     | '/api/attribution/conversations'
@@ -1217,6 +1242,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountingRoute: typeof AccountingRoute
+  AcquisitionRoute: typeof AcquisitionRoute
   AdsRoute: typeof AdsRoute
   AttributionRoute: typeof AttributionRoute
   CampaignsRoute: typeof CampaignsRoute
@@ -1276,6 +1302,7 @@ export interface RootRouteChildren {
   ApiWeekendRoute: typeof ApiWeekendRoute
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
+  ApiAcquisitionPerformanceRoute: typeof ApiAcquisitionPerformanceRoute
   ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
   ApiAttributionChatwootFactsBackfillRoute: typeof ApiAttributionChatwootFactsBackfillRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
@@ -1329,6 +1356,13 @@ declare module '@tanstack/react-router' {
       path: '/accounting'
       fullPath: '/accounting'
       preLoaderRoute: typeof AccountingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/acquisition': {
+      id: '/acquisition'
+      path: '/acquisition'
+      fullPath: '/acquisition'
+      preLoaderRoute: typeof AcquisitionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ads': {
@@ -1744,6 +1778,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAcquisitionEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/acquisition/performance': {
+      id: '/api/acquisition/performance'
+      path: '/api/acquisition/performance'
+      fullPath: '/api/acquisition/performance'
+      preLoaderRoute: typeof ApiAcquisitionPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/acquisition/summary': {
       id: '/api/acquisition/summary'
       path: '/api/acquisition/summary'
@@ -2009,6 +2050,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountingRoute: AccountingRoute,
+  AcquisitionRoute: AcquisitionRoute,
   AdsRoute: AdsRoute,
   AttributionRoute: AttributionRoute,
   CampaignsRoute: CampaignsRoute,
@@ -2068,6 +2110,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWeekendRoute: ApiWeekendRoute,
   ApiYoyRoute: ApiYoyRoute,
   ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
+  ApiAcquisitionPerformanceRoute: ApiAcquisitionPerformanceRoute,
   ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
   ApiAttributionChatwootFactsBackfillRoute:
     ApiAttributionChatwootFactsBackfillRoute,

@@ -1092,6 +1092,39 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
   },
   {
+    id: "acquisition_performance",
+    routes: ["/acquisition"],
+    section: "campaigns",
+    title: t("تحليل أداء الاستحواذ", "Acquisition performance"),
+    status: "CONNECTED",
+    sensitivity: "internal",
+    views: [],
+    operations: ["summary"],
+    filters: [...PERIOD_FILTERS],
+    entities: ["campaign", "source"],
+    sources: [
+      {
+        endpoint: "/api/acquisition/performance",
+        as: "root",
+        required: true,
+        operations: ["summary"],
+        why: "Acquisitions by channel, campaign, ad set, ad, creative, landing page and Meta form, today and for the period, with exact-ID spend joins.",
+        summaryPaths: ["kpis", "confidence", "metaAggregate", "unmatched", "today", "blockers"],
+      },
+    ],
+    freshnessPaths: ["generatedAt", "kpis.spendThrough"],
+    caveats: [
+      t(
+        "الحملة والإعلان والمادة تُنسب بالمعرّف الدقيق فقط؛ غير المعروف يبقى غير معروف ولا يُسمى عضويًا.",
+        "Campaigns, ads and creatives are credited by exact ID only; unknown stays unknown and is never called organic.",
+      ),
+      t(
+        "أرقام Meta المجمّعة (عملاء المنصة) تقارير وليست سجلات، ولا تُضاف إلى الأحداث.",
+        "Meta aggregate lead totals are platform reporting, not records, and are never added to events.",
+      ),
+    ],
+  },
+  {
     id: "attribution",
     routes: ["/attribution"],
     section: "campaigns",

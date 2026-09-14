@@ -101,6 +101,7 @@ export const CHATWOOT_ATTRIBUTION_KEYS: readonly ChatwootAttributionKey[] =
 export const CUSTOMER_SOURCES = [
   "meta_instant_form",
   "click_to_whatsapp",
+  "whatsapp",
   "messenger",
   "instagram_dm",
   "landing_page",
@@ -119,6 +120,10 @@ const FACT_KEYS: readonly ChatwootAttributionKey[] = [
 ];
 /** Business classifications: they fill an empty attribute or replace `unknown`, nothing else. */
 const CLASSIFICATION_KEYS: readonly ChatwootAttributionKey[] = ["customer_source", "customer_type"];
+/** Channel-only classifications that later provider evidence may make more specific. */
+const CLASSIFICATION_UPGRADES: Readonly<Record<string, readonly string[]>> = {
+  whatsapp: ["click_to_whatsapp"],
+};
 
 const META_REFERRAL_METHODS = new Set([
   "meta_referral",
@@ -186,9 +191,10 @@ export function hasAttributionEvidence(method: string): boolean {
 }
 
 /**
- * How the customer reached Engosoft. A Meta click-to-WhatsApp referral is the
- * only way a WhatsApp conversation gets a source; Messenger, Instagram and
- * website inboxes are the entry point themselves. Anything else is unknown.
+ * How the customer reached Engosoft. The inbox proves the entry channel, so a
+ * WhatsApp, Messenger, Instagram or website conversation always has a source;
+ * a Meta click-to-WhatsApp referral upgrades WhatsApp to `click_to_whatsapp`.
+ * Only a conversation on an unrecognised channel stays unknown.
  */
 export function customerSourceFor(input: {
   attributionMethod: string;
@@ -199,6 +205,7 @@ export function customerSourceFor(input: {
   const channel = chatwootDestinationChannel(clean(input.channel));
   if (method === "meta_whatsapp_referral" || (method === "meta_referral" && channel === "whatsapp"))
     return "click_to_whatsapp";
+  if (channel === "whatsapp") return "whatsapp";
   if (channel === "messenger") return "messenger";
   if (channel === "instagram_dm") return "instagram_dm";
   if (channel === "website_chat") return "website_chat";
@@ -300,7 +307,8 @@ function confidenceRank(value: unknown): number {
  * - Facts (channel, branch, marketer) only fill an empty attribute, so a manual
  *   value set by an agent survives.
  * - Classifications (customer source and type) fill an empty attribute or
- *   upgrade `unknown`; a known classification is never replaced.
+ *   upgrade `unknown`; a known classification is only replaced by a more
+ *   specific one proven later (WhatsApp → click-to-WhatsApp).
  * - Attribution is never replaced by unknown data or by weaker evidence.
  * - In backfill mode, attribution markers only fill empty (or `unknown`) attributes.
  */
@@ -321,9 +329,11 @@ export function planChatwootAttributionUpdate(
     if (FACT_KEYS.includes(key)) {
       if (existing) continue;
     } else if (CLASSIFICATION_KEYS.includes(key)) {
-      if (existing && existing !== "unknown") continue;
-      // A conversation with proven attribution never gains an `unknown` classification.
-      if (value === "unknown" && proven) continue;
+      if (existing && existing !== "unknown" && !CLASSIFICATION_UPGRADES[existing]?.includes(value))
+        continue;
+      // A conversation with proven attribution never gains an `unknown` or a
+      // channel-only classification; its provider evidence supplies the specific one.
+      if (proven && (value === "unknown" || CLASSIFICATION_UPGRADES[value])) continue;
     } else {
       if (wantedUnknown && proven) continue;
       if (weaker) continue;

@@ -730,6 +730,107 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
   },
   {
+    id: "acquisition_performance",
+    route: "/acquisition",
+    title: q("تحليل أداء الاستحواذ", "Acquisition performance"),
+    description: q(
+      "كم عميلًا ورسالة وصلت اليوم وفي الفترة، ومن أين بالضبط: القناة والحملة والإعلان والمادة وصفحة الهبوط ونموذج Meta.",
+      "How many leads and messages arrived today and in the period, and exactly where from: channel, campaign, ad, creative, landing page and Meta form.",
+    ),
+    tabs: [],
+    sections: [
+      {
+        id: "today",
+        title: q("اليوم", "Today"),
+        elements: ["acquisition_performance.today_total", "acquisition_performance.top_campaign"],
+      },
+      {
+        id: "breakdowns",
+        title: q("التفصيل", "Breakdowns"),
+        elements: [
+          "acquisition_performance.campaign_table",
+          "acquisition_performance.creative_table",
+          "acquisition_performance.landing_pages",
+        ],
+      },
+    ],
+    elements: [
+      {
+        id: "acquisition_performance.today_total",
+        type: "kpi",
+        title: q("استحواذ اليوم", "Today's acquisitions"),
+        meaning: q(
+          "محادثات Chatwoot وعملاء نماذج Meta وإرسالات صفحات الهبوط في يوم العمل الحالي.",
+          "Chatwoot conversations, Meta form leads and landing submissions in the current business day.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: false,
+        filterSensitive: false,
+        questions: [
+          q("جالنا كام عميل النهارده ومنين؟", "How many leads came today, and from where?"),
+        ],
+      },
+      {
+        id: "acquisition_performance.top_campaign",
+        type: "card",
+        title: q("أعلى حملة", "Top campaign"),
+        meaning: q(
+          "الحملة صاحبة أكبر عدد استحواذ مرتبط بمعرّفها الدقيق اليوم.",
+          "The campaign with the most acquisitions linked to its exact ID today.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: false,
+        filterSensitive: false,
+        questions: [q("أنهي حملة جابت أكتر النهارده؟", "Which campaign brought the most today?")],
+      },
+      {
+        id: "acquisition_performance.campaign_table",
+        type: "table",
+        title: q("أداء الحملات", "Campaign performance"),
+        meaning: q(
+          "الاستحواذ الدقيق والصرف وتكلفة الاستحواذ لكل حملة ومجموعة إعلان وإعلان ومادة.",
+          "Exact acquisitions, spend and cost per acquisition for each campaign, ad set, ad and creative.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("أنهي حملة أقل تكلفة استحواذ؟", "Which campaign has the lowest cost per acquisition?"),
+        ],
+      },
+      {
+        id: "acquisition_performance.creative_table",
+        type: "table",
+        title: q("أداء المواد الإعلانية", "Creative performance"),
+        meaning: q(
+          "المحادثات وعملاء النماذج والإرسالات المرتبطة بمعرّف كل مادة إعلانية.",
+          "Conversations, form leads and submissions linked to each creative ID.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [q("أنهي كريتيف جاب أكتر عملاء؟", "Which creative brought the most leads?")],
+      },
+      {
+        id: "acquisition_performance.landing_pages",
+        type: "table",
+        title: q("أداء صفحات الهبوط", "Landing page performance"),
+        meaning: q(
+          "المشاهدات والزوار وبدء النماذج والإرسالات ومعدل التحويل لكل صفحة هبوط متتبعة.",
+          "Views, visitors, form starts, submissions and conversion rate for each tracked landing page.",
+        ),
+        sourceCapability: "acquisition_performance",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [q("أنهي صفحة هبوط بتحوّل أحسن؟", "Which landing page converts best?")],
+      },
+    ],
+    suggestedQuestions: [
+      q("جالنا كام عميل ورسالة النهارده؟", "How many leads and messages came in today?"),
+      q("ليه الإسناد الدقيق صفر؟", "Why is exact attribution zero?"),
+    ],
+  },
+  {
     id: "attribution",
     route: "/attribution",
     title: q("إسناد محادثات واتساب", "Conversation attribution"),

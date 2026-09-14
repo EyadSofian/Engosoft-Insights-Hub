@@ -13,6 +13,7 @@ import {
   MapPinned,
   Receipt,
   TrendingDown,
+  TrendingUp,
   Users,
   UsersRound,
   UserRoundSearch,
@@ -70,6 +71,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     items: [
       { to: "/campaigns", key: "campaigns", icon: Megaphone },
       { to: "/ads", key: "ads_tech", icon: BarChart3, tabLabel: { ar: "الإعلانات", en: "Ads" } },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: TrendingUp,
+        tabLabel: { ar: "تحليل الاستحواذ", en: "Acquisition performance" },
+      },
       {
         to: "/attribution",
         key: "attribution",

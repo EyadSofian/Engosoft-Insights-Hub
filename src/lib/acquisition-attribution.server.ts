@@ -36,7 +36,7 @@ export interface AcquisitionFilters {
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[\w.:-]{1,64}$/;
 
-function getPool(): Pool {
+export function getPool(): Pool {
   const connectionString = process.env.DATABASE_URL?.trim();
   if (!connectionString) throw new Error("DATABASE_URL is not configured");
   if (!pool) {
@@ -154,7 +154,7 @@ function landingSql(entity: "landing_submission" | "landing_visit"): string {
   FROM landing_attribution_sessions${submission ? " WHERE submitted_at IS NOT NULL" : ""}`;
 }
 
-async function eventsCte(): Promise<{ cte: string | null; dashboardRows: boolean }> {
+export async function eventsCte(): Promise<{ cte: string | null; dashboardRows: boolean }> {
   const sources = await existingSources();
   const parts = [
     sources.leads ? META_LEADS_SQL : "",
@@ -170,16 +170,20 @@ async function eventsCte(): Promise<{ cte: string | null; dashboardRows: boolean
   };
 }
 
-function where(filters: AcquisitionFilters): { sql: string; params: unknown[] } {
+/** The dashboard's business day. Every acquisition window is a Cairo calendar day, not a UTC one. */
+export const BUSINESS_TIME_ZONE = "Africa/Cairo";
+const LOCAL_OCCURRED_AT = `(occurred_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')`;
+
+export function where(filters: AcquisitionFilters): { sql: string; params: unknown[] } {
   const clauses: string[] = [];
   const params: unknown[] = [];
   const add = (sql: string, value: unknown) => {
     params.push(value);
     clauses.push(sql.replace("?", `$${params.length}`));
   };
-  if (filters.from && DATE.test(filters.from)) add("occurred_at >= ?::date", filters.from);
+  if (filters.from && DATE.test(filters.from)) add(`${LOCAL_OCCURRED_AT} >= ?::date`, filters.from);
   if (filters.to && DATE.test(filters.to))
-    add("occurred_at < (?::date + interval '1 day')", filters.to);
+    add(`${LOCAL_OCCURRED_AT} < (?::date + interval '1 day')`, filters.to);
   for (const [key, column] of [
     ["entityType", "entity_type"],
     ["sourceType", "source_type"],
@@ -196,7 +200,7 @@ function where(filters: AcquisitionFilters): { sql: string; params: unknown[] } 
 }
 
 /** A synced sheet cell as a number, or 0 when it is blank or not numeric. */
-function numericCell(key: string): string {
+export function numericCell(key: string): string {
   const cell = `replace(btrim(COALESCE(row_data->>'${key}', '')), ',', '')`;
   return `(CASE WHEN ${cell} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN ${cell}::numeric ELSE 0 END)`;
 }
@@ -208,7 +212,7 @@ const ISO_DAY = `'^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])'`;
  * `التاريخ` cell and have no stored record_date, so reading record_date alone
  * would drop them from any date window.
  */
-const AD_ROW_DATE = `COALESCE(record_date,
+export const AD_ROW_DATE = `COALESCE(record_date,
   CASE WHEN row_data->>'التاريخ' ~ ${ISO_DAY} THEN left(row_data->>'التاريخ', 10)::date END,
   CASE WHEN row_data->>'Date' ~ ${ISO_DAY} THEN left(row_data->>'Date', 10)::date END)`;
 
@@ -216,7 +220,7 @@ const AD_ROW_DATE = `COALESCE(record_date,
  * The window and ID filters that also make sense for synced ad-platform rows.
  * Values are validated by DATE and ID above before they are inlined.
  */
-function adRowsWhere(filters: AcquisitionFilters): string {
+export function adRowsWhere(filters: AcquisitionFilters): string {
   const clauses: string[] = [];
   if (filters.from && DATE.test(filters.from))
     clauses.push(`${AD_ROW_DATE} >= '${filters.from}'::date`);
@@ -288,7 +292,7 @@ export async function getAcquisitionSummary(filters: AcquisitionFilters = {}) {
     ),
     getPool().query<Row>(
       `${filtered}
-       SELECT to_char(date_trunc('day', occurred_at), 'YYYY-MM-DD') AS date, entity_type, count(*)::int AS events
+       SELECT to_char(date_trunc('day', ${LOCAL_OCCURRED_AT}), 'YYYY-MM-DD') AS date, entity_type, count(*)::int AS events
          FROM filtered WHERE occurred_at IS NOT NULL GROUP BY 1,2 ORDER BY 1`,
       params,
     ),

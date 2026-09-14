@@ -102,6 +102,7 @@ export function pageTypeFor(path: string): NexusPageType {
     "social-media": "social_media",
     organic: "organic",
     attribution: "attribution",
+    acquisition: "attribution",
     guide: "guide",
     // Legacy bookmarks that redirect into Accounting.
     "full-invoiced": "accounting",
