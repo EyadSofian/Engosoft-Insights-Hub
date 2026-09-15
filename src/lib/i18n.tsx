@@ -151,6 +151,7 @@ export const DICT = {
 
   // date presets
   date_range: { ar: "الفترة الزمنية", en: "Date range" },
+  preset_today: { ar: "اليوم", en: "Today" },
   preset_7: { ar: "آخر ٧ أيام", en: "Last 7 days" },
   preset_30: { ar: "آخر ٣٠ يوماً", en: "Last 30 days" },
   preset_month: { ar: "هذا الشهر", en: "This month" },

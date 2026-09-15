@@ -63,7 +63,7 @@ export interface GlobalFilters {
   lostDateBasis?: "creation" | "closed";
 }
 
-export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
+export type DatePreset = "today" | "7d" | "30d" | "month" | "year" | "all";
 
 /* --- normalized rows ------------------------------------------------------ */
 

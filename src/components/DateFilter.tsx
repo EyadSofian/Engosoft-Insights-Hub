@@ -15,9 +15,11 @@ import { cn } from "@/lib/utils";
 /*  Presets                                                                    */
 /* -------------------------------------------------------------------------- */
 
-type PresetKey = "preset_7" | "preset_30" | "preset_month" | "preset_year" | "preset_all";
+type PresetKey =
+  "preset_today" | "preset_7" | "preset_30" | "preset_month" | "preset_year" | "preset_all";
 
 const PRESETS: { value: DatePreset; key: PresetKey; full?: boolean }[] = [
+  { value: "today", key: "preset_today" },
   { value: "7d", key: "preset_7" },
   { value: "30d", key: "preset_30" },
   { value: "month", key: "preset_month" },
@@ -26,6 +28,7 @@ const PRESETS: { value: DatePreset; key: PresetKey; full?: boolean }[] = [
 ];
 
 const PRESET_KEY: Record<DatePreset, PresetKey> = {
+  today: "preset_today",
   "7d": "preset_7",
   "30d": "preset_30",
   month: "preset_month",
@@ -50,7 +53,7 @@ function activePreset(
     if (w.from === f.from && w.to === f.to) return preferred;
   }
 
-  for (const p of ["7d", "30d", "month", "year"] as const) {
+  for (const p of ["today", "7d", "30d", "month", "year"] as const) {
     if (p === preferred) continue;
     const w = presetWindow(p, latest);
     if (w.from === f.from && w.to === f.to) return p;

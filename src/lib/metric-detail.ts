@@ -220,6 +220,7 @@ export function periodLabel(
 }
 
 const PRESET_LABEL: Record<DatePreset, { ar: string; en: string }> = {
+  today: { ar: "اليوم", en: "Today" },
   "7d": { ar: "آخر 7 أيام", en: "Last 7 days" },
   "30d": { ar: "آخر 30 يوماً", en: "Last 30 days" },
   month: { ar: "الشهر الحالي", en: "This month" },

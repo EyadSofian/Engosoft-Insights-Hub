@@ -66,6 +66,8 @@ export function presetWindow(
   };
 
   switch (next) {
+    case "today":
+      return { from: iso(anchor), to: iso(anchor) };
     case "all":
       // Explicitly opt out of the server's default window.
       return { from: undefined, to: undefined, range: "all" };
