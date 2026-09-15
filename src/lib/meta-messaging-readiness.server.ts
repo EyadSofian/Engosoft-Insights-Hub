@@ -563,6 +563,11 @@ async function buildReadiness() {
   ];
 
   const igFields = subscribed("instagram");
+  // A native Instagram inbox in Chatwoot is detected by itself; nobody has to report it.
+  const instagramInbox = await import("./chatwoot.server")
+    .then((module) => (module.chatwootConfigured() ? module.listChatwootInboxes() : []))
+    .then((inboxes) => inboxes.find((inbox) => inbox.channelType === "Channel::Instagram") ?? null)
+    .catch(() => null);
   const instagram: ReadinessCheck[] = [
     {
       key: "account_relationship",
@@ -587,12 +592,14 @@ async function buildReadiness() {
       "referral_parser",
       "exact_resolution",
     ]),
-    chatwootCount("instagram") > 0
+    chatwootCount("instagram") > 0 || instagramInbox
       ? {
           key: "chatwoot_correlation",
           label: "Chatwoot provider-message correlation",
           state: "ready",
-          detail: `${chatwootCount("instagram")} Chatwoot Instagram messages in 14 days carry the provider message ID.`,
+          detail: instagramInbox
+            ? `Chatwoot Instagram inbox "${instagramInbox.name}" (#${instagramInbox.id}) exists; ${chatwootCount("instagram")} Instagram messages in 14 days carry the provider message ID.`
+            : `${chatwootCount("instagram")} Chatwoot Instagram messages in 14 days carry the provider message ID.`,
         }
       : {
           key: "chatwoot_correlation",
