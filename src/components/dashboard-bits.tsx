@@ -354,13 +354,7 @@ export interface BreadcrumbStep {
  * every earlier step one click back. This replaces a row of level tabs: moving
  * down happens by opening a row, moving up by pressing a step here.
  */
-export function DrilldownBreadcrumb({
-  steps,
-  label,
-}: {
-  steps: BreadcrumbStep[];
-  label?: string;
-}) {
+export function DrilldownBreadcrumb({ steps, label }: { steps: BreadcrumbStep[]; label?: string }) {
   const { lang } = useI18n();
   const Separator = lang === "ar" ? ChevronLeft : ChevronRight;
   return (

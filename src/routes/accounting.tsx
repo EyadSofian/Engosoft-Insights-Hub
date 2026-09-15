@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeDollarSign,
@@ -45,6 +45,7 @@ import {
   KpiRow,
   PageSection,
   PageSections,
+  ViewSelect,
 } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
@@ -148,10 +149,12 @@ function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
-  const initialView = Route.useSearch().view;
-  const [view, setView] = useState<"summary" | "months" | "profitability" | "marketing">(
-    initialView ?? "summary",
-  );
+  // The view lives in the URL, so the Revenue workspace tabs (which navigate on
+  // this same route) and the report dropdown can never disagree with the page.
+  const view: AccountingView = Route.useSearch().view ?? "summary";
+  const navigate = useNavigate({ from: "/accounting" });
+  const setView = (next: AccountingView) =>
+    void navigate({ search: { view: next === "summary" ? undefined : next } });
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
   useRegisterNexusView("accounting", { tab: view });
@@ -354,7 +357,13 @@ function Accounting() {
       <DashboardPageHeader
         flush
         icon={<Receipt size={20} />}
-        title={t("accounting")}
+        title={
+          view === "marketing"
+            ? lang === "ar"
+              ? "من التسويق للإيراد"
+              : "Marketing → revenue"
+            : t("accounting")
+        }
         subtitle={
           lang === "ar"
             ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
@@ -452,34 +461,21 @@ function Accounting() {
         </div>
       </details>
 
-      <div className="hscroll bleed-x [--bleed:0.875rem] sm:[--bleed:0px] pb-1">
-        <Segmented
+      {/* Collection and Marketing → revenue are the Revenue workspace's own
+          tabs; the two analyst views of the collection report are a choice
+          inside it, not a second tab strip. */}
+      {view !== "marketing" && (
+        <ViewSelect
+          label={lang === "ar" ? "التقرير" : "Report"}
           value={view}
           onChange={setView}
-          size="md"
           options={[
-            {
-              value: "summary",
-              label: lang === "ar" ? "ملخص الحسابات" : "Accounting summary",
-            },
-            {
-              value: "months",
-              label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison",
-            },
-            {
-              value: "profitability",
-              label: lang === "ar" ? "الربحية" : "Profitability",
-            },
-            {
-              value: "marketing",
-              label:
-                lang === "ar"
-                  ? "أداء المبيعات من التسويق"
-                  : "Sales performance (marketing → revenue)",
-            },
+            { value: "summary", label: lang === "ar" ? "ملخص التحصيل" : "Collection summary" },
+            { value: "months", label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison" },
+            { value: "profitability", label: lang === "ar" ? "الربحية" : "Profitability" },
           ]}
         />
-      </div>
+      )}
 
       {view === "marketing" ? (
         <SalesPerformance />
