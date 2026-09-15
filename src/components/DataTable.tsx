@@ -45,6 +45,31 @@ export interface Col<T> {
   sortable?: boolean;
 }
 
+/** Columns a table shows before the reader asks for more. */
+export const DEFAULT_VISIBLE_COLUMNS = 8;
+
+/**
+ * Which columns start hidden: the ones flagged `hideByDefault`, then — if more
+ * than `limit` would still show — the trailing ones, keeping identity (`always`)
+ * and pinned (`sticky`) columns. Nothing is removed: every hidden column stays
+ * one click away under Columns, and the chooser is forced on whenever this
+ * trims anything.
+ */
+export function defaultHiddenColumns<T>(
+  cols: Col<T>[],
+  limit = DEFAULT_VISIBLE_COLUMNS,
+): Set<string> {
+  const hidden = new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key));
+  let visible = cols.filter((c) => !hidden.has(c.key)).length;
+  for (let i = cols.length - 1; i >= 0 && visible > limit; i--) {
+    const col = cols[i];
+    if (col.always || col.sticky || hidden.has(col.key)) continue;
+    hidden.add(col.key);
+    visible--;
+  }
+  return hidden;
+}
+
 export function DataTable<T>({
   rows,
   cols,
@@ -122,11 +147,9 @@ export function DataTable<T>({
   // would then be meaningless. Re-seeding on identity change keeps the defaults
   // honest without wiping a choice the reader just made on the same set.
   const colIdentity = cols.map((c) => c.key).join("|");
-  const [hidden, setHidden] = useState<Set<string>>(
-    () => new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)),
-  );
+  const [hidden, setHidden] = useState<Set<string>>(() => defaultHiddenColumns(cols));
   useEffect(() => {
-    setHidden(new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)));
+    setHidden(defaultHiddenColumns(cols));
     // Re-seed on the column set itself, not on every render of new col objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colIdentity]);
@@ -196,6 +219,9 @@ export function DataTable<T>({
   }, [visibleCols, groupLabels]);
 
   const hiddenCount = cols.filter((c) => !c.always && hidden.has(c.key)).length;
+  // A table wider than the default always offers the chooser, so the columns
+  // the default tucked away can never become unreachable.
+  const showChooser = columnChooser || cols.length > DEFAULT_VISIBLE_COLUMNS;
 
   return (
     <div className={`card overflow-hidden ${className}`}>
@@ -218,7 +244,7 @@ export function DataTable<T>({
             {rowTotal.toLocaleString("en-US")} {t("rows")}
           </span>
 
-          {columnChooser && (
+          {showChooser && (
             <Popover>
               <PopoverTrigger asChild>
                 <button

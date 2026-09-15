@@ -12,7 +12,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { toneOf, toneVars, TONE, type AnyTone, type Tone } from "@/lib/dashboard-tone";
+import { cardTone, toneOf, toneVars, TONE, type AnyTone, type Tone } from "@/lib/dashboard-tone";
 import { Card, EmptyState } from "./ui-bits";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 
@@ -67,15 +67,15 @@ export function DashboardPageHeader({
   /** Sub-navigation, rendered under the heading rule. */
   children?: ReactNode;
 }) {
-  const t = toneOf(tone);
+  const t = cardTone(tone);
   return (
     <header className={flush ? "" : "mb-4"}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
         <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
           {icon && (
             <span
-              className="grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
-              style={{ background: t.strong }}
+              className="grid size-10 shrink-0 place-items-center rounded-xl"
+              style={{ background: t.surface, color: t.strong }}
               aria-hidden="true"
             >
               {icon}
@@ -198,7 +198,7 @@ export function PageSection({
   id?: string;
   "aria-label"?: string;
 }) {
-  const t = toneOf(tone);
+  const t = cardTone(tone);
   const heading = title != null && (
     <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
       <div className="flex min-w-0 items-center gap-2.5">
@@ -237,6 +237,198 @@ export function PageSection({
       {heading}
       {children}
     </section>
+  );
+}
+
+/* --- management primitives --------------------------------------------- */
+
+/**
+ * Everything a management page keeps but does not lead with.
+ *
+ * One quiet row saying what is inside; the content is mounted only once it is
+ * opened, so charts inside never measure a zero-width box and a closed page
+ * costs nothing. Level 3 of a report — rows, formulas, diagnostics — lives here.
+ */
+export function MoreDetails({
+  label,
+  hint,
+  children,
+  defaultOpen = false,
+  testId,
+}: {
+  label?: string;
+  hint?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  testId?: string;
+}) {
+  const { lang } = useI18n();
+  const [open, setOpen] = useState(defaultOpen);
+  const id = `more-details-${(label ?? "details").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  return (
+    <section className="section-stack" data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((value) => !value)}
+        className="card flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-2 sm:px-5"
+      >
+        <LayoutGrid size={15} className="shrink-0 text-text-subtle" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-semibold text-text">
+            {label ?? (lang === "ar" ? "تفاصيل أكثر" : "More details")}
+          </span>
+          {hint && <span className="mt-0.5 block text-[11.5px] text-text-muted">{hint}</span>}
+        </span>
+        <ChevronDownGlyph open={open} />
+      </button>
+      {open && (
+        <div id={id} className="page-sections">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export interface WorkspaceLink {
+  to: string;
+  search?: Record<string, string>;
+  title: string;
+  description: string;
+  /** A real figure from a response already on screen, or nothing. */
+  figure?: string;
+  icon: ReactNode;
+}
+
+/** Where to go next: one row per workspace, never more than four. */
+export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
+  const { lang } = useI18n();
+  return (
+    <div className="card-grid sm:grid-cols-2 xl:grid-cols-4" data-testid="workspace-links">
+      {links.slice(0, 4).map((link) => (
+        <Link
+          key={`${link.to}${JSON.stringify(link.search ?? {})}`}
+          to={link.to}
+          search={link.search as never}
+          className="card lift group flex min-w-0 items-center gap-3 p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          <span
+            className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"
+            aria-hidden="true"
+          >
+            {link.icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13.5px] font-bold text-text">{link.title}</span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-text-muted">
+              {link.description}
+            </span>
+            {link.figure && (
+              <bdi className="num mt-1 block truncate text-[12px] font-semibold text-text">
+                {link.figure}
+              </bdi>
+            )}
+          </span>
+          {lang === "ar" ? (
+            <ChevronLeft size={17} className="shrink-0 text-text-subtle" aria-hidden="true" />
+          ) : (
+            <ChevronRight size={17} className="shrink-0 text-text-subtle" aria-hidden="true" />
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export interface BreadcrumbStep {
+  key: string;
+  label: string;
+  /** Omitted on the step the reader is on. */
+  onSelect?: () => void;
+}
+
+/**
+ * Where the reader is in a hierarchy — All campaigns › Campaign › Ad set — with
+ * every earlier step one click back. This replaces a row of level tabs: moving
+ * down happens by opening a row, moving up by pressing a step here.
+ */
+export function DrilldownBreadcrumb({
+  steps,
+  label,
+}: {
+  steps: BreadcrumbStep[];
+  label?: string;
+}) {
+  const { lang } = useI18n();
+  const Separator = lang === "ar" ? ChevronLeft : ChevronRight;
+  return (
+    <nav aria-label={label ?? (lang === "ar" ? "مسار التفاصيل" : "Drill-down path")}>
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
+        {steps.map((step, index) => {
+          const last = index === steps.length - 1;
+          return (
+            <li key={step.key} className="flex min-w-0 items-center gap-1">
+              {index > 0 && (
+                <Separator size={14} className="shrink-0 text-text-subtle" aria-hidden="true" />
+              )}
+              {last || !step.onSelect ? (
+                <span
+                  aria-current={last ? "location" : undefined}
+                  className="max-w-[16rem] truncate font-semibold text-text"
+                  title={step.label}
+                >
+                  {step.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={step.onSelect}
+                  className="max-w-[12rem] cursor-pointer truncate rounded-md px-1 font-medium text-brand hover:underline"
+                  title={step.label}
+                >
+                  {step.label}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * A compact choice of view inside one page — a native select, so it is small,
+ * keyboard- and screen-reader-native and never becomes a second tab strip.
+ */
+export function ViewSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label className="inline-flex max-w-full items-center gap-2 text-[12.5px] text-text-muted">
+      <span className="shrink-0 font-medium">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="min-h-10 min-w-0 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[13px] font-semibold text-text"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -305,7 +497,7 @@ export function SecondaryMetrics({
   );
 }
 
-function ChevronDownGlyph() {
+function ChevronDownGlyph({ open }: { open?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -317,7 +509,7 @@ function ChevronDownGlyph() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="shrink-0 text-text-muted transition-transform duration-150 group-open:rotate-180"
+      className={`shrink-0 text-text-muted transition-transform duration-150 group-open:rotate-180 ${open ? "rotate-180" : ""}`}
     >
       <path d="m6 9 6 6 6-6" />
     </svg>
@@ -328,11 +520,13 @@ function ChevronDownGlyph() {
 
 export type InsightKind = "best" | "attention" | "opportunity" | "note";
 
-const INSIGHT_TONE: Record<InsightKind, Tone> = {
-  best: "mint",
-  attention: "rose",
-  opportunity: "sky",
-  note: "violet",
+/** A reading is a verdict, so it may carry a semantic accent: good is green,
+ *  attention is amber (red is kept for something genuinely wrong). */
+const INSIGHT_TONE: Record<InsightKind, AnyTone> = {
+  best: "success",
+  attention: "warning",
+  opportunity: "brand",
+  note: "neutral",
 };
 
 const INSIGHT_ICON = {
@@ -389,7 +583,6 @@ export function InsightCard({
 }) {
   const { lang } = useI18n();
   const tone = INSIGHT_TONE[kind];
-  const t = toneOf(tone);
   const Icon = INSIGHT_ICON[kind];
   const label = eyebrow ?? INSIGHT_LABEL[kind][lang];
   const interactive = Boolean(to || onClick);
@@ -402,55 +595,39 @@ export function InsightCard({
           style={{ color: "var(--tone-strong)" }}
         >
           <span
-            className="grid size-6 shrink-0 place-items-center rounded-lg text-white"
-            style={{ background: "var(--tone-strong)" }}
+            className="grid size-6 shrink-0 place-items-center rounded-lg"
+            style={{ background: "var(--tone-soft)", color: "var(--tone-strong)" }}
           >
             <Icon size={13} strokeWidth={2.6} aria-hidden="true" />
           </span>
           {label}
         </span>
         {interactive && (
-          <span
-            className="kpi-cue-arrow shrink-0 opacity-45"
-            style={{ color: "var(--tone-ink)" }}
-            aria-hidden="true"
-          >
+          <span className="kpi-cue-arrow shrink-0 text-text-subtle" aria-hidden="true">
             {lang === "ar" ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
           </span>
         )}
       </div>
 
       {value != null && (
-        <div
-          className="num mt-2.5 text-[24px] font-bold leading-none tracking-[-0.03em]"
-          style={{ color: "var(--tone-ink)" }}
-        >
+        <div className="num mt-2.5 text-[24px] font-bold leading-none tracking-[-0.03em] text-text">
           {value}
         </div>
       )}
 
       <div
-        className={`text-[13.5px] font-semibold leading-snug ${value != null ? "mt-1.5" : "mt-2.5"}`}
-        style={{ color: "var(--tone-ink)" }}
+        className={`text-[13.5px] font-semibold leading-snug text-text ${value != null ? "mt-1.5" : "mt-2.5"}`}
       >
         {title}
       </div>
 
       {detail != null && (
-        <p
-          className="mt-1 line-clamp-2 text-[11.5px] leading-relaxed"
-          style={{ color: "var(--tone-ink)", opacity: 0.7 }}
-        >
-          {detail}
-        </p>
+        <p className="mt-1 line-clamp-2 text-[11.5px] leading-relaxed text-text-muted">{detail}</p>
       )}
       {interactive && actionLabel && (
         /* `mt-auto` pins the cue to the foot of the card, so a row of readings
            lines up along the bottom however long each explanation runs. */
-        <span
-          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[11.5px] font-bold"
-          style={{ color: "var(--tone-strong)" }}
-        >
+        <span className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[11.5px] font-bold text-brand">
           {actionLabel}
         </span>
       )}
@@ -467,7 +644,14 @@ export function InsightCard({
     (interactive
       ? "kpi-card lift cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       : "");
-  const style = { ...toneVars(tone), "--i": index } as React.CSSProperties;
+  // The verdict is one 3px rule on the reading edge, plus the words in the
+  // eyebrow — never a coloured card.
+  const style = {
+    ...toneVars(tone),
+    "--i": index,
+    borderInlineStartWidth: "3px",
+    borderInlineStartColor: "var(--tone-strong)",
+  } as React.CSSProperties;
 
   if (to) {
     return (
@@ -559,7 +743,7 @@ export function DashboardPanel({
   bodyClassName?: string;
   footer?: ReactNode;
 }) {
-  const t = toneOf(tone);
+  const t = cardTone(tone);
   return (
     <section className={`card flex min-w-0 flex-col overflow-hidden ${className}`}>
       {(title || action) && (
@@ -637,7 +821,7 @@ export function RankingPanel({
   limit?: number;
 }) {
   const { lang } = useI18n();
-  const t = toneOf(tone);
+  const t = cardTone(tone);
   const shown = items.slice(0, limit);
   const peak = Math.max(...shown.map((i) => Math.abs(i.raw ?? i.ratio ?? 0)), 1);
 
@@ -1205,7 +1389,7 @@ export function InfoDot({ text }: { text: string }) {
   return (
     <span
       className="grid size-4 shrink-0 cursor-help place-items-center rounded-full text-[9px] font-bold opacity-55"
-      style={{ background: "var(--tone-strong)", color: "#fff" }}
+      style={{ background: "var(--text-subtle)", color: "#fff" }}
       title={text}
       role="note"
       aria-label={`${lang === "ar" ? "التعريف" : "Definition"}: ${text}`}

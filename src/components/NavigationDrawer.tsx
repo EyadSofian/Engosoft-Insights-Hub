@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Link, useLocation, useRouterState } from "@tanstack/react-router";
-import { BookOpen, Menu, Sparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, Menu, Sparkles, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useModalGuard } from "@/lib/ui-store";
-import { navigationDrawerTree, type DrawerLink } from "@/lib/navigation";
+import { itemLabel, navigationDrawerTree, type DrawerLink } from "@/lib/navigation";
+import { useLocationSearch } from "./MoreReports";
 import logoImg from "@/assets/engosoft-logo.png";
 
 const DRAWER_ID = "app-navigation-drawer";
@@ -23,9 +24,7 @@ export function NavigationDrawer() {
   const { t, lang } = useI18n();
   const { pathname } = useLocation();
   const href = useRouterState({ select: (state) => state.location.href });
-  const acquisitionSection = useRouterState({
-    select: (state) => (state.location.search as { section?: string }).section,
-  });
+  const search = useLocationSearch();
   const [open, setOpen] = useState(false);
   useModalGuard(open);
 
@@ -40,12 +39,7 @@ export function NavigationDrawer() {
     return () => desktop.removeEventListener("change", onChange);
   }, []);
 
-  const tree = navigationDrawerTree(
-    pathname,
-    acquisitionSection,
-    lang,
-    (item) => item.tabLabel?.[lang] ?? t(item.key),
-  );
+  const tree = navigationDrawerTree(pathname, search, lang, (item) => itemLabel(item, lang, t));
   const A = lang === "ar";
 
   return (
@@ -98,24 +92,21 @@ export function NavigationDrawer() {
             <ul className="flex flex-col gap-1">
               {tree.map((section) => (
                 <li key={section.key}>
-                  <DrawerRow link={section} level={0} />
-                  {section.children.length > 0 && (
-                    <ul className="mt-1 mb-2 flex flex-col gap-0.5 border-s border-border ms-6 ps-2">
-                      {section.children.map((report) => (
-                        <li key={report.key}>
-                          <DrawerRow link={report} level={1} />
-                          {report.children.length > 0 && (
-                            <ul className="my-0.5 flex flex-col gap-0.5 border-s border-border ms-4 ps-2">
-                              {report.children.map((view) => (
-                                <li key={view.key}>
-                                  <DrawerRow link={view} level={2} />
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                  {section.menu ? (
+                    <MenuGroup section={section} />
+                  ) : (
+                    <>
+                      <DrawerRow link={section} level={0} />
+                      {section.children.length > 0 && (
+                        <ul className="mt-1 mb-2 flex flex-col gap-0.5 border-s border-border ms-6 ps-2">
+                          {section.children.map((report) => (
+                            <li key={report.key}>
+                              <DrawerRow link={report} level={1} />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
                   )}
                 </li>
               ))}
@@ -151,6 +142,43 @@ export function NavigationDrawer() {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** More, in the drawer: a disclosure that is open whenever one of its reports is. */
+function MenuGroup({ section }: { section: DrawerLink }) {
+  const [open, setOpen] = useState(section.active);
+  const Icon = section.icon;
+  const id = `drawer-group-${section.key}`;
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((value) => !value)}
+        className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 text-start text-[14px] font-semibold transition-colors ${
+          section.active ? "bg-brand-soft text-brand" : "text-text hover:bg-surface-2"
+        }`}
+      >
+        {Icon && <Icon size={18} aria-hidden="true" />}
+        <span className="min-w-0 flex-1 truncate">{section.label}</span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <ul id={id} className="mt-1 mb-2 flex flex-col gap-0.5 border-s border-border ms-6 ps-2">
+          {section.children.map((report) => (
+            <li key={report.key}>
+              <DrawerRow link={report} level={1} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -191,30 +219,19 @@ function DrawerRow({ link, level }: { link: DrawerLink; level: 0 | 1 | 2 }) {
 
   // Wrapped in Close so a tap on the page already open still dismisses the
   // panel; a real navigation closes it through the route-change effect too.
-  // `exact` stops the router from also marking Overview (no search) as the
-  // current page while another acquisition section is open.
+  // Exact matching, search included, stops the router from also marking a
+  // sibling that shares the route as the current page.
   return (
     <Dialog.Close asChild>
-      {link.section ? (
-        <Link
-          to="/acquisition"
-          search={{ section: link.section === "overview" ? undefined : link.section }}
-          activeOptions={{ exact: true }}
-          aria-current={current ? "page" : undefined}
-          className={`${base} ${size} ${tone}`}
-        >
-          {content}
-        </Link>
-      ) : (
-        <Link
-          to={link.to}
-          activeOptions={{ exact: true }}
-          aria-current={current ? "page" : undefined}
-          className={`${base} ${size} ${tone}`}
-        >
-          {content}
-        </Link>
-      )}
+      <Link
+        to={link.to}
+        search={link.search as never}
+        activeOptions={{ exact: true, includeSearch: true }}
+        aria-current={current ? "page" : undefined}
+        className={`${base} ${size} ${tone}`}
+      >
+        {content}
+      </Link>
     </Dialog.Close>
   );
 }

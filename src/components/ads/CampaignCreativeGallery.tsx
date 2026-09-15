@@ -18,6 +18,7 @@ import { useApi } from "@/lib/use-api";
 import type { CreativeAnalyticsRow, PlatformSourceHealth } from "@/lib/types";
 import { PlatformBadges } from "@/components/metric-bits";
 import { Skeleton } from "@/components/ui-bits";
+import { CreativeDetail } from "@/components/acquisition/ClosedLoop";
 
 interface CreativeResponse {
   rows: CreativeAnalyticsRow[];
@@ -116,11 +117,14 @@ function CreativeCard({
   rank,
   showWinner,
   showCampaign = false,
+  onOpenDetail,
 }: {
   row: CreativeAnalyticsRow;
   rank: number;
   showWinner: boolean;
   showCampaign?: boolean;
+  /** Opens the creative's own detail: its leads, who handled them, sales and revenue. */
+  onOpenDetail?: (creativeId: string) => void;
 }) {
   const { lang } = useI18n();
   const previewUrl = row.permalinkUrl || row.landingPageUrl;
@@ -207,12 +211,18 @@ function CreativeCard({
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-2">
-          <span
-            className="num max-w-[68%] truncate text-[9px] text-text-subtle"
-            title={row.creativeId}
-          >
-            ID {row.creativeId || "—"}
-          </span>
+          {onOpenDetail && row.creativeId && row.platform === "meta" ? (
+            <button
+              type="button"
+              onClick={() => onOpenDetail(row.creativeId)}
+              className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md text-[11px] font-semibold text-brand hover:underline"
+              title={`ID ${row.creativeId}`}
+            >
+              {lang === "ar" ? "العملاء والمبيعات" : "Leads & sales"}
+            </button>
+          ) : (
+            <span />
+          )}
           {previewUrl ? (
             <a
               href={previewUrl}
@@ -243,6 +253,7 @@ export function CampaignCreativeGallery({
 }) {
   const { lang } = useI18n();
   const [sort, setSort] = useState<CreativeSort>("won");
+  const [detailCreativeId, setDetailCreativeId] = useState<string | null>(null);
   const { data, isLoading, isError } = useApi<CreativeResponse>(
     `/api/ads-creatives?campaignKey=${encodeURIComponent(campaignKey)}`,
     { enabled: !!campaignKey },
@@ -365,6 +376,7 @@ export function CampaignCreativeGallery({
               row={row}
               rank={index}
               showWinner={SORTS[sort].value(row) > 0}
+              onOpenDetail={setDetailCreativeId}
             />
           ))}
         </div>
@@ -377,6 +389,7 @@ export function CampaignCreativeGallery({
             : `Showing the first 30 of ${fmtNum(rows.length)} creatives.`}
         </p>
       )}
+      <CreativeDetail creativeId={detailCreativeId} onClose={() => setDetailCreativeId(null)} />
     </section>
   );
 }

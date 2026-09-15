@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Image, TrendingUp } from "lucide-react";
 import { AcquisitionPerformance } from "@/components/acquisition/AcquisitionPerformance";
 import {
   AssetPerformance,
@@ -23,9 +23,15 @@ import {
   OverviewKpis,
   SimpleFunnel,
 } from "@/components/acquisition/ManagementOverview";
-import { DashboardPageHeader, PageSections } from "@/components/dashboard-bits";
+import {
+  DashboardPageHeader,
+  DrilldownBreadcrumb,
+  MoreDetails,
+  PageSections,
+  ViewSelect,
+} from "@/components/dashboard-bits";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
-import { Card, Segmented } from "@/components/ui-bits";
+import { Card } from "@/components/ui-bits";
 import type { ClosedLoopGrain, GrainRow } from "@/lib/closed-loop";
 import { useI18n } from "@/lib/i18n";
 import { ACQUISITION_SECTIONS } from "@/lib/navigation";
@@ -116,6 +122,8 @@ function Acquisition() {
     campaignId?: string;
     adsetId?: string;
     label?: string;
+    campaignLabel?: string;
+    adsetLabel?: string;
   }>({});
   const [recordFilter, setRecordFilter] = useState<RecordFilter | null>(null);
   const [creativeId, setCreativeId] = useState<string | null>(null);
@@ -132,14 +140,18 @@ function Acquisition() {
 
   const drill = (grain: ClosedLoopGrain, row: GrainRow) => {
     if (grain === "campaign") {
-      setGrainFilter({ campaignId: row.campaignId, label: row.campaignName || row.campaignId });
+      const campaignLabel = row.campaignName || row.campaignId;
+      setGrainFilter({ campaignId: row.campaignId, label: campaignLabel, campaignLabel });
       go("ads", "adsets");
     } else if (grain === "adset") {
-      setGrainFilter({
+      const adsetLabel = row.adsetName || row.adsetId;
+      setGrainFilter((previous) => ({
         campaignId: row.campaignId,
         adsetId: row.adsetId,
-        label: row.adsetName || row.adsetId,
-      });
+        label: adsetLabel,
+        campaignLabel: previous.campaignLabel ?? (row.campaignName || row.campaignId),
+        adsetLabel,
+      }));
       go("ads", "ads");
     } else if (grain === "ad" && row.creativeId) {
       setCreativeId(row.creativeId);
@@ -150,17 +162,6 @@ function Acquisition() {
     go("sales");
   };
 
-  const sections: { value: Section; label: string }[] = ACQUISITION_SECTIONS.map((entry) => ({
-    value: entry.value,
-    label: entry.label[lang],
-  }));
-  const adViews: { value: AdView; label: string }[] = [
-    { value: "campaigns", label: A ? "الحملات" : "Campaigns" },
-    { value: "adsets", label: A ? "مجموعات الإعلانات" : "Ad sets" },
-    { value: "ads", label: A ? "الإعلانات" : "Ads" },
-    { value: "creatives", label: A ? "المواد الإعلانية" : "Creatives" },
-    { value: "assets", label: A ? "الأصول" : "Assets" },
-  ];
   const leadViews: { value: LeadView; label: string }[] = [
     { value: "today", label: A ? "اليوم والفترة" : "Today & period" },
     { value: "forms", label: A ? "نماذج العملاء" : "Lead forms" },
@@ -173,22 +174,96 @@ function Acquisition() {
   const grain =
     section === "ads" && adView in GRAIN_OF ? GRAIN_OF[adView as keyof typeof GRAIN_OF] : null;
 
+  const heading: Record<Section, { title: string; subtitle: string }> = {
+    overview: {
+      title: A ? "التسويق" : "Marketing",
+      subtitle: A
+        ? "كم صرفنا، كم عميلًا جاء، كم منهم اشترى، وكم دفعوا."
+        : "What we spent, how many leads came, how many bought and what they paid.",
+    },
+    ads: grain
+      ? {
+          title: A ? "الحملات بالإسناد الدقيق" : "Campaigns by exact attribution",
+          subtitle: A
+            ? "افتح حملة لترى مجموعاتها، ثم إعلاناتها، ثم المادة الإعلانية."
+            : "Open a campaign to see its ad sets, then its ads, then the creative.",
+        }
+      : {
+          title: A ? "المواد الإعلانية" : "Creatives",
+          subtitle: A
+            ? "كل مادة إعلانية بإنفاقها وعملائها ومبيعاتها. اضغط أي مادة للتفاصيل."
+            : "Every creative with its spend, leads and sales. Open one for the full story.",
+        },
+    leads: {
+      title: A ? "مصادر العملاء" : "Lead sources",
+      subtitle: A
+        ? "من أين جاء العملاء وجودتهم."
+        : "Where leads came from, and how good they were.",
+    },
+    sales: {
+      title: A ? "سجلات المبيعات المرتبطة" : "Linked sales records",
+      subtitle: A ? "كل عميل من إعلانه حتى الفاتورة." : "Every lead from its ad to its invoice.",
+    },
+    coverage: {
+      title: A ? "تغطية البيانات" : "Data coverage",
+      subtitle: A
+        ? "دقة الربط وحالة المصادر — للمراجعة التقنية."
+        : "Attribution accuracy and source health — for technical review.",
+    },
+  };
+
+  const breadcrumb =
+    grain === null
+      ? null
+      : [
+          {
+            key: "campaigns",
+            label: A ? "كل الحملات" : "All campaigns",
+            onSelect:
+              grain === "campaign"
+                ? undefined
+                : () => {
+                    setGrainFilter({});
+                    go("ads", "campaigns");
+                  },
+          },
+          ...(grain !== "campaign"
+            ? [
+                {
+                  key: "campaign",
+                  label: grainFilter.campaignLabel ?? (A ? "كل المجموعات" : "All ad sets"),
+                  onSelect:
+                    grain === "ad" && grainFilter.campaignId
+                      ? () => {
+                          setGrainFilter({
+                            campaignId: grainFilter.campaignId,
+                            label: grainFilter.campaignLabel,
+                            campaignLabel: grainFilter.campaignLabel,
+                          });
+                          go("ads", "adsets");
+                        }
+                      : undefined,
+                },
+              ]
+            : []),
+          ...(grain === "ad"
+            ? [
+                {
+                  key: "adset",
+                  label: grainFilter.adsetLabel ?? (A ? "كل الإعلانات" : "All ads"),
+                },
+              ]
+            : []),
+        ];
+
   return (
     <PageSections>
       <DashboardPageHeader
-        icon={<TrendingUp size={22} />}
-        title={A ? "تحليل أداء الاستحواذ" : "Acquisition Performance"}
-        subtitle={
-          A
-            ? "كم صرفنا، كم عميلًا جاء، كم منهم اشترى، وكم دفعوا — لكل حملة ومادة إعلانية."
-            : "What we spent, how many leads came, how many bought, and what they paid — for every campaign and creative."
-        }
+        icon={section === "ads" && !grain ? <Image size={20} /> : <TrendingUp size={20} />}
+        title={heading[section].title}
+        subtitle={heading[section].subtitle}
         period={period || (A ? "الشهر الحالي" : "Month to date")}
-        tone="violet"
       />
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <Segmented value={section} onChange={(value) => go(value)} options={sections} size="md" />
-      </div>
       {closedLoop.error ? (
         <Card padded className="text-sm text-danger">
           {A ? "تعذر تحميل بيانات الربط: " : "The closed-loop data could not load: "}
@@ -201,25 +276,59 @@ function Acquisition() {
           <OverviewKpis data={data} loading={loading} />
           <SimpleFunnel data={data} loading={loading} />
           <BestPerformers data={data} loading={loading} onOpenCreative={setCreativeId} />
-          <CheapVersusQuality data={data} loading={loading} onOpenCreative={setCreativeId} />
-          <DataCoverageCard data={data} loading={loading} onViewDetails={() => go("coverage")} />
+          <MoreDetails
+            label={A ? "تحليل إضافي" : "More analysis"}
+            hint={
+              A
+                ? "الأرخص مقابل الأفضل جودة، وملخص تغطية البيانات"
+                : "Cheapest against best quality, and the data coverage summary"
+            }
+          >
+            <CheapVersusQuality data={data} loading={loading} onOpenCreative={setCreativeId} />
+            <DataCoverageCard data={data} loading={loading} onViewDetails={() => go("coverage")} />
+          </MoreDetails>
         </>
       ) : null}
 
       {section === "ads" ? (
         <>
-          <div className="-mx-1 overflow-x-auto px-1">
-            <Segmented
-              value={adView}
-              onChange={(value) => {
-                // Choosing a level by hand clears a drill-down filter.
-                if (value === "campaigns" || value === "creatives" || value === "assets")
+          {breadcrumb ? (
+            <DrilldownBreadcrumb steps={breadcrumb} />
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <ViewSelect
+                label={A ? "العرض" : "Show"}
+                value={adView === "assets" ? "assets" : creativeTable ? "table" : "cards"}
+                options={[
+                  { value: "cards", label: A ? "صور المواد" : "Creative cards" },
+                  { value: "table", label: A ? "جدول المواد" : "Creative table" },
+                  {
+                    value: "assets",
+                    label: A ? "الأصول (فيديو وصور)" : "Assets (video and images)",
+                  },
+                ]}
+                onChange={(value) => {
+                  if (value === "assets") {
+                    go("ads", "assets");
+                    return;
+                  }
+                  setCreativeTable(value === "table");
+                  if (adView !== "creatives") go("ads", "creatives");
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
                   setGrainFilter({});
-                go("ads", value);
-              }}
-              options={adViews}
-            />
-          </div>
+                  go("ads", "campaigns");
+                }}
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-brand hover:bg-brand-soft"
+              >
+                {A ? "تتبّع من الحملة للمادة" : "Drill down from campaign to creative"}
+                {A ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+              </button>
+            </div>
+          )}
           {grain ? (
             <GrainPerformance
               data={data}
@@ -227,7 +336,10 @@ function Acquisition() {
               grain={grain}
               filter={grain === "campaign" ? {} : grainFilter}
               onDrill={drill}
-              onClearFilter={() => setGrainFilter({})}
+              onClearFilter={() => {
+                setGrainFilter({});
+                go("ads", "campaigns");
+              }}
               onOpenCreative={setCreativeId}
               onShowRecords={showRecords}
             />
@@ -241,25 +353,16 @@ function Acquisition() {
             />
           ) : null}
           {adView === "creatives" && creativeTable ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setCreativeTable(false)}
-                className="self-start text-xs font-semibold text-brand hover:underline"
-              >
-                {A ? "عرض كصور" : "Show as cards"}
-              </button>
-              <GrainPerformance
-                data={data}
-                loading={loading}
-                grain="creative"
-                filter={{}}
-                onDrill={drill}
-                onClearFilter={() => setGrainFilter({})}
-                onOpenCreative={setCreativeId}
-                onShowRecords={showRecords}
-              />
-            </>
+            <GrainPerformance
+              data={data}
+              loading={loading}
+              grain="creative"
+              filter={{}}
+              onDrill={drill}
+              onClearFilter={() => setGrainFilter({})}
+              onOpenCreative={setCreativeId}
+              onShowRecords={showRecords}
+            />
           ) : null}
           {adView === "assets" ? (
             <AssetPerformance data={data} loading={loading} onOpenCreative={setCreativeId} />
@@ -269,13 +372,12 @@ function Acquisition() {
 
       {section === "leads" ? (
         <>
-          <div className="-mx-1 overflow-x-auto px-1">
-            <Segmented
-              value={leadView}
-              onChange={(value) => go("leads", value)}
-              options={leadViews}
-            />
-          </div>
+          <ViewSelect
+            label={A ? "العرض" : "Show"}
+            value={leadView}
+            options={leadViews}
+            onChange={(value) => go("leads", value)}
+          />
           {leadView === "today" ? <AcquisitionPerformance view="today" /> : null}
           {leadView === "forms" ? <AcquisitionPerformance view="forms" /> : null}
           {leadView === "landing" ? <AcquisitionPerformance view="landing" /> : null}

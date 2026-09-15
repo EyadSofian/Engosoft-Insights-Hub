@@ -15,7 +15,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { KpiRow, PageSection } from "@/components/dashboard-bits";
+import { KpiRow, PageSection, SecondaryMetrics } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Card, Pill } from "@/components/ui-bits";
 import type { Kpi, KpiFormat, KpiStatus } from "@/lib/closed-loop-kpis";
@@ -65,7 +65,7 @@ export function kpiDisplay(kpi: Kpi | undefined, lang: Lang): string {
   return formatKpiValue(kpi.value, kpi.format);
 }
 
-function KpiFigure({
+export function KpiFigure({
   kpi,
   index,
   icon,
@@ -165,18 +165,8 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
           }
         />
         <KpiFigure
-          kpi={k?.crmMatched}
-          index={2}
-          icon={<ShieldCheck size={17} />}
-          tone="sky"
-          loading={loading}
-          sub={
-            A ? `${shown("crmMatchRate")} من كل العملاء` : `${shown("crmMatchRate")} of all leads`
-          }
-        />
-        <KpiFigure
           kpi={k?.qualified}
-          index={3}
+          index={2}
           icon={<Target size={17} />}
           tone="sky"
           loading={loading}
@@ -188,7 +178,7 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
         />
         <KpiFigure
           kpi={k?.won}
-          index={4}
+          index={3}
           icon={<Trophy size={17} />}
           tone="mint"
           loading={loading}
@@ -196,7 +186,7 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
         />
         <KpiFigure
           kpi={k?.revenue}
-          index={5}
+          index={4}
           icon={<BadgeDollarSign size={17} />}
           tone="mint"
           loading={loading}
@@ -205,7 +195,7 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
         />
         <KpiFigure
           kpi={k?.roasAllSpend}
-          index={6}
+          index={5}
           icon={<Gauge size={17} />}
           tone="violet"
           loading={loading}
@@ -215,19 +205,33 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
               : `${shown("roasTracked")} on tracked campaigns`
           }
         />
-        <KpiFigure
-          kpi={k?.costPerCustomerAll}
-          index={7}
-          icon={<Scale size={17} />}
-          tone="rose"
-          loading={loading}
-          sub={
-            A
-              ? `${shown("costPerCustomerTracked")} على الحملات المتتبَّعة`
-              : `${shown("costPerCustomerTracked")} on tracked campaigns`
-          }
-        />
       </KpiRow>
+      <SecondaryMetrics label={A ? "أرقام إضافية" : "More figures"} count={2}>
+        <KpiRow>
+          <KpiFigure
+            kpi={k?.crmMatched}
+            index={0}
+            icon={<ShieldCheck size={17} />}
+            tone="sky"
+            loading={loading}
+            sub={
+              A ? `${shown("crmMatchRate")} من كل العملاء` : `${shown("crmMatchRate")} of all leads`
+            }
+          />
+          <KpiFigure
+            kpi={k?.costPerCustomerAll}
+            index={1}
+            icon={<Scale size={17} />}
+            tone="rose"
+            loading={loading}
+            sub={
+              A
+                ? `${shown("costPerCustomerTracked")} على الحملات المتتبَّعة`
+                : `${shown("costPerCustomerTracked")} on tracked campaigns`
+            }
+          />
+        </KpiRow>
+      </SecondaryMetrics>
     </PageSection>
   );
 }

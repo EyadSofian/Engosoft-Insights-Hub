@@ -1769,8 +1769,12 @@ export function CreativeDetail({
       onClose={onClose}
       width="min(920px, 100vw)"
       eyebrow={A ? "مادة إعلانية" : "Creative"}
-      title={d?.creative?.creativeName || creativeId || ""}
-      subtitle={creativeId ?? ""}
+      title={d?.creative?.creativeName || (A ? "مادة إعلانية" : "Creative")}
+      subtitle={
+        d?.hierarchy?.[0]
+          ? `${d.hierarchy[0].campaignName} → ${d.hierarchy[0].adsetName}`
+          : undefined
+      }
     >
       {detail.isLoading ? (
         <div className="text-sm text-text-muted">{A ? "جارِ التحميل…" : "Loading…"}</div>
@@ -1802,10 +1806,7 @@ export function CreativeDetail({
             )}
             <div className="space-y-1 text-xs text-text-muted">
               <div>
-                <Pill tone="neutral">{d.creative?.mediaType || "—"}</Pill>{" "}
-                {d.creative?.videoId ? (
-                  <span className="font-mono">video {d.creative.videoId}</span>
-                ) : null}
+                <Pill tone="neutral">{d.creative?.mediaType || "—"}</Pill>
               </div>
               {d.creative?.headline ? (
                 <div className="text-sm text-text">{d.creative.headline}</div>
@@ -1816,13 +1817,6 @@ export function CreativeDetail({
                   {d.creative.landingPageUrl}
                 </div>
               ) : null}
-              <div>
-                {(d.assets ?? []).length
-                  ? `${A ? "الأصول" : "Assets"}: ${(d.assets ?? []).map((a) => `${a.asset_type} ${a.asset_id}`).join(" · ")}`
-                  : A
-                    ? "لا أصول بمعرّف Meta"
-                    : "No assets with a Meta ID"}
-              </div>
             </div>
           </div>
 
@@ -1834,15 +1828,37 @@ export function CreativeDetail({
               {(d.hierarchy ?? []).map((row) => (
                 <div
                   key={row.adId}
-                  className="rounded-md border border-border px-2 py-1 text-[11px] text-text-muted"
+                  className="rounded-md border border-border px-2 py-1 text-[11.5px] text-text"
                 >
-                  {row.campaignName} <span className="font-mono">({row.campaignId})</span> →{" "}
-                  {row.adsetName} <span className="font-mono">({row.adsetId})</span> → {row.adName}{" "}
-                  <span className="font-mono">({row.adId})</span>
+                  {row.campaignName} → {row.adsetName} → {row.adName}
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Identifiers reconcile a row with Meta; a manager reading the
+              creative's story does not need them in the way. */}
+          <details className="group rounded-lg border border-border">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-text-muted [&::-webkit-details-marker]:hidden">
+              {A ? "تفاصيل تقنية" : "Technical details"}
+            </summary>
+            <div className="space-y-1 border-t border-border px-3 py-2 font-mono text-[11px] text-text-muted">
+              <div>creative {creativeId}</div>
+              {d.creative?.videoId ? <div>video {d.creative.videoId}</div> : null}
+              {(d.hierarchy ?? []).map((row) => (
+                <div key={`ids-${row.adId}`} className="break-all">
+                  campaign {row.campaignId} · ad set {row.adsetId} · ad {row.adId}
+                </div>
+              ))}
+              <div className="break-all">
+                {(d.assets ?? []).length
+                  ? `${A ? "الأصول" : "Assets"}: ${(d.assets ?? []).map((a) => `${a.asset_type} ${a.asset_id}`).join(" · ")}`
+                  : A
+                    ? "لا أصول بمعرّف Meta"
+                    : "No assets with a Meta ID"}
+              </div>
+            </div>
+          </details>
 
           <div>
             <div className="mb-1 text-xs font-semibold text-text">

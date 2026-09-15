@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useFilters, usePreset } from "@/lib/filter-store";
-import { toneOf, toneVars, type AnyTone } from "@/lib/dashboard-tone";
+import { cardTone, toneVars, type AnyTone } from "@/lib/dashboard-tone";
 import { scopeChips, type MetricBreakdownGroup, type MetricDetail } from "@/lib/metric-detail";
 import { contextualQuestions, elementManifest } from "@/lib/nexus-surface-registry";
 import { getNexusView, updateNexusView } from "./engo-nexus/state/nexus-view-context";
@@ -68,7 +68,6 @@ export function MetricDetailHeader({
   deltaInvert?: boolean;
   period?: string;
 }) {
-  const t = toneOf(tone);
   return (
     <div
       className="tone-surface flex items-start gap-3 rounded-2xl p-3.5"
@@ -77,30 +76,21 @@ export function MetricDetailHeader({
     >
       {icon && (
         <span
-          className="grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
-          style={{ background: t.strong }}
+          className="grid size-10 shrink-0 place-items-center rounded-xl"
+          style={{ background: "var(--tone-soft)", color: "var(--tone-strong)" }}
           aria-hidden="true"
         >
           {icon}
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold" style={{ color: t.ink, opacity: 0.78 }}>
-          {title}
-        </div>
-        <div
-          className="num mt-1 text-[26px] font-bold leading-none tracking-[-0.03em]"
-          style={{ color: t.ink }}
-        >
+        <div className="text-[12px] font-semibold text-text-muted">{title}</div>
+        <div className="num mt-1 text-[26px] font-bold leading-none tracking-[-0.03em] text-text">
           {value}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <DeltaBadge value={delta} invert={deltaInvert} />
-          {period && (
-            <span className="text-[11px]" style={{ color: t.ink, opacity: 0.7 }}>
-              {period}
-            </span>
-          )}
+          {period && <span className="text-[11px] text-text-muted">{period}</span>}
         </div>
       </div>
     </div>
@@ -223,7 +213,7 @@ export function MetricTrendSection({
 }) {
   const { lang } = useI18n();
   if (!trend) return null;
-  const t = toneOf(tone);
+  const t = cardTone(tone);
   const points = trend.points.filter((point) => Number.isFinite(point.value));
 
   return (
@@ -280,7 +270,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
       ) : (
         <ul className="space-y-2.5">
           {rows.map((row) => {
-            const t = toneOf(row.tone ?? "sky");
+            const t = cardTone(row.tone ?? "sky");
             return (
               <li key={row.key}>
                 <div className="flex items-baseline justify-between gap-3">
