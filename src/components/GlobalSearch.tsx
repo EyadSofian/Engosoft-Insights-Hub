@@ -234,18 +234,25 @@ export function GlobalSearch() {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          aria-label={A ? "بحث" : "Search"}
-          title={`${A ? "بحث" : "Search"} (⌘K)`}
-          className="inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-2.5 text-[13px] text-text-muted transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-9 md:min-w-[210px]"
-        >
-          <Search size={16} className="shrink-0" aria-hidden="true" />
-          <span className="hidden truncate md:inline">{placeholder}</span>
-          <kbd className="ms-auto hidden rounded border border-border px-1 text-[10px] lg:inline">
-            ⌘K
-          </kbd>
-        </button>
+        <span className="global-search-wrap relative isolate shrink-0">
+          <span className="global-search-ring" aria-hidden="true" />
+          <button
+            type="button"
+            aria-label={A ? "بحث شامل" : "Global search"}
+            title={`${A ? "بحث شامل" : "Global search"} (⌘K)`}
+            className="global-search-trigger group relative inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 overflow-hidden rounded-xl border border-brand/35 bg-[linear-gradient(110deg,var(--brand-soft),var(--surface)_58%)] px-2.5 text-[13px] text-text shadow-sm transition-[border-color,background,transform] hover:border-brand/60 hover:bg-surface-2 active:scale-[0.97] sm:h-9 md:min-w-[260px]"
+          >
+            <span className="relative z-10 grid size-7 shrink-0 place-items-center rounded-lg bg-brand text-white shadow-sm">
+              <Search size={16} aria-hidden="true" />
+            </span>
+            <span className="relative z-10 hidden min-w-0 truncate text-start md:inline">
+              {placeholder}
+            </span>
+            <kbd className="relative z-10 ms-auto hidden shrink-0 rounded-md border border-brand/25 bg-surface/80 px-1.5 py-0.5 text-[10px] font-bold text-brand shadow-sm lg:inline">
+              ⌘K
+            </kbd>
+          </button>
+        </span>
       </Dialog.Trigger>
 
       <Dialog.Portal>

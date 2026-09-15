@@ -1186,6 +1186,60 @@
   box-shadow: 0 1px 2px rgba(11, 31, 56, 0.04);
 }
 
+/* Give the one global entry point a quiet pulse so it is discoverable on a
+   busy dashboard. The ring sits outside the button and never changes layout. */
+@keyframes global-search-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.025);
+  }
+}
+
+.global-search-ring {
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border: 1px solid color-mix(in oklab, var(--brand) 42%, transparent);
+  border-radius: 0.95rem;
+  pointer-events: none;
+  animation: global-search-pulse 2.8s ease-in-out infinite;
+}
+
+.global-search-trigger::after {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -45%;
+  width: 32%;
+  content: "";
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, white 42%, transparent), transparent);
+  transform: skewX(-18deg);
+  pointer-events: none;
+  animation: global-search-sheen 5.5s ease-in-out infinite;
+}
+
+@keyframes global-search-sheen {
+  0%,
+  62%,
+  100% {
+    inset-inline-start: -45%;
+  }
+  78% {
+    inset-inline-start: 118%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-search-ring,
+  .global-search-trigger::after {
+    animation: none;
+  }
+}
+
 /* The rail reads as part of the page, not as a separate dark application.
    It takes the same surface family the cards do and separates itself with one
    hairline instead of a glass slab, so the darkest thing on a light screen is
