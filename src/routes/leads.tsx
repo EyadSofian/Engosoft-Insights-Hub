@@ -21,6 +21,7 @@ import {
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { BarList, Card, ErrorState, Pill, Skeleton } from "@/components/ui-bits";
+import { OverviewEfficiency } from "@/components/overview-records";
 import {
   DashboardPageHeader,
   DataHealthSummary,
@@ -764,6 +765,17 @@ function CrmWorkspace() {
             truncated={data.detail.truncated}
           />
         </PageSection>
+
+        <MoreDetails
+          label={A ? "كفاءة التحويل والمصادر" : "Conversion efficiency and sources"}
+          hint={
+            A
+              ? "معدل التحويل والخسارة وزمن الإغلاق وتكلفة العميل، ومن أين جاء العملاء"
+              : "Conversion, loss, close time and cost per lead — and where the leads came from"
+          }
+        >
+          <OverviewEfficiency />
+        </MoreDetails>
 
         <MoreDetails
           label={A ? "كيف تُعرَّف الحالات" : "How these states are defined"}

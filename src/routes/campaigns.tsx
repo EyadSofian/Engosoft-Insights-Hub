@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   BarChart3,
@@ -31,6 +31,8 @@ import type { MetricDetail } from "@/lib/metric-detail";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { CompareBars } from "@/components/ads/CompareBars";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
+import { OverviewCampaignRecords } from "@/components/overview-records";
+import { CampaignDetail, type CampaignTab } from "@/components/campaigns/CampaignDetail";
 import { roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricsGlossaryButton } from "@/components/ads/MetricsGlossary";
 import { FilterSummary } from "@/components/ads/FilterSummary";
@@ -39,11 +41,22 @@ import { ratioCell } from "@/components/ads/cells";
 import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
-type CampaignsSearch = { view?: "attributedRevenue" };
+type CampaignsSearch = {
+  view?: "attributedRevenue";
+  /** The campaign whose detail is open, by its stable performance key. */
+  campaign?: string;
+  tab?: CampaignTab;
+};
+
+const CAMPAIGN_TABS: CampaignTab[] = ["overview", "ads", "sales"];
 
 export const Route = createFileRoute("/campaigns")({
   validateSearch: (search: Record<string, unknown>): CampaignsSearch => ({
     view: search.view === "attributedRevenue" ? "attributedRevenue" : undefined,
+    campaign: typeof search.campaign === "string" && search.campaign ? search.campaign : undefined,
+    tab: CAMPAIGN_TABS.includes(search.tab as CampaignTab)
+      ? (search.tab as CampaignTab)
+      : undefined,
   }),
   component: Campaigns,
 });
@@ -175,7 +188,8 @@ function headlineDetails(
 
 function Campaigns() {
   const { t, lang } = useI18n();
-  const { view: initialView } = Route.useSearch();
+  const { view: initialView, campaign: openCampaign, tab: campaignTab } = Route.useSearch();
+  const navigate = useNavigate({ from: "/campaigns" });
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
   // One panel for the three readings: whichever card was pressed last.
@@ -216,6 +230,44 @@ function Campaigns() {
       })
     : null;
   const insights = headlineDetails(headline, lang);
+  // The campaign the reader opened, if any: its own screen replaces the list
+  // rather than unfolding underneath it.
+  const detailRow = openCampaign
+    ? (data?.rows.find((entry) => entry.key === openCampaign) ??
+      data?.rows.find((entry) => entry.campaignKey === openCampaign))
+    : undefined;
+  const openDetail = (key: string) =>
+    void navigate({
+      search: (prev: CampaignsSearch) => ({ ...prev, campaign: key, tab: undefined }),
+    });
+  const closeDetail = () =>
+    void navigate({
+      search: (prev: CampaignsSearch) => ({ ...prev, campaign: undefined, tab: undefined }),
+    });
+
+  if (openCampaign && data && detailRow)
+    return (
+      <CampaignDetail
+        row={detailRow}
+        rows={data.rows}
+        state={Object.values(data.activity.delivery).find(
+          (entry) =>
+            entry.campaignKey === detailRow.campaignKey || entry.campaignKey === detailRow.key,
+        )}
+        lostAvailable={hasReportableLost(data.health.lostAuthority)}
+        tab={campaignTab ?? "overview"}
+        onTab={(next) =>
+          void navigate({
+            search: (prev: CampaignsSearch) => ({
+              ...prev,
+              tab: next === "overview" ? undefined : next,
+            }),
+          })
+        }
+        onBack={closeDetail}
+        period={period}
+      />
+    );
 
   return (
     <div>
@@ -443,6 +495,7 @@ function Campaigns() {
                 initialView={initialView}
                 unknownAdsetKey={data.unknownAdsetKey}
                 csvPrefix="engosoft"
+                onOpenDetail={grain === "campaign" ? openDetail : undefined}
                 activeCampaignStates={Object.values(data.activity.delivery)}
                 lostAvailable={hasReportableLost(data.health.lostAuthority)}
                 spendAvailable={spend > 0}
@@ -478,6 +531,7 @@ function Campaigns() {
                 }
               >
                 <CampaignActivityPanel activity={data.activity} />
+                <OverviewCampaignRecords />
                 <>
                   <SectionTitle
                     hint={
