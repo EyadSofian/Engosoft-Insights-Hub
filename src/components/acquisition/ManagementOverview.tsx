@@ -660,15 +660,18 @@ export function DataCoverageCard({
             return (
               <li
                 key={item.key}
-                className="flex items-center gap-2"
+                // The label never breaks mid-word; on a narrow phone a long status
+                // ("Infrastructure ready / credential pending") drops to its own
+                // line instead of squeezing the channel name to "WhatsAp / p".
+                className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
                 title={A ? item.note.ar : item.note.en}
               >
                 {TONE_ICON[tone]}
-                <span className="text-sm text-text">
+                <span className="whitespace-nowrap text-sm text-text">
                   {A ? SIMPLE_LABEL[item.key]!.ar : SIMPLE_LABEL[item.key]!.en}
                 </span>
                 <span
-                  className={`num ms-auto text-sm font-bold ${tone === "bad" ? "text-danger" : tone === "wait" ? "text-text-muted" : "text-text"}`}
+                  className={`num ms-auto text-end text-sm font-bold ${tone === "bad" ? "text-danger" : tone === "wait" ? "text-text-muted" : "text-text"}`}
                 >
                   {value}
                 </span>
