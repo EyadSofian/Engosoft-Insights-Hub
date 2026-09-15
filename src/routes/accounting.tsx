@@ -50,7 +50,7 @@ import {
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
-import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { DEFAULT_FX_RATES } from "@/lib/fx-rates";
 import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
@@ -512,7 +512,7 @@ function Accounting() {
                 />
                 <MetricDetailTrigger
                   detail={metrics!.credits}
-                  card={{ index: 4, valueWrap: true, sub: fmtUSDExact(data.summary.creditNoteUsd) }}
+                  card={{ index: 4, valueWrap: true }}
                 />
               </KpiRow>
 
@@ -745,7 +745,7 @@ function accountingMetrics(
   const revenue: MetricDetail = {
     id: "accounting.revenue",
     title: A ? "الإيراد المحصّل" : "Collected revenue",
-    value: fmtUSDExact(S.paidUsd),
+    value: fmtUSDFull(S.paidUsd),
     tone: "mint",
     icon: <BadgeDollarSign size={16} />,
     definition: A
@@ -767,13 +767,13 @@ function accountingMetrics(
       {
         key: "avg",
         label: A ? "متوسط الفاتورة" : "Average invoice",
-        value: fmtUSDExact(S.averageInvoice),
+        value: fmtUSDFull(S.averageInvoice),
       },
       { key: "lines", label: A ? "بنود المنتجات" : "Product lines", value: fmtNum(S.productLines) },
       {
         key: "credit",
         label: A ? "إشعارات خصم" : "Credit notes",
-        value: fmtUSDExact(S.creditNoteUsd),
+        value: fmtUSDFull(S.creditNoteUsd),
       },
     ],
     breakdowns: [
