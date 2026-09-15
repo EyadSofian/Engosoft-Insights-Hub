@@ -72,7 +72,15 @@ export const Route = createFileRoute("/api/media-plan-activity")({
             activeAds: state?.activeAds ?? 0,
             checkedAt: state?.checkedAt || "",
             spend: period?.spend ?? 0,
-            platformLeads: row.platformLeads,
+            // The operational state is intentionally live and can carry a
+            // recent/24h lead value. Activity is a selected-month report, so
+            // use the period aggregate first; falling back to the row keeps
+            // older snapshots readable without changing the date contract.
+            // A selected-month aggregate is authoritative even when its
+            // platform field is null. Falling back here would leak the live/24h
+            // row into a September plan report and turn "no source" into a
+            // misleading month total.
+            platformLeads: period ? period.platformLeads : row.platformLeads,
             crmLeads: period?.crmLeads ?? 0,
             won: period?.won ?? 0,
             revenueUsd: period?.revenue ?? 0,

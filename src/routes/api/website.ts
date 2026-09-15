@@ -461,6 +461,7 @@ export const Route = createFileRoute("/api/website")({
         return json({
           totals: {
             leads: crm.length + lost.length,
+            qualified: crm.filter((lead) => lead.readyToConvert).length,
             won: won.length,
             lost: lost.length,
             open: open.length,

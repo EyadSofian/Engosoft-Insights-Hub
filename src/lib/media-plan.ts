@@ -1,5 +1,31 @@
 export type MediaPlanStatus = "approved" | "draft";
 
+export type MediaPlanDeliverableCategory =
+  "website" | "paid_media" | "landing_page" | "webinar" | "creative" | "organic" | "other";
+
+export type MediaPlanDeliverableMetric =
+  | "leads"
+  | "visits"
+  | "submissions"
+  | "campaigns"
+  | "creatives"
+  | "videos"
+  | "posts"
+  | "registrations"
+  | "custom";
+
+/** A management promise with a canonical source for its actual value. */
+export interface MediaPlanDeliverable {
+  key: string;
+  label: string;
+  category: MediaPlanDeliverableCategory;
+  metric: MediaPlanDeliverableMetric;
+  target: number;
+  unit: string;
+  actualSource: string;
+  matchTerms?: string[];
+}
+
 export interface MediaPlanCourseTarget {
   /** Stable editor id. Custom courses are allowed for future monthly plans. */
   key: string;
@@ -15,6 +41,12 @@ export interface MediaPlanActivityBudget {
   key: string;
   label: string;
   budgetUsd: number;
+  /** Optional delivery promise; legacy budget-only activities remain valid. */
+  category?: MediaPlanDeliverableCategory;
+  metric?: MediaPlanDeliverableMetric;
+  target?: number;
+  unit?: string;
+  actualSource?: string;
   matchTerms?: string[];
 }
 
@@ -63,14 +95,34 @@ const ADDITIONAL_ACTIVITIES: MediaPlanActivityBudget[] = [
     key: "website",
     label: "Website campaigns",
     budgetUsd: 3_000,
+    category: "website",
+    metric: "leads",
+    target: 200,
+    unit: "leads",
+    actualSource: "website_crm_leads",
     matchTerms: ["web", "website", "web con", "web sign", "signup"],
   },
-  { key: "webinar", label: "Webinar promotion", budgetUsd: 500, matchTerms: ["webinar"] },
+  {
+    key: "webinar",
+    label: "Webinar promotion",
+    budgetUsd: 500,
+    category: "webinar",
+    metric: "leads",
+    target: 1_000,
+    unit: "leads",
+    actualSource: "webinar_crm_leads",
+    matchTerms: ["webinar"],
+  },
   { key: "youtube", label: "YouTube", budgetUsd: 250, matchTerms: ["youtube"] },
   {
     key: "branding",
     label: "Social media branding",
     budgetUsd: 250,
+    category: "creative",
+    metric: "creatives",
+    target: 25,
+    unit: "creatives",
+    actualSource: "creative_catalog",
     matchTerms: ["branding", "awareness"],
   },
 ];
@@ -300,6 +352,23 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
         key,
         label: shortText(row.label, `Activity ${index + 1} label`, 100),
         budgetUsd: boundedNumber(row.budgetUsd, `Activity ${index + 1} budget`, 100_000_000),
+        ...(typeof row.category === "string"
+          ? { category: row.category as MediaPlanDeliverableCategory }
+          : {}),
+        ...(typeof row.metric === "string"
+          ? { metric: row.metric as MediaPlanDeliverableMetric }
+          : {}),
+        ...(row.target !== undefined
+          ? { target: boundedNumber(row.target, `Activity ${index + 1} target`, 10_000_000) }
+          : {}),
+        ...(row.unit !== undefined
+          ? { unit: shortText(row.unit, `Activity ${index + 1} unit`, 40, false) }
+          : {}),
+        ...(row.actualSource !== undefined
+          ? {
+              actualSource: shortText(row.actualSource, `Activity ${index + 1} actual source`, 120),
+            }
+          : {}),
         matchTerms: Array.isArray(row.matchTerms)
           ? stringList(row.matchTerms, `Activity ${index + 1} match terms`, 20)
           : [],

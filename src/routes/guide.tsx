@@ -193,8 +193,8 @@ function GuidePage() {
           }
           description={
             ar
-              ? "مركز إدارة العملاء يعرض كل الـstages والـOpen Status والـWon والـLost حسب CRM 1.26. تحليل الـLost يمشي بتاريخ إنشاء الليد للكوهورت، ومعه حركة مستقلة بتاريخ الخسارة المناسب لكل نوع سجل."
-              : "The CRM command center shows every stage, Open Status, Won and CRM 1.26 Lost. Lost analysis follows creation date for cohort quality and keeps a separate movement view using the correct loss date for each record type."
+              ? "إدارة العملاء والـ CRM تعرض كل الـstages والـOpen Status والـWon والـLost حسب CRM 1.26. تحليل الـLost يمشي بتاريخ إنشاء الليد للكوهورت، ومعه حركة مستقلة بتاريخ الخسارة المناسب لكل نوع سجل."
+              : "CRM & Customer Management shows every stage, Open Status, Won and CRM 1.26 Lost. Lost analysis follows creation date for cohort quality and keeps a separate movement view using the correct loss date for each record type."
           }
           to="/lost"
         >

@@ -95,6 +95,7 @@ interface MediaPlanResponse {
     salesAchievement: number | null;
   };
   courses: CourseRow[];
+  deliverables: DeliverableRow[];
   unplanned: {
     course: string;
     spend: number;
@@ -113,6 +114,31 @@ interface MediaPlanResponse {
   };
   storeError: string;
   sources: string[];
+}
+
+interface DeliverableRow {
+  key: string;
+  label: string;
+  category:
+    "website" | "paid_media" | "landing_page" | "webinar" | "creative" | "organic" | "other";
+  metric:
+    | "leads"
+    | "visits"
+    | "submissions"
+    | "campaigns"
+    | "creatives"
+    | "videos"
+    | "posts"
+    | "registrations"
+    | "custom";
+  target: number;
+  unit: string;
+  actual: number | null;
+  connected: boolean;
+  actualSource: string;
+  dateScope: string;
+  matchingRule: string;
+  reportTo: string;
 }
 
 const ratioPct = (value: number | null): string => (value === null ? "—" : fmtPct(value * 100, 1));
@@ -422,6 +448,7 @@ function MediaPlanPage() {
   // same plan the manager has selected instead of silently defaulting to now.
   useRegisterNexusView("media_plan", { parameters: { month } });
   const [editor, setEditor] = useState<"edit" | "create" | null>(null);
+  const [showCampaignDelivery, setShowCampaignDelivery] = useState(false);
   const { data, isLoading, error, refetch } = useApi<MediaPlanResponse>(
     `/api/media-plan?month=${month}`,
   );
@@ -437,7 +464,7 @@ function MediaPlanPage() {
         <DashboardPageHeader
           flush
           icon={<CalendarRange size={20} />}
-          title={lang === "ar" ? "خطة الميديا الشهرية" : "Monthly media plan"}
+          title={`${lang === "ar" ? "خطة" : "Plan"} · ${monthName(month, lang)}`}
           subtitle={
             lang === "ar"
               ? "لوحة واحدة تربط التارجت بالصرف والليدز الفعلية لكل دورة ومسؤول."
@@ -578,58 +605,49 @@ function MediaPlanPage() {
 
           {!!data.storeError && <Notice tone="warning">{data.storeError}</Notice>}
 
-          <MediaPlanActivityPanel month={data.plan.month} />
+          <PlanDeliverySection
+            deliverables={data.deliverables}
+            elapsed={data.window.elapsed}
+            phase={data.window.phase}
+            lang={lang}
+          />
 
-          <Card className="overflow-hidden">
-            <SectionTitle
-              hint={
-                lang === "ar"
-                  ? "المطلوب حتى اليوم محسوب حسب نسبة الأيام المنقضية من الشهر، وليس التارجت الكامل من أول يوم."
-                  : "Expected-to-date uses elapsed calendar days, not the entire monthly target from day one."
-              }
-              action={
-                <Pill tone={data.window.phase === "active" ? "brand" : "neutral"}>
-                  {data.window.phase === "upcoming"
-                    ? lang === "ar"
-                      ? "لم يبدأ الشهر"
-                      : "Month not started"
-                    : data.window.phase === "complete"
-                      ? lang === "ar"
-                        ? "الشهر مكتمل"
-                        : "Month complete"
-                      : `${ratioPct(data.window.elapsed)} ${lang === "ar" ? "من الشهر" : "elapsed"}`}
-                </Pill>
-              }
-            >
-              {lang === "ar" ? "المطلوب مقابل المتحقق" : "Plan versus actual"}
-            </SectionTitle>
-            <div className="card-grid lg:grid-cols-3">
-              <ProgressRail
-                label={lang === "ar" ? "ليدز الحملات المدفوعة" : "Paid campaign leads"}
-                actual={fmtNum(data.actual.targetedLeads)}
-                target={fmtNum(data.plan.paidLeadTarget)}
-                ratio={data.actual.paidLeadAchievement}
-                expected={data.window.elapsed}
-                accent="#1d6fdc"
-              />
-              <ProgressRail
-                label={lang === "ar" ? "Organic + Webinar" : "Organic + Webinar"}
-                actual={fmtNum(data.actual.organicWebinarLeads)}
-                target={fmtNum(data.plan.organicWebinarLeadTarget)}
-                ratio={data.actual.organicAchievement}
-                expected={data.window.elapsed}
-                accent="#159a78"
-              />
-              <ProgressRail
-                label={lang === "ar" ? "المبيعات المحصلة" : "Collected sales"}
-                actual={fmtUSDFull(data.actual.revenueUsd)}
-                target={fmtUSDFull(data.plan.salesTargetUsd)}
-                ratio={data.actual.salesAchievement}
-                expected={data.window.elapsed}
-                accent="#e59318"
-              />
+          <NeedsAttention
+            deliverables={data.deliverables}
+            elapsed={data.window.elapsed}
+            lang={lang}
+          />
+
+          <Card className="border-dashed border-brand/25 bg-brand-soft/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-text">
+                  {lang === "ar" ? "تفاصيل تنفيذ الحملات" : "Detailed campaign delivery"}
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  {lang === "ar"
+                    ? "حالة التشغيل الرسمية والجدول التفصيلي متاحان عند الحاجة، خارج التدفق الإداري الرئيسي."
+                    : "Official platform state and the full campaign table are available when needed, outside the main management flow."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCampaignDelivery((open) => !open)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-3 text-xs font-bold text-white"
+              >
+                {showCampaignDelivery
+                  ? lang === "ar"
+                    ? "إخفاء التفاصيل"
+                    : "Hide details"
+                  : lang === "ar"
+                    ? "عرض تفاصيل الحملات"
+                    : "View campaign delivery"}
+                <ArrowUpRight size={14} />
+              </button>
             </div>
           </Card>
+
+          {showCampaignDelivery && <MediaPlanActivityPanel month={data.plan.month} />}
 
           <Card padded={false} className="overflow-hidden">
             <div className="p-4 sm:p-5">
@@ -825,6 +843,235 @@ function ProgressRail({
         </span>
       </div>
     </div>
+  );
+}
+
+function PlanDeliverySection({
+  deliverables,
+  elapsed,
+  phase,
+  lang,
+}: {
+  deliverables: DeliverableRow[];
+  elapsed: number;
+  phase: PlanPhase;
+  lang: "ar" | "en";
+}) {
+  return (
+    <Card className="overflow-hidden border-brand/15">
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? "ما طُلب من الفريق مقابل ما تم تنفيذه فعلًا، مع مراعاة نسبة الشهر المنقضية."
+            : "What the team was asked to deliver versus what is done, paced against the elapsed month."
+        }
+        action={
+          <Pill tone={phase === "active" ? "brand" : "neutral"}>
+            {phase === "upcoming"
+              ? lang === "ar"
+                ? "لم يبدأ الشهر"
+                : "Month not started"
+              : `${fmtPct(elapsed * 100, 0)} ${lang === "ar" ? "من الشهر" : "of month"}`}
+          </Pill>
+        }
+      >
+        {lang === "ar" ? "تنفيذ خطة الشهر" : "Monthly Plan Delivery"}
+      </SectionTitle>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {deliverables.map((row, index) => (
+          <DeliverableCard key={row.key} row={row} elapsed={elapsed} lang={lang} index={index} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function NeedsAttention({
+  deliverables,
+  elapsed,
+  lang,
+}: {
+  deliverables: DeliverableRow[];
+  elapsed: number;
+  lang: "ar" | "en";
+}) {
+  const priority = { not_connected: 0, not_started: 1, behind: 2 } as const;
+  const rows = deliverables
+    .map((row, index) => ({
+      row,
+      index,
+      status: deliverableStatus(row.actual, row.target, elapsed, row.connected),
+    }))
+    .filter(({ status }) => status in priority)
+    .sort(
+      (a, b) =>
+        priority[a.status as keyof typeof priority] - priority[b.status as keyof typeof priority],
+    )
+    .slice(0, 3);
+
+  return (
+    <Card className="border-amber-border/70 bg-amber-surface/35">
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? "أقصى ثلاثة عناصر تحتاج قرارًا أو توصيل مصدر بيانات."
+            : "Up to three items that need a decision or a connected source."
+        }
+      >
+        {lang === "ar" ? "تحتاج انتباه" : "Needs attention"}
+      </SectionTitle>
+      {rows.length === 0 ? (
+        <p className="text-sm font-semibold text-mint-ink">
+          {lang === "ar"
+            ? "كل التسليمات المتصلة على المسار أو مكتملة."
+            : "All connected deliverables are on track or complete."}
+        </p>
+      ) : (
+        <div className="grid gap-2 md:grid-cols-3">
+          {rows.map(({ row, status }) => (
+            <Link
+              key={row.key}
+              to={row.reportTo as never}
+              className="rounded-xl border border-amber-border/60 bg-surface px-3 py-2.5 transition-colors hover:border-brand/40"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-xs font-bold text-text">{row.label}</span>
+                <span className="shrink-0 text-[10px] font-bold text-amber-ink">
+                  {deliverableStatusLabel(status, lang)}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {row.actual === null || !row.connected
+                  ? lang === "ar"
+                    ? "المصدر غير متصل"
+                    : "Source not connected"
+                  : `${fmtNum(row.actual)} / ${fmtNum(row.target)} ${row.unit}`}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+const DELIVERABLE_TONES = [
+  { strong: "var(--sky-strong)", surface: "var(--sky-surface)", ink: "var(--sky-ink)" },
+  { strong: "var(--violet-strong)", surface: "var(--violet-surface)", ink: "var(--violet-ink)" },
+  { strong: "var(--amber-strong)", surface: "var(--amber-surface)", ink: "var(--amber-ink)" },
+  { strong: "var(--mint-strong)", surface: "var(--mint-surface)", ink: "var(--mint-ink)" },
+  { strong: "var(--rose-strong)", surface: "var(--rose-surface)", ink: "var(--rose-ink)" },
+];
+
+function deliverableStatus(
+  actual: number | null,
+  target: number,
+  elapsed: number,
+  connected: boolean,
+) {
+  if (!connected || actual === null) return "not_connected";
+  if (actual >= target && target > 0) return "complete";
+  if (actual <= 0) return "not_started";
+  const achievement = target > 0 ? actual / target : 0;
+  if (achievement >= elapsed + 0.05) return "ahead";
+  if (achievement + 0.05 < elapsed) return "behind";
+  return "on_track";
+}
+
+function deliverableStatusLabel(status: string, lang: "ar" | "en") {
+  const labels: Record<string, { ar: string; en: string }> = {
+    ahead: { ar: "متقدم", en: "Ahead" },
+    on_track: { ar: "على المسار", en: "On track" },
+    behind: { ar: "متأخر", en: "Behind" },
+    not_started: { ar: "لم يبدأ", en: "Not started" },
+    complete: { ar: "مكتمل", en: "Complete" },
+    not_connected: { ar: "غير متصل", en: "Not connected" },
+  };
+  return labels[status]?.[lang] ?? status;
+}
+
+function DeliverableCard({
+  row,
+  elapsed,
+  lang,
+  index,
+}: {
+  row: DeliverableRow;
+  elapsed: number;
+  lang: "ar" | "en";
+  index: number;
+}) {
+  const tone = DELIVERABLE_TONES[index % DELIVERABLE_TONES.length];
+  const actual = row.actual;
+  const achievement = actual !== null && row.target > 0 ? actual / row.target : null;
+  const status = deliverableStatus(actual, row.target, elapsed, row.connected);
+  const remaining = actual === null ? null : Math.max(0, row.target - actual);
+  const label =
+    row.key === "website" ? (lang === "ar" ? "ليدز الموقع" : "Website leads") : row.label;
+
+  return (
+    <Link
+      to={row.reportTo as never}
+      className="group rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md"
+      style={{ borderTopColor: tone.strong, borderTopWidth: 3 }}
+      title={`${row.actualSource} · ${row.dateScope}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div
+            className="text-[11px] font-bold uppercase tracking-[0.08em]"
+            style={{ color: tone.ink }}
+          >
+            {label}
+          </div>
+          <div className="mt-2 text-xs text-text-muted">{lang === "ar" ? "التارجت" : "Target"}</div>
+          <div className="num mt-0.5 text-2xl font-black tracking-tight text-text">
+            {fmtNum(row.target)}{" "}
+            <span className="text-xs font-semibold text-text-muted">{row.unit}</span>
+          </div>
+        </div>
+        <span
+          className="rounded-full px-2 py-1 text-[10px] font-bold"
+          style={{ background: tone.surface, color: tone.ink }}
+        >
+          {deliverableStatusLabel(status, lang)}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <div className="text-xs text-text-muted">{lang === "ar" ? "الفعلي" : "Actual"}</div>
+          <div className="num mt-0.5 text-xl font-bold text-text">
+            {actual === null || !row.connected ? "—" : fmtNum(actual)}
+          </div>
+        </div>
+        <div className="text-end">
+          <div className="text-xs text-text-muted">{lang === "ar" ? "الإنجاز" : "Achievement"}</div>
+          <div className="num mt-0.5 text-lg font-bold" style={{ color: tone.ink }}>
+            {achievement === null ? "—" : fmtPct(achievement * 100, 1)}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
+        <div
+          className="h-full rounded-full transition-[width] duration-700"
+          style={{ width: barWidth(achievement), background: tone.strong }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-text-subtle">
+        <span>
+          {remaining === null
+            ? lang === "ar"
+              ? "لا يوجد مصدر موصل"
+              : "No source connected"
+            : `${fmtNum(remaining)} ${lang === "ar" ? "متبقي" : "remaining"}`}
+        </span>
+        <span className="font-semibold group-hover:text-brand">
+          {lang === "ar" ? "فتح التقرير ↗" : "View report ↗"}
+        </span>
+      </div>
+    </Link>
   );
 }
 

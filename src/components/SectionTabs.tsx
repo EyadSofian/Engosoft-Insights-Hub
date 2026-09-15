@@ -35,6 +35,7 @@ export function SectionTabs() {
   const section = sectionForLocation(pathname, search);
   const ref = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Anything stacking below this strip — a page's own tab bar — needs its
   // height, and that height is zero on the pages and breakpoints where the
@@ -140,30 +141,96 @@ export function SectionTabs() {
             </Popover>
           </div>
         ) : (
-          <div className="hscroll flex min-w-0 flex-1 items-stretch gap-1">
-            {section.items.map((item, index) => {
-              const active = itemIsActive(item, pathname, search);
-              const Icon = item.icon;
+          <>
+            <div className="hscroll hidden min-w-0 flex-1 items-stretch gap-1 sm:flex">
+              {section.items.map((item, index) => {
+                const active = itemIsActive(item, pathname, search);
+                const Icon = item.icon;
 
-              return (
-                <Link
-                  key={`${item.to}:${index}`}
-                  to={item.to}
-                  search={item.search as never}
-                  activeOptions={{ exact: true, includeSearch: true }}
-                  aria-current={active ? "page" : undefined}
-                  className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
-                    active
-                      ? "border-brand bg-brand text-white shadow-sm"
-                      : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
-                  }`}
+                return (
+                  <Link
+                    key={`${item.to}:${index}`}
+                    to={item.to}
+                    search={item.search as never}
+                    activeOptions={{ exact: true, includeSearch: true }}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
+                      active
+                        ? "border-brand bg-brand text-white shadow-sm"
+                        : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+                    }`}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+                    <span>{itemLabel(item, lang, t)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="flex min-w-0 flex-1 items-center py-1.5 sm:hidden">
+              <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-semibold text-text"
+                    aria-label={lang === "ar" ? "تغيير مساحة العمل" : "Switch workspace"}
+                  >
+                    {(() => {
+                      const current = section.items.find((item) =>
+                        itemIsActive(item, pathname, search),
+                      );
+                      const Icon = current?.icon;
+                      return (
+                        <>
+                          {Icon && (
+                            <Icon size={15} className="shrink-0 text-brand" aria-hidden="true" />
+                          )}
+                          <span className="truncate">
+                            {current ? itemLabel(current, lang, t) : section.label[lang]}
+                          </span>
+                        </>
+                      );
+                    })()}
+                    <ChevronDown
+                      size={15}
+                      className="shrink-0 text-text-muted"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-[min(20rem,calc(100vw-2rem))] rounded-xl p-2"
+                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
-                  <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
-                  <span>{itemLabel(item, lang, t)}</span>
-                </Link>
-              );
-            })}
-          </div>
+                  <div className="grid gap-1">
+                    {section.items.map((item, index) => {
+                      const active = itemIsActive(item, pathname, search);
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={`${item.to}:mobile:${index}`}
+                          to={item.to}
+                          search={item.search as never}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${
+                            active
+                              ? "bg-brand text-white"
+                              : "text-text-muted hover:bg-surface-2 hover:text-text"
+                          }`}
+                        >
+                          <Icon size={16} aria-hidden="true" />
+                          <span>{itemLabel(item, lang, t)}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </>
         )}
       </div>
     </nav>

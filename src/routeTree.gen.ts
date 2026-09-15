@@ -16,6 +16,7 @@ import { Route as AdsRouteImport } from './routes/ads'
 import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
+import { Route as CreativesRouteImport } from './routes/creatives'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LandingPagesRouteImport } from './routes/landing-pages'
@@ -152,6 +153,11 @@ const CampaignsRoute = CampaignsRouteImport.update({
 const CoursesRoute = CoursesRouteImport.update({
   id: '/courses',
   path: '/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreativesRoute = CreativesRouteImport.update({
+  id: '/creatives',
+  path: '/creatives',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FullInvoicedRoute = FullInvoicedRouteImport.update({
@@ -691,6 +697,7 @@ export interface FileRoutesByFullPath {
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -802,6 +809,7 @@ export interface FileRoutesByTo {
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -914,6 +922,7 @@ export interface FileRoutesById {
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -1027,6 +1036,7 @@ export interface FileRouteTypes {
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1138,6 +1148,7 @@ export interface FileRouteTypes {
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1249,6 +1260,7 @@ export interface FileRouteTypes {
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1361,6 +1373,7 @@ export interface RootRouteChildren {
   AttributionRoute: typeof AttributionRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
+  CreativesRoute: typeof CreativesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
   LandingPagesRoute: typeof LandingPagesRoute
@@ -1514,6 +1527,13 @@ declare module '@tanstack/react-router' {
       path: '/courses'
       fullPath: '/courses'
       preLoaderRoute: typeof CoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creatives': {
+      id: '/creatives'
+      path: '/creatives'
+      fullPath: '/creatives'
+      preLoaderRoute: typeof CreativesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/full-invoiced': {
@@ -2241,6 +2261,7 @@ const rootRouteChildren: RootRouteChildren = {
   AttributionRoute: AttributionRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
+  CreativesRoute: CreativesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
   LandingPagesRoute: LandingPagesRoute,

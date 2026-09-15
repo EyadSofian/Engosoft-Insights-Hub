@@ -676,6 +676,8 @@ export interface CampaignOperationalState {
 /** Business result attributed to a currently eligible campaign inside the selected date filter. */
 export interface CampaignPeriodSummary {
   spend: number;
+  /** Platform-reported lead total inside the selected reporting window. */
+  platformLeads: number | null;
   /** Active non-Lost CRM rows attributed to this campaign. */
   crmLeads: number;
   /** Canonical Lost rows attributed to this campaign in the selected period. */

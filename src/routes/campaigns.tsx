@@ -1,6 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import {
+  Activity,
   BarChart3,
   CircleDollarSign,
   Megaphone,
@@ -68,6 +70,72 @@ interface Resp {
   activity: CampaignActivity;
   unknownAdsetKey: string;
   health: DataHealth;
+}
+
+interface WebsiteChannelData {
+  totals?: { leads: number; won: number; sales: number };
+}
+
+const CHANNEL_TONES = [
+  { accent: "var(--sky-strong)", surface: "var(--sky-surface)" },
+  { accent: "var(--mint-strong)", surface: "var(--mint-surface)" },
+  { accent: "var(--violet-strong)", surface: "var(--violet-surface)" },
+  { accent: "var(--amber-strong)", surface: "var(--amber-surface)" },
+  { accent: "var(--rose-strong)", surface: "var(--rose-surface)" },
+  { accent: "var(--sky-strong)", surface: "var(--sky-surface)" },
+] as const;
+
+function ChannelCard({
+  label,
+  icon,
+  to,
+  value,
+  detail,
+  connected,
+  index,
+  lang,
+}: {
+  label: string;
+  icon: ReactNode;
+  to: string;
+  value: string;
+  detail: string;
+  connected: boolean;
+  index: number;
+  lang: "ar" | "en";
+}) {
+  const tone = CHANNEL_TONES[index % CHANNEL_TONES.length];
+  return (
+    <Link to={to as never} className="block min-w-0">
+      <Card
+        className="h-full overflow-hidden border-border/80 p-3 transition-transform hover:-translate-y-0.5"
+        style={{ borderTop: `3px solid ${tone.accent}` }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span
+            className="grid size-8 place-items-center rounded-xl"
+            style={{ background: tone.surface, color: tone.accent }}
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+          <span className="text-[11px] font-bold text-text-subtle">↗</span>
+        </div>
+        <p className="mt-3 truncate text-[12px] font-bold text-text" title={label}>
+          {label}
+        </p>
+        <p className="mt-1 text-lg font-black tracking-tight text-text">{value}</p>
+        <p className={`mt-1 text-[10.5px] ${connected ? "text-text-muted" : "text-text-subtle"}`}>
+          {detail}
+        </p>
+        {!connected && (
+          <p className="mt-2 text-[10px] font-semibold text-text-subtle">
+            {lang === "ar" ? "المصدر غير متصل" : "Source not connected"}
+          </p>
+        )}
+      </Card>
+    </Link>
+  );
 }
 
 /**
@@ -197,6 +265,7 @@ function Campaigns() {
   // have something to resolve against. Ids and state only — no figures.
   useRegisterNexusView("campaigns", { tab: "decision" });
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
+  const { data: websiteChannelData } = useApi<WebsiteChannelData>("/api/website");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -204,6 +273,10 @@ function Campaigns() {
   const totals = data?.totals;
   const spend = totals?.spend ?? 0;
   const headline = campaignHeadlines(data?.rows ?? []);
+  const metaRows = data?.rows.filter((row) => row.platforms.includes("meta")) ?? [];
+  const metaLeads = metaRows.reduce((sum, row) => sum + (row.platformLeads ?? 0), 0);
+  const websiteLeads = websiteChannelData?.totals?.leads ?? null;
+  const websiteWon = websiteChannelData?.totals?.won ?? null;
   const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
   // Built from the response already on screen — the drill-down never re-queries
   // and so can never disagree with the card that opened it.
@@ -274,7 +347,7 @@ function Campaigns() {
       <DashboardPageHeader
         flush
         icon={<Megaphone size={20} />}
-        title={t("campaigns")}
+        title={lang === "ar" ? "نظرة عامة على التسويق" : "Marketing Overview"}
         subtitle={
           lang === "ar"
             ? "أداء حملاتك التسويقية عبر جميع القنوات"
@@ -290,6 +363,88 @@ function Campaigns() {
           aria-label={lang === "ar" ? "مؤشرات الفترة" : "Period figures"}
         >
           <FilterSummary />
+
+          <div className="mt-4">
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "نظرة سريعة على القنوات؛ افتح أي بطاقة للتفاصيل."
+                  : "A compact view of the channels; open a card for its report."
+              }
+            >
+              {lang === "ar" ? "ملخص القنوات" : "Channel summary"}
+            </SectionTitle>
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <ChannelCard
+                label="Meta Ads"
+                icon={<Megaphone size={15} />}
+                to="/ads"
+                value={data ? fmtNum(metaLeads) : "—"}
+                detail={lang === "ar" ? "ليدز أبلغت عنها المنصة" : "platform-reported leads"}
+                connected={Boolean(data)}
+                index={0}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Website"
+                icon={<TrendingUp size={15} />}
+                to="/website"
+                value={websiteLeads === null ? "—" : fmtNum(websiteLeads)}
+                detail={
+                  websiteWon === null
+                    ? lang === "ar"
+                      ? "ليدز من مصدر Website"
+                      : "leads from CRM source Website"
+                    : lang === "ar"
+                      ? `${fmtNum(websiteWon)} رابحة`
+                      : `${fmtNum(websiteWon)} won`
+                }
+                connected={websiteLeads !== null}
+                index={1}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Landing Pages"
+                icon={<Target size={15} />}
+                to="/landing-pages"
+                value="—"
+                detail={lang === "ar" ? "التسليم التفصيلي" : "delivery detail"}
+                connected={false}
+                index={2}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Lead Forms"
+                icon={<Users size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "نماذج Meta" : "Meta forms"}
+                connected={false}
+                index={3}
+                lang={lang}
+              />
+              <ChannelCard
+                label="WhatsApp"
+                icon={<Activity size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "مصدر الرسائل" : "message source"}
+                connected={false}
+                index={4}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Messenger"
+                icon={<BarChart3 size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "مصدر الرسائل" : "message source"}
+                connected={false}
+                index={5}
+                lang={lang}
+              />
+            </div>
+          </div>
 
           {/* The period's five figures, and the three readings of it worth
               acting on. Both describe the selected window rather than any one

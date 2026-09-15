@@ -116,6 +116,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         matches: (search) => acquisitionSection(search) === "ads",
       },
       {
+        to: "/website",
+        key: "website",
+        icon: Globe2,
+        tabLabel: { ar: "الموقع الإلكتروني", en: "Website" },
+      },
+      {
         to: "/acquisition",
         key: "acquisition_performance",
         icon: Users,
@@ -124,11 +130,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         matches: (search) => acquisitionSection(search) === "leads",
       },
     ],
+    aliases: ["/attribution", "/landing-pages"],
   },
   {
     id: "sales-crm",
-    label: { ar: "المبيعات والعملاء", en: "Sales & CRM" },
-    shortLabel: { ar: "المبيعات", en: "Sales & CRM" },
+    label: { ar: "إدارة العملاء والـ CRM", en: "CRM & Customer Management" },
+    shortLabel: { ar: "إدارة العملاء", en: "CRM" },
     icon: Users,
     defaultTo: "/leads",
     contextual: "tabs",
@@ -224,13 +231,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         description: { ar: "أداء كل صفحة هبوط", en: "Performance of each landing page" },
       },
       {
-        to: "/website",
-        key: "website",
-        icon: Globe2,
-        tabLabel: { ar: "تتبع الموقع", en: "Website tracking" },
-        description: { ar: "زيارات وتحويلات الموقع", en: "Website visits and conversions" },
-      },
-      {
         to: "/acquisition",
         key: "acquisition_performance",
         icon: ShieldCheck,
@@ -265,7 +265,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         to: "/media-plan",
         key: "media_plan",
         icon: CalendarRange,
-        tabLabel: { ar: "الخطة الإعلامية", en: "Media plan" },
+        tabLabel: { ar: "خطة الميديا", en: "Media Plan" },
         description: { ar: "الميزانية المخططة مقابل الفعلي", en: "Planned budget against actual" },
       },
       {

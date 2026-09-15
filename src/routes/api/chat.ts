@@ -257,8 +257,8 @@ export const Route = createFileRoute("/api/chat")({
           }
           if (has("فين الليدز", "الليدز منين", "أجيب الليدز", "اجيب الليدز", "where are leads")) {
             return ar
-              ? "افتح **مركز إدارة العملاء** من [هنا](/leads). هتلاقي كل الـstages والـOpen Status والـWon والـLost بتعريف CRM 1.26، والتحليل المتقدم للخسائر في [تحليل الخسائر](/lost)."
-              : "Open the **CRM command center** [here](/leads) for every stage, Open Status, Won and CRM 1.26 Lost; advanced loss analysis is [here](/lost).";
+              ? "افتح **إدارة العملاء والـ CRM** من [هنا](/leads). هتلاقي كل الـstages والـOpen Status والـWon والـLost بتعريف CRM 1.26، والتحليل المتقدم للخسائر في [تحليل الخسائر](/lost)."
+              : "Open **CRM & Customer Management** [here](/leads) for every stage, Open Status, Won and CRM 1.26 Lost; advanced loss analysis is [here](/lost).";
           }
           if (
             has("فين الدورات", "الدورات منين", "أجيب الدورات", "اجيب الدورات", "where are courses")
@@ -307,7 +307,7 @@ export const Route = createFileRoute("/api/chat")({
             cpa: "total ad spend ÷ won deals.",
             lost: "CRM 1.26: Lost Lead = inactive with Lost Reason; current Lost Opportunity = active in the XMLID-resolved Lost stage; archived Opportunity history is retained.",
             navigation:
-              "Business analytics: /. Campaigns: /campaigns. Sales and paid invoices: /accounting. Courses: /courses. CRM command center: /leads. Lost analysis: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Monthly media plan: /media-plan. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
+              "Business analytics: /. Marketing: /campaigns. Revenue and paid invoices: /accounting. Courses: /courses. CRM & Customer Management: /leads. Lost analysis: /lost. Comparisons: /weekend and /yoy. Website: /website. Media buyers: /media-buyers. Monthly media plan: /media-plan. Social media and moderation: /social-media. Organic: /organic. Full user guide: /guide.",
             revenue: "Accounting.USD Paid filtered by Payment Date at invoice product-line grain.",
             roas: "Accounting.USD Paid revenue ÷ total ad spend. attributedRoas uses campaign-linked Accounting revenue.",
             acos: "(spend ÷ revenue) × 100, the inverse of ROAS.",

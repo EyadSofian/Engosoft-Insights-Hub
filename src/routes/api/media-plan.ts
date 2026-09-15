@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { matchMediaPlanCourse, plannedCourseBudget } from "@/lib/media-plan";
+import {
+  matchMediaPlanCourse,
+  plannedCourseBudget,
+  type MediaPlanDeliverable,
+} from "@/lib/media-plan";
 import type { CourseAgg } from "@/lib/types";
 
 interface ActualCourse {
@@ -10,6 +14,21 @@ interface ActualCourse {
   lost: number;
   revenueUsd: number;
   invoices: number;
+}
+
+interface DeliverableDelivery {
+  key: string;
+  label: string;
+  category: MediaPlanDeliverable["category"];
+  metric: MediaPlanDeliverable["metric"];
+  target: number;
+  unit: string;
+  actual: number | null;
+  connected: boolean;
+  actualSource: string;
+  dateScope: string;
+  matchingRule: string;
+  reportTo: string;
 }
 
 const emptyActual = (): ActualCourse => ({
@@ -101,9 +120,11 @@ export const Route = createFileRoute("/api/media-plan")({
           salesperson: undefined,
         } as const;
 
-        const [data, organicData] = await Promise.all([
+        const [data, organicData, websiteData, webinarData] = await Promise.all([
           getFiltered(scopedFilters),
           getFiltered({ ...scopedFilters, channel: "organic" }),
+          getFiltered({ ...scopedFilters, source: "Website" }),
+          getFiltered({ ...scopedFilters, source: "Webinar" }),
         ]);
         const courses = computeCourses(data);
         const totals = computeTotals(data);
@@ -175,6 +196,119 @@ export const Route = createFileRoute("/api/media-plan")({
           0,
         );
 
+        const dateScope = `${window.from} → ${window.to}`;
+        const websiteLeads = computeTotals(websiteData).totalLeads;
+        const webinarLeads = computeTotals(webinarData).totalLeads;
+        const paidPlatformLeads = data.ads
+          .filter((row) => row.objective === "leads")
+          .reduce((sum, row) => sum + (row.platformLeads ?? 0), 0);
+        const sourceForDeliverable = (deliverable: {
+          actualSource?: string;
+          metric?: MediaPlanDeliverable["metric"];
+        }) => {
+          switch (deliverable.actualSource) {
+            case "website_crm_leads":
+              return {
+                actual: websiteLeads,
+                connected: true,
+                actualSource: "Odoo CRM · Source=Website",
+                matchingRule: "Source exactly equals Website; active CRM + canonical Lost rows.",
+                reportTo: "/website",
+              };
+            case "webinar_crm_leads":
+              return {
+                actual: webinarLeads,
+                connected: true,
+                actualSource: "Odoo CRM · Source=Webinar",
+                matchingRule: "Source exactly equals Webinar; active CRM + canonical Lost rows.",
+                reportTo: "/leads",
+              };
+            case "creative_catalog":
+              return {
+                actual: data.snapshot.creatives.length,
+                connected: data.snapshot.creatives.length > 0,
+                actualSource: "Canonical creative catalog",
+                matchingRule: "Creative catalog rows available in the selected plan snapshot.",
+                reportTo: "/creatives",
+              };
+            case "paid_media_platform_leads":
+              return {
+                actual: paidPlatformLeads,
+                connected: data.ads.some((row) => row.platformLeads !== null),
+                actualSource: "Paid-media platform lead fields",
+                matchingRule:
+                  "Objective=leads; sum platform-reported lead fields inside the plan window.",
+                reportTo: "/ads",
+              };
+            default:
+              return {
+                actual: null,
+                connected: false,
+                actualSource: "Not connected",
+                matchingRule: "No authoritative source configured for this deliverable.",
+                reportTo: "/media-plan",
+              };
+          }
+        };
+        const deliverables: DeliverableDelivery[] = [
+          {
+            key: "paid-media-leads",
+            label: "Paid media leads",
+            category: "paid_media",
+            metric: "leads",
+            target: plan.paidLeadTarget,
+            unit: "leads",
+            actual: targetedLeads,
+            connected: data.ads.some((row) => row.platformLeads !== null),
+            actualSource: "Course-attributed paid delivery",
+            dateScope,
+            matchingRule:
+              "Course/campaign matching from the selected plan; platform leads preferred, CRM fallback labelled below.",
+            reportTo: "/ads",
+          },
+          ...plan.courses.map((target) => {
+            const row = courseRows.find((candidate) => candidate.key === target.key);
+            return {
+              key: target.key,
+              label: target.label,
+              category: "paid_media" as const,
+              metric: "leads" as const,
+              target: target.targetLeads,
+              unit: "leads",
+              actual: row?.actual.actualLeads ?? null,
+              connected: !!row,
+              actualSource:
+                row?.actual.leadBasis === "platform"
+                  ? "Platform campaign delivery"
+                  : "CRM fallback",
+              dateScope,
+              matchingRule: "Campaign name/course aliases from the selected monthly plan.",
+              reportTo: "/campaigns",
+            };
+          }),
+          ...plan.additionalActivities
+            .filter(
+              (activity) =>
+                activity.target !== undefined &&
+                activity.category &&
+                activity.metric &&
+                activity.unit,
+            )
+            .map((activity) => {
+              const source = sourceForDeliverable(activity);
+              return {
+                key: activity.key,
+                label: activity.label,
+                category: activity.category!,
+                metric: activity.metric!,
+                target: activity.target!,
+                unit: activity.unit!,
+                ...source,
+                dateScope,
+              };
+            }),
+        ];
+
         return json({
           plan: {
             ...plan,
@@ -204,6 +338,7 @@ export const Route = createFileRoute("/api/media-plan")({
             salesAchievement: divide(totals.revenue, plan.salesTargetUsd),
           },
           courses: courseRows,
+          deliverables,
           unplanned: unplanned.sort((a, b) => b.spend - a.spend),
           availableMonths,
           editable: source.editable && writesEnabled(),

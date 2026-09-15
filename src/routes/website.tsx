@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Banknote,
+  BadgeCheck,
   BookOpen,
   CircleCheckBig,
   CircleDot,
@@ -107,6 +108,7 @@ interface WebsiteCampaignRow {
 interface Resp {
   totals: {
     leads: number;
+    qualified: number;
     won: number;
     lost: number;
     open: number;
@@ -193,6 +195,14 @@ interface Resp {
   asOf: string;
 }
 
+interface LandingSummary {
+  configured: boolean;
+  totals: { uniqueVisitors: number } | null;
+  landingPages: { landingPageName: string; views: number; submissions: number }[];
+  sources: { source: string; uniqueVisitors: number; submissions: number }[];
+  campaigns: { campaign: string; uniqueVisitors: number; submissions: number }[];
+}
+
 const fmtAmount = (value: number) =>
   value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -208,6 +218,7 @@ function websiteMetrics(
   data: Resp,
   copy: Record<string, string>,
   lang: "ar" | "en",
+  extras: { visits: number | null } = { visits: null },
 ): Record<string, MetricDetail> {
   const A = lang === "ar";
   const T = data.totals;
@@ -256,6 +267,57 @@ function websiteMetrics(
   ];
 
   return {
+    visits: {
+      id: "website.visits",
+      title: A ? "زيارات الموقع" : "Website visits",
+      value: extras.visits === null ? "—" : fmtNum(extras.visits),
+      tone: "sky",
+      icon: <MousePointerClick size={16} />,
+      definition: A
+        ? "الزوار الفريدون المسجلون في طبقة تتبع الموقع داخل الفترة؛ إذا لم تكن طبقة التتبع متصلة لا نعرض صفرًا."
+        : "Unique visitors recorded by the website attribution layer in the period; when tracking is not connected, this stays unavailable rather than becoming zero.",
+      supporting: [
+        {
+          key: "source",
+          label: A ? "المصدر" : "Source",
+          value:
+            extras.visits === null ? (A ? "غير متصل" : "Not connected") : "Landing attribution",
+        },
+      ],
+      report: {
+        to: "/landing-pages",
+        label: A ? "فتح تقرير صفحات الهبوط" : "Open landing pages report",
+      },
+    },
+    qualified: {
+      id: "website.qualified",
+      title: A ? "عملاء مؤهلون" : "Qualified leads",
+      value: fmtNum(T.qualified),
+      tone: "violet",
+      icon: <BadgeCheck size={16} />,
+      definition: A
+        ? "عملاء الموقع الذين يحملون علامة Ready to Convert المحفوظة في CRM؛ لا نعيد تعريف التأهيل من الاسم أو التخمين."
+        : "Website leads carrying the CRM's stored Ready to Convert flag; qualification is not inferred from a name or guess.",
+      formula: `${fmtNum(T.qualified)} ÷ ${fmtNum(T.leads)} = ${share(T.qualified)}`,
+      supporting: leadFacts,
+      report: {
+        to: "/leads",
+        label: A ? "فتح إدارة العملاء والـ CRM" : "Open CRM & Customer Management",
+      },
+    },
+    conversion: {
+      id: "website.conversion",
+      title: A ? "معدل التحويل" : "Conversion rate",
+      value: fmtPct(T.leads ? (T.won / T.leads) * 100 : null, 1),
+      tone: "mint",
+      icon: <Gauge size={16} />,
+      definition: A
+        ? "الصفقات الرابحة مقسومة على إجمالي عملاء الموقع في الفترة المختارة."
+        : "Won website leads divided by total website leads in the selected period.",
+      formula: `${fmtNum(T.won)} ÷ ${fmtNum(T.leads)}`,
+      supporting: leadFacts,
+      report: { to: "/website", label: A ? "فتح ملخص الموقع" : "Open Website summary" },
+    },
     leads: {
       id: "website.leads",
       title: A ? "عملاء الموقع" : "Website leads",
@@ -428,6 +490,101 @@ function websiteMetrics(
   };
 }
 
+function WebsiteManagementSources({
+  data,
+  lang,
+}: {
+  data: LandingSummary | undefined;
+  lang: "ar" | "en";
+}) {
+  const sections = [
+    {
+      title: lang === "ar" ? "أعلى صفحات الهبوط" : "Top Landing Pages",
+      rows: (data?.landingPages ?? []).slice(0, 3).map((row) => ({
+        label: row.landingPageName,
+        value: row.views,
+        detail: `${fmtNum(row.submissions)} ${lang === "ar" ? "إرسال" : "submissions"}`,
+      })),
+    },
+    {
+      title: lang === "ar" ? "مصادر الزيارات" : "Traffic Sources",
+      rows: (data?.sources ?? []).slice(0, 3).map((row) => ({
+        label: row.source || (lang === "ar" ? "مباشر" : "Direct / unset"),
+        value: row.uniqueVisitors,
+        detail: `${fmtNum(row.submissions)} ${lang === "ar" ? "إرسال" : "submissions"}`,
+      })),
+    },
+    {
+      title: lang === "ar" ? "الحملات التي تجلب الزيارات" : "Campaigns sending traffic",
+      rows: (data?.campaigns ?? []).slice(0, 3).map((row) => ({
+        label: row.campaign || (lang === "ar" ? "بدون اسم حملة" : "Unnamed campaign"),
+        value: row.uniqueVisitors,
+        detail: `${fmtNum(row.submissions)} ${lang === "ar" ? "إرسال" : "submissions"}`,
+      })),
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      {sections.map((section) => (
+        <Card key={section.title} className="border-brand/15">
+          <SectionTitle
+            hint={
+              data?.configured
+                ? lang === "ar"
+                  ? "من طبقة إسناد الموقع للفترة المختارة."
+                  : "From the website attribution layer for the selected period."
+                : lang === "ar"
+                  ? "المصدر غير متصل؛ لا نعرض صفرًا."
+                  : "Source not connected; no zero is implied."
+            }
+            action={
+              <Link to="/landing-pages" className="text-[10px] font-bold text-brand">
+                {lang === "ar" ? "فتح التقرير ↗" : "Open report ↗"}
+              </Link>
+            }
+          >
+            {section.title}
+          </SectionTitle>
+          {section.rows.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-text-subtle">
+              {data?.configured
+                ? lang === "ar"
+                  ? "لا توجد بيانات في الفترة"
+                  : "No data in this period"
+                : lang === "ar"
+                  ? "غير متصل"
+                  : "Not connected"}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {section.rows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-surface-2/55 px-3 py-2"
+                >
+                  <span
+                    className="min-w-0 truncate text-xs font-semibold text-text"
+                    title={row.label}
+                  >
+                    {row.label}
+                  </span>
+                  <span className="shrink-0 text-end">
+                    <span className="num block text-sm font-bold text-text">
+                      {fmtNum(row.value)}
+                    </span>
+                    <span className="block text-[10px] text-text-subtle">{row.detail}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 function Website() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
@@ -441,6 +598,7 @@ function Website() {
    */
   useRegisterNexusView("website", { tab: websiteTab });
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/website");
+  const { data: landingData } = useApi<LandingSummary>("/api/landing-attribution/summary");
   const copy =
     lang === "ar"
       ? {
@@ -622,7 +780,9 @@ function Website() {
 
   // One description per figure, built from the response already on screen.
   const websiteFigures = data
-    ? websiteMetrics(data, copy as unknown as Record<string, string>, lang)
+    ? websiteMetrics(data, copy as unknown as Record<string, string>, lang, {
+        visits: landingData?.totals?.uniqueVisitors ?? null,
+      })
     : ({} as ReturnType<typeof websiteMetrics>);
 
   const specialtyCols: Col<SpecialtyRow>[] = [
@@ -1053,47 +1213,66 @@ function Website() {
           <div className={websiteTab === "owner" ? "space-y-5" : "hidden"}>
             <KpiRow>
               <MetricDetailTrigger
-                detail={{ ...websiteFigures.leads, title: t("website_leads") }}
+                detail={websiteFigures.visits}
                 card={{
                   index: 0,
+                  subWrap: true,
+                  sub: landingData?.configured
+                    ? lang === "ar"
+                      ? "زوار فريدون من التتبع"
+                      : "unique visitors from tracking"
+                    : lang === "ar"
+                      ? "المصدر غير متصل"
+                      : "Source not connected",
+                }}
+              />
+              <MetricDetailTrigger
+                detail={{ ...websiteFigures.leads, title: t("website_leads") }}
+                card={{
+                  index: 1,
                   subWrap: true,
                   sub: `${fmtNum(data.leadSources.activeCrm)} ${copy.activeCrm} + ${fmtNum(data.leadSources.archivedLost)} ${copy.archivedLost}`,
                 }}
               />
               <MetricDetailTrigger
+                detail={{
+                  ...websiteFigures.qualified,
+                  title: lang === "ar" ? "عملاء مؤهلون" : "Qualified leads",
+                }}
+                card={{
+                  index: 2,
+                  subWrap: true,
+                  sub: lang === "ar" ? "Ready to Convert من CRM" : "CRM Ready to Convert",
+                }}
+              />
+              <MetricDetailTrigger
                 detail={{ ...websiteFigures.won, title: t("won") }}
                 card={{
-                  index: 1,
+                  index: 3,
                   subWrap: true,
                   sub: `${fmtPct(data.totals.leads ? (data.totals.won / data.totals.leads) * 100 : null, 1)} · ${copy.wonDefinition}`,
                 }}
               />
               <MetricDetailTrigger
-                detail={{ ...websiteFigures.lost, title: t("lost_count") }}
+                detail={{ ...websiteFigures.sales, title: lang === "ar" ? "الإيراد" : "Revenue" }}
                 card={{
-                  index: 2,
-                  subWrap: true,
-                  sub: `${fmtPct(data.totals.leads ? (data.totals.lost / data.totals.leads) * 100 : null, 1)} · ${copy.lostDefinition}`,
-                }}
-              />
-              <MetricDetailTrigger
-                detail={{ ...websiteFigures.open, title: t("open_leads") }}
-                card={{ index: 3, subWrap: true, sub: copy.openDefinition }}
-              />
-              <MetricDetailTrigger
-                detail={{ ...websiteFigures.notContacted, title: t("not_contacted") }}
-                card={{ index: 4, subWrap: true, sub: copy.notContactedDefinition }}
-              />
-              <MetricDetailTrigger
-                detail={{ ...websiteFigures.sales, title: t("website_sales") }}
-                card={{
-                  index: 5,
+                  index: 4,
                   hero: true,
                   subWrap: true,
                   sub: `${fmtNum(data.totals.salesOrders)} ${copy.orders} · ${fmtNum(data.reconciliation.odooOnlyOrders)} ${copy.odooOnlyOrders} · ${fmtNum(data.reconciliation.matchedOrders)} ${copy.matchedOrders} · ${fmtNum(data.reconciliation.externalOnlyOrders)} ${copy.externalOnlyOrders}`,
                 }}
               />
+              <MetricDetailTrigger
+                detail={websiteFigures.conversion}
+                card={{
+                  index: 5,
+                  subWrap: true,
+                  sub: lang === "ar" ? "رابحة ÷ ليدز الموقع" : "Won ÷ website leads",
+                }}
+              />
             </KpiRow>
+
+            <WebsiteManagementSources data={landingData} lang={lang} />
 
             <Card className="overflow-hidden border-brand/15">
               <SectionTitle
