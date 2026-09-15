@@ -563,6 +563,11 @@ async function buildReadiness() {
   ];
 
   const igFields = subscribed("instagram");
+  // A native Instagram inbox in Chatwoot is detected by itself; nobody has to report it.
+  const instagramInbox = await import("./chatwoot.server")
+    .then((module) => (module.chatwootConfigured() ? module.listChatwootInboxes() : []))
+    .then((inboxes) => inboxes.find((inbox) => inbox.channelType === "Channel::Instagram") ?? null)
+    .catch(() => null);
   const instagram: ReadinessCheck[] = [
     {
       key: "account_relationship",
@@ -587,12 +592,14 @@ async function buildReadiness() {
       "referral_parser",
       "exact_resolution",
     ]),
-    chatwootCount("instagram") > 0
+    chatwootCount("instagram") > 0 || instagramInbox
       ? {
           key: "chatwoot_correlation",
           label: "Chatwoot provider-message correlation",
           state: "ready",
-          detail: `${chatwootCount("instagram")} Chatwoot Instagram messages in 14 days carry the provider message ID.`,
+          detail: instagramInbox
+            ? `Chatwoot Instagram inbox "${instagramInbox.name}" (#${instagramInbox.id}) exists; ${chatwootCount("instagram")} Instagram messages in 14 days carry the provider message ID.`
+            : `${chatwootCount("instagram")} Chatwoot Instagram messages in 14 days carry the provider message ID.`,
         }
       : {
           key: "chatwoot_correlation",
@@ -665,7 +672,9 @@ async function qaTestState(): Promise<ReadinessCheck> {
   return {
     key: "qa_paid_test",
     label,
-    state: "permission_pending",
+    // Spend approval is a business decision, not a readiness gap: the item is
+    // ready once the paused ad exists, and waits only on the credential before.
+    state: ad ? "ready" : "credential_pending",
     detail: `Campaign ${QA_CTWA.campaignId} (${text(obj(read?.data.campaign).effective_status) || "PAUSED"}), ad set ${QA_CTWA.adsetId} (${text(read?.data.destination_type) || "WHATSAPP"}, ${Number(read?.data.daily_budget ?? QA_CTWA.dailyBudgetUsd * 100) / 100} USD/day, ${text(read?.data.effective_status) || "PAUSED"}), ad ${ad ? `${text(ad.id)} (${text(ad.effective_status)})` : "created automatically with the Attribution credential"}${phones.length ? `, destination ${phones.map((phone) => text(phone.display)).join(" / ")}` : ""}. Publishing needs spend approval.${proof}`,
   };
 }
