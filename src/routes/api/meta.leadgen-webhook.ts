@@ -52,6 +52,46 @@ export const Route = createFileRoute("/api/meta/leadgen-webhook")({
           return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
         }
 
+        // The Page and Instagram objects share this callback. `changes` entries
+        // carry leadgen; `messaging` entries carry Messenger / Instagram DMs and
+        // go to the message-attribution listener (attribution-only, no replies).
+        const root = (payload && typeof payload === "object" ? payload : {}) as {
+          object?: unknown;
+          entry?: unknown;
+        };
+        const hasMessaging =
+          Array.isArray(root.entry) &&
+          root.entry.some(
+            (entry) =>
+              entry &&
+              typeof entry === "object" &&
+              Array.isArray((entry as { messaging?: unknown }).messaging),
+          );
+        if (hasMessaging && (root.object === "page" || root.object === "instagram")) {
+          const { ingestMetaMessageAttributionWebhook, processPendingMetaAttributionEvents } =
+            await import("@/lib/meta-message-attribution.server");
+          try {
+            const messaging = await ingestMetaMessageAttributionWebhook({ payload, rawBody });
+            setImmediate(() => {
+              void processPendingMetaAttributionEvents().catch((error) =>
+                console.error("[meta-attribution] background processing failed", {
+                  message:
+                    error instanceof Error ? error.message.slice(0, 200) : "processing failed",
+                }),
+              );
+            });
+            if (root.object === "instagram") return Response.json({ ok: true, messaging });
+          } catch (error) {
+            console.error("[meta-attribution] durable messaging ingestion failed", {
+              message: error instanceof Error ? error.message.slice(0, 200) : "ingestion failed",
+            });
+            return Response.json(
+              { ok: false, error: "Message storage is unavailable" },
+              { status: 503 },
+            );
+          }
+        }
+
         const { ingestMetaLeadgenWebhook, processPendingMetaLeadgenEvents } =
           await import("@/lib/meta-leadgen.server");
         try {

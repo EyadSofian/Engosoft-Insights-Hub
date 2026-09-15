@@ -92,7 +92,9 @@ import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.datase
 import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
 import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
 import { Route as ApiMetaCatalogReconcileRouteImport } from './routes/api/meta.catalog-reconcile'
+import { Route as ApiMetaCredentialHealthRouteImport } from './routes/api/meta.credential-health'
 import { Route as ApiMetaLeadgenWebhookRouteImport } from './routes/api/meta.leadgen-webhook'
+import { Route as ApiMetaMessagingReadinessRouteImport } from './routes/api/meta.messaging-readiness'
 import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
@@ -544,11 +546,22 @@ const ApiMetaCatalogReconcileRoute = ApiMetaCatalogReconcileRouteImport.update({
   path: '/api/meta/catalog-reconcile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaCredentialHealthRoute = ApiMetaCredentialHealthRouteImport.update({
+  id: '/api/meta/credential-health',
+  path: '/api/meta/credential-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaLeadgenWebhookRoute = ApiMetaLeadgenWebhookRouteImport.update({
   id: '/api/meta/leadgen-webhook',
   path: '/api/meta/leadgen-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaMessagingReadinessRoute =
+  ApiMetaMessagingReadinessRouteImport.update({
+    id: '/api/meta/messaging-readiness',
+    path: '/api/meta/messaging-readiness',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMetaWhatsappAttributionWebhookRoute =
   ApiMetaWhatsappAttributionWebhookRouteImport.update({
     id: '/api/meta/whatsapp-attribution-webhook',
@@ -748,7 +761,9 @@ export interface FileRoutesByFullPath {
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -856,7 +871,9 @@ export interface FileRoutesByTo {
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -965,7 +982,9 @@ export interface FileRoutesById {
   '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
   '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
   '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
   '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -1075,7 +1094,9 @@ export interface FileRouteTypes {
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
     | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
     | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1183,7 +1204,9 @@ export interface FileRouteTypes {
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
     | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
     | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1291,7 +1314,9 @@ export interface FileRouteTypes {
     | '/api/landing-attribution/events'
     | '/api/landing-attribution/summary'
     | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
     | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1400,7 +1425,9 @@ export interface RootRouteChildren {
   ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
   ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
   ApiMetaCatalogReconcileRoute: typeof ApiMetaCatalogReconcileRoute
+  ApiMetaCredentialHealthRoute: typeof ApiMetaCredentialHealthRoute
   ApiMetaLeadgenWebhookRoute: typeof ApiMetaLeadgenWebhookRoute
+  ApiMetaMessagingReadinessRoute: typeof ApiMetaMessagingReadinessRoute
   ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
@@ -2008,11 +2035,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMetaCatalogReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/credential-health': {
+      id: '/api/meta/credential-health'
+      path: '/api/meta/credential-health'
+      fullPath: '/api/meta/credential-health'
+      preLoaderRoute: typeof ApiMetaCredentialHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/meta/leadgen-webhook': {
       id: '/api/meta/leadgen-webhook'
       path: '/api/meta/leadgen-webhook'
       fullPath: '/api/meta/leadgen-webhook'
       preLoaderRoute: typeof ApiMetaLeadgenWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/messaging-readiness': {
+      id: '/api/meta/messaging-readiness'
+      path: '/api/meta/messaging-readiness'
+      fullPath: '/api/meta/messaging-readiness'
+      preLoaderRoute: typeof ApiMetaMessagingReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta/whatsapp-attribution-webhook': {
@@ -2257,7 +2298,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
   ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
   ApiMetaCatalogReconcileRoute: ApiMetaCatalogReconcileRoute,
+  ApiMetaCredentialHealthRoute: ApiMetaCredentialHealthRoute,
   ApiMetaLeadgenWebhookRoute: ApiMetaLeadgenWebhookRoute,
+  ApiMetaMessagingReadinessRoute: ApiMetaMessagingReadinessRoute,
   ApiMetaWhatsappAttributionWebhookRoute:
     ApiMetaWhatsappAttributionWebhookRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,

@@ -14,6 +14,7 @@ import {
   useClosedLoop,
 } from "@/components/acquisition/ClosedLoop";
 import { CreativeGallery } from "@/components/acquisition/CreativeGallery";
+import { MessagingReadinessPanel } from "@/components/acquisition/MessagingReadiness";
 import {
   BestPerformers,
   CheapVersusQuality,
@@ -310,6 +311,7 @@ function Acquisition() {
                 view="technical"
                 before={<ClosedLoopCoverage data={data} loading={loading} />}
               />
+              <MessagingReadinessPanel />
               <ChatwootAttributionHealth />
               <InferredLinkAudit />
             </div>

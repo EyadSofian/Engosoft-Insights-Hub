@@ -518,3 +518,74 @@ describe("rollups", () => {
     ).toBeNull();
   });
 });
+
+describe("ambiguous inferred links", () => {
+  const conversation = (id: string, crmIds: string[]) => ({
+    acquisitionEventId: `chatwoot_conversation:${id}`,
+    entityType: "chatwoot_conversation",
+    providerLeadId: "",
+    chatwootConversationId: id,
+    chatwootContactId: id,
+    landingSubmissionId: "",
+    chatwootCrmLeadIds: crmIds,
+    occurredAt: "2026-09-10 10:00:00",
+  });
+  const record = (id: string) => ({
+    id,
+    recordType: "lead",
+    businessStatus: "open",
+    stageKey: "open",
+    openStatus: "",
+    priority: "",
+    createdAt: "2026-09-10 11:00:00",
+    facebookLeadId: "",
+    adId: "",
+    campaignId: "",
+  });
+
+  it("flags a phone key shared by several CRM records instead of choosing one", () => {
+    const links = linkAcquisitionsToCrm(
+      [conversation("1", ["A", "B"])],
+      [record("A"), record("B")],
+    );
+    expect(links.every((link) => link.matchConfidence === "ambiguous" && !link.isPrimary)).toBe(
+      true,
+    );
+    expect(links[0]!.ambiguityReason).toBe("phone_key_shared_by_several_crm_records");
+  });
+
+  it("flags a CRM record claimed by two conversations on both sides", () => {
+    const links = linkAcquisitionsToCrm(
+      [conversation("1", ["A"]), conversation("2", ["A"])],
+      [record("A")],
+    );
+    expect(links).toHaveLength(2);
+    expect(
+      links.every((link) => link.ambiguityReason === "crm_record_claimed_by_several_conversations"),
+    ).toBe(true);
+    expect(links.some((link) => link.isPrimary)).toBe(false);
+  });
+
+  it("never touches exact provider-ID links", () => {
+    const links = linkAcquisitionsToCrm(
+      [
+        {
+          acquisitionEventId: "meta_lead:1762205674919639",
+          entityType: "meta_lead",
+          providerLeadId: "1762205674919639",
+          chatwootConversationId: "",
+          chatwootContactId: "",
+          landingSubmissionId: "",
+          chatwootCrmLeadIds: [],
+          occurredAt: "2026-08-22 20:17:22",
+        },
+      ],
+      [
+        { ...record("145254"), facebookLeadId: "1762205674919639" },
+        { ...record("999"), facebookLeadId: "1762205674919639" },
+      ],
+    );
+    expect(links.filter((link) => link.isPrimary)).toHaveLength(1);
+    expect(links.every((link) => link.matchConfidence === "exact")).toBe(true);
+  });
+});

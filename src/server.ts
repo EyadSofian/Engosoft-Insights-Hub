@@ -21,6 +21,14 @@ void import("./lib/chatwoot-attribution-reconcile.server")
   .then(({ startChatwootReconcileWorker }) => startChatwootReconcileWorker())
   .catch((error) => console.error("[chatwoot-reconcile] worker bootstrap failed:", error));
 
+void import("./lib/meta-credential-health.server")
+  .then(({ startMetaCredentialWorker }) => startMetaCredentialWorker())
+  .catch((error) => console.error("[meta-credential] worker bootstrap failed:", error));
+
+void import("./lib/meta-messaging-readiness.server")
+  .then(({ startMessagingReadinessWorker }) => startMessagingReadinessWorker())
+  .catch((error) => console.error("[messaging-readiness] worker bootstrap failed:", error));
+
 void import("./lib/meta-leadgen.server")
   .then(({ startMetaLeadAdsWorker }) => startMetaLeadAdsWorker())
   .catch((error) => console.error("[meta-lead-ads] worker bootstrap failed:", error));

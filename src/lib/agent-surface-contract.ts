@@ -1152,6 +1152,22 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         summaryPaths: ["links", "dayGap", "ambiguity", "duplicateRisk", "outcomes"],
       },
       {
+        endpoint: "/api/meta/messaging-readiness",
+        as: "messagingReadiness",
+        required: false,
+        views: ["coverage"],
+        why: "WhatsApp, Messenger and Instagram attribution readiness: checklist states, last infrastructure self-test, real deliveries.",
+        summaryPaths: ["whatsapp.status", "messenger.status", "instagram.status", "generatedAt"],
+      },
+      {
+        endpoint: "/api/meta/credential-health",
+        as: "credentialHealth",
+        required: false,
+        views: ["coverage"],
+        why: "Which Meta capabilities the configured credentials have (connected / not connected). No credential text.",
+        summaryPaths: ["credentials"],
+      },
+      {
         endpoint: "/api/meta/catalog-reconcile",
         as: "catalogReconcile",
         required: false,

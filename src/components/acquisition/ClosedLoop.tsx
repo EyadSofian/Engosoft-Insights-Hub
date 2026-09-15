@@ -116,8 +116,21 @@ export interface ClosedLoopResponse {
     numerator: number;
     denominator: number;
     status: KpiStatus;
+    /** Messaging channels: connected / infrastructure_ready_permission_pending / not_connected. */
+    channelStatus?: string;
     note: { en: string; ar: string };
   }[];
+  crmBreakdown?: { exact: number; inferred: number; ambiguous: number; unmatched: number };
+  chatwootHealth?: {
+    inboundConversations: number;
+    expectedRows: number;
+    presentRows: number;
+    missing: number;
+    recovered: number;
+    failedOrStuck: number;
+    flagged: boolean;
+    checkedAt: string | null;
+  } | null;
   sources?: {
     leadAdsDirect: KpiStatus;
     messaging: KpiStatus;
