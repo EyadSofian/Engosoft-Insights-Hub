@@ -557,14 +557,54 @@ export function coveragePercent(numerator: number, denominator: number): string 
   return fmtPct(value, 1);
 }
 
-const COVERAGE_ICON: Record<KpiStatus, ReactNode> = {
-  ok: <CheckCircle2 size={14} className="text-success" />,
-  no_denominator: <CircleDashed size={14} className="text-text-muted" />,
-  pending_sync: <CircleDashed size={14} className="text-warning" />,
-  not_connected: <CircleDashed size={14} className="text-danger" />,
-  historical_evidence_missing: <CircleDashed size={14} className="text-warning" />,
+/** Status words for channel rows. A channel without exact attribution is never drawn as 0%. */
+const CHANNEL_WORDS: Record<string, { en: string; ar: string; tone: "good" | "wait" | "bad" }> = {
+  connected: { en: "Connected", ar: "متصل", tone: "good" },
+  infrastructure_ready_awaiting_traffic: {
+    en: "Ready — awaiting first message",
+    ar: "جاهز — بانتظار أول رسالة",
+    tone: "good",
+  },
+  infrastructure_ready_meta_approval_pending: {
+    en: "Infrastructure ready / Meta approval pending",
+    ar: "البنية جاهزة / بانتظار موافقة Meta",
+    tone: "wait",
+  },
+  infrastructure_ready_credential_pending: {
+    en: "Infrastructure ready / credential pending",
+    ar: "البنية جاهزة / بانتظار بيانات الاعتماد",
+    tone: "wait",
+  },
+  inbox_setup_required: { en: "Inbox setup required", ar: "يلزم إعداد صندوق الوارد", tone: "wait" },
+  not_connected: { en: "Not connected", ar: "غير متصل", tone: "bad" },
+  healthy: { en: "Healthy", ar: "سليم", tone: "good" },
+  needs_attention: { en: "Needs attention", ar: "يحتاج انتباه", tone: "bad" },
+  not_checked: { en: "Not checked yet", ar: "لم يُفحص بعد", tone: "wait" },
 };
 
+const TONE_ICON: Record<"good" | "wait" | "bad", ReactNode> = {
+  good: <CheckCircle2 size={14} className="text-success" />,
+  wait: <CircleDashed size={14} className="text-warning" />,
+  bad: <CircleDashed size={14} className="text-danger" />,
+};
+
+const SIMPLE_LABEL: Record<string, { en: string; ar: string }> = {
+  meta_lead_attribution: { en: "Meta Lead attribution", ar: "إسناد عملاء Meta" },
+  creative_attribution: { en: "Creative attribution", ar: "إسناد المادة الإعلانية" },
+  form_attribution: { en: "Form attribution", ar: "إسناد النموذج" },
+  crm_match: { en: "CRM exact match", ar: "المطابقة الدقيقة في CRM" },
+  messaging_whatsapp: { en: "WhatsApp", ar: "واتساب" },
+  messaging_messenger: { en: "Messenger", ar: "ماسنجر" },
+  messaging_instagram: { en: "Instagram", ar: "إنستغرام" },
+  chatwoot_ingestion: { en: "Chatwoot ingestion", ar: "استقبال محادثات Chatwoot" },
+};
+
+/**
+ * Data coverage for managers: one line per source, a percentage only where the
+ * source is connected, status words everywhere else. Everything technical
+ * (CRM link breakdown, ingestion counts, historical evidence) lives in
+ * CoverageTechnicalDetails behind "View technical details".
+ */
 export function DataCoverageCard({
   data,
   loading,
@@ -576,6 +616,7 @@ export function DataCoverageCard({
 }) {
   const { lang } = useI18n();
   const A = lang === "ar";
+  const items = (data?.coverageSummary ?? []).filter((item) => SIMPLE_LABEL[item.key]);
   return (
     <PageSection
       level="insight"
@@ -584,8 +625,8 @@ export function DataCoverageCard({
       tone="sky"
       hint={
         A
-          ? "إلى أي حد نستطيع تتبع العملاء. النسبة تُحسب فقط حيث يوجد مصدر متصل."
-          : "How much of the journey we can trace. A percentage is shown only where the source is connected."
+          ? "إلى أي حد نستطيع تتبع العملاء. النسبة تُعرض فقط حيث يكون المصدر متصلًا."
+          : "How much of the journey we can trace. A percentage appears only where the source is connected."
       }
       action={
         onViewDetails ? (
@@ -600,81 +641,105 @@ export function DataCoverageCard({
       }
     >
       <Card padded>
-        <ul className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-          {(data?.coverageSummary ?? []).map((item) => {
-            const connected = item.status === "ok";
-            const partialHistory = item.status === "historical_evidence_missing";
-            const channelWords =
-              item.channelStatus === "infrastructure_ready_permission_pending"
-                ? A
-                  ? "البنية جاهزة — بانتظار الصلاحية"
-                  : "Infrastructure ready — permission pending"
-                : item.channelStatus === "not_connected"
-                  ? A
-                    ? "غير متصل"
-                    : "Not connected"
-                  : null;
-            const valueText = loading
+        <ul className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+          {items.map((item) => {
+            const words = item.channelStatus ? CHANNEL_WORDS[item.channelStatus] : undefined;
+            const percent =
+              !words && item.status === "ok" && item.denominator
+                ? coveragePercent(item.numerator, item.denominator)
+                : null;
+            const tone = words?.tone ?? (percent ? "good" : "wait");
+            const value = loading
               ? "…"
-              : channelWords
-                ? channelWords
-                : connected && item.denominator
-                  ? coveragePercent(item.numerator, item.denominator)
-                  : partialHistory
-                    ? A
-                      ? "جزئي"
-                      : "Partial"
-                    : STATUS_TEXT[item.status === "ok" ? "no_denominator" : item.status][lang];
+              : words
+                ? A
+                  ? words.ar
+                  : words.en
+                : (percent ??
+                  STATUS_TEXT[item.status === "ok" ? "no_denominator" : item.status][lang]);
             return (
-              <li key={item.key} className="flex items-start gap-2">
-                <span className="mt-0.5">{COVERAGE_ICON[item.status]}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm text-text">{A ? item.label.ar : item.label.en}</span>
-                    <span
-                      className={`num text-sm font-bold ${connected ? "text-text" : "text-text-muted"}`}
-                    >
-                      {valueText}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-text-muted">
-                    {connected && item.denominator
-                      ? `${fmtNum(item.numerator)} / ${fmtNum(item.denominator)} · `
-                      : ""}
-                    {A ? item.note.ar : item.note.en}
-                  </div>
-                </div>
+              <li
+                key={item.key}
+                className="flex items-center gap-2"
+                title={A ? item.note.ar : item.note.en}
+              >
+                {TONE_ICON[tone]}
+                <span className="text-sm text-text">
+                  {A ? SIMPLE_LABEL[item.key]!.ar : SIMPLE_LABEL[item.key]!.en}
+                </span>
+                <span
+                  className={`num ms-auto text-sm font-bold ${tone === "bad" ? "text-danger" : tone === "wait" ? "text-text-muted" : "text-text"}`}
+                >
+                  {value}
+                </span>
               </li>
             );
           })}
         </ul>
+      </Card>
+    </PageSection>
+  );
+}
+
+/** The detail behind the simple card: CRM link breakdown, ingestion counts, history. */
+export function CoverageTechnicalDetails({
+  data,
+  loading,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const technical = (data?.coverageSummary ?? []).filter((item) => !SIMPLE_LABEL[item.key]);
+  const rows = (data?.coverageSummary ?? []).filter((item) => SIMPLE_LABEL[item.key]);
+  return (
+    <PageSection
+      title={A ? "تفاصيل التغطية" : "Coverage details"}
+      icon={<ShieldCheck size={16} />}
+      tone="sky"
+    >
+      <Card padded className="space-y-4 text-xs">
+        <ul className="space-y-1.5">
+          {[...rows, ...technical].map((item) => (
+            <li key={item.key} className="flex flex-wrap gap-x-2">
+              <b className="text-text">
+                {A
+                  ? (SIMPLE_LABEL[item.key]?.ar ?? item.label.ar)
+                  : (SIMPLE_LABEL[item.key]?.en ?? item.label.en)}
+              </b>
+              <span className="text-text-muted">
+                {item.denominator
+                  ? `${fmtNum(item.numerator)} / ${fmtNum(item.denominator)} · `
+                  : ""}
+                {A ? item.note.ar : item.note.en}
+              </span>
+            </li>
+          ))}
+        </ul>
         {data?.crmBreakdown ? (
-          <div className="mt-3 border-t border-border pt-3">
-            <div className="mb-1.5 text-xs font-semibold text-text">
+          <div>
+            <div className="mb-1 font-semibold text-text">
               {A ? "ربط العملاء بـ CRM" : "CRM links"}
             </div>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
               {(
                 [
-                  ["exact", A ? "روابط دقيقة" : "Exact CRM links", "text-text"],
-                  ["inferred", A ? "روابط مستنتجة" : "Inferred CRM links", "text-text-muted"],
-                  [
-                    "ambiguous",
-                    A ? "غامضة (لم يُختر سجل)" : "Ambiguous (no record chosen)",
-                    "text-warning",
-                  ],
-                  ["unmatched", A ? "غير مطابقة" : "Unmatched", "text-text-muted"],
+                  ["exact", A ? "روابط دقيقة" : "Exact CRM links"],
+                  ["inferred", A ? "روابط مستنتجة" : "Inferred CRM links"],
+                  ["ambiguous", A ? "غامضة (لم يُختر سجل)" : "Ambiguous (no record chosen)"],
+                  ["unmatched", A ? "غير مطابقة" : "Unmatched"],
                 ] as const
-              ).map(([key, label, tone]) => (
+              ).map(([key, label]) => (
                 <div key={key} className="flex items-baseline justify-between gap-2">
                   <dt className="text-text-muted">{label}</dt>
-                  <dd className={`num font-semibold ${tone}`}>
+                  <dd className="num font-semibold">
                     {loading ? "…" : fmtNum(data.crmBreakdown![key])}
                   </dd>
                 </div>
               ))}
             </dl>
-            <div className="mt-1 text-[11px] text-text-muted">
+            <div className="mt-1 text-text-muted">
               {A
                 ? "مؤشرات الإدارة تستخدم الروابط الدقيقة فقط."
                 : "Management KPIs use exact links only."}
@@ -682,44 +747,37 @@ export function DataCoverageCard({
           </div>
         ) : null}
         {data?.chatwootHealth ? (
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="font-semibold text-text">
               {A ? "محادثات Chatwoot" : "Chatwoot conversations"}
             </span>
-            <span className="text-text-muted">
+            <span>
               {A ? "واردة" : "Inbound"}{" "}
-              <b className="num text-text">{fmtNum(data.chatwootHealth.inboundConversations)}</b>
+              <b className="num">{fmtNum(data.chatwootHealth.inboundConversations)}</b>
             </span>
-            <span className="text-text-muted">
+            <span>
               {A ? "صفوف موجودة" : "Rows present"}{" "}
-              <b className="num text-text">{fmtNum(data.chatwootHealth.presentRows)}</b>
+              <b className="num">{fmtNum(data.chatwootHealth.presentRows)}</b>
             </span>
-            <span className={data.chatwootHealth.missing > 0 ? "text-danger" : "text-text-muted"}>
+            <span className={data.chatwootHealth.missing ? "text-danger" : ""}>
               {A ? "ناقصة" : "Missing"} <b className="num">{fmtNum(data.chatwootHealth.missing)}</b>
             </span>
-            <span className="text-text-muted">
+            <span>
               {A ? "استُعيدت تلقائيًا" : "Recovered automatically"}{" "}
-              <b className="num text-text">{fmtNum(data.chatwootHealth.recovered)}</b>
+              <b className="num">{fmtNum(data.chatwootHealth.recovered)}</b>
             </span>
-            <span
-              className={data.chatwootHealth.failedOrStuck > 0 ? "text-danger" : "text-text-muted"}
-            >
+            <span className={data.chatwootHealth.failedOrStuck ? "text-danger" : ""}>
               {A ? "فاشلة/عالقة" : "Failed/stuck"}{" "}
               <b className="num">{fmtNum(data.chatwootHealth.failedOrStuck)}</b>
             </span>
-            {data.chatwootHealth.flagged ? (
-              <Pill tone="danger">{A ? "يحتاج انتباه" : "Needs attention"}</Pill>
-            ) : (
-              <Pill tone="success">{A ? "لا شيء ناقص" : "Nothing missing"}</Pill>
-            )}
           </div>
         ) : null}
         {data?.sources?.leadAdsDirect === "not_connected" ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
-            <Pill tone="warning">{A ? "غير متصل" : "Not connected"}</Pill>
+          <div className="flex flex-wrap items-center gap-2 text-text-muted">
+            <Pill tone="warning">{A ? "بانتظار بيانات الاعتماد" : "Credential pending"}</Pill>
             {A
-              ? "صلاحية Meta Lead Ads (أسماء النماذج وإجاباتها) غير مفعلة؛ باقي الأرقام لا تتأثر."
-              : "Meta Lead Ads access (form names and answers) is not connected; the other figures are unaffected."}
+              ? "أسماء نماذج Meta وإجاباتها تصل بعد إضافة بيانات اعتماد Attribution؛ باقي الأرقام لا تتأثر."
+              : "Meta form names and answers arrive once the Attribution credential is added; the other figures are unaffected."}
           </div>
         ) : null}
       </Card>

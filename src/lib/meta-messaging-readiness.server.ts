@@ -472,9 +472,9 @@ async function buildReadiness() {
       : {
           key: "waba_subscription",
           label: "WABA subscription",
-          state: "unverified",
+          state: "credential_pending",
           detail:
-            "Needs WhatsApp Business Management on META_LEAD_ADS_ACCESS_TOKEN to read the account's subscribed apps.",
+            "Verified automatically (subscribed apps, owner business, callback) once the Attribution credential with whatsapp_business_management is in Railway.",
         },
     wabaCap.state === "connected"
       ? {
@@ -486,8 +486,8 @@ async function buildReadiness() {
       : {
           key: "phone_number",
           label: "Phone number",
-          state: "unverified",
-          detail: `Chatwoot receives WhatsApp messages (${chatwootCount("whatsapp")} in 14 days); the number's WABA link needs WhatsApp Business Management to verify.`,
+          state: "credential_pending",
+          detail: `Chatwoot receives WhatsApp messages (${chatwootCount("whatsapp")} in 14 days); phone-number IDs are listed automatically once the Attribution credential exists.`,
         },
     testCheck("whatsapp", "callback", "Callback, signature and storage", [
       "callback_verification",
@@ -550,8 +550,9 @@ async function buildReadiness() {
       : {
           key: "page_subscription",
           label: "Page subscription",
-          state: "permission_pending",
-          detail: "Subscribed automatically once the credential has pages_manage_metadata.",
+          state: "credential_pending",
+          detail:
+            "Subscribed automatically once the Attribution credential with pages_manage_metadata is in Railway.",
         },
     permissionCheck(
       "messaging_permission",
@@ -596,9 +597,9 @@ async function buildReadiness() {
       : {
           key: "chatwoot_correlation",
           label: "Chatwoot provider-message correlation",
-          state: "not_ready",
+          state: "setup_required",
           detail:
-            "No Instagram messages reached Chatwoot in 14 days, so matching cannot be proven on real data (no Instagram inbox in Chatwoot).",
+            "Chatwoot has the Instagram IDs stored on the Facebook Page inboxes, but no Instagram conversation has reached Chatwoot: an Instagram inbox (Settings → Inboxes → Add Inbox → Instagram) is needed so DMs can be matched.",
         },
     common.catalog,
     permissionCheck(
@@ -642,40 +643,30 @@ async function buildReadiness() {
  * readiness: it is the last, spend-approved step, reported as its own item.
  */
 async function qaTestState(): Promise<ReadinessCheck> {
-  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
   const label = "Paid QA test (paused)";
-  if (!token)
-    return {
-      key: "qa_paid_test",
-      label,
-      state: "permission_pending",
-      detail: "No ads credential to read the prepared test.",
-    };
-  const { QA_CTWA } = await import("./meta-credential-health.server");
-  const campaigns = await metaGet(`${QA_CTWA.account}/campaigns`, token, {
-    fields:
-      "id,effective_status,adsets{id,effective_status,destination_type,daily_budget,ads{id,effective_status}}",
-    filtering: JSON.stringify([
-      { field: "name", operator: "CONTAIN", value: "QA – CTWA attribution test" },
-    ]),
-  });
-  const campaign = (Array.isArray(campaigns.data.data) ? campaigns.data.data : []).map(obj)[0];
-  if (!campaign)
-    return { key: "qa_paid_test", label, state: "permission_pending", detail: "Not prepared yet." };
-  const adset = (
-    Array.isArray(obj(campaign.adsets).data) ? (obj(campaign.adsets).data as unknown[]) : []
+  const { QA_CTWA, qaCtwaState } = await import("./meta-credential-health.server");
+  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
+  const state = (await qaCtwaState().catch(() => null)) as Json | null;
+  const read = token
+    ? await metaGet(QA_CTWA.adsetId, token, {
+        fields:
+          "id,effective_status,daily_budget,destination_type,campaign{id,effective_status},ads{id,effective_status}",
+      })
+    : null;
+  const ad = (
+    Array.isArray(obj(read?.data.ads).data) ? (obj(read?.data.ads).data as unknown[]) : []
   ).map(obj)[0];
-  const ad = adset
-    ? (Array.isArray(obj(adset.ads).data) ? (obj(adset.ads).data as unknown[]) : []).map(obj)[0]
-    : undefined;
+  const phones = Array.isArray(state?.destination_phones)
+    ? (state!.destination_phones as Json[])
+    : [];
+  const proof = state?.proof_at
+    ? ` Proof recorded ${String(state.proof_at)}; paused ${state.paused_at ? String(state.paused_at) : "manually required"}.`
+    : "";
   return {
     key: "qa_paid_test",
     label,
-    // Spend approval is a business decision, not an infrastructure gap.
     state: "permission_pending",
-    detail: ad
-      ? `Campaign ${text(campaign.id)}, ad set ${text(adset?.id)} (WhatsApp, ${Number(adset?.daily_budget ?? 0) / 100} USD/day) and ad ${text(ad.id)} are all ${text(ad.effective_status)}. Publishing needs spend approval.`
-      : `Campaign ${text(campaign.id)} and ad set ${text(adset?.id ?? "")} are prepared PAUSED with the WhatsApp destination accepted. The creative and paused ad are created automatically once the Attribution credential exists (Meta refuses creatives from the development-mode Marketing API app).`,
+    detail: `Campaign ${QA_CTWA.campaignId} (${text(obj(read?.data.campaign).effective_status) || "PAUSED"}), ad set ${QA_CTWA.adsetId} (${text(read?.data.destination_type) || "WHATSAPP"}, ${Number(read?.data.daily_budget ?? QA_CTWA.dailyBudgetUsd * 100) / 100} USD/day, ${text(read?.data.effective_status) || "PAUSED"}), ad ${ad ? `${text(ad.id)} (${text(ad.effective_status)})` : "created automatically with the Attribution credential"}${phones.length ? `, destination ${phones.map((phone) => text(phone.display)).join(" / ")}` : ""}. Publishing needs spend approval.${proof}`,
   };
 }
 

@@ -291,6 +291,22 @@ function ensureSchema() {
          bootstrap jsonb NOT NULL DEFAULT '{}'::jsonb,
          bootstrapped_fingerprint text NOT NULL DEFAULT '',
          bootstrapped_at timestamptz
+       );
+       ALTER TABLE meta_credential_health ADD COLUMN IF NOT EXISTS bootstrap_fingerprint text NOT NULL DEFAULT '';
+       ALTER TABLE meta_credential_health ADD COLUMN IF NOT EXISTS bootstrap_attempted_at timestamptz;
+       CREATE TABLE IF NOT EXISTS meta_qa_ctwa_state (
+         id integer PRIMARY KEY DEFAULT 1,
+         campaign_id text NOT NULL DEFAULT '',
+         adset_id text NOT NULL DEFAULT '',
+         ad_id text NOT NULL DEFAULT '',
+         creative_id text NOT NULL DEFAULT '',
+         status text NOT NULL DEFAULT '',
+         destination_phones jsonb NOT NULL DEFAULT '[]'::jsonb,
+         prepared_at timestamptz,
+         proof_at timestamptz,
+         proof jsonb NOT NULL DEFAULT '{}'::jsonb,
+         paused_at timestamptz,
+         pause_error text NOT NULL DEFAULT ''
        );`,
     )
     .then(() => undefined)
@@ -346,44 +362,69 @@ export interface BootstrapStep {
 }
 
 /**
- * What the system does by itself once a working Attribution credential exists.
- * Every step is idempotent and additive: other apps' subscriptions and the
- * Chatwoot WhatsApp callback are never touched.
+ * Everything the system does by itself once META_LEAD_ADS_ACCESS_TOKEN appears.
+ * Each step is idempotent and additive: other apps' subscriptions, the Chatwoot
+ * WhatsApp callback and live campaigns are never touched, and the QA ad stays
+ * PAUSED. A failed step is retried on a later tick.
  */
 export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<BootstrapStep[]> {
   const steps: BootstrapStep[] = [];
   const token = process.env[probe.variable]?.trim() ?? "";
   const caps = probe.capabilities;
+  const appId = process.env.META_ATTRIBUTION_APP_ID?.trim() ?? "";
   const add = (step: string, ok: boolean, detail: string, skipped = false) =>
     steps.push({ step, ok, detail, skipped });
+  const { missingScopes } = await import("./meta-credential-health");
 
-  // 1. Pages the credential can act on.
+  // 1–3. Token, app and system user, scopes.
+  add(
+    "validate_token",
+    probe.valid,
+    probe.valid
+      ? `Valid ${probe.type || "credential"}${probe.expiresAt ? `, expires ${probe.expiresAt}` : ", never expires"}.`
+      : "Meta reports the credential as invalid.",
+  );
+  if (!probe.valid) return steps;
+  const me = await metaGet("me", token, { fields: "id,name" });
+  add(
+    "identify_app_and_system_user",
+    probe.appMatchesAttributionApp && me.ok,
+    `${probe.appMatchesAttributionApp ? "Issued for Engosoft Attribution" : "Issued for a different app, not Engosoft Attribution"}; identity ${me.ok ? text(me.data.name) || "system user" : me.error}.`,
+  );
+  const missing = missingScopes(probe.scopes);
+  add(
+    "validate_scopes",
+    missing.length === 0,
+    missing.length
+      ? `Missing: ${missing.join(", ")}. Available capabilities are used; the rest wait.`
+      : "All required scopes granted.",
+  );
+
+  // 4–5. Pages and Leads Access.
   const accounts = await metaGet("me/accounts", token, { fields: "id,name,tasks", limit: "100" });
   const pages = (Array.isArray(accounts.data.data) ? accounts.data.data : [])
     .map(obj)
     .filter((page) => ATTRIBUTION_PAGE_IDS().includes(text(page.id)));
+  const pageIds = pages.map((page) => text(page.id));
   add(
-    "discover_pages",
-    accounts.ok,
+    "verify_pages",
+    accounts.ok && pageIds.length === ATTRIBUTION_PAGE_IDS().length,
     accounts.ok
-      ? `${pages.length} Engosoft Pages available: ${pages.map((page) => text(page.name)).join(", ")}`
+      ? `${pageIds.length} of ${ATTRIBUTION_PAGE_IDS().length} Engosoft Pages available: ${pages.map((page) => text(page.name)).join(", ")}.`
       : accounts.error,
   );
-  const pageIds = pages.map((page) => text(page.id));
-
-  // 2. Leads Access.
   const withLeads = pages.filter(
     (page) =>
       Array.isArray(page.tasks) && (page.tasks as unknown[]).map(text).includes("MANAGE_LEADS"),
   );
   add(
     "verify_leads_access",
-    withLeads.length === pageIds.length && pageIds.length > 0,
-    `${withLeads.length} of ${pageIds.length} Pages grant MANAGE_LEADS to this credential.`,
+    pageIds.length > 0 && withLeads.length === pageIds.length,
+    `${withLeads.length} of ${pageIds.length} Pages grant MANAGE_LEADS.`,
   );
 
   const leadgen = await import("./meta-leadgen.server");
-  // 3. Page webhook fields: leadgen always; messaging fields once messaging is granted.
+  // 6. Page webhook subscriptions (leadgen; messaging once granted).
   if (caps.pageMetadata.state === "connected" && pageIds.length) {
     const fields =
       caps.messengerMessaging.state === "connected"
@@ -396,17 +437,17 @@ export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<
       errors.length === 0,
       errors.length
         ? errors.map((error) => error.error).join("; ")
-        : `Pages subscribed to: ${["leadgen", ...fields].join(", ")}.`,
+        : `Pages subscribed to ${["leadgen", ...fields].join(", ")}.`,
     );
   } else {
-    add("subscribe_pages", false, "Needs Page Metadata (pages_manage_metadata).", true);
+    add("subscribe_pages", false, "Waiting for pages_manage_metadata.", true);
   }
 
-  // 4 + 5. Form catalog and historical lead records.
+  // 7–8. Form names and historical Lead Ads (including CRM leads without an ad ID).
   if (caps.leadFormsRead.state === "connected" && pageIds.length) {
     const forms = await leadgen.listMetaLeadForms(pageIds);
     add(
-      "sync_form_catalog",
+      "sync_form_names",
       forms.pages.every((page) => !page.error),
       `${forms.forms.length} forms synced with names and status.`,
     );
@@ -416,85 +457,90 @@ export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<
       maxLeadsPerForm: 500,
     });
     const inserted = backfill.forms.reduce((sum, row) => sum + row.inserted, 0);
+    const queued = await leadgen.queueCrmMetaLeadsWithoutAdId();
     add(
-      "historical_form_reconciliation",
+      "reconcile_historical_lead_ads",
       backfill.forms.every((row) => !row.error),
-      `${inserted} lead records stored with their form ID (resumable; continues on later runs).`,
+      `${inserted} lead records stored with form IDs; ${queued.queued} CRM leads without an ad ID queued for exact lookup by lead ID (resumable).`,
     );
   } else {
-    add("sync_form_catalog", false, "Needs Lead Forms Read (leads_retrieval).", true);
-    add("historical_form_reconciliation", false, "Needs Lead Forms Read (leads_retrieval).", true);
+    add("sync_form_names", false, "Waiting for leads_retrieval.", true);
+    add("reconcile_historical_lead_ads", false, "Waiting for leads_retrieval.", true);
   }
 
-  // 6. WhatsApp Business Account subscription (additive, no callback override).
-  if (caps.whatsappBusinessManagement.state === "connected") {
-    const appId = process.env.META_ATTRIBUTION_APP_ID?.trim() ?? "";
-    const current = await metaGet(`${ATTRIBUTION_WABA_ID()}/subscribed_apps`, token);
-    const apps = (Array.isArray(current.data.data) ? current.data.data : []).map(obj);
-    const present = apps.some((app) => text(obj(app.whatsapp_business_api_data).id) === appId);
-    if (!present) {
-      const subscribed = await metaPost(`${ATTRIBUTION_WABA_ID()}/subscribed_apps`, token);
-      add(
-        "verify_waba_subscription",
-        subscribed.ok,
-        subscribed.ok
-          ? "Attribution app subscribed to the WhatsApp Business Account."
-          : subscribed.error,
-      );
-    } else {
-      add(
-        "verify_waba_subscription",
-        true,
-        `Attribution app is one of ${apps.length} apps subscribed to the WhatsApp Business Account.`,
-      );
-    }
-    const phones = await metaGet(`${ATTRIBUTION_WABA_ID()}/phone_numbers`, token, {
-      fields: "id,display_phone_number,verified_name,quality_rating",
-    });
-    add(
-      "verify_phone_numbers",
-      phones.ok,
-      phones.ok
-        ? `${(phones.data.data as unknown[] | undefined)?.length ?? 0} phone numbers on the account.`
-        : phones.error,
-    );
-  } else {
-    add("verify_waba_subscription", false, "Needs WhatsApp Business Management.", true);
-  }
+  // 9–11. WhatsApp Business Account, phone numbers, subscription and callback.
+  const whatsapp = await verifyWhatsAppBusinessAccount(
+    token,
+    caps.whatsappBusinessManagement.state === "connected",
+  );
+  for (const step of whatsapp) steps.push(step);
 
-  // 7 + 8. Messenger and Instagram Page subscriptions.
-  for (const [step, cap] of [
-    ["verify_messenger_subscription", caps.messengerMessaging],
-    ["verify_instagram_subscription", caps.instagramMessaging],
+  // 12–13. Messenger and Instagram subscriptions.
+  const appSubscriptions = appToken() ? await metaGet(`${appId}/subscriptions`, appToken()) : null;
+  const appFields = (object: string) =>
+    ((Array.isArray(appSubscriptions?.data.data) ? appSubscriptions!.data.data : []) as Json[])
+      .filter((row) => text(row.object) === object)
+      .flatMap((row) =>
+        (Array.isArray(row.fields) ? row.fields : []).map((field) => text(obj(field).name)),
+      );
+  for (const [step, cap, object] of [
+    ["verify_messenger_subscriptions", caps.messengerMessaging, "page"],
+    ["verify_instagram_subscriptions", caps.instagramMessaging, "instagram"],
   ] as const) {
-    if (cap.state !== "connected" || !pageIds[0]) {
-      add(step, false, cap.detail, true);
-      continue;
+    const fields = appFields(object);
+    let pageFields: string[] = [];
+    if (caps.pageMetadata.state === "connected" && pageIds[0]) {
+      const access = await pageToken(pageIds[0], token);
+      const current = await metaGet(`${pageIds[0]}/subscribed_apps`, access);
+      const mine = (Array.isArray(current.data.data) ? current.data.data : [])
+        .map(obj)
+        .find((app) => text(app.id) === appId);
+      pageFields = Array.isArray(mine?.subscribed_fields)
+        ? (mine!.subscribed_fields as unknown[]).map(text)
+        : [];
     }
-    const access = await pageToken(pageIds[0], token);
-    const current = await metaGet(`${pageIds[0]}/subscribed_apps`, access);
-    const mine = (Array.isArray(current.data.data) ? current.data.data : [])
-      .map(obj)
-      .find((app) => text(app.id) === (process.env.META_ATTRIBUTION_APP_ID?.trim() ?? ""));
-    const fields = Array.isArray(mine?.subscribed_fields)
-      ? (mine!.subscribed_fields as unknown[]).map(text)
-      : [];
     add(
       step,
-      fields.includes("messages"),
-      `Attribution app Page fields: ${fields.join(", ") || "none"}.`,
+      fields.includes("messages") && cap.state === "connected",
+      `App ${object} fields: ${fields.join(", ") || "none"}; Page fields for this app: ${pageFields.join(", ") || "not readable yet"}; permission: ${cap.state === "connected" ? "granted" : "pending Meta approval"}.`,
+      cap.state !== "connected",
     );
   }
 
-  // 9. The prepared QA Click-to-WhatsApp test: campaign and ad set already exist
-  // paused; the creative needs a Live app's credential. Everything stays PAUSED.
+  // 14. Credential health refresh.
+  await checkMetaCredentials({ force: true }).catch(() => undefined);
+  add("refresh_credential_health", true, "Capability rows refreshed.");
+
+  // 15. Resume the Meta catalog reconciliation.
+  try {
+    const { runMetaCatalogReconcile } = await import("./meta-catalog-reconcile.server");
+    const summary = await runMetaCatalogReconcile({ maxAds: 400 });
+    add(
+      "resume_catalog_reconciliation",
+      summary.status !== "failed",
+      summary.message || summary.status,
+    );
+  } catch (error) {
+    add(
+      "resume_catalog_reconciliation",
+      false,
+      error instanceof Error ? error.message.slice(0, 200) : "failed",
+    );
+  }
+
+  // 16. The prepared QA Click-to-WhatsApp ad, PAUSED.
   if (probe.scopes.includes("ads_management")) {
     add("prepare_qa_ctwa_ad", ...(await prepareQaCtwaAd(token)));
   } else {
-    add("prepare_qa_ctwa_ad", false, "Needs ads_management on the Attribution credential.", true);
+    add(
+      "prepare_qa_ctwa_ad",
+      false,
+      "Waiting for ads_management on the Attribution credential.",
+      true,
+    );
   }
 
-  // 10. Diagnostics: the platform self-test and readiness snapshot.
+  // Diagnostics: platform self-test and readiness snapshot.
   try {
     const readiness = await import("./meta-messaging-readiness.server");
     const selfTest = await readiness.runMessagingSelfTest();
@@ -516,35 +562,117 @@ export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<
   return steps;
 }
 
+async function verifyWhatsAppBusinessAccount(
+  token: string,
+  capable: boolean,
+): Promise<BootstrapStep[]> {
+  if (!capable) {
+    return ["verify_waba", "list_phone_numbers", "verify_messages_subscription"].map((step) => ({
+      step,
+      ok: false,
+      skipped: true,
+      detail: "Waiting for whatsapp_business_management.",
+    }));
+  }
+  const appId = process.env.META_ATTRIBUTION_APP_ID?.trim() ?? "";
+  const waba = ATTRIBUTION_WABA_ID();
+  const steps: BootstrapStep[] = [];
+  const account = await metaGet(waba, token, {
+    fields: "id,name,owner_business_info,account_review_status",
+  });
+  const owner = obj(account.data.owner_business_info);
+  steps.push({
+    step: "verify_waba",
+    ok: account.ok,
+    detail: account.ok
+      ? `WABA ${text(account.data.id)} "${text(account.data.name)}", owned by ${text(owner.name) || "unknown"} (${text(owner.id)}${text(owner.id) === "147679829607313" ? ", the Engosoft business" : ", NOT the Engosoft business: Advanced Access is needed for webhooks"}), review ${text(account.data.account_review_status) || "unknown"}.`
+      : account.error,
+  });
+  const phones = await metaGet(`${waba}/phone_numbers`, token, {
+    fields: "id,display_phone_number,verified_name,quality_rating,platform_type",
+  });
+  const numbers = (Array.isArray(phones.data.data) ? phones.data.data : []).map(obj);
+  await getPool()
+    .query(
+      `INSERT INTO meta_qa_ctwa_state (id, destination_phones) VALUES (1, $1::jsonb)
+       ON CONFLICT (id) DO UPDATE SET destination_phones = EXCLUDED.destination_phones`,
+      [
+        JSON.stringify(
+          numbers.map((number) => ({
+            id: text(number.id),
+            display: text(number.display_phone_number),
+            name: text(number.verified_name),
+          })),
+        ),
+      ],
+    )
+    .catch(() => undefined);
+  steps.push({
+    step: "list_phone_numbers",
+    ok: phones.ok && numbers.length > 0,
+    detail: phones.ok
+      ? numbers
+          .map(
+            (number) =>
+              `${text(number.display_phone_number)} (ID ${text(number.id)}, ${text(number.verified_name)})`,
+          )
+          .join("; ") || "No phone numbers."
+      : phones.error,
+  });
+  const subscribed = await metaGet(`${waba}/subscribed_apps`, token);
+  const apps = (Array.isArray(subscribed.data.data) ? subscribed.data.data : []).map(obj);
+  let present = apps.some((app) => text(obj(app.whatsapp_business_api_data).id) === appId);
+  let detail = `${apps.length} apps subscribed to the WABA; Engosoft Attribution ${present ? "is" : "is not"} one of them.`;
+  if (subscribed.ok && !present) {
+    const added = await metaPost(`${waba}/subscribed_apps`, token);
+    present = added.ok;
+    detail += added.ok
+      ? " Subscribed it now (no callback override)."
+      : ` Subscribing failed: ${added.error}`;
+  }
+  const appSubscriptions = appToken() ? await metaGet(`${appId}/subscriptions`, appToken()) : null;
+  const whatsappObject = (
+    (Array.isArray(appSubscriptions?.data.data) ? appSubscriptions!.data.data : []) as Json[]
+  ).find((row) => text(row.object) === "whatsapp_business_account");
+  const fields = (Array.isArray(whatsappObject?.fields) ? whatsappObject!.fields : []).map(
+    (field) => text(obj(field).name),
+  );
+  const callback = text(whatsappObject?.callback_url).replace(/^https:\/\/[^/]+/, "");
+  steps.push({
+    step: "verify_messages_subscription",
+    ok: subscribed.ok && present && fields.includes("messages") && whatsappObject?.active !== false,
+    detail: `${subscribed.ok ? detail : subscribed.error} App object whatsapp_business_account: fields ${fields.join(", ") || "none"}, callback ${callback || "none"}, ${whatsappObject?.active === false ? "inactive" : "active"}.`,
+  });
+  return steps;
+}
+
 export const QA_CTWA = {
   account: "act_405972484493798",
+  campaignId: "120254541943490712",
+  adsetId: "120254541944970712",
   campaignName: "QA – CTWA attribution test (paused, publish only with approval)",
   pageId: "1500414613618298",
   imageHash: "4aecbb4282891fb0ef5f21bf0c0bccf1",
+  dailyBudgetUsd: 3,
 } as const;
 
 /** Creates the QA creative and a PAUSED ad in the prepared QA ad set, once. */
 async function prepareQaCtwaAd(token: string): Promise<[boolean, string]> {
-  const campaigns = await metaGet(`${QA_CTWA.account}/campaigns`, token, {
-    fields: "id,name,effective_status",
-    filtering: JSON.stringify([
-      { field: "name", operator: "CONTAIN", value: "QA – CTWA attribution test" },
-    ]),
+  const ads = await metaGet(`${QA_CTWA.adsetId}/ads`, token, {
+    fields: "id,effective_status,creative{id}",
   });
-  const campaign = (Array.isArray(campaigns.data.data) ? campaigns.data.data : []).map(obj)[0];
-  if (!campaign) return [false, campaigns.error || "The prepared QA campaign was not found."];
-  const adsets = await metaGet(`${text(campaign.id)}/adsets`, token, {
-    fields: "id,name,effective_status",
-  });
-  const adset = (Array.isArray(adsets.data.data) ? adsets.data.data : []).map(obj)[0];
-  if (!adset) return [false, "The prepared QA ad set was not found."];
-  const ads = await metaGet(`${text(adset.id)}/ads`, token, { fields: "id,effective_status" });
   const existing = (Array.isArray(ads.data.data) ? ads.data.data : []).map(obj)[0];
-  if (existing)
+  if (existing) {
+    await recordQaState({
+      adId: text(existing.id),
+      creativeId: text(obj(existing.creative).id),
+      status: text(existing.effective_status),
+    });
     return [
       true,
       `QA ad ${text(existing.id)} already prepared (${text(existing.effective_status)}).`,
     ];
+  }
   const creative = await metaPost(`${QA_CTWA.account}/adcreatives`, token, {
     name: "QA – CTWA test creative",
     object_story_spec: JSON.stringify({
@@ -560,22 +688,90 @@ async function prepareQaCtwaAd(token: string): Promise<[boolean, string]> {
   if (!creative.ok) return [false, creative.error];
   const ad = await metaPost(`${QA_CTWA.account}/ads`, token, {
     name: "QA – CTWA test ad (paused)",
-    adset_id: text(adset.id),
+    adset_id: QA_CTWA.adsetId,
     creative: JSON.stringify({ creative_id: text(creative.data.id) }),
     status: "PAUSED",
   });
-  return ad.ok
-    ? [
-        true,
-        `QA ad ${text(ad.data.id)} prepared PAUSED in ad set ${text(adset.id)}; publishing needs explicit approval.`,
-      ]
-    : [false, ad.error];
+  if (!ad.ok) return [false, ad.error];
+  await recordQaState({
+    adId: text(ad.data.id),
+    creativeId: text(creative.data.id),
+    status: "PAUSED",
+  });
+  return [
+    true,
+    `QA ad ${text(ad.data.id)} prepared PAUSED in ad set ${QA_CTWA.adsetId}; publishing needs explicit approval.`,
+  ];
+}
+
+async function recordQaState(input: { adId: string; creativeId: string; status: string }) {
+  await getPool()
+    .query(
+      `INSERT INTO meta_qa_ctwa_state (id, campaign_id, adset_id, ad_id, creative_id, status, prepared_at)
+       VALUES (1, $1, $2, $3, $4, $5, now())
+       ON CONFLICT (id) DO UPDATE SET campaign_id = EXCLUDED.campaign_id, adset_id = EXCLUDED.adset_id,
+         ad_id = EXCLUDED.ad_id, creative_id = EXCLUDED.creative_id, status = EXCLUDED.status,
+         prepared_at = COALESCE(meta_qa_ctwa_state.prepared_at, now())`,
+      [QA_CTWA.campaignId, QA_CTWA.adsetId, input.adId, input.creativeId, input.status],
+    )
+    .catch(() => undefined);
+}
+
+/**
+ * Called when a real (not self-test) WhatsApp referral resolves to the QA
+ * campaign: records the proof and pauses the QA campaign so the test never keeps
+ * spending after it proved the chain. Pausing only ever reduces spend. Set
+ * META_QA_AUTO_PAUSE=false to keep it running.
+ */
+export async function handleQaCtwaProof(input: {
+  campaignId: string;
+  adId: string;
+  creativeId: string;
+  providerMessageId: string;
+  conversationId: number;
+}) {
+  if (input.campaignId !== QA_CTWA.campaignId || !databaseConfigured()) return;
+  await ensureSchema();
+  const pool = getPool();
+  const state = (
+    await pool.query<Json>(`SELECT proof_at, paused_at FROM meta_qa_ctwa_state WHERE id = 1`)
+  ).rows[0];
+  if (state?.proof_at) return;
+  await pool.query(
+    `INSERT INTO meta_qa_ctwa_state (id, campaign_id, proof_at, proof)
+     VALUES (1, $1, now(), $2::jsonb)
+     ON CONFLICT (id) DO UPDATE SET proof_at = now(), proof = EXCLUDED.proof`,
+    [QA_CTWA.campaignId, JSON.stringify(input)],
+  );
+  if (text(process.env.META_QA_AUTO_PAUSE).toLowerCase() === "false") return;
+  const token =
+    [process.env.META_LEAD_ADS_ACCESS_TOKEN, process.env.META_ACCESS_TOKEN]
+      .map((value) => value?.trim() ?? "")
+      .find(Boolean) ?? "";
+  if (!token) return;
+  const paused = await metaPost(QA_CTWA.campaignId, token, { status: "PAUSED" });
+  await pool.query(
+    `UPDATE meta_qa_ctwa_state SET paused_at = CASE WHEN $1 THEN now() ELSE paused_at END, pause_error = $2 WHERE id = 1`,
+    [paused.ok, paused.ok ? "" : paused.error],
+  );
+}
+
+export async function qaCtwaState() {
+  if (!databaseConfigured()) return null;
+  await ensureSchema();
+  return (
+    (await getPool().query<Json>(`SELECT * FROM meta_qa_ctwa_state WHERE id = 1`)).rows[0] ?? null
+  );
 }
 
 let worker: ReturnType<typeof setInterval> | null = null;
 let running = false;
 
-/** Checks credentials every 10 minutes and bootstraps once per new working credential. */
+/**
+ * Checks credentials every 10 minutes. A new working Attribution credential is
+ * bootstrapped at once; a bootstrap with failed steps is retried hourly until
+ * every available step succeeds, and again whenever the credential changes.
+ */
 export function startMetaCredentialWorker() {
   if (worker || !databaseConfigured()) return;
   const tick = async () => {
@@ -588,15 +784,24 @@ export function startMetaCredentialWorker() {
         const fingerprint = credentialFingerprint(process.env[probe.variable]?.trim() ?? "");
         const stored = (
           await getPool().query<Json>(
-            `SELECT bootstrapped_fingerprint FROM meta_credential_health WHERE variable = $1`,
+            `SELECT bootstrapped_fingerprint, bootstrap_attempted_at, bootstrap_fingerprint FROM meta_credential_health WHERE variable = $1`,
             [probe.variable],
           )
         ).rows[0];
         if (text(stored?.bootstrapped_fingerprint) === fingerprint) continue;
+        const sameCredential = text(stored?.bootstrap_fingerprint) === fingerprint;
+        const attemptedAt = stored?.bootstrap_attempted_at
+          ? new Date(String(stored.bootstrap_attempted_at)).getTime()
+          : 0;
+        if (sameCredential && Date.now() - attemptedAt < 60 * 60_000) continue;
         const steps = await bootstrapAfterCredential(probe);
+        const complete = steps.every((step) => step.ok || step.skipped);
         await getPool().query(
-          `UPDATE meta_credential_health SET bootstrap = $2::jsonb, bootstrapped_fingerprint = $3, bootstrapped_at = now() WHERE variable = $1`,
-          [probe.variable, JSON.stringify(steps), fingerprint],
+          `UPDATE meta_credential_health SET bootstrap = $2::jsonb, bootstrap_fingerprint = $3, bootstrap_attempted_at = now(),
+             bootstrapped_fingerprint = CASE WHEN $4 THEN $3 ELSE bootstrapped_fingerprint END,
+             bootstrapped_at = CASE WHEN $4 THEN now() ELSE bootstrapped_at END
+           WHERE variable = $1`,
+          [probe.variable, JSON.stringify(steps), fingerprint, complete],
         );
       }
     } catch (error) {
@@ -613,17 +818,48 @@ export function startMetaCredentialWorker() {
   worker.unref?.();
 }
 
-/** Public view: capability states and bootstrap steps. No token, no fingerprint. */
+/** Public view: business capability rows, per-credential detail and the bootstrap log. No token, no fingerprint. */
 export async function metaCredentialHealthView() {
   if (!databaseConfigured()) return { configured: false as const };
   await ensureSchema();
   const rows = (
     await getPool().query<Json>(
-      `SELECT variable, probe, checked_at, bootstrap, bootstrapped_at FROM meta_credential_health ORDER BY variable`,
+      `SELECT variable, probe, checked_at, bootstrap, bootstrapped_at, bootstrap_attempted_at FROM meta_credential_health ORDER BY variable DESC`,
     )
   ).rows;
+  const { capabilityRows, missingScopes } = await import("./meta-credential-health");
+  const probes = rows.map((row) => obj(row.probe) as unknown as CredentialProbe);
+  const attribution = probes.find((probe) => probe.variable === "META_LEAD_ADS_ACCESS_TOKEN");
+  const ordered = [
+    attribution ?? {
+      variable: "META_LEAD_ADS_ACCESS_TOKEN",
+      configured: false,
+      valid: false,
+      scopes: [],
+      capabilities: {},
+    },
+    ...probes.filter((probe) => probe.variable !== "META_LEAD_ADS_ACCESS_TOKEN"),
+  ];
   return {
     configured: true as const,
+    summary: capabilityRows(
+      ordered.map((probe) => ({
+        configured: Boolean(probe.configured),
+        valid: Boolean(probe.valid),
+        scopes: probe.scopes ?? [],
+        capabilities: (probe.capabilities ?? {}) as Record<
+          string,
+          { state: CapabilityState; detail: string }
+        >,
+      })),
+    ),
+    attributionCredential: {
+      added: Boolean(attribution?.configured),
+      valid: Boolean(attribution?.valid),
+      issuedForAttributionApp: Boolean(attribution?.appMatchesAttributionApp),
+      missingScopes: attribution?.valid ? missingScopes(attribution.scopes ?? []) : [],
+    },
+    qaCtwa: await qaCtwaState().catch(() => null),
     credentials: rows.map((row) => {
       const probe = obj(row.probe) as unknown as CredentialProbe;
       return {
@@ -646,6 +882,7 @@ export async function metaCredentialHealthView() {
         checkedAt: row.checked_at,
         bootstrap: row.bootstrap,
         bootstrappedAt: row.bootstrapped_at,
+        bootstrapAttemptedAt: row.bootstrap_attempted_at,
       };
     }),
   };
