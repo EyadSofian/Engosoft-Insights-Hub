@@ -332,8 +332,12 @@ export async function chatwootOperationalHealth() {
          (SELECT count(*) FILTER (WHERE state IN ('has_row','replayed'))::int FROM chatwoot_attribution_reconciliation) AS present,
          (SELECT count(*) FILTER (WHERE state IN ('replayable','failed'))::int FROM chatwoot_attribution_reconciliation) AS missing,
          (SELECT count(*)::int FROM chatwoot_conversation_attribution WHERE unknown_reason = 'webhook_delivery_missed') AS recovered,
-         (SELECT count(*)::int FROM chatwoot_event_inbox
-            WHERE status = 'failed' OR (status IN ('pending','processing') AND received_at < now() - interval '15 minutes')) AS failed_or_stuck,
+         (SELECT count(*)::int FROM chatwoot_event_inbox event
+            WHERE (event.status = 'failed' OR (event.status IN ('pending','processing') AND event.received_at < now() - interval '15 minutes'))
+              -- An event interrupted by a restart after its conversation already has
+              -- its attribution row lost nothing; only real gaps are flagged.
+              AND NOT EXISTS (SELECT 1 FROM chatwoot_conversation_attribution attribution
+                               WHERE attribution.conversation_id = event.conversation_id)) AS failed_or_stuck,
          (SELECT max(updated_at) FROM chatwoot_attribution_reconcile_state) AS checked_at`,
       )
     ).rows[0] ?? {};
