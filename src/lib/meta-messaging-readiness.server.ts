@@ -672,7 +672,9 @@ async function qaTestState(): Promise<ReadinessCheck> {
   return {
     key: "qa_paid_test",
     label,
-    state: "permission_pending",
+    // Spend approval is a business decision, not a readiness gap: the item is
+    // ready once the paused ad exists, and waits only on the credential before.
+    state: ad ? "ready" : "credential_pending",
     detail: `Campaign ${QA_CTWA.campaignId} (${text(obj(read?.data.campaign).effective_status) || "PAUSED"}), ad set ${QA_CTWA.adsetId} (${text(read?.data.destination_type) || "WHATSAPP"}, ${Number(read?.data.daily_budget ?? QA_CTWA.dailyBudgetUsd * 100) / 100} USD/day, ${text(read?.data.effective_status) || "PAUSED"}), ad ${ad ? `${text(ad.id)} (${text(ad.effective_status)})` : "created automatically with the Attribution credential"}${phones.length ? `, destination ${phones.map((phone) => text(phone.display)).join(" / ")}` : ""}. Publishing needs spend approval.${proof}`,
   };
 }
