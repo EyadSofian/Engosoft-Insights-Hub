@@ -21,6 +21,7 @@ import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
 import { fetchOpenAIAds } from "./openai-ads.server";
 import { isOperationalStateCurrent } from "./campaign-status-policy";
 import { leadStageBucket } from "./uncalled-leads";
+import { canonicalLossReason, groupByCanonicalReason } from "./loss-reason-taxonomy";
 import type {
   AdRow,
   AccountingRow,
@@ -1959,10 +1960,21 @@ export function computeLost(data: FilteredData): LostBreakdown {
   const rows = authoritativeLostLeads(data);
   const labels = data.snapshot.sourceLabels;
   const monthOf = (d: string) => (d ? d.slice(0, 7) : "—");
+  // Bilingual Odoo spellings of one reason are one reason: charts group by the
+  // canonical key, drill-downs keep every raw spelling (byReasonCanonical).
+  const reasonKey = (r: LostRow) => canonicalLossReason(r.lossReason).canonicalReasonKey;
+  const byReasonCanonical = groupByCanonicalReason(rows, (r) => r.lossReason);
   return {
     byCategory: groupBy(rows, (r) => r.lostCategory || "—"),
     byType: groupBy(rows, (r) => (r.recordType === "lead" ? "Lead" : "Opportunity")),
-    byReason: groupBy(rows, (r) => r.lossReason || "—"),
+    byReason: groupBy(rows, reasonKey),
+    byReasonCanonical,
+    reasonLabels: Object.fromEntries(
+      byReasonCanonical.map((group) => [
+        group.canonicalReasonKey,
+        { ar: group.canonicalReasonLabelAr, en: group.canonicalReasonLabelEn },
+      ]),
+    ),
     byCourse: groupBy(rows, (r) => r.course || "—"),
     byMonth: groupBy(rows, (r) => monthOf(archivedLostReportingDate(r, data.snapshot))).sort(
       (a, b) => a.label.localeCompare(b.label),
@@ -1971,16 +1983,8 @@ export function computeLost(data: FilteredData): LostBreakdown {
     bySalesperson: groupBy(rows, (r) => r.salesperson || "—"),
     bySource: groupBy(rows, (r) => labels.get(r.sourceKey) ?? r.source ?? "—"),
     byCampaign: groupBy(rows, (r) => r.campaignName || "—"),
-    reasonByTeam: matrix(
-      rows,
-      (r) => r.lossReason || "—",
-      (r) => r.salesTeam || "—",
-    ),
-    reasonByCourse: matrix(
-      rows,
-      (r) => r.lossReason || "—",
-      (r) => r.course || "—",
-    ),
+    reasonByTeam: matrix(rows, reasonKey, (r) => r.salesTeam || "—"),
+    reasonByCourse: matrix(rows, reasonKey, (r) => r.course || "—"),
     total: rows.length,
     crmLostCount: 0,
   };

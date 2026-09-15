@@ -1,22 +1,25 @@
 import type { QualityMetrics } from "./closed-loop";
+import { metricContract, type MetricContract } from "./metric-contracts";
+import { exactAttributionAvailable, type ManagementScope, type ScopeSpend } from "./management-scope";
 
 /**
- * Management KPIs for the closed loop, with their scopes spelled out.
+ * Management KPIs for the Marketing Overview, with their scopes spelled out.
  *
- * Two populations exist and a ratio never mixes them silently:
+ * Two engines, never blended inside one figure:
  *
- *   ALL      every lead in the period, and ALL Meta ad spend in the period
- *   TRACKED  leads whose ad is known by its exact Meta ID and that matched a
- *            CRM record by Meta lead ID; spend of the campaigns that produced
- *            at least one such lead
+ *   SCOPE    (metrics.server) the selected platform scope: ad spend of every
+ *            platform with a spend source, unique CRM leads and won customers
+ *            by creation date, paid collections by payment date.
+ *   EXACT    (closed-loop) acquisitions whose ad is known by its Meta provider
+ *            IDs and matched to a CRM record by Meta lead ID; their paid revenue
+ *            comes from Accounting through the sale order → opportunity link.
+ *            Exists only for Meta: with another platform selected every EXACT
+ *            figure is `not_available`, never a Meta number under another name.
  *
- * Paid revenue only exists for tracked leads (an unknown lead has no known
- * sale), so "ROAS on all ad spend" deliberately divides tracked revenue by all
- * spend: the conservative return. It is labelled as exactly that, next to the
- * tracked-campaign ROAS whose numerator and denominator share one population.
- *
- * Every KPI carries a status. `ok` with value 0 means the source was queried
- * and the answer is zero; anything else is shown as words, never as 0.
+ * Cohort revenue (leads created in the window, paid at any date since) is only
+ * ever divided by spend under a label that says "cohort". Every ratio carries
+ * its numerator, denominator and contract; every figure carries a status, and
+ * anything other than `ok` is shown as words, never as 0.
  */
 
 export type KpiStatus =
@@ -28,7 +31,11 @@ export type KpiStatus =
   /** The integration that would supply it is not connected. */
   | "not_connected"
   /** The data was never recorded for this period. */
-  | "historical_evidence_missing";
+  | "historical_evidence_missing"
+  /** The figure does not exist for the selected platform scope (e.g. exact attribution off Meta). */
+  | "not_available"
+  /** A component source is missing (e.g. one platform's spend), so a ratio on it would mislead. */
+  | "incomplete_source";
 
 export type KpiFormat = "usd" | "count" | "ratio" | "percent";
 
@@ -40,6 +47,7 @@ export interface KpiPart {
 
 export interface Kpi {
   key: string;
+  kind: "value" | "ratio";
   scope: "all" | "tracked";
   label: { en: string; ar: string };
   definition: { en: string; ar: string };
@@ -49,150 +57,311 @@ export interface Kpi {
   numerator?: KpiPart;
   denominator?: KpiPart;
   formula?: string;
+  /** Set when a value is shown but a component source is missing. */
+  coverageNote?: { en: string; ar: string };
+  contract?: MetricContract;
+}
+
+export interface ScopeTotalsInput {
+  spend: ScopeSpend;
+  uniqueCrmLeads: number | null;
+  uniqueWonCustomers: number | null;
+  collectedRevenue: number | null;
+  scopeLabel: { en: string; ar: string };
 }
 
 export interface KpiInputs {
-  /** All facts in the period (any confidence). */
+  /** Acquisition facts in the selected scope (any confidence). */
   all: QualityMetrics;
   /** Exact-attribution facts only. */
   tracked: QualityMetrics;
   /** Every Meta ad spend row in the period. */
   totalSpend: number;
-  /** Spend of campaigns with at least one tracked lead in the period. */
+  /** Spend of Meta campaigns with at least one tracked lead in the period. */
   trackedSpend: number;
   /** Whether Meta spend rows exist for the period at all. */
   spendSynced: boolean;
   /** Whether the CRM/sales graph has been built at least once. */
   crmSynced: boolean;
+  /** Global platform/channel selection; All when omitted. */
+  scope?: ManagementScope;
+  /** Acquisition events in the Meta scope (the CPL denominator); defaults to `all.leads`. */
+  metaEvents?: number;
+  /** Distinct CRM ids behind exact CRM matches; defaults to `tracked.crmMatched`. */
+  exactUniqueLeads?: number;
+  /** Distinct won CRM ids behind exact CRM matches; defaults to `tracked.won`. */
+  exactUniqueWon?: number;
+  /** Events in scope with an exact CRM link; defaults to `tracked.crmMatched`. */
+  exactCrmMatchesInScope?: number;
+  /** Selected-scope figures from metrics.server. Omitted in isolated tests. */
+  scopeTotals?: ScopeTotalsInput;
 }
 
 const t = (en: string, ar: string) => ({ en, ar });
 
+const PENDING_SPEND_NOTE = t(
+  "Spend for part of this scope is unavailable.",
+  "صرف جزء من هذا النطاق غير متاح.",
+);
+
+function withContract(kpi: Omit<Kpi, "contract">): Kpi {
+  const contract = metricContract(kpi.key);
+  return contract ? { ...kpi, contract } : kpi;
+}
+
 function ratio(
   numerator: KpiPart,
   denominator: KpiPart,
-  base: Omit<Kpi, "value" | "status" | "numerator" | "denominator" | "formula">,
+  base: Omit<Kpi, "kind" | "value" | "status" | "numerator" | "denominator" | "formula">,
   gate: KpiStatus,
 ): Kpi {
   const formula = `${numerator.label.en} ÷ ${denominator.label.en}`;
-  if (gate !== "ok") return { ...base, value: null, status: gate, numerator, denominator, formula };
-  if (!denominator.value) {
-    return { ...base, value: null, status: "no_denominator", numerator, denominator, formula };
-  }
+  const shell = { ...base, kind: "ratio" as const, numerator, denominator, formula };
+  if (gate !== "ok") return withContract({ ...shell, value: null, status: gate });
+  if (!denominator.value) return withContract({ ...shell, value: null, status: "no_denominator" });
   const raw = numerator.value / denominator.value;
-  const value =
-    base.format === "usd" || base.format === "ratio" ? Math.round(raw * 100) / 100 : raw;
-  return { ...base, value, status: "ok", numerator, denominator, formula };
+  const value = base.format === "usd" || base.format === "ratio" ? Math.round(raw * 100) / 100 : raw;
+  return withContract({ ...shell, value, status: "ok" });
 }
 
-export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
-  const spendGate: KpiStatus = input.spendSynced ? "ok" : "pending_sync";
-  const crmGate: KpiStatus = input.crmSynced ? "ok" : "pending_sync";
-  const both: KpiStatus = spendGate !== "ok" ? spendGate : crmGate;
-
-  const part = {
-    totalSpend: {
-      label: t("All Meta ad spend", "كل صرف إعلانات Meta"),
-      value: input.totalSpend,
-      format: "usd" as const,
-    },
-    trackedSpend: {
-      label: t("Spend on campaigns with tracked leads", "صرف الحملات التي جاءت بعملاء متتبَّعين"),
-      value: input.trackedSpend,
-      format: "usd" as const,
-    },
-    allLeads: {
-      label: t("All leads", "كل العملاء"),
-      value: input.all.leads,
-      format: "count" as const,
-    },
-    trackedLeads: {
-      label: t("Tracked leads", "العملاء المتتبَّعون"),
-      value: input.tracked.leads,
-      format: "count" as const,
-    },
-    matched: {
-      label: t("Tracked leads matched to CRM", "العملاء المتتبَّعون المطابقون في CRM"),
-      value: input.tracked.crmMatched,
-      format: "count" as const,
-    },
-    interested: {
-      label: t("Interested leads", "العملاء المهتمون"),
-      value: input.tracked.interested,
-      format: "count" as const,
-    },
-    qualified: {
-      label: t("Qualified leads", "العملاء المؤهلون"),
-      value: input.tracked.qualified,
-      format: "count" as const,
-    },
-    quotations: {
-      label: t("Leads with a quotation", "عملاء بعرض سعر"),
-      value: input.tracked.quotations,
-      format: "count" as const,
-    },
-    won: {
-      label: t("Customers won", "العملاء المكسوبون"),
-      value: input.tracked.won,
-      format: "count" as const,
-    },
-    revenue: {
-      label: t("Paid revenue from tracked leads", "الإيراد المدفوع من العملاء المتتبَّعين"),
-      value: input.tracked.revenue,
-      format: "usd" as const,
-    },
-  };
-
-  const value = (
-    key: string,
-    scope: Kpi["scope"],
-    label: Kpi["label"],
-    definition: Kpi["definition"],
-    amount: number,
-    format: KpiFormat,
-    gate: KpiStatus,
-  ): Kpi => ({
+function value(
+  key: string,
+  scope: Kpi["scope"],
+  label: Kpi["label"],
+  definition: Kpi["definition"],
+  amount: number | null,
+  format: KpiFormat,
+  gate: KpiStatus,
+  coverageNote?: Kpi["coverageNote"],
+): Kpi {
+  return withContract({
     key,
+    kind: "value",
     scope,
     label,
     definition,
     value: gate === "ok" ? amount : null,
     format,
-    status: gate,
+    status: gate === "ok" && amount === null ? "pending_sync" : gate,
+    ...(coverageNote ? { coverageNote } : {}),
   });
+}
 
-  const kpis: Kpi[] = [
+export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
+  const exactOk = !input.scope || exactAttributionAvailable(input.scope);
+  const exactGate = (gate: KpiStatus): KpiStatus => (exactOk ? gate : "not_available");
+  const spendGate: KpiStatus = input.spendSynced ? "ok" : "pending_sync";
+  const crmGate: KpiStatus = input.crmSynced ? "ok" : "pending_sync";
+  const both: KpiStatus = spendGate !== "ok" ? spendGate : crmGate;
+  const metaEvents = input.metaEvents ?? input.all.leads;
+  const exactUniqueLeads = input.exactUniqueLeads ?? input.tracked.crmMatched;
+  const exactUniqueWon = input.exactUniqueWon ?? input.tracked.won;
+  const exactMatchesInScope = input.exactCrmMatchesInScope ?? input.tracked.crmMatched;
+
+  const part = {
+    metaSpend: { label: t("All Meta ad spend", "كل صرف إعلانات Meta"), value: input.totalSpend, format: "usd" as const },
+    trackedSpend: {
+      label: t("Spend on tracked Meta campaigns", "صرف حملات Meta المتتبَّعة"),
+      value: input.trackedSpend,
+      format: "usd" as const,
+    },
+    events: {
+      label: t("Acquisition events in scope", "أحداث الاستحواذ في النطاق"),
+      value: input.all.leads,
+      format: "count" as const,
+    },
+    metaEvents: {
+      label: t("Meta acquisition events", "أحداث استحواذ Meta"),
+      value: metaEvents,
+      format: "count" as const,
+    },
+    trackedLeads: {
+      label: t("Exactly attributed acquisitions", "استحواذات بإسناد دقيق"),
+      value: input.tracked.leads,
+      format: "count" as const,
+    },
+    matched: {
+      label: t("Exact CRM matches", "مطابقات CRM دقيقة"),
+      value: input.tracked.crmMatched,
+      format: "count" as const,
+    },
+    matchedInScope: {
+      label: t("Events in scope with an exact CRM match", "أحداث النطاق المطابقة بدقة في CRM"),
+      value: exactMatchesInScope,
+      format: "count" as const,
+    },
+    interested: { label: t("Interested (exact)", "مهتمون (دقيق)"), value: input.tracked.interested, format: "count" as const },
+    qualified: { label: t("Qualified (exact)", "مؤهلون (دقيق)"), value: input.tracked.qualified, format: "count" as const },
+    quotations: {
+      label: t("Quotations (exact)", "عروض أسعار (دقيق)"),
+      value: input.tracked.quotations,
+      format: "count" as const,
+    },
+    won: { label: t("Won (exact)", "مكسوب (دقيق)"), value: input.tracked.won, format: "count" as const },
+    revenue: {
+      label: t("Cohort paid revenue (exact)", "إيراد الكوهورت المدفوع (دقيق)"),
+      value: input.tracked.revenue,
+      format: "usd" as const,
+    },
+  };
+
+  const kpis: Kpi[] = [];
+
+  /* --- selected scope (metrics.server) ------------------------------------ */
+  const scopeTotals = input.scopeTotals;
+  if (scopeTotals) {
+    const spend = scopeTotals.spend;
+    const spendStatus: KpiStatus =
+      spend.status === "not_applicable" ? "not_available" : spend.status === "pending_sync" ? "pending_sync" : "ok";
+    const ratioSpendGate: KpiStatus =
+      spend.status === "ok" ? "ok" : spend.status === "partial" ? "incomplete_source" : spendStatus;
+    const scopeName = scopeTotals.scopeLabel;
+    kpis.push(
+      value(
+        "adSpend",
+        "all",
+        t(`Ad spend · ${scopeName.en}`, `صرف الإعلانات · ${scopeName.ar}`),
+        t(
+          `Spend of every paid platform in scope with a spend source (${spend.includedPlatforms.join(", ") || "none"}). Platforms whose spend is unavailable are named, never counted as zero.`,
+          `صرف كل منصة مدفوعة في النطاق لها مصدر صرف (${spend.includedPlatforms.join("، ") || "لا يوجد"}). المنصات غير المتاح صرفها تُذكر بالاسم ولا تُحسب صفرًا.`,
+        ),
+        spend.value,
+        "usd",
+        spendStatus,
+        spend.status === "partial"
+          ? t(
+              `Excludes unavailable spend for ${spend.unavailablePlatforms.join(", ")}.`,
+              `لا يشمل الصرف غير المتاح لـ ${spend.unavailablePlatforms.join("، ")}.`,
+            )
+          : undefined,
+      ),
+      value(
+        "uniqueCrmLeads",
+        "all",
+        t("Unique CRM leads created", "ليدز CRM فريدة أُنشئت"),
+        t(
+          "Distinct Odoo CRM records (active + canonical Lost) created in the period, narrowed by the platform filter. People, not events.",
+          "سجلات Odoo CRM المميزة (النشطة + Lost القياسية) المُنشأة في الفترة، بحسب فلتر المنصة. أشخاص وليست أحداثًا.",
+        ),
+        scopeTotals.uniqueCrmLeads,
+        "count",
+        "ok",
+      ),
+      value(
+        "uniqueWonCustomers",
+        "all",
+        t("Won customers (CRM cohort)", "عملاء مكسوبون (كوهورت CRM)"),
+        t(
+          "Distinct CRM records created in the period that are Won, narrowed by the platform filter.",
+          "سجلات CRM المميزة المُنشأة في الفترة والمكسوبة، بحسب فلتر المنصة.",
+        ),
+        scopeTotals.uniqueWonCustomers,
+        "count",
+        "ok",
+      ),
+      value(
+        "collectedRevenue",
+        "all",
+        t("Paid collections (payment date)", "التحصيل المدفوع (تاريخ الدفع)"),
+        t(
+          "Accounting USD paid whose Payment Date is in the period. With a platform selected, only lines linked to that platform's campaigns or sources. This is money collected, not revenue attributed to ads.",
+          "USD المدفوع في الحسابات بتاريخ دفع داخل الفترة. مع اختيار منصة: البنود المرتبطة بحملاتها أو مصادرها فقط. هذا تحصيل فعلي وليس إيرادًا مُسندًا للإعلانات.",
+        ),
+        scopeTotals.collectedRevenue,
+        "usd",
+        "ok",
+      ),
+    );
+    const spendPart = { label: t("Ad spend in scope", "الصرف في النطاق"), value: spend.value ?? 0, format: "usd" as const };
+    kpis.push(
+      ratio(
+        spendPart,
+        {
+          label: t("Unique CRM leads created", "ليدز CRM فريدة أُنشئت"),
+          value: scopeTotals.uniqueCrmLeads ?? 0,
+          format: "count",
+        },
+        {
+          key: "costPerCrmLead",
+          scope: "all",
+          label: t("Spend per unique CRM lead", "الصرف لكل ليد CRM فريد"),
+          definition: t(
+            "Ad spend in scope divided by unique CRM leads created in the same period and scope.",
+            "صرف النطاق مقسومًا على ليدز CRM الفريدة المُنشأة في نفس الفترة والنطاق.",
+          ),
+          format: "usd",
+          ...(spend.status === "partial" ? { coverageNote: PENDING_SPEND_NOTE } : {}),
+        },
+        scopeTotals.uniqueCrmLeads === null ? "pending_sync" : ratioSpendGate,
+      ),
+      ratio(
+        {
+          label: t("Paid collections in scope", "التحصيل في النطاق"),
+          value: scopeTotals.collectedRevenue ?? 0,
+          format: "usd",
+        },
+        spendPart,
+        {
+          key: "blendedRoas",
+          scope: "all",
+          label: t("Collections ÷ ad spend (not attributed)", "التحصيل ÷ صرف الإعلانات (بدون إسناد)"),
+          definition: t(
+            "Payment-date collections in scope divided by ad spend in scope. Not an attributed return: it includes money from older leads and non-ad sources.",
+            "تحصيل النطاق بتاريخ الدفع مقسومًا على صرف النطاق. ليس عائدًا مُسندًا: يشمل أموالًا من ليدز أقدم ومصادر غير إعلانية.",
+          ),
+          format: "ratio",
+        },
+        scopeTotals.collectedRevenue === null ? "pending_sync" : ratioSpendGate,
+      ),
+    );
+  } else {
+    // Isolated use (tests, scripts): the only spend known here is Meta's.
+    kpis.push(
+      value(
+        "adSpend",
+        "all",
+        t("Meta ad spend", "صرف إعلانات Meta"),
+        t("Money spent on Meta ads in the selected period.", "المبلغ المصروف على إعلانات Meta في الفترة المختارة."),
+        input.totalSpend,
+        "usd",
+        exactGate(spendGate),
+      ),
+    );
+  }
+
+  /* --- exact attribution (closed-loop, Meta only) -------------------------- */
+  kpis.push(
     value(
-      "adSpend",
+      "metaSpend",
       "all",
-      t("Ad spend", "صرف الإعلانات"),
+      part.metaSpend.label,
       t(
-        "Money spent on Meta ads in the selected period.",
-        "المبلغ المصروف على إعلانات Meta في الفترة المختارة.",
+        "Money spent on Meta ads in the period: the spend the exact-attribution figures are measured against.",
+        "المبلغ المصروف على إعلانات Meta في الفترة: الصرف الذي تُقاس عليه أرقام الإسناد الدقيق.",
       ),
       input.totalSpend,
       "usd",
-      spendGate,
+      exactGate(spendGate),
     ),
     value(
       "trackedSpend",
       "tracked",
       part.trackedSpend.label,
       t(
-        "Ad spend of the campaigns that brought at least one lead we can trace to its exact ad.",
-        "صرف الحملات التي جاءت بعميل واحد على الأقل نعرف إعلانه بالضبط.",
+        "Meta spend of the campaigns that brought at least one lead we can trace to its exact ad.",
+        "صرف حملات Meta التي جاءت بعميل واحد على الأقل نعرف إعلانه بالضبط.",
       ),
       input.trackedSpend,
       "usd",
-      spendGate,
+      exactGate(spendGate),
     ),
     value(
       "leads",
       "all",
-      t("Leads", "العملاء المحتملون"),
+      t("Acquisition events", "أحداث الاستحواذ"),
       t(
-        "People acquired from ads, forms and messages during the selected period.",
-        "الأشخاص الذين وصلوا من الإعلانات والنماذج والرسائل خلال الفترة المختارة.",
+        "Meta form leads, Chatwoot conversations and landing-page submissions in the period, in scope. One person can produce several events; this is not a count of customers.",
+        "عملاء نماذج Meta ومحادثات Chatwoot وإرسالات صفحات الهبوط في الفترة داخل النطاق. الشخص الواحد قد ينتج أكثر من حدث؛ هذا ليس عدد عملاء.",
       ),
       input.all.leads,
       "count",
@@ -202,70 +371,91 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       "trackedLeads",
       "tracked",
       part.trackedLeads.label,
-      t("Leads whose exact Meta ad is known.", "العملاء الذين نعرف إعلان Meta الخاص بهم بالضبط."),
+      t("Acquisition events whose exact Meta ad is known.", "أحداث الاستحواذ التي نعرف إعلان Meta الخاص بها بالضبط."),
       input.tracked.leads,
       "count",
-      "ok",
+      exactGate("ok"),
+    ),
+    value(
+      "exactAttributedLeads",
+      "tracked",
+      t("Unique exact-attributed CRM leads", "ليدز CRM فريدة بإسناد دقيق"),
+      t(
+        "Distinct CRM records behind the exact CRM matches.",
+        "سجلات CRM المميزة خلف المطابقات الدقيقة.",
+      ),
+      exactUniqueLeads,
+      "count",
+      exactGate(crmGate),
     ),
     value(
       "crmMatched",
       "tracked",
-      t("CRM matched leads", "عملاء مطابقون في CRM"),
+      part.matched.label,
       t(
-        "Leads we could connect to an exact CRM record through Meta's lead ID.",
-        "العملاء الذين أمكن ربطهم بسجل CRM محدد عبر معرّف العميل من Meta.",
+        "Exactly attributed acquisitions connected to a CRM record through Meta's lead ID.",
+        "استحواذات بإسناد دقيق مربوطة بسجل CRM عبر معرّف العميل من Meta.",
       ),
       input.tracked.crmMatched,
       "count",
-      crmGate,
+      exactGate(crmGate),
     ),
     value(
       "qualified",
       "tracked",
-      t("Qualified leads", "العملاء المؤهلون"),
+      part.qualified.label,
       t(
-        "Matched leads that currently meet the CRM qualification rule (a later stage, or hot/intermediate priority).",
-        "العملاء المطابقون الذين يستوفون حاليًا قاعدة التأهيل في CRM (مرحلة متقدمة أو أولوية ساخنة/متوسطة).",
+        "Exact CRM matches that currently meet the CRM qualification rule (a later stage, or hot/intermediate priority).",
+        "المطابقات الدقيقة التي تستوفي حاليًا قاعدة التأهيل في CRM (مرحلة متقدمة أو أولوية ساخنة/متوسطة).",
       ),
       input.tracked.qualified,
       "count",
-      crmGate,
+      exactGate(crmGate),
     ),
     value(
       "won",
       "tracked",
-      t("Customers won", "العملاء المكسوبون"),
-      t("CRM opportunities marked Won.", "فرص CRM المسجلة كفوز."),
+      part.won.label,
+      t("Exact CRM matches whose CRM record is Won.", "المطابقات الدقيقة التي سجلها في CRM مكسوب."),
       input.tracked.won,
       "count",
-      crmGate,
+      exactGate(crmGate),
+    ),
+    value(
+      "exactUniqueWon",
+      "tracked",
+      t("Unique won customers (exact)", "عملاء مكسوبون فريدون (دقيق)"),
+      t("Distinct won CRM records behind the exact CRM matches.", "سجلات CRM المكسوبة المميزة خلف المطابقات الدقيقة."),
+      exactUniqueWon,
+      "count",
+      exactGate(crmGate),
     ),
     value(
       "revenue",
       "tracked",
-      t("Paid revenue", "الإيراد المدفوع"),
+      t("Cohort paid revenue (exact)", "إيراد الكوهورت المدفوع (دقيق)"),
       t(
-        "Actual paid invoice revenue connected to exactly tracked leads, dated by when the lead arrived.",
-        "إيراد الفواتير المدفوعة فعليًا المرتبط بعملاء متتبَّعين بدقة، ومؤرخ بتاريخ وصول العميل.",
+        "Accounting paid revenue, at any payment date so far, of the exactly attributed leads that arrived in the period. A cohort figure dated by lead arrival, not by payment date.",
+        "إيراد مدفوع من الحسابات، بأي تاريخ دفع حتى الآن، للعملاء بإسناد دقيق الذين وصلوا في الفترة. رقم كوهورت مؤرخ بوصول العميل وليس بتاريخ الدفع.",
       ),
       input.tracked.revenue,
       "usd",
-      crmGate,
+      exactGate(crmGate),
     ),
     ratio(
       part.revenue,
-      part.totalSpend,
+      part.metaSpend,
       {
         key: "roasAllSpend",
         scope: "all",
-        label: t("ROAS (all ad spend)", "العائد على كل صرف الإعلانات"),
+        label: t("Cohort ROAS on all Meta spend", "العائد (كوهورت) على كل صرف Meta"),
         definition: t(
-          "Paid revenue from tracked leads divided by ALL Meta ad spend. The conservative return: untracked spend counts as cost with no revenue.",
-          "الإيراد المدفوع من العملاء المتتبَّعين مقسومًا على كل صرف Meta. العائد المتحفظ: الصرف غير المتتبَّع يُحسب تكلفة بلا إيراد.",
+          "Cohort paid revenue of exactly attributed leads divided by ALL Meta ad spend in the period. The conservative return: untracked Meta spend counts as cost with no revenue. Revenue is dated by lead arrival, spend by spend date.",
+          "إيراد الكوهورت للعملاء بإسناد دقيق مقسومًا على كل صرف Meta في الفترة. العائد المتحفظ. الإيراد مؤرخ بوصول العميل والصرف بتاريخ الصرف.",
         ),
         format: "ratio",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
       part.revenue,
@@ -273,29 +463,29 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "roasTracked",
         scope: "tracked",
-        label: t("ROAS (tracked campaigns)", "العائد على الحملات المتتبَّعة"),
+        label: t("Cohort ROAS on tracked Meta campaigns", "العائد (كوهورت) على حملات Meta المتتبَّعة"),
         definition: t(
-          "Paid revenue from tracked leads divided by the spend of the campaigns those leads came from.",
-          "الإيراد المدفوع من العملاء المتتبَّعين مقسومًا على صرف الحملات التي جاؤوا منها.",
+          "Cohort paid revenue of exactly attributed leads divided by the Meta spend of the campaigns those leads came from.",
+          "إيراد الكوهورت للعملاء بإسناد دقيق مقسومًا على صرف حملات Meta التي جاؤوا منها.",
         ),
         format: "ratio",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
-      part.totalSpend,
-      part.allLeads,
+      part.metaSpend,
+      part.metaEvents,
       {
         key: "cplAll",
         scope: "all",
-        label: t("Cost per lead (all)", "تكلفة العميل (الكل)"),
+        label: t("Meta spend per Meta acquisition event", "صرف Meta لكل حدث استحواذ من Meta"),
         definition: t(
-          "All Meta ad spend divided by all leads.",
-          "كل صرف Meta مقسومًا على كل العملاء.",
+          "All Meta ad spend divided by acquisition events that belong to Meta. Events from unknown sources are not in the denominator.",
+          "كل صرف Meta مقسومًا على أحداث الاستحواذ التابعة لـ Meta. أحداث المصادر غير المعروفة ليست في المقام.",
         ),
         format: "usd",
       },
-      spendGate,
+      exactGate(spendGate),
     ),
     ratio(
       part.trackedSpend,
@@ -303,14 +493,14 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "cplTracked",
         scope: "tracked",
-        label: t("Cost per lead (tracked)", "تكلفة العميل (المتتبَّع)"),
+        label: t("Cost per tracked lead", "تكلفة العميل المتتبَّع"),
         definition: t(
-          "Spend of campaigns with tracked leads divided by tracked leads.",
-          "صرف الحملات المتتبَّعة مقسومًا على العملاء المتتبَّعين.",
+          "Tracked-campaign spend divided by exactly attributed acquisitions.",
+          "صرف الحملات المتتبَّعة مقسومًا على الاستحواذات بإسناد دقيق.",
         ),
         format: "usd",
       },
-      spendGate,
+      exactGate(spendGate),
     ),
     ratio(
       part.trackedSpend,
@@ -319,13 +509,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "costPerInterested",
         scope: "tracked",
         label: t("Cost per interested lead", "تكلفة العميل المهتم"),
-        definition: t(
-          "Tracked-campaign spend divided by interested leads.",
-          "صرف الحملات المتتبَّعة مقسومًا على العملاء المهتمين.",
-        ),
+        definition: t("Tracked-campaign spend divided by interested leads.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المهتمين."),
         format: "usd",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
       part.trackedSpend,
@@ -334,13 +521,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "costPerQualified",
         scope: "tracked",
         label: t("Cost per qualified lead", "تكلفة العميل المؤهل"),
-        definition: t(
-          "Tracked-campaign spend divided by qualified leads.",
-          "صرف الحملات المتتبَّعة مقسومًا على العملاء المؤهلين.",
-        ),
+        definition: t("Tracked-campaign spend divided by qualified leads.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المؤهلين."),
         format: "usd",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
       part.trackedSpend,
@@ -355,22 +539,22 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         ),
         format: "usd",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
-      part.totalSpend,
+      part.metaSpend,
       part.won,
       {
         key: "costPerCustomerAll",
         scope: "all",
-        label: t("Cost per customer (all ad spend)", "تكلفة العميل المكسوب (كل الصرف)"),
+        label: t("CAC on all Meta spend (exact won)", "تكلفة العميل المكسوب على كل صرف Meta"),
         definition: t(
-          "All Meta ad spend divided by customers won.",
-          "كل صرف Meta مقسومًا على العملاء المكسوبين.",
+          "All Meta ad spend divided by exactly attributed won customers.",
+          "كل صرف Meta مقسومًا على العملاء المكسوبين بإسناد دقيق.",
         ),
         format: "usd",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
       part.trackedSpend,
@@ -378,17 +562,11 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "costPerCustomerTracked",
         scope: "tracked",
-        label: t(
-          "Cost per customer (tracked campaigns)",
-          "تكلفة العميل المكسوب (الحملات المتتبَّعة)",
-        ),
-        definition: t(
-          "Tracked-campaign spend divided by customers won.",
-          "صرف الحملات المتتبَّعة مقسومًا على العملاء المكسوبين.",
-        ),
+        label: t("CAC on tracked Meta campaigns", "تكلفة العميل المكسوب (الحملات المتتبَّعة)"),
+        definition: t("Tracked-campaign spend divided by exactly attributed won customers.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المكسوبين بإسناد دقيق."),
         format: "usd",
       },
-      both,
+      exactGate(both),
     ),
     ratio(
       part.revenue,
@@ -396,14 +574,14 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "revenuePerLead",
         scope: "tracked",
-        label: t("Revenue per lead", "الإيراد لكل عميل"),
+        label: t("Cohort revenue per tracked lead", "إيراد الكوهورت لكل عميل متتبَّع"),
         definition: t(
-          "Paid revenue divided by tracked leads.",
-          "الإيراد المدفوع مقسومًا على العملاء المتتبَّعين.",
+          "Cohort paid revenue divided by exactly attributed acquisitions.",
+          "إيراد الكوهورت المدفوع مقسومًا على الاستحواذات بإسناد دقيق.",
         ),
         format: "usd",
       },
-      crmGate,
+      exactGate(crmGate),
     ),
     ratio(
       part.won,
@@ -411,14 +589,14 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "winRate",
         scope: "tracked",
-        label: t("Win rate", "معدل الفوز"),
+        label: t("Win rate (exact CRM matches)", "معدل الفوز (مطابقات دقيقة)"),
         definition: t(
-          "Customers won divided by tracked leads matched to CRM. Unmatched leads are left out: their outcome is unknown, not lost.",
-          "العملاء المكسوبون مقسومين على العملاء المتتبَّعين المطابقين في CRM. غير المطابق مستبعد: نتيجته غير معروفة وليست خسارة.",
+          "Won divided by exact CRM matches. Unmatched leads are left out: their outcome is unknown, not lost.",
+          "المكسوب مقسومًا على المطابقات الدقيقة. غير المطابق مستبعد: نتيجته غير معروفة وليست خسارة.",
         ),
         format: "percent",
       },
-      crmGate,
+      exactGate(crmGate),
     ),
     ratio(
       part.qualified,
@@ -426,31 +604,28 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "qualificationRate",
         scope: "tracked",
-        label: t("Qualification rate", "معدل التأهيل"),
-        definition: t(
-          "Qualified leads divided by tracked leads matched to CRM.",
-          "العملاء المؤهلون مقسومين على العملاء المتتبَّعين المطابقين في CRM.",
-        ),
+        label: t("Qualification rate (exact CRM matches)", "معدل التأهيل (مطابقات دقيقة)"),
+        definition: t("Qualified divided by exact CRM matches.", "المؤهلون مقسومين على المطابقات الدقيقة."),
         format: "percent",
       },
-      crmGate,
+      exactGate(crmGate),
     ),
     ratio(
-      part.matched,
-      part.allLeads,
+      part.matchedInScope,
+      part.events,
       {
         key: "crmMatchRate",
         scope: "all",
-        label: t("CRM match rate", "نسبة المطابقة في CRM"),
+        label: t("Exact CRM match rate", "نسبة المطابقة الدقيقة في CRM"),
         definition: t(
-          "Tracked leads matched to CRM divided by all leads.",
-          "العملاء المتتبَّعون المطابقون في CRM مقسومين على كل العملاء.",
+          "Acquisition events in scope with an exact CRM link divided by all acquisition events in scope. Both sides count events.",
+          "أحداث الاستحواذ في النطاق المربوطة بدقة في CRM مقسومة على كل أحداث الاستحواذ في النطاق. الطرفان يعدّان أحداثًا.",
         ),
         format: "percent",
       },
-      crmGate,
+      exactGate(crmGate),
     ),
-  ];
+  );
   return Object.fromEntries(kpis.map((kpi) => [kpi.key, kpi]));
 }
 

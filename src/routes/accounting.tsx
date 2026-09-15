@@ -60,11 +60,13 @@ import { useFiltersData } from "@/components/TopBar";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
 import { SalesPerformance } from "@/components/acquisition/SalesPerformance";
+import { EntryCohortView } from "@/components/accounting/EntryCohortView";
 
-type AccountingView = "summary" | "months" | "profitability" | "marketing";
+type AccountingView = "summary" | "months" | "cohorts" | "profitability" | "marketing";
 const ACCOUNTING_VIEWS: readonly AccountingView[] = [
   "summary",
   "months",
+  "cohorts",
   "profitability",
   "marketing",
 ];
@@ -472,6 +474,10 @@ function Accounting() {
           options={[
             { value: "summary", label: lang === "ar" ? "ملخص التحصيل" : "Collection summary" },
             { value: "months", label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison" },
+            {
+              value: "cohorts",
+              label: lang === "ar" ? "كوهورت دخول العملاء" : "Customer entry cohorts",
+            },
             { value: "profitability", label: lang === "ar" ? "الربحية" : "Profitability" },
           ]}
         />
@@ -479,6 +485,8 @@ function Accounting() {
 
       {view === "marketing" ? (
         <SalesPerformance />
+      ) : view === "cohorts" ? (
+        <EntryCohortView />
       ) : isLoading || !data ? (
         <>
           <Skeleton className="h-28" />

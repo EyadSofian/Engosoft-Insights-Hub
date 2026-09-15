@@ -23,6 +23,7 @@ import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { MiniMetric } from "@/components/accounting/MiniMetric";
 import { monthLabel } from "@/components/accounting/accounting-format";
+import { LeadQaControl, useLeadQaVerifications } from "@/components/accounting/LeadQaControl";
 
 export type UncalledScope = "none" | "owner";
 type UncalledStatus = "fresh" | "critical" | "warning" | "stable";
@@ -42,9 +43,13 @@ interface UncalledLeadsResponse {
   summary: {
     assignedLeads: number;
     calledByAny: number | null;
+    /** Confirmed: complete evidence and no contact found. */
     uncalled: number | null;
+    /** No contact found but evidence incomplete: never a confirmed omission. */
+    uncalledUnconfirmed?: number;
     calledByOwner: number | null;
     ownerUncalled: number | null;
+    ownerUncalledUnconfirmed?: number;
     rescuedByColleague: number | null;
     calls: number | null;
     callsPerLead: number | null;
@@ -110,6 +115,9 @@ interface UncalledLeadsResponse {
       chatAssignees: string[];
       latestChatAt: number | null;
       latestChatUrl: string | null;
+      /** `unknown` when Yeastar or Chatwoot evidence is incomplete for this lead. */
+      contactStatus?: "not_contacted" | "unknown";
+      evidence?: Record<string, unknown>;
       status: UncalledStatus;
       reasons: string[];
       url: string | null;
@@ -206,6 +214,8 @@ export function UncalledLeadsDialog({
   const { data, isLoading, error, refetch } = useApi<UncalledLeadsResponse>(query, {
     enabled: scope !== null,
   });
+  // Manual QA verdicts for the page in hand, so a reviewer verifies from the evidence.
+  const leadQa = useLeadQaVerifications(data?.leads.rows.map((lead) => lead.id) ?? []);
 
   const dayLabel = (days: number | null) =>
     days === null
@@ -281,11 +291,16 @@ export function UncalledLeadsDialog({
                     <MiniMetric
                       label={lang === "ar" ? "المعروض في الفلتر" : "Shown by filter"}
                       value={fmtNum(data.leads.total)}
-                      hint={
-                        lang === "ar"
-                          ? `${fmtNum(data.leads.unfilteredTotal)} إجمالي غير متصل بها من ${fmtNum(data.summary.assignedLeads)} ليد موزعة`
-                          : `${fmtNum(data.leads.unfilteredTotal)} total uncalled of ${fmtNum(data.summary.assignedLeads)} assigned`
-                      }
+                      hint={(() => {
+                        const unconfirmed =
+                          scope === "owner"
+                            ? (data.summary.ownerUncalledUnconfirmed ?? 0)
+                            : (data.summary.uncalledUnconfirmed ?? 0);
+                        const confirmed = Math.max(0, data.leads.unfilteredTotal - unconfirmed);
+                        return lang === "ar"
+                          ? `${fmtNum(confirmed)} مؤكد بدون تواصل + ${fmtNum(unconfirmed)} غير مؤكد (دليل ناقص) من ${fmtNum(data.summary.assignedLeads)} ليد موزعة`
+                          : `${fmtNum(confirmed)} confirmed not contacted + ${fmtNum(unconfirmed)} unconfirmed (incomplete evidence) of ${fmtNum(data.summary.assignedLeads)} assigned`;
+                      })()}
                     />
                     <MiniMetric
                       label={lang === "ar" ? "حالات حرجة" : "Critical"}
@@ -536,6 +551,25 @@ export function UncalledLeadsDialog({
                               <Pill tone={uncalledStatusTone(lead.status)}>
                                 {uncalledStatusLabel(lead.status, lang)}
                               </Pill>
+                              {lead.contactStatus === "unknown" && (
+                                <Pill tone="warning">
+                                  {lang === "ar"
+                                    ? "غير مؤكد — الدليل غير مكتمل"
+                                    : "Unconfirmed — evidence incomplete"}
+                                </Pill>
+                              )}
+                              <LeadQaControl
+                                lead={{
+                                  id: lead.id,
+                                  label: lead.contact || lead.phone || `#${lead.id}`,
+                                  salesperson: lead.salesperson,
+                                  url: lead.url,
+                                  latestCallUrl: lead.latestCallUrl,
+                                  latestChatUrl: lead.latestChatUrl,
+                                }}
+                                evidence={lead.evidence}
+                                verification={leadQa.data?.verifications?.[lead.id]}
+                              />
                             </div>
                             <small className="mt-1 block text-[10px] text-text-muted">
                               {lang === "ar" ? "أُنشئ" : "Created"}{" "}

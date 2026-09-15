@@ -5,11 +5,16 @@ import type { MonthlyLeadFact, UncalledLeadSort, UncalledLeadStatus } from "@/li
  * The named leads behind the two un-contacted counters on the employee tab.
  *
  * The counters are produced by `mergeLeadCallCoverage` in
- * `agent-analytics.server.ts`, which joins Odoo leads to Yeastar calls through
- * the Calls Hub. This route repeats that join at lead grain instead of employee
- * grain so the pop-up can name the rows, and it deliberately uses the same
- * phone key, the same de-duplication key and the same owner test — a pop-up
- * whose list did not add up to the tile above it would be worse than no pop-up.
+ * `agent-analytics.server.ts`. Both this route and that aggregate resolve a
+ * lead's contact through the one shared resolver (`lead-contact-evidence.ts`):
+ * same phone + mobile matching, same number normalisation, same owner test and
+ * same evidence-completeness rule — a pop-up whose list did not add up to the
+ * tile above it would be worse than no pop-up.
+ *
+ * A lead with no contact found but incomplete evidence (Calls Hub unread, or a
+ * number Chatwoot has not been checked for) is listed with
+ * `contactStatus: "unknown"` and counted separately; it is never reported as
+ * confirmed "not contacted".
  */
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -23,13 +28,10 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const { integrationPersonMatchScore } = await import("@/lib/integration-person");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
-        const {
-          chatwootPhoneKey,
-          getChatwootPhoneConversationEvidence,
-        } = await import("@/lib/chatwoot.server");
+        const { chatwootPhoneKey, getChatwootPhoneConversationEvidence } =
+          await import("@/lib/chatwoot.server");
         const {
           closeRateOf,
-          callCanCoverLead,
           leadAgeDays,
           leadCallAggregateKey,
           leadStageBucket,
@@ -37,13 +39,19 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           summarizeUncalledMonths,
           uncalledLeadSeverity,
         } = await import("@/lib/uncalled-leads");
+        const {
+          LEAD_CONTACT_EVIDENCE_VERSION,
+          indexCallsByPhone,
+          publicContactEvidence,
+          resolveLeadContactEvidence,
+        } = await import("@/lib/lead-contact-evidence");
         const { hasReportableLost } = await import("@/lib/lost-authority");
 
         const url = new URL(request.url);
         /**
-         * `none`  — nobody in the company called the lead.
-         * `owner` — the assigned salesperson never called it, which also covers
-         *           every lead a colleague rescued. The two are different
+         * `none`  — nobody in the company contacted the lead.
+         * `owner` — the assigned salesperson never contacted it, which also
+         *           covers every lead a colleague rescued. The two are different
          *           populations and the caller picks one explicitly.
          */
         const scope = url.searchParams.get("scope") === "owner" ? "owner" : "none";
@@ -82,6 +90,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         ) {
           return Response.json({ error: "A valid date range is required" }, { status: 400 });
         }
+        const window = { from: filters.from, to: filters.to };
 
         // The employee filter is applied here, by owner, rather than through the
         // global `salesperson` filter — that one also narrows invoices and ads,
@@ -89,11 +98,6 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const sharedFilters = { ...filters };
         delete sharedFilters.salesperson;
         const data = await getFiltered(sharedFilters);
-        /**
-         * With no Lost population every lead reads as won-or-open, and the close
-         * rate computes to a confident 100%. The dashboard already flags that
-         * state globally; the pop-up refuses the ratio rather than repeating it.
-         */
         const lostAvailable = hasReportableLost(data.snapshot.health.lostAuthority);
 
         let callsAvailable = true;
@@ -103,30 +107,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           callsError = error instanceof Error ? error.message : "Calls Hub is unavailable";
           return [];
         });
+        const callsByPhone = indexCallsByPhone(leadCalls);
 
         /**
-         * Yeastar may hold `+9665…`, Odoo may hold `05…`, and Egyptian records
-         * carry their own prefix. The subscriber's final nine digits are stable
-         * across all three; anything shorter is an internal extension and is
-         * never matched. Identical to the aggregate path by design.
-         */
-        const phoneKey = chatwootPhoneKey;
-        const callsByPhone = new Map<string, typeof leadCalls>();
-        for (const call of leadCalls) {
-          const key = phoneKey(call.phone);
-          if (!key) continue;
-          callsByPhone.set(key, [...(callsByPhone.get(key) ?? []), call]);
-        }
-
-        /**
-         * Owner extension lookup.
-         *
-         * A PBX row names the agent twice — by display name and by extension —
-         * and the display name is often shorter than the Odoo legal name. The
-         * aggregate path resolves that with `integrationPersonMatchScore` and
-         * accepts a fuzzy match only when exactly one Odoo person wins, because
-         * crediting a call to the wrong colleague is worse than not crediting
-         * it. The same rule is repeated here.
+         * Owner extension lookup. A PBX row names the agent by display name and
+         * extension, and the display name is often shorter than the Odoo legal
+         * name; a fuzzy match is accepted only when exactly one Odoo person wins.
          */
         const ownerNames = new Map<string, string>();
         for (const row of data.crm) {
@@ -168,12 +154,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             ? `${odooBaseUrl}/web#id=${id}&model=crm.lead&view_type=form`
             : null;
         };
+        const callUrl = (callId: string) =>
+          callId ? `${callsHubBaseUrl}/?call=${encodeURIComponent(callId)}#archive` : null;
 
         /**
          * This is an action queue, not a historical funnel. Closed Won and every
-         * canonical Lost row are deliberately excluded before severity is
-         * calculated; a closed record can still belong in reports, but it can
-         * never be an employee's current "critical follow-up".
+         * canonical Lost row are excluded before severity is calculated.
          */
         type SourceLead = {
           id: string;
@@ -210,38 +196,43 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         }
 
         const employeeKey = employee ? normalizePersonName(employee) : "";
-        const matchesByLead = new Map<string, (typeof leadCalls)[number][]>();
-        const chatCandidatePhones: string[] = [];
-        for (const lead of leads.values()) {
+        const ownerMatchers = (lead: SourceLead) => {
           const ownerKey = normalizePersonName(lead.salesperson);
-          if (!ownerKey || (employeeKey && ownerKey !== employeeKey)) continue;
           const ownerExtension = extensionByOwner.get(ownerKey) || "";
-          const matches = new Map<string, (typeof leadCalls)[number]>();
-          for (const key of new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean))) {
-            for (const call of callsByPhone.get(key) ?? []) {
-              if (!callCanCoverLead(call, lead.createdAt)) continue;
-              matches.set(leadCallAggregateKey(call), call);
-            }
-          }
-          const matched = [...matches.values()];
-          matchesByLead.set(lead.id, matched);
-          const ownerCalled = matched.some(
-            (call) =>
+          return {
+            ownerKey,
+            isOwnerCall: (call: (typeof leadCalls)[number]) =>
               normalizePersonName(call.agentName) === ownerKey ||
               (!!ownerExtension && call.agentExtension === ownerExtension),
-          );
-          if (scope === "none" ? matched.length === 0 : !ownerCalled) {
+            isOwnerChatName: (name: string) => integrationPersonMatchScore(lead.salesperson, name) > 0,
+          };
+        };
+
+        // Pass 1 — calls only — decides which numbers still need Chatwoot proof.
+        const noChats = new Map();
+        const chatCandidatePhones: string[] = [];
+        for (const lead of leads.values()) {
+          const owner = ownerMatchers(lead);
+          if (!owner.ownerKey || (employeeKey && owner.ownerKey !== employeeKey)) continue;
+          const callsOnly = resolveLeadContactEvidence(lead, {
+            window,
+            callsByPhone,
+            callsAvailable,
+            chatsByPhone: noChats,
+            chatwootAvailable: false,
+            isOwnerCall: owner.isOwnerCall,
+            isOwnerChatName: owner.isOwnerChatName,
+          });
+          if (scope === "none" ? !callsOnly.calledByAny : !callsOnly.calledByOwner) {
             chatCandidatePhones.push(lead.phone, lead.mobile);
           }
         }
 
         let chatwootAvailable = true;
-        let chatwootComplete = true;
         let chatwootError: string | null = null;
         const chatBatch = await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(
           (error) => {
             chatwootAvailable = false;
-            chatwootComplete = false;
             chatwootError =
               error instanceof Error ? error.message : "Chatwoot matching is unavailable";
             return {
@@ -253,12 +244,9 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             };
           },
         );
-        const chatsByPhone = chatBatch.evidence;
-        if (!chatBatch.complete) {
-          chatwootComplete = false;
+        if (chatwootAvailable && !chatBatch.complete) {
           chatwootError = `Chatwoot sync is warming ${chatBatch.missing} phone records`;
-        } else if (chatBatch.error) {
-          chatwootAvailable = false;
+        } else if (chatwootAvailable && chatBatch.error) {
           chatwootError = chatBatch.error;
         }
 
@@ -295,18 +283,25 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           chatAssignees: string[];
           latestChatAt: number | null;
           latestChatUrl: string | null;
+          /** `unknown` when evidence is incomplete: never a confident "not contacted". */
+          contactStatus: "not_contacted" | "unknown";
+          evidence: ReturnType<typeof publicContactEvidence>;
           status: UncalledLeadStatus;
           reasons: string[];
           url: string | null;
           latestCallUrl: string | null;
         }> = [];
 
-        /** Per owner, the `(phone, extension, agent)` pairs already counted. */
+        /** Per owner, the `(phone, extension, agent, day)` call aggregates already counted. */
         const callKeysByOwner = new Map<string, Set<string>>();
         const ownerCallKeysByOwner = new Map<string, Set<string>>();
         let assignedLeads = 0;
-        let calledByAnyTotal = 0;
-        let calledByOwnerTotal = 0;
+        let contactedByAnyTotal = 0;
+        let contactedByOwnerTotal = 0;
+        let confirmedNotContacted = 0;
+        let confirmedOwnerNotContacted = 0;
+        let unknownContact = 0;
+        let unknownOwnerContact = 0;
         let matchedCallTotal = 0;
         let matchedOwnerCallTotal = 0;
         let chatContactedTotal = 0;
@@ -317,103 +312,56 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         let lostTotal = 0;
 
         for (const lead of leads.values()) {
-          const ownerKey = normalizePersonName(lead.salesperson);
-          if (!ownerKey) continue;
-          if (employeeKey && ownerKey !== employeeKey) continue;
+          const owner = ownerMatchers(lead);
+          if (!owner.ownerKey) continue;
+          if (employeeKey && owner.ownerKey !== employeeKey) continue;
           assignedLeads += 1;
 
-          const ownerExtension = extensionByOwner.get(ownerKey) || "";
-          const matched = matchesByLead.get(lead.id) ?? [];
-          const matches = new Map(matched.map((call) => [leadCallAggregateKey(call), call]));
-          const ownerMatches = matched.filter(
-            (call) =>
-              normalizePersonName(call.agentName) === ownerKey ||
-              (!!ownerExtension && call.agentExtension === ownerExtension),
-          );
-          const calledByAny = matched.length > 0;
-          const calledByOwner = ownerMatches.length > 0;
-          const createdAt = Date.parse(`${lead.createdAt.slice(0, 10)}T00:00:00Z`) / 1000;
-          const periodStart = Date.parse(`${filters.from}T00:00:00Z`) / 1000;
-          const periodEnd = Date.parse(`${filters.to}T23:59:59Z`) / 1000;
-          const chatPhoneKeys = [
-            ...new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean)),
-          ];
-          const chatMatches = chatPhoneKeys
-            .flatMap((key) => chatsByPhone.get(key) ?? [])
-            .filter(
-              (chat) =>
-                chat.lastActivityAt >= periodStart &&
-                (!Number.isFinite(createdAt) || chat.lastActivityAt >= createdAt) &&
-                chat.lastActivityAt <= periodEnd,
-            )
-            .sort((left, right) => right.lastActivityAt - left.lastActivityAt);
-          const agentChatMatches = chatMatches.filter(
-            (chat) =>
-              chat.agentContactedAt > 0 &&
-              chat.agentContactedAt >= periodStart &&
-              (!Number.isFinite(createdAt) || chat.agentContactedAt >= createdAt) &&
-              chat.agentContactedAt <= periodEnd,
-          );
-          const ownerChatMatches = agentChatMatches.filter(
-            (chat) =>
-              [...(chat.agentNames ?? []), chat.assigneeName]
-                .filter(Boolean)
-                .some(
-                  (name) => integrationPersonMatchScore(lead.salesperson, name) > 0,
-                ),
-          );
-          const contactedViaChat = agentChatMatches.length > 0;
-          const chatByOwner = ownerChatMatches.length > 0;
-          const chatAwaitingReply = chatMatches.some(
-            (chat) => chat.awaitingReply && chat.customerMessagedAt >= (createdAt || 0),
-          );
-          const latestChat = chatMatches[0] ?? null;
-          const latestChatStatus = String(latestChat?.status || "").trim().toLowerCase();
-          const chatOpen = Boolean(
-            latestChat && !["resolved", "closed"].includes(latestChatStatus),
-          );
-          const contactedByAny = calledByAny || contactedViaChat;
-          const contactedByOwner = calledByOwner || chatByOwner;
-          const chatEvidenceComplete = chatPhoneKeys.every((key) => chatsByPhone.has(key));
-          const stillNeedsChatProof = scope === "none" ? !contactedByAny : !contactedByOwner;
-          if (stillNeedsChatProof && !chatEvidenceComplete) chatEvidenceIncompleteTotal += 1;
-          /** Every call on this lead's phone — what the lead's own row shows. */
-          const totalCalls = matched.reduce((sum, call) => sum + call.totalCalls, 0);
+          const evidence = resolveLeadContactEvidence(lead, {
+            window,
+            callsByPhone,
+            callsAvailable,
+            chatsByPhone: chatBatch.evidence,
+            chatwootAvailable,
+            isOwnerCall: owner.isOwnerCall,
+            isOwnerChatName: owner.isOwnerChatName,
+            callUrl,
+          });
+          const chatEvidenceComplete = !evidence.missingSources.includes("chatwoot");
+          const scopedStatus = scope === "none" ? evidence.contactStatus : evidence.ownerContactStatus;
+          if (scopedStatus !== "contacted" && !chatEvidenceComplete) chatEvidenceIncompleteTotal += 1;
 
           /**
-           * Coverage is lead-grain but call totals are not.
-           *
-           * Two Odoo opportunities can carry the same customer phone, and each
-           * has genuinely been reached by its owner — so both count as covered.
-           * The PBX call behind them is still one call, so the aggregate adds a
-           * `(phone, agent)` pair to an employee's total only once, and this
-           * total is de-duplicated the same way. Summing per lead instead
-           * inflated the period figure by 14 calls on the August window.
+           * Coverage is lead-grain but call totals are not: two opportunities on
+           * one customer phone share one PBX call, so an owner's call total adds
+           * each aggregate once.
            */
-          const ownerCallKeys = callKeysByOwner.get(ownerKey) ?? new Set<string>();
-          callKeysByOwner.set(ownerKey, ownerCallKeys);
-          const employeeCallKeys = ownerCallKeysByOwner.get(ownerKey) ?? new Set<string>();
-          ownerCallKeysByOwner.set(ownerKey, employeeCallKeys);
+          const ownerCallKeys = callKeysByOwner.get(owner.ownerKey) ?? new Set<string>();
+          callKeysByOwner.set(owner.ownerKey, ownerCallKeys);
+          const employeeCallKeys = ownerCallKeysByOwner.get(owner.ownerKey) ?? new Set<string>();
+          ownerCallKeysByOwner.set(owner.ownerKey, employeeCallKeys);
           let dedupedCalls = 0;
           let dedupedOwnerCalls = 0;
-          for (const [key, call] of matches) {
+          for (const call of evidence.matchedCalls) {
+            const key = leadCallAggregateKey(call);
             if (ownerCallKeys.has(key)) continue;
             ownerCallKeys.add(key);
             dedupedCalls += call.totalCalls;
-            const sameOwner =
-              normalizePersonName(call.agentName) === ownerKey ||
-              (!!ownerExtension && call.agentExtension === ownerExtension);
-            if (sameOwner && !employeeCallKeys.has(key)) {
+            if (owner.isOwnerCall(call) && !employeeCallKeys.has(key)) {
               employeeCallKeys.add(key);
               dedupedOwnerCalls += call.totalCalls;
             }
           }
 
-          if (contactedByAny) calledByAnyTotal += 1;
-          if (contactedByOwner) calledByOwnerTotal += 1;
-          if (contactedViaChat) chatContactedTotal += 1;
-          if (chatByOwner) chatContactedByOwnerTotal += 1;
-          if (chatAwaitingReply) chatAwaitingReplyTotal += 1;
+          if (evidence.contactedByAny) contactedByAnyTotal += 1;
+          if (evidence.contactedByOwner) contactedByOwnerTotal += 1;
+          if (evidence.contactStatus === "not_contacted") confirmedNotContacted += 1;
+          if (evidence.ownerContactStatus === "not_contacted") confirmedOwnerNotContacted += 1;
+          if (evidence.contactStatus === "unknown") unknownContact += 1;
+          if (evidence.ownerContactStatus === "unknown") unknownOwnerContact += 1;
+          if (evidence.contactedViaChat) chatContactedTotal += 1;
+          if (evidence.chatByOwner) chatContactedByOwnerTotal += 1;
+          if (evidence.chatAwaitingReply) chatAwaitingReplyTotal += 1;
           matchedCallTotal += dedupedCalls;
           matchedOwnerCallTotal += dedupedOwnerCalls;
           if (lead.outcome === "won") wonTotal += 1;
@@ -421,34 +369,28 @@ export const Route = createFileRoute("/api/uncalled-leads")({
 
           monthFacts.push({
             month: lead.createdAt.slice(0, 7),
-            calledByAny: contactedByAny,
-            calledByOwner: contactedByOwner,
-            // De-duplicated, so the months still add up to the period total. A
-            // phone shared across months lands in the first month that used it.
+            calledByAny: evidence.contactedByAny,
+            calledByOwner: evidence.contactedByOwner,
+            // De-duplicated, so the months still add up to the period total.
             calls: dedupedCalls,
             ownerCalls: dedupedOwnerCalls,
             outcome: lead.outcome,
           });
 
-          // `none` is a strict subset of `owner`: a lead nobody called is also a
-          // lead its owner did not call.
-          if (scope === "none" ? contactedByAny : contactedByOwner) continue;
+          // `none` is a strict subset of `owner`.
+          if (scopedStatus === "contacted") continue;
 
-          /**
-           * Age is measured to the END of the selected window, not to today.
-           * Read in September, a lead created on 30 July was one day old when
-           * the July report closed — dating it 60 days would make every archived
-           * month look uniformly neglected and hide the months that really were.
-           */
+          /** Age is measured to the END of the selected window, not to today. */
           const ageDays = leadAgeDays(lead.createdAt, filters.to);
           const severity = uncalledLeadSeverity({
             stage: lead.stage,
             priority: lead.priority,
             callingReply: lead.callingReply,
             ageDays,
-            calledByAny: contactedByAny,
-            chatAwaitingReply,
+            calledByAny: evidence.contactedByAny,
+            chatAwaitingReply: evidence.chatAwaitingReply,
           });
+          const latestChatStatus = evidence.latestChatStatus;
 
           rows.push({
             id: lead.id,
@@ -464,49 +406,30 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             lastStageUpdate: lead.lastStageUpdate,
             ageDays,
             outcome: lead.outcome,
-            calledByAny: contactedByAny,
-            calledByOwner: contactedByOwner,
-            totalCalls,
-            calledBy: [...new Set(matched.map((call) => call.agentName).filter(Boolean))].slice(
-              0,
-              4,
-            ),
-            latestCallAt:
-              matched
-                .map((call) => call.latestCallAt)
-                .filter(Boolean)
-                .sort()
-                .at(-1) ?? null,
-            contactedViaChat,
-            chatByOwner,
-            chatAwaitingReply,
-            chatConversationCount: chatMatches.length,
-            chatEmployeeReplied: agentChatMatches.length > 0,
-            chatOwnerReplied: ownerChatMatches.length > 0,
-            latestChatStatus: latestChatStatus || null,
-            latestChatOpen: latestChat ? chatOpen : null,
+            calledByAny: evidence.contactedByAny,
+            calledByOwner: evidence.contactedByOwner,
+            totalCalls: evidence.totalCalls,
+            calledBy: evidence.callers.slice(0, 4),
+            latestCallAt: evidence.latestCallAt,
+            contactedViaChat: evidence.contactedViaChat,
+            chatByOwner: evidence.chatByOwner,
+            chatAwaitingReply: evidence.chatAwaitingReply,
+            chatConversationCount: evidence.chatConversationCount,
+            chatEmployeeReplied: evidence.contactedViaChat,
+            chatOwnerReplied: evidence.chatByOwner,
+            latestChatStatus,
+            latestChatOpen:
+              latestChatStatus === null ? null : !["resolved", "closed"].includes(latestChatStatus),
             chatEvidenceComplete,
-            chatAssignees: [
-              ...new Set(
-                chatMatches
-                  .flatMap((chat) => [...(chat.agentNames ?? []), chat.assigneeName])
-                  .filter(Boolean),
-              ),
-            ].slice(0, 4),
-            latestChatAt: latestChat?.lastActivityAt ?? null,
-            latestChatUrl: latestChat?.url ?? null,
+            chatAssignees: evidence.chatAssignees.slice(0, 4),
+            latestChatAt: evidence.latestChatAt,
+            latestChatUrl: evidence.latestChatUrl,
+            contactStatus: scopedStatus,
+            evidence: publicContactEvidence(evidence),
             status: severity.status,
             reasons: severity.reasons,
             url: leadUrl(lead.id),
-            latestCallUrl:
-              matched
-                .filter((call) => call.latestCallId)
-                .sort((left, right) => right.latestCallAt.localeCompare(left.latestCallAt))
-                .map(
-                  (call) =>
-                    `${callsHubBaseUrl}/?call=${encodeURIComponent(call.latestCallId)}#archive`,
-                )
-                .at(0) ?? null,
+            latestCallUrl: evidence.latestCallUrl,
           });
         }
 
@@ -526,10 +449,6 @@ export const Route = createFileRoute("/api/uncalled-leads")({
         const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize));
         const safePage = Math.min(page, totalPages);
         const pageRows = ordered.slice((safePage - 1) * pageSize, safePage * pageSize);
-        // Owner and caller are colleagues, and this list is read beside the
-        // employee cards — so they are written the same way there: Odoo HR's
-        // name, three parts. Only the page in hand is rewritten; the filtering
-        // above ran on the raw spelling the lead itself carries.
         const { getEmployeeDirectory } = await import("@/lib/employee-directory.server");
         const directory = await getEmployeeDirectory();
         const named = pageRows.map((row) => ({
@@ -537,10 +456,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           salesperson: directory.displayNameFor(row.salesperson),
           calledBy: row.calledBy.map((agent) => directory.displayNameFor(agent)),
         }));
-        // A missing alternate number on a lead already proven contacted cannot
-        // change the action list. Only incomplete evidence on a still-uncontacted
-        // lead keeps the sync in a warming state.
-        chatwootComplete = chatwootAvailable && chatEvidenceIncompleteTotal === 0;
+        const chatwootComplete = chatwootAvailable && chatEvidenceIncompleteTotal === 0;
 
         return json({
           ok: true,
@@ -548,7 +464,8 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           employee: employee || null,
           sort,
           status: statusFilter,
-          range: { from: filters.from, to: filters.to },
+          range: window,
+          evidenceVersion: LEAD_CONTACT_EVIDENCE_VERSION,
           callsAvailable,
           callsError,
           chatwootAvailable,
@@ -557,13 +474,17 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           lostAvailable,
           summary: {
             assignedLeads,
-            calledByAny: callsAvailable ? calledByAnyTotal : null,
-            uncalled: callsAvailable ? assignedLeads - calledByAnyTotal : null,
-            calledByOwner: callsAvailable ? calledByOwnerTotal : null,
-            ownerUncalled: callsAvailable ? assignedLeads - calledByOwnerTotal : null,
+            calledByAny: callsAvailable ? contactedByAnyTotal : null,
+            /** Confirmed: complete evidence and no contact found. */
+            uncalled: callsAvailable ? confirmedNotContacted : null,
+            /** No contact found, but evidence incomplete — not a confirmed omission. */
+            uncalledUnconfirmed: unknownContact,
+            calledByOwner: callsAvailable ? contactedByOwnerTotal : null,
+            ownerUncalled: callsAvailable ? confirmedOwnerNotContacted : null,
+            ownerUncalledUnconfirmed: unknownOwnerContact,
             /** Leads the owner ignored but a colleague picked up. */
             rescuedByColleague: callsAvailable
-              ? Math.max(0, calledByAnyTotal - calledByOwnerTotal)
+              ? Math.max(0, contactedByAnyTotal - contactedByOwnerTotal)
               : null,
             calls: callsAvailable ? matchedCallTotal : null,
             callsPerLead:
@@ -576,10 +497,12 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             closeRate: closeRateOf(wonTotal, lostTotal, lostAvailable),
             conversionRate: assignedLeads > 0 ? (wonTotal / assignedLeads) * 100 : null,
             contactRate:
-              callsAvailable && assignedLeads > 0 ? (calledByAnyTotal / assignedLeads) * 100 : null,
+              callsAvailable && assignedLeads > 0
+                ? (contactedByAnyTotal / assignedLeads) * 100
+                : null,
             ownerContactRate:
               callsAvailable && assignedLeads > 0
-                ? (calledByOwnerTotal / assignedLeads) * 100
+                ? (contactedByOwnerTotal / assignedLeads) * 100
                 : null,
             chatContacted: chatwootAvailable ? chatContactedTotal : null,
             chatContactedByOwner: chatwootAvailable ? chatContactedByOwnerTotal : null,
@@ -590,7 +513,7 @@ export const Route = createFileRoute("/api/uncalled-leads")({
           leads: {
             rows: named,
             total: ordered.length,
-            /** Before the status filter — the number the tile itself shows. */
+            /** Before the status filter — confirmed plus unconfirmed rows. */
             unfilteredTotal: rows.length,
             page: safePage,
             pageSize,

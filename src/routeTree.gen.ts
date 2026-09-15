@@ -53,6 +53,7 @@ import { Route as ApiEmployeeEvidenceRouteImport } from './routes/api/employee-e
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
@@ -64,6 +65,7 @@ import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
+import { Route as ApiRevenueCohortsRouteImport } from './routes/api/revenue-cohorts'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
@@ -342,6 +344,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
+  id: '/api/lead-qa',
+  path: '/api/lead-qa',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLeadsRoute = ApiLeadsRouteImport.update({
   id: '/api/leads',
   path: '/api/leads',
@@ -395,6 +402,11 @@ const ApiProfitabilityRoute = ApiProfitabilityRouteImport.update({
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
   id: '/api/refresh',
   path: '/api/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRevenueCohortsRoute = ApiRevenueCohortsRouteImport.update({
+  id: '/api/revenue-cohorts',
+  path: '/api/revenue-cohorts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSalesRoute = ApiSalesRouteImport.update({
@@ -734,6 +746,7 @@ export interface FileRoutesByFullPath {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -745,6 +758,7 @@ export interface FileRoutesByFullPath {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
@@ -846,6 +860,7 @@ export interface FileRoutesByTo {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -857,6 +872,7 @@ export interface FileRoutesByTo {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
@@ -959,6 +975,7 @@ export interface FileRoutesById {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -970,6 +987,7 @@ export interface FileRoutesById {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
@@ -1073,6 +1091,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
@@ -1084,6 +1103,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
     | '/api/targets'
@@ -1185,6 +1205,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
@@ -1196,6 +1217,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
     | '/api/targets'
@@ -1297,6 +1319,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
     | '/api/media-buyers'
@@ -1308,6 +1331,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
     | '/api/targets'
@@ -1410,6 +1434,7 @@ export interface RootRouteChildren {
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiLeadQaRoute: typeof ApiLeadQaRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
@@ -1421,6 +1446,7 @@ export interface RootRouteChildren {
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
+  ApiRevenueCohortsRoute: typeof ApiRevenueCohortsRoute
   ApiSalesRoute: typeof ApiSalesRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
@@ -1788,6 +1814,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/lead-qa': {
+      id: '/api/lead-qa'
+      path: '/api/lead-qa'
+      fullPath: '/api/lead-qa'
+      preLoaderRoute: typeof ApiLeadQaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/leads': {
       id: '/api/leads'
       path: '/api/leads'
@@ -1863,6 +1896,13 @@ declare module '@tanstack/react-router' {
       path: '/api/refresh'
       fullPath: '/api/refresh'
       preLoaderRoute: typeof ApiRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/revenue-cohorts': {
+      id: '/api/revenue-cohorts'
+      path: '/api/revenue-cohorts'
+      fullPath: '/api/revenue-cohorts'
+      preLoaderRoute: typeof ApiRevenueCohortsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sales': {
@@ -2298,6 +2338,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiLeadQaRoute: ApiLeadQaRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
@@ -2309,6 +2350,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiRefreshRoute: ApiRefreshRoute,
+  ApiRevenueCohortsRoute: ApiRevenueCohortsRoute,
   ApiSalesRoute: ApiSalesRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiTargetsRoute: ApiTargetsRoute,

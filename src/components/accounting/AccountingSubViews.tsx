@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { TargetEditor } from "@/components/accounting/TargetEditor";
 import { EmployeeMetricInfo } from "@/components/accounting/EmployeeMetricInfo";
 import { MiniMetric } from "@/components/accounting/MiniMetric";
+import { LeadQaControl, useLeadQaVerifications } from "@/components/accounting/LeadQaControl";
 import { monthLabel } from "@/components/accounting/accounting-format";
 import {
   UncalledLeadsDialog,
@@ -108,10 +109,20 @@ interface EmployeeEvidenceResponse {
       firstCallAt: string | null;
       latestCallAt: string | null;
       latestCallUrl: string | null;
+      phoneNumbers?: string[];
+      /** Shared contact evidence (lead-contact-evidence.ts). */
+      evidence?: Record<string, unknown> & {
+        contactStatus?: "contacted" | "not_contacted" | "unknown";
+        ownerContactStatus?: "contacted" | "not_contacted" | "unknown";
+        latestChatUrl?: string | null;
+        contactedViaChat?: boolean;
+      };
     }>;
     total: number;
     truncated: boolean;
   };
+  callsAvailable?: boolean;
+  chatwootPhoneAvailable?: boolean;
   orders: {
     rows: Array<{
       orderRef: string;
@@ -945,7 +956,7 @@ export function AccountingAgentsView() {
   const filters = useFilters();
   const [section, setSection] = useState<"units" | "employees">("units");
   const [display, setDisplay] = useState<"cards" | "table">("cards");
-  const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls">("revenue");
+  const [sortBy, setSortBy] = useState<"revenue" | "closing" | "calls" | "closedLost">("revenue");
   const [search, setSearch] = useState("");
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
   const [editingTargets, setEditingTargets] = useState(false);
@@ -1048,6 +1059,11 @@ export function AccountingAgentsView() {
         ? (b.decidedConversionRate ?? -1) - (a.decidedConversionRate ?? -1) ||
           b.slaWon - a.slaWon ||
           b.paidRevenue - a.paidRevenue
+        : sortBy === "closedLost"
+          ? // Highest Closed Lost: the closure movement in the window, never the cohort `lost`.
+            b.closedLostInPeriod - a.closedLostInPeriod ||
+            b.olderCohortClosedLostInPeriod - a.olderCohortClosedLostInPeriod ||
+            a.displayName.localeCompare(b.displayName)
         : sortBy === "calls"
           ? (b.outboundCalls ?? -1) - (a.outboundCalls ?? -1) ||
             (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
@@ -1372,8 +1388,8 @@ export function AccountingAgentsView() {
                 }
                 hint={
                   lang === "ar"
-                    ? "لا مكالمة ولا رسالة أو رد من موظف"
-                    : "No employee call, message, or reply"
+                    ? `مؤكد: لا مكالمة ولا رد موظف بدليل مكتمل · ${data.summary.contactUnknownDistributedLeads === null ? "—" : fmtNum(data.summary.contactUnknownDistributedLeads)} غير مؤكد لأن الدليل ناقص`
+                    : `Confirmed: no employee call or reply, complete evidence · ${data.summary.contactUnknownDistributedLeads === null ? "—" : fmtNum(data.summary.contactUnknownDistributedLeads)} unconfirmed (incomplete evidence)`
                 }
                 onDrill={
                   data.summary.uncalledDistributedLeads === null
@@ -1502,6 +1518,10 @@ export function AccountingAgentsView() {
                   options={[
                     { value: "revenue", label: lang === "ar" ? "التحصيل" : "Revenue" },
                     { value: "closing", label: lang === "ar" ? "الإغلاقات" : "Closures" },
+                    {
+                      value: "closedLost",
+                      label: lang === "ar" ? "الأعلى في Lost المقفول" : "Highest Closed Lost",
+                    },
                     ...(data.callsHub.callsAvailable
                       ? [{ value: "calls" as const, label: lang === "ar" ? "المكالمات" : "Calls" }]
                       : []),
@@ -2410,6 +2430,9 @@ function EmployeeEvidencePanel({
   const { lang } = useI18n();
   const query = `/api/employee-evidence?employee=${encodeURIComponent(row.name)}${row.callExtension ? `&extension=${encodeURIComponent(row.callExtension)}` : ""}${row.chatwootAgentId ? `&chatwoot_agent_id=${row.chatwootAgentId}` : ""}`;
   const { data, isLoading, error, refetch } = useApi<EmployeeEvidenceResponse>(query);
+  const leadQa = useLeadQaVerifications(
+    kind === "leads" ? (data?.leads.rows.map((lead) => lead.id) ?? []) : [],
+  );
   const outcomeLabel = (outcome: "won" | "open" | "lost") =>
     outcome === "won"
       ? lang === "ar"
@@ -2579,16 +2602,44 @@ function EmployeeEvidencePanel({
                             {fmtNum(lead.ownerCalls)}
                           </bdi>{" "}
                           {lang === "ar" ? "مكالمة من الموظف" : "owner calls"} ·{" "}
-                          {lead.calledByOwner
+                          {(() => {
+                            // Shared evidence: calls on phone and mobile plus Chatwoot replies.
+                            // Incomplete evidence is never shown as "not contacted".
+                            const status =
+                              lead.evidence?.ownerContactStatus ??
+                              (lead.calledByOwner ? "contacted" : "unknown");
+                            return status === "contacted"
+                              ? lang === "ar"
+                                ? "تم التواصل"
+                                : "contacted"
+                              : status === "not_contacted"
+                                ? lang === "ar"
+                                  ? "لم يتواصل (دليل مكتمل)"
+                                  : "not contacted (complete evidence)"
+                                : lang === "ar"
+                                  ? "غير مؤكد — الدليل غير مكتمل"
+                                  : "unconfirmed — evidence incomplete";
+                          })()}
+                          {lead.evidence?.contactedViaChat
                             ? lang === "ar"
-                              ? "تم التواصل"
-                              : "contacted"
-                            : lang === "ar"
-                              ? "لم يتواصل"
-                              : "not contacted"}
+                              ? " · رد في Chatwoot"
+                              : " · replied in Chatwoot"
+                            : ""}
                         </small>
                       </div>
                       <span className="flex shrink-0 flex-wrap gap-1.5">
+                        <LeadQaControl
+                          lead={{
+                            id: lead.id,
+                            label: lead.contact || lead.phone || `#${lead.id}`,
+                            salesperson: data.employee,
+                            url: lead.url,
+                            latestCallUrl: lead.latestCallUrl,
+                            latestChatUrl: lead.evidence?.latestChatUrl ?? null,
+                          }}
+                          evidence={lead.evidence}
+                          verification={leadQa.data?.verifications?.[lead.id]}
+                        />
                         {lead.latestCallUrl && (
                           <a
                             href={lead.latestCallUrl}
@@ -2792,7 +2843,7 @@ function AgentCards({
   onSelect,
 }: {
   rows: AgentRow[];
-  sortBy: "revenue" | "closing" | "calls";
+  sortBy: "revenue" | "closing" | "calls" | "closedLost";
   callsAvailable: boolean;
   onSelect: (row: AgentRow) => void;
 }) {
@@ -2843,17 +2894,23 @@ function AgentCards({
                 ? lang === "ar"
                   ? "إغلاقات رابحة تمت في الفترة"
                   : "Won closures in period"
-                : sortBy === "calls"
+                : sortBy === "closedLost"
                   ? lang === "ar"
-                    ? "إجمالي المكالمات"
-                    : "Total calls"
-                  : lang === "ar"
-                    ? "التحصيل المدفوع"
-                    : "Paid collections"}
+                    ? "اتقفل Lost خلال الفترة"
+                    : "Closed Lost during period"
+                  : sortBy === "calls"
+                    ? lang === "ar"
+                      ? "إجمالي المكالمات"
+                      : "Total calls"
+                    : lang === "ar"
+                      ? "التحصيل المدفوع"
+                      : "Paid collections"}
             </div>
             <div className="num mt-1 text-xl font-semibold text-text">
               {sortBy === "closing"
                 ? fmtNum(row.slaWon)
+                : sortBy === "closedLost"
+                  ? fmtNum(row.closedLostInPeriod)
                 : sortBy === "calls"
                   ? row.outboundCalls === null
                     ? "—"
@@ -2896,12 +2953,12 @@ function AgentCards({
               }
             />
             <MiniMetric
-              label={lang === "ar" ? "إغلاقات خاسرة" : "Lost closures"}
-              value={fmtNum(row.slaLost)}
+              label={lang === "ar" ? "اتقفل Lost في الفترة" : "Closed Lost in period"}
+              value={fmtNum(row.closedLostInPeriod)}
               hint={
                 lang === "ar"
-                  ? "صفقات قفلها خاسرة، محسوبة بتاريخ القفل مش بتاريخ دخول الليد."
-                  : "Deals he closed lost, dated by close date — not by when the lead arrived."
+                  ? `بتاريخ القفل: ${fmtNum(row.olderCohortClosedLostInPeriod)} من كوهورت أقدم · ${fmtNum(row.createdAndLostInPeriod)} دخلت واتقفلت في الفترة. خسارة الكوهورت (بتاريخ الإنشاء): ${fmtNum(row.cohortLost)}.`
+                  : `By close date: ${fmtNum(row.olderCohortClosedLostInPeriod)} from older cohorts · ${fmtNum(row.createdAndLostInPeriod)} created and lost in the period. Cohort Lost (by creation date): ${fmtNum(row.cohortLost)}.`
               }
             />
             <MiniMetric
@@ -3309,51 +3366,222 @@ function AgentPerformanceSheet({
           </div>
 
           <div className="space-y-5 p-4 sm:p-7">
+            {/* 1 — Collections first: "الموظف حصّل كام؟" */}
+            <section className="space-y-3" aria-labelledby="employee-collections-title">
+              <div>
+                <div className="text-xs font-semibold text-brand">
+                  {lang === "ar" ? "١ · التحصيلات" : "1 · Collections"}
+                </div>
+                <h3 id="employee-collections-title" className="mt-0.5 text-lg font-bold text-text">
+                  {lang === "ar" ? "الموظف حصّل كام؟" : "How much did the employee collect?"}
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <ProfileMetric
+                  label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
+                  explain="paidCollections"
+                  value={fmtUSDFull(row.paidRevenue)}
+                  sub={invoiceCount(row.invoices, lang)}
+                  icon={<ReceiptText size={17} />}
+                  hero
+                  evidenceHref="#employee-sales-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
+                  value={fmtNum(row.invoices)}
+                  sub={lang === "ar" ? "فواتير مميزة بتاريخ الدفع" : "Distinct invoices by payment date"}
+                  icon={<ReceiptText size={17} />}
+                  evidenceHref="#employee-sales-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "مبيعات أوامر البيع" : "Sale-order revenue"}
+                  value={row.orderRevenue === null ? "—" : fmtUSDFull(row.orderRevenue)}
+                  sub={
+                    lang === "ar"
+                      ? `${fmtNum(row.orderCount)} أمر بيع · أساس مختلف عن التحصيل`
+                      : `${fmtNum(row.orderCount)} sale orders · a different basis from collections`
+                  }
+                  icon={<ChartNoAxesCombined size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "إنجاز التارجت" : "Target achievement"}
+                  explain="achievementPaid"
+                  value={
+                    row.target && row.target.target !== null ? fmtPct(row.target.achievementPaid, 1) : "—"
+                  }
+                  sub={
+                    row.target && row.target.target !== null
+                      ? `${lang === "ar" ? "التارجت" : "Target"} ${fmtUSDFull(row.target.target)}`
+                      : lang === "ar"
+                        ? "لا يوجد تارجت منشور للفترة"
+                        : "No published target for the period"
+                  }
+                  icon={<Trophy size={17} />}
+                />
+              </div>
+              {row.target && <AgentTargetPanel target={row.target} row={row} />}
+            </section>
+
+            {/* 2 — Leads: "دخل له كام ليد وعمل فيهم إيه؟" */}
+            <section className="space-y-3" aria-labelledby="employee-leads-title">
+              <div>
+                <div className="text-xs font-semibold text-brand">{lang === "ar" ? "٢ · الليدز" : "2 · Leads"}</div>
+                <h3 id="employee-leads-title" className="mt-0.5 text-lg font-bold text-text">
+                  {lang === "ar" ? "دخل له كام ليد وعمل فيهم إيه؟" : "How many leads came in, and what happened?"}
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <ProfileMetric
+                  label={lang === "ar" ? "ليدز دخلت له" : "Leads assigned (cohort)"}
+                  explain="totalLeads"
+                  value={fmtNum(row.cleanLeads)}
+                  sub={
+                    lang === "ar"
+                      ? `${fmtNum(row.distributedLeads)} مفتوحة للمتابعة الآن`
+                      : `${fmtNum(row.distributedLeads)} still open for follow-up`
+                  }
+                  icon={<Users size={17} />}
+                  evidenceHref="#employee-lead-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "رابحة" : "Won"}
+                  explain="cohortWon"
+                  value={fmtNum(row.won)}
+                  sub={
+                    lang === "ar"
+                      ? `${fmtPct(row.conversionRate, 1)} تحويل كل الليدز`
+                      : `${fmtPct(row.conversionRate, 1)} lead conversion`
+                  }
+                  icon={<Trophy size={17} />}
+                  evidenceHref="#employee-lead-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "خسارة الكوهورت" : "Cohort Lost"}
+                  value={fmtNum(row.cohortLost)}
+                  sub={lang === "ar" ? "ليدز الفترة التي انتهت Lost (بتاريخ الإنشاء)" : "Period leads now Lost (by creation date)"}
+                  icon={<ChartNoAxesCombined size={17} />}
+                  evidenceHref="#employee-lead-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "اتقفل Lost في الفترة" : "Closed Lost during period"}
+                  value={fmtNum(row.closedLostInPeriod)}
+                  sub={
+                    lang === "ar"
+                      ? `${fmtNum(row.olderCohortClosedLostInPeriod)} من كوهورت أقدم · ${fmtNum(row.createdAndLostInPeriod)} دخلت واتقفلت في الفترة`
+                      : `${fmtNum(row.olderCohortClosedLostInPeriod)} from older cohorts · ${fmtNum(row.createdAndLostInPeriod)} created and lost in period`
+                  }
+                  icon={<ChartNoAxesCombined size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "مفتوحة / متابعة" : "Open / follow-up"}
+                  value={fmtNum(Math.max(0, row.cleanLeads - row.won - row.cohortLost))}
+                  sub={lang === "ar" ? "ليدز الفترة غير الرابحة وغير الخاسرة" : "Period leads neither won nor lost"}
+                  icon={<Users size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
+                  explain="periodClosureRate"
+                  value={fmtPct(row.decidedConversionRate, 1)}
+                  sub={
+                    lang === "ar"
+                      ? `${fmtNum(row.slaWon)} رابحة · ${fmtNum(row.closedLostInPeriod)} خاسرة · اتقفلوا في الفترة`
+                      : `${fmtNum(row.slaWon)} won · ${fmtNum(row.closedLostInPeriod)} lost · closed in period`
+                  }
+                  icon={<Trophy size={17} />}
+                  evidenceHref="#employee-lead-evidence"
+                />
+              </div>
+            </section>
+
+            {/* 3 — Contact & QA: evidence of contact, then the manual verdicts. */}
+            <section className="space-y-3" aria-labelledby="employee-contact-qa-title">
+              <div>
+                <div className="text-xs font-semibold text-brand">
+                  {lang === "ar" ? "٣ · التواصل والتحقق" : "3 · Contact & QA"}
+                </div>
+                <h3 id="employee-contact-qa-title" className="mt-0.5 text-lg font-bold text-text">
+                  {lang === "ar" ? "تواصل مع ليدزه؟ وهل اتأكدنا؟" : "Were the leads contacted, and verified?"}
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <ProfileMetric
+                  label={lang === "ar" ? "تواصل معها الموظف" : "Contacted by employee"}
+                  value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
+                  sub={
+                    lang === "ar"
+                      ? `تغطية ${fmtPct(row.leadOwnerCallCoverageRate, 1)} من ${fmtNum(row.distributedLeads)} ليد`
+                      : `${fmtPct(row.leadOwnerCallCoverageRate, 1)} of ${fmtNum(row.distributedLeads)} leads`
+                  }
+                  icon={<PhoneCall size={17} />}
+                  evidenceHref="#employee-lead-evidence"
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by anyone"}
+                  value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)}
+                  sub={
+                    lang === "ar"
+                      ? `${row.chatRepliedDistributedLeads === null ? "—" : fmtNum(row.chatRepliedDistributedLeads)} برد في Chatwoot`
+                      : `${row.chatRepliedDistributedLeads === null ? "—" : fmtNum(row.chatRepliedDistributedLeads)} via a Chatwoot reply`
+                  }
+                  icon={<PhoneCall size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "لم يتواصل معها أحد (مؤكد)" : "Not contacted (confirmed)"}
+                  value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
+                  sub={
+                    lang === "ar"
+                      ? `+ ${row.contactUnknownDistributedLeads === null ? "—" : fmtNum(row.contactUnknownDistributedLeads)} غير مؤكد لأن الدليل ناقص`
+                      : `+ ${row.contactUnknownDistributedLeads === null ? "—" : fmtNum(row.contactUnknownDistributedLeads)} unconfirmed (incomplete evidence)`
+                  }
+                  icon={<PhoneCall size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "ينتظرون رده في Chatwoot" : "Awaiting a Chatwoot reply"}
+                  value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)}
+                  sub={lang === "ar" ? "حالة الآن، لا تتبع الفترة" : "Current state, not the period"}
+                  icon={<Users size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "تحقق يدوي" : "Manually verified"}
+                  value={row.leadQa ? fmtNum(row.leadQa.verified) : "—"}
+                  sub={
+                    row.leadQa
+                      ? lang === "ar"
+                        ? `نسبة التحقق ${fmtPct(row.leadQa.verificationRate, 1)} من ${fmtNum(row.leadQa.assignedLeads)} ليد`
+                        : `${fmtPct(row.leadQa.verificationRate, 1)} of ${fmtNum(row.leadQa.assignedLeads)} leads verified`
+                      : lang === "ar"
+                        ? "سجل التحقق غير متاح"
+                        : "Verification store unavailable"
+                  }
+                  icon={<Users size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "يحتاج مراجعة / متنازع" : "Needs review / disputed"}
+                  value={row.leadQa ? `${fmtNum(row.leadQa.needsReview)} / ${fmtNum(row.leadQa.disputed)}` : "—"}
+                  sub={lang === "ar" ? "من التحقق اليدوي" : "From manual QA"}
+                  icon={<Users size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "ليدز صالحة / غير صالحة" : "Valid / invalid leads"}
+                  value={row.leadQa ? `${fmtNum(row.leadQa.verifiedValid)} / ${fmtNum(row.leadQa.verifiedInvalid)}` : "—"}
+                  sub={lang === "ar" ? "تحقق يدوي لجودة الليد" : "Manual lead-quality verdicts"}
+                  icon={<Users size={17} />}
+                />
+                <ProfileMetric
+                  label={lang === "ar" ? "جودة المكالمات (AI)" : "Call quality (AI)"}
+                  value={fmtQuality(row.averageQualityScore)}
+                  sub={
+                    lang === "ar"
+                      ? "تقييم آلي للمكالمات — منفصل عن التحقق اليدوي"
+                      : "Automated call score — separate from manual QA"
+                  }
+                  icon={<PhoneCall size={17} />}
+                  evidenceHref="#employee-call-evidence"
+                />
+              </div>
+            </section>
+
             <EmployeeScoreSummary row={row} />
-            {row.target && <AgentTargetPanel target={row.target} row={row} />}
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <ProfileMetric
-                label={lang === "ar" ? "التحصيل المدفوع" : "Paid collections"}
-                explain="paidCollections"
-                value={fmtUSDFull(row.paidRevenue)}
-                sub={invoiceCount(row.invoices, lang)}
-                icon={<ReceiptText size={17} />}
-                hero
-                evidenceHref="#employee-sales-evidence"
-              />
-              <ProfileMetric
-                label={lang === "ar" ? "إجمالي الليدز" : "Total leads"}
-                explain="totalLeads"
-                value={fmtNum(row.cleanLeads)}
-                sub={
-                  lang === "ar"
-                    ? `${fmtNum(row.won)} رابحة · ${fmtNum(row.lost)} خاسرة`
-                    : `${fmtNum(row.won)} won · ${fmtNum(row.lost)} lost`
-                }
-                icon={<Users size={17} />}
-                evidenceHref="#employee-lead-evidence"
-              />
-              <ProfileMetric
-                label={lang === "ar" ? "تحويل كل الليدز" : "Lead conversion"}
-                explain="conversionAll"
-                value={fmtPct(row.conversionRate, 1)}
-                sub={lang === "ar" ? "الرابحة ÷ إجمالي الليدز" : "Won ÷ all leads"}
-                icon={<ChartNoAxesCombined size={17} />}
-                evidenceHref="#employee-lead-evidence"
-              />
-              <ProfileMetric
-                label={lang === "ar" ? "نسبة الإغلاق في الفترة" : "Period closure rate"}
-                explain="periodClosureRate"
-                value={fmtPct(row.decidedConversionRate, 1)}
-                sub={
-                  lang === "ar"
-                    ? `${fmtNum(row.slaWon)} رابحة · ${fmtNum(row.slaLost)} خاسرة · اتقفلوا في الفترة`
-                    : `${fmtNum(row.slaWon)} won · ${fmtNum(row.slaLost)} lost · closed in period`
-                }
-                icon={<Trophy size={17} />}
-                evidenceHref="#employee-lead-evidence"
-              />
-            </div>
 
             <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
               <div className="flex flex-wrap items-end justify-between gap-3">
