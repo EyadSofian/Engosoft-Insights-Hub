@@ -315,3 +315,38 @@ export function startChatwootReconcileWorker() {
   worker = setInterval(run, hours * 3_600_000);
   worker.unref?.();
 }
+
+/**
+ * The one operational number that matters: Chatwoot conversations with an
+ * inbound message that have no attribution row. Target zero; anything else is
+ * flagged. Counts come from the last reconciliation window and the event inbox.
+ */
+export async function chatwootOperationalHealth() {
+  if (!databaseConfigured()) return null;
+  await ensureSchema();
+  const row =
+    (
+      await getPool().query<Row>(
+        `SELECT
+         (SELECT count(*) FILTER (WHERE state IN ('has_row','replayed','replayable','failed'))::int FROM chatwoot_attribution_reconciliation) AS inbound,
+         (SELECT count(*) FILTER (WHERE state IN ('has_row','replayed'))::int FROM chatwoot_attribution_reconciliation) AS present,
+         (SELECT count(*) FILTER (WHERE state IN ('replayable','failed'))::int FROM chatwoot_attribution_reconciliation) AS missing,
+         (SELECT count(*)::int FROM chatwoot_conversation_attribution WHERE unknown_reason = 'webhook_delivery_missed') AS recovered,
+         (SELECT count(*)::int FROM chatwoot_event_inbox
+            WHERE status = 'failed' OR (status IN ('pending','processing') AND received_at < now() - interval '15 minutes')) AS failed_or_stuck,
+         (SELECT max(updated_at) FROM chatwoot_attribution_reconcile_state) AS checked_at`,
+      )
+    ).rows[0] ?? {};
+  const missing = Number(row.missing ?? 0);
+  const failedOrStuck = Number(row.failed_or_stuck ?? 0);
+  return {
+    inboundConversations: Number(row.inbound ?? 0),
+    expectedRows: Number(row.inbound ?? 0),
+    presentRows: Number(row.present ?? 0),
+    missing,
+    recovered: Number(row.recovered ?? 0),
+    failedOrStuck,
+    flagged: missing > 0 || failedOrStuck > 0,
+    checkedAt: row.checked_at ?? null,
+  };
+}

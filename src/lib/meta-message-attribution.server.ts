@@ -57,6 +57,17 @@ export interface MetaIdentityResolution {
 }
 
 const MAX_WEBHOOK_TEXT = 1_000;
+
+/**
+ * Provider message IDs of the platform self-test. Real Meta IDs start with
+ * `wamid.`, `m_` or `aWdf`; nothing Meta sends starts with this prefix, so a
+ * self-test event can never be mistaken for, or counted as, real traffic.
+ */
+export const SELF_TEST_MESSAGE_PREFIX = "selftest.";
+
+export function isSelfTestMessageId(providerMessageId: string): boolean {
+  return providerMessageId.startsWith(SELF_TEST_MESSAGE_PREFIX);
+}
 const MAX_PROCESS_ATTEMPTS = 8;
 const MANAGED_LABEL_PREFIXES = ["src:", "channel:", "campaign:", "branch:"];
 
@@ -401,13 +412,15 @@ export async function ingestMetaMessageAttributionWebhook(input: {
   let duplicates = 0;
   for (const item of normalized) {
     const eventKey = `${item.provider}:${item.providerMessageId}`;
+    // A self-test event is stored (that is the proof) but parked outside the worker's statuses.
+    const selfTest = isSelfTestMessageId(item.providerMessageId);
     const result = await getPool().query(
       `INSERT INTO meta_message_attribution_events (
         event_key, provider, provider_message_id, channel, source_platform,
         destination_phone_number_id, destination_page_id, referral_source_id, ctwa_clid,
         source_url, source_type, attribution_method, attribution_confidence, unknown_reason,
-        reduced_evidence_json, payload_hash, occurred_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17)
+        reduced_evidence_json, payload_hash, occurred_at, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18)
       ON CONFLICT (provider, provider_message_id) DO UPDATE SET
         duplicate_deliveries = meta_message_attribution_events.duplicate_deliveries + 1
       RETURNING (xmax = 0) AS inserted`,
@@ -429,6 +442,7 @@ export async function ingestMetaMessageAttributionWebhook(input: {
         JSON.stringify(item.reducedEvidence),
         payloadHash,
         item.occurredAt,
+        selfTest ? "self_test" : "received",
       ],
     );
     if (result.rows[0]?.inserted) accepted += 1;
@@ -1079,7 +1093,7 @@ export async function getMetaAttributionHealth() {
   await ensureSchema();
   const [events, catalog] = await Promise.all([
     getPool().query(
-      `SELECT count(*)::int received,count(*) FILTER (WHERE status='resolved')::int resolved,count(*) FILTER (WHERE status='unresolved')::int unresolved,count(*) FILTER (WHERE status LIKE 'waiting_%')::int waiting,count(*) FILTER (WHERE status='failed')::int failed,coalesce(sum(duplicate_deliveries),0)::int duplicate_deliveries,max(received_at) last_received_at FROM meta_message_attribution_events`,
+      `SELECT count(*)::int received,count(*) FILTER (WHERE status='resolved')::int resolved,count(*) FILTER (WHERE status='unresolved')::int unresolved,count(*) FILTER (WHERE status LIKE 'waiting_%')::int waiting,count(*) FILTER (WHERE status='failed')::int failed,coalesce(sum(duplicate_deliveries),0)::int duplicate_deliveries,max(received_at) last_received_at FROM meta_message_attribution_events WHERE status <> 'self_test'`,
     ),
     getPool().query(
       `SELECT count(*)::int rows,count(*) FILTER (WHERE campaign_id<>'')::int campaigns,count(*) FILTER (WHERE creative_id<>'')::int creatives,count(*) FILTER (WHERE effective_object_story_id<>'')::int story_ids,count(*) FILTER (WHERE source_post_id<>'')::int post_ids FROM meta_entity_identity_catalog`,

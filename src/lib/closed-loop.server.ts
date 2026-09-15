@@ -59,6 +59,9 @@ type Row = Record<string, unknown>;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const s = (value: unknown): string => (value == null ? "" : String(value).trim());
+const text = s;
+const obj = (value: unknown): Row =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : {};
 const n = (value: unknown): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -163,6 +166,7 @@ export function ensureClosedLoopSchema(): Promise<void> {
          matched_at timestamptz NOT NULL DEFAULT now(),
          UNIQUE (acquisition_event_id, crm_lead_id)
        );
+       ALTER TABLE acquisition_crm_links ADD COLUMN IF NOT EXISTS ambiguity_reason text NOT NULL DEFAULT '';
        CREATE UNIQUE INDEX IF NOT EXISTS acquisition_crm_links_primary_idx
          ON acquisition_crm_links (acquisition_event_id) WHERE is_primary;
        CREATE INDEX IF NOT EXISTS acquisition_crm_links_crm_idx ON acquisition_crm_links (crm_lead_id);
@@ -548,6 +552,7 @@ export interface ClosedLoopRefreshSummary {
   primaryLinks: number;
   exactLinks: number;
   inferredLinks: number;
+  ambiguousLinks: number;
   errors: string[];
   durationMs: number;
 }
@@ -829,6 +834,7 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           { name: "match_method", type: "text" },
           { name: "match_confidence", type: "text" },
           { name: "is_primary", type: "boolean" },
+          { name: "ambiguity_reason", type: "text" },
         ],
         links.map((link) => [
           link.acquisitionEventId,
@@ -841,6 +847,7 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
           link.matchMethod,
           link.matchConfidence,
           link.isPrimary,
+          link.ambiguityReason ?? "",
         ]),
       );
       await client.query("COMMIT");
@@ -865,6 +872,11 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
       exactLinks: links.filter((link) => link.isPrimary && link.matchConfidence === "exact").length,
       inferredLinks: links.filter((link) => link.isPrimary && link.matchConfidence === "inferred")
         .length,
+      ambiguousLinks: new Set(
+        links
+          .filter((link) => link.matchConfidence === "ambiguous")
+          .map((link) => link.acquisitionEventId),
+      ).size,
       errors,
       durationMs: Date.now() - started,
     };
@@ -1355,6 +1367,29 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
       crmSynced: Boolean(refresh.finishedAt),
     });
     const messagingStatus: KpiStatus = sources.messagingResolved > 0 ? "ok" : "not_connected";
+    const messaging = (await import("./meta-messaging-readiness.server")
+      .then((module) => module.storedMessagingReadiness())
+      .catch(() => null)) as Row | null;
+    const ambiguousIds = new Set(
+      (
+        await pool
+          .query<Row>(
+            `SELECT DISTINCT acquisition_event_id FROM acquisition_crm_links WHERE match_confidence = 'ambiguous'`,
+          )
+          .catch(() => ({ rows: [] as Row[] }))
+      ).rows.map((row) => s(row.acquisition_event_id)),
+    );
+    const crmBreakdown = {
+      exact: facts.filter((fact) => fact.outcome && fact.matchConfidence === "exact").length,
+      inferred: facts.filter((fact) => fact.outcome && fact.matchConfidence === "inferred").length,
+      ambiguous: facts.filter((fact) => !fact.outcome && ambiguousIds.has(fact.acquisitionEventId))
+        .length,
+      unmatched: facts.filter((fact) => !fact.outcome && !ambiguousIds.has(fact.acquisitionEventId))
+        .length,
+    };
+    const chatwootHealth = await import("./chatwoot-attribution-reconcile.server")
+      .then((module) => module.chatwootOperationalHealth())
+      .catch(() => null);
     const coverageSummary = [
       {
         key: "meta_lead_attribution",
@@ -1409,26 +1444,43 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
           ar: "عملاء مطابقون لسجل CRM بمعرّف العميل من Meta.",
         },
       },
-      {
-        key: "messaging_attribution",
-        label: {
-          en: "Messaging attribution (WhatsApp, Messenger, Instagram)",
-          ar: "إسناد الرسائل (واتساب وماسنجر وإنستغرام)",
-        },
-        numerator: conversations.filter((fact) => fact.attributionConfidence === "exact").length,
-        denominator: conversations.length,
-        status: messagingStatus,
-        note:
-          messagingStatus === "ok"
-            ? {
-                en: "Conversations with an exact ad referral from Meta.",
-                ar: "محادثات لها إحالة إعلان دقيقة من Meta.",
-              }
-            : {
-                en: "Meta is not delivering message referrals to the attribution listener yet, so conversation sources are unknown.",
-                ar: "Meta لا ترسل إحالات الرسائل إلى مستقبل الإسناد بعد، لذلك مصدر المحادثات غير معروف.",
-              },
-      },
+      ...(["whatsapp", "messenger", "instagram"] as const).map((channel) => {
+        const readiness = obj(messaging?.[channel]);
+        const status = text(readiness.status) || "not_connected";
+        const channelFacts = conversations.filter((fact) =>
+          channel === "instagram"
+            ? fact.destinationChannel === "instagram_dm"
+            : fact.destinationChannel === channel,
+        );
+        const name = {
+          whatsapp: ["WhatsApp", "واتساب"],
+          messenger: ["Messenger", "ماسنجر"],
+          instagram: ["Instagram", "إنستغرام"],
+        }[channel];
+        return {
+          key: `messaging_${channel}`,
+          label: { en: `${name[0]} attribution`, ar: `إسناد ${name[1]}` },
+          numerator: channelFacts.filter((fact) => fact.attributionConfidence === "exact").length,
+          denominator: channelFacts.length,
+          status: (status === "connected" ? "ok" : "not_connected") as KpiStatus,
+          channelStatus: status,
+          note:
+            status === "connected"
+              ? {
+                  en: "Conversations with an exact ad referral from Meta.",
+                  ar: "محادثات لها إحالة إعلان دقيقة من Meta.",
+                }
+              : status === "infrastructure_ready_permission_pending"
+                ? {
+                    en: "Infrastructure ready — waiting for Meta permission before real messages can be attributed.",
+                    ar: "البنية جاهزة — بانتظار صلاحية Meta قبل إسناد الرسائل الحقيقية.",
+                  }
+                : {
+                    en: "Not connected: Meta is not delivering this channel's ad referrals yet, so conversation sources stay unknown.",
+                    ar: "غير متصل: Meta لا ترسل إحالات إعلانات هذه القناة بعد، لذلك يبقى مصدر المحادثات غير معروف.",
+                  },
+        };
+      }),
       {
         key: "historical_chatwoot",
         label: { en: "Historical conversations", ar: "المحادثات السابقة" },
@@ -1473,6 +1525,19 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
       refresh,
       kpis,
       coverageSummary,
+      crmBreakdown,
+      chatwootHealth,
+      messagingChannels: messaging
+        ? Object.fromEntries(
+            (["whatsapp", "messenger", "instagram"] as const).map((channel) => [
+              channel,
+              {
+                status: text(obj(messaging[channel]).status) || "not_connected",
+                label: obj(messaging[channel]).label ?? null,
+              },
+            ]),
+          )
+        : null,
       sources: {
         leadAdsDirect: sources.leadAdsTokenConfigured ? "ok" : "not_connected",
         messaging: messagingStatus,
@@ -1713,7 +1778,7 @@ export async function getInferredLinkAudit() {
   if (!hasConversations) return { configured: true as const, links: 0 };
   const result = await pool.query<Row>(
     `WITH inferred AS (
-       SELECT l.acquisition_event_id, l.crm_lead_id, l.is_primary, o.business_status, o.won,
+       SELECT l.acquisition_event_id, l.crm_lead_id, l.is_primary, l.match_confidence, l.ambiguity_reason, o.business_status, o.won,
               o.revenue_paid_usd, o.created_at AS crm_created_at, c.first_touch_at,
               jsonb_array_length(c.crm_lead_ids) AS phone_candidates,
               ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
@@ -1722,7 +1787,7 @@ export async function getInferredLinkAudit() {
          JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
          LEFT JOIN chatwoot_conversation_attribution c
            ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
-        WHERE l.match_confidence = 'inferred'
+        WHERE l.match_confidence IN ('inferred','ambiguous')
      ),
      shared AS (SELECT crm_lead_id FROM inferred GROUP BY crm_lead_id HAVING count(*) > 1),
      multi AS (SELECT acquisition_event_id FROM inferred GROUP BY acquisition_event_id HAVING count(*) > 1)
@@ -1737,12 +1802,15 @@ export async function getInferredLinkAudit() {
             count(*) FILTER (WHERE phone_candidates > 1)::int AS phone_key_with_other_crm_records,
             (SELECT count(*)::int FROM multi) AS conversations_with_several_links,
             (SELECT count(*)::int FROM shared) AS crm_records_claimed_by_several_conversations,
-            count(*) FILTER (WHERE won)::int AS won,
+            count(*) FILTER (WHERE match_confidence = 'ambiguous')::int AS ambiguous,
+            count(*) FILTER (WHERE ambiguity_reason = 'phone_key_shared_by_several_crm_records')::int AS ambiguous_shared_phone,
+            count(*) FILTER (WHERE ambiguity_reason = 'crm_record_claimed_by_several_conversations')::int AS ambiguous_claimed,
+            count(*) FILTER (WHERE won AND match_confidence = 'inferred')::int AS won,
             COALESCE(sum(revenue_paid_usd) FILTER (WHERE is_primary), 0) AS revenue
        FROM inferred`,
   );
   const sample = await pool.query<Row>(
-    `SELECT l.acquisition_event_id, l.crm_lead_id, o.business_status,
+    `SELECT l.acquisition_event_id, l.crm_lead_id, l.match_confidence, l.ambiguity_reason, o.business_status,
             ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
               - (c.first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date) AS day_gap,
             jsonb_array_length(c.crm_lead_ids) AS phone_candidates
@@ -1750,8 +1818,8 @@ export async function getInferredLinkAudit() {
        JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
        LEFT JOIN chatwoot_conversation_attribution c
          ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
-      WHERE l.match_confidence = 'inferred'
-      ORDER BY phone_candidates DESC NULLS LAST, day_gap DESC NULLS LAST
+      WHERE l.match_confidence IN ('inferred','ambiguous')
+      ORDER BY (l.match_confidence = 'ambiguous') DESC, phone_candidates DESC NULLS LAST, day_gap DESC NULLS LAST
       LIMIT 200`,
   );
   const r = result.rows[0] ?? {};
@@ -1781,10 +1849,18 @@ export async function getInferredLinkAudit() {
       crmRecordsClaimedBySeveralConversations: n(r.crm_records_claimed_by_several_conversations),
     },
     outcomes: { won: n(r.won), revenue: n(r.revenue) },
+    flaggedAmbiguous: {
+      total: n(r.ambiguous),
+      sharedPhone: n(r.ambiguous_shared_phone),
+      crmClaimedBySeveralConversations: n(r.ambiguous_claimed),
+      rule: "Ambiguous links are kept for audit, never primary, and carry no CRM outcome.",
+    },
     promotedToExact: 0,
     rows: sample.rows.map((row) => ({
       acquisitionEventId: s(row.acquisition_event_id),
       crmLeadId: s(row.crm_lead_id),
+      confidence: s(row.match_confidence),
+      ambiguityReason: s(row.ambiguity_reason),
       businessStatus: s(row.business_status),
       dayGap: row.day_gap == null ? null : n(row.day_gap),
       phoneCandidates: n(row.phone_candidates),

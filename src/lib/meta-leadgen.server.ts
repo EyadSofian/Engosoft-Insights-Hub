@@ -710,7 +710,11 @@ export async function listMetaLeadForms(pageIds: string[]) {
  * identifies this app, so other apps subscribed to the Page are untouched;
  * fields this app already has on the Page are kept.
  */
-export async function subscribeMetaLeadgenPages(pageIds: string[], options: { dryRun: boolean }) {
+export async function subscribeMetaLeadgenPages(
+  pageIds: string[],
+  options: { dryRun: boolean; fields?: string[] },
+) {
+  const wanted = [...new Set(["leadgen", ...(options.fields ?? [])])];
   const appId = process.env.META_ATTRIBUTION_APP_ID?.trim() ?? "";
   const results: {
     pageId: string;
@@ -727,8 +731,8 @@ export async function subscribeMetaLeadgenPages(pageIds: string[], options: { dr
       const apps = Array.isArray(current.data) ? current.data.map(obj) : [];
       const mine = apps.find((app) => text(app.id) === appId);
       const before = Array.isArray(mine?.subscribed_fields) ? mine.subscribed_fields.map(text) : [];
-      const after = [...new Set([...before, "leadgen"])];
-      const changed = !before.includes("leadgen");
+      const after = [...new Set([...before, ...wanted])];
+      const changed = wanted.some((field) => !before.includes(field));
       if (changed && !options.dryRun) {
         await graph(
           `${pageId}/subscribed_apps?subscribed_fields=${encodeURIComponent(after.join(","))}`,

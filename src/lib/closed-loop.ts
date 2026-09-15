@@ -12,7 +12,11 @@
  */
 
 export type AttributionConfidence = "exact" | "declared" | "inferred" | "unknown";
-export type MatchConfidence = "exact" | "strong" | "inferred";
+export type MatchConfidence = "exact" | "strong" | "inferred" | "ambiguous";
+
+/** Why an inferred link cannot be trusted to pick one CRM record. */
+export type AmbiguityReason =
+  "phone_key_shared_by_several_crm_records" | "crm_record_claimed_by_several_conversations";
 export type MatchMethod =
   /** The acquisition's provider lead ID equals the CRM record's Facebook Lead ID. */
   | "provider_lead_id"
@@ -298,6 +302,12 @@ export interface AcquisitionCrmLink {
   matchConfidence: MatchConfidence;
   /** One acquisition counts once: exactly one primary link per acquisition. */
   isPrimary: boolean;
+  /**
+   * Set on an inferred link that cannot be trusted to name one CRM record. Such
+   * a link is kept for audit, demoted to `ambiguous`, and never primary: no
+   * outcome is attached rather than silently choosing a winner.
+   */
+  ambiguityReason?: AmbiguityReason;
 }
 
 /**
@@ -367,7 +377,39 @@ export function linkAcquisitionsToCrm(
       });
     }
   }
-  return links;
+  return flagAmbiguousInferredLinks(links, acquisitions, byId);
+}
+
+function flagAmbiguousInferredLinks(
+  links: AcquisitionCrmLink[],
+  acquisitions: readonly AcquisitionIdentity[],
+  byId: Map<string, CrmRecord>,
+): AcquisitionCrmLink[] {
+  const phoneRecords = new Map(
+    acquisitions.map((acquisition) => [
+      acquisition.acquisitionEventId,
+      new Set(acquisition.chatwootCrmLeadIds.map(clean).filter((id) => byId.has(id))).size,
+    ]),
+  );
+  const claims = new Map<string, Set<string>>();
+  for (const link of links) {
+    if (link.matchConfidence !== "inferred") continue;
+    const set = claims.get(link.crmLeadId) ?? new Set<string>();
+    set.add(link.acquisitionEventId);
+    claims.set(link.crmLeadId, set);
+  }
+  return links.map((link) => {
+    if (link.matchConfidence !== "inferred") return link;
+    const reason: AmbiguityReason | undefined =
+      (phoneRecords.get(link.acquisitionEventId) ?? 0) > 1
+        ? "phone_key_shared_by_several_crm_records"
+        : (claims.get(link.crmLeadId)?.size ?? 0) > 1
+          ? "crm_record_claimed_by_several_conversations"
+          : undefined;
+    return reason
+      ? { ...link, matchConfidence: "ambiguous", isPrimary: false, ambiguityReason: reason }
+      : link;
+  });
 }
 
 function compareForPrimary(

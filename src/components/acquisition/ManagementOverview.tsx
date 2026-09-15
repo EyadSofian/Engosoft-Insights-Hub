@@ -604,15 +604,27 @@ export function DataCoverageCard({
           {(data?.coverageSummary ?? []).map((item) => {
             const connected = item.status === "ok";
             const partialHistory = item.status === "historical_evidence_missing";
+            const channelWords =
+              item.channelStatus === "infrastructure_ready_permission_pending"
+                ? A
+                  ? "البنية جاهزة — بانتظار الصلاحية"
+                  : "Infrastructure ready — permission pending"
+                : item.channelStatus === "not_connected"
+                  ? A
+                    ? "غير متصل"
+                    : "Not connected"
+                  : null;
             const valueText = loading
               ? "…"
-              : connected && item.denominator
-                ? coveragePercent(item.numerator, item.denominator)
-                : partialHistory
-                  ? A
-                    ? "جزئي"
-                    : "Partial"
-                  : STATUS_TEXT[item.status === "ok" ? "no_denominator" : item.status][lang];
+              : channelWords
+                ? channelWords
+                : connected && item.denominator
+                  ? coveragePercent(item.numerator, item.denominator)
+                  : partialHistory
+                    ? A
+                      ? "جزئي"
+                      : "Partial"
+                    : STATUS_TEXT[item.status === "ok" ? "no_denominator" : item.status][lang];
             return (
               <li key={item.key} className="flex items-start gap-2">
                 <span className="mt-0.5">{COVERAGE_ICON[item.status]}</span>
@@ -636,6 +648,72 @@ export function DataCoverageCard({
             );
           })}
         </ul>
+        {data?.crmBreakdown ? (
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="mb-1.5 text-xs font-semibold text-text">
+              {A ? "ربط العملاء بـ CRM" : "CRM links"}
+            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
+              {(
+                [
+                  ["exact", A ? "روابط دقيقة" : "Exact CRM links", "text-text"],
+                  ["inferred", A ? "روابط مستنتجة" : "Inferred CRM links", "text-text-muted"],
+                  [
+                    "ambiguous",
+                    A ? "غامضة (لم يُختر سجل)" : "Ambiguous (no record chosen)",
+                    "text-warning",
+                  ],
+                  ["unmatched", A ? "غير مطابقة" : "Unmatched", "text-text-muted"],
+                ] as const
+              ).map(([key, label, tone]) => (
+                <div key={key} className="flex items-baseline justify-between gap-2">
+                  <dt className="text-text-muted">{label}</dt>
+                  <dd className={`num font-semibold ${tone}`}>
+                    {loading ? "…" : fmtNum(data.crmBreakdown![key])}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-1 text-[11px] text-text-muted">
+              {A
+                ? "مؤشرات الإدارة تستخدم الروابط الدقيقة فقط."
+                : "Management KPIs use exact links only."}
+            </div>
+          </div>
+        ) : null}
+        {data?.chatwootHealth ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs">
+            <span className="font-semibold text-text">
+              {A ? "محادثات Chatwoot" : "Chatwoot conversations"}
+            </span>
+            <span className="text-text-muted">
+              {A ? "واردة" : "Inbound"}{" "}
+              <b className="num text-text">{fmtNum(data.chatwootHealth.inboundConversations)}</b>
+            </span>
+            <span className="text-text-muted">
+              {A ? "صفوف موجودة" : "Rows present"}{" "}
+              <b className="num text-text">{fmtNum(data.chatwootHealth.presentRows)}</b>
+            </span>
+            <span className={data.chatwootHealth.missing > 0 ? "text-danger" : "text-text-muted"}>
+              {A ? "ناقصة" : "Missing"} <b className="num">{fmtNum(data.chatwootHealth.missing)}</b>
+            </span>
+            <span className="text-text-muted">
+              {A ? "استُعيدت تلقائيًا" : "Recovered automatically"}{" "}
+              <b className="num text-text">{fmtNum(data.chatwootHealth.recovered)}</b>
+            </span>
+            <span
+              className={data.chatwootHealth.failedOrStuck > 0 ? "text-danger" : "text-text-muted"}
+            >
+              {A ? "فاشلة/عالقة" : "Failed/stuck"}{" "}
+              <b className="num">{fmtNum(data.chatwootHealth.failedOrStuck)}</b>
+            </span>
+            {data.chatwootHealth.flagged ? (
+              <Pill tone="danger">{A ? "يحتاج انتباه" : "Needs attention"}</Pill>
+            ) : (
+              <Pill tone="success">{A ? "لا شيء ناقص" : "Nothing missing"}</Pill>
+            )}
+          </div>
+        ) : null}
         {data?.sources?.leadAdsDirect === "not_connected" ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
             <Pill tone="warning">{A ? "غير متصل" : "Not connected"}</Pill>
