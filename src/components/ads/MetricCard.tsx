@@ -152,19 +152,25 @@ export function MetricCard({
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
     >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-8 h-24 w-24 rounded-full opacity-[0.13]"
+        style={{ background: "var(--tone-strong)", insetInlineEnd: "-1.25rem" }}
+      />
+
       <div className="relative flex items-start justify-between gap-1.5">
         <span className="flex min-w-0 items-center gap-2">
           {icon && (
             <span
-              className="grid size-7 shrink-0 place-items-center rounded-lg"
-              style={{ background: "var(--tone-soft)", color: "var(--tone-strong)" }}
-              aria-hidden="true"
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-white"
+              style={{ background: "var(--tone-strong)" }}
             >
               {icon}
             </span>
           )}
           <span
-            className="line-clamp-2 text-[11.5px] font-semibold leading-snug text-text-muted"
+            className="line-clamp-2 text-[11.5px] font-semibold leading-snug"
+            style={{ color: "var(--tone-ink)", opacity: 0.78 }}
             title={copy.label}
           >
             {copy.label}
@@ -175,7 +181,7 @@ export function MetricCard({
 
       <div
         className="num relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,16cqi,1.6rem)] font-bold leading-none tracking-[-0.03em]"
-        style={{ color: "var(--text)" }}
+        style={{ color: "var(--tone-ink)" }}
       >
         {unavailable ? <Unavailable reason={unavailableReason} /> : value}
       </div>
@@ -186,7 +192,7 @@ export function MetricCard({
         )}
         <span
           className="line-clamp-2 min-w-0 text-[10.5px] leading-snug"
-          style={{ color: "var(--text-muted)" }}
+          style={{ color: "var(--tone-ink)", opacity: 0.68 }}
           dir="auto"
         >
           {sub ?? (unavailable ? unavailableReason : copy.formula)}
@@ -197,7 +203,7 @@ export function MetricCard({
         <div className="relative mt-auto pt-2.5">
           <span
             className="kpi-cue inline-flex items-center gap-0.5 text-[10.5px] font-bold"
-            style={{ color: "var(--brand)" }}
+            style={{ color: "var(--tone-strong)" }}
           >
             {cue}
             <span className="kpi-cue-arrow inline-flex" aria-hidden="true">

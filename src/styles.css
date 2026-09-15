@@ -912,14 +912,19 @@
   }
 }
 
-/* A management card: the same white surface and hairline for every figure.
-   Meaning is carried by the label, the position and the size of the number —
-   colour is reserved for the one accent a card may carry (`--tone-strong`). */
+/* --- tonal surfaces -------------------------------------------------------
+   A block that carries a colour family end to end: pastel ground, matching
+   hairline, family radius. Set --tone-surface/--tone-border on the element (or
+   any ancestor) and everything inside can read --tone-ink and --tone-strong.
+
+   The colour is the point: a row of KPI cards has to read as several different
+   things from across a desk. What the redesign takes out is DENSITY — how many
+   coloured objects a screen carries — not colour itself. */
 @utility tone-surface {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  color: var(--text);
+  background: var(--tone-surface, var(--surface));
+  border: 1px solid var(--tone-border, var(--border));
+  border-radius: 18px;
+  color: var(--tone-ink, var(--text));
 }
 
 /* Lifts 2px and deepens its shadow. Nothing else moves. */

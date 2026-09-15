@@ -25,6 +25,8 @@ import {
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
+import { MoreDetails } from "@/components/dashboard-bits";
+import { OverviewCourseContribution } from "@/components/overview-records";
 import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
@@ -489,6 +491,19 @@ function Courses() {
           )}
         </>
       )}
+
+      {/* Contribution and average selling price: the pair that used to sit on
+          the executive summary, now in the report about courses. */}
+      <MoreDetails
+        label={lang === "ar" ? "مساهمة الكورسات في الإيراد" : "Course contribution to revenue"}
+        hint={
+          lang === "ar"
+            ? "أعلى الكورسات إيرادًا في الفترة، ونصيب كل كورس ومتوسط سعر بيعه"
+            : "The period's top courses, each one's share and its average selling price"
+        }
+      >
+        <OverviewCourseContribution />
+      </MoreDetails>
     </div>
   );
 }

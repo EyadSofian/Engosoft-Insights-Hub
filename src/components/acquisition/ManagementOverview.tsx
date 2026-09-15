@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { KpiRow, PageSection, SecondaryMetrics } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
+import { Link } from "@tanstack/react-router";
 import { Card, Pill } from "@/components/ui-bits";
+import { toneVars } from "@/lib/dashboard-tone";
 import type { Kpi, KpiFormat, KpiStatus } from "@/lib/closed-loop-kpis";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import type { ClosedLoopResponse } from "./ClosedLoop";
@@ -788,6 +790,128 @@ export function CoverageTechnicalDetails({
           </div>
         ) : null}
       </Card>
+    </PageSection>
+  );
+}
+
+/* --- lead sources ---------------------------------------------------------- */
+
+const SOURCE_CARDS: {
+  type: string;
+  label: { ar: string; en: string };
+  tone: "violet" | "sky" | "mint" | "amber";
+  view?: string;
+  to?: string;
+}[] = [
+  {
+    type: "meta_instant_form",
+    label: { ar: "نماذج Meta", en: "Meta forms" },
+    tone: "violet",
+    view: "forms",
+  },
+  {
+    type: "landing_submission",
+    label: { ar: "صفحات الهبوط", en: "Landing pages" },
+    tone: "sky",
+    view: "landing",
+  },
+  { type: "whatsapp", label: { ar: "واتساب", en: "WhatsApp" }, tone: "mint", to: "/attribution" },
+  {
+    type: "messenger",
+    label: { ar: "ماسنجر", en: "Messenger" },
+    tone: "amber",
+    to: "/attribution",
+  },
+];
+
+/**
+ * Where this period's leads came from, as four cards a manager can open.
+ *
+ * Each card carries the two numbers that decide what to do with a source: how
+ * many leads it produced, and how many of those we can trace to their exact ad.
+ * A source with no exact attribution says so in words — it is never a zero
+ * dressed up as a result.
+ */
+export function LeadSourceCards({
+  data,
+  loading,
+  onSelectView,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+  onSelectView: (view: string) => void;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const byType = new Map((data?.coverageByType ?? []).map((row) => [row.type, row]));
+
+  return (
+    <PageSection
+      level="primary"
+      title={A ? "مصادر العملاء" : "Where leads came from"}
+      hint={A ? "اضغط أي مصدر لفتح تفاصيله." : "Open any source to see its detail."}
+    >
+      <div className="card-grid sm:grid-cols-2 xl:grid-cols-4">
+        {SOURCE_CARDS.map((source, index) => {
+          const row = byType.get(source.type);
+          const total = row?.total ?? 0;
+          const exact = row?.exact ?? 0;
+          const card = (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="text-[12px] font-semibold"
+                  style={{ color: "var(--tone-ink)", opacity: 0.8 }}
+                >
+                  {source.label[lang]}
+                </span>
+                <Pill tone="neutral">{A ? "افتح" : "Open"}</Pill>
+              </div>
+              <div
+                className="num mt-2 text-[26px] font-bold leading-none"
+                style={{ color: "var(--tone-ink)" }}
+              >
+                {loading ? "…" : fmtNum(total)}
+              </div>
+              <p
+                className="mt-1.5 text-[11.5px] leading-snug"
+                style={{ color: "var(--tone-ink)", opacity: 0.7 }}
+              >
+                {total === 0
+                  ? A
+                    ? "لا عملاء من هذا المصدر في الفترة"
+                    : "No leads from this source in the period"
+                  : exact > 0
+                    ? A
+                      ? `${fmtNum(exact)} منهم نعرف إعلانهم بالضبط`
+                      : `${fmtNum(exact)} traced to their exact ad`
+                    : A
+                      ? "لا يوجد إسناد دقيق لهذا المصدر بعد"
+                      : "No exact attribution for this source yet"}
+              </p>
+            </>
+          );
+          const className =
+            "tone-surface lift pad-card flex h-full min-w-0 flex-col text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]";
+          const style = toneVars(source.tone);
+          return source.to ? (
+            <Link key={source.type} to={source.to} className={className} style={style}>
+              {card}
+            </Link>
+          ) : (
+            <button
+              key={source.type}
+              type="button"
+              onClick={() => source.view && onSelectView(source.view)}
+              className={`${className} cursor-pointer`}
+              style={style}
+              data-index={index}
+            >
+              {card}
+            </button>
+          );
+        })}
+      </div>
     </PageSection>
   );
 }

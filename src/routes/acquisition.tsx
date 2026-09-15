@@ -15,11 +15,13 @@ import {
 } from "@/components/acquisition/ClosedLoop";
 import { CreativeGallery } from "@/components/acquisition/CreativeGallery";
 import { MessagingReadinessPanel } from "@/components/acquisition/MessagingReadiness";
+import { TelegramPanel } from "@/components/TelegramPanel";
 import {
   BestPerformers,
   CheapVersusQuality,
   CoverageTechnicalDetails,
   DataCoverageCard,
+  LeadSourceCards,
   OverviewKpis,
   SimpleFunnel,
 } from "@/components/acquisition/ManagementOverview";
@@ -372,6 +374,11 @@ function Acquisition() {
 
       {section === "leads" ? (
         <>
+          <LeadSourceCards
+            data={data}
+            loading={loading}
+            onSelectView={(view) => go("leads", view)}
+          />
           <ViewSelect
             label={A ? "العرض" : "Show"}
             value={leadView}
@@ -414,6 +421,7 @@ function Acquisition() {
               />
               <CoverageTechnicalDetails data={data} loading={loading} />
               <MessagingReadinessPanel />
+              <TelegramPanel />
               <ChatwootAttributionHealth />
               <InferredLinkAudit />
             </div>

@@ -1,16 +1,19 @@
 /* -------------------------------------------------------------------------
-   Colour, in one place — and deliberately very little of it.
+   Colour, in one place.
 
-   Management screens use five colours: Engosoft brand blue, green, amber, red
-   and neutral. Every card sits on the same white surface with the same
-   hairline; meaning comes from the label, the position and the type size.
+   Six families plus a neutral. Every family is complete — a pastel `surface` a
+   whole card can sit on, a `border` from the same family, an `ink` that stays
+   legible on that surface, and a `strong` for the icon chip, the sparkline and
+   the progress fill.
 
-   The seven family names (mint, rose, sky, violet, amber, cyan, slate) stay as
-   a vocabulary so no caller breaks, but they no longer paint surfaces. A family
-   is a naming convention, not a verdict, so on chrome it resolves to brand
-   blue. Only the semantic names — success, danger, warning — reach green, red
-   and amber, because only a caller that has judged a figure may colour it.
-   Charts keep their own multi-series palette through the `--*-strong` tokens.
+   A card takes all four. The previous system put the family colour on a 32px
+   icon and left the card white, so five cards meant to say five different
+   things read, at a glance, as one grey block.
+
+   Which family a metric gets is a convention, not a verdict: money in is mint,
+   money out is rose, volume is sky, a qualified count is violet, a ratio is
+   amber, anything non-paid is cyan. `slate` is for figures that carry no
+   meaning of their own.
 ------------------------------------------------------------------------- */
 
 export type Tone = "mint" | "rose" | "sky" | "violet" | "amber" | "cyan" | "slate";
@@ -19,41 +22,59 @@ export type Tone = "mint" | "rose" | "sky" | "violet" | "amber" | "cyan" | "slat
 export type SemanticTone = "success" | "danger" | "brand" | "warning" | "neutral";
 
 export interface ToneStyle {
-  /** Soft ground for a small chip or pill — never a whole card. */
+  /** Pastel ground for a whole card. */
   surface: string;
-  /** Hairline. Always the neutral border. */
+  /** Hairline from the same family. */
   border: string;
-  /** Text on a surface. Always the neutral text colour. */
+  /** Readable dark tone on `surface` — the figure itself. */
   ink: string;
-  /** The accent: icon, sparkline, progress fill, focus cue. */
+  /** Saturated tone: icon chip, sparkline stroke, progress fill. */
   strong: string;
 }
 
-const soft = (accent: string) => `color-mix(in oklab, ${accent} 11%, var(--surface))`;
-
-const accentStyle = (accent: string): ToneStyle => ({
-  surface: soft(accent),
-  border: "var(--border)",
-  ink: "var(--text)",
-  strong: accent,
-});
-
-const BRAND = accentStyle("var(--brand)");
-const NEUTRAL = accentStyle("var(--text-muted)");
-
-/**
- * Families used as status proxies in older components (mint = fine, rose =
- * problem, amber = watch) keep that meaning on small indicators; the rest are
- * brand blue.
- */
 export const TONES: Record<Tone, ToneStyle> = {
-  mint: accentStyle("var(--success)"),
-  rose: accentStyle("var(--danger)"),
-  sky: BRAND,
-  violet: BRAND,
-  amber: accentStyle("var(--warning)"),
-  cyan: BRAND,
-  slate: NEUTRAL,
+  mint: {
+    surface: "var(--mint-surface)",
+    border: "var(--mint-border)",
+    ink: "var(--mint-ink)",
+    strong: "var(--mint-strong)",
+  },
+  rose: {
+    surface: "var(--rose-surface)",
+    border: "var(--rose-border)",
+    ink: "var(--rose-ink)",
+    strong: "var(--rose-strong)",
+  },
+  sky: {
+    surface: "var(--sky-surface)",
+    border: "var(--sky-border)",
+    ink: "var(--sky-ink)",
+    strong: "var(--sky-strong)",
+  },
+  violet: {
+    surface: "var(--violet-surface)",
+    border: "var(--violet-border)",
+    ink: "var(--violet-ink)",
+    strong: "var(--violet-strong)",
+  },
+  amber: {
+    surface: "var(--amber-surface)",
+    border: "var(--amber-border)",
+    ink: "var(--amber-ink)",
+    strong: "var(--amber-strong)",
+  },
+  cyan: {
+    surface: "var(--cyan-surface)",
+    border: "var(--cyan-border)",
+    ink: "var(--cyan-ink)",
+    strong: "var(--cyan-strong)",
+  },
+  slate: {
+    surface: "var(--slate-surface)",
+    border: "var(--slate-border)",
+    ink: "var(--slate-ink)",
+    strong: "var(--slate-strong)",
+  },
 };
 
 /** Semantic names map onto families, so "success" and mint are one green. */
@@ -73,47 +94,19 @@ export function toneOf(tone: AnyTone | undefined): ToneStyle {
 }
 
 /**
- * The CSS custom properties a card sets on itself: a neutral surface and one
- * accent. Spread into `style` and everything inside can read `--tone-strong`
- * and `--tone-soft` without being handed the tone as a prop.
+ * The CSS custom properties a tonal block sets on itself.
+ *
+ * Spread into `style` and everything inside can read `--tone-ink` and
+ * `--tone-strong` without being handed the tone as a prop.
  */
 export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
-  const accent = surfaceAccent(tone);
+  const t = toneOf(tone);
   return {
-    "--tone-surface": "var(--surface)",
-    "--tone-border": "var(--border)",
-    "--tone-ink": "var(--text)",
-    "--tone-strong": accent,
-    "--tone-soft": soft(accent),
+    "--tone-surface": t.surface,
+    "--tone-border": t.border,
+    "--tone-ink": t.ink,
+    "--tone-strong": t.strong,
   } as React.CSSProperties;
-}
-
-/**
- * The accent a whole card (KPI, reading, detail header) may carry. A family name
- * on a card is only a convention — revenue is not "good" because it is mint — so
- * it resolves to brand blue; semantic names keep their meaning.
- */
-export function surfaceAccent(tone: AnyTone | undefined): string {
-  switch (tone) {
-    case "success":
-      return "var(--success)";
-    case "danger":
-      return "var(--danger)";
-    case "warning":
-      return "var(--warning)";
-    case "neutral":
-      return "var(--text-muted)";
-    default:
-      return "var(--brand)";
-  }
-}
-
-/**
- * The palette for page chrome — header, section and panel icon tiles, ranking
- * bars. Same rule as a card: brand blue unless the caller passed a verdict.
- */
-export function cardTone(tone: AnyTone | undefined): ToneStyle {
-  return accentStyle(surfaceAccent(tone));
 }
 
 /**

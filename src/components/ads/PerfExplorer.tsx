@@ -352,6 +352,7 @@ export function PerfExplorer({
   title,
   subtitle,
   initialView,
+  onOpenDetail,
 }: {
   rows: PerfRow[];
   grain: Grain;
@@ -369,6 +370,11 @@ export function PerfExplorer({
   subtitle?: string;
   /** Deep-link from the overview into one decision-ready quick view. */
   initialView?: "attributedRevenue";
+  /**
+   * Opens a row's own screen instead of a drawer. Set at campaign grain, where
+   * the answer to "what about this one" is a page, not a panel.
+   */
+  onOpenDetail?: (key: string) => void;
 }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
@@ -782,7 +788,7 @@ export function PerfExplorer({
           search={query}
           onSearchChange={setQuery}
           initialSort={{ key: "spend", dir: -1 }}
-          onRowClick={setDetail}
+          onRowClick={onOpenDetail ? (row) => onOpenDetail(row.key) : setDetail}
           csvFilename={`${csvPrefix}-${grain}`}
           maxHeight={620}
           columnChooser
@@ -821,7 +827,7 @@ export function PerfExplorer({
             showLivePerformance={ownerViewMode}
             ownerMode={ownerViewMode}
             ownerVerdicts={ownerVerdicts}
-            onRowClick={setDetail}
+            onRowClick={onOpenDetail ? (row) => onOpenDetail(row.key) : setDetail}
             emptyState={emptyState}
           />
           {cardRows.length > cardLimit && (
