@@ -61,9 +61,15 @@ export function nameWithId(name: string, id: string) {
   if (!name) {
     return <span className="font-mono text-[11px] text-text-muted">ID {id}</span>;
   }
+  // A campaign or creative name is its own bidi run: Latin, digits and slashes
+  // inside an Arabic table must not reorder, and a name is never styled as a figure.
   return (
-    <span className="text-text" title={id ? `ID ${id}` : undefined}>
+    <bdi
+      dir="auto"
+      className="bidi-name block max-w-[320px] truncate text-text"
+      title={id ? `${name} · ID ${id}` : name}
+    >
       {name}
-    </span>
+    </bdi>
   );
 }

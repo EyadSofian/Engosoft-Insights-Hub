@@ -37,6 +37,18 @@ import {
   type SpendRow,
 } from "./closed-loop";
 import { cheapVersusQuality, closedLoopKpis, type KpiStatus } from "./closed-loop-kpis";
+import { PLATFORMS, PLATFORM_LABEL } from "./constants";
+import {
+  acquisitionInScope,
+  exactAttributionAvailable,
+  managementHealth,
+  managementScopeFrom,
+  reconcileRevenue,
+  scopeKey,
+  scopeSpend,
+  type ManagementScope,
+  type RevenueAttribution,
+} from "./management-scope";
 
 /**
  * Closed-loop Marketing → Sales identity graph.
@@ -418,7 +430,36 @@ async function loadSaleOrders(): Promise<{ orders: SaleOrderLink[] | null; error
   }
 }
 
-async function loadPaidInvoiceLines(): Promise<PaidInvoiceLine[]> {
+/**
+ * Paid invoice lines for CRM outcomes. The Accounting authority (deduplicated
+ * paid lines, credit notes signed, USD at the dashboard FX rates) is the source,
+ * so stored outcome revenue reconciles to the Accounting page. The raw dataset
+ * read below is only a fallback when the snapshot cannot be loaded, and the
+ * refresh records that it happened.
+ */
+async function loadPaidInvoiceLines(errors: string[] = []): Promise<PaidInvoiceLine[]> {
+  try {
+    const [{ loadAllData }, { accountingUsdPaid, DEFAULT_FX_RATES }] = await Promise.all([
+      import("./sheet-cache.server"),
+      import("./fx-rates"),
+    ]);
+    const snapshot = await loadAllData();
+    if (snapshot.accounting.length) {
+      return snapshot.accounting
+        .filter((row) => row.orderRef)
+        .map((row) => ({
+          orderName: row.orderRef,
+          movement: row.movement,
+          usdPaid: accountingUsdPaid(row, DEFAULT_FX_RATES),
+          paymentDate: (row.isCreditNote ? row.invoiceDate || row.paymentDate : row.paymentDate).slice(0, 10),
+        }));
+    }
+    errors.push("accounting authority: snapshot has no Accounting rows; stored dataset used");
+  } catch (error) {
+    errors.push(
+      `accounting authority: ${error instanceof Error ? error.message : String(error)}; stored dataset used`,
+    );
+  }
   const result = await getPool().query<Row>(
     `SELECT COALESCE(row_data->>'Sales Order #','') AS order_name,
             COALESCE(row_data->>'حركة', row_data->>'Movement', '') AS movement,
@@ -581,7 +622,7 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
       loadMetaGraph(),
       loadCrmRecords(),
       loadSaleOrders(),
-      loadPaidInvoiceLines(),
+      loadPaidInvoiceLines(errors),
     ]);
     if (sales.error) errors.push(`sale orders: ${sales.error}`);
 
@@ -992,6 +1033,7 @@ function resolveRange(from?: string, to?: string) {
 }
 
 interface FactRecord extends AcquisitionFactRow {
+  sourceType: string;
   occurredAt: string;
   crmLeadId: string;
   matchMethod: string;
@@ -1009,7 +1051,7 @@ async function loadFacts(range: { from: string; to: string }): Promise<FactRecor
   const { sql, params } = where(range);
   const result = await getPool().query<Row>(
     `${cte}
-     SELECT e.acquisition_event_id, e.entity_type, e.destination_channel, e.source_platform,
+     SELECT e.acquisition_event_id, e.entity_type, e.destination_channel, e.source_platform, e.source_type,
             e.attribution_confidence, e.campaign_id, e.campaign_name, e.adset_id, e.adset_name,
             e.ad_id, e.ad_name, e.creative_id, e.creative_name, e.form_id, e.landing_page_id,
             to_char(e.occurred_at AT TIME ZONE '${BUSINESS_TIME_ZONE}', 'YYYY-MM-DD HH24:MI') AS occurred_at,
@@ -1047,6 +1089,7 @@ async function loadFacts(range: { from: string; to: string }): Promise<FactRecor
       entityType: s(row.entity_type),
       destinationChannel: s(row.destination_channel),
       sourcePlatform: s(row.source_platform),
+      sourceType: s(row.source_type),
       attributionConfidence: (["exact", "declared", "inferred"].includes(confidence)
         ? confidence
         : confidence === "strong"
@@ -1120,16 +1163,21 @@ async function loadSourceStatus() {
         )
       : Promise.resolve({ rows: [{ resolved: 0 }] as Row[] }),
     pool.query<Row>(
-      `SELECT to_char((synced_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date, 'YYYY-MM-DD') AS through
-         FROM dashboard_sync_state WHERE dataset = 'meta_ads'`,
+      `SELECT dataset, synced_at,
+              to_char((synced_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date, 'YYYY-MM-DD') AS through
+         FROM dashboard_sync_state WHERE dataset IN ('meta_ads', 'crm')`,
     ),
     reconcile
       ? pool.query<Row>(`SELECT finished_at FROM meta_catalog_reconcile_state WHERE id = 1`)
       : Promise.resolve({ rows: [] as Row[] }),
   ]);
+  const syncRow = (dataset: string) => adsSync.rows.find((row) => s(row.dataset) === dataset);
+  const crmSyncedAt = syncRow("crm")?.synced_at;
   return {
     messagingResolved: n(messaging.rows[0]?.resolved),
-    metaAdsSyncedThrough: s(adsSync.rows[0]?.through),
+    metaAdsSyncedThrough: s(syncRow("meta_ads")?.through),
+    crmSyncedAt:
+      crmSyncedAt instanceof Date ? crmSyncedAt.toISOString() : crmSyncedAt ? s(crmSyncedAt) : null,
     catalogReconciledAt: reconciled.rows[0]?.finished_at ?? null,
     leadAdsTokenConfigured: Boolean(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim()),
   };
@@ -1201,13 +1249,207 @@ function coverageByType(facts: readonly FactRecord[]) {
   return Object.entries(groups).map(([type, rows]) => ({ type, ...coverageOf(rows) }));
 }
 
-export async function getClosedLoop(filters: { from?: string; to?: string } = {}) {
+interface RevenueAuthority {
+  /** Accounting USD (FX authority) per CRM record, every payment date, through the exact order link. */
+  byLead: Map<string, { usd: number; invoices: Set<string>; firstPaidAt: string }>;
+  /** Every Accounting line whose payment date is in the window, with its linked CRM record if any. */
+  paymentWindow: { usd: number; crmLeadId: string }[];
+  linksAvailable: boolean;
+}
+
+/**
+ * Paid revenue for the closed loop comes from the Accounting authority — the
+ * same deduplicated, FX-recalculated rows the Accounting page totals — joined
+ * only through `crm_sale_order_links` (sale order → opportunity). Attribution
+ * decides which CRM record is credited; it never creates money.
+ */
+async function loadRevenueAuthority(
+  range: { from: string; to: string },
+  fxFilters: { fxEgp?: string; fxSar?: string },
+): Promise<RevenueAuthority> {
+  const [{ loadAllData }, { accountingUsdPaid, fxRatesFromFilters }, { accountingReportingDate }] =
+    await Promise.all([import("./sheet-cache.server"), import("./fx-rates"), import("./accounting-policy")]);
+  const [snapshot, links] = await Promise.all([
+    loadAllData(),
+    getPool().query<Row>(`SELECT sale_order_name, opportunity_id FROM crm_sale_order_links`),
+  ]);
+  const fx = fxRatesFromFilters(fxFilters);
+  const opportunityByOrder = new Map<string, string>();
+  const conflicting = new Set<string>();
+  for (const row of links.rows) {
+    const order = s(row.sale_order_name);
+    const opportunity = s(row.opportunity_id);
+    if (!order || !opportunity) continue;
+    const previous = opportunityByOrder.get(order);
+    if (previous && previous !== opportunity) conflicting.add(order);
+    else opportunityByOrder.set(order, opportunity);
+  }
+  // An order name that points at two opportunities is not a deterministic link.
+  for (const order of conflicting) opportunityByOrder.delete(order);
+
+  const byLead: RevenueAuthority["byLead"] = new Map();
+  const paymentWindow: RevenueAuthority["paymentWindow"] = [];
+  for (const row of snapshot.accounting) {
+    const usd = accountingUsdPaid(row, fx);
+    const crmLeadId = row.orderRef ? (opportunityByOrder.get(row.orderRef.trim()) ?? "") : "";
+    if (crmLeadId) {
+      const entry = byLead.get(crmLeadId) ?? { usd: 0, invoices: new Set<string>(), firstPaidAt: "" };
+      entry.usd += usd;
+      if (!row.isCreditNote) {
+        if (row.movement) entry.invoices.add(row.movement);
+        if (row.paymentDate && (!entry.firstPaidAt || row.paymentDate < entry.firstPaidAt))
+          entry.firstPaidAt = row.paymentDate;
+      }
+      byLead.set(crmLeadId, entry);
+    }
+    const date = accountingReportingDate(row, "payment");
+    if (date && date >= range.from && date <= range.to) paymentWindow.push({ usd, crmLeadId });
+  }
+  return { byLead, paymentWindow, linksAvailable: links.rows.length > 0 };
+}
+
+function applyRevenueAuthority(facts: FactRecord[], authority: RevenueAuthority): void {
+  for (const fact of facts) {
+    if (!fact.outcome) continue;
+    const revenue = authority.byLead.get(fact.crmLeadId);
+    fact.outcome.revenuePaidUsd = revenue ? Math.round(revenue.usd * 100) / 100 : 0;
+    fact.outcome.invoiceCount = revenue?.invoices.size ?? 0;
+    fact.outcome.firstInvoiceAt = revenue?.firstPaidAt ?? "";
+  }
+}
+
+/** How each CRM record is attributed, across all time: exact Meta, inferred with a campaign, or none. */
+async function loadAttributionByLead(): Promise<Map<string, RevenueAttribution>> {
+  const pool = getPool();
+  const conversations = Boolean(
+    (await pool.query<Row>(`SELECT to_regclass('public.chatwoot_conversation_attribution') AS t`))
+      .rows[0]?.t,
+  );
+  const result = await pool.query<Row>(
+    `SELECT l.crm_lead_id,
+            bool_or(l.match_confidence = 'exact' AND g.ad_id IS NOT NULL) AS exact,
+            ${conversations ? "bool_or(l.match_confidence = 'inferred' AND COALESCE(c.campaign_id, '') <> '')" : "false"} AS inferred
+       FROM acquisition_crm_links l
+       JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+       LEFT JOIN meta_entity_graph g ON o.ad_id <> '' AND g.ad_id = o.ad_id
+       ${
+         conversations
+           ? "LEFT JOIN chatwoot_conversation_attribution c ON l.chatwoot_conversation_id <> '' AND c.conversation_id::text = l.chatwoot_conversation_id"
+           : ""
+       }
+      WHERE l.is_primary
+      GROUP BY l.crm_lead_id`,
+  );
+  const map = new Map<string, RevenueAttribution>();
+  for (const row of result.rows) {
+    if (row.exact === true) map.set(s(row.crm_lead_id), "exact");
+    else if (row.inferred === true) map.set(s(row.crm_lead_id), "inferred");
+  }
+  return map;
+}
+
+async function loadCohortLeadIds(range: { from: string; to: string }): Promise<string[]> {
+  const result = await getPool().query<Row>(
+    `SELECT crm_lead_id FROM crm_lead_outcomes
+      WHERE (created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date BETWEEN $1::date AND $2::date`,
+    [range.from, range.to],
+  );
+  return result.rows.map((row) => s(row.crm_lead_id));
+}
+
+/** Selected-scope figures from the generalized engine (metrics.server), platform by platform. */
+async function loadScopeTotals(
+  range: { from: string; to: string },
+  scope: ManagementScope,
+  fxFilters: { fxEgp?: string; fxSar?: string },
+) {
+  const { getFiltered, computeTotals } = await import("./metrics.server");
+  const base = { from: range.from, to: range.to, fxEgp: fxFilters.fxEgp, fxSar: fxFilters.fxSar };
+  const scoped = await getFiltered({
+    ...base,
+    platform: scope.kind === "platform" ? scope.platform : undefined,
+    channel: scope.kind === "organic" ? "organic" : undefined,
+  });
+  const totals = computeTotals(scoped);
+  const platforms = await Promise.all(
+    PLATFORMS.map(async (platform) => {
+      const data =
+        scope.kind === "platform" && scope.platform === platform
+          ? scoped
+          : await getFiltered({ ...base, platform });
+      const platformTotals = computeTotals(data);
+      const health = data.snapshot.health.platformSources?.[platform];
+      return {
+        platform,
+        spend: platformTotals.spend,
+        adRows: data.ads.length,
+        sourceHealthy: !health || !health.configured || health.ok,
+        crmLeads: platformTotals.totalLeads,
+      };
+    }),
+  );
+  const uniqueIds = (rows: { id: string }[]) => {
+    const ids = new Set<string>();
+    let anonymous = 0;
+    for (const row of rows) {
+      if (row.id) ids.add(row.id);
+      else anonymous += 1;
+    }
+    return ids.size + anonymous;
+  };
+  return {
+    spend: scopeSpend(scope, platforms),
+    uniqueCrmLeads: uniqueIds([...scoped.crm, ...scoped.lost]),
+    uniqueWonCustomers: uniqueIds(scoped.crm.filter((row) => row.isWon)),
+    collectedRevenue: Math.round(totals.revenue * 100) / 100,
+    scopeLabel:
+      scope.kind === "all"
+        ? { en: "All channels", ar: "كل القنوات" }
+        : scope.kind === "organic"
+          ? { en: "Organic", ar: "أورجانيك" }
+          : PLATFORM_LABEL[scope.platform],
+  };
+}
+
+export interface ClosedLoopFilters {
+  from?: string;
+  to?: string;
+  platform?: string;
+  channel?: string;
+  fxEgp?: string;
+  fxSar?: string;
+}
+
+export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false as const };
   const range = resolveRange(filters.from, filters.to);
-  return cached(`closed-loop|${range.from}|${range.to}`, async () => {
+  const scope = managementScopeFrom(filters);
+  const exactOk = exactAttributionAvailable(scope);
+  const fxFilters = { fxEgp: filters.fxEgp, fxSar: filters.fxSar };
+  const cacheKey = [
+    "closed-loop",
+    range.from,
+    range.to,
+    scopeKey(scope),
+    filters.fxEgp ?? "",
+    filters.fxSar ?? "",
+  ].join("|");
+  return cached(cacheKey, async () => {
     await ensureClosedLoopSchema();
     const pool = getPool();
-    const [facts, spend, graphRows, catalog, refresh, crmTotals, sources] = await Promise.all([
+    const [
+      allFacts,
+      allSpend,
+      graphRows,
+      catalog,
+      refresh,
+      crmTotals,
+      sources,
+      authority,
+      attributionByLead,
+      cohortLeadIds,
+      scopeTotals,
+    ] = await Promise.all([
       loadFacts(range),
       loadSpend(range),
       pool.query<Row>(
@@ -1239,7 +1481,18 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
         [range.from, range.to],
       ),
       loadSourceStatus(),
+      loadRevenueAuthority(range, fxFilters),
+      loadAttributionByLead(),
+      loadCohortLeadIds(range),
+      loadScopeTotals(range, scope, fxFilters),
     ]);
+
+    // Revenue comes from the Accounting authority; then everything narrows to the
+    // selected scope. Meta spend rows exist only where exact Meta attribution does,
+    // so a Snapchat/TikTok/Google/Organic selection never shows Meta rows.
+    applyRevenueAuthority(allFacts, authority);
+    const facts = allFacts.filter((fact) => acquisitionInScope(fact, scope));
+    const spend = exactOk ? allSpend : [];
 
     const media = new Map(graphRows.rows.map((row) => [s(row.creative_id), row]));
     const grains = Object.fromEntries(
@@ -1361,14 +1614,67 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
     const metaCoverage = coverageOf(metaLeads);
     const conversations = facts.filter((fact) => fact.entityType === "chatwoot_conversation");
     const trackedSpend = exactTotals.spend;
+    const exactFacts = facts.filter((fact) => fact.attributionConfidence === "exact");
+    const exactMatched = exactFacts.filter((fact) => fact.outcome && fact.matchConfidence === "exact");
     const kpis = closedLoopKpis({
       all: totals,
       tracked: exactTotals,
       totalSpend: totals.spend,
       trackedSpend,
       // A period with no Meta rows is zero only if Meta was synced after it ended.
-      spendSynced: spend.length > 0 || sources.metaAdsSyncedThrough >= range.to,
+      spendSynced: allSpend.length > 0 || sources.metaAdsSyncedThrough >= range.to,
       crmSynced: Boolean(refresh.finishedAt),
+      scope,
+      metaEvents: allFacts.filter((fact) =>
+        acquisitionInScope(fact, { kind: "platform", platform: "meta" }),
+      ).length,
+      exactUniqueLeads: new Set(exactMatched.map((fact) => fact.crmLeadId)).size,
+      exactUniqueWon: new Set(
+        exactMatched.filter((fact) => fact.outcome?.won).map((fact) => fact.crmLeadId),
+      ).size,
+      exactCrmMatchesInScope: facts.filter((fact) => fact.outcome && fact.matchConfidence === "exact")
+        .length,
+      scopeTotals,
+    });
+
+    // Attributed + unattributed always add back to the Accounting population of
+    // the same basis: every payment in the window, or every lead created in it.
+    const attributionOf = (crmLeadId: string): RevenueAttribution =>
+      crmLeadId ? (attributionByLead.get(crmLeadId) ?? "none") : "none";
+    const paymentDateReconciliation = reconcileRevenue(
+      "payment_date",
+      authority.paymentWindow.map((line) => ({ usd: line.usd, attribution: attributionOf(line.crmLeadId) })),
+    );
+    const leadCohortReconciliation = reconcileRevenue(
+      "lead_cohort",
+      cohortLeadIds.map((id) => ({ usd: authority.byLead.get(id)?.usd ?? 0, attribution: attributionOf(id) })),
+    );
+    const revenueReconciliation = exactOk
+      ? {
+          paymentDate: paymentDateReconciliation,
+          leadCohort: leadCohortReconciliation,
+          linksAvailable: authority.linksAvailable,
+          /**
+           * The Overview's exact cohort revenue minus the exact slice of the
+           * lead-cohort reconciliation. Both read the same Accounting rows; a
+           * non-zero value is a disagreement to investigate, shown, not hidden.
+           */
+          exactCohortDifference:
+            Math.round((exactTotals.revenue - leadCohortReconciliation.exactAttributedRevenue) * 100) / 100,
+        }
+      : null;
+    const finishedAt = refresh.finishedAt as unknown;
+    const health = managementHealth({
+      scope,
+      window: range,
+      spend: scopeTotals.spend,
+      metaAdsSyncedThrough: sources.metaAdsSyncedThrough,
+      closedLoopRefreshedAt:
+        finishedAt instanceof Date ? finishedAt.toISOString() : finishedAt ? s(finishedAt) : null,
+      closedLoopStatus: refresh.status,
+      crmSyncedAt: sources.crmSyncedAt,
+      exactShareOfEvents: facts.length ? (exactFacts.length / facts.length) * 100 : null,
+      events: facts.length,
     });
     const messagingStatus: KpiStatus = sources.messagingResolved > 0 ? "ok" : "not_connected";
     const messaging = (await import("./meta-messaging-readiness.server")
@@ -1566,6 +1872,12 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
       period: range,
       businessTimeZone: BUSINESS_TIME_ZONE,
       refresh,
+      /** The platform scope every figure below was computed in. */
+      scope,
+      exactAttributionAvailable: exactOk,
+      scopeTotals,
+      health,
+      revenueReconciliation,
       kpis,
       coverageSummary,
       crmBreakdown,
@@ -1717,7 +2029,7 @@ export async function getCreativeDetail(
   return cached(`creative|${id}|${range.from}|${range.to}`, async () => {
     await ensureClosedLoopSchema();
     const pool = getPool();
-    const [ads, assets, facts, spend, historical] = await Promise.all([
+    const [ads, assets, facts, spend, historical, authority] = await Promise.all([
       pool.query<Row>(
         `SELECT * FROM meta_entity_graph WHERE creative_id = $1 ORDER BY campaign_name, adset_name, ad_name`,
         [id],
@@ -1735,7 +2047,9 @@ export async function getCreativeDetail(
           WHERE g.creative_id = $1 AND o.facebook_lead_id <> ''`,
         [id],
       ),
+      loadRevenueAuthority(range, {}),
     ]);
+    applyRevenueAuthority(facts, authority);
     if (!ads.rows.length)
       return { configured: true as const, found: false as const, period: range };
     const adIds = new Set(ads.rows.map((row) => s(row.ad_id)));

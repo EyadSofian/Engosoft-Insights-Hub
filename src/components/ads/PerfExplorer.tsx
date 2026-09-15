@@ -793,6 +793,7 @@ export function PerfExplorer({
           maxHeight={620}
           columnChooser
           groupLabels={{
+            financial: lang === "ar" ? "القرار المالي" : "Financial decision",
             advertising: METRIC_GROUP_LABEL.advertising[lang],
             crm: METRIC_GROUP_LABEL.crm[lang],
             accounting: METRIC_GROUP_LABEL.accounting[lang],
@@ -1542,7 +1543,7 @@ function buildColumns({
     </span>
   );
 
-  return [
+  const columns: Col<PerfRow>[] = [
     {
       key: "name",
       group: "identity",
@@ -1552,27 +1553,38 @@ function buildColumns({
       sticky: true,
       width: "250px",
       sortValue: (r) => nameOf(r),
+      // Names mix Latin, digits, slashes and hyphens inside an Arabic page. Each
+      // one is its own isolated run with its own direction (`bdi dir="auto"`),
+      // never styled as a figure, truncated with the full value on hover. The
+      // return marker sits in a fixed slot, so rows with and without a marker
+      // start their names at the same edge.
       render: (r) => (
         <div className="flex min-w-0 items-start gap-2">
-          {grain === "campaign" && spendAvailable && <CampaignReturnMarker row={r} />}
-          <div className="min-w-0">
-            <div
-              className={`truncate max-w-[210px] ${
+          {grain === "campaign" && spendAvailable && (
+            <span className="flex h-5 w-10 shrink-0 items-center">
+              <CampaignReturnMarker row={r} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <bdi
+              dir="auto"
+              className={`bidi-name block max-w-[210px] truncate ${
                 r.key === unknownAdsetKey ? "text-text-muted italic" : ""
               }`}
               title={nameOf(r)}
             >
               {nameOf(r)}
-            </div>
+            </bdi>
             {grain !== "campaign" && r.key !== unknownAdsetKey && (
-              <div
-                className="mt-0.5 max-w-[210px] truncate text-[10px] text-text-subtle"
+              <bdi
+                dir="auto"
+                className="bidi-name mt-0.5 block max-w-[210px] truncate text-[10px] text-text-subtle"
                 title={[r.campaignName, grain === "ad" ? r.adsetName : ""]
                   .filter(Boolean)
                   .join(" › ")}
               >
                 {[r.campaignName, grain === "ad" ? r.adsetName : ""].filter(Boolean).join(" › ")}
-              </div>
+              </bdi>
             )}
           </div>
           {grain === "adset" && r.key !== unknownAdsetKey && (
@@ -1812,6 +1824,18 @@ function buildColumns({
       render: (r) => <AcosBadge row={r} />,
     },
   ];
+
+  // Spend, Revenue and ROAS are the financial decision and sit side by side right
+  // after the identity columns (in RTL the table mirrors, keeping them adjacent).
+  // Column order only: every value above is rendered exactly as before.
+  const FINANCIAL_KEYS = ["spend", "revenue", "roas"];
+  const financial = FINANCIAL_KEYS.flatMap((key) => columns.filter((column) => column.key === key)).map(
+    (column) => ({ ...column, group: "financial", hideByDefault: false }),
+  );
+  const rest = columns.filter((column) => !FINANCIAL_KEYS.includes(column.key));
+  const firstMetric = rest.findIndex((column) => column.group !== "identity");
+  const insertAt = firstMetric === -1 ? rest.length : firstMetric;
+  return [...rest.slice(0, insertAt), ...financial, ...rest.slice(insertAt)];
 }
 
 function campaignReturnCopy(band: Exclude<CampaignReturnBand, "unrated">, lang: Lang) {
@@ -1844,7 +1868,7 @@ function CampaignReturnMarker({ row }: { row: PerfRow }) {
   const ratio = row.revenue / row.spend;
   return (
     <span
-      className="mt-1 h-2.5 w-10 shrink-0 rounded-full"
+      className="h-2.5 w-10 shrink-0 rounded-full"
       style={{ background: CAMPAIGN_RETURN_COLOR[band] }}
       title={`${campaignReturnCopy(band, lang)} · ${ratio.toFixed(2)}×${
         row.partialSpend ? (lang === "ar" ? " · الإنفاق جزئي" : " · partial spend") : ""

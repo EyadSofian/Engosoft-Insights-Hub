@@ -766,7 +766,11 @@ export interface Grouped {
 export interface LostBreakdown {
   byCategory: Grouped[];
   byType: Grouped[];
+  /** Grouped by `canonicalReasonKey`; `label` is the key, translate it with `reasonLabels`. */
   byReason: Grouped[];
+  /** Canonical reasons with every raw Odoo spelling folded into each, for audit drill-downs. */
+  byReasonCanonical: import("./loss-reason-taxonomy").CanonicalReasonGroup[];
+  reasonLabels: Record<string, { ar: string; en: string }>;
   byCourse: Grouped[];
   byMonth: Grouped[];
   byTeam: Grouped[];

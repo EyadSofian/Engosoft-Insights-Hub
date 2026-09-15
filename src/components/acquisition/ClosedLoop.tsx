@@ -18,6 +18,12 @@ import { Card, Pill, Segmented } from "@/components/ui-bits";
 import { nameWithId } from "@/components/attribution/acquisition-labels";
 import type { ClosedLoopGrain, FunnelStep, GrainRow, QualityMetrics } from "@/lib/closed-loop";
 import type { Kpi, KpiStatus } from "@/lib/closed-loop-kpis";
+import type {
+  ManagementHealthIndicator,
+  ManagementScope,
+  RevenueReconciliation,
+  ScopeSpend,
+} from "@/lib/management-scope";
 import { kpiDisplay } from "./ManagementOverview";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
@@ -95,6 +101,24 @@ interface DimensionBucket {
 export interface ClosedLoopResponse {
   configured: boolean;
   period?: { from: string; to: string };
+  /** The platform scope every figure was computed in (the global filter). */
+  scope?: ManagementScope;
+  /** False off Meta: exact attribution figures are then unavailable, never Meta under another name. */
+  exactAttributionAvailable?: boolean;
+  scopeTotals?: {
+    spend: ScopeSpend;
+    uniqueCrmLeads: number | null;
+    uniqueWonCustomers: number | null;
+    collectedRevenue: number | null;
+    scopeLabel: { en: string; ar: string };
+  };
+  health?: ManagementHealthIndicator[];
+  revenueReconciliation?: {
+    paymentDate: RevenueReconciliation;
+    leadCohort: RevenueReconciliation;
+    linksAvailable: boolean;
+    exactCohortDifference: number;
+  } | null;
   refresh?: { status: string; finishedAt: string | null; lastError: string };
   marketing?: {
     campaigns: number;
@@ -808,8 +832,11 @@ function metricColumns<T>(
   }));
 }
 
+// Spend, Revenue and ROAS lead as one financial decision group (order only).
 const QUALITY_KEYS: MetricKey[] = [
   "spend",
+  "revenue",
+  "roas",
   "leads",
   "conversations",
   "metaFormLeads",
@@ -819,7 +846,6 @@ const QUALITY_KEYS: MetricKey[] = [
   "qualified",
   "quotations",
   "won",
-  "revenue",
   "cpl",
   "costPerInterested",
   "costPerQualified",
@@ -829,7 +855,6 @@ const QUALITY_KEYS: MetricKey[] = [
   "qualificationRate",
   "winRate",
   "revenuePerLead",
-  "roas",
 ];
 
 /* --- hierarchy grains -------------------------------------------------------- */
@@ -984,7 +1009,8 @@ export function GrainPerformance({
       A,
       (row) => row,
       QUALITY_KEYS,
-      data?.kpis?.adSpend ? data.kpis.adSpend.status === "ok" : true,
+      // Grain rows carry Meta spend, so they follow the Meta spend figure, not the scope total.
+      data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true,
     ),
     // Technical IDs, off by default: available from the column chooser.
     {

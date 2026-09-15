@@ -2,6 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * One employee's records behind their cards: leads with contact evidence,
+ * orders, invoices and Chatwoot conversations.
+ *
+ * Lead contact is resolved by the shared resolver (`lead-contact-evidence.ts`),
+ * the same one the uncalled-leads queue and the employee coverage counters use:
+ * phone and mobile, normalised numbers, Yeastar calls after creation and
+ * Chatwoot replies in the window. A Calls Hub outage is reported as
+ * unavailable, never as "no calls".
+ */
 export const Route = createFileRoute("/api/employee-evidence")({
   server: {
     handlers: {
@@ -9,11 +19,20 @@ export const Route = createFileRoute("/api/employee-evidence")({
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const { authoritativeLostLeads, getFiltered } = await import("@/lib/metrics.server");
         const { normalizePersonName } = await import("@/lib/person-name");
+        const { integrationPersonMatchScore } = await import("@/lib/integration-person");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
-        const { callCanCoverLead } = await import("@/lib/uncalled-leads");
-        const { chatwootConfigured, getChatwootAgentConversationEvidence } =
-          await import("@/lib/chatwoot.server");
+        const {
+          chatwootConfigured,
+          getChatwootAgentConversationEvidence,
+          getChatwootPhoneConversationEvidence,
+        } = await import("@/lib/chatwoot.server");
+        const {
+          LEAD_CONTACT_EVIDENCE_VERSION,
+          indexCallsByPhone,
+          publicContactEvidence,
+          resolveLeadContactEvidence,
+        } = await import("@/lib/lead-contact-evidence");
 
         const url = new URL(request.url);
         const employee = (url.searchParams.get("employee") || "").trim();
@@ -31,25 +50,20 @@ export const Route = createFileRoute("/api/employee-evidence")({
         ) {
           return Response.json({ error: "A valid date range is required" }, { status: 400 });
         }
+        const window = { from: filters.from, to: filters.to };
 
         const employeeKey = normalizePersonName(employee);
         const sharedFilters = { ...filters };
         delete sharedFilters.salesperson;
         const data = await getFiltered(sharedFilters);
-        const leadCalls = await getCallsHubLeadCalls(filters.from, filters.to).catch(() => []);
-        const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-        const phoneKey = (value: string) => {
-          const digits = value
-            .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
-            .replace(/\D/g, "");
-          return digits.length >= 9 ? digits.slice(-9) : "";
-        };
-        const callsByPhone = new Map<string, typeof leadCalls>();
-        for (const call of leadCalls) {
-          const key = phoneKey(call.phone);
-          if (!key) continue;
-          callsByPhone.set(key, [...(callsByPhone.get(key) ?? []), call]);
-        }
+        let callsAvailable = true;
+        let callsError: string | null = null;
+        const leadCalls = await getCallsHubLeadCalls(filters.from, filters.to).catch((error) => {
+          callsAvailable = false;
+          callsError = error instanceof Error ? error.message : "Calls Hub is unavailable";
+          return [];
+        });
+        const callsByPhone = indexCallsByPhone(leadCalls);
         const odooBaseUrl = odooConfig().url;
         const callsHubBaseUrl = (
           process.env.CALLS_HUB_URL || "https://web-production-c7b78.up.railway.app"
@@ -60,86 +74,106 @@ export const Route = createFileRoute("/api/employee-evidence")({
             ? `${odooBaseUrl}/web#id=${id}&model=crm.lead&view_type=form`
             : null;
         };
-        const withCallEvidence = <T extends { phone: string; createdAt: string }>(lead: T) => {
-          const calls = (callsByPhone.get(phoneKey(lead.phone)) ?? []).filter((call) =>
-            callCanCoverLead(call, lead.createdAt),
-          );
-          const ownerCalls = calls.filter(
-            (call) =>
-              normalizePersonName(call.agentName) === employeeKey ||
-              (!!extension && call.agentExtension === extension),
-          );
-          return {
-            ...lead,
-            calledByAny: calls.length > 0,
-            calledByOwner: ownerCalls.length > 0,
-            totalCalls: calls.reduce((sum, call) => sum + call.totalCalls, 0),
-            ownerCalls: ownerCalls.reduce((sum, call) => sum + call.totalCalls, 0),
-            firstCallAt:
-              calls
-                .map((call) => call.firstCallAt)
-                .filter(Boolean)
-                .sort()
-                .at(0) ?? null,
-            latestCallAt:
-              calls
-                .map((call) => call.latestCallAt)
-                .filter(Boolean)
-                .sort()
-                .at(-1) ?? null,
-            latestCallUrl:
-              ownerCalls
-                .filter((call) => call.latestCallId)
-                .sort((left, right) => right.latestCallAt.localeCompare(left.latestCallAt))
-                .map(
-                  (call) =>
-                    `${callsHubBaseUrl}/?call=${encodeURIComponent(call.latestCallId)}#archive`,
-                )
-                .at(0) ?? null,
-          };
+
+        type SourceLead = {
+          id: string;
+          contact: string;
+          phone: string;
+          mobile: string;
+          stage: string;
+          course: string;
+          createdAt: string;
+          outcome: "won" | "open" | "lost";
         };
-        const activeLeads = data.crm
-          .filter((row) => normalizePersonName(row.salesperson) === employeeKey)
-          .map((row) =>
-            withCallEvidence({
+        const sourceLeads: SourceLead[] = [
+          ...data.crm
+            .filter((row) => normalizePersonName(row.salesperson) === employeeKey)
+            .map((row) => ({
               id: row.id,
               contact: row.contact,
-              phone: row.phone || row.mobile,
+              phone: row.phone,
+              mobile: row.mobile,
               stage: row.stage,
               course: row.course,
               createdAt: row.createdAt,
-              outcome: row.isWon ? "won" : "open",
-              url: leadUrl(row.id),
-            }),
-          );
-        const archivedLeads = authoritativeLostLeads(data)
-          .filter((row) => normalizePersonName(row.salesperson) === employeeKey)
-          .map((row) =>
-            withCallEvidence({
+              outcome: (row.isWon ? "won" : "open") as SourceLead["outcome"],
+            })),
+          ...authoritativeLostLeads(data)
+            .filter((row) => normalizePersonName(row.salesperson) === employeeKey)
+            .map((row) => ({
               id: row.id,
               contact: row.contact,
-              phone: row.phone || row.mobile,
+              phone: row.phone,
+              mobile: row.mobile,
               stage: row.stage,
               course: row.course,
               createdAt: row.createdAt,
               outcome: "lost" as const,
-              url: leadUrl(row.id),
-            }),
-          );
-        const leadMap = new Map<
-          string,
-          (typeof activeLeads)[number] | (typeof archivedLeads)[number]
-        >();
-        for (const lead of [...activeLeads, ...archivedLeads]) {
-          const key = lead.id || `${phoneKey(lead.phone)}:${lead.createdAt}`;
+            })),
+        ];
+        const leadMap = new Map<string, SourceLead>();
+        for (const lead of sourceLeads) {
+          const key = lead.id || `${lead.phone || lead.mobile}:${lead.createdAt}`;
           if (!leadMap.has(key)) leadMap.set(key, lead);
         }
-        const leads = capped(
-          [...leadMap.values()].sort((left, right) =>
-            right.createdAt.localeCompare(left.createdAt),
-          ),
+        const page = capped(
+          [...leadMap.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
           100,
         );
+
+        // Chatwoot is read only for the numbers on the page in hand.
+        let chatwootPhoneAvailable = false;
+        let chatwootPhoneError: string | null = null;
+        let chatsByPhone = new Map();
+        if (chatwootConfigured()) {
+          try {
+            const batch = await getChatwootPhoneConversationEvidence(
+              page.rows.flatMap((lead) => [lead.phone, lead.mobile]),
+            );
+            chatsByPhone = batch.evidence;
+            chatwootPhoneAvailable = true;
+            if (!batch.complete) chatwootPhoneError = `Chatwoot sync is warming ${batch.missing} phone records`;
+            else if (batch.error) chatwootPhoneError = batch.error;
+          } catch (error) {
+            chatwootPhoneError = error instanceof Error ? error.message : "Chatwoot matching is unavailable";
+          }
+        }
+
+        const rows = page.rows.map((lead) => {
+          const evidence = resolveLeadContactEvidence(lead, {
+            window,
+            callsByPhone,
+            callsAvailable,
+            chatsByPhone,
+            chatwootAvailable: chatwootPhoneAvailable,
+            isOwnerCall: (call) =>
+              normalizePersonName(call.agentName) === employeeKey ||
+              (!!extension && call.agentExtension === extension),
+            isOwnerChatName: (name) => integrationPersonMatchScore(employee, name) > 0,
+            callUrl: (callId) =>
+              callId ? `${callsHubBaseUrl}/?call=${encodeURIComponent(callId)}#archive` : null,
+          });
+          return {
+            id: lead.id,
+            contact: lead.contact,
+            phone: lead.phone || lead.mobile,
+            phoneNumbers: [...new Set([lead.phone, lead.mobile].filter(Boolean))],
+            stage: lead.stage,
+            course: lead.course,
+            createdAt: lead.createdAt,
+            outcome: lead.outcome,
+            url: leadUrl(lead.id),
+            calledByAny: evidence.calledByAny,
+            calledByOwner: evidence.calledByOwner,
+            totalCalls: evidence.totalCalls,
+            ownerCalls: evidence.ownerCalls,
+            firstCallAt: evidence.firstCallAt,
+            latestCallAt: evidence.latestCallAt,
+            latestCallUrl: evidence.latestOwnerCallUrl,
+            evidence: publicContactEvidence(evidence),
+          };
+        });
+        const leads = { rows, total: page.total, truncated: page.truncated };
 
         const orderMap = new Map<
           string,
@@ -231,7 +265,12 @@ export const Route = createFileRoute("/api/employee-evidence")({
         return json({
           ok: true,
           employee,
-          range: { from: filters.from, to: filters.to },
+          range: window,
+          evidenceVersion: LEAD_CONTACT_EVIDENCE_VERSION,
+          callsAvailable,
+          callsError,
+          chatwootPhoneAvailable,
+          chatwootPhoneError,
           leads,
           orders,
           invoices,

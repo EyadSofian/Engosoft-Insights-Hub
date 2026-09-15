@@ -744,6 +744,28 @@
     text-align: start;
   }
 
+  /* Campaign, ad-set, ad and creative names in data tables.
+   *
+   * `pmp-23-12-25-sayed t` or `Automotive - Riyadh - 4/7/26 - CBO - sh` inside
+   * an Arabic table: rendered as part of the RTL paragraph, the slashes and
+   * hyphens at a run's edge take the paragraph's direction and the name reads
+   * scrambled. The element carries `dir="auto"` (its own direction from its
+   * first strong character) and is isolated here. A name is text, not a figure,
+   * so the app-wide tabular digits are switched off; alignment follows the page
+   * so short Latin and Arabic names line up at the same edge. */
+  .bidi-name {
+    unicode-bidi: isolate;
+    font-variant-numeric: normal;
+    font-feature-settings: normal;
+    overflow-wrap: normal;
+  }
+  [dir="rtl"] .bidi-name {
+    text-align: right;
+  }
+  [dir="ltr"] .bidi-name {
+    text-align: left;
+  }
+
   /* Latin numerals inside Arabic copy still read left-to-right.
    *
    * `direction: ltr` also resets this box's `text-align: start` to LEFT, and

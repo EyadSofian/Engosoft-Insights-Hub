@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   BadgeDollarSign,
   CheckCircle2,
@@ -20,6 +21,7 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Link } from "@tanstack/react-router";
 import { Card, Pill } from "@/components/ui-bits";
 import { toneVars } from "@/lib/dashboard-tone";
+import { PLATFORM_LABEL } from "@/lib/constants";
 import type { Kpi, KpiFormat, KpiStatus } from "@/lib/closed-loop-kpis";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import type { ClosedLoopResponse } from "./ClosedLoop";
@@ -43,6 +45,32 @@ export const STATUS_TEXT: Record<Exclude<KpiStatus, "ok">, { en: string; ar: str
     en: "Historical evidence missing",
     ar: "الدليل التاريخي غير متوفر",
   },
+  not_available: { en: "Not available for this selection", ar: "غير متاح لهذا الاختيار" },
+  incomplete_source: { en: "Incomplete source", ar: "مصدر غير مكتمل" },
+};
+
+const DATE_BASIS_TEXT: Record<string, { en: string; ar: string }> = {
+  ad_spend_date: { en: "Ad spend date", ar: "تاريخ الصرف" },
+  acquisition_event_date: { en: "Acquisition date", ar: "تاريخ الاستحواذ" },
+  crm_created_date: { en: "CRM creation date", ar: "تاريخ إنشاء الليد" },
+  payment_date: { en: "Payment date", ar: "تاريخ الدفع" },
+  lost_close_date: { en: "Lost/close date", ar: "تاريخ الخسارة/الإقفال" },
+  lead_created_cohort_all_payment_dates: {
+    en: "Lead arrival cohort, any payment date so far",
+    ar: "كوهورت وصول الليد، بأي تاريخ دفع حتى الآن",
+  },
+};
+
+const PLATFORM_SCOPE_TEXT: Record<string, { en: string; ar: string }> = {
+  selected_scope: { en: "Follows the platform filter", ar: "يتبع فلتر المنصة" },
+  meta_only_exact: { en: "Meta only (exact attribution)", ar: "Meta فقط (إسناد دقيق)" },
+  not_platform_scoped: { en: "Not narrowed by platform", ar: "لا يتأثر بالمنصة" },
+};
+
+const ENGINE_TEXT: Record<string, { en: string; ar: string }> = {
+  "metrics.server": { en: "Dashboard totals (ads, CRM, Accounting)", ar: "إجماليات اللوحة (إعلانات، CRM، حسابات)" },
+  "closed-loop": { en: "Exact attribution graph", ar: "مخطط الإسناد الدقيق" },
+  accounting: { en: "Accounting paid invoices", ar: "فواتير الحسابات المدفوعة" },
 };
 
 export function formatKpiValue(value: number, format: KpiFormat): string {
@@ -88,7 +116,7 @@ export function KpiFigure({
   const A = lang === "ar";
   const label = kpi ? (A ? kpi.label.ar : kpi.label.en) : "—";
   const unavailable = kpi && (kpi.status !== "ok" || kpi.value === null);
-  const supporting =
+  const ratioParts =
     kpi?.numerator && kpi.denominator
       ? [
           {
@@ -102,7 +130,33 @@ export function KpiFigure({
             value: formatKpiValue(kpi.denominator.value, kpi.denominator.format),
           },
         ]
-      : undefined;
+      : [];
+  // Every figure states its date basis, platform scope and engine next to its value.
+  const contract = kpi?.contract;
+  const contractParts = contract
+    ? [
+        {
+          key: "dateBasis",
+          label: A ? "أساس التاريخ" : "Date basis",
+          value: [contract.dateBasis, contract.denominatorDateBasis]
+            .filter((basis): basis is NonNullable<typeof basis> => Boolean(basis))
+            .map((basis) => DATE_BASIS_TEXT[basis]?.[lang] ?? basis)
+            .join(" ÷ "),
+        },
+        {
+          key: "platformScope",
+          label: A ? "نطاق المنصة" : "Platform scope",
+          value: PLATFORM_SCOPE_TEXT[contract.platformScope]?.[lang] ?? contract.platformScope,
+        },
+        {
+          key: "engine",
+          label: A ? "المصدر" : "Source",
+          value: ENGINE_TEXT[contract.engine]?.[lang] ?? contract.engine,
+        },
+      ]
+    : [];
+  const supporting = ratioParts.length || contractParts.length ? [...ratioParts, ...contractParts] : undefined;
+  const coverageNote = kpi?.coverageNote ? (A ? kpi.coverageNote.ar : kpi.coverageNote.en) : undefined;
   return (
     <MetricDetailTrigger
       detail={{
@@ -119,7 +173,7 @@ export function KpiFigure({
             ? A
               ? `لا يوجد رقم: ${STATUS_TEXT[kpi.status === "ok" ? "no_denominator" : kpi.status].ar}. لا يُعرض صفر مكانه.`
               : `No figure: ${STATUS_TEXT[kpi.status === "ok" ? "no_denominator" : kpi.status].en}. A zero is never shown in its place.`
-            : undefined,
+            : coverageNote,
       }}
       card={{ index, sub, subWrap: true, loading, hero, valueWrap: Boolean(unavailable) }}
     />
@@ -131,109 +185,315 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
   const A = lang === "ar";
   const k = data?.kpis;
   const shown = (key: string) => (k?.[key] ? kpiDisplay(k[key], lang) : "—");
+  const scopeLabel = data?.scopeTotals?.scopeLabel;
+  const scopeName = scopeLabel ? (A ? scopeLabel.ar : scopeLabel.en) : A ? "كل القنوات" : "All channels";
+  const spendByPlatform = (data?.scopeTotals?.spend.byPlatform ?? [])
+    .map((row) =>
+      row.state === "source_unavailable"
+        ? `${PLATFORM_LABEL[row.platform][lang]}: ${A ? "الصرف غير متاح" : "spend unavailable"}`
+        : row.state === "available"
+          ? `${PLATFORM_LABEL[row.platform][lang]} ${fmtUSD(row.spend ?? 0)}`
+          : "",
+    )
+    .filter(Boolean)
+    .join(" · ");
+  const exact = data?.exactAttributionAvailable !== false;
   return (
-    <PageSection
-      level="headline"
-      title={A ? "من الإعلان إلى الإيراد" : "From ad to revenue"}
-      hint={
-        A
-          ? "العملاء والمبيعات والإيراد للعملاء الذين نعرف إعلانهم بالضبط. اضغط أي رقم لترى كيف حُسب."
-          : "Leads, sales and revenue for leads we can trace to their exact ad. Press any figure to see how it was calculated."
-      }
-    >
-      <KpiRow>
-        <KpiFigure
-          kpi={k?.adSpend}
-          index={0}
-          icon={<DollarSign size={17} />}
-          tone="amber"
-          loading={loading}
-          sub={
-            A
-              ? `منها ${shown("trackedSpend")} على حملات متتبَّعة`
-              : `${shown("trackedSpend")} on tracked campaigns`
-          }
-        />
-        <KpiFigure
-          kpi={k?.leads}
-          index={1}
-          icon={<Users size={17} />}
-          tone="violet"
-          loading={loading}
-          sub={
-            A
-              ? `${shown("trackedLeads")} من إعلانات متتبَّعة`
-              : `${shown("trackedLeads")} from tracked ads`
-          }
-        />
-        <KpiFigure
-          kpi={k?.qualified}
-          index={2}
-          icon={<Target size={17} />}
-          tone="sky"
-          loading={loading}
-          sub={
-            A
-              ? `معدل التأهيل ${shown("qualificationRate")}`
-              : `${shown("qualificationRate")} qualification rate`
-          }
-        />
-        <KpiFigure
-          kpi={k?.won}
-          index={3}
-          icon={<Trophy size={17} />}
-          tone="mint"
-          loading={loading}
-          sub={A ? `معدل الفوز ${shown("winRate")}` : `${shown("winRate")} win rate`}
-        />
-        <KpiFigure
-          kpi={k?.revenue}
-          index={4}
-          icon={<BadgeDollarSign size={17} />}
-          tone="mint"
-          loading={loading}
-          hero
-          sub={A ? `${shown("revenuePerLead")} لكل عميل` : `${shown("revenuePerLead")} per lead`}
-        />
-        <KpiFigure
-          kpi={k?.roasAllSpend}
-          index={5}
-          icon={<Gauge size={17} />}
-          tone="violet"
-          loading={loading}
-          sub={
-            A
-              ? `${shown("roasTracked")} على الحملات المتتبَّعة`
-              : `${shown("roasTracked")} on tracked campaigns`
-          }
-        />
-      </KpiRow>
-      <SecondaryMetrics label={A ? "أرقام إضافية" : "More figures"} count={2}>
+    <>
+      <PageSection
+        level="headline"
+        title={A ? `النطاق المختار · ${scopeName}` : `Selected scope · ${scopeName}`}
+        hint={
+          A
+            ? "صرف كل منصة لها مصدر صرف، وليدز CRM الفريدة بتاريخ الإنشاء، والتحصيل بتاريخ الدفع — كلها بنفس فلتر المنصة. اضغط أي رقم لترى كيف حُسب."
+            : "Spend of every platform with a spend source, unique CRM leads by creation date and collections by payment date — all under the same platform filter. Press any figure to see how it was calculated."
+        }
+      >
         <KpiRow>
           <KpiFigure
-            kpi={k?.crmMatched}
+            kpi={k?.adSpend}
             index={0}
-            icon={<ShieldCheck size={17} />}
-            tone="sky"
+            icon={<DollarSign size={17} />}
+            tone="amber"
             loading={loading}
-            sub={
-              A ? `${shown("crmMatchRate")} من كل العملاء` : `${shown("crmMatchRate")} of all leads`
-            }
+            sub={spendByPlatform || undefined}
           />
           <KpiFigure
-            kpi={k?.costPerCustomerAll}
+            kpi={k?.uniqueCrmLeads}
             index={1}
-            icon={<Scale size={17} />}
-            tone="rose"
+            icon={<Users size={17} />}
+            tone="violet"
             loading={loading}
             sub={
               A
-                ? `${shown("costPerCustomerTracked")} على الحملات المتتبَّعة`
-                : `${shown("costPerCustomerTracked")} on tracked campaigns`
+                ? `${shown("leads")} حدث استحواذ · ${shown("costPerCrmLead")} لكل ليد`
+                : `${shown("leads")} acquisition events · ${shown("costPerCrmLead")} per lead`
+            }
+          />
+          <KpiFigure
+            kpi={k?.uniqueWonCustomers}
+            index={2}
+            icon={<Trophy size={17} />}
+            tone="mint"
+            loading={loading}
+            sub={A ? "مكسوبون من ليدز الفترة" : "Won among leads created in the period"}
+          />
+          <KpiFigure
+            kpi={k?.collectedRevenue}
+            index={3}
+            icon={<BadgeDollarSign size={17} />}
+            tone="mint"
+            loading={loading}
+            hero
+            sub={
+              A
+                ? `${shown("blendedRoas")} التحصيل ÷ الصرف (بدون إسناد)`
+                : `${shown("blendedRoas")} collections ÷ spend (not attributed)`
             }
           />
         </KpiRow>
-      </SecondaryMetrics>
+      </PageSection>
+      <PageSection
+        level="headline"
+        title={
+          A ? "من الإعلان إلى الإيراد · إسناد دقيق (Meta)" : "From ad to revenue · exact attribution (Meta)"
+        }
+        hint={
+          exact
+            ? A
+              ? "العملاء الذين نعرف إعلان Meta الخاص بهم بالضبط، ونتيجتهم في CRM، وإيرادهم المدفوع من الحسابات (كوهورت بتاريخ وصول العميل)."
+              : "Leads traced to their exact Meta ad, their CRM outcome, and their paid revenue from Accounting (a cohort dated by lead arrival)."
+            : A
+              ? "الإسناد الدقيق متاح لـ Meta فقط؛ هذه الأرقام غير متاحة للمنصة المختارة."
+              : "Exact attribution exists for Meta only; these figures are not available for the selected platform."
+        }
+      >
+        <KpiRow>
+          <KpiFigure
+            kpi={k?.exactAttributedLeads}
+            index={0}
+            icon={<ShieldCheck size={17} />}
+            tone="violet"
+            loading={loading}
+            sub={
+              A
+                ? `${shown("trackedLeads")} استحواذ دقيق · ${shown("crmMatchRate")} من كل الأحداث`
+                : `${shown("trackedLeads")} exact acquisitions · ${shown("crmMatchRate")} of all events`
+            }
+          />
+          <KpiFigure
+            kpi={k?.qualified}
+            index={1}
+            icon={<Target size={17} />}
+            tone="sky"
+            loading={loading}
+            sub={
+              A
+                ? `معدل التأهيل ${shown("qualificationRate")}`
+                : `${shown("qualificationRate")} qualification rate`
+            }
+          />
+          <KpiFigure
+            kpi={k?.won}
+            index={2}
+            icon={<Trophy size={17} />}
+            tone="mint"
+            loading={loading}
+            sub={A ? `معدل الفوز ${shown("winRate")}` : `${shown("winRate")} win rate`}
+          />
+          <KpiFigure
+            kpi={k?.revenue}
+            index={3}
+            icon={<BadgeDollarSign size={17} />}
+            tone="mint"
+            loading={loading}
+            hero
+            sub={
+              A
+                ? `${shown("revenuePerLead")} لكل عميل متتبَّع`
+                : `${shown("revenuePerLead")} per tracked lead`
+            }
+          />
+          <KpiFigure
+            kpi={k?.roasAllSpend}
+            index={4}
+            icon={<Gauge size={17} />}
+            tone="violet"
+            loading={loading}
+            sub={
+              A
+                ? `${shown("roasTracked")} على الحملات المتتبَّعة`
+                : `${shown("roasTracked")} on tracked campaigns`
+            }
+          />
+        </KpiRow>
+        <SecondaryMetrics label={A ? "أرقام إضافية" : "More figures"} count={4}>
+          <KpiRow>
+            <KpiFigure
+              kpi={k?.metaSpend}
+              index={0}
+              icon={<DollarSign size={17} />}
+              tone="amber"
+              loading={loading}
+              sub={
+                A
+                  ? `منها ${shown("trackedSpend")} على حملات متتبَّعة`
+                  : `${shown("trackedSpend")} on tracked campaigns`
+              }
+            />
+            <KpiFigure
+              kpi={k?.crmMatched}
+              index={1}
+              icon={<ShieldCheck size={17} />}
+              tone="sky"
+              loading={loading}
+              sub={
+                A
+                  ? `${shown("exactUniqueWon")} عميل مكسوب فريد`
+                  : `${shown("exactUniqueWon")} unique won customers`
+              }
+            />
+            <KpiFigure
+              kpi={k?.costPerCustomerAll}
+              index={2}
+              icon={<Scale size={17} />}
+              tone="rose"
+              loading={loading}
+              sub={
+                A
+                  ? `${shown("costPerCustomerTracked")} على الحملات المتتبَّعة`
+                  : `${shown("costPerCustomerTracked")} on tracked campaigns`
+              }
+            />
+            <KpiFigure
+              kpi={k?.cplTracked}
+              index={3}
+              icon={<Scale size={17} />}
+              tone="amber"
+              loading={loading}
+              sub={
+                A
+                  ? `${shown("cplAll")} صرف Meta لكل حدث من Meta`
+                  : `${shown("cplAll")} Meta spend per Meta event`
+              }
+            />
+          </KpiRow>
+        </SecondaryMetrics>
+      </PageSection>
+      <ManagementHealthCard data={data} loading={loading} />
+      <RevenueReconciliationCard data={data} loading={loading} />
+    </>
+  );
+}
+
+/** What is missing for this scope, in words. Rendered only when something is. */
+export function ManagementHealthCard({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const items = data?.health ?? [];
+  if (loading || !items.length) return null;
+  const severity = {
+    critical: { tone: "danger" as const, en: "Missing", ar: "ناقص" },
+    warning: { tone: "warning" as const, en: "Check", ar: "تحقق" },
+    info: { tone: "neutral" as const, en: "Note", ar: "ملاحظة" },
+  };
+  return (
+    <PageSection
+      level="insight"
+      title={A ? "صحة البيانات لهذا النطاق" : "Data health for this scope"}
+      icon={<AlertTriangle size={16} />}
+      tone="amber"
+    >
+      <Card padded>
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li key={`${item.key}-${item.severity}`} className="flex flex-wrap items-start gap-2 text-sm">
+              <Pill tone={severity[item.severity].tone}>{severity[item.severity][lang]}</Pill>
+              <span className="min-w-0 flex-1 text-text">{A ? item.message.ar : item.message.en}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </PageSection>
+  );
+}
+
+/**
+ * Media revenue next to the Accounting money it comes from. Attributed plus
+ * unattributed always equals the Accounting total for the same basis, and any
+ * disagreement between the Overview's cohort revenue and this split is shown.
+ */
+export function RevenueReconciliationCard({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const r = data?.revenueReconciliation;
+  if (!r) return null;
+  const figure = (value: number) => (loading ? "…" : fmtUSD(value));
+  const block = (title: string, note: string, rec: NonNullable<typeof r>["paymentDate"]) => (
+    <div className="rounded-xl bg-surface-2 p-3">
+      <div className="text-xs font-semibold text-text">{title}</div>
+      <div className="mt-0.5 text-[11px] text-text-muted">{note}</div>
+      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        {(
+          [
+            [A ? "إجمالي الحسابات" : "Accounting total", figure(rec.totalAccountingRevenue)],
+            [A ? "مُسند بدقة" : "Exactly attributed", figure(rec.exactAttributedRevenue)],
+            [A ? "مُسند باستنتاج" : "Inferred attribution", figure(rec.inferredAttributedRevenue)],
+            [A ? "غير مُسند" : "Unattributed", figure(rec.unattributedRevenue)],
+            [
+              A ? "تغطية الإسناد" : "Attribution coverage",
+              rec.attributionCoverage === null ? "—" : fmtPct(rec.attributionCoverage, 1),
+            ],
+          ] as const
+        ).map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-2">
+            <dt className="text-text-muted">{label}</dt>
+            <dd className="num font-semibold text-text">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+  return (
+    <PageSection
+      level="insight"
+      title={A ? "مطابقة الإيراد مع الحسابات" : "Revenue reconciled to Accounting"}
+      icon={<Scale size={16} />}
+      tone="mint"
+      hint={
+        A
+          ? "الإسناد يحدد لمن يُنسب الإيراد ولا يخلق مالًا: المُسند + غير المُسند = إجمالي الحسابات لنفس أساس التاريخ."
+          : "Attribution decides who is credited, never how much money exists: attributed + unattributed = the Accounting total for the same date basis."
+      }
+    >
+      <Card padded className="grid gap-3 md:grid-cols-2">
+        {block(
+          A ? "الإيراد المحصَّل في الفترة" : "Revenue collected in the period",
+          A ? "كل الفواتير المدفوعة بتاريخ دفع داخل الفترة." : "Every paid invoice line whose payment date is in the period.",
+          r.paymentDate,
+        )}
+        {block(
+          A ? "إيراد ليدز الفترة (كوهورت)" : "Revenue of leads created in the period (cohort)",
+          A
+            ? "إيراد مدفوع بأي تاريخ حتى الآن لسجلات CRM المُنشأة في الفترة."
+            : "Paid at any date so far by CRM records created in the period.",
+          r.leadCohort,
+        )}
+        {!r.linksAvailable ? (
+          <p className="text-xs text-warning md:col-span-2">
+            {A
+              ? "روابط أوامر البيع بالفرص غير متاحة؛ كل الإيراد يظهر غير مُسند."
+              : "Sale-order links are unavailable; all revenue shows as unattributed."}
+          </p>
+        ) : null}
+        {r.exactCohortDifference !== 0 ? (
+          <p className="text-xs text-danger md:col-span-2">
+            {A
+              ? `اختلاف ${fmtUSD(r.exactCohortDifference)} بين إيراد الكوهورت الدقيق أعلاه والجزء الدقيق هنا. يُعرض ولا يُخفى.`
+              : `A ${fmtUSD(r.exactCohortDifference)} difference between the exact cohort revenue above and the exact slice here. Shown, not hidden.`}
+          </p>
+        ) : null}
+      </Card>
     </PageSection>
   );
 }
@@ -246,8 +506,9 @@ export function SimpleFunnel({ data, loading }: { data?: ClosedLoopResponse; loa
   const steps: { key: string; label: string; value: string; count?: number; note?: string }[] = [
     {
       key: "spend",
-      label: A ? "صرف الإعلانات" : "Ad spend",
-      value: kpiDisplay(k?.adSpend, lang),
+      // The journey below is the exact Meta funnel, so it starts from Meta spend.
+      label: A ? "صرف إعلانات Meta" : "Meta ad spend",
+      value: kpiDisplay(k?.metaSpend ?? k?.adSpend, lang),
       note: clicks ? (A ? `${fmtNum(clicks)} نقرة` : `${fmtNum(clicks)} clicks`) : undefined,
     },
     {

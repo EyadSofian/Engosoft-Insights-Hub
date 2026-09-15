@@ -6,6 +6,8 @@ export const Route = createFileRoute("/api/teams")({
       GET: async ({ request }) => {
         const { getFiltered, computeTeams, computeTotals } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
+        const { rankHighestClosedLost } = await import("@/lib/lost-classification");
+        const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -46,11 +48,30 @@ export const Route = createFileRoute("/api/teams")({
           .sort((a, b) => b.crmLeads - a.crmLeads)
           .slice(0, 10);
 
+        // Ranked by the closure movement (Lost/Close Date in the window), never
+        // by the cohort `lost` field.
+        const highestClosedLost = rankHighestClosedLost(
+          agentAnalytics.agents.map((agent) => ({
+            key: agent.key,
+            name: agent.displayName || agent.name,
+            team: agent.team,
+            closedLostInPeriod: agent.closedLostInPeriod,
+            createdAndLostInPeriod: agent.createdAndLostInPeriod,
+            olderCohortClosedLostInPeriod: agent.olderCohortClosedLostInPeriod,
+            undatedCohortClosedLostInPeriod: agent.undatedCohortClosedLostInPeriod,
+            cohortLost: agent.cohortLost,
+          })),
+        );
+
         return json({
           teams,
           ...agentAnalytics,
           leaderboard,
           needsAttention,
+          rankings: {
+            highestClosedLost,
+            contract: METRIC_CONTRACTS.closedLostInPeriod,
+          },
           medianConversion: medianConv,
           totals: computeTotals(data),
           health: data.snapshot.health,

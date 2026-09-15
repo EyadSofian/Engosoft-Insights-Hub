@@ -34,9 +34,14 @@ interface LostRowView {
   active: boolean;
   category: string;
   reportingDate: string;
+  closedInPeriod?: boolean;
   campaign: string;
   adName: string;
   reason: string;
+  rawReason?: string;
+  canonicalReasonKey?: string;
+  canonicalReasonLabelAr?: string;
+  canonicalReasonLabelEn?: string;
   course: string;
   mainCategory: string;
   salesTeam: string;
@@ -55,6 +60,8 @@ interface Resp {
     createdInPeriod: number;
     campaignCreatedInPeriod: number;
     fromOlderCohorts: number;
+    olderCohortClosedLostInPeriod?: number;
+    undatedCohortClosedLostInPeriod?: number;
     lostLeads: number;
     lostOpportunities: number;
     currentOpportunities: number;
@@ -89,6 +96,21 @@ function lostSection(
   };
 }
 
+/** Canonical reason keys in the reader's language; unknown keys fall back to themselves. */
+function translatedReasons(breakdown: LostBreakdown, lang: "ar" | "en"): Grouped[] {
+  return breakdown.byReason.map((row) => ({
+    ...row,
+    label: breakdown.reasonLabels?.[row.label]?.[lang] ?? row.label,
+  }));
+}
+
+function translatedReasonMatrix(breakdown: LostBreakdown, matrix: Matrix, lang: "ar" | "en"): Matrix {
+  return {
+    ...matrix,
+    rows: matrix.rows.map((key) => breakdown.reasonLabels?.[key]?.[lang] ?? key),
+  };
+}
+
 /**
  * What the four Lost figures are made of.
  *
@@ -101,11 +123,13 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
   const B = data.breakdown;
   const T = data.totals;
   const M = data.closureMovement;
-  const topReason = B.byReason[0] ?? null;
+  // Reasons arrive grouped by canonical key; each is shown in the reader's language.
+  const reasons = translatedReasons(B, lang);
+  const topReason = reasons[0] ?? null;
 
   const common = [
     lostSection("categories", A ? "فئات الخسارة" : "Loss categories", B.byCategory, lang),
-    lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", B.byReason, lang),
+    lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", reasons, lang),
     lostSection("teams", A ? "أكثر الفرق تأثرًا" : "Most affected teams", B.byTeam, lang),
     lostSection("courses", A ? "أكثر الدورات تأثرًا" : "Most affected courses", B.byCourse, lang),
     lostSection("sources", A ? "حسب المصدر" : "By source", B.bySource, lang),
@@ -214,8 +238,17 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
         {
           key: "older",
           label: A ? "من كوهورتات أقدم" : "From older cohorts",
-          value: fmtNum(M.fromOlderCohorts),
+          value: fmtNum(M.olderCohortClosedLostInPeriod ?? M.fromOlderCohorts),
         },
+        ...(M.undatedCohortClosedLostInPeriod
+          ? [
+              {
+                key: "undated",
+                label: A ? "بلا تاريخ إنشاء صالح" : "No valid creation date",
+                value: fmtNum(M.undatedCohortClosedLostInPeriod),
+              },
+            ]
+          : []),
         {
           key: "campaign",
           label: A ? "من حملات" : "From campaigns",
@@ -306,12 +339,20 @@ function Lost() {
     {
       key: "reason",
       header: t("loss_reason"),
-      sortValue: (r) => r.reason,
-      render: (r) => (
-        <span className="truncate block max-w-[220px]" title={r.reason}>
-          {r.reason || "—"}
-        </span>
-      ),
+      // Canonical reason on screen; the raw Odoo spelling stays on hover and in the CSV.
+      sortValue: (r) => r.canonicalReasonKey ?? r.reason,
+      render: (r) => {
+        const label =
+          (lang === "ar" ? r.canonicalReasonLabelAr : r.canonicalReasonLabelEn) || r.reason || "—";
+        return (
+          <span
+            className="truncate block max-w-[220px]"
+            title={r.rawReason !== undefined ? `${label} · Odoo: ${r.rawReason || "—"}` : r.reason}
+          >
+            {label}
+          </span>
+        );
+      },
     },
     {
       key: "course",
@@ -543,7 +584,14 @@ function Lost() {
                 </button>
               ))}
             </div>
-            <ShareRows rows={shareRows(data.breakdown, shareView)} sorted={shareView === "month"} />
+            <ShareRows
+              rows={
+                shareView === "reason"
+                  ? translatedReasons(data.breakdown, lang)
+                  : shareRows(data.breakdown, shareView)
+              }
+              sorted={shareView === "month"}
+            />
           </Card>
 
           <details className="card overflow-hidden">
@@ -593,11 +641,13 @@ function Lost() {
                 {matrixView === "team" ? t("team") : t("course")}
               </SectionTitle>
               <MatrixTable
-                matrix={
+                matrix={translatedReasonMatrix(
+                  data.breakdown,
                   matrixView === "team"
                     ? data.breakdown.reasonByTeam
-                    : data.breakdown.reasonByCourse
-                }
+                    : data.breakdown.reasonByCourse,
+                  lang,
+                )}
               />
             </div>
           </details>
@@ -626,6 +676,9 @@ function Lost() {
                   active: String(r.active),
                   lost_category: r.category,
                   reason: r.reason,
+                  canonical_reason_key: r.canonicalReasonKey ?? "",
+                  canonical_reason: (lang === "ar" ? r.canonicalReasonLabelAr : r.canonicalReasonLabelEn) ?? "",
+                  raw_reason: r.rawReason ?? r.reason,
                   course: r.course,
                   main_category: r.mainCategory,
                   sales_team: r.salesTeam,

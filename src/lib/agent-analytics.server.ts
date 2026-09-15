@@ -17,7 +17,6 @@ import { loadTargetSource } from "./sales-targets.server";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
 import {
-  chatwootPhoneKey,
   chatwootConfigured,
   getChatwootAgentSnapshot,
   getChatwootPhoneConversationEvidence,
@@ -34,8 +33,11 @@ import {
   EMPLOYEE_SCORE_WEIGHTS,
   type AgentPerformanceScore,
 } from "./employee-performance-score";
-import { callCanCoverLead, leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
+import { leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
 import { getEmployeeDirectory } from "./employee-directory.server.ts";
+import { classifyLostRow } from "./lost-classification";
+import { indexCallsByPhone, resolveLeadContactEvidence } from "./lead-contact-evidence";
+import { summarizeLeadQa, type LeadQaSummary } from "./lead-qa";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
@@ -106,7 +108,25 @@ export interface AgentAnalyticsRow {
   chatwootAgentId: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
+  /** Same population as `closedLostInPeriod`; kept for existing readers. */
   slaLost: number;
+  /**
+   * Canonical Lost populations (`lost-classification.ts`). `lost` above stays
+   * the cohort figure; rankings of closures read `closedLostInPeriod` only.
+   */
+  cohortLost: number;
+  closedLostInPeriod: number;
+  createdAndLostInPeriod: number;
+  olderCohortClosedLostInPeriod: number;
+  undatedCohortClosedLostInPeriod: number;
+  /** Assigned leads with no contact found and incomplete Yeastar/Chatwoot evidence. */
+  contactUnknownDistributedLeads: number | null;
+  /** Same, for contact by the assigned owner. */
+  ownerContactUnknownDistributedLeads: number | null;
+  /** Assigned leads an employee replied to in Chatwoot inside the window. */
+  chatRepliedDistributedLeads: number | null;
+  /** Manual lead QA over this employee's leads created in the window; null when unavailable. */
+  leadQa: LeadQaSummary | null;
   decidedConversionRate: number | null;
   /**
    * Sale orders confirmed on his name in this window, in USD.
@@ -300,7 +320,17 @@ export interface AgentAnalyticsResult {
     lost: number;
     conversionRate: number | null;
     periodClosedWon: number;
+    /** Closed Lost in the window (= periodClosedLost), split canonically below. */
     periodClosedLost: number;
+    createdAndLostInPeriod: number;
+    olderCohortClosedLostInPeriod: number;
+    undatedCohortClosedLostInPeriod: number;
+    /** Assigned leads with no contact found and incomplete evidence (not confirmed omissions). */
+    contactUnknownDistributedLeads: number | null;
+    ownerContactUnknownDistributedLeads: number | null;
+    leadQaVerified: number | null;
+    leadQaNeedsReview: number | null;
+    leadQaDisputed: number | null;
     decidedConversionRate: number | null;
     outboundCalls: number | null;
     answeredCalls: number | null;
@@ -584,6 +614,15 @@ const blank = (key: string, name: string): MutableAgent => ({
   avgFirstCallMinutes: null,
   slaWon: 0,
   slaLost: 0,
+  cohortLost: 0,
+  closedLostInPeriod: 0,
+  createdAndLostInPeriod: 0,
+  olderCohortClosedLostInPeriod: 0,
+  undatedCohortClosedLostInPeriod: 0,
+  contactUnknownDistributedLeads: null,
+  ownerContactUnknownDistributedLeads: null,
+  chatRepliedDistributedLeads: null,
+  leadQa: null,
   decidedConversionRate: null,
   orderRevenue: 0,
   orderCount: 0,
@@ -1120,18 +1159,6 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
   }
 }
 
-const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-
-function phoneKey(value: string): string {
-  const digits = value
-    .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
-    .replace(/\D/g, "");
-  // Yeastar may hold +9665..., Odoo may hold 05..., and Egyptian records can
-  // similarly carry a country prefix. The subscriber's final nine digits are
-  // stable across those formats. Short extensions are never considered.
-  return digits.length >= 9 ? digits.slice(-9) : "";
-}
-
 async function mergeLeadCallCoverage(
   map: Map<string, MutableAgent>,
   data: FilteredData,
@@ -1139,19 +1166,15 @@ async function mergeLeadCallCoverage(
   from: string,
   to: string,
 ) {
-  const callsByPhone = new Map<string, CallsHubLeadCallAggregate[]>();
-  for (const call of calls) {
-    const key = phoneKey(call.phone);
-    if (!key) continue;
-    const rows = callsByPhone.get(key) ?? [];
-    rows.push(call);
-    callsByPhone.set(key, rows);
-  }
+  const callsByPhone = indexCallsByPhone(calls);
   for (const row of map.values()) {
     row.distributedLeads = 0;
     row.calledDistributedLeads = 0;
     row.ownerCalledDistributedLeads = 0;
     row.uncalledDistributedLeads = 0;
+    row.contactUnknownDistributedLeads = 0;
+    row.ownerContactUnknownDistributedLeads = 0;
+    row.chatRepliedDistributedLeads = 0;
     row.callsFromDistributedLeads = 0;
     row.callsByAssignedEmployee = 0;
     row.leadPhoneKeys.clear();
@@ -1169,89 +1192,91 @@ async function mergeLeadCallCoverage(
     leads.set(lead.id, lead);
   }
 
-  const callMatchesByLead = new Map<string, CallsHubLeadCallAggregate[]>();
+  // Contact is resolved by the shared resolver, the same one the uncalled-leads
+  // queue and the employee evidence drawer use, so the tile and its list agree.
+  const window = { from, to };
+  const ownerOf = (lead: { salesperson: string }) => {
+    const key = normalizePersonName(lead.salesperson);
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    return {
+      key,
+      row,
+      isOwnerCall: (call: CallsHubLeadCallAggregate) =>
+        normalizePersonName(call.agentName) === key ||
+        Boolean(row.callExtension && call.agentExtension === row.callExtension),
+      isOwnerChatName: (name: string) => integrationPersonMatchScore(lead.salesperson, name) > 0,
+    };
+  };
+
+  const noChats = new Map();
   const chatCandidatePhones: string[] = [];
   for (const lead of leads.values()) {
-    const key = normalizePersonName(lead.salesperson);
-    if (!key) continue;
-    const row = map.get(key) ?? blank(key, lead.salesperson);
-    const matches = new Map<string, CallsHubLeadCallAggregate>();
-    for (const phone of new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean))) {
-      for (const call of callsByPhone.get(phone) ?? []) {
-        if (!callCanCoverLead(call, lead.createdAt)) continue;
-        matches.set(leadCallAggregateKey(call), call);
-      }
-    }
-    const matched = [...matches.values()];
-    callMatchesByLead.set(lead.id, matched);
-    const ownerCalled = matched.some(
-      (call) =>
-        normalizePersonName(call.agentName) === key ||
-        (row.callExtension && call.agentExtension === row.callExtension),
-    );
-    if (!ownerCalled) chatCandidatePhones.push(lead.phone, lead.mobile);
+    const owner = ownerOf(lead);
+    if (!owner.key) continue;
+    const callsOnly = resolveLeadContactEvidence(lead, {
+      window,
+      callsByPhone,
+      callsAvailable: true,
+      chatsByPhone: noChats,
+      chatwootAvailable: false,
+      isOwnerCall: owner.isOwnerCall,
+      isOwnerChatName: owner.isOwnerChatName,
+    });
+    if (!callsOnly.calledByOwner) chatCandidatePhones.push(lead.phone, lead.mobile);
   }
-  const chatBatch = chatwootConfigured()
-    ? await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(() => null)
+  let chatwootAvailable = chatwootConfigured();
+  const chatBatch = chatwootAvailable
+    ? await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(() => {
+        chatwootAvailable = false;
+        return null;
+      })
     : null;
   const chatsByPhone = chatBatch?.evidence ?? new Map();
-  const periodStart = Date.parse(`${from}T00:00:00Z`) / 1000;
-  const periodEnd = Date.parse(`${to}T23:59:59Z`) / 1000;
 
   for (const lead of leads.values()) {
-    const key = normalizePersonName(lead.salesperson);
-    if (!key) continue;
-    const row = map.get(key) ?? blank(key, lead.salesperson);
+    const owner = ownerOf(lead);
+    if (!owner.key) continue;
+    const row = owner.row;
     row.distributedLeads += 1;
-    const matched = callMatchesByLead.get(lead.id) ?? [];
-    const matches = new Map(matched.map((call) => [leadCallAggregateKey(call), call]));
-    const createdAt = Date.parse(`${lead.createdAt.slice(0, 10)}T00:00:00Z`) / 1000;
-    const chatMatches = [
-      ...new Set([lead.phone, lead.mobile].map(chatwootPhoneKey).filter(Boolean)),
-    ]
-      .flatMap((phone) => chatsByPhone.get(phone) ?? [])
-      .filter(
-        (chat) =>
-          chat.agentContactedAt > 0 &&
-          chat.agentContactedAt >= periodStart &&
-          (!Number.isFinite(createdAt) || chat.agentContactedAt >= createdAt) &&
-          chat.agentContactedAt <= periodEnd,
-      );
-    const chatByAny = chatMatches.length > 0;
-    const chatByOwner = chatMatches.some((chat) =>
-      [...(chat.agentNames ?? []), chat.assigneeName]
-        .filter(Boolean)
-        .some((name) => integrationPersonMatchScore(lead.salesperson, name) > 0),
-    );
-    if (!matches.size && !chatByAny) {
-      row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
-      map.set(key, row);
+    const evidence = resolveLeadContactEvidence(lead, {
+      window,
+      callsByPhone,
+      callsAvailable: true,
+      chatsByPhone,
+      chatwootAvailable,
+      isOwnerCall: owner.isOwnerCall,
+      isOwnerChatName: owner.isOwnerChatName,
+    });
+    if (evidence.contactedViaChat)
+      row.chatRepliedDistributedLeads = (row.chatRepliedDistributedLeads ?? 0) + 1;
+    if (evidence.contactStatus === "unknown")
+      row.contactUnknownDistributedLeads = (row.contactUnknownDistributedLeads ?? 0) + 1;
+    if (evidence.ownerContactStatus === "unknown")
+      row.ownerContactUnknownDistributedLeads = (row.ownerContactUnknownDistributedLeads ?? 0) + 1;
+    if (!evidence.contactedByAny) {
+      // Only complete evidence confirms an omission; the rest is counted as unknown above.
+      if (evidence.contactStatus === "not_contacted")
+        row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
+      map.set(owner.key, row);
       continue;
     }
     row.calledDistributedLeads = (row.calledDistributedLeads ?? 0) + 1;
-    let calledByOwner = false;
-    for (const call of matches.values()) {
-      const sameOwner =
-        normalizePersonName(call.agentName) === key ||
-        (row.callExtension && call.agentExtension === row.callExtension);
-      // Coverage is lead-grain: if two Odoo opportunities share a customer
-      // phone, each has still been reached by its assigned owner. Call totals,
-      // however, stay de-duplicated below so the same PBX call is not summed
-      // twice. The old order performed the de-duplication first and therefore
-      // under-counted owner coverage on the second opportunity.
-      if (sameOwner) calledByOwner = true;
+    // Coverage is lead-grain: if two Odoo opportunities share a customer phone,
+    // each has still been reached by its assigned owner. Call totals stay
+    // de-duplicated so the same PBX call is not summed twice.
+    for (const call of evidence.matchedCalls) {
       const matchedCallKey = leadCallAggregateKey(call);
       if (row.leadPhoneKeys.has(matchedCallKey)) continue;
       row.leadPhoneKeys.add(matchedCallKey);
       row.callsFromDistributedLeads = (row.callsFromDistributedLeads ?? 0) + call.totalCalls;
-      if (sameOwner) {
+      if (owner.isOwnerCall(call)) {
         row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
       }
     }
-    if (calledByOwner || chatByOwner) {
+    if (evidence.contactedByOwner) {
       row.ownerCalledDistributedLeads = (row.ownerCalledDistributedLeads ?? 0) + 1;
     }
-    map.set(key, row);
+    map.set(owner.key, row);
   }
 
   for (const row of map.values()) {
@@ -1346,6 +1371,9 @@ function mergeOperationalClosures(
 
   // The 1.26 Lost snapshot is already classified by type + active + reason or
   // the XMLID-resolved Lost stage. Won remains exclusively an active Opportunity.
+  // Closed Lost in the window, split by the canonical classification into
+  // created-and-lost, older-cohort and undated-cohort closures.
+  const window = { from: filters.from, to: filters.to };
   for (const lead of data.snapshot.lost) {
     if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
     if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
@@ -1354,6 +1382,11 @@ function mergeOperationalClosures(
     const row = map.get(key) ?? blank(key, lead.salesperson);
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
     row.slaLost += 1;
+    row.closedLostInPeriod += 1;
+    const { closedSplit } = classifyLostRow(lead, window);
+    if (closedSplit === "created_in_period") row.createdAndLostInPeriod += 1;
+    else if (closedSplit === "older_cohort") row.olderCohortClosedLostInPeriod += 1;
+    else row.undatedCohortClosedLostInPeriod += 1;
     map.set(key, row);
   }
 }
@@ -1627,6 +1660,30 @@ export async function buildAgentAnalytics(
   const directory = await directoryPromise;
   for (const row of map.values()) row.displayName = directory.displayNameFor(row.name);
 
+  // Manual lead QA over each owner's leads created in the window (active CRM +
+  // canonical Lost). Separate from the AI call-quality score; null when the QA
+  // table cannot be read rather than a confident zero.
+  const leadQaByOwner = await (async () => {
+    try {
+      const { leadQaConfigured, readLeadQaVerifications } = await import("./lead-qa.server");
+      if (!leadQaConfigured()) return null;
+      const idsByOwner = new Map<string, string[]>();
+      for (const lead of [...data.crm, ...data.lost]) {
+        const key = normalizePersonName(lead.salesperson);
+        if (!key || !lead.id) continue;
+        const ids = idsByOwner.get(key) ?? [];
+        ids.push(lead.id);
+        idsByOwner.set(key, ids);
+      }
+      const verifications = await readLeadQaVerifications([...new Set([...idsByOwner.values()].flat())]);
+      return new Map(
+        [...idsByOwner.entries()].map(([key, ids]) => [key, summarizeLeadQa(ids, verifications)]),
+      );
+    } catch {
+      return null;
+    }
+  })();
+
   const selectedAgents = [...map.values()].filter((row) => {
     // Either spelling selects the person: the filter list still offers the raw
     // Odoo user name, while a link built from what the tab shows carries the
@@ -1674,6 +1731,8 @@ export async function buildAgentAnalytics(
       row.avgFirstCallMinutes =
         row.firstCallWeight > 0 ? row.firstCallWeighted / row.firstCallWeight : null;
       row.slaMonths = row.months.size;
+      row.cohortLost = row.lost;
+      row.leadQa = leadQaByOwner?.get(row.key) ?? null;
       row.courseProfile =
         courseProfiles.get(row.key) ??
         blankCourseProfile(data.snapshot.health.lostAuthority !== "unavailable");
@@ -1764,6 +1823,20 @@ export async function buildAgentAnalytics(
       acc.lost += row.lost;
       acc.periodClosedWon += row.slaWon;
       acc.periodClosedLost += row.slaLost;
+      acc.createdAndLostInPeriod += row.createdAndLostInPeriod;
+      acc.olderCohortClosedLostInPeriod += row.olderCohortClosedLostInPeriod;
+      acc.undatedCohortClosedLostInPeriod += row.undatedCohortClosedLostInPeriod;
+      if (row.contactUnknownDistributedLeads !== null)
+        acc.contactUnknownDistributedLeads =
+          (acc.contactUnknownDistributedLeads ?? 0) + row.contactUnknownDistributedLeads;
+      if (row.ownerContactUnknownDistributedLeads !== null)
+        acc.ownerContactUnknownDistributedLeads =
+          (acc.ownerContactUnknownDistributedLeads ?? 0) + row.ownerContactUnknownDistributedLeads;
+      if (row.leadQa) {
+        acc.leadQaVerified = (acc.leadQaVerified ?? 0) + row.leadQa.verified;
+        acc.leadQaNeedsReview = (acc.leadQaNeedsReview ?? 0) + row.leadQa.needsReview;
+        acc.leadQaDisputed = (acc.leadQaDisputed ?? 0) + row.leadQa.disputed;
+      }
       if (row.outboundCalls !== null)
         acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
       if (row.answeredCalls !== null)
@@ -1813,6 +1886,16 @@ export async function buildAgentAnalytics(
       lost: 0,
       periodClosedWon: 0,
       periodClosedLost: 0,
+      createdAndLostInPeriod: 0,
+      olderCohortClosedLostInPeriod: 0,
+      undatedCohortClosedLostInPeriod: 0,
+      contactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
+      ownerContactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      leadQaVerified: leadQaByOwner ? 0 : (null as number | null),
+      leadQaNeedsReview: leadQaByOwner ? 0 : (null as number | null),
+      leadQaDisputed: leadQaByOwner ? 0 : (null as number | null),
       conversionRate: null as number | null,
       decidedConversionRate: null as number | null,
       outboundCalls: slaStatus.callsAvailable ? 0 : (null as number | null),

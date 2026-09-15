@@ -31,29 +31,26 @@ const production = (): KpiInputs => ({
 });
 
 describe("ROAS never mixes populations under one generic label", () => {
-  it("states the all-spend ROAS as tracked revenue over ALL spend (≈3.00x)", () => {
+  it("states the all-spend ROAS as a cohort return on ALL Meta spend (≈3.00x)", () => {
     const kpi = closedLoopKpis(production()).roasAllSpend!;
     expect(kpi.value).toBe(3);
     expect(kpi.numerator!.value).toBe(263_699.52);
     expect(kpi.denominator!.value).toBe(87_779.99);
-    expect(kpi.label.en).toContain("all ad spend");
+    expect(kpi.label.en).toContain("all Meta spend");
+    expect(kpi.label.en).toContain("Cohort");
+    expect(kpi.contract?.dateBasis).toBe("lead_created_cohort_all_payment_dates");
+    expect(kpi.contract?.denominatorDateBasis).toBe("ad_spend_date");
   });
 
   it("states the tracked ROAS over tracked-campaign spend only (≈3.27x)", () => {
     const kpi = closedLoopKpis(production()).roasTracked!;
     expect(kpi.value).toBe(3.27);
-    expect(kpi.denominator!.label.en).toBe("Spend on campaigns with tracked leads");
+    expect(kpi.denominator!.label.en).toBe("Spend on tracked Meta campaigns");
   });
 
   it("gives every ratio its numerator, denominator and formula", () => {
     for (const kpi of Object.values(closedLoopKpis(production()))) {
-      if (
-        kpi.format === "count" ||
-        kpi.key === "adSpend" ||
-        kpi.key === "trackedSpend" ||
-        kpi.key === "revenue"
-      )
-        continue;
+      if (kpi.kind !== "ratio") continue;
       expect(kpi.numerator, kpi.key).toBeTruthy();
       expect(kpi.denominator, kpi.key).toBeTruthy();
       expect(kpi.formula, kpi.key).toContain("÷");
