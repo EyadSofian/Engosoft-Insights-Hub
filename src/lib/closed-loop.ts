@@ -622,6 +622,19 @@ export function rollupByGrain(
     }
     return row;
   };
+  // An ad shows one creative. At ad grain the row names it — for the step from
+  // an ad to its creative — only when every exact fact and spend row for that
+  // ad agrees on the same creative ID. It changes no figure.
+  const adCreatives = new Map<string, { ids: Set<string>; name: string }>();
+  const noteCreative = (row: GrainRow, creativeId: string, creativeName = "") => {
+    if (grain !== "ad") return;
+    const id = clean(creativeId);
+    if (!id) return;
+    const entry = adCreatives.get(row.key) ?? { ids: new Set<string>(), name: "" };
+    entry.ids.add(id);
+    entry.name ||= creativeName;
+    adCreatives.set(row.key, entry);
+  };
   for (const fact of facts) {
     if (fact.attributionConfidence !== "exact") continue;
     const row = at(fact);
@@ -630,6 +643,7 @@ export function rollupByGrain(
     row.adsetName ||= row.adsetId ? fact.adsetName : "";
     row.adName ||= row.adId ? fact.adName : "";
     row.creativeName ||= row.creativeId ? fact.creativeName : "";
+    noteCreative(row, fact.creativeId, fact.creativeName);
     addFact(row, fact);
   }
   for (const item of spend) {
@@ -638,6 +652,13 @@ export function rollupByGrain(
     row.spend += item.spend;
     row.impressions += item.impressions;
     row.clicks += item.clicks;
+    noteCreative(row, item.creativeId);
+  }
+  for (const [key, entry] of adCreatives) {
+    const row = rows.get(key);
+    if (!row || entry.ids.size !== 1) continue;
+    row.creativeId = [...entry.ids][0];
+    row.creativeName = entry.name;
   }
   return [...rows.values()].map((row) => finalizeMetrics(row) as GrainRow);
 }

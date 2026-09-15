@@ -431,6 +431,31 @@ describe("rollups", () => {
     ]);
   });
 
+  it("names an ad's creative only when every exact row agrees on it", () => {
+    const spendRow = (adId: string, creativeId: string) => ({
+      campaignId: "camp-1",
+      adsetId: "set-1",
+      adId,
+      creativeId,
+      spend: 10,
+      impressions: 100,
+      clicks: 5,
+    });
+    const rows = rollupByGrain(
+      [
+        fact({ acquisitionEventId: "a" }),
+        fact({ acquisitionEventId: "b", adId: "ad-2", creativeId: "cr-2" }),
+        fact({ acquisitionEventId: "c", adId: "ad-2", creativeId: "cr-3" }),
+      ],
+      [spendRow("ad-1", "cr-1")],
+      "ad",
+    );
+    const byAd = Object.fromEntries(rows.map((row) => [row.adId, row]));
+    expect(byAd["ad-1"]).toMatchObject({ creativeId: "cr-1", leads: 1, spend: 10 });
+    // Two creatives under one ad ID: no link rather than a guess.
+    expect(byAd["ad-2"]).toMatchObject({ creativeId: "", leads: 2 });
+  });
+
   it("ranks the creative with fewer, better leads above cheap leads that never buy", () => {
     const cheap = { ...emptyMetrics(), key: "cheap", leads: 100, crmMatched: 100, spend: 100 };
     const strong = {
