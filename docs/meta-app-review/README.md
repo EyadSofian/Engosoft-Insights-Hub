@@ -30,6 +30,9 @@ the App Dashboard and Meta's human review.
 | Instagram professional accounts | READY | engosoftofficial ↔ Engosoft Page; engosoft_eng ↔ Engosoft Saudi Arabia |
 | System user and Page tasks | READY | n8n-api-user has MANAGE_LEADS on both Pages and a Developer role on the app |
 | Webhook callbacks | READY | Verify-token handshake and signature verification proven by the production self-test |
+| App webhook subscriptions | READY | `page`: leadgen, messages, messaging_referrals, messaging_postbacks · `instagram`: messages, messaging_referral, messaging_postbacks · `whatsapp_business_account`: messages (added through the API on 2026-09-15; Meta verified the callbacks) |
+| Page-level subscription for this app | AUTOMATIC | Done by the credential bootstrap as soon as a credential with `pages_manage_metadata` exists |
+| Lead Ads Terms on the Pages | CHECK | Both Pages report `leadgen_tos_accepted = false` to the system user; accept at facebook.com/ads/leadgen/tos if Meta asks during review |
 | Webhook handling code | READY | Page/Instagram `messaging` routed to the attribution listener; tests + signed self-test |
 | Screencast | TO RECORD | Script below in each permission file (about 2 minutes each) |
 
