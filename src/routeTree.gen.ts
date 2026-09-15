@@ -64,6 +64,7 @@ import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
+import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
@@ -393,6 +394,11 @@ const ApiRefreshRoute = ApiRefreshRouteImport.update({
 const ApiSalesRoute = ApiSalesRouteImport.update({
   id: '/api/sales',
   path: '/api/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTargetsRoute = ApiTargetsRouteImport.update({
@@ -733,6 +739,7 @@ export interface FileRoutesByFullPath {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -843,6 +850,7 @@ export interface FileRoutesByTo {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -954,6 +962,7 @@ export interface FileRoutesById {
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -1066,6 +1075,7 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1176,6 +1186,7 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1286,6 +1297,7 @@ export interface FileRouteTypes {
     | '/api/profitability'
     | '/api/refresh'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1397,6 +1409,7 @@ export interface RootRouteChildren {
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiSalesRoute: typeof ApiSalesRoute
+  ApiSearchRoute: typeof ApiSearchRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
@@ -1839,6 +1852,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/targets': {
       id: '/api/targets'
       path: '/api/targets'
@@ -2269,6 +2289,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiSalesRoute: ApiSalesRoute,
+  ApiSearchRoute: ApiSearchRoute,
   ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,

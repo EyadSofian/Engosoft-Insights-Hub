@@ -34,6 +34,7 @@ import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { NavigationDrawer } from "./NavigationDrawer";
+import { GlobalSearch } from "./GlobalSearch";
 import logoImg from "@/assets/engosoft-logo.png";
 
 export interface FiltersResp {
@@ -214,6 +215,8 @@ export function TopBar({ title }: { title?: string }) {
               overflow menu rather than shrinking below a usable tap size, which
               is what used to squeeze the wordmark off the left edge at 320px. */}
           <div className="ms-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+            {/* One way in to everything, whatever the reader calls it. */}
+            <GlobalSearch />
             <SyncBadge data={data} />
 
             <Link

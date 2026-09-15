@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Image, TrendingUp } from "lucide-react";
 import { AcquisitionPerformance } from "@/components/acquisition/AcquisitionPerformance";
@@ -56,7 +56,7 @@ const LEAD_VIEWS = ["today", "forms", "landing", "quality"] as const;
 type AdView = (typeof AD_VIEWS)[number];
 type LeadView = (typeof LEAD_VIEWS)[number];
 
-type AcquisitionSearch = { section?: Section; view?: string };
+type AcquisitionSearch = { section?: Section; view?: string; creative?: string };
 
 /** Old tab names keep working as deep links. */
 const LEGACY: Record<string, { section: Section; view?: string }> = {
@@ -79,7 +79,13 @@ export const Route = createFileRoute("/acquisition")({
     const section = (SECTIONS as readonly string[]).includes(rawSection)
       ? (rawSection as Section)
       : undefined;
-    return { section: section === "overview" ? undefined : section, view: rawView };
+    return {
+      section: section === "overview" ? undefined : section,
+      view: rawView,
+      // Deep link from search straight onto one creative's detail.
+      creative:
+        typeof search.creative === "string" && search.creative ? search.creative : undefined,
+    };
   },
   component: Acquisition,
 });
@@ -120,6 +126,10 @@ function Acquisition() {
   });
 
   const closedLoop = useClosedLoop();
+  // A creative arriving in the URL opens on top of whichever view is showing.
+  useEffect(() => {
+    if (search.creative) setCreativeId(search.creative);
+  }, [search.creative]);
   const [grainFilter, setGrainFilter] = useState<{
     campaignId?: string;
     adsetId?: string;
@@ -128,7 +138,7 @@ function Acquisition() {
     adsetLabel?: string;
   }>({});
   const [recordFilter, setRecordFilter] = useState<RecordFilter | null>(null);
-  const [creativeId, setCreativeId] = useState<string | null>(null);
+  const [creativeId, setCreativeId] = useState<string | null>(search.creative ?? null);
   const [creativeTable, setCreativeTable] = useState(false);
 
   const go = (next: Section, view?: string) =>
