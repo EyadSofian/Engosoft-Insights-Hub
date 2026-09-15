@@ -28,6 +28,7 @@ import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-c
 import { Card, Segmented } from "@/components/ui-bits";
 import type { ClosedLoopGrain, GrainRow } from "@/lib/closed-loop";
 import { useI18n } from "@/lib/i18n";
+import { ACQUISITION_SECTIONS } from "@/lib/navigation";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 
 /**
@@ -40,7 +41,7 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
  * one disclosure. Section and view live in the URL so a view can be shared.
  */
 
-export const SECTIONS = ["overview", "ads", "leads", "sales", "coverage"] as const;
+export const SECTIONS = ACQUISITION_SECTIONS.map((entry) => entry.value);
 type Section = (typeof SECTIONS)[number];
 const AD_VIEWS = ["campaigns", "adsets", "ads", "creatives", "assets"] as const;
 const LEAD_VIEWS = ["today", "forms", "landing", "quality"] as const;
@@ -149,13 +150,10 @@ function Acquisition() {
     go("sales");
   };
 
-  const sections: { value: Section; label: string }[] = [
-    { value: "overview", label: A ? "نظرة عامة" : "Overview" },
-    { value: "ads", label: A ? "الإعلانات والمواد" : "Ads & creatives" },
-    { value: "leads", label: A ? "العملاء والجودة" : "Leads & quality" },
-    { value: "sales", label: A ? "المبيعات والإيراد" : "Sales & revenue" },
-    { value: "coverage", label: A ? "تغطية البيانات" : "Data coverage" },
-  ];
+  const sections: { value: Section; label: string }[] = ACQUISITION_SECTIONS.map((entry) => ({
+    value: entry.value,
+    label: entry.label[lang],
+  }));
   const adViews: { value: AdView; label: string }[] = [
     { value: "campaigns", label: A ? "الحملات" : "Campaigns" },
     { value: "adsets", label: A ? "مجموعات الإعلانات" : "Ad sets" },

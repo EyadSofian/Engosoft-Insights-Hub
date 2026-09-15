@@ -186,3 +186,78 @@ export function sectionIsActive(section: NavigationSection, pathname: string): b
 export function sectionForPathname(pathname: string): NavigationSection | undefined {
   return NAVIGATION_SECTIONS.find((section) => sectionIsActive(section, pathname));
 }
+
+/**
+ * The five views of Acquisition performance. Shared by the page's own switch
+ * and the phone navigation drawer so the two can never name them differently.
+ */
+export const ACQUISITION_SECTIONS = [
+  { value: "overview", label: { ar: "نظرة عامة", en: "Overview" } },
+  { value: "ads", label: { ar: "الإعلانات والمواد", en: "Ads & creatives" } },
+  { value: "leads", label: { ar: "العملاء والجودة", en: "Leads & quality" } },
+  { value: "sales", label: { ar: "المبيعات والإيراد", en: "Sales & revenue" } },
+  { value: "coverage", label: { ar: "تغطية البيانات", en: "Data coverage" } },
+] as const satisfies readonly { value: string; label: Record<Lang, string> }[];
+
+export type AcquisitionSectionValue = (typeof ACQUISITION_SECTIONS)[number]["value"];
+
+export interface DrawerLink {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
+  to: string;
+  /** Only the acquisition views carry a search; everything else is a plain route. */
+  section?: AcquisitionSectionValue;
+  active: boolean;
+  children: DrawerLink[];
+}
+
+/**
+ * What the phone drawer lists: every section at the first level, and — only for
+ * the section the reader is in — its reports one level down, with the
+ * acquisition views under Acquisition performance when that report is open.
+ * Nesting only where it helps keeps the first level a short, scannable list.
+ */
+export function navigationDrawerTree(
+  pathname: string,
+  acquisitionSection: string | undefined,
+  lang: Lang,
+  itemLabel: (item: NavigationItem) => string,
+): DrawerLink[] {
+  return NAVIGATION_SECTIONS.map((section) => {
+    const active = sectionIsActive(section, pathname);
+    const reports =
+      active && section.items.length > 1
+        ? section.items.map((item): DrawerLink => {
+            const itemActive = pathMatchesRoute(pathname, item.to);
+            const views =
+              item.to === "/acquisition" && itemActive
+                ? ACQUISITION_SECTIONS.map((view): DrawerLink => ({
+                    key: `acquisition:${view.value}`,
+                    label: view.label[lang],
+                    to: "/acquisition",
+                    section: view.value,
+                    active: (acquisitionSection || "overview") === view.value,
+                    children: [],
+                  }))
+                : [];
+            return {
+              key: item.to,
+              label: itemLabel(item),
+              icon: item.icon,
+              to: item.to,
+              active: itemActive,
+              children: views,
+            };
+          })
+        : [];
+    return {
+      key: section.id,
+      label: section.label[lang],
+      icon: section.icon,
+      to: section.defaultTo,
+      active,
+      children: reports,
+    };
+  });
+}

@@ -99,7 +99,7 @@ export function NexusProactivePopup({ suppressed }: { suppressed?: boolean }) {
       data-testid="nexus-proactive"
       className={[
         "fixed z-50 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-border bg-bg p-3 shadow-xl",
-        "bottom-[calc(env(safe-area-inset-bottom,0px)+10rem)] end-4",
+        "bottom-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] end-4",
         "sm:bottom-[calc(env(safe-area-inset-bottom,0px)+6.25rem)] sm:end-6",
         "motion-safe:animate-[nexus-rise_220ms_ease-out]",
       ].join(" ")}

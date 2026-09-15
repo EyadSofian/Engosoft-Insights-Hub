@@ -24,7 +24,8 @@ import {
   useFilters,
 } from "@/lib/filter-store";
 import { approvedReportingEnd, DEFAULT_DATE_PRESET } from "@/lib/reporting-window";
-import { useModalGuard } from "@/lib/ui-store";
+import { uiStore, useModalGuard } from "@/lib/ui-store";
+import { attachHeaderAutoHide } from "@/lib/header-auto-hide";
 import { chromeStore, useChrome } from "@/lib/chrome-store";
 import type { AcquisitionChannel, CampaignObjective, DataHealth, Platform } from "@/lib/types";
 import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "@/lib/constants";
@@ -32,6 +33,8 @@ import { acquisitionChannel } from "@/lib/acquisition-channel";
 import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { NavigationDrawer } from "./NavigationDrawer";
+import logoImg from "@/assets/engosoft-logo.png";
 
 export interface FiltersResp {
   accounts: {
@@ -118,13 +121,21 @@ export function TopBar({ title }: { title?: string }) {
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const chrome = useChrome();
-  // The top controls no longer react to scroll either. A manager should not
-  // lose filters, refresh or the navigation switch just because they reached
-  // the lower half of a report.
+  // The bar hides on the way down and returns on the way up (see
+  // header-auto-hide.ts). That runs outside React: the controller flips one
+  // attribute on <html> and CSS slides the bar, so scrolling never re-renders
+  // the shell. The reserve below stays constant, so nothing in the page moves.
   const compact = false;
-  const hidden = false;
   const { barRef, reserved } = useReservedHeight(true, false);
+
+  useEffect(() => {
+    const element = barRef.current;
+    if (!element) return;
+    return attachHeaderAutoHide(element, {
+      isModalOpen: uiStore.isOpen,
+      subscribeModal: uiStore.subscribe,
+    });
+  }, [barRef]);
 
   const { data } = useFiltersData();
   const activeCount = activeDimensionCount(filters);
@@ -162,23 +173,35 @@ export function TopBar({ title }: { title?: string }) {
       <header
         ref={barRef}
         data-app-chrome=""
-        className="app-topbar chrome-slide chrome-bar fixed top-0 z-30 pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]"
+        className="app-topbar chrome-slide chrome-bar fixed top-0 z-(--z-header) pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]"
         style={{
           insetInlineStart: "var(--chrome-nav-inset)",
           insetInlineEnd: 0,
+          paddingTop: "env(safe-area-inset-top)",
           transition:
             "transform var(--dur-chrome) var(--ease-chrome), inset-inline-start var(--dur-chrome) var(--ease-chrome)",
-          transform: hidden ? "translateY(-100%)" : "translateY(0)",
         }}
       >
         <div className={`flex items-center gap-2 ${compact ? "py-1.5" : "py-2"}`}>
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's DashboardPageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
+          {/* Below lg: menu, mark and wordmark — the rail's job moves into the
+              drawer. The wordmark gives way first at 320px, never the controls. */}
           <div className="flex shrink-0 items-center gap-2 min-w-0">
-            <span className="lg:hidden shrink-0 font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">
-              ENGOSOFT
-            </span>
+            <NavigationDrawer />
+            <Link
+              to="/"
+              className="flex shrink-0 items-center gap-2 rounded-lg lg:hidden"
+              aria-label="ENGOSOFT"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border bg-white">
+                <img src={logoImg} alt="" className="h-5 w-5 object-contain" />
+              </span>
+              <span className="hidden font-semibold text-[14px] tracking-tight text-text min-[360px]:inline sm:text-[15px]">
+                ENGOSOFT
+              </span>
+            </Link>
             {title && (
               <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">
                 {title}

@@ -12,9 +12,10 @@ import { pathMatchesRoute, sectionForPathname } from "@/lib/navigation";
  * `tablist`: these controls navigate to separate pages rather than swapping
  * panels in-place.
  *
- * It sticks directly under the top bar and rides up with it: once the bar hides
- * the tabs park at the top of the viewport on their own, so the reader keeps
- * one line saying where they are while the rest of the chrome is gone.
+ * It sticks directly under the top bar. When the bar slides away on a downward
+ * scroll the strip follows it up on the same transform (`chrome-follow`) and
+ * parks at the top of the viewport, so the reader keeps one line saying where
+ * they are while the rest of the chrome is gone.
  */
 export function SectionTabs() {
   const { pathname } = useLocation();
@@ -66,11 +67,8 @@ export function SectionTabs() {
       // sibling tab without scrolling up. A section with a single report still
       // renders nothing at all (see the guard above), so this costs a row only
       // where there is genuinely something to switch between.
-      className="chrome-bar sticky z-20"
-      style={{
-        top: "var(--chrome-header-h, 0px)",
-        transition: "top var(--dur-chrome) var(--ease-chrome)",
-      }}
+      className="chrome-bar chrome-follow sticky z-(--z-sticky)"
+      style={{ top: "var(--chrome-header-h, 0px)" }}
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
         {/* The section's own name, at EVERY width — phone included.

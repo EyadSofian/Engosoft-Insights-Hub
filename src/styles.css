@@ -293,9 +293,18 @@
      away. Read by `scroll-padding-top` so an anchor never lands beneath it. */
   --chrome-tabbar-h: 48px;
 
-  /* Height of the fixed mobile nav bar, safe area included. Anything that has
-     to clear it reads this instead of hard-coding a padding that drifts. */
-  --mobile-nav-h: calc(64px + env(safe-area-inset-bottom));
+  /* --- layering ---------------------------------------------------------
+     One scale for everything that floats. Page content sits at 0; the strips
+     that stick inside a page come next; then the global header and the rail;
+     dropdowns open above the header; the navigation drawer covers all of that;
+     dialogs sit on top. Use these instead of inventing a bigger number. */
+  --z-content: 0;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-rail: 35;
+  --z-dropdown: 50;
+  --z-drawer: 60;
+  --z-modal: 70;
 
   /* Room the assistant launcher takes out of the bottom of the content column
      on desktop: its own 56px plus the 24px it sits above the viewport edge.
@@ -1075,23 +1084,6 @@
   }
 }
 
-/* A phone on its side has roughly 360px of height, so the bottom nav slims
-   down to give the report the room. The control bar used to be un-pinned here
-   as well; it no longer needs to be, because it now hides itself on the first
-   downward scroll and comes back on the first upward one. Declared outside
-   `@layer base` on purpose — it has to outrank the `min-h` utilities. */
-@media (max-height: 520px) and (max-width: 1023px) {
-  :root {
-    --mobile-nav-h: calc(52px + env(safe-area-inset-bottom));
-  }
-  .app-mobile-nav {
-    min-height: 52px;
-  }
-  .app-mobile-nav :is(a, button) {
-    min-height: 44px;
-  }
-}
-
 /* --- layout -------------------------------------------------------------- */
 
 /* A phone in landscape puts the notch on an inline edge, not the top. Anything
@@ -1201,6 +1193,94 @@
   background: var(--nav-surface);
   border-inline-end: 1px solid var(--nav-border);
   box-shadow: none;
+}
+
+/* Header auto-hide. header-auto-hide.ts writes `data-chrome-header` on <html>;
+   everything else is here, on transform only. The header leaves by its own
+   height (plus its hairline shadow), and the strips that park under it follow
+   it up by the same distance, so they end flush with the top of the viewport
+   instead of leaving a gap where the header was. */
+:root[data-chrome-header="hidden"] .app-topbar {
+  transform: translateY(calc(-100% - 4px));
+}
+
+@utility chrome-follow {
+  transition: transform var(--dur-chrome) var(--ease-chrome);
+}
+
+:root[data-chrome-header="hidden"] .chrome-follow {
+  transform: translateY(calc(var(--chrome-header-h, 0px) * -1));
+}
+
+/* How much of the viewport the header covers right now, for sticky strips that
+   are not always stuck (a transform would move them mid-page). */
+:root {
+  --chrome-header-offset: var(--chrome-header-h, 0px);
+}
+
+:root[data-chrome-header="hidden"] {
+  --chrome-header-offset: 0px;
+}
+
+/* The phone navigation drawer: enters from the inline start edge, which is the
+   right in Arabic. Keyframes rather than transitions, because Radix keeps the
+   panel mounted until the closing animation ends. */
+.nav-drawer {
+  --drawer-from: -100%;
+  animation: engo-drawer-in 260ms var(--ease-out) both;
+}
+
+[dir="rtl"] .nav-drawer {
+  --drawer-from: 100%;
+}
+
+.nav-drawer[data-state="closed"] {
+  animation: engo-drawer-out 200ms var(--ease-in-out) both;
+}
+
+.nav-drawer-backdrop {
+  background: color-mix(in oklab, var(--ink, #001e3c) 48%, transparent);
+  animation: engo-fade 200ms var(--ease-out) both;
+}
+
+.nav-drawer-backdrop[data-state="closed"] {
+  animation: engo-fade-out 200ms var(--ease-in-out) both;
+}
+
+@keyframes engo-drawer-in {
+  from {
+    transform: translateX(var(--drawer-from));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes engo-drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--drawer-from));
+  }
+}
+
+@keyframes engo-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-drawer,
+  .nav-drawer[data-state="closed"],
+  .nav-drawer-backdrop,
+  .nav-drawer-backdrop[data-state="closed"] {
+    animation-duration: 1ms;
+  }
 }
 
 /* Invisible until reached. Sits on the inline edge the rail slid out to, so
