@@ -880,6 +880,10 @@ async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
       errors,
       durationMs: Date.now() - started,
     };
+    // Leads the CRM holds without an ad ID wait for an exact lookup by lead ID.
+    await import("./meta-leadgen.server")
+      .then((module) => module.queueCrmMetaLeadsWithoutAdId())
+      .catch(() => undefined);
     await pool.query(
       `UPDATE closed_loop_refresh_state
           SET finished_at = now(), status = $1, summary = $2::jsonb, last_error = $3 WHERE id = 1`,
@@ -1470,19 +1474,35 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
                   en: "Conversations with an exact ad referral from Meta.",
                   ar: "محادثات لها إحالة إعلان دقيقة من Meta.",
                 }
-              : status === "infrastructure_ready_permission_pending"
+              : status === "infrastructure_ready_meta_approval_pending"
                 ? {
-                    en: "Infrastructure ready — waiting for Meta permission before real messages can be attributed.",
-                    ar: "البنية جاهزة — بانتظار صلاحية Meta قبل إسناد الرسائل الحقيقية.",
+                    en: "Software verified; waiting for Meta's review of messaging access.",
+                    ar: "البرمجيات جاهزة؛ بانتظار مراجعة Meta لصلاحية الرسائل.",
                   }
-                : {
-                    en: "Not connected: Meta is not delivering this channel's ad referrals yet, so conversation sources stay unknown.",
-                    ar: "غير متصل: Meta لا ترسل إحالات إعلانات هذه القناة بعد، لذلك يبقى مصدر المحادثات غير معروف.",
-                  },
+                : status === "infrastructure_ready_credential_pending"
+                  ? {
+                      en: "Software verified; completes automatically once the Attribution credential is in Railway.",
+                      ar: "البرمجيات جاهزة؛ يكتمل تلقائيًا عند إضافة بيانات اعتماد Attribution في Railway.",
+                    }
+                  : status === "inbox_setup_required"
+                    ? {
+                        en: "Instagram messages do not reach Chatwoot yet; an Instagram inbox is needed.",
+                        ar: "رسائل إنستغرام لا تصل إلى Chatwoot بعد؛ يلزم صندوق وارد لإنستغرام.",
+                      }
+                    : status === "infrastructure_ready_awaiting_traffic"
+                      ? {
+                          en: "Ready; waiting for the first ad-started message.",
+                          ar: "جاهز؛ بانتظار أول رسالة من إعلان.",
+                        }
+                      : {
+                          en: "Not connected: conversation sources stay unknown.",
+                          ar: "غير متصل: يبقى مصدر المحادثات غير معروف.",
+                        },
         };
       }),
       {
         key: "historical_chatwoot",
+        technical: true,
         label: { en: "Historical conversations", ar: "المحادثات السابقة" },
         numerator: conversations.filter((fact) => fact.attributionConfidence !== "unknown").length,
         denominator: conversations.length,
@@ -1491,6 +1511,29 @@ export async function getClosedLoop(filters: { from?: string; to?: string } = {}
           en: "Conversations recorded before referral capture keep an unknown source: the evidence was never stored.",
           ar: "المحادثات المسجلة قبل التقاط الإحالة يبقى مصدرها غير معروف: الدليل لم يُحفظ أصلًا.",
         },
+      },
+      {
+        key: "chatwoot_ingestion",
+        label: { en: "Chatwoot ingestion", ar: "استقبال محادثات Chatwoot" },
+        numerator: chatwootHealth?.presentRows ?? 0,
+        denominator: chatwootHealth?.expectedRows ?? 0,
+        status: (chatwootHealth ? "ok" : "pending_sync") as KpiStatus,
+        channelStatus: chatwootHealth
+          ? chatwootHealth.flagged
+            ? "needs_attention"
+            : "healthy"
+          : "not_checked",
+        note: chatwootHealth
+          ? chatwootHealth.flagged
+            ? {
+                en: `${chatwootHealth.missing} conversations missing an attribution row, ${chatwootHealth.failedOrStuck} failed or stuck events.`,
+                ar: `${chatwootHealth.missing} محادثة بلا صف إسناد، و${chatwootHealth.failedOrStuck} حدث فاشل أو عالق.`,
+              }
+            : {
+                en: "Every conversation with an inbound message has its attribution row.",
+                ar: "كل محادثة بها رسالة واردة لها صف إسناد.",
+              }
+          : { en: "Not checked yet.", ar: "لم يُفحص بعد." },
       },
     ];
     // Rates and ROAS need a sample big enough to mean something.

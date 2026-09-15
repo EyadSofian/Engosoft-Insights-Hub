@@ -20,7 +20,13 @@ import { useApi } from "@/lib/use-api";
 interface Check {
   key: string;
   label: string;
-  state: "ready" | "not_ready" | "unverified" | "permission_pending";
+  state:
+    | "ready"
+    | "not_ready"
+    | "unverified"
+    | "permission_pending"
+    | "credential_pending"
+    | "setup_required";
   detail: string;
 }
 interface Channel {
@@ -59,12 +65,19 @@ const STATE_ICON: Record<Check["state"], ReactNode> = {
   not_ready: <XCircle size={14} className="text-danger" />,
   unverified: <CircleDashed size={14} className="text-warning" />,
   permission_pending: <Clock3 size={14} className="text-warning" />,
+  credential_pending: <KeyRound size={14} className="text-warning" />,
+  setup_required: <CircleDashed size={14} className="text-warning" />,
 };
 const STATE_LABEL: Record<Check["state"], { en: string; ar: string }> = {
   ready: { en: "Ready", ar: "جاهز" },
   not_ready: { en: "Not ready", ar: "غير جاهز" },
   unverified: { en: "Cannot verify yet", ar: "لا يمكن التحقق بعد" },
-  permission_pending: { en: "Meta permission pending", ar: "بانتظار صلاحية Meta" },
+  permission_pending: { en: "Meta approval pending", ar: "بانتظار موافقة Meta" },
+  credential_pending: {
+    en: "Credential pending (automatic after)",
+    ar: "بانتظار بيانات الاعتماد (تلقائي بعدها)",
+  },
+  setup_required: { en: "Setup required", ar: "يلزم إعداد" },
 };
 
 export function MessagingReadinessPanel() {
@@ -98,7 +111,8 @@ export function MessagingReadinessPanel() {
                   tone={
                     channel?.status === "connected"
                       ? "success"
-                      : channel?.status === "infrastructure_ready_permission_pending"
+                      : channel?.status?.startsWith("infrastructure_ready") ||
+                          channel?.status === "inbox_setup_required"
                         ? "warning"
                         : "neutral"
                   }

@@ -18,6 +18,7 @@ import { MessagingReadinessPanel } from "@/components/acquisition/MessagingReadi
 import {
   BestPerformers,
   CheapVersusQuality,
+  CoverageTechnicalDetails,
   DataCoverageCard,
   OverviewKpis,
   SimpleFunnel,
@@ -311,6 +312,7 @@ function Acquisition() {
                 view="technical"
                 before={<ClosedLoopCoverage data={data} loading={loading} />}
               />
+              <CoverageTechnicalDetails data={data} loading={loading} />
               <MessagingReadinessPanel />
               <ChatwootAttributionHealth />
               <InferredLinkAudit />

@@ -16,7 +16,11 @@ export type CheckState =
   /** Cannot be checked with the credentials the system holds. */
   | "unverified"
   /** Waiting on a Meta permission / review, not on code or configuration. */
-  | "permission_pending";
+  | "permission_pending"
+  /** Verified automatically as soon as the Attribution credential exists. */
+  | "credential_pending"
+  /** Needs a one-time setup outside this system (for example a Chatwoot inbox). */
+  | "setup_required";
 
 export interface ReadinessCheck {
   key: string;
@@ -28,35 +32,52 @@ export interface ReadinessCheck {
 export type ChannelStatus =
   /** Real provider referrals are arriving and resolving. */
   | "connected"
-  /** Everything Engosoft controls is verified; a Meta permission is outstanding. */
-  | "infrastructure_ready_permission_pending"
-  /** Something Engosoft controls is not ready (or cannot be verified yet). */
+  /** Everything is verified; the channel is waiting for its first real ad-started message. */
+  | "infrastructure_ready_awaiting_traffic"
+  /** Everything Engosoft controls is verified; only Meta's review is outstanding. */
+  | "infrastructure_ready_meta_approval_pending"
+  /** Everything Engosoft controls is verified; the Attribution credential completes it. */
+  | "infrastructure_ready_credential_pending"
+  /** A one-time inbox setup is needed before messages can be matched. */
+  | "inbox_setup_required"
+  /** Something Engosoft controls is not ready. */
   | "not_connected";
 
 export const CHANNEL_STATUS_LABEL: Record<ChannelStatus, { en: string; ar: string }> = {
   connected: { en: "Connected", ar: "متصل" },
-  infrastructure_ready_permission_pending: {
-    en: "Infrastructure ready — permission pending",
-    ar: "البنية جاهزة — بانتظار الصلاحية",
+  infrastructure_ready_awaiting_traffic: {
+    en: "Infrastructure ready — awaiting first message",
+    ar: "البنية جاهزة — بانتظار أول رسالة",
   },
+  infrastructure_ready_meta_approval_pending: {
+    en: "Infrastructure ready — Meta approval pending",
+    ar: "البنية جاهزة — بانتظار موافقة Meta",
+  },
+  infrastructure_ready_credential_pending: {
+    en: "Infrastructure ready — credential pending",
+    ar: "البنية جاهزة — بانتظار بيانات الاعتماد",
+  },
+  inbox_setup_required: { en: "Inbox setup required", ar: "يلزم إعداد صندوق الوارد" },
   not_connected: { en: "Not connected", ar: "غير متصل" },
 };
 
 /**
- * A channel is connected only by real deliveries. Without them it is
- * "infrastructure ready" when nothing is `not_ready` or `unverified` and at
- * least one check is waiting on a Meta permission; otherwise not connected.
+ * A channel is connected only by real deliveries. Otherwise the most
+ * significant outstanding item names the status: anything not ready (or not
+ * verifiable) → not connected; an inbox to set up; a Meta review; the
+ * Attribution credential; nothing left → awaiting traffic.
  */
 export function channelStatus(
   checks: readonly ReadinessCheck[],
   realResolvedDeliveries: number,
 ): ChannelStatus {
   if (realResolvedDeliveries > 0) return "connected";
-  const blocking = checks.some(
-    (check) => check.state === "not_ready" || check.state === "unverified",
-  );
-  const pending = checks.some((check) => check.state === "permission_pending");
-  return !blocking && pending ? "infrastructure_ready_permission_pending" : "not_connected";
+  const has = (state: CheckState) => checks.some((check) => check.state === state);
+  if (has("not_ready") || has("unverified")) return "not_connected";
+  if (has("setup_required")) return "inbox_setup_required";
+  if (has("permission_pending")) return "infrastructure_ready_meta_approval_pending";
+  if (has("credential_pending")) return "infrastructure_ready_credential_pending";
+  return "infrastructure_ready_awaiting_traffic";
 }
 
 export const SELF_TEST_PREFIX = "selftest.";

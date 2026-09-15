@@ -1020,6 +1020,24 @@ async function processEvent(event: Record<string, string>): Promise<boolean> {
       unknownReason,
     ],
   );
+  if (resolution && event.provider === "whatsapp") {
+    // The QA Click-to-WhatsApp test: record the proof and stop its spend.
+    await import("./meta-credential-health.server")
+      .then(({ handleQaCtwaProof }) =>
+        handleQaCtwaProof({
+          campaignId: resolution.campaignId,
+          adId: resolution.adId,
+          creativeId: resolution.creativeId,
+          providerMessageId: event.provider_message_id,
+          conversationId: Number(match.conversation_id),
+        }),
+      )
+      .catch((error) =>
+        console.error("[meta-attribution] QA proof handling failed", {
+          message: error instanceof Error ? error.message.slice(0, 200) : "failed",
+        }),
+      );
+  }
   if (projected) await syncCanonicalToChatwoot(Number(match.conversation_id), projected);
   return true;
 }

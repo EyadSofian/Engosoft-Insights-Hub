@@ -3,6 +3,8 @@
 App: **Engosoft Attribution** (App ID 1385923989778622), owned by the Engosoft
 business portfolio (147679829607313, **verified**). Mode: Live.
 
+**Copy-paste submission text for every field: [`META_APP_REVIEW_SUBMISSION.md`](./META_APP_REVIEW_SUBMISSION.md).**
+
 This folder is the complete submission package for the two permissions that need
 Meta Advanced Access before real customers' Messenger and Instagram messages can
 be attributed:
@@ -21,10 +23,10 @@ the App Dashboard and Meta's human review.
 | App owned by the verified business | READY | `owned_apps` lists Engosoft Attribution |
 | App mode | READY | Live (webhooks deliver; app subscriptions active) |
 | Privacy policy URL | READY | `https://engosoft.com/privacy` (HTTP 200) |
-| Terms of service URL | NEEDS UPDATE | Currently `https://www.facebook.com/`. Set to `https://engosoft.com/terms-and-conditions` (HTTP 200) |
-| Data deletion instructions URL | NEEDS SETTING | Use `https://engosoft-insights-hub-production.up.railway.app/legal/data-deletion.html` |
-| App icon (1024×1024) | NEEDS UPLOAD | Default placeholder icon is set |
-| App category | NEEDS SETTING | Suggested: **Business and pages** |
+| Terms of service URL | VALUE READY | `https://engosoft.com/terms-and-conditions` (Engosoft's real terms, HTTP 200). Currently `https://www.facebook.com/`; API changes are disabled for this app, so it is set in App settings → Basic |
+| Data deletion instructions URL | VALUE READY | `https://engosoft-insights-hub-production.up.railway.app/legal/data-deletion.html` (public HTTPS, 200, no login) |
+| App icon (1024×1024) | FILE READY | `https://engosoft-insights-hub-production.up.railway.app/brand/engosoft-attribution-icon-1024.png` (official engosoft.com logo) |
+| App category | VALUE READY | **Business and pages** (fallback **Business**) |
 | Contact email | READY | Set |
 | Pages | READY | Engosoft (1500414613618298), Engosoft Saudi Arabia (125287657625184), both owned by the business |
 | Instagram professional accounts | READY | engosoftofficial ↔ Engosoft Page; engosoft_eng ↔ Engosoft Saudi Arabia |

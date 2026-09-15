@@ -135,17 +135,32 @@ describe("channel status is words, never a zero", () => {
     expect(channelStatus([check("ready")], 3)).toBe("connected");
   });
 
-  it("is infrastructure ready when only a Meta permission is outstanding", () => {
-    expect(channelStatus([check("ready"), check("permission_pending")], 0)).toBe(
-      "infrastructure_ready_permission_pending",
+  it("Messenger: software verified, only Meta review outstanding", () => {
+    expect(
+      channelStatus([check("ready"), check("credential_pending"), check("permission_pending")], 0),
+    ).toBe("infrastructure_ready_meta_approval_pending");
+  });
+
+  it("WhatsApp: software verified, only the credential outstanding", () => {
+    expect(channelStatus([check("ready"), check("credential_pending")], 0)).toBe(
+      "infrastructure_ready_credential_pending",
     );
   });
 
-  it("is not connected when anything Engosoft controls is not ready or unverified", () => {
+  it("Instagram: an inbox to set up outranks the pending review", () => {
+    expect(
+      channelStatus([check("ready"), check("setup_required"), check("permission_pending")], 0),
+    ).toBe("inbox_setup_required");
+  });
+
+  it("is not connected when anything Engosoft controls is not ready", () => {
     expect(
       channelStatus([check("ready"), check("permission_pending"), check("not_ready")], 0),
     ).toBe("not_connected");
-    expect(channelStatus([check("ready"), check("unverified")], 0)).toBe("not_connected");
+  });
+
+  it("is ready and waiting for traffic when nothing is outstanding", () => {
+    expect(channelStatus([check("ready")], 0)).toBe("infrastructure_ready_awaiting_traffic");
   });
 
   it("knows which app webhook fields are missing", () => {

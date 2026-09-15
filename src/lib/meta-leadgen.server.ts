@@ -962,3 +962,29 @@ export async function getMetaLeadAdsHealth() {
     backfill: backfill.rows[0],
   };
 }
+
+/**
+ * CRM records that carry Meta's lead ID but no ad ID. The lead record at Meta
+ * holds its ad, ad set, campaign and form, so each one is queued for an exact
+ * lookup by lead ID. Without leads_retrieval the event waits (status
+ * waiting_for_meta_access) and resolves by itself once the credential exists.
+ * Idempotent: a lead already queued or already stored is skipped.
+ */
+export async function queueCrmMetaLeadsWithoutAdId(): Promise<{ queued: number }> {
+  if (!metaLeadAdsDatabaseConfigured()) return { queued: 0 };
+  await ensureMetaLeadAdsSchema();
+  const present = await getPool().query<Row>(`SELECT to_regclass('public.crm_lead_outcomes') AS t`);
+  if (!present.rows[0]?.t) return { queued: 0 };
+  const result = await getPool().query(
+    `INSERT INTO meta_leadgen_events
+       (event_key, lead_id, ingestion_source, status, next_attempt_at, reduced_evidence_json, payload_hash)
+     SELECT 'crm_recovery:' || o.facebook_lead_id, o.facebook_lead_id, 'crm_recovery', $1, now(),
+            jsonb_build_object('lead_id', o.facebook_lead_id, 'reason', 'crm_record_without_ad_id'), ''
+       FROM crm_lead_outcomes o
+      WHERE o.facebook_lead_id ~ '^[0-9]{6,}$' AND o.ad_id = ''
+        AND NOT EXISTS (SELECT 1 FROM meta_lead_acquisitions m WHERE m.lead_id = o.facebook_lead_id)
+     ON CONFLICT DO NOTHING`,
+    [metaLeadAdsCredentialConfigured() ? "received" : "waiting_for_meta_access"],
+  );
+  return { queued: result.rowCount ?? 0 };
+}

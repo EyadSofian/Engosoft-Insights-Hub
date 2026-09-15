@@ -48,17 +48,30 @@ describe("an unavailable figure never looks like a real zero", () => {
     expect(kpiDisplay(k.cplAll, "en")).toBe("Nothing to divide by");
   });
 
-  it("renders a not-connected source in words on the coverage card", () => {
+  it("renders channel status in words and keeps technical rows out of the simple card", () => {
     const data: ClosedLoopResponse = {
       configured: true,
       coverageSummary: [
         {
-          key: "messaging_attribution",
-          label: { en: "Messaging attribution", ar: "إسناد الرسائل" },
+          key: "messaging_whatsapp",
+          label: { en: "WhatsApp attribution", ar: "إسناد واتساب" },
           numerator: 0,
           denominator: 726,
           status: "not_connected",
-          note: { en: "Meta is not delivering message referrals.", ar: "" },
+          channelStatus: "infrastructure_ready_credential_pending",
+          note: {
+            en: "Software verified; completes automatically once the credential is in Railway.",
+            ar: "",
+          },
+        },
+        {
+          key: "messaging_instagram",
+          label: { en: "Instagram attribution", ar: "إسناد إنستغرام" },
+          numerator: 0,
+          denominator: 0,
+          status: "not_connected",
+          channelStatus: "inbox_setup_required",
+          note: { en: "Instagram inbox needed.", ar: "" },
         },
         {
           key: "creative_attribution",
@@ -67,6 +80,15 @@ describe("an unavailable figure never looks like a real zero", () => {
           denominator: 15_162,
           status: "ok",
           note: { en: "Leads whose creative is known.", ar: "" },
+        },
+        {
+          key: "historical_chatwoot",
+          label: { en: "Historical conversations", ar: "" },
+          numerator: 0,
+          denominator: 1140,
+          status: "historical_evidence_missing",
+          technical: true,
+          note: { en: "Evidence never stored.", ar: "" },
         },
       ],
       sources: {
@@ -81,9 +103,13 @@ describe("an unavailable figure never looks like a real zero", () => {
         <DataCoverageCard data={data} loading={false} />
       </I18nProvider>,
     );
-    expect(screen.getAllByText("Not connected").length).toBeGreaterThan(0);
+    expect(screen.getByText("Infrastructure ready / credential pending")).toBeTruthy();
+    expect(screen.getByText("Inbox setup required")).toBeTruthy();
     expect(screen.queryByText("0.0%")).toBeNull();
+    expect(screen.queryByText("0%")).toBeNull();
     expect(screen.getByText("99.98%", { exact: false })).toBeTruthy();
+    // Historical evidence is a technical detail, not a headline row.
+    expect(screen.queryByText("Historical conversations")).toBeNull();
   });
 });
 

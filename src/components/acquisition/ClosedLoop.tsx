@@ -116,8 +116,9 @@ export interface ClosedLoopResponse {
     numerator: number;
     denominator: number;
     status: KpiStatus;
-    /** Messaging channels: connected / infrastructure_ready_permission_pending / not_connected. */
+    /** Channel rows: a status word instead of a percentage (see CHANNEL_WORDS). */
     channelStatus?: string;
+    technical?: boolean;
     note: { en: string; ar: string };
   }[];
   crmBreakdown?: { exact: number; inferred: number; ambiguous: number; unmatched: number };
