@@ -193,9 +193,15 @@ export async function probeMetaCredential(variable: string): Promise<CredentialP
   };
   if (!token) return base;
 
-  const debug = appToken()
+  // An app token can only inspect its own app's credentials; a credential from
+  // another app (the Marketing API app) inspects itself instead.
+  let debug = appToken()
     ? await metaGet("debug_token", appToken(), { input_token: token })
-    : await metaGet("debug_token", token, { input_token: token });
+    : { ok: false, data: {} as Json, error: "", code: 0 };
+  if (!debug.ok || obj(debug.data.data).is_valid !== true) {
+    const self = await metaGet("debug_token", token, { input_token: token });
+    if (self.ok) debug = self;
+  }
   const info = obj(debug.data.data);
   base.valid = info.is_valid === true;
   base.type = text(info.type);
@@ -480,7 +486,15 @@ export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<
     );
   }
 
-  // 9. Diagnostics: the platform self-test and readiness snapshot.
+  // 9. The prepared QA Click-to-WhatsApp test: campaign and ad set already exist
+  // paused; the creative needs a Live app's credential. Everything stays PAUSED.
+  if (probe.scopes.includes("ads_management")) {
+    add("prepare_qa_ctwa_ad", ...(await prepareQaCtwaAd(token)));
+  } else {
+    add("prepare_qa_ctwa_ad", false, "Needs ads_management on the Attribution credential.", true);
+  }
+
+  // 10. Diagnostics: the platform self-test and readiness snapshot.
   try {
     const readiness = await import("./meta-messaging-readiness.server");
     const selfTest = await readiness.runMessagingSelfTest();
@@ -500,6 +514,62 @@ export async function bootstrapAfterCredential(probe: CredentialProbe): Promise<
     );
   }
   return steps;
+}
+
+export const QA_CTWA = {
+  account: "act_405972484493798",
+  campaignName: "QA – CTWA attribution test (paused, publish only with approval)",
+  pageId: "1500414613618298",
+  imageHash: "4aecbb4282891fb0ef5f21bf0c0bccf1",
+} as const;
+
+/** Creates the QA creative and a PAUSED ad in the prepared QA ad set, once. */
+async function prepareQaCtwaAd(token: string): Promise<[boolean, string]> {
+  const campaigns = await metaGet(`${QA_CTWA.account}/campaigns`, token, {
+    fields: "id,name,effective_status",
+    filtering: JSON.stringify([
+      { field: "name", operator: "CONTAIN", value: "QA – CTWA attribution test" },
+    ]),
+  });
+  const campaign = (Array.isArray(campaigns.data.data) ? campaigns.data.data : []).map(obj)[0];
+  if (!campaign) return [false, campaigns.error || "The prepared QA campaign was not found."];
+  const adsets = await metaGet(`${text(campaign.id)}/adsets`, token, {
+    fields: "id,name,effective_status",
+  });
+  const adset = (Array.isArray(adsets.data.data) ? adsets.data.data : []).map(obj)[0];
+  if (!adset) return [false, "The prepared QA ad set was not found."];
+  const ads = await metaGet(`${text(adset.id)}/ads`, token, { fields: "id,effective_status" });
+  const existing = (Array.isArray(ads.data.data) ? ads.data.data : []).map(obj)[0];
+  if (existing)
+    return [
+      true,
+      `QA ad ${text(existing.id)} already prepared (${text(existing.effective_status)}).`,
+    ];
+  const creative = await metaPost(`${QA_CTWA.account}/adcreatives`, token, {
+    name: "QA – CTWA test creative",
+    object_story_spec: JSON.stringify({
+      page_id: QA_CTWA.pageId,
+      link_data: {
+        image_hash: QA_CTWA.imageHash,
+        link: "https://api.whatsapp.com/send",
+        message: "تحدث مع مستشار Engosoft على واتساب لمعرفة تفاصيل دورة CFM.",
+        call_to_action: { type: "WHATSAPP_MESSAGE", value: { app_destination: "WHATSAPP" } },
+      },
+    }),
+  });
+  if (!creative.ok) return [false, creative.error];
+  const ad = await metaPost(`${QA_CTWA.account}/ads`, token, {
+    name: "QA – CTWA test ad (paused)",
+    adset_id: text(adset.id),
+    creative: JSON.stringify({ creative_id: text(creative.data.id) }),
+    status: "PAUSED",
+  });
+  return ad.ok
+    ? [
+        true,
+        `QA ad ${text(ad.data.id)} prepared PAUSED in ad set ${text(adset.id)}; publishing needs explicit approval.`,
+      ]
+    : [false, ad.error];
 }
 
 let worker: ReturnType<typeof setInterval> | null = null;

@@ -445,6 +445,7 @@ async function buildReadiness() {
   };
 
   const whatsappFields = subscribed("whatsapp_business_account");
+  const qa = await qaTestState();
   const wabaCap = capability("whatsappBusinessManagement");
   const whatsapp: ReadinessCheck[] = [
     {
@@ -505,6 +506,7 @@ async function buildReadiness() {
       "referral_parser",
       "exact_resolution",
     ]),
+    qa,
   ];
 
   const pageFields = subscribed("page");
@@ -632,6 +634,48 @@ async function buildReadiness() {
       instagram: igFields,
     },
     wabaId: ATTRIBUTION_WABA_ID(),
+  };
+}
+
+/**
+ * The paused QA Click-to-WhatsApp test. It never blocks infrastructure
+ * readiness: it is the last, spend-approved step, reported as its own item.
+ */
+async function qaTestState(): Promise<ReadinessCheck> {
+  const token = process.env.META_ACCESS_TOKEN?.trim() ?? "";
+  const label = "Paid QA test (paused)";
+  if (!token)
+    return {
+      key: "qa_paid_test",
+      label,
+      state: "permission_pending",
+      detail: "No ads credential to read the prepared test.",
+    };
+  const { QA_CTWA } = await import("./meta-credential-health.server");
+  const campaigns = await metaGet(`${QA_CTWA.account}/campaigns`, token, {
+    fields:
+      "id,effective_status,adsets{id,effective_status,destination_type,daily_budget,ads{id,effective_status}}",
+    filtering: JSON.stringify([
+      { field: "name", operator: "CONTAIN", value: "QA – CTWA attribution test" },
+    ]),
+  });
+  const campaign = (Array.isArray(campaigns.data.data) ? campaigns.data.data : []).map(obj)[0];
+  if (!campaign)
+    return { key: "qa_paid_test", label, state: "permission_pending", detail: "Not prepared yet." };
+  const adset = (
+    Array.isArray(obj(campaign.adsets).data) ? (obj(campaign.adsets).data as unknown[]) : []
+  ).map(obj)[0];
+  const ad = adset
+    ? (Array.isArray(obj(adset.ads).data) ? (obj(adset.ads).data as unknown[]) : []).map(obj)[0]
+    : undefined;
+  return {
+    key: "qa_paid_test",
+    label,
+    // Spend approval is a business decision, not an infrastructure gap.
+    state: "permission_pending",
+    detail: ad
+      ? `Campaign ${text(campaign.id)}, ad set ${text(adset?.id)} (WhatsApp, ${Number(adset?.daily_budget ?? 0) / 100} USD/day) and ad ${text(ad.id)} are all ${text(ad.effective_status)}. Publishing needs spend approval.`
+      : `Campaign ${text(campaign.id)} and ad set ${text(adset?.id ?? "")} are prepared PAUSED with the WhatsApp destination accepted. The creative and paused ad are created automatically once the Attribution credential exists (Meta refuses creatives from the development-mode Marketing API app).`,
   };
 }
 
