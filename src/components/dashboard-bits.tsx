@@ -93,7 +93,7 @@ export function DashboardPageHeader({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
             <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-[11.5px] font-semibold text-text-muted">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
@@ -120,7 +120,7 @@ export function SyncStatus({ label, tone = "mint" }: { label?: string; tone?: An
   const t = toneOf(tone);
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11.5px] font-medium"
+      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11.5px] font-medium"
       style={{ background: t.surface, color: t.ink }}
     >
       <span
