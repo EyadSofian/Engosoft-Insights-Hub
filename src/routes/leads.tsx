@@ -3,7 +3,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Archive,
   ArrowLeft,
-  BadgeCheck,
   Boxes,
   BriefcaseBusiness,
   ChevronLeft,
@@ -26,6 +25,7 @@ import {
   DashboardPageHeader,
   DataHealthSummary,
   KpiRow,
+  MoreDetails,
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
@@ -588,18 +588,13 @@ function CrmWorkspace() {
       <DashboardPageHeader
         flush
         icon={<BriefcaseBusiness size={21} />}
-        title={A ? "مركز إدارة العملاء" : "CRM command center"}
+        title={A ? "العملاء والمبيعات" : "Leads and sales"}
         subtitle={
           A
-            ? "صورة واحدة لكل Lead وOpportunity: المرحلة، حالة المتابعة، والنتيجة النهائية حسب عقد Odoo الجديد."
-            : "One operational view of every Lead and Opportunity: stage, follow-up status and final outcome under the new Odoo contract."
+            ? "كل عميل: في أي مرحلة، ومن يتابعه، وهل اشترى."
+            : "Every lead: which stage it is in, who is following it up, and whether it bought."
         }
         period={period}
-        actions={
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-mint-border bg-mint-surface px-2.5 py-1.5 text-[11px] font-bold text-mint-ink">
-            <BadgeCheck size={13} /> CRM {data.contractVersion}
-          </span>
-        }
       />
 
       <PageSections className="gap-after-header">
@@ -736,94 +731,6 @@ function CrmWorkspace() {
           </Card>
         </PageSection>
 
-        {(selectedStage || view === "lost") && (
-          <PageSection level="insight" aria-label={A ? "تعريف الحالة" : "Status definition"}>
-            <div
-              className="relative overflow-hidden rounded-2xl border p-4 sm:p-5"
-              style={{
-                borderColor: STAGE_COLOR[stage ?? "lost"],
-                background: `color-mix(in oklab, ${STAGE_COLOR[stage ?? "lost"]} 7%, var(--surface))`,
-              }}
-            >
-              <div className="flex flex-wrap items-start gap-4">
-                <span
-                  className="grid size-11 shrink-0 place-items-center rounded-2xl text-white"
-                  style={{ background: STAGE_COLOR[stage ?? "lost"] }}
-                >
-                  {stageIcon(stage ?? "lost", 20)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[17px] font-bold text-text">
-                      {selectedStage?.name ??
-                        (A ? "تعريف Lost في 1.26" : "Lost definition in 1.26")}
-                    </h2>
-                    {stage === "lost" || view === "lost" ? (
-                      <Pill tone="danger">{A ? "قاعدتان مختلفتان" : "Two distinct rules"}</Pill>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 max-w-3xl text-[12.5px] leading-6 text-text-muted">
-                    {selectedStage?.note ??
-                      (A
-                        ? "Lead الضائع: active=false ومعه Lost Reason والـstage يظل كما كان. Opportunity الضائعة: active=true وداخل Lost stage."
-                        : "Lost Lead: active=false with a Lost Reason and its stage preserved. Lost Opportunity: active=true in the Lost stage.")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {(selectedStage?.fields ?? stageCopy("lost", lang).fields).map((field) => (
-                      <span
-                        key={field}
-                        className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[10.5px] font-semibold text-text-muted"
-                      >
-                        {field}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {(stage === "lost" || view === "lost") && (
-                  <div className="grid min-w-[260px] grid-cols-2 gap-2">
-                    <MiniStat label={A ? "Lost Leads" : "Lost Leads"} value={summary.lostLeads} />
-                    <MiniStat
-                      label={A ? "Lost Opportunities" : "Lost Opportunities"}
-                      value={summary.lostOpportunities}
-                    />
-                    <MiniStat
-                      label={A ? "فرص حالية" : "Current opps"}
-                      value={summary.currentLostOpportunities}
-                    />
-                    <MiniStat
-                      label={A ? "فرص تاريخية" : "Historical opps"}
-                      value={summary.historicalLostOpportunities}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </PageSection>
-        )}
-
-        <PageSection
-          level="primary"
-          title={A ? "الحقول التي تشرح الحالة" : "Fields that explain this state"}
-          hint={
-            A
-              ? "كل توزيع محسوب من نفس السكان الظاهرين في التحديد الحالي."
-              : "Every distribution follows the current workspace selection."
-          }
-          icon={<Filter size={17} />}
-        >
-          <div className="card-grid lg:grid-cols-3">
-            {lens.map((item) => (
-              <FacetCard
-                key={item.key}
-                title={item.label}
-                rows={activeFacets[item.key]}
-                empty={A ? "غير محدد" : "Not set"}
-                color={item.color}
-              />
-            ))}
-          </div>
-        </PageSection>
-
         <PageSection
           level="records"
           title={
@@ -857,6 +764,103 @@ function CrmWorkspace() {
             truncated={data.detail.truncated}
           />
         </PageSection>
+
+        <MoreDetails
+          label={A ? "كيف تُعرَّف الحالات" : "How these states are defined"}
+          hint={
+            A
+              ? `تعريف المرحلة المختارة وحقول Odoo التي تشرحها · عقد CRM ${data.contractVersion}`
+              : `The selected stage's definition and the Odoo fields behind it · CRM contract ${data.contractVersion}`
+          }
+        >
+          {(selectedStage || view === "lost") && (
+            <PageSection level="insight" aria-label={A ? "تعريف الحالة" : "Status definition"}>
+              <div
+                className="relative overflow-hidden rounded-2xl border p-4 sm:p-5"
+                style={{
+                  borderColor: STAGE_COLOR[stage ?? "lost"],
+                  background: `color-mix(in oklab, ${STAGE_COLOR[stage ?? "lost"]} 7%, var(--surface))`,
+                }}
+              >
+                <div className="flex flex-wrap items-start gap-4">
+                  <span
+                    className="grid size-11 shrink-0 place-items-center rounded-2xl text-white"
+                    style={{ background: STAGE_COLOR[stage ?? "lost"] }}
+                  >
+                    {stageIcon(stage ?? "lost", 20)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-[17px] font-bold text-text">
+                        {selectedStage?.name ??
+                          (A ? "تعريف Lost في 1.26" : "Lost definition in 1.26")}
+                      </h2>
+                      {stage === "lost" || view === "lost" ? (
+                        <Pill tone="danger">{A ? "قاعدتان مختلفتان" : "Two distinct rules"}</Pill>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 max-w-3xl text-[12.5px] leading-6 text-text-muted">
+                      {selectedStage?.note ??
+                        (A
+                          ? "Lead الضائع: active=false ومعه Lost Reason والـstage يظل كما كان. Opportunity الضائعة: active=true وداخل Lost stage."
+                          : "Lost Lead: active=false with a Lost Reason and its stage preserved. Lost Opportunity: active=true in the Lost stage.")}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {(selectedStage?.fields ?? stageCopy("lost", lang).fields).map((field) => (
+                        <span
+                          key={field}
+                          className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[10.5px] font-semibold text-text-muted"
+                        >
+                          {field}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {(stage === "lost" || view === "lost") && (
+                    <div className="grid min-w-[260px] grid-cols-2 gap-2">
+                      <MiniStat label={A ? "Lost Leads" : "Lost Leads"} value={summary.lostLeads} />
+                      <MiniStat
+                        label={A ? "Lost Opportunities" : "Lost Opportunities"}
+                        value={summary.lostOpportunities}
+                      />
+                      <MiniStat
+                        label={A ? "فرص حالية" : "Current opps"}
+                        value={summary.currentLostOpportunities}
+                      />
+                      <MiniStat
+                        label={A ? "فرص تاريخية" : "Historical opps"}
+                        value={summary.historicalLostOpportunities}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </PageSection>
+          )}
+
+          <PageSection
+            level="primary"
+            title={A ? "الحقول التي تشرح الحالة" : "Fields that explain this state"}
+            hint={
+              A
+                ? "كل توزيع محسوب من نفس السكان الظاهرين في التحديد الحالي."
+                : "Every distribution follows the current workspace selection."
+            }
+            icon={<Filter size={17} />}
+          >
+            <div className="card-grid lg:grid-cols-3">
+              {lens.map((item) => (
+                <FacetCard
+                  key={item.key}
+                  title={item.label}
+                  rows={activeFacets[item.key]}
+                  empty={A ? "غير محدد" : "Not set"}
+                  color={item.color}
+                />
+              ))}
+            </div>
+          </PageSection>
+        </MoreDetails>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3 text-[11.5px] text-text-muted">
           <span className="inline-flex items-center gap-2">
@@ -1019,6 +1023,7 @@ function CrmRecords({
     },
     {
       key: "recordType",
+      hideByDefault: true,
       header: A ? "النوع" : "Type",
       render: (row) => (
         <Pill tone="neutral">{row.recordType === "lead" ? "Lead" : "Opportunity"}</Pill>
@@ -1061,6 +1066,7 @@ function CrmRecords({
     },
     {
       key: "openStatus",
+      hideByDefault: true,
       header: "Open Status",
       render: (row) => row.openStatus || "—",
       sortValue: (row) => row.openStatus,
@@ -1068,6 +1074,7 @@ function CrmRecords({
     },
     {
       key: "leadSegment",
+      hideByDefault: true,
       header: "Lead Segment",
       render: (row) => row.leadSegment || "—",
       sortValue: (row) => row.leadSegment,
@@ -1075,6 +1082,7 @@ function CrmRecords({
     },
     {
       key: "priority",
+      hideByDefault: true,
       header: A ? "الأولوية" : "Priority",
       render: (row) => row.priority || "—",
       sortValue: (row) => row.priority,
@@ -1098,6 +1106,7 @@ function CrmRecords({
     },
     {
       key: "ready",
+      hideByDefault: true,
       header: A ? "جاهز للتحويل" : "Ready",
       render: (row) =>
         row.readyToConvert ? (
@@ -1212,7 +1221,6 @@ function CrmRecords({
       render: (row) => row.campaign || "—",
       sortValue: (row) => row.campaign,
       group: "ownership",
-      hideByDefault: true,
     },
     {
       key: "campaignId",
@@ -1264,6 +1272,7 @@ function CrmRecords({
     },
     {
       key: "salesTeam",
+      hideByDefault: true,
       header: A ? "الفريق" : "Team",
       render: (row) => row.salesTeam || "—",
       sortValue: (row) => row.salesTeam,

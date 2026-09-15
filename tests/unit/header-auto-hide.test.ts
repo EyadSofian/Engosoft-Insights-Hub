@@ -4,7 +4,12 @@ import {
   nextHeaderState,
   type HeaderScrollState,
 } from "@/lib/header-auto-hide";
-import { navigationDrawerTree } from "@/lib/navigation";
+import {
+  itemIsActive,
+  NAVIGATION_SECTIONS,
+  navigationDrawerTree,
+  sectionForLocation,
+} from "@/lib/navigation";
 
 const TOP = 120;
 
@@ -47,44 +52,89 @@ describe("header auto-hide", () => {
   });
 });
 
-describe("navigation drawer tree", () => {
-  const label = (item: { to: string }) => item.to;
+describe("navigation", () => {
+  const label = (item: { to: string; tabLabel?: { en: string } }) => item.tabLabel?.en ?? item.to;
 
-  it("lists every section and expands only the active one", () => {
-    const tree = navigationDrawerTree("/leads", undefined, "en", label);
-    expect(tree.length).toBeGreaterThan(4);
-    const expanded = tree.filter((section) => section.children.length > 0);
-    expect(expanded.map((section) => section.key)).toEqual(["leads"]);
-    expect(expanded[0].children.find((report) => report.active)?.to).toBe("/leads");
+  it("offers at most six primary destinations and four contextual tabs per workspace", () => {
+    expect(NAVIGATION_SECTIONS.length).toBeLessThanOrEqual(6);
+    for (const section of NAVIGATION_SECTIONS.filter((entry) => entry.contextual === "tabs")) {
+      expect(section.items.length, section.id).toBeLessThanOrEqual(4);
+    }
   });
 
-  it("nests the five acquisition views under Acquisition performance when it is open", () => {
-    const tree = navigationDrawerTree("/acquisition", "coverage", "en", label);
-    const acquisition = tree
-      .flatMap((section) => section.children)
-      .find((report) => report.to === "/acquisition");
-    expect(acquisition?.children.map((view) => view.label)).toEqual([
-      "Overview",
-      "Ads & creatives",
-      "Leads & quality",
-      "Sales & revenue",
-      "Data coverage",
+  it("expands only the active workspace in the drawer", () => {
+    const tree = navigationDrawerTree("/leads", {}, "en", label);
+    const expanded = tree.filter((section) => section.children.length > 0 && !section.menu);
+    expect(expanded.map((section) => section.key)).toEqual(["sales-crm"]);
+    expect(expanded[0].children.find((report) => report.active)?.label).toBe("Leads");
+  });
+
+  it("puts creatives, lead sources and campaigns under one Marketing workspace", () => {
+    const creatives = sectionForLocation("/acquisition", { section: "ads", view: "creatives" });
+    const leads = sectionForLocation("/acquisition", { section: "leads" });
+    const campaigns = sectionForLocation("/campaigns", {});
+    const overview = sectionForLocation("/acquisition", {});
+    expect([creatives?.id, leads?.id, campaigns?.id, overview?.id]).toEqual([
+      "marketing",
+      "marketing",
+      "marketing",
+      "marketing",
     ]);
-    expect(acquisition?.children.filter((view) => view.active).map((view) => view.section)).toEqual(
-      ["coverage"],
+    const marketing = NAVIGATION_SECTIONS.find((section) => section.id === "marketing")!;
+    const active = marketing.items.filter((item) =>
+      itemIsActive(item, "/acquisition", { section: "ads", view: "adsets" }),
     );
+    expect(active.map((item) => item.tabLabel?.en)).toEqual(["Creatives"]);
   });
 
-  it("marks Overview active when no acquisition section is in the URL", () => {
-    const tree = navigationDrawerTree("/acquisition", undefined, "ar", label);
-    const views = tree.flatMap((section) => section.children).flatMap((report) => report.children);
-    expect(views.find((view) => view.active)?.section).toBe("overview");
-    expect(views[0].label).toBe("نظرة عامة");
+  it("keeps technical and specialist reports reachable under More", () => {
+    expect(sectionForLocation("/acquisition", { section: "coverage" })?.id).toBe("more");
+    for (const route of [
+      "/ads",
+      "/attribution",
+      "/landing-pages",
+      "/website",
+      "/weekend",
+      "/yoy",
+    ]) {
+      expect(sectionForLocation(route, {})?.id, route).toBe("more");
+    }
   });
 
-  it("does not expose acquisition views from other pages", () => {
-    const tree = navigationDrawerTree("/campaigns", undefined, "en", label);
-    const views = tree.flatMap((section) => section.children).flatMap((report) => report.children);
-    expect(views).toEqual([]);
+  it("keeps every legacy route inside some section", () => {
+    const routes = [
+      "/",
+      "/campaigns",
+      "/ads",
+      "/acquisition",
+      "/attribution",
+      "/landing-pages",
+      "/website",
+      "/accounting",
+      "/courses",
+      "/pricing",
+      "/leads",
+      "/lost",
+      "/teams",
+      "/weekend",
+      "/yoy",
+      "/media-buyers",
+      "/media-plan",
+      "/social-media",
+      "/organic",
+      "/sales",
+      "/full-invoiced",
+    ];
+    expect(routes.filter((route) => !sectionForLocation(route, {}))).toEqual([]);
+  });
+
+  it("separates the collection report from marketing → revenue on one route", () => {
+    expect(sectionForLocation("/accounting", { view: "marketing" })?.id).toBe("revenue");
+    const revenue = NAVIGATION_SECTIONS.find((section) => section.id === "revenue")!;
+    const on = (search: Record<string, string>) =>
+      revenue.items.filter((item) => itemIsActive(item, "/accounting", search)).length;
+    expect(on({ view: "marketing" })).toBe(1);
+    expect(on({ view: "months" })).toBe(1);
+    expect(on({})).toBe(1);
   });
 });

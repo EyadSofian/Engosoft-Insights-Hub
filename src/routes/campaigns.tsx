@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  Activity,
   BarChart3,
   CircleDollarSign,
   Megaphone,
@@ -22,6 +21,7 @@ import {
   InsightCard,
   InsightRow,
   KpiRow,
+  MoreDetails,
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
@@ -40,7 +40,6 @@ import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types"
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 type CampaignsSearch = { view?: "attributedRevenue" };
-type CampaignWorkspaceTab = "decision" | "live" | "analysis";
 
 export const Route = createFileRoute("/campaigns")({
   validateSearch: (search: Record<string, unknown>): CampaignsSearch => ({
@@ -179,11 +178,10 @@ function Campaigns() {
   const { view: initialView } = Route.useSearch();
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
-  const [workspaceTab, setWorkspaceTab] = useState<CampaignWorkspaceTab>("decision");
   // One panel for the three readings: whichever card was pressed last.
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
-  useRegisterNexusView("campaigns", { tab: workspaceTab });
+  useRegisterNexusView("campaigns", { tab: "decision" });
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -434,118 +432,52 @@ function Campaigns() {
           level="primary"
           aria-label={lang === "ar" ? "مساحة عمل الحملات" : "Campaign workspace"}
         >
-          <div
-            role="tablist"
-            aria-label={lang === "ar" ? "أقسام صفحة الحملات" : "Campaign workspace"}
-            /* Scrolls with full labels on a phone, equal 3-up from `sm`. */
-            className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:grid sm:grid-cols-3"
-          >
-            {(
-              [
-                {
-                  key: "decision" as const,
-                  label: lang === "ar" ? "قرار سريع" : "Quick decision",
-                  description: lang === "ar" ? "ناجحة ولا محتاجة تدخل؟" : "What needs action?",
-                  icon: Target,
-                },
-                {
-                  key: "live" as const,
-                  label: lang === "ar" ? "الحملات الشغالة" : "Live campaigns",
-                  description:
-                    lang === "ar" ? "حالة التشغيل على المنصات" : "Platform delivery state",
-                  icon: Activity,
-                },
-                {
-                  key: "analysis" as const,
-                  label: lang === "ar" ? "تحليل الفترة" : "Period analysis",
-                  description:
-                    lang === "ar" ? "صرف، إيراد، وكل التفاصيل" : "Spend, revenue and detail",
-                  icon: BarChart3,
-                },
-              ] satisfies Array<{
-                key: CampaignWorkspaceTab;
-                label: string;
-                description: string;
-                icon: typeof Target;
-              }>
-            ).map((tab) => {
-              const active = workspaceTab === tab.key;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setWorkspaceTab(tab.key)}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-start transition-colors sm:min-w-0 sm:shrink sm:px-3 ${
-                    active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 text-[12.5px] font-bold sm:text-[13.5px]">
-                    <span
-                      className="grid size-6 shrink-0 place-items-center rounded-lg transition-colors"
-                      style={
-                        active
-                          ? { background: "var(--sky-strong)", color: "#fff" }
-                          : { background: "var(--surface-3)", color: "var(--text-subtle)" }
-                      }
-                      aria-hidden="true"
-                    >
-                      <Icon size={13} />
-                    </span>
-                    <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
-                  </span>
-                  <span className="mt-0.5 hidden truncate ps-8 text-[10.5px] text-text-subtle sm:block">
-                    {tab.description}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
           {isLoading || !data || !totals ? (
             <Skeleton className="h-[520px]" />
           ) : (
             <>
-              {workspaceTab === "decision" && (
-                <PerfExplorer
-                  rows={data.rows}
-                  grain={grain}
-                  onGrainChange={setGrain}
-                  initialView={initialView}
-                  unknownAdsetKey={data.unknownAdsetKey}
-                  csvPrefix="engosoft"
-                  activeCampaignStates={Object.values(data.activity.delivery)}
-                  lostAvailable={hasReportableLost(data.health.lostAuthority)}
-                  spendAvailable={spend > 0}
-                  spendNote={
-                    spend <= 0
-                      ? lang === "ar"
-                        ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
-                        : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
-                      : undefined
-                  }
-                  title={
-                    grain === "campaign"
-                      ? lang === "ar"
-                        ? "قرار الحملات اللي شغالة دلوقتي"
-                        : "Live campaign decisions"
-                      : lang === "ar"
-                        ? "تفاصيل الحملة"
-                        : "Campaign details"
-                  }
-                  subtitle={
-                    lang === "ar"
-                      ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
-                      : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
-                  }
-                />
-              )}
+              <PerfExplorer
+                rows={data.rows}
+                grain={grain}
+                onGrainChange={setGrain}
+                initialView={initialView}
+                unknownAdsetKey={data.unknownAdsetKey}
+                csvPrefix="engosoft"
+                activeCampaignStates={Object.values(data.activity.delivery)}
+                lostAvailable={hasReportableLost(data.health.lostAuthority)}
+                spendAvailable={spend > 0}
+                spendNote={
+                  spend <= 0
+                    ? lang === "ar"
+                      ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
+                      : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
+                    : undefined
+                }
+                title={
+                  grain === "campaign"
+                    ? lang === "ar"
+                      ? "قرار الحملات اللي شغالة دلوقتي"
+                      : "Live campaign decisions"
+                    : lang === "ar"
+                      ? "تفاصيل الحملة"
+                      : "Campaign details"
+                }
+                subtitle={
+                  lang === "ar"
+                    ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
+                    : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
+                }
+              />
 
-              {workspaceTab === "live" && <CampaignActivityPanel activity={data.activity} />}
-
-              {workspaceTab === "analysis" && (
+              <MoreDetails
+                label={lang === "ar" ? "تحليل إضافي" : "More analysis"}
+                hint={
+                  lang === "ar"
+                    ? "حالة التشغيل على المنصات، الإنفاق مقابل التحصيل، وملاحظات البيانات"
+                    : "Platform delivery status, spend against collections, and data notes"
+                }
+              >
+                <CampaignActivityPanel activity={data.activity} />
                 <>
                   <SectionTitle
                     hint={
@@ -669,7 +601,7 @@ function Campaigns() {
                       : `${fmtNum(data.rows.length)} rows at this level. Blended CPA is ${fmtUSDFull(totals.cpa)} on the ${filters.cpaBasis === "invoices" ? "invoice-count" : "won-deals"} basis.`}
                   </p>
                 </>
-              )}
+              </MoreDetails>
             </>
           )}
         </PageSection>

@@ -45,7 +45,7 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { KpiRow } from "@/components/dashboard-bits";
+import { KpiRow, SecondaryMetrics } from "@/components/dashboard-bits";
 import { MetricDetailTrigger, MetricDrilldown } from "@/components/metric-detail";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n, type Lang } from "@/lib/i18n";
@@ -1129,95 +1129,101 @@ export function AccountingAgentsView() {
         // report is re-read rather than left showing the previous numbers.
         onSaved={() => refetch()}
       />
-      <KpiRow>
-        <MetricDetailTrigger
-          detail={boardMetrics.employees}
-          card={{
-            index: 0,
-            sub:
-              data.targets.matched > 0
-                ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "لهم تارجت" : "with a published target"}`
-                : undefined,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.collections}
-          card={{ index: 1, hero: true, sub: invoiceCount(data.summary.invoices, lang) }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.target}
-          card={{
-            index: 2,
-            // Prorated, so half a month shows half the quota. An em dash means
-            // no target is published for this window — never a zero.
-            sub:
-              data.targets.totalTarget === null
-                ? lang === "ar"
-                  ? "لا يوجد تارجت للفترة"
-                  : "No target published for this window"
-                : `${lang === "ar" ? "تم تحقيق" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.leads}
-          card={{
-            index: 3,
-            sub: `${fmtNum(data.summary.won)} ${lang === "ar" ? "تم كسبها" : "became won"}`,
-            info: <EmployeeMetricInfo metric="cohortWon" />,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.closures}
-          card={{
-            index: 4,
-            sub:
-              lang === "ar"
-                ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · تحويل ${fmtPct(data.summary.decidedConversionRate, 1)}`
-                : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`,
-            info: <EmployeeMetricInfo metric="periodClosures" />,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.calls}
-          card={{
-            index: 5,
-            sub:
-              data.summary.answeredCalls === null
-                ? lang === "ar"
-                  ? "لا توجد بيانات"
-                  : "Unavailable for period"
-                : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "مردود عليها" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={{
-            ...boardMetrics.callTime,
-            value: <CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />,
-          }}
-          card={{
-            index: 6,
-            valueWrap: true,
-            sub:
-              lang === "ar"
-                ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
-                : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`,
-          }}
-        />
-        <MetricDetailTrigger
-          detail={boardMetrics.quality}
-          card={{
-            index: 7,
-            sub:
-              data.summary.analyzedCalls === null
-                ? lang === "ar"
-                  ? "لا يوجد تقييم"
-                  : "Quality data unavailable"
-                : lang === "ar"
-                  ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
-                  : `${fmtNum(data.summary.analyzedCalls)} analyzed calls · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`,
-          }}
-        />
-      </KpiRow>
+      <>
+        <KpiRow>
+          <MetricDetailTrigger
+            detail={boardMetrics.employees}
+            card={{
+              index: 0,
+              sub:
+                data.targets.matched > 0
+                  ? `${fmtNum(data.targets.matched)} ${lang === "ar" ? "لهم تارجت" : "with a published target"}`
+                  : undefined,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={boardMetrics.collections}
+            card={{ index: 1, hero: true, sub: invoiceCount(data.summary.invoices, lang) }}
+          />
+          <MetricDetailTrigger
+            detail={boardMetrics.target}
+            card={{
+              index: 2,
+              // Prorated, so half a month shows half the quota. An em dash means
+              // no target is published for this window — never a zero.
+              sub:
+                data.targets.totalTarget === null
+                  ? lang === "ar"
+                    ? "لا يوجد تارجت للفترة"
+                    : "No target published for this window"
+                  : `${lang === "ar" ? "تم تحقيق" : "Achieved"} ${fmtPct(data.targets.totalAchievementPaid, 1)}`,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={boardMetrics.leads}
+            card={{
+              index: 3,
+              sub: `${fmtNum(data.summary.won)} ${lang === "ar" ? "تم كسبها" : "became won"}`,
+              info: <EmployeeMetricInfo metric="cohortWon" />,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={boardMetrics.closures}
+            card={{
+              index: 4,
+              sub:
+                lang === "ar"
+                  ? `${fmtNum(data.summary.periodClosedLost)} خاسرة · تحويل ${fmtPct(data.summary.decidedConversionRate, 1)}`
+                  : `${fmtNum(data.summary.periodClosedLost)} lost · ${fmtPct(data.summary.decidedConversionRate, 1)}`,
+              info: <EmployeeMetricInfo metric="periodClosures" />,
+            }}
+          />
+          <MetricDetailTrigger
+            detail={boardMetrics.calls}
+            card={{
+              index: 5,
+              sub:
+                data.summary.answeredCalls === null
+                  ? lang === "ar"
+                    ? "لا توجد بيانات"
+                    : "Unavailable for period"
+                  : `${fmtNum(data.summary.answeredCalls)} ${lang === "ar" ? "مردود عليها" : "answered"} · ${fmtPct(data.summary.answerRate, 1)}`,
+            }}
+          />
+        </KpiRow>
+        <SecondaryMetrics count={2}>
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={{
+                ...boardMetrics.callTime,
+                value: <CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />,
+              }}
+              card={{
+                index: 6,
+                valueWrap: true,
+                sub:
+                  lang === "ar"
+                    ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
+                    : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={boardMetrics.quality}
+              card={{
+                index: 7,
+                sub:
+                  data.summary.analyzedCalls === null
+                    ? lang === "ar"
+                      ? "لا يوجد تقييم"
+                      : "Quality data unavailable"
+                    : lang === "ar"
+                      ? `${fmtNum(data.summary.analyzedCalls)} مكالمة محللة · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} تحتاج مراجعة`
+                      : `${fmtNum(data.summary.analyzedCalls)} analyzed calls · ${fmtNum(data.summary.qualityNeedsReview ?? 0)} to review`,
+              }}
+            />
+          </KpiRow>
+        </SecondaryMetrics>
+      </>
 
       <Card padded={false} className="p-2">
         <div

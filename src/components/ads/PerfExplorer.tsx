@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Download,
   Layers,
@@ -121,6 +121,7 @@ type QuickViewKey =
   | "watch"
   | "weak"
   | "early"
+  | "attention"
   | "bestConversion"
   | "bestRoas"
   | "worst"
@@ -181,6 +182,16 @@ const QUICK_VIEWS: QuickView[] = [
     hint: {
       ar: "حملات Live عدّت وقت الحكم وفشلت في معيارين أو في استرداد المصروف",
       en: "Live campaigns mature enough to judge that fail two rules or break-even",
+    },
+    apply: (rows) => rows,
+  },
+  {
+    key: "attention",
+    ar: "تحتاج انتباه",
+    en: "Needs attention",
+    hint: {
+      ar: "حملات Live محتاجة متابعة أو ضعيفة — الاتنين مع بعض",
+      en: "Live campaigns to watch or that are weak — both together",
     },
     apply: (rows) => rows,
   },
@@ -378,12 +389,13 @@ export function PerfExplorer({
   const nameOf = (r: PerfRow) => (r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM);
 
   const decisionMode = grain === "campaign" && activeCampaignStates !== undefined;
-  const ownerViewMode = decisionMode && (view === "all" || isOwnerView(view));
+  const ownerViewMode =
+    decisionMode && (view === "all" || view === "attention" || isOwnerView(view));
   const views = QUICK_VIEWS.filter((v) => {
     if (v.adOnly && grain !== "ad") return false;
     if (v.key === "attributedRevenue" && grain !== "campaign") return false;
     if (decisionMode && (v.key === "bestRoas" || v.key === "worst")) return false;
-    if (!decisionMode && isOwnerView(v.key)) return false;
+    if (!decisionMode && (isOwnerView(v.key) || v.key === "attention")) return false;
     return true;
   });
   const activeView = views.find((v) => v.key === view) ?? views[0];
@@ -437,6 +449,20 @@ export function PerfExplorer({
         )
         .sort((a, b) => b.spend - a.spend);
     }
+    if (decisionMode && view === "attention") {
+      return applied
+        .filter((row) => {
+          if (!activeCampaignKeySet.has(row.campaignKey) && !activeCampaignKeySet.has(row.key))
+            return false;
+          const status = ownerVerdicts.get(row.key)?.status;
+          return status === "watch" || status === "weak";
+        })
+        .sort((a, b) => {
+          const va = ownerVerdicts.get(a.key)!;
+          const vb = ownerVerdicts.get(b.key)!;
+          return vb.failures - va.failures || vb.watches - va.watches || b.spend - a.spend;
+        });
+    }
     if (decisionMode && isOwnerView(view)) {
       return applied
         .filter(
@@ -482,7 +508,7 @@ export function PerfExplorer({
   const cardRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = q ? shown.filter((r) => searchable(r).includes(q)) : shown;
-    if (decisionMode && isOwnerView(view)) return filtered;
+    if (decisionMode && (isOwnerView(view) || view === "attention")) return filtered;
     const pick = CARD_SORTS[cardSort].value;
     return [...filtered].sort((a, b) => pick(b) - pick(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -499,7 +525,9 @@ export function PerfExplorer({
   useEffect(() => {
     if (grain !== "campaign")
       setView((current) =>
-        current === "attributedRevenue" || isOwnerView(current) ? "all" : current,
+        current === "attributedRevenue" || current === "attention" || isOwnerView(current)
+          ? "all"
+          : current,
       );
   }, [grain]);
 
@@ -542,12 +570,15 @@ export function PerfExplorer({
     />
   );
 
-  const primaryViews = decisionMode
-    ? views.filter((item) => item.key === "all" || isOwnerView(item.key))
-    : views;
-  const advancedViews = decisionMode
-    ? views.filter((item) => item.key !== "all" && !isOwnerView(item.key))
-    : [];
+  // Four choices on screen for a manager — All, Good, Needs attention, Too
+  // early. Every other view still exists, one press away under More filters.
+  const PRIMARY_KEYS: QuickViewKey[] = decisionMode
+    ? ["all", "successful", "attention", "early"]
+    : ["all"];
+  const primaryViews = PRIMARY_KEYS.map((key) => views.find((item) => item.key === key)).filter(
+    (item): item is QuickView => Boolean(item),
+  );
+  const advancedViews = views.filter((item) => !PRIMARY_KEYS.includes(item.key));
   const advancedOpen = showAdvancedViews || advancedViews.some((item) => item.key === view);
   const viewButton = (v: QuickView) => {
     const active = v.key === view;
@@ -564,12 +595,23 @@ export function PerfExplorer({
         }`}
         style={active ? { background: "var(--brand)" } : undefined}
       >
-        {decisionMode && v.key === "all" ? (lang === "ar" ? "كل الـLive" : "All live") : v[lang]}
+        {decisionMode && v.key === "all"
+          ? lang === "ar"
+            ? "كل الـLive"
+            : "All live"
+          : v.key === "successful"
+            ? lang === "ar"
+              ? "جيدة"
+              : "Good"
+            : v[lang]}
         {decisionMode && v.key === "all" && (
           <span className="opacity-75 num">{evaluatedLiveCount}</span>
         )}
         {decisionMode && isOwnerView(v.key) && (
           <span className="ms-1 opacity-75 num">{ownerCounts[v.key]}</span>
+        )}
+        {decisionMode && v.key === "attention" && (
+          <span className="ms-1 opacity-75 num">{ownerCounts.watch + ownerCounts.weak}</span>
         )}
       </button>
     );
@@ -579,7 +621,7 @@ export function PerfExplorer({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {primaryViews.map(viewButton)}
-        {decisionMode && advancedViews.length > 0 && (
+        {advancedViews.length > 0 && (
           <button
             type="button"
             onClick={() => setShowAdvancedViews((open) => !open)}
@@ -595,7 +637,7 @@ export function PerfExplorer({
           </button>
         )}
       </div>
-      {decisionMode && advancedOpen && (
+      {advancedOpen && (
         <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/60 p-2">
           {advancedViews.map(viewButton)}
         </div>
@@ -687,22 +729,9 @@ export function PerfExplorer({
 
       <div className="flex flex-wrap items-center gap-2">
         <Breadcrumbs grain={grain} onGrainChange={onGrainChange} />
-        {/* The layout switch and the three grain buttons together need ~355px,
-            which is wider than a small phone. Below `sm` they take the full row
-            and scroll rather than being clipped at the edge. */}
-        <div className="max-sm:hscroll flex w-full items-center gap-2 sm:ms-auto sm:w-auto">
-          {layoutToggle}
-          <Segmented
-            value={grain}
-            onChange={onGrainChange}
-            size="md"
-            options={[
-              { value: "campaign", label: t("campaign") },
-              { value: "adset", label: t("ad_set") },
-              { value: "ad", label: t("ad_name") },
-            ]}
-          />
-        </div>
+        {/* Levels are not tabs: a row opens its detail, the detail opens the
+            level below, and the breadcrumb goes back up. */}
+        <div className="flex items-center gap-2 sm:ms-auto">{layoutToggle}</div>
       </div>
 
       {view === "attributedRevenue" && !loading && (
@@ -967,7 +996,7 @@ function Breadcrumbs({
       <Layers size={14} className="text-text-subtle shrink-0" />
       {crumbs.map((c, i) => (
         <span key={i} className="flex items-center gap-1 min-w-0">
-          {i > 0 && <ChevronLeft size={13} className="text-text-subtle shrink-0 rtl:rotate-180" />}
+          {i > 0 && <ChevronRight size={13} className="text-text-subtle shrink-0 rtl:rotate-180" />}
           {c.onClick ? (
             <button
               onClick={c.onClick}
@@ -1027,6 +1056,9 @@ function RowDrawer({
   const campaignId = row.campaignKey.startsWith("id:") ? row.campaignKey.slice(3) : "";
 
   const facts: { label: string; value: React.ReactNode }[] = [];
+  // Platform identifiers and data-coverage dates help an analyst reconcile a
+  // row; a manager deciding what to do with it does not need them first.
+  const technical: { label: string; value: React.ReactNode }[] = [];
   if (grain === "ad") {
     facts.push({
       label: lang === "ar" ? "اسم الإعلان (Creative)" : "Creative name",
@@ -1034,7 +1066,7 @@ function RowDrawer({
         <Unavailable reason={lang === "ar" ? "الاسم مش موجود في المصدر" : "Absent in the source"} />
       ),
     });
-    facts.push({
+    technical.push({
       label: lang === "ar" ? "معرّف الإعلان (Ad ID)" : "Ad ID",
       value: adId ? <span className="num text-[11px] break-all">{adId}</span> : <Unavailable />,
     });
@@ -1042,18 +1074,18 @@ function RowDrawer({
   if (grain !== "campaign" && row.adsetName)
     facts.push({ label: t("ad_set"), value: row.adsetName });
   if (grain === "adset" && adsetId)
-    facts.push({
+    technical.push({
       label: lang === "ar" ? "معرّف المجموعة" : "Ad set ID",
       value: <span className="num text-[11px] break-all">{adsetId}</span>,
     });
   if (row.campaignName) facts.push({ label: t("campaign"), value: row.campaignName });
   if (campaignId)
-    facts.push({
+    technical.push({
       label: lang === "ar" ? "معرّف الحملة" : "Campaign ID",
       value: <span className="num text-[11px] break-all">{campaignId}</span>,
     });
   if (row.spendDateMin)
-    facts.push({
+    technical.push({
       label: lang === "ar" ? "أيام الإنفاق المتاحة" : "Spend data covers",
       value: <span className="num text-[11px]">{`${row.spendDateMin} → ${row.spendDateMax}`}</span>,
     });
@@ -1251,6 +1283,34 @@ function RowDrawer({
             </p>
           )}
 
+          <button
+            onClick={onDrill}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors cursor-pointer"
+            style={{ background: "var(--brand)" }}
+          >
+            <Target size={15} />
+            {grain === "campaign"
+              ? lang === "ar"
+                ? "افتح المجموعات الإعلانية للحملة"
+                : "Open this campaign's ad sets"
+              : grain === "adset"
+                ? lang === "ar"
+                  ? "افتح إعلانات المجموعة"
+                  : "Open this ad set's ads"
+                : lang === "ar"
+                  ? "ركّز الصفحة كلها على الإعلان ده"
+                  : "Scope the whole page to this ad"}
+          </button>
+
+          {childGrain && row.campaignKey && (
+            <ChildLevel
+              parentGrain={grain}
+              childGrain={childGrain}
+              campaignKey={row.campaignKey}
+              adsetKey={row.adsetKey}
+            />
+          )}
+
           {grain === "campaign" && row.campaignKey && (
             <CampaignCreativeGallery
               campaignKey={row.campaignKey}
@@ -1270,6 +1330,25 @@ function RowDrawer({
                 </div>
               ))}
             </dl>
+          )}
+
+          {technical.length > 0 && (
+            <details className="group rounded-xl border border-border bg-surface">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-semibold text-text-muted">
+                <span>{lang === "ar" ? "تفاصيل تقنية" : "Technical details"}</span>
+                <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+              </summary>
+              <dl className="grid grid-cols-1 gap-2 border-t border-border px-3 py-2 text-[12px]">
+                {technical.map((f) => (
+                  <div key={f.label} className="flex items-start justify-between gap-3 py-1">
+                    <dt className="shrink-0 text-text-muted">{f.label}</dt>
+                    <dd className="min-w-0 break-words text-end font-medium text-text">
+                      {f.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           )}
 
           {groups.map((g) => (
@@ -1340,30 +1419,6 @@ function RowDrawer({
                 ))}
               </ul>
             </details>
-          )}
-
-          <button
-            onClick={onDrill}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors cursor-pointer"
-            style={{ background: "var(--brand)" }}
-          >
-            <Target size={15} />
-            {grain === "ad"
-              ? lang === "ar"
-                ? "ركّز الصفحة كلها على الإعلان ده"
-                : "Scope the whole page to this ad"
-              : lang === "ar"
-                ? "ركّز الصفحة كلها على الصف ده"
-                : "Scope the whole page to this row"}
-          </button>
-
-          {childGrain && row.campaignKey && (
-            <ChildLevel
-              parentGrain={grain}
-              childGrain={childGrain}
-              campaignKey={row.campaignKey}
-              adsetKey={row.adsetKey}
-            />
           )}
         </div>
       </div>
@@ -1572,6 +1627,7 @@ function buildColumns({
     },
     {
       key: "ctrAll",
+      hideByDefault: true,
       group: "advertising",
       label: label("ctrAll"),
       header: header("ctrAll"),
@@ -1592,6 +1648,7 @@ function buildColumns({
     },
     {
       key: "platformLeads",
+      hideByDefault: true,
       group: "advertising",
       label: label("platformLeads"),
       header: header("platformLeads"),
@@ -1611,6 +1668,7 @@ function buildColumns({
     },
     {
       key: "followUp",
+      hideByDefault: true,
       group: "crm",
       label: lang === "ar" ? "قيد المتابعة" : "Follow-up",
       header: lang === "ar" ? "Follow up" : "Follow-up",
@@ -1639,6 +1697,7 @@ function buildColumns({
     },
     {
       key: "lost",
+      hideByDefault: true,
       group: "crm",
       label: label("lost"),
       header: header("lost"),
@@ -1668,6 +1727,7 @@ function buildColumns({
     },
     {
       key: "invoices",
+      hideByDefault: true,
       group: "accounting",
       label: lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices",
       header: lang === "ar" ? "الفواتير" : "Invoices",
@@ -1677,6 +1737,7 @@ function buildColumns({
     },
     {
       key: "invoiceConversionRate",
+      hideByDefault: true,
       group: "accounting",
       label: lang === "ar" ? "تحويل الليد إلى فاتورة" : "Lead-to-invoice conversion",
       header: lang === "ar" ? "تحويل لفاتورة" : "Invoice conv.",
@@ -1686,6 +1747,7 @@ function buildColumns({
     },
     {
       key: "salesOrders",
+      hideByDefault: true,
       group: "accounting",
       label: lang === "ar" ? "أوامر البيع المفوترة بالكامل" : "Fully invoiced sales orders",
       header: lang === "ar" ? "أوامر البيع" : "Sales orders",
@@ -1706,6 +1768,7 @@ function buildColumns({
 
     {
       key: "cpl",
+      hideByDefault: true,
       group: "efficiency",
       label: label("cpl"),
       header: header("cpl"),

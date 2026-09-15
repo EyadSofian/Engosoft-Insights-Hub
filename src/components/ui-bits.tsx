@@ -140,14 +140,13 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * A single headline figure, as a coloured card.
+ * A single headline figure, as a quiet management card.
  *
- * The whole card takes its family: pastel ground, matching hairline, the
- * figure in the family's ink, a solid icon chip in the family's strong tone,
- * and — when the caller hands over a real series — a filled sparkline in the
- * same colour. That is deliberate and it is the point: a row of five KPIs has
- * to read as five different things from across a desk, and five white cards
- * with five small coloured icons read as one grey block.
+ * White surface, one hairline, a strong number. The label says what the figure
+ * is; the tone only tints the small icon and the sparkline — brand blue unless
+ * the caller passed a semantic verdict — so a row of six figures reads as one
+ * calm row instead of six competing colours. The page's single most important
+ * figure (`hero`) carries a brand-blue rule along its top edge.
  *
  * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
  * is `--pad-card`, the label sits 11px above the figure, the figure 8px above
@@ -250,43 +249,20 @@ export function KpiCard({
       className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       } ${compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"}`}
-      style={
-        {
-          ...toneVars(tone),
-          "--i": index,
-          ...(hero
-            ? {
-                boxShadow: "var(--shadow-sm)",
-                borderColor: "var(--tone-strong)",
-              }
-            : {}),
-        } as React.CSSProperties
-      }
+      style={{ ...toneVars(tone), "--i": index } as React.CSSProperties}
     >
-      {/* The page's primary figure gets a solid rule in its own family along
-          the top edge. `hero` used to change only the shadow, which at a
-          glance was no emphasis at all. */}
       {hero && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-1"
-          style={{ background: "var(--tone-strong)" }}
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: "var(--brand)" }}
         />
       )}
-      {/* A wash of the family's strong tone bleeding in from the trailing
-          corner. It is what makes the card read as coloured at a glance and at
-          a distance, without lifting the pastel enough to hurt the figure. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-8 h-28 w-28 rounded-full opacity-[0.13]"
-        style={{ background: "var(--tone-strong)", insetInlineEnd: "-1.5rem", filter: "blur(4px)" }}
-      />
 
       <div className="relative flex items-start justify-between gap-3">
         <span className="inline-flex min-w-0 items-start gap-1.5">
           <span
-            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-1 text-[10.5px]" : "line-clamp-2 text-[11.5px] sm:text-xs"}`}
-            style={{ color: "var(--tone-ink)", opacity: 0.78 }}
+            className={`font-semibold leading-[1.4] text-text-muted ${compact ? "line-clamp-1 text-[10.5px]" : "line-clamp-2 text-[11.5px] sm:text-xs"}`}
           >
             {label}
           </span>
@@ -294,10 +270,9 @@ export function KpiCard({
         </span>
         {icon && (
           <span
-            className={`grid shrink-0 place-items-center rounded-xl text-white shadow-sm ${
-              compact ? "size-7" : "size-9"
-            }`}
-            style={{ background: "var(--tone-strong)" }}
+            className={`grid shrink-0 place-items-center rounded-lg ${compact ? "size-7" : "size-8"}`}
+            style={{ background: "var(--tone-soft)", color: "var(--tone-strong)" }}
+            aria-hidden="true"
           >
             {icon}
           </span>
@@ -314,7 +289,7 @@ export function KpiCard({
             ? "overflow-visible whitespace-normal text-[clamp(1rem,13cqi,1.6rem)] leading-[1.15]"
             : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,16cqi,1.95rem)] leading-none"
         }`}
-        style={{ color: "var(--tone-ink)" }}
+        style={{ color: "var(--text)" }}
       >
         {value}
       </div>
@@ -332,7 +307,7 @@ export function KpiCard({
               className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-1 text-[10px]" : "text-[10.5px] sm:text-[11px]"} ${
                 subWrap ? "leading-relaxed" : "line-clamp-2"
               }`}
-              style={{ color: "var(--tone-ink)", opacity: 0.68 }}
+              style={{ color: "var(--text-muted)" }}
             >
               {sub}
             </span>
@@ -348,7 +323,7 @@ export function KpiCard({
           {interactive ? (
             <span
               className="kpi-cue inline-flex items-center gap-0.5 text-[10.5px] font-bold"
-              style={{ color: "var(--tone-strong)" }}
+              style={{ color: "var(--brand)" }}
             >
               {cue}
               <span className="kpi-cue-arrow inline-flex" aria-hidden="true">

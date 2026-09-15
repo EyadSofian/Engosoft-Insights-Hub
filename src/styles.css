@@ -912,18 +912,14 @@
   }
 }
 
-/* --- tonal surfaces -------------------------------------------------------
-   A block that carries a colour family end to end: pastel ground, matching
-   hairline, family radius. Set --tone-surface/--tone-border on the element (or
-   any ancestor) and everything inside can read --tone-ink and --tone-strong.
-
-   This is the whole point of the redesign: a KPI card is not a white card with
-   a coloured icon, it is a coloured card. */
+/* A management card: the same white surface and hairline for every figure.
+   Meaning is carried by the label, the position and the size of the number —
+   colour is reserved for the one accent a card may carry (`--tone-strong`). */
 @utility tone-surface {
-  background: var(--tone-surface, var(--surface));
-  border: 1px solid var(--tone-border, var(--border));
-  border-radius: 18px;
-  color: var(--tone-ink, var(--text));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text);
 }
 
 /* Lifts 2px and deepens its shadow. Nothing else moves. */
