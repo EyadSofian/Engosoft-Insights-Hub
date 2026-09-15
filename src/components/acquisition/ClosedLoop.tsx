@@ -841,6 +841,63 @@ const NEXT: Record<ClosedLoopGrain, ClosedLoopGrain | null> = {
   creative: null,
 };
 
+/**
+ * The name columns for one level of the campaign drill-down. A level the reader
+ * has already drilled through is named in the breadcrumb, so its column is not
+ * repeated — the table keeps its room for the figures (ROAS included). At ad
+ * level the ad name carries the step down to its creative.
+ */
+function identityColumns(
+  grain: ClosedLoopGrain,
+  filter: { campaignId?: string; adsetId?: string },
+  A: boolean,
+  onOpenCreative: (creativeId: string) => void,
+): Col<CreativeGrainRow>[] {
+  const columns: Col<CreativeGrainRow>[] = [];
+  if (grain === "campaign" || !filter.campaignId)
+    columns.push({
+      key: "campaign",
+      header: A ? "الحملة" : "Campaign",
+      minWidth: "240px",
+      render: (row) => nameWithId(row.campaignName, row.campaignId),
+      sortValue: (row) => row.campaignName,
+    });
+  if (grain === "adset" || (grain === "ad" && !filter.adsetId))
+    columns.push({
+      key: "adset",
+      header: A ? "مجموعة الإعلان" : "Ad set",
+      minWidth: "240px",
+      render: (row) => nameWithId(row.adsetName, row.adsetId),
+      sortValue: (row) => row.adsetName,
+    });
+  if (grain === "ad")
+    columns.push({
+      key: "ad",
+      header: A ? "الإعلان" : "Ad",
+      minWidth: "240px",
+      render: (row) => (
+        <div className="min-w-0">
+          {nameWithId(row.adName, row.adId)}
+          {row.creativeId ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenCreative(row.creativeId);
+              }}
+              className="mt-0.5 block text-[11.5px] font-semibold text-brand hover:underline"
+            >
+              {A ? "عرض المادة الإعلانية ←" : "View creative →"}
+            </button>
+          ) : null}
+        </div>
+      ),
+      sortValue: (row) => row.adName,
+    });
+  if (columns[0]) columns[0] = { ...columns[0], always: true, sticky: true };
+  return columns;
+}
+
 export function GrainPerformance({
   data,
   loading,
@@ -920,39 +977,7 @@ export function GrainPerformance({
             sortValue: (row) => row.creativeName || row.creativeId,
           },
         ]
-      : [
-          {
-            key: "campaign",
-            header: A ? "الحملة" : "Campaign",
-            minWidth: "240px",
-            always: true,
-            sticky: true,
-            render: (row) => nameWithId(row.campaignName, row.campaignId),
-            sortValue: (row) => row.campaignName,
-          },
-          ...(grain !== "campaign"
-            ? [
-                {
-                  key: "adset",
-                  header: A ? "مجموعة الإعلان" : "Ad set",
-                  minWidth: "240px",
-                  render: (row: CreativeGrainRow) => nameWithId(row.adsetName, row.adsetId),
-                  sortValue: (row: CreativeGrainRow) => row.adsetName,
-                },
-              ]
-            : []),
-          ...(grain === "ad"
-            ? [
-                {
-                  key: "ad",
-                  header: A ? "الإعلان" : "Ad",
-                  minWidth: "240px",
-                  render: (row: CreativeGrainRow) => nameWithId(row.adName, row.adId),
-                  sortValue: (row: CreativeGrainRow) => row.adName,
-                },
-              ]
-            : []),
-        ];
+      : identityColumns(grain, filter, A, onOpenCreative);
   const cols: Col<CreativeGrainRow>[] = [
     ...identity,
     ...metricColumns<CreativeGrainRow>(
