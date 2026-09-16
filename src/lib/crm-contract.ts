@@ -8,6 +8,16 @@
  */
 export const CRM_CONTRACT_VERSION = "17.0.1.26.0";
 
+/**
+ * Serialization/classification revision for persisted CRM snapshots.
+ *
+ * The Odoo module version alone is not enough to invalidate last-good rows:
+ * dashboard-only authority fields can change without a module upgrade. Bump
+ * this value whenever the persisted raw-row shape or its date semantics
+ * change so a deploy cannot keep serving a structurally stale snapshot.
+ */
+export const CRM_SNAPSHOT_SCHEMA_REVISION = "lost-date-authority-v2";
+
 export type CrmRecordType = "lead" | "opportunity";
 export type CrmBusinessStatus = "lead" | "open" | "won" | "lost";
 export type CrmStageKey = "preparation" | "new" | "open" | "quotation" | "won" | "lost" | "other";
@@ -54,7 +64,7 @@ export function crmSnapshotRevision(
   stageExternalIds: ReadonlyMap<string, CrmStageKey> = CRM_STAGE_EXTERNAL_IDS,
 ): string {
   const stages = [...stageExternalIds].map(([xmlid, key]) => `${xmlid}=${key}`).sort();
-  return [CRM_CONTRACT_VERSION, ...stages].join("|");
+  return [CRM_CONTRACT_VERSION, `schema=${CRM_SNAPSHOT_SCHEMA_REVISION}`, ...stages].join("|");
 }
 
 export const CRM_SNAPSHOT_REVISION = crmSnapshotRevision();

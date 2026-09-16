@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   CRM_CONTRACT_VERSION,
+  CRM_SNAPSHOT_SCHEMA_REVISION,
   CRM_SNAPSHOT_REVISION,
   CRM_STAGE_EXTERNAL_IDS,
   crmBusinessStatus,
@@ -20,6 +21,7 @@ const record = (overrides = {}) => ({
 });
 
 assert.equal(CRM_CONTRACT_VERSION, "17.0.1.26.0");
+assert.equal(CRM_SNAPSHOT_SCHEMA_REVISION, "lost-date-authority-v2");
 
 assert.equal(crmBusinessStatus(record()), "lead", "active Lead stays workable");
 assert.equal(
@@ -85,6 +87,7 @@ assert.equal(
 assert.equal(crmStageKeyForExternalId(false), "other", "a stage without an XMLID is never guessed");
 
 assert.ok(CRM_SNAPSHOT_REVISION.startsWith(`${CRM_CONTRACT_VERSION}|`));
+assert.ok(CRM_SNAPSHOT_REVISION.includes(`schema=${CRM_SNAPSHOT_SCHEMA_REVISION}`));
 assert.notEqual(
   crmSnapshotRevision(
     new Map([...CRM_STAGE_EXTERNAL_IDS].filter(([xmlid]) => xmlid !== "crm.stage_lead4")),
