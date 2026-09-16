@@ -7,13 +7,24 @@ export const Route = createFileRoute("/api/leads")({
         const { getFiltered, authoritativeLostLeads, groupBy } =
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
+        const { lostPopulations, lostPopulationCounts } = await import("@/lib/lost-classification");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
-        const data = await getFiltered(filters);
+        const [data, closedData] = await Promise.all([
+          getFiltered(filters),
+          getFiltered({ ...filters, lostDateBasis: "closed" }),
+        ]);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
+        const closedCanonicalLost = authoritativeLostLeads(closedData);
+        const opportunityMovement = lostPopulations({
+          cohortRows: canonicalLost.filter((row) => row.recordType === "opportunity"),
+          closedRows: closedCanonicalLost.filter((row) => row.recordType === "opportunity"),
+          window: { from: filters.from, to: filters.to },
+        });
+        const opportunityMovementCounts = lostPopulationCounts(opportunityMovement);
         const odooBaseUrl = odooConfig().url;
 
         const activeRows = data.crm.map((row) => ({
@@ -75,7 +86,7 @@ export const Route = createFileRoute("/api/leads")({
           daysToClose: row.daysToClose,
         }));
 
-        const lostRows = canonicalLost.map((row) => ({
+        const toLostWorkspaceRow = (row: (typeof canonicalLost)[number]) => ({
           id: row.id,
           odooUrl: row.id
             ? `${odooBaseUrl}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
@@ -134,7 +145,14 @@ export const Route = createFileRoute("/api/leads")({
           conversionDate: row.conversionDate,
           closedAt: row.closeDate,
           daysToClose: null,
-        }));
+        });
+        const lostRows = canonicalLost.map(toLostWorkspaceRow);
+        const closedLostOpportunityRows =
+          opportunityMovement.closedLostInPeriod.map(toLostWorkspaceRow);
+        const freshLostOpportunityRows =
+          opportunityMovement.createdAndLostInPeriod.map(toLostWorkspaceRow);
+        const olderLostOpportunityRows =
+          opportunityMovement.olderCohortClosedLostInPeriod.map(toLostWorkspaceRow);
 
         const workspaceRows = [...activeRows, ...lostRows];
         const stageKeys = ["preparation", "new", "open", "quotation", "won", "lost"] as const;
@@ -222,6 +240,36 @@ export const Route = createFileRoute("/api/leads")({
           lostTypeFacets: {
             leads: facets(lostRows.filter((row) => row.recordType === "lead")),
             opportunities: facets(lostRows.filter((row) => row.recordType === "opportunity")),
+          },
+          lostOpportunityMovement: {
+            total: opportunityMovementCounts.closedLostInPeriod,
+            fresh: opportunityMovementCounts.createdAndLostInPeriod,
+            older: opportunityMovementCounts.olderCohortClosedLostInPeriod,
+            undated: opportunityMovementCounts.undatedCohortClosedLostInPeriod,
+            dateBasisCounts: Object.fromEntries(
+              [...new Set(opportunityMovement.closedLostInPeriod.map((row) => row.lostDateBasis))]
+                .filter(Boolean)
+                .map((basis) => [
+                  basis,
+                  opportunityMovement.closedLostInPeriod.filter(
+                    (row) => row.lostDateBasis === basis,
+                  ).length,
+                ]),
+            ),
+          },
+          lostOpportunityMovementFacets: facets(closedLostOpportunityRows),
+          lostOpportunityMovementDetail: {
+            all: capped(
+              closedLostOpportunityRows
+                .slice()
+                .sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
+            ),
+            fresh: capped(
+              freshLostOpportunityRows.slice().sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
+            ),
+            older: capped(
+              olderLostOpportunityRows.slice().sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
+            ),
           },
           detail: capped(
             workspaceRows.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),

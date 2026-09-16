@@ -149,6 +149,19 @@ interface Resp {
   stageFacets: Partial<Record<CrmStageKey, Facets>>;
   statusFacets: Record<WorkspaceView | "activeLeads" | "ready" | "open", Facets>;
   lostTypeFacets: { leads: Facets; opportunities: Facets };
+  lostOpportunityMovement: {
+    total: number;
+    fresh: number;
+    older: number;
+    undated: number;
+    dateBasisCounts: Record<string, number>;
+  };
+  lostOpportunityMovementFacets: Facets;
+  lostOpportunityMovementDetail: {
+    all: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
+    fresh: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
+    older: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
+  };
   detail: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
   health: DataHealth;
 }
@@ -301,6 +314,7 @@ function CrmWorkspace() {
 
   const A = lang === "ar";
   const summary = data.summary;
+  const lostOpportunityMovement = data.lostOpportunityMovement;
   const tabs: { key: WorkspaceView; label: string; count: number; icon: ReactNode }[] = [
     {
       key: "all",
@@ -565,21 +579,21 @@ function CrmWorkspace() {
     },
     lostOpportunities: {
       id: "crm-lost-opportunities",
-      title: "Lost Opportunities",
-      value: fmtNum(summary.lostOpportunities),
+      title: A ? "Lost Opportunities خلال الفترة" : "Lost Opportunities in period",
+      value: fmtNum(lostOpportunityMovement.total),
       tone: "violet",
       icon: <XCircle size={17} />,
       definition: A
-        ? "Opportunities ضائعة بنوعين منفصلين: فرصة حالية ما زالت active داخل Lost stage، أو فرصة تاريخية مؤرشفة ومعها دليل خسارة."
-        : "Lost Opportunities have two distinct populations: a current active Opportunity in the Lost stage, or an archived historical Opportunity with loss evidence.",
+        ? "كل Opportunity سُجّل لها تاريخ Lost داخل الفترة المحددة. نقسمها حسب create_date إلى Fresh أُنشئت داخل نفس الفترة، وOld Cohort أُنشئت قبلها."
+        : "Every Opportunity whose canonical Lost date falls inside the selected period, split by create_date into Fresh records created in the same period and Older Cohorts created before it.",
       formula: A
-        ? `${fmtNum(summary.currentLostOpportunities)} حالية + ${fmtNum(summary.historicalLostOpportunities)} تاريخية = ${fmtNum(summary.lostOpportunities)}`
-        : `${fmtNum(summary.currentLostOpportunities)} current + ${fmtNum(summary.historicalLostOpportunities)} historical = ${fmtNum(summary.lostOpportunities)}`,
+        ? `${fmtNum(lostOpportunityMovement.fresh)} Fresh + ${fmtNum(lostOpportunityMovement.older)} من شهور أقدم${lostOpportunityMovement.undated ? ` + ${fmtNum(lostOpportunityMovement.undated)} بلا create_date صالح` : ""} = ${fmtNum(lostOpportunityMovement.total)}`
+        : `${fmtNum(lostOpportunityMovement.fresh)} Fresh + ${fmtNum(lostOpportunityMovement.older)} Older Cohort${lostOpportunityMovement.undated ? ` + ${fmtNum(lostOpportunityMovement.undated)} without a valid create_date` : ""} = ${fmtNum(lostOpportunityMovement.total)}`,
       provenance: {
         system: A ? "Odoo CRM مباشرة ← /api/leads" : "Direct Odoo CRM → /api/leads",
         model: "crm.lead",
         query:
-          "inventory_bucket = False AND type = 'opportunity' AND ((active = True AND stage XMLID = Lost) OR (active = False AND (lost_reason_id != False OR stage XMLID = Lost)))",
+          "inventory_bucket = False AND type = 'opportunity' AND canonical Lost date inside selected period",
         fields: [
           "inventory_bucket",
           "type",
@@ -588,58 +602,81 @@ function CrmWorkspace() {
           "stage XMLID",
           "lost_reason_id",
           "create_date",
+          "lost_verification_date",
+          "date_last_stage_update",
         ],
         dateBasis: A
-          ? "create_date — الفلتر يربط الخسارة بكوهورت إنشاء الفرصة، وليس بشهر الإغلاق."
-          : "create_date — the filter attributes loss to the Opportunity creation cohort, not the closing month.",
+          ? "تاريخ Lost = lost_verification_date، ومع غيابه نستخدم date_last_stage_update كـfallback. وبعدها create_date يفصل Fresh عن Old Cohort."
+          : "Lost date = lost_verification_date, falling back to date_last_stage_update when absent. create_date then separates Fresh from Older Cohorts.",
         note: A
-          ? "Lost stage تُعرَف بالـXMLID الثابت، وليس بالاسم المترجم أو probability."
-          : "The Lost stage is resolved by stable XMLID, never by translated name or probability.",
+          ? `${fmtNum(lostOpportunityMovement.dateBasisCounts.lost_verification_date ?? 0)} بسجل Lost Verification Date مباشر، و${fmtNum(lostOpportunityMovement.dateBasisCounts.date_last_stage_update_fallback ?? 0)} محسوبة من آخر تغيير للمرحلة كـfallback.`
+          : `${fmtNum(lostOpportunityMovement.dateBasisCounts.lost_verification_date ?? 0)} use a direct Lost Verification Date; ${fmtNum(lostOpportunityMovement.dateBasisCounts.date_last_stage_update_fallback ?? 0)} use the last stage update fallback.`,
       },
       caveat:
         data.health.lostAuthority === "unavailable"
           ? A
             ? "مصدر Lost الموثوق غير متاح الآن؛ لا تعتبر الصفر نتيجة أعمال."
             : "The authoritative Lost source is unavailable; do not treat zero as a business result."
-          : undefined,
+          : lostOpportunityMovement.undated
+            ? A
+              ? `${fmtNum(lostOpportunityMovement.undated)} سجل له Lost Date داخل الفترة لكن create_date غير صالح؛ ظاهر في المعادلة ولا نخبّيه داخل أي كارت.`
+              : `${fmtNum(lostOpportunityMovement.undated)} records have an in-period Lost date but no valid create_date; they stay visible in the equation and are not hidden in either card.`
+            : undefined,
       breakdowns: [
         breakdown(
           "lost-opportunity-category",
           A ? "حسب فئة الخسارة" : "By Lost category",
-          data.lostTypeFacets.opportunities.byLostCategory,
+          data.lostOpportunityMovementFacets.byLostCategory,
         ),
         breakdown(
           "lost-opportunity-reason",
           A ? "حسب سبب الخسارة" : "By Lost reason",
-          data.lostTypeFacets.opportunities.byLostReason,
+          data.lostOpportunityMovementFacets.byLostReason,
         ),
         breakdown(
           "lost-opportunity-source",
           A ? "جاءت من أي مصدر؟" : "Which source produced them?",
-          data.lostTypeFacets.opportunities.bySource,
+          data.lostOpportunityMovementFacets.bySource,
         ),
       ],
       supporting: [
         {
-          key: "current-lost-opportunities",
-          label: A ? "فرص Lost حالية" : "Current Lost-stage",
-          value: fmtNum(summary.currentLostOpportunities),
-          hint: A ? "active=true داخل Lost stage" : "active=true in the Lost stage",
+          key: "fresh-lost-opportunities",
+          label: A ? "Fresh ودخلت Lost في الفترة" : "Fresh → Lost in period",
+          value: fmtNum(lostOpportunityMovement.fresh),
+          hint: A
+            ? "create_date وLost Date كلاهما داخل الفترة"
+            : "Both create_date and Lost date are inside the period",
         },
         {
-          key: "historical-lost-opportunities",
-          label: A ? "فرص Lost تاريخية" : "Historical Lost",
-          value: fmtNum(summary.historicalLostOpportunities),
-          hint: A ? "active=false مع دليل خسارة" : "active=false with loss evidence",
+          key: "older-cohort-lost-opportunities",
+          label: A ? "Old Cohort ودخلت Lost في الفترة" : "Older Cohort → Lost in period",
+          value: fmtNum(lostOpportunityMovement.older),
+          hint: A
+            ? "create_date قبل الفترة وLost Date داخلها"
+            : "create_date is before the period; Lost date is inside it",
         },
       ],
-      records: records(
-        A ? "أمثلة Lost Opportunities كوّنت الرقم" : "Lost Opportunity records behind the figure",
-        data.detail.rows.filter((row) => row.status === "lost" && row.recordType === "opportunity"),
-        A
-          ? "اضغط علامة الفتح بجوار أي اسم لمراجعة الـOpportunity نفسها داخل Odoo."
-          : "Use the open icon beside any name to inspect that exact Opportunity in Odoo.",
-      ),
+      records: {
+        title: A
+          ? "أحدث Opportunities دخلت Lost داخل الفترة"
+          : "Latest Opportunities that became Lost in the period",
+        hint: A
+          ? "كل صف يعرض تاريخ الإنشاء وتاريخ Lost؛ اضغط علامة الفتح لمراجعة السجل داخل Odoo."
+          : "Each row shows its creation and Lost dates; use the open icon to inspect it in Odoo.",
+        rows: data.lostOpportunityMovementDetail.all.rows.slice(0, 8).map((row) => ({
+          key: row.id,
+          title: row.contact || `#${row.id}`,
+          subtitle: A
+            ? `إنشاء ${fmtDate(row.createdAt, lang)} · Lost ${fmtDate(row.lostDate, lang)}`
+            : `Created ${fmtDate(row.createdAt, lang)} · Lost ${fmtDate(row.lostDate, lang)}`,
+          value: row.source || row.salesperson || undefined,
+          href: row.odooUrl || undefined,
+        })),
+        emptyLabel: A
+          ? "لا توجد Opportunities دخلت Lost داخل الفترة."
+          : "No Opportunities became Lost inside the period.",
+      },
       report: {
         to: "/lost",
         label: A ? "فتح تحليل Lost Opportunities" : "Open Lost Opportunity analysis",
@@ -757,8 +794,8 @@ function CrmWorkspace() {
               card={{
                 index: 6,
                 sub: A
-                  ? `${fmtNum(summary.currentLostOpportunities)} حالية · ${fmtNum(summary.historicalLostOpportunities)} تاريخية`
-                  : `${fmtNum(summary.currentLostOpportunities)} current · ${fmtNum(summary.historicalLostOpportunities)} historical`,
+                  ? `${fmtNum(lostOpportunityMovement.fresh)} Fresh · ${fmtNum(lostOpportunityMovement.older)} من شهور أقدم`
+                  : `${fmtNum(lostOpportunityMovement.fresh)} Fresh · ${fmtNum(lostOpportunityMovement.older)} Older Cohort`,
               }}
             />
           </KpiRow>
