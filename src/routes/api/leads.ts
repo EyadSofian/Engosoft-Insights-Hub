@@ -7,15 +7,20 @@ export const Route = createFileRoute("/api/leads")({
         const { getFiltered, authoritativeLostLeads, groupBy } =
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
+        const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
+        const odooBaseUrl = odooConfig().url;
 
         const activeRows = data.crm.map((row) => ({
           id: row.id,
+          odooUrl: row.id
+            ? `${odooBaseUrl}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
+            : "",
           createdAt: row.createdAt,
           contact: row.contact,
           phone: row.phone,
@@ -72,6 +77,9 @@ export const Route = createFileRoute("/api/leads")({
 
         const lostRows = canonicalLost.map((row) => ({
           id: row.id,
+          odooUrl: row.id
+            ? `${odooBaseUrl}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
+            : "",
           createdAt: row.createdAt,
           contact: row.contact,
           phone: row.phone,
@@ -210,6 +218,10 @@ export const Route = createFileRoute("/api/leads")({
             open: facets(workspaceRows.filter((row) => row.status === "open")),
             won: facets(workspaceRows.filter((row) => row.status === "won")),
             lost: facets(workspaceRows.filter((row) => row.status === "lost")),
+          },
+          lostTypeFacets: {
+            leads: facets(lostRows.filter((row) => row.recordType === "lead")),
+            opportunities: facets(lostRows.filter((row) => row.recordType === "opportunity")),
           },
           detail: capped(
             workspaceRows.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),

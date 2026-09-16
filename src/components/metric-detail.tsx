@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  Database,
   ExternalLink,
   Sigma,
   Sparkles,
@@ -200,6 +201,102 @@ export function MetricDefinition({
           {caveat}
         </p>
       )}
+    </section>
+  );
+}
+
+/* --- provenance ----------------------------------------------------------- */
+
+/**
+ * The exact audit trail behind a figure: system, model, fields, query and date.
+ * It is intentionally denser than the plain-language definition above it, but
+ * still readable by a manager who does not know Odoo domains.
+ */
+export function MetricProvenance({
+  provenance,
+}: {
+  provenance: NonNullable<MetricDetail["provenance"]>;
+}) {
+  const { lang } = useI18n();
+  return (
+    <section data-testid="metric-provenance">
+      <SectionLabel>
+        {lang === "ar" ? "مصدر الرقم بالضبط" : "Exact source of this figure"}
+      </SectionLabel>
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="flex items-start gap-3 border-b border-border bg-surface-2/70 px-3.5 py-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-text text-surface">
+            <Database size={15} aria-hidden="true" />
+          </span>
+          <dl className="grid min-w-0 flex-1 gap-x-5 gap-y-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-subtle">
+                {lang === "ar" ? "النظام" : "System"}
+              </dt>
+              <dd className="mt-0.5 text-[12px] font-semibold text-text">{provenance.system}</dd>
+            </div>
+            {provenance.model && (
+              <div>
+                <dt className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-subtle">
+                  {lang === "ar" ? "الموديل" : "Model"}
+                </dt>
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
+                  {provenance.model}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+
+        <div className="space-y-3 px-3.5 py-3">
+          {provenance.query && (
+            <div>
+              <div className="mb-1 text-[10px] font-bold text-text-subtle">
+                {lang === "ar" ? "قاعدة دخول السجل في الرقم" : "Record inclusion rule"}
+              </div>
+              <code
+                dir="ltr"
+                className="block overflow-x-auto rounded-xl border border-border bg-surface-2 px-3 py-2 text-left text-[10.5px] leading-5 text-text"
+              >
+                {provenance.query}
+              </code>
+            </div>
+          )}
+
+          {provenance.fields && provenance.fields.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-[10px] font-bold text-text-subtle">
+                {lang === "ar" ? "حقول Odoo المستخدمة" : "Odoo fields used"}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {provenance.fields.map((field) => (
+                  <span
+                    key={field}
+                    dir="ltr"
+                    className="num rounded-lg border border-border bg-surface px-2 py-1 text-[10px] font-semibold text-text-muted"
+                  >
+                    {field}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {provenance.dateBasis && (
+            <p className="text-[11px] leading-5 text-text-muted">
+              <span className="font-bold text-text">
+                {lang === "ar" ? "أساس الفترة: " : "Period basis: "}
+              </span>
+              {provenance.dateBasis}
+            </p>
+          )}
+          {provenance.note && (
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-[11px] leading-5 text-text-muted">
+              {provenance.note}
+            </p>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
@@ -559,6 +656,8 @@ export function MetricDetailSheet({
           formula={detail.formula}
           caveat={detail.caveat}
         />
+
+        {detail.provenance && <MetricProvenance provenance={detail.provenance} />}
 
         {detail.trend && <MetricTrendSection trend={detail.trend} tone={detail.tone} />}
 

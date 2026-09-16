@@ -67,6 +67,7 @@ type Facets = Record<FacetKey, Grouped[]>;
 
 interface CrmWorkspaceRow {
   id: string;
+  odooUrl: string;
   createdAt: string;
   contact: string;
   phone: string;
@@ -147,6 +148,7 @@ interface Resp {
   facets: Facets;
   stageFacets: Partial<Record<CrmStageKey, Facets>>;
   statusFacets: Record<WorkspaceView | "activeLeads" | "ready" | "open", Facets>;
+  lostTypeFacets: { leads: Facets; opportunities: Facets };
   detail: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
   health: DataHealth;
 }
@@ -341,17 +343,23 @@ function CrmWorkspace() {
   const records = (
     title: string,
     rows: CrmWorkspaceRow[],
+    hint?: string,
   ): NonNullable<MetricDetail["records"]> => ({
     title,
+    hint,
     rows: rows.slice(0, 8).map((row) => ({
       key: row.id,
       title: row.contact || `#${row.id}`,
-      subtitle: `${row.recordType === "lead" ? "Lead" : "Opportunity"} · ${row.stage || "—"}`,
+      subtitle: `${row.source || (A ? "مصدر غير محدد" : "Source not set")} · ${row.stage || "—"}`,
       value: row.salesperson || row.salesTeam || undefined,
+      href: row.odooUrl || undefined,
     })),
     emptyLabel: A ? "لا توجد سجلات في هذا التحديد." : "No records in this selection.",
   });
-  const metricDetails: Record<"all" | "leads" | "open" | "ready" | "won" | "lost", MetricDetail> = {
+  const metricDetails: Record<
+    "all" | "leads" | "open" | "ready" | "won" | "lostLeads" | "lostOpportunities",
+    MetricDetail
+  > = {
     all: {
       id: "crm-total",
       title: A ? "كل سجلات الـCRM" : "All CRM records",
@@ -485,18 +493,109 @@ function CrmWorkspace() {
       ),
       report: { to: "/leads", label: A ? "فتح Won" : "Open Won workspace" },
     },
-    lost: {
-      id: "crm-lost-canonical",
-      title: "Lost",
-      value: fmtNum(summary.lost),
+    lostLeads: {
+      id: "crm-lost-leads",
+      title: "Lost Leads",
+      value: fmtNum(summary.lostLeads),
       tone: "rose",
+      icon: <Users size={17} />,
+      definition: A
+        ? "سجل ما زال نوعه Lead، تم أرشفته في Odoo ومعه Lost Reason مسجّل. المرحلة التي كان فيها تظل محفوظة ولا نحوله إلى Lost Opportunity."
+        : "A record that is still a Lead, archived in Odoo with a registered Lost Reason. Its previous stage is preserved; it does not become a Lost Opportunity.",
+      formula:
+        "inventory_bucket = False AND type = lead AND active = false AND lost_reason_id != False",
+      caveat:
+        data.health.lostAuthority === "unavailable"
+          ? A
+            ? "مصدر Lost الموثوق غير متاح الآن؛ لا تعتبر الصفر نتيجة أعمال."
+            : "The authoritative Lost source is unavailable; do not treat zero as a business result."
+          : A
+            ? "اسم الـstage ليس شرطًا هنا؛ الـLead قد يظهر بمرحلة New أو Open أو غيرها لأنه يُؤرشف مكانه."
+            : "Stage name is not a condition here; the Lead can retain New, Open or another previous stage because it is archived in place.",
+      provenance: {
+        system: A ? "Odoo CRM مباشرة ← /api/leads" : "Direct Odoo CRM → /api/leads",
+        model: "crm.lead",
+        query:
+          "inventory_bucket = False AND type = 'lead' AND active = False AND lost_reason_id != False",
+        fields: ["inventory_bucket", "type", "active", "lost_reason_id", "create_date"],
+        dateBasis: A
+          ? "create_date — الفلتر يختار الـLeads التي أُنشئت في الفترة ثم أصبحت Lost."
+          : "create_date — the filter selects Leads created in the window that later became Lost.",
+        note: A
+          ? "كل سجل في الأمثلة بالأسفل يحمل Odoo ID حقيقي، ويمكن فتحه مباشرة لمراجعة الحقول."
+          : "Every example below carries a real Odoo ID and can be opened directly for verification.",
+      },
+      breakdowns: [
+        breakdown(
+          "lost-lead-category",
+          A ? "حسب فئة الخسارة" : "By Lost category",
+          data.lostTypeFacets.leads.byLostCategory,
+        ),
+        breakdown(
+          "lost-lead-reason",
+          A ? "حسب سبب الخسارة" : "By Lost reason",
+          data.lostTypeFacets.leads.byLostReason,
+        ),
+        breakdown(
+          "lost-lead-source",
+          A ? "جاءت من أي مصدر؟" : "Which source produced them?",
+          data.lostTypeFacets.leads.bySource,
+        ),
+      ],
+      supporting: [
+        {
+          key: "lead-active-rule",
+          label: A ? "حالة Odoo" : "Odoo state",
+          value: A ? "مؤرشف" : "Archived",
+        },
+        {
+          key: "lead-reason-rule",
+          label: A ? "Lost Reason" : "Lost Reason",
+          value: A ? "مطلوب" : "Required",
+        },
+      ],
+      records: records(
+        A ? "أمثلة Lost Leads كوّنت الرقم" : "Lost Lead records behind the figure",
+        data.detail.rows.filter((row) => row.status === "lost" && row.recordType === "lead"),
+        A
+          ? "اضغط علامة الفتح بجوار أي اسم لمراجعة السجل نفسه داخل Odoo."
+          : "Use the open icon beside any name to inspect that exact record in Odoo.",
+      ),
+      report: { to: "/lost", label: A ? "فتح تحليل Lost Leads" : "Open Lost Lead analysis" },
+    },
+    lostOpportunities: {
+      id: "crm-lost-opportunities",
+      title: "Lost Opportunities",
+      value: fmtNum(summary.lostOpportunities),
+      tone: "violet",
       icon: <XCircle size={17} />,
       definition: A
-        ? "Lost Lead مؤرشف ومعه سبب؛ Lost Opportunity حالية داخل Lost stage، مع الاحتفاظ بالتاريخ المؤرشف."
-        : "A Lost Lead is archived with a reason; a current Lost Opportunity is active in the Lost stage, with archived history retained.",
+        ? "Opportunities ضائعة بنوعين منفصلين: فرصة حالية ما زالت active داخل Lost stage، أو فرصة تاريخية مؤرشفة ومعها دليل خسارة."
+        : "Lost Opportunities have two distinct populations: a current active Opportunity in the Lost stage, or an archived historical Opportunity with loss evidence.",
       formula: A
-        ? "قواعد مختلفة حسب type — لا نستخدم اسم الـstage المترجم"
-        : "Type-specific rules; translated stage names are never used",
+        ? `${fmtNum(summary.currentLostOpportunities)} حالية + ${fmtNum(summary.historicalLostOpportunities)} تاريخية = ${fmtNum(summary.lostOpportunities)}`
+        : `${fmtNum(summary.currentLostOpportunities)} current + ${fmtNum(summary.historicalLostOpportunities)} historical = ${fmtNum(summary.lostOpportunities)}`,
+      provenance: {
+        system: A ? "Odoo CRM مباشرة ← /api/leads" : "Direct Odoo CRM → /api/leads",
+        model: "crm.lead",
+        query:
+          "inventory_bucket = False AND type = 'opportunity' AND ((active = True AND stage XMLID = Lost) OR (active = False AND (lost_reason_id != False OR stage XMLID = Lost)))",
+        fields: [
+          "inventory_bucket",
+          "type",
+          "active",
+          "stage_id",
+          "stage XMLID",
+          "lost_reason_id",
+          "create_date",
+        ],
+        dateBasis: A
+          ? "create_date — الفلتر يربط الخسارة بكوهورت إنشاء الفرصة، وليس بشهر الإغلاق."
+          : "create_date — the filter attributes loss to the Opportunity creation cohort, not the closing month.",
+        note: A
+          ? "Lost stage تُعرَف بالـXMLID الثابت، وليس بالاسم المترجم أو probability."
+          : "The Lost stage is resolved by stable XMLID, never by translated name or probability.",
+      },
       caveat:
         data.health.lostAuthority === "unavailable"
           ? A
@@ -505,34 +604,46 @@ function CrmWorkspace() {
           : undefined,
       breakdowns: [
         breakdown(
-          "lost-category",
+          "lost-opportunity-category",
           A ? "حسب فئة الخسارة" : "By Lost category",
-          data.statusFacets.lost.byLostCategory,
+          data.lostTypeFacets.opportunities.byLostCategory,
         ),
         breakdown(
-          "lost-reason",
+          "lost-opportunity-reason",
           A ? "حسب سبب الخسارة" : "By Lost reason",
-          data.statusFacets.lost.byLostReason,
+          data.lostTypeFacets.opportunities.byLostReason,
+        ),
+        breakdown(
+          "lost-opportunity-source",
+          A ? "جاءت من أي مصدر؟" : "Which source produced them?",
+          data.lostTypeFacets.opportunities.bySource,
         ),
       ],
       supporting: [
-        { key: "lost-leads", label: "Lost Leads", value: fmtNum(summary.lostLeads) },
         {
-          key: "lost-opportunities",
-          label: "Lost Opportunities",
-          value: fmtNum(summary.lostOpportunities),
+          key: "current-lost-opportunities",
+          label: A ? "فرص Lost حالية" : "Current Lost-stage",
+          value: fmtNum(summary.currentLostOpportunities),
+          hint: A ? "active=true داخل Lost stage" : "active=true in the Lost stage",
         },
         {
-          key: "current-lost",
-          label: A ? "فرص Lost حالية" : "Current Lost-stage opps",
-          value: fmtNum(summary.currentLostOpportunities),
+          key: "historical-lost-opportunities",
+          label: A ? "فرص Lost تاريخية" : "Historical Lost",
+          value: fmtNum(summary.historicalLostOpportunities),
+          hint: A ? "active=false مع دليل خسارة" : "active=false with loss evidence",
         },
       ],
       records: records(
-        A ? "أحدث حالات Lost" : "Latest Lost records",
-        data.detail.rows.filter((row) => row.status === "lost"),
+        A ? "أمثلة Lost Opportunities كوّنت الرقم" : "Lost Opportunity records behind the figure",
+        data.detail.rows.filter((row) => row.status === "lost" && row.recordType === "opportunity"),
+        A
+          ? "اضغط علامة الفتح بجوار أي اسم لمراجعة الـOpportunity نفسها داخل Odoo."
+          : "Use the open icon beside any name to inspect that exact Opportunity in Odoo.",
       ),
-      report: { to: "/lost", label: A ? "فتح تحليل Lost" : "Open Lost analysis" },
+      report: {
+        to: "/lost",
+        label: A ? "فتح تحليل Lost Opportunities" : "Open Lost Opportunity analysis",
+      },
     },
   };
 
@@ -635,12 +746,19 @@ function CrmWorkspace() {
               card={{ index: 4, sub: A ? "من Won stage" : "From the Won stage" }}
             />
             <MetricDetailTrigger
-              detail={metricDetails.lost}
+              detail={metricDetails.lostLeads}
               card={{
                 index: 5,
+                sub: A ? "مؤرشف + Lost Reason" : "Archived + Lost Reason",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metricDetails.lostOpportunities}
+              card={{
+                index: 6,
                 sub: A
-                  ? `${fmtNum(summary.lostLeads)} Leads · ${fmtNum(summary.lostOpportunities)} فرص`
-                  : `${fmtNum(summary.lostLeads)} Leads · ${fmtNum(summary.lostOpportunities)} opportunities`,
+                  ? `${fmtNum(summary.currentLostOpportunities)} حالية · ${fmtNum(summary.historicalLostOpportunities)} تاريخية`
+                  : `${fmtNum(summary.currentLostOpportunities)} current · ${fmtNum(summary.historicalLostOpportunities)} historical`,
               }}
             />
           </KpiRow>

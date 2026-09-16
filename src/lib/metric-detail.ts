@@ -114,6 +114,16 @@ export interface MetricReportLink {
   label: string;
 }
 
+/** Verifiable lineage for a figure whose business rule needs to be audited. */
+export interface MetricProvenance {
+  system: string;
+  model?: string;
+  query?: string;
+  fields?: string[];
+  dateBasis?: string;
+  note?: string;
+}
+
 export interface MetricDetail {
   /**
    * The Nexus element id when the registry knows this metric, so "ask Nexus
@@ -133,6 +143,8 @@ export interface MetricDetail {
   formula?: string;
   /** A caveat that changes what the figure means. Rendered, never hidden. */
   caveat?: string;
+  /** Exact source and rule, shown when a plain-language definition is not enough. */
+  provenance?: MetricProvenance;
   trend?: MetricTrend;
   breakdowns?: MetricBreakdownGroup[];
   supporting?: MetricSupportingFact[];
