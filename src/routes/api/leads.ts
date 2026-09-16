@@ -7,8 +7,7 @@ export const Route = createFileRoute("/api/leads")({
         const { getFiltered, authoritativeLostLeads, groupBy } =
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
-        const { loadLostMovement } = await import("@/lib/crm-lost-movement.server");
-        const { loadFreshLostPipeline, loadOlderLostPipeline, loadArchivedLostLeads } =
+        const { loadFreshLostPipeline, loadArchivedLostLeads } =
           await import("@/lib/crm-fresh-lost.server");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
@@ -17,10 +16,8 @@ export const Route = createFileRoute("/api/leads")({
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
-        const [movement, freshPipeline, olderPipeline, archivedLeads] = await Promise.all([
-          loadLostMovement(filters, data.snapshot),
+        const [freshPipeline, archivedLeads] = await Promise.all([
           loadFreshLostPipeline(filters, data.snapshot),
-          loadOlderLostPipeline(filters, data.snapshot),
           loadArchivedLostLeads(filters, data.snapshot),
         ]);
         const odooBaseUrl = odooConfig().url;
@@ -152,13 +149,6 @@ export const Route = createFileRoute("/api/leads")({
           workspaceRows.filter((row) => row.displayStageKey === key);
         const top = <T>(rows: T[], pick: (row: T) => string) =>
           groupBy(rows, (row) => pick(row) || "—").slice(0, 8);
-        const eventFacets = (rows: typeof movement.records) => ({
-          byType: top(rows, (row) => (row.typeAtEvent === "lead" ? "Lead" : "Opportunity")),
-          bySource: top(rows, (row) => row.source),
-          byTeam: top(rows, (row) => row.salesTeam),
-          byLostReason: top(rows, (row) => row.lossReason),
-          byLostCategory: top(rows, (row) => row.lostCategory),
-        });
         const facets = (rows: typeof workspaceRows) => ({
           byType: top(rows, (row) => (row.recordType === "lead" ? "Lead" : "Opportunity")),
           bySource: top(rows, (row) => row.source),
@@ -190,7 +180,7 @@ export const Route = createFileRoute("/api/leads")({
 
         return json({
           contractVersion: CRM_CONTRACT_VERSION,
-          lostEventContract: "2026-09-16-tracking-cohorts-v1",
+          lostEventContract: "2026-09-16-normal-odoo-filters-v1",
           summary: {
             total: workspaceRows.length,
             activeLeads: activeRows.filter((row) => row.recordType === "lead").length,
@@ -241,12 +231,6 @@ export const Route = createFileRoute("/api/leads")({
             leads: facets(lostRows.filter((row) => row.recordType === "lead")),
             opportunities: facets(lostRows.filter((row) => row.recordType === "opportunity")),
           },
-          lostMovement: {
-            ...movement,
-            records: undefined,
-            freshRecords: undefined,
-            olderRecords: undefined,
-          },
           freshLostPipeline: { ...freshPipeline, records: undefined },
           freshLostPipelineFacets: {
             bySource: top(freshPipeline.records, (row) => row.source),
@@ -255,14 +239,6 @@ export const Route = createFileRoute("/api/leads")({
             byLostCategory: top(freshPipeline.records, (row) => row.lostCategory),
           },
           freshLostPipelineDetail: capped(freshPipeline.records),
-          olderLostPipeline: { ...olderPipeline, records: undefined },
-          olderLostPipelineFacets: {
-            bySource: top(olderPipeline.records, (row) => row.source),
-            byTeam: top(olderPipeline.records, (row) => row.salesTeam),
-            byLostReason: top(olderPipeline.records, (row) => row.lossReason),
-            byLostCategory: top(olderPipeline.records, (row) => row.lostCategory),
-          },
-          olderLostPipelineDetail: capped(olderPipeline.records),
           archivedLostLeads: { ...archivedLeads, records: undefined },
           archivedLostLeadsFacets: {
             bySource: top(archivedLeads.records, (row) => row.source),
@@ -271,33 +247,6 @@ export const Route = createFileRoute("/api/leads")({
             byLostCategory: top(archivedLeads.records, (row) => row.lostCategory),
           },
           archivedLostLeadsDetail: capped(archivedLeads.records),
-          lostMovementFacets: eventFacets(movement.records),
-          lostMovementCohortFacets: {
-            fresh: eventFacets(movement.freshRecords),
-            older: eventFacets(movement.olderRecords),
-          },
-          olderLostCreationMonths: groupBy(
-            movement.olderRecords,
-            (row) => row.createdAt.slice(0, 7) || "—",
-          ),
-          lostMovementDetail: {
-            all: capped(movement.records),
-            fresh: capped(movement.freshRecords),
-            older: capped(movement.olderRecords),
-          },
-          // Transitional shape for already-open pre-contract browser bundles.
-          // They must never receive the retired mutable-date proxy as a count.
-          lostOpportunityMovement: {
-            total: null,
-            fresh: null,
-            older: null,
-            undated: 0,
-            dateBasisCounts: {},
-            availability: "unavailable",
-            error: "Reload to use verified Lost event cohorts.",
-          },
-          lostOpportunityMovementFacets: facets([]),
-          lostOpportunityMovementDetail: { all: capped([]), fresh: capped([]), older: capped([]) },
           detail: capped(
             workspaceRows.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
           ),

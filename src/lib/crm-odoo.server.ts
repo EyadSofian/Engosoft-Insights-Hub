@@ -374,8 +374,6 @@ function commonRaw(
   return {
     __odoo_id: String(lead.id),
     __odoo_create_date_utc: display(lead.create_date),
-    __odoo_date_closed_utc: display(lead.date_closed),
-    __odoo_lost_verification_date_utc: display(lead.lost_verification_date),
     __odoo_write_date: dateTime(lead.write_date),
     "Record Type": contract.type,
     "Record Active": String(contract.active),
@@ -519,9 +517,6 @@ async function loadCrmRawFromDomains(
     "campaign_id",
     "lost_reason_id",
     "lost_category_id",
-    "date_closed",
-    "lost_verification_date",
-    "date_last_stage_update",
   ];
   const fields = [
     ...new Set([...standard.filter((f) => metadata[f]), ...Object.values(plan).filter(Boolean)]),

@@ -46,25 +46,6 @@ export function freshLostPipelineDomain(filters: GlobalFilters): unknown[] {
   return domain;
 }
 
-/** Matches the normal Odoo Lost filter for older-created Opportunities that
- * entered the Lost stage during the selected period. This intentionally uses
- * stored CRM fields only; it does not read mail.message or mail.tracking.value.
- */
-export function olderLostPipelineDomain(filters: GlobalFilters): unknown[] {
-  const bounds = lostEventWindow(filters.from, filters.to);
-  const domain: unknown[] = [
-    ["type", "=", "opportunity"],
-    ["active", "=", true],
-    ["stage_is_lost", "=", true],
-  ];
-  if (bounds.start) {
-    domain.push(["create_date", "<", bounds.start]);
-    domain.push(["lost_verification_date", ">=", bounds.start]);
-  }
-  if (bounds.end) domain.push(["lost_verification_date", "<", bounds.end]);
-  return domain;
-}
-
 export function archivedLostLeadsDomain(filters: GlobalFilters): unknown[] {
   const bounds = lostEventWindow(filters.from, filters.to);
   const domain: unknown[] = [
@@ -80,15 +61,11 @@ export function archivedLostLeadsDomain(filters: GlobalFilters): unknown[] {
 async function readFreshLostPipeline(
   filters: GlobalFilters,
   snapshot: Snapshot,
-  kind: "pipeline" | "older" | "archived" = "pipeline",
+  kind: "pipeline" | "archived" = "pipeline",
 ): Promise<FreshLostPipelineResult> {
   const cfg = odooConfig();
   const businessDomain =
-    kind === "pipeline"
-      ? freshLostPipelineDomain(filters)
-      : kind === "older"
-        ? olderLostPipelineDomain(filters)
-        : archivedLostLeadsDomain(filters);
+    kind === "pipeline" ? freshLostPipelineDomain(filters) : archivedLostLeadsDomain(filters);
   const base = {
     integrationLogin: cfg.login,
     companyIds: cfg.companyIds,
@@ -111,26 +88,15 @@ async function readFreshLostPipeline(
           ? row["Record Type"] !== "opportunity" ||
             row["Record Active"] !== "true" ||
             row["Stage Key"] !== "lost"
-          : kind === "older"
-            ? row["Record Type"] !== "opportunity" ||
-              row["Record Active"] !== "true" ||
-              row["Stage Key"] !== "lost"
-            : row["Record Type"] !== "lead" ||
-              row["Record Active"] !== "false" ||
-              !row["سبب الضياع"]) ||
+          : row["Record Type"] !== "lead" ||
+            row["Record Active"] !== "false" ||
+            !row["سبب الضياع"]) ||
         !matchesLostMovementDimensions(row, filters, snapshot)
       )
         continue;
       const createdUtc = row.__odoo_create_date_utc || "";
-      if (kind === "older") {
-        const lostVerifiedUtc = row.__odoo_lost_verification_date_utc || "";
-        if (base.bounds.start && createdUtc >= base.bounds.start) continue;
-        if (base.bounds.start && lostVerifiedUtc < base.bounds.start) continue;
-        if (base.bounds.end && lostVerifiedUtc >= base.bounds.end) continue;
-      } else {
-        if (base.bounds.start && createdUtc < base.bounds.start) continue;
-        if (base.bounds.end && createdUtc >= base.bounds.end) continue;
-      }
+      if (base.bounds.start && createdUtc < base.bounds.start) continue;
+      if (base.bounds.end && createdUtc >= base.bounds.end) continue;
       const id = row.__odoo_id;
       if (!id) continue;
       records.set(id, {
@@ -181,16 +147,10 @@ export function loadArchivedLostLeads(
 ): Promise<FreshLostPipelineResult> {
   return loadCurrentLostCohort(filters, snapshot, "archived");
 }
-export function loadOlderLostPipeline(
-  filters: GlobalFilters,
-  snapshot: Snapshot,
-): Promise<FreshLostPipelineResult> {
-  return loadCurrentLostCohort(filters, snapshot, "older");
-}
 function loadCurrentLostCohort(
   filters: GlobalFilters,
   snapshot: Snapshot,
-  kind: "pipeline" | "older" | "archived",
+  kind: "pipeline" | "archived",
 ): Promise<FreshLostPipelineResult> {
   const cfg = odooConfig();
   const key = JSON.stringify([kind, cfg.url, cfg.db, cfg.login, cfg.companyIds, filters]);
