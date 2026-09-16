@@ -15,8 +15,10 @@ vi.mock("@/lib/odoo.server", () => ({
 import {
   archivedLostLeadsDomain,
   freshLostPipelineDomain,
+  olderLostPipelineDomain,
   loadArchivedLostLeads,
   loadFreshLostPipeline,
+  loadOlderLostPipeline,
 } from "@/lib/crm-fresh-lost.server";
 import type { Snapshot } from "@/lib/sheet-cache.server";
 const filters = { from: "2026-09-01", to: "2026-09-16" };
@@ -27,6 +29,7 @@ const raw = (id: number, extra: Record<string, string> = {}) => ({
   "Record Type": "opportunity",
   "Record Active": "true",
   "Stage Key": "lost",
+  __odoo_lost_verification_date_utc: "2026-09-03 10:00:00",
   "Inventory Bucket": "",
   "سبب الضياع": "Duplicate",
   Source: "Facebook",
@@ -52,6 +55,14 @@ describe("current Lost creation cohorts, independent of tracking access", () => 
       ["lost_reason_id", "!=", false],
       ["create_date", ">=", "2026-08-31 21:00:00"],
       ["create_date", "<", "2026-09-16 21:00:00"],
+    ]);
+    expect(olderLostPipelineDomain(filters)).toEqual([
+      ["type", "=", "opportunity"],
+      ["active", "=", true],
+      ["stage_is_lost", "=", true],
+      ["create_date", "<", "2026-08-31 21:00:00"],
+      ["lost_verification_date", ">=", "2026-08-31 21:00:00"],
+      ["lost_verification_date", "<", "2026-09-16 21:00:00"],
     ]);
   });
   it("never mixes archived Leads/Opportunities or Inventory with Pipeline; deduplicates IDs", async () => {
@@ -105,6 +116,32 @@ describe("current Lost creation cohorts, independent of tracking access", () => 
     expect(result.total).toBe(1);
     expect(result.records[0].createdAt).toBe("2026-09-01");
     expect(mocks.dimensions).toHaveBeenCalledWith(expect.any(Object), selected, snap);
+  });
+  it("loads the older Lost cohort with normal Odoo fields, without tracking", async () => {
+    mocks.raw.mockResolvedValue([
+      raw(1, {
+        __odoo_create_date_utc: "2026-08-30 10:00:00",
+        __odoo_lost_verification_date_utc: "2026-09-05 10:00:00",
+      }),
+      raw(2, {
+        __odoo_create_date_utc: "2026-08-30 10:00:00",
+        __odoo_lost_verification_date_utc: "2026-08-31 20:59:59",
+      }),
+      raw(3, {
+        __odoo_create_date_utc: "2026-09-01 10:00:00",
+        __odoo_lost_verification_date_utc: "2026-09-05 10:00:00",
+      }),
+      raw(4, {
+        __odoo_create_date_utc: "2026-08-30 10:00:00",
+        __odoo_lost_verification_date_utc: "",
+      }),
+    ]);
+    const result = await loadOlderLostPipeline(filters, snapshot());
+    expect(result.availability).toBe("available");
+    expect(result.total).toBe(1);
+    expect(result.records.map((r) => r.id)).toEqual(["1"]);
+    expect(mocks.raw.mock.calls[0][0]).toEqual(olderLostPipelineDomain(filters));
+    expect(JSON.stringify(mocks.raw.mock.calls)).not.toMatch(/tracking|mail\.message/);
   });
   it("failed CRM read is unavailable, not zero or a last-good/event-date fallback", async () => {
     mocks.raw.mockRejectedValue(new Error("CRM unavailable"));

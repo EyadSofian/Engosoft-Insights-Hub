@@ -154,6 +154,9 @@ interface Resp {
   freshLostPipeline: Omit<FreshLostPipelineResult, "records">;
   freshLostPipelineFacets: Pick<Facets, "bySource" | "byTeam" | "byLostReason" | "byLostCategory">;
   freshLostPipelineDetail: { rows: FreshLostPipelineRecord[]; total: number; truncated: boolean };
+  olderLostPipeline: Omit<FreshLostPipelineResult, "records">;
+  olderLostPipelineFacets: Resp["freshLostPipelineFacets"];
+  olderLostPipelineDetail: Resp["freshLostPipelineDetail"];
   archivedLostLeads: Resp["freshLostPipeline"];
   archivedLostLeadsFacets: Resp["freshLostPipelineFacets"];
   archivedLostLeadsDetail: Resp["freshLostPipelineDetail"];
@@ -163,10 +166,6 @@ interface Resp {
     "byType" | "bySource" | "byTeam" | "byLostReason" | "byLostCategory"
   >;
   lostMovementCohortFacets: Record<"fresh" | "older", Resp["lostMovementFacets"]>;
-  oldLeadLost: number | null;
-  oldLeadLostFacets: Resp["lostMovementFacets"];
-  oldLeadLostDetail: { rows: LostMovementRecord[]; total: number; truncated: boolean };
-  oldLeadLostCreationMonths: Grouped[];
   olderLostCreationMonths: Grouped[];
   lostMovementDetail: {
     all: { rows: LostMovementRecord[]; total: number; truncated: boolean };
@@ -710,21 +709,42 @@ function CrmWorkspace() {
     },
   };
 
-  const currentLostCard = (kind: "pipeline" | "archived"): MetricDetail => {
+  const currentLostCard = (kind: "pipeline" | "older" | "archived"): MetricDetail => {
     const archived = kind === "archived";
-    const result = archived ? data.archivedLostLeads : data.freshLostPipeline;
-    const rows = archived ? data.archivedLostLeadsDetail : data.freshLostPipelineDetail;
-    const facets = archived ? data.archivedLostLeadsFacets : data.freshLostPipelineFacets;
+    const older = kind === "older";
+    const result = archived
+      ? data.archivedLostLeads
+      : older
+        ? data.olderLostPipeline
+        : data.freshLostPipeline;
+    const rows = archived
+      ? data.archivedLostLeadsDetail
+      : older
+        ? data.olderLostPipelineDetail
+        : data.freshLostPipelineDetail;
+    const facets = archived
+      ? data.archivedLostLeadsFacets
+      : older
+        ? data.olderLostPipelineFacets
+        : data.freshLostPipelineFacets;
     const available = result.availability === "available";
     return {
-      id: archived ? "crm-archived-lost-leads" : "crm-fresh-lost-pipeline",
+      id: archived
+        ? "crm-archived-lost-leads"
+        : older
+          ? "crm-old-lost-opportunities"
+          : "crm-fresh-lost-pipeline",
       title: archived
         ? A
           ? "Lost Leads مؤرشفة — إنشاء خلال الفترة"
           : "Archived Lost Leads — created in period"
-        : A
-          ? "Lost Opportunities — من سجلات الفترة"
-          : "Lost Opportunities — created in period",
+        : older
+          ? A
+            ? "Old Lost Opportunities — إنشاء أقدم وخسارة هذا الشهر"
+            : "Old Lost Opportunities — created before period, Lost this period"
+          : A
+            ? "Lost Opportunities — من سجلات الفترة"
+            : "Lost Opportunities — created in period",
       value: available ? fmtNum(result.total) : A ? "غير متاح" : "Unavailable",
       tone: archived ? "rose" : "violet",
       icon: archived ? <Archive size={17} /> : <XCircle size={17} />,
@@ -732,12 +752,18 @@ function CrmWorkspace() {
         ? A
           ? "سجلات نوعها الحالي Lead، أُنشئت خلال الفترة ثم أصبحت مؤرشفة ومعها Lost Reason. تحتفظ بمرحلتها الأصلية؛ ليست Opportunities في عمود Lost، وليست كلها Duplicate. الأسباب أدناه هي القيم المسجلة حاليًا. الأرشفة بلا سبب لا تُعد Lost هنا."
           : "Current-type Leads created in the period, now archived with a Lost Reason. They keep their original stage and are not Opportunities in the Lost pipeline column. They are not assumed to be Duplicate: the reasons below are current recorded values. Archive without a reason is not counted here."
-        : A
-          ? "نفس فلتر Odoo Pipeline: Creation Date داخل الفترة + Stage Is Lost. Opportunities نشطة موجودة حاليًا في Lost؛ لا نضيف Lost Leads المؤرشفة. هذا كوهورت إنشاء بحالة حالية، وليس إثباتًا أن الخسارة حدثت خلال الفترة."
-          : "Matches Odoo Pipeline: Creation Date in period + Stage Is Lost. Active Opportunities currently in the Lost stage; archived Lost Leads are not added. This is a creation cohort with a current state, not proof of in-period loss timing.",
+        : older
+          ? A
+            ? "نفس فلاتر Odoo العادية: Creation Date قبل الفترة + Stage Is Lost + Lost Verification Date داخل الفترة. Opportunities نشطة في Lost؛ لا نقرأ mail.tracking.value."
+            : "Normal Odoo filters: Creation Date before the period + Stage Is Lost + Lost Verification Date inside the period. Active Opportunities in Lost; mail.tracking.value is not read."
+          : A
+            ? "نفس فلتر Odoo Pipeline: Creation Date داخل الفترة + Stage Is Lost. Opportunities نشطة موجودة حاليًا في Lost؛ لا نضيف Lost Leads المؤرشفة. هذا كوهورت إنشاء بحالة حالية."
+            : "Matches Odoo Pipeline: Creation Date in period + Stage Is Lost. Active Opportunities currently in Lost; archived Lost Leads are not added. This is a current-state creation cohort.",
       formula: archived
         ? "COUNT DISTINCT crm.lead.id: type = lead AND active = False AND lost_reason_id != False AND create_date in period"
-        : "COUNT DISTINCT crm.lead.id: type = opportunity AND active = True AND stage_is_lost = True AND create_date in period",
+        : older
+          ? "COUNT DISTINCT crm.lead.id: type = opportunity AND active = True AND stage_is_lost = True AND create_date < period_start AND lost_verification_date in period"
+          : "COUNT DISTINCT crm.lead.id: type = opportunity AND active = True AND stage_is_lost = True AND create_date in period",
       provenance: {
         system: A ? "Odoo CRM مباشرة عبر /api/leads" : "Direct Odoo CRM via /api/leads",
         model: "crm.lead",
@@ -750,10 +776,15 @@ function CrmWorkspace() {
           "stage_id",
           "create_date",
           "lost_reason_id",
+          ...(older ? ["lost_verification_date"] : []),
         ],
         dateBasis: A
-          ? "create_date فقط بحدود القاهرة نصف المفتوحة، محوّلة إلى UTC. لا نعتمد على write_date أو Lost Verification Date، ولا ندّعي وقت حدوث الخسارة."
-          : "create_date only, using half-open Cairo boundaries converted to UTC. No write_date or Lost Verification Date; loss timing is not claimed.",
+          ? older
+            ? "create_date يفصل السجل القديم، وlost_verification_date هو حقل Odoo العادي المستخدم داخل الفترة؛ لا mail.tracking.value."
+            : "create_date فقط بحدود القاهرة نصف المفتوحة، محوّلة إلى UTC."
+          : older
+            ? "create_date separates older records; Odoo's stored lost_verification_date is filtered inside the period; no mail.tracking.value."
+            : "create_date only, using half-open Cairo boundaries converted to UTC.",
         note: A
           ? `حساب الربط: ${result.integrationLogin}. الشركات: ${result.companyIds.join(", ")}. استبعاد Inventory صريح. المصدر والسبب والمالك والفريق قيم حالية. آخر قراءة: ${result.fetchedAt}.`
           : `Integration: ${result.integrationLogin}. Companies: ${result.companyIds.join(", ")}. Explicit Inventory exclusion. Source, reason, owner and team are CURRENT. Read at ${result.fetchedAt}.`,
@@ -762,9 +793,13 @@ function CrmWorkspace() {
         ? A
           ? "قراءة CRM المباشرة غير متاحة؛ لم نستبدلها بصفر أو كاش قديم."
           : "Direct CRM read unavailable; no zero or stale-cache substitute."
-        : A
-          ? "تاريخ إنشاء السجل معروف، لكن هذا الكارد لا يحدد تاريخ حصول الـLost. Duplicate اسم سبب مسجل، وليس إثباتًا مستقلًا بأن العميل مكرر."
-          : "Creation date is known, but this card does not establish loss timing. Duplicate is a recorded reason, not independent proof that the customer is duplicated.",
+        : older
+          ? A
+            ? "هذا الكارد يستخدم حقول Odoo العادية فقط؛ السجلات التي لا تحتوي Lost Verification Date داخل الفترة لا تدخل الرقم."
+            : "This card uses only normal Odoo fields; records without Lost Verification Date inside the period are excluded."
+          : A
+            ? "تاريخ إنشاء السجل معروف، وDuplicate اسم سبب مسجل وليس إثباتًا مستقلًا بأن العميل مكرر."
+            : "Creation date is known; Duplicate is a recorded reason, not independent proof that the customer is duplicated.",
       breakdowns: [
         breakdown(
           `${kind}-current-reasons`,
@@ -812,98 +847,6 @@ function CrmWorkspace() {
             : "Read failed; an empty list is not a zero.",
       },
       report: { to: "/lost", label: A ? "فتح تحليل Lost" : "Open Lost analysis" },
-    };
-  };
-
-  const eventCohortCard = (
-    cohort: "fresh" | "older",
-    origin: "all" | "lead" = "all",
-  ): MetricDetail => {
-    const base = metricDetails.lostOpportunities;
-    const leadOrigin = origin === "lead";
-    const rows = leadOrigin ? data.oldLeadLostDetail : data.lostMovementDetail[cohort];
-    const facets = leadOrigin ? data.oldLeadLostFacets : data.lostMovementCohortFacets[cohort];
-    const count = leadOrigin ? data.oldLeadLost : lostMovement[cohort];
-    const available = lostMovement.availability === "available" && count !== null;
-    return {
-      ...base,
-      id: leadOrigin ? "crm-old-lost-leads" : `crm-lost-event-${cohort}`,
-      title: leadOrigin
-        ? A
-          ? "Old Lost Leads — إنشاء أقدم وخسارة هذا الشهر"
-          : "Old Lost Leads — older creation, Lost this period"
-        : cohort === "fresh"
-          ? A
-            ? "Fresh — إنشاء وخسارة خلال الفترة"
-            : "Fresh — created and marked Lost in period"
-          : A
-            ? "Old Cohort — إنشاء أقدم وخسارة خلال الفترة"
-            : "Older Cohort — marked Lost in period",
-      value: available ? fmtNum(count) : A ? "غير متاح" : "Unavailable",
-      definition: leadOrigin
-        ? A
-          ? "سجلات كان نوعها Lead عند الإنشاء، أُنشئت قبل بداية الفترة، ولها حدث Lost مؤكد داخل الفترة الحالية. السجل يُحسب مرة واحدة حتى لو تم تحويله لاحقًا إلى Opportunity."
-          : "Records created as Leads before the selected period with a confirmed Lost event inside the current period. Each record counts once even if it was later converted to an Opportunity."
-        : cohort === "fresh"
-          ? A
-            ? "سجلات CRM أُنشئت داخل الفترة المحددة ولها حدث Lost مؤكد داخل نفس الفترة؛ النوع وقت الخسارة موضح أدناه. السجل يُحسب مرة واحدة حتى لو تكررت خسارته أو اتفتح بعدها."
-            : "CRM records created in the selected period with a confirmed Lost event in the same period. Type at event is shown below. Each record counts once, even if repeatedly lost or reopened."
-          : A
-            ? "سجلات CRM أُنشئت قبل بداية الفترة المحددة ولها حدث Lost مؤكد داخل الفترة، مهما كانت حالتها الحالية. السجل يُحسب مرة واحدة؛ لا نعتبر تحديثات الترحيل أحداث خسارة."
-            : "CRM records created before the selected period with a confirmed Lost event in it, regardless of current state. Each record counts once; migration writes are not Lost events.",
-      formula: leadOrigin
-        ? "DISTINCT crm.lead.id: origin type = lead AND create_date < period_start AND confirmed Lost event in period"
-        : cohort === "fresh"
-          ? "DISTINCT crm.lead.id: create_date in period AND confirmed Lost event in period"
-          : "DISTINCT crm.lead.id: create_date before period AND confirmed Lost event in period",
-      provenance: {
-        ...base.provenance!,
-        query: `${base.provenance!.query}; AND ${leadOrigin ? "origin_type_at_creation = lead AND create_date < start_utc" : cohort === "fresh" ? "create_date in [start_utc, end_utc)" : "create_date < start_utc"}`,
-      },
-      supporting: [
-        {
-          key: "total",
-          label: A
-            ? "كل السجلات ذات حدث Lost مؤكد خلال الفترة"
-            : "All records with confirmed in-period Lost",
-          value: available ? fmtNum(count) : "—",
-        },
-      ],
-      breakdowns: [
-        breakdown(`${cohort}-type`, A ? "نوع السجل وقت الخسارة" : "Type at event", facets.byType),
-        ...(cohort === "older"
-          ? [
-              breakdown(
-                "older-creation-months",
-                A ? "حسب شهر الإنشاء الأصلي" : "By original creation month",
-                leadOrigin ? data.oldLeadLostCreationMonths : data.olderLostCreationMonths,
-              ),
-            ]
-          : []),
-        breakdown(
-          `${cohort}-reason`,
-          A ? "سبب الخسارة المثبت في الحدث" : "Confirmed event reason",
-          facets.byLostReason,
-        ),
-        breakdown(`${cohort}-source`, A ? "المصدر الحالي" : "Current source", facets.bySource),
-      ],
-      records: {
-        ...base.records!,
-        rows: rows.rows.slice(0, 8).map((row) => ({
-          key: row.id,
-          title: row.contact || `#${row.id}`,
-          subtitle: `Created ${row.createdAt} · Lost ${row.lostDate} · message #${row.messageId} · ${row.typeAtEvent}`,
-          value: row.lossReason || undefined,
-          href: row.odooUrl,
-        })),
-        hint: available
-          ? A
-            ? `كل الرقم محسوب من ${fmtNum(rows.total)} سجلًا؛ معرّف الرسالة يثبت الحدث. القائمة المعروضة أمثلة فقط.`
-            : `The figure is computed from ${fmtNum(rows.total)} records; message IDs identify the evidence. The displayed list is a sample only.`
-          : A
-            ? "السجلات غير متاحة للتحقق؛ لا يمكن تحديد عددها من هذا المصدر الآن."
-            : "Evidence records are unavailable; their count cannot be determined from this source right now.",
-      },
     };
   };
 
@@ -1009,8 +952,8 @@ function CrmWorkspace() {
           title={A ? "Lost — نطاقات منفصلة وواضحة" : "Lost — separate, explicit populations"}
           hint={
             A
-              ? "Opportunities من إنشاء الفترة بحالة Lost الحالية، وLeads أقدم حدث لها Lost داخل الفترة، وLost Leads مؤرشفة في كارد مستقل."
-              : "Current Lost Opportunities created in the period; older Leads with a Lost event in the period; archived Lost Leads separately."
+              ? "Opportunities من إنشاء الفترة بحالة Lost الحالية، وOpportunities أقدم لها Lost Verification Date داخل الفترة، وLost Leads مؤرشفة في كارد مستقل."
+              : "Current Lost Opportunities created in the period; older Opportunities with Lost Verification Date in the period; archived Lost Leads separately."
           }
           icon={<XCircle size={17} />}
         >
@@ -1025,12 +968,12 @@ function CrmWorkspace() {
               }}
             />
             <MetricDetailTrigger
-              detail={eventCohortCard("older", "lead")}
+              detail={currentLostCard("older")}
               card={{
                 index: 1,
                 sub: A
-                  ? "Lead قديم + Lost خلال الفترة"
-                  : "Created as Lead before period + Lost in period",
+                  ? "إنشاء أقدم + Lost Verification Date داخل الفترة"
+                  : "Created before period + Lost Verification Date in period",
               }}
             />
             <MetricDetailTrigger
@@ -1048,8 +991,8 @@ function CrmWorkspace() {
             className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           >
             {A
-              ? "الكارد الثاني يطابق التعريف المطلوب: Lead أقدم من بداية الفترة + حدث Lost مؤكد داخل الفترة. لا نخلطه مع مخزون Opportunities القديمة الحالي."
-              : "The second card matches the requested definition: a Lead created before the period plus a confirmed Lost event inside the period. It is not mixed with the current stock of old Opportunities."}
+              ? "الكارد الثاني يستخدم فلاتر Odoo العادية فقط: Creation Date قبل الفترة + Stage Is Lost + Lost Verification Date داخل الفترة. لا يستخدم mail.tracking ولا يخلط مخزون Opportunities القديمة."
+              : "The second card uses only normal Odoo filters: Creation Date before the period + Stage Is Lost + Lost Verification Date inside the period. It does not use mail.tracking or mix the current stock of old Opportunities."}
           </div>
         </PageSection>
 
