@@ -865,19 +865,8 @@ function CrmWorkspace() {
               card={{ index: 2, sub: A ? "قبل Won أو Lost" : "Before Won or Lost" }}
             />
             <MetricDetailTrigger
-              detail={metricDetails.ready}
-              card={{ index: 3, sub: A ? "القيمة Yes فقط" : "Only the stored Yes value" }}
-            />
-            <MetricDetailTrigger
               detail={metricDetails.won}
-              card={{ index: 4, sub: A ? "من Won stage" : "From the Won stage" }}
-            />
-            <MetricDetailTrigger
-              detail={metricDetails.lostLeads}
-              card={{
-                index: 5,
-                sub: A ? "مؤرشف + Lost Reason" : "Archived + Lost Reason",
-              }}
+              card={{ index: 3, sub: A ? "من Won stage" : "From the Won stage" }}
             />
           </KpiRow>
         </PageSection>
