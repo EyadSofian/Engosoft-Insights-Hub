@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/leads")({
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
         const { loadLostMovement } = await import("@/lib/crm-lost-movement.server");
-        const { loadFreshLostPipeline, loadArchivedLostLeads } =
+        const { loadFreshLostPipeline, loadOlderLostPipeline, loadArchivedLostLeads } =
           await import("@/lib/crm-fresh-lost.server");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
@@ -17,9 +17,10 @@ export const Route = createFileRoute("/api/leads")({
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
-        const [movement, freshPipeline, archivedLeads] = await Promise.all([
+        const [movement, freshPipeline, olderPipeline, archivedLeads] = await Promise.all([
           loadLostMovement(filters, data.snapshot),
           loadFreshLostPipeline(filters, data.snapshot),
+          loadOlderLostPipeline(filters, data.snapshot),
           loadArchivedLostLeads(filters, data.snapshot),
         ]);
         const odooBaseUrl = odooConfig().url;
@@ -254,6 +255,14 @@ export const Route = createFileRoute("/api/leads")({
             byLostCategory: top(freshPipeline.records, (row) => row.lostCategory),
           },
           freshLostPipelineDetail: capped(freshPipeline.records),
+          olderLostPipeline: { ...olderPipeline, records: undefined },
+          olderLostPipelineFacets: {
+            bySource: top(olderPipeline.records, (row) => row.source),
+            byTeam: top(olderPipeline.records, (row) => row.salesTeam),
+            byLostReason: top(olderPipeline.records, (row) => row.lossReason),
+            byLostCategory: top(olderPipeline.records, (row) => row.lostCategory),
+          },
+          olderLostPipelineDetail: capped(olderPipeline.records),
           archivedLostLeads: { ...archivedLeads, records: undefined },
           archivedLostLeadsFacets: {
             bySource: top(archivedLeads.records, (row) => row.source),
