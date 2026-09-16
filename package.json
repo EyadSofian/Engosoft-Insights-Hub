@@ -40,6 +40,7 @@
     "test:landing-attribution": "vite-node scripts/test-landing-attribution.mjs",
     "test:meta-message-attribution": "vite-node scripts/test-meta-message-attribution.mjs",
     "backfill:chatwoot-attribution": "vite-node scripts/backfill-chatwoot-attribution.mjs",
+    "migrate:lead-qa": "vite-node scripts/migrate-lead-qa.mjs",
     "provision:chatwoot-attribution": "node scripts/provision-chatwoot-attribution.mjs",
     "purge:chatwoot-attribution": "vite-node scripts/purge-chatwoot-attribution.mjs",
     "reconcile": "node scripts/reconcile.mjs",
@@ -71,7 +72,8 @@
     "test:pricing": "npm run test:price-book-parser && npm run test:pricing-engine && npm run test:price-versioning && npm run test:pricing-security && npm run test:pricing-performance && npm run test:pricing-catalog",
     "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs",
     "audit:agent-coverage": "node --experimental-strip-types scripts/audit-agent-coverage.mjs",
-    "audit:agent-coverage:self-test": "node --experimental-strip-types scripts/audit-agent-coverage.mjs --self-test"
+    "audit:agent-coverage:self-test": "node --experimental-strip-types scripts/audit-agent-coverage.mjs --self-test",
+    "audit:crm-lost": "vite-node scripts/audit-crm-lost.mjs"
   },
   "dependencies": {
     "@botpress/webchat": "^5.5.1",

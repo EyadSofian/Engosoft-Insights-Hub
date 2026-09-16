@@ -499,8 +499,8 @@ export function ClosedLoopSalesBridge() {
             value={fmtUSD(e?.revenue ?? 0)}
             sub={
               A
-                ? `العائد على كل الصرف ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · على الحملات المتتبَّعة ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
-                : `ROAS on all ad spend ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · on tracked campaigns ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
+                ? `عائد الكوهورت على كل صرف Meta ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · على الحملات المتتبَّعة ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
+                : `Cohort ROAS on all Meta spend ${kpiDisplay(data?.kpis?.roasAllSpend, lang)} · on tracked campaigns ${kpiDisplay(data?.kpis?.roasTracked, lang)}`
             }
             definition={
               A

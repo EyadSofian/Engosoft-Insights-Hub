@@ -15,7 +15,9 @@ const metrics = (overrides: Partial<QualityMetrics>): QualityMetrics =>
   finalizeMetrics({ ...emptyMetrics(), ...overrides });
 
 /** Synthetic platform feed: every platform reports rows except ChatGPT, which is idle. */
-const platforms = (overrides: Partial<Record<string, Partial<PlatformSpendInput>>> = {}): PlatformSpendInput[] =>
+const platforms = (
+  overrides: Partial<Record<string, Partial<PlatformSpendInput>>> = {},
+): PlatformSpendInput[] =>
   (
     [
       { platform: "meta", spend: 1_000, adRows: 100, sourceHealthy: true, crmLeads: 300 },
@@ -54,9 +56,17 @@ const kpisFor = (scope: ManagementScope, feed = platforms()): ReturnType<typeof 
 describe("all-channel vs Meta-only spend scope", () => {
   it("reads the global filter into one scope", () => {
     expect(managementScopeFrom({})).toEqual({ kind: "all" });
-    expect(managementScopeFrom({ platform: "meta" })).toEqual({ kind: "platform", platform: "meta" });
-    expect(managementScopeFrom({ platform: "tiktok" })).toEqual({ kind: "platform", platform: "tiktok" });
-    expect(managementScopeFrom({ channel: "organic", platform: "meta" })).toEqual({ kind: "organic" });
+    expect(managementScopeFrom({ platform: "meta" })).toEqual({
+      kind: "platform",
+      platform: "meta",
+    });
+    expect(managementScopeFrom({ platform: "tiktok" })).toEqual({
+      kind: "platform",
+      platform: "tiktok",
+    });
+    expect(managementScopeFrom({ channel: "organic", platform: "meta" })).toEqual({
+      kind: "organic",
+    });
     expect(managementScopeFrom({ platform: "unknown-network" })).toEqual({ kind: "all" });
   });
 
@@ -82,9 +92,10 @@ describe("all-channel vs Meta-only spend scope", () => {
   });
 
   it("treats an idle, healthy platform as a real zero and a failed connector as unavailable", () => {
-    expect(scopeSpend({ kind: "all" }, platforms()).byPlatform.find((row) => row.platform === "chatgpt")?.state).toBe(
-      "no_rows",
-    );
+    expect(
+      scopeSpend({ kind: "all" }, platforms()).byPlatform.find((row) => row.platform === "chatgpt")
+        ?.state,
+    ).toBe("no_rows");
     const failed = scopeSpend({ kind: "all" }, platforms({ chatgpt: { sourceHealthy: false } }));
     expect(failed.unavailablePlatforms).toContain("chatgpt");
   });
@@ -109,7 +120,16 @@ describe("all-channel vs Meta-only spend scope", () => {
   it("changes the management figures when Snapchat is selected and hides every Meta-only figure", () => {
     const kpis = kpisFor({ kind: "platform", platform: "snapchat" });
     expect(kpis.adSpend!.value).toBe(50);
-    for (const key of ["metaSpend", "trackedSpend", "revenue", "won", "qualified", "roasAllSpend", "roasTracked", "crmMatchRate"]) {
+    for (const key of [
+      "metaSpend",
+      "trackedSpend",
+      "revenue",
+      "won",
+      "qualified",
+      "roasAllSpend",
+      "roasTracked",
+      "crmMatchRate",
+    ]) {
       expect(kpis[key]!.status, key).toBe("not_available");
       expect(kpis[key]!.value, key).toBeNull();
     }
@@ -120,23 +140,41 @@ describe("all-channel vs Meta-only spend scope", () => {
     expect(kpis.adSpend!.coverageNote?.en).toContain("tiktok");
     expect(kpis.costPerCrmLead!.status).toBe("incomplete_source");
     expect(kpis.costPerCrmLead!.value).toBeNull();
-    expect(kpis.blendedRoas!.status).toBe("incomplete_source");
+    expect(kpis.collectionsToSpend!.status).toBe("incomplete_source");
   });
 
   it("never promotes an unknown-source conversation to Meta", () => {
     const meta: ManagementScope = { kind: "platform", platform: "meta" };
-    expect(acquisitionInScope({ sourcePlatform: "unknown", entityType: "chatwoot_conversation" }, meta)).toBe(false);
-    expect(acquisitionInScope({ sourcePlatform: "whatsapp", entityType: "chatwoot_conversation" }, meta)).toBe(false);
+    expect(
+      acquisitionInScope({ sourcePlatform: "unknown", entityType: "chatwoot_conversation" }, meta),
+    ).toBe(false);
+    expect(
+      acquisitionInScope({ sourcePlatform: "whatsapp", entityType: "chatwoot_conversation" }, meta),
+    ).toBe(false);
     expect(
       acquisitionInScope(
-        { sourcePlatform: "whatsapp", entityType: "chatwoot_conversation", sourceType: "meta_whatsapp_referral" },
+        {
+          sourcePlatform: "whatsapp",
+          entityType: "chatwoot_conversation",
+          sourceType: "meta_whatsapp_referral",
+        },
         meta,
       ),
     ).toBe(true);
-    expect(acquisitionInScope({ sourcePlatform: "facebook", entityType: "meta_lead" }, meta)).toBe(true);
-    expect(acquisitionInScope({ sourcePlatform: "unknown", entityType: "chatwoot_conversation" }, { kind: "all" })).toBe(true);
+    expect(acquisitionInScope({ sourcePlatform: "facebook", entityType: "meta_lead" }, meta)).toBe(
+      true,
+    );
     expect(
-      acquisitionInScope({ sourcePlatform: "tiktok", entityType: "landing_submission" }, { kind: "platform", platform: "tiktok" }),
+      acquisitionInScope(
+        { sourcePlatform: "unknown", entityType: "chatwoot_conversation" },
+        { kind: "all" },
+      ),
+    ).toBe(true);
+    expect(
+      acquisitionInScope(
+        { sourcePlatform: "tiktok", entityType: "landing_submission" },
+        { kind: "platform", platform: "tiktok" },
+      ),
     ).toBe(true);
   });
 });
@@ -174,8 +212,12 @@ describe("revenue reconciles to Accounting", () => {
     ]);
     expect(result.totalAccountingRevenue).toBe(970.01);
     expect(
-      Math.round((result.exactAttributedRevenue + result.inferredAttributedRevenue + result.unattributedRevenue) * 100) /
-        100,
+      Math.round(
+        (result.exactAttributedRevenue +
+          result.inferredAttributedRevenue +
+          result.unattributedRevenue) *
+          100,
+      ) / 100,
     ).toBe(result.totalAccountingRevenue);
     expect(result.exactCoverage).toBeCloseTo((70.105 / 970.005) * 100, 3);
   });
@@ -186,7 +228,7 @@ describe("revenue reconciles to Accounting", () => {
     expect(kpis.revenue!.contract?.dateBasis).toBe("lead_created_cohort_all_payment_dates");
     expect(kpis.revenue!.label.en).toContain("Cohort");
     expect(kpis.roasAllSpend!.label.en).toContain("Cohort");
-    expect(kpis.blendedRoas!.label.en).toContain("not attributed");
+    expect(kpis.collectionsToSpend!.label.en).toContain("not ROAS");
   });
 });
 

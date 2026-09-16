@@ -68,7 +68,10 @@ const PLATFORM_SCOPE_TEXT: Record<string, { en: string; ar: string }> = {
 };
 
 const ENGINE_TEXT: Record<string, { en: string; ar: string }> = {
-  "metrics.server": { en: "Dashboard totals (ads, CRM, Accounting)", ar: "إجماليات اللوحة (إعلانات، CRM، حسابات)" },
+  "metrics.server": {
+    en: "Dashboard totals (ads, CRM, Accounting)",
+    ar: "إجماليات اللوحة (إعلانات، CRM، حسابات)",
+  },
   "closed-loop": { en: "Exact attribution graph", ar: "مخطط الإسناد الدقيق" },
   accounting: { en: "Accounting paid invoices", ar: "فواتير الحسابات المدفوعة" },
 };
@@ -155,8 +158,13 @@ export function KpiFigure({
         },
       ]
     : [];
-  const supporting = ratioParts.length || contractParts.length ? [...ratioParts, ...contractParts] : undefined;
-  const coverageNote = kpi?.coverageNote ? (A ? kpi.coverageNote.ar : kpi.coverageNote.en) : undefined;
+  const supporting =
+    ratioParts.length || contractParts.length ? [...ratioParts, ...contractParts] : undefined;
+  const coverageNote = kpi?.coverageNote
+    ? A
+      ? kpi.coverageNote.ar
+      : kpi.coverageNote.en
+    : undefined;
   return (
     <MetricDetailTrigger
       detail={{
@@ -186,7 +194,13 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
   const k = data?.kpis;
   const shown = (key: string) => (k?.[key] ? kpiDisplay(k[key], lang) : "—");
   const scopeLabel = data?.scopeTotals?.scopeLabel;
-  const scopeName = scopeLabel ? (A ? scopeLabel.ar : scopeLabel.en) : A ? "كل القنوات" : "All channels";
+  const scopeName = scopeLabel
+    ? A
+      ? scopeLabel.ar
+      : scopeLabel.en
+    : A
+      ? "كل القنوات"
+      : "All channels";
   const spendByPlatform = (data?.scopeTotals?.spend.byPlatform ?? [])
     .map((row) =>
       row.state === "source_unavailable"
@@ -247,8 +261,8 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
             hero
             sub={
               A
-                ? `${shown("blendedRoas")} التحصيل ÷ الصرف (بدون إسناد)`
-                : `${shown("blendedRoas")} collections ÷ spend (not attributed)`
+                ? `${shown("collectionsToSpend")} التحصيل ÷ الصرف (بدون إسناد)`
+                : `${shown("collectionsToSpend")} collections ÷ spend (not attributed)`
             }
           />
         </KpiRow>
@@ -256,7 +270,9 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
       <PageSection
         level="headline"
         title={
-          A ? "من الإعلان إلى الإيراد · إسناد دقيق (Meta)" : "From ad to revenue · exact attribution (Meta)"
+          A
+            ? "من الإعلان إلى الإيراد · إسناد دقيق (Meta)"
+            : "From ad to revenue · exact attribution (Meta)"
         }
         hint={
           exact
@@ -387,7 +403,13 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
 }
 
 /** What is missing for this scope, in words. Rendered only when something is. */
-export function ManagementHealthCard({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+export function ManagementHealthCard({
+  data,
+  loading,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+}) {
   const { lang } = useI18n();
   const A = lang === "ar";
   const items = data?.health ?? [];
@@ -407,9 +429,14 @@ export function ManagementHealthCard({ data, loading }: { data?: ClosedLoopRespo
       <Card padded>
         <ul className="space-y-2">
           {items.map((item) => (
-            <li key={`${item.key}-${item.severity}`} className="flex flex-wrap items-start gap-2 text-sm">
+            <li
+              key={`${item.key}-${item.severity}`}
+              className="flex flex-wrap items-start gap-2 text-sm"
+            >
               <Pill tone={severity[item.severity].tone}>{severity[item.severity][lang]}</Pill>
-              <span className="min-w-0 flex-1 text-text">{A ? item.message.ar : item.message.en}</span>
+              <span className="min-w-0 flex-1 text-text">
+                {A ? item.message.ar : item.message.en}
+              </span>
             </li>
           ))}
         </ul>
@@ -423,7 +450,13 @@ export function ManagementHealthCard({ data, loading }: { data?: ClosedLoopRespo
  * unattributed always equals the Accounting total for the same basis, and any
  * disagreement between the Overview's cohort revenue and this split is shown.
  */
-export function RevenueReconciliationCard({ data, loading }: { data?: ClosedLoopResponse; loading: boolean }) {
+export function RevenueReconciliationCard({
+  data,
+  loading,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+}) {
   const { lang } = useI18n();
   const A = lang === "ar";
   const r = data?.revenueReconciliation;
@@ -469,7 +502,9 @@ export function RevenueReconciliationCard({ data, loading }: { data?: ClosedLoop
       <Card padded className="grid gap-3 md:grid-cols-2">
         {block(
           A ? "الإيراد المحصَّل في الفترة" : "Revenue collected in the period",
-          A ? "كل الفواتير المدفوعة بتاريخ دفع داخل الفترة." : "Every paid invoice line whose payment date is in the period.",
+          A
+            ? "كل الفواتير المدفوعة بتاريخ دفع داخل الفترة."
+            : "Every paid invoice line whose payment date is in the period.",
           r.paymentDate,
         )}
         {block(

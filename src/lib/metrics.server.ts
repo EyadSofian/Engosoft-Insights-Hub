@@ -779,7 +779,10 @@ export function computeTotals(data: FilteredData): Totals {
     cpa: cpaWon,
     cpaWon,
     cpaInvoices,
+    // All collections ÷ all spend: not attributed, so its explicit name is
+    // collectionsToSpend. `roas` is the same value, kept for existing API readers.
     roas: div(revenue, efficiencySpend),
+    collectionsToSpend: div(revenue, efficiencySpend),
     attributedRoas: div(attributedRevenue, efficiencySpend),
     acos: (() => {
       const r = div(efficiencySpend, revenue);

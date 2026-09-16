@@ -13,6 +13,12 @@ void import("./lib/meta-message-attribution.server")
   .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
   .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
 
+// Explicit, idempotent schema migration for manual lead QA. Request handlers
+// only verify the tables exist; they never create them.
+void import("./lib/lead-qa.server")
+  .then(({ startLeadQaMigration }) => startLeadQaMigration())
+  .catch((error) => console.error("[lead-qa] migration bootstrap failed:", error));
+
 void import("./lib/closed-loop.server")
   .then(({ startClosedLoopWorker }) => startClosedLoopWorker())
   .catch((error) => console.error("[closed-loop] worker bootstrap failed:", error));

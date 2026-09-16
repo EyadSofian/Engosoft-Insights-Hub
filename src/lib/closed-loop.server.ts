@@ -451,7 +451,10 @@ async function loadPaidInvoiceLines(errors: string[] = []): Promise<PaidInvoiceL
           orderName: row.orderRef,
           movement: row.movement,
           usdPaid: accountingUsdPaid(row, DEFAULT_FX_RATES),
-          paymentDate: (row.isCreditNote ? row.invoiceDate || row.paymentDate : row.paymentDate).slice(0, 10),
+          paymentDate: (row.isCreditNote
+            ? row.invoiceDate || row.paymentDate
+            : row.paymentDate
+          ).slice(0, 10),
         }));
     }
     errors.push("accounting authority: snapshot has no Accounting rows; stored dataset used");
@@ -1268,7 +1271,11 @@ async function loadRevenueAuthority(
   fxFilters: { fxEgp?: string; fxSar?: string },
 ): Promise<RevenueAuthority> {
   const [{ loadAllData }, { accountingUsdPaid, fxRatesFromFilters }, { accountingReportingDate }] =
-    await Promise.all([import("./sheet-cache.server"), import("./fx-rates"), import("./accounting-policy")]);
+    await Promise.all([
+      import("./sheet-cache.server"),
+      import("./fx-rates"),
+      import("./accounting-policy"),
+    ]);
   const [snapshot, links] = await Promise.all([
     loadAllData(),
     getPool().query<Row>(`SELECT sale_order_name, opportunity_id FROM crm_sale_order_links`),
@@ -1293,7 +1300,11 @@ async function loadRevenueAuthority(
     const usd = accountingUsdPaid(row, fx);
     const crmLeadId = row.orderRef ? (opportunityByOrder.get(row.orderRef.trim()) ?? "") : "";
     if (crmLeadId) {
-      const entry = byLead.get(crmLeadId) ?? { usd: 0, invoices: new Set<string>(), firstPaidAt: "" };
+      const entry = byLead.get(crmLeadId) ?? {
+        usd: 0,
+        invoices: new Set<string>(),
+        firstPaidAt: "",
+      };
       entry.usd += usd;
       if (!row.isCreditNote) {
         if (row.movement) entry.invoices.add(row.movement);
@@ -1615,7 +1626,9 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
     const conversations = facts.filter((fact) => fact.entityType === "chatwoot_conversation");
     const trackedSpend = exactTotals.spend;
     const exactFacts = facts.filter((fact) => fact.attributionConfidence === "exact");
-    const exactMatched = exactFacts.filter((fact) => fact.outcome && fact.matchConfidence === "exact");
+    const exactMatched = exactFacts.filter(
+      (fact) => fact.outcome && fact.matchConfidence === "exact",
+    );
     const kpis = closedLoopKpis({
       all: totals,
       tracked: exactTotals,
@@ -1632,8 +1645,9 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
       exactUniqueWon: new Set(
         exactMatched.filter((fact) => fact.outcome?.won).map((fact) => fact.crmLeadId),
       ).size,
-      exactCrmMatchesInScope: facts.filter((fact) => fact.outcome && fact.matchConfidence === "exact")
-        .length,
+      exactCrmMatchesInScope: facts.filter(
+        (fact) => fact.outcome && fact.matchConfidence === "exact",
+      ).length,
       scopeTotals,
     });
 
@@ -1643,11 +1657,17 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
       crmLeadId ? (attributionByLead.get(crmLeadId) ?? "none") : "none";
     const paymentDateReconciliation = reconcileRevenue(
       "payment_date",
-      authority.paymentWindow.map((line) => ({ usd: line.usd, attribution: attributionOf(line.crmLeadId) })),
+      authority.paymentWindow.map((line) => ({
+        usd: line.usd,
+        attribution: attributionOf(line.crmLeadId),
+      })),
     );
     const leadCohortReconciliation = reconcileRevenue(
       "lead_cohort",
-      cohortLeadIds.map((id) => ({ usd: authority.byLead.get(id)?.usd ?? 0, attribution: attributionOf(id) })),
+      cohortLeadIds.map((id) => ({
+        usd: authority.byLead.get(id)?.usd ?? 0,
+        attribution: attributionOf(id),
+      })),
     );
     const revenueReconciliation = exactOk
       ? {
@@ -1660,7 +1680,9 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
            * non-zero value is a disagreement to investigate, shown, not hidden.
            */
           exactCohortDifference:
-            Math.round((exactTotals.revenue - leadCohortReconciliation.exactAttributedRevenue) * 100) / 100,
+            Math.round(
+              (exactTotals.revenue - leadCohortReconciliation.exactAttributedRevenue) * 100,
+            ) / 100,
         }
       : null;
     const finishedAt = refresh.finishedAt as unknown;

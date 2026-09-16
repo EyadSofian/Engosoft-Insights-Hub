@@ -204,7 +204,8 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             isOwnerCall: (call: (typeof leadCalls)[number]) =>
               normalizePersonName(call.agentName) === ownerKey ||
               (!!ownerExtension && call.agentExtension === ownerExtension),
-            isOwnerChatName: (name: string) => integrationPersonMatchScore(lead.salesperson, name) > 0,
+            isOwnerChatName: (name: string) =>
+              integrationPersonMatchScore(lead.salesperson, name) > 0,
           };
         };
 
@@ -328,8 +329,10 @@ export const Route = createFileRoute("/api/uncalled-leads")({
             callUrl,
           });
           const chatEvidenceComplete = !evidence.missingSources.includes("chatwoot");
-          const scopedStatus = scope === "none" ? evidence.contactStatus : evidence.ownerContactStatus;
-          if (scopedStatus !== "contacted" && !chatEvidenceComplete) chatEvidenceIncompleteTotal += 1;
+          const scopedStatus =
+            scope === "none" ? evidence.contactStatus : evidence.ownerContactStatus;
+          if (scopedStatus !== "contacted" && !chatEvidenceComplete)
+            chatEvidenceIncompleteTotal += 1;
 
           /**
            * Coverage is lead-grain but call totals are not: two opportunities on

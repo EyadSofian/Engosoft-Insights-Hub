@@ -342,7 +342,8 @@ export function standardMetrics({
 
   const roas: MetricDetail = {
     id: `${surface}.roas`,
-    title: title("roas", A ? "العائد على الإنفاق" : "Return on ad spend"),
+    // All collections ÷ all spend is not attributed, so it is not called ROAS.
+    title: title("roas", A ? "نسبة التحصيل إلى الصرف" : "Collections-to-spend ratio"),
     value: fmtRoas(T.roas),
     tone: T.roas !== null && isFinite(T.roas) && T.roas < 1 ? "rose" : "amber",
     icon: <Target size={16} />,
@@ -586,7 +587,7 @@ export function standardMetrics({
     supporting: [
       { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(T.spend) },
       { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(T.revenue) },
-      { key: "roas", label: A ? "العائد" : "Return", value: fmtRoas(T.roas) },
+      { key: "roas", label: A ? "التحصيل ÷ الصرف" : "Collections ÷ spend", value: fmtRoas(T.roas) },
       {
         key: "attributedAcos",
         label: A ? "ACOS المرتبط" : "Attributed ACOS",

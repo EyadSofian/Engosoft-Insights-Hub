@@ -79,14 +79,24 @@ export function EntryCohortView() {
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-text-muted">
                 <th className="px-3 py-2 text-start">{A ? "شهر الدخول" : "Entry month"}</th>
-                <th className="px-3 py-2 text-end">{A ? "ليدز/عملاء CRM فريدة" : "Unique CRM leads"}</th>
+                <th className="px-3 py-2 text-end">
+                  {A ? "ليدز/عملاء CRM فريدة" : "Unique CRM leads"}
+                </th>
                 <th className="px-3 py-2 text-end">{A ? "مكسوب" : "Won"}</th>
-                <th className="px-3 py-2 text-end">{A ? "عملاء بفاتورة مدفوعة" : "Customers with paid invoice"}</th>
-                <th className="px-3 py-2 text-end">{A ? "فواتير مدفوعة مميزة" : "Distinct paid invoices"}</th>
+                <th className="px-3 py-2 text-end">
+                  {A ? "عملاء بفاتورة مدفوعة" : "Customers with paid invoice"}
+                </th>
+                <th className="px-3 py-2 text-end">
+                  {A ? "فواتير مدفوعة مميزة" : "Distinct paid invoices"}
+                </th>
                 <th className="px-3 py-2 text-end">{A ? "الإيراد المدفوع" : "Paid revenue"}</th>
                 <th className="px-3 py-2 text-end">{A ? "تحويل لفاتورة" : "Invoice conversion"}</th>
-                <th className="px-3 py-2 text-end">{A ? "متوسط الإيراد لكل عميل" : "Avg paid revenue / customer"}</th>
-                <th className="px-3 py-2 text-end">{A ? "الوقت لأول فاتورة (وسيط)" : "Time to first invoice (median)"}</th>
+                <th className="px-3 py-2 text-end">
+                  {A ? "متوسط الإيراد لكل عميل" : "Avg paid revenue / customer"}
+                </th>
+                <th className="px-3 py-2 text-end">
+                  {A ? "الوقت لأول فاتورة (وسيط)" : "Time to first invoice (median)"}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -95,11 +105,19 @@ export function EntryCohortView() {
                   <td className="px-3 py-2.5">{monthLabel(row.entryMonth, lang)}</td>
                   <td className="num px-3 py-2.5 text-end">{fmtNum(row.uniqueLeads)}</td>
                   <td className="num px-3 py-2.5 text-end">{fmtNum(row.won)}</td>
-                  <td className="num px-3 py-2.5 text-end">{fmtNum(row.customersWithPaidInvoice)}</td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {fmtNum(row.customersWithPaidInvoice)}
+                  </td>
                   <td className="num px-3 py-2.5 text-end">{fmtNum(row.distinctPaidInvoices)}</td>
-                  <td className="num px-3 py-2.5 text-end font-semibold">{money(row.paidRevenue)}</td>
-                  <td className="num px-3 py-2.5 text-end">{fmtPct(row.invoiceConversionRate, 1)}</td>
-                  <td className="num px-3 py-2.5 text-end">{money(row.averagePaidRevenuePerCustomer)}</td>
+                  <td className="num px-3 py-2.5 text-end font-semibold">
+                    {money(row.paidRevenue)}
+                  </td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {fmtPct(row.invoiceConversionRate, 1)}
+                  </td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {money(row.averagePaidRevenuePerCustomer)}
+                  </td>
                   <td className="num px-3 py-2.5 text-end">{days(row.medianDaysToFirstInvoice)}</td>
                 </tr>
               ))}
@@ -108,12 +126,22 @@ export function EntryCohortView() {
                   <td className="px-3 py-2.5">{A ? "الإجمالي" : "Total"}</td>
                   <td className="num px-3 py-2.5 text-end">{fmtNum(data.totals.uniqueLeads)}</td>
                   <td className="num px-3 py-2.5 text-end">{fmtNum(data.totals.won)}</td>
-                  <td className="num px-3 py-2.5 text-end">{fmtNum(data.totals.customersWithPaidInvoice)}</td>
-                  <td className="num px-3 py-2.5 text-end">{fmtNum(data.totals.distinctPaidInvoices)}</td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {fmtNum(data.totals.customersWithPaidInvoice)}
+                  </td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {fmtNum(data.totals.distinctPaidInvoices)}
+                  </td>
                   <td className="num px-3 py-2.5 text-end">{money(data.totals.paidRevenue)}</td>
-                  <td className="num px-3 py-2.5 text-end">{fmtPct(data.totals.invoiceConversionRate, 1)}</td>
-                  <td className="num px-3 py-2.5 text-end">{money(data.totals.averagePaidRevenuePerCustomer)}</td>
-                  <td className="num px-3 py-2.5 text-end">{days(data.totals.medianDaysToFirstInvoice)}</td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {fmtPct(data.totals.invoiceConversionRate, 1)}
+                  </td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {money(data.totals.averagePaidRevenuePerCustomer)}
+                  </td>
+                  <td className="num px-3 py-2.5 text-end">
+                    {days(data.totals.medianDaysToFirstInvoice)}
+                  </td>
                 </tr>
               ) : null}
             </tbody>
@@ -135,15 +163,33 @@ export function EntryCohortView() {
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {(
               [
-                [A ? "إجمالي الحسابات حتى اليوم" : "Accounting total to date", money(reconciliation.totalAccountingRevenue)],
-                [A ? "كوهورت الفترة" : "Cohorts in the window", money(reconciliation.cohortRevenue)],
-                [A ? "كوهورتات أخرى" : "Other entry months", money(reconciliation.otherCohortsRevenue)],
-                [A ? "مرتبط بفرصة خارج CRM المحمّل" : "Linked to an opportunity not in CRM", money(reconciliation.linkedUnknownCrmRevenue)],
-                [A ? "غير مرتبط بفرصة" : "Not linked to an opportunity", money(reconciliation.unlinkedRevenue)],
+                [
+                  A ? "إجمالي الحسابات حتى اليوم" : "Accounting total to date",
+                  money(reconciliation.totalAccountingRevenue),
+                ],
+                [
+                  A ? "كوهورت الفترة" : "Cohorts in the window",
+                  money(reconciliation.cohortRevenue),
+                ],
+                [
+                  A ? "كوهورتات أخرى" : "Other entry months",
+                  money(reconciliation.otherCohortsRevenue),
+                ],
+                [
+                  A ? "مرتبط بفرصة خارج CRM المحمّل" : "Linked to an opportunity not in CRM",
+                  money(reconciliation.linkedUnknownCrmRevenue),
+                ],
+                [
+                  A ? "غير مرتبط بفرصة" : "Not linked to an opportunity",
+                  money(reconciliation.unlinkedRevenue),
+                ],
                 [A ? "نسبة الربط" : "Linked share", fmtPct(reconciliation.linkedShare, 1)],
               ] as const
             ).map(([label, value]) => (
-              <div key={label} className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5">
+              <div
+                key={label}
+                className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5"
+              >
                 <dt className="text-text-muted">{label}</dt>
                 <dd className="num font-semibold text-text">{value}</dd>
               </div>

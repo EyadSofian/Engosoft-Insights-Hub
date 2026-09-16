@@ -48,13 +48,19 @@ describe("lost cohort vs closed-lost movement", () => {
   });
 
   it("deduplicates by Odoo id", () => {
-    const duplicated = lostPopulations({ cohortRows: [...rows, rows[0]!], closedRows: [...rows, rows[0]!], window });
+    const duplicated = lostPopulations({
+      cohortRows: [...rows, rows[0]!],
+      closedRows: [...rows, rows[0]!],
+      window,
+    });
     expect(lostPopulationCounts(duplicated)).toEqual(counts);
   });
 });
 
 describe("older-cohort closed-lost split", () => {
-  const counts = lostPopulationCounts(lostPopulations({ cohortRows: rows, closedRows: rows, window }));
+  const counts = lostPopulationCounts(
+    lostPopulations({ cohortRows: rows, closedRows: rows, window }),
+  );
 
   it("splits closures into created-in-period, older-cohort and undated-cohort", () => {
     expect(counts.createdAndLostInPeriod).toBe(1);
@@ -64,13 +70,19 @@ describe("older-cohort closed-lost split", () => {
 
   it("always adds the split back to closedLostInPeriod", () => {
     expect(
-      counts.createdAndLostInPeriod + counts.olderCohortClosedLostInPeriod + counts.undatedCohortClosedLostInPeriod,
+      counts.createdAndLostInPeriod +
+        counts.olderCohortClosedLostInPeriod +
+        counts.undatedCohortClosedLostInPeriod,
     ).toBe(counts.closedLostInPeriod);
   });
 
   it("classifies one row the same way the population split does", () => {
-    expect(classifyLostRow(row("x", "2026-08-31", "2026-09-01"), window).closedSplit).toBe("older_cohort");
-    expect(classifyLostRow(row("x", "2026-09-01", "2026-09-01"), window).closedSplit).toBe("created_in_period");
+    expect(classifyLostRow(row("x", "2026-08-31", "2026-09-01"), window).closedSplit).toBe(
+      "older_cohort",
+    );
+    expect(classifyLostRow(row("x", "2026-09-01", "2026-09-01"), window).closedSplit).toBe(
+      "created_in_period",
+    );
     expect(classifyLostRow(row("x", "2026-09-01", "2026-09-16"), window).closedSplit).toBeNull();
   });
 });

@@ -412,6 +412,8 @@ export interface LostRow {
   /** Canonical Lost movement date: Lead `date_closed`; Opportunity verification/stage date. */
   closeDate: string;
   lostDate: string;
+  /** Which Odoo field supplied `lostDate`; fallback bases stay visible to QA. */
+  lostDateBasis: string;
   lastStageUpdate: string;
   lostCategory: string;
   probability: number;
@@ -522,7 +524,11 @@ export interface Totals {
   cpa: Maybe;
   cpaWon: Maybe;
   cpaInvoices: Maybe;
+  /** All collections ÷ all spend. Not attributed — kept under this name for API compatibility; never label it ROAS. */
   roas: Maybe;
+  /** Explicit name for `roas` above: the non-attributed collections-to-spend ratio. */
+  collectionsToSpend: Maybe;
+  /** Campaign-attributed collections ÷ spend: the only total that is a ROAS. */
   attributedRoas: Maybe;
   acos: Maybe;
   attributedAcos: Maybe;

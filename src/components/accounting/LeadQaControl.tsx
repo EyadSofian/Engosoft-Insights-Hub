@@ -69,7 +69,9 @@ export function useLeadQaVerifications(ids: readonly string[]) {
     enabled: key.length > 0,
     staleTime: 30_000,
     queryFn: async () => {
-      const response = await fetch(`/api/lead-qa?ids=${encodeURIComponent(key)}`, { credentials: "include" });
+      const response = await fetch(`/api/lead-qa?ids=${encodeURIComponent(key)}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error(`Lead QA request failed: ${response.status}`);
       return response.json();
     },
@@ -140,7 +142,10 @@ export function LeadQaControl({
       const response = await fetch("/api/lead-qa", {
         method: "POST",
         credentials: "include",
-        headers: { "content-type": "application/json", ...(code ? { "x-admin-secret": code } : {}) },
+        headers: {
+          "content-type": "application/json",
+          ...(code ? { "x-admin-secret": code } : {}),
+        },
         body: JSON.stringify({
           crmLeadId: lead.id,
           ...draft,
@@ -152,9 +157,12 @@ export function LeadQaControl({
       const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (response.status === 401) {
         setNeedsCode(true);
-        throw new Error(A ? "أدخل كود الإدارة لحفظ التحقق." : "Enter the admin code to save the verdict.");
+        throw new Error(
+          A ? "أدخل كود الإدارة لحفظ التحقق." : "Enter the admin code to save the verdict.",
+        );
       }
-      if (!response.ok || !body.ok) throw new Error(body.error || `Request failed: ${response.status}`);
+      if (!response.ok || !body.ok)
+        throw new Error(body.error || `Request failed: ${response.status}`);
       try {
         if (code) localStorage.setItem(CODE_KEY, code);
       } catch {
@@ -172,7 +180,8 @@ export function LeadQaControl({
 
   const contactStatus = typeof evidence?.contactStatus === "string" ? evidence.contactStatus : null;
   const label = LEAD_QA_STATUS_LABEL[status];
-  const field = "min-h-10 w-full rounded-lg border border-border bg-surface px-2.5 text-sm text-text outline-none focus:border-brand";
+  const field =
+    "min-h-10 w-full rounded-lg border border-border bg-surface px-2.5 text-sm text-text outline-none focus:border-brand";
 
   return (
     <>
@@ -217,9 +226,11 @@ export function LeadQaControl({
                 {" · "}
                 {A ? "مكالمات" : "calls"} {fmtNum(readNumber(evidence, "totalCalls") ?? 0)}
                 {" · "}
-                {A ? "مكالمات المسؤول" : "owner calls"} {fmtNum(readNumber(evidence, "ownerCalls") ?? 0)}
+                {A ? "مكالمات المسؤول" : "owner calls"}{" "}
+                {fmtNum(readNumber(evidence, "ownerCalls") ?? 0)}
                 {" · "}
-                {A ? "محادثات" : "chats"} {fmtNum(readNumber(evidence, "chatConversationCount") ?? 0)}
+                {A ? "محادثات" : "chats"}{" "}
+                {fmtNum(readNumber(evidence, "chatConversationCount") ?? 0)}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {[
@@ -248,7 +259,10 @@ export function LeadQaControl({
                 className={field}
                 value={draft.verificationStatus}
                 onChange={(event) =>
-                  setDraft((current) => ({ ...current, verificationStatus: event.target.value as LeadQaStatus }))
+                  setDraft((current) => ({
+                    ...current,
+                    verificationStatus: event.target.value as LeadQaStatus,
+                  }))
                 }
               >
                 {LEAD_QA_STATUSES.map((value) => (
@@ -260,12 +274,17 @@ export function LeadQaControl({
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
-                <span className="mb-1 block text-xs text-text-muted">{A ? "التواصل" : "Contact"}</span>
+                <span className="mb-1 block text-xs text-text-muted">
+                  {A ? "التواصل" : "Contact"}
+                </span>
                 <select
                   className={field}
                   value={draft.contactVerdict}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, contactVerdict: event.target.value as LeadQaContactVerdict }))
+                    setDraft((current) => ({
+                      ...current,
+                      contactVerdict: event.target.value as LeadQaContactVerdict,
+                    }))
                   }
                 >
                   {LEAD_QA_CONTACT_VERDICTS.map((value) => (
@@ -276,7 +295,9 @@ export function LeadQaControl({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs text-text-muted">{A ? "جودة الليد" : "Lead quality"}</span>
+                <span className="mb-1 block text-xs text-text-muted">
+                  {A ? "جودة الليد" : "Lead quality"}
+                </span>
                 <select
                   className={field}
                   value={draft.leadQualityVerdict}
@@ -301,7 +322,9 @@ export function LeadQaControl({
                 className={field}
                 maxLength={200}
                 value={draft.reason}
-                onChange={(event) => setDraft((current) => ({ ...current, reason: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, reason: event.target.value }))
+                }
               />
             </label>
             <label className="block">
@@ -310,12 +333,16 @@ export function LeadQaControl({
                 className={`${field} min-h-20 py-2`}
                 maxLength={2000}
                 value={draft.notes}
-                onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, notes: event.target.value }))
+                }
               />
             </label>
             {needsCode ? (
               <label className="block">
-                <span className="mb-1 block text-xs text-text-muted">{A ? "كود الإدارة" : "Admin code"}</span>
+                <span className="mb-1 block text-xs text-text-muted">
+                  {A ? "كود الإدارة" : "Admin code"}
+                </span>
                 <input
                   className={field}
                   type="password"

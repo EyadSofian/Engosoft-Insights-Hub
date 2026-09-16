@@ -88,7 +88,10 @@ describe("phone number normalisation", () => {
 
 describe("phone + mobile contact matching", () => {
   it("finds a call placed to the lead's mobile when the phone field is empty", () => {
-    const evidence = resolveLeadContactEvidence(lead, context({ callsByPhone: indexCallsByPhone([call({})]) }));
+    const evidence = resolveLeadContactEvidence(
+      lead,
+      context({ callsByPhone: indexCallsByPhone([call({})]) }),
+    );
     expect(evidence.calledByAny).toBe(true);
     expect(evidence.calledByOwner).toBe(true);
     expect(evidence.totalCalls).toBe(2);
@@ -98,25 +101,44 @@ describe("phone + mobile contact matching", () => {
 
   it("matches on both numbers and counts a call on each", () => {
     const both = { ...lead, phone: "+20 100 000 0002" };
-    const calls = indexCallsByPhone([call({}), call({ phone: "01000000002", latestCallId: "call-2", totalCalls: 1 })]);
+    const calls = indexCallsByPhone([
+      call({}),
+      call({ phone: "01000000002", latestCallId: "call-2", totalCalls: 1 }),
+    ]);
     const evidence = resolveLeadContactEvidence(
       both,
-      context({ callsByPhone: calls, chatsByPhone: new Map([["500000001", []], ["000000002", []]]) }),
+      context({
+        callsByPhone: calls,
+        chatsByPhone: new Map([
+          ["500000001", []],
+          ["000000002", []],
+        ]),
+      }),
     );
     expect(evidence.phoneKeys).toHaveLength(2);
     expect(evidence.totalCalls).toBe(3);
   });
 
   it("ignores a call made before the lead existed", () => {
-    const early = call({ callDate: "2026-08-30", firstCallAt: "2026-08-30T08:00:00Z", latestCallAt: "2026-08-30T08:00:00Z" });
-    const evidence = resolveLeadContactEvidence(lead, context({ callsByPhone: indexCallsByPhone([early]) }));
+    const early = call({
+      callDate: "2026-08-30",
+      firstCallAt: "2026-08-30T08:00:00Z",
+      latestCallAt: "2026-08-30T08:00:00Z",
+    });
+    const evidence = resolveLeadContactEvidence(
+      lead,
+      context({ callsByPhone: indexCallsByPhone([early]) }),
+    );
     expect(evidence.calledByAny).toBe(false);
     expect(evidence.contactStatus).toBe("not_contacted");
   });
 
   it("separates a colleague's call from the owner's", () => {
     const colleague = call({ agentName: "Colleague", agentExtension: "202" });
-    const evidence = resolveLeadContactEvidence(lead, context({ callsByPhone: indexCallsByPhone([colleague]) }));
+    const evidence = resolveLeadContactEvidence(
+      lead,
+      context({ callsByPhone: indexCallsByPhone([colleague]) }),
+    );
     expect(evidence.calledByAny).toBe(true);
     expect(evidence.calledByOwner).toBe(false);
     expect(evidence.callers).toEqual(["Colleague"]);
@@ -133,7 +155,12 @@ describe("Yeastar + Chatwoot evidence reconciliation", () => {
         chatsByPhone: new Map([
           [
             "500000001",
-            [chat({ agentNames: ["Owner Person"], agentContactedAt: unix("2026-09-05T09:00:00Z") })],
+            [
+              chat({
+                agentNames: ["Owner Person"],
+                agentContactedAt: unix("2026-09-05T09:00:00Z"),
+              }),
+            ],
           ],
         ]),
       }),
@@ -168,7 +195,9 @@ describe("Yeastar + Chatwoot evidence reconciliation", () => {
     const evidence = resolveLeadContactEvidence(
       lead,
       context({
-        chatsByPhone: new Map([["500000001", [chat({ agentContactedAt: unix("2026-09-20T09:00:00Z") })]]]),
+        chatsByPhone: new Map([
+          ["500000001", [chat({ agentContactedAt: unix("2026-09-20T09:00:00Z") })]],
+        ]),
       }),
     );
     expect(evidence.contactedViaChat).toBe(false);
@@ -200,7 +229,9 @@ describe("evidence-incomplete behavior", () => {
   });
 
   it("reports unknown when Chatwoot is unavailable", () => {
-    expect(resolveLeadContactEvidence(lead, context({ chatwootAvailable: false })).contactStatus).toBe("unknown");
+    expect(
+      resolveLeadContactEvidence(lead, context({ chatwootAvailable: false })).contactStatus,
+    ).toBe("unknown");
   });
 
   it("reports unknown for a lead without any phone number", () => {

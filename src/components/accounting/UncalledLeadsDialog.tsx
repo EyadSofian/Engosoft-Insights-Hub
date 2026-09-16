@@ -158,11 +158,7 @@ function uncalledStatusLabel(status: UncalledStatus, lang: "ar" | "en"): string 
   return lang === "ar" ? "مستبعد من المتابعة" : "No follow-up expected";
 }
 
-function chatStatusLabel(
-  status: string | null,
-  open: boolean | null,
-  lang: "ar" | "en",
-): string {
+function chatStatusLabel(status: string | null, open: boolean | null, lang: "ar" | "en"): string {
   if (!status) return lang === "ar" ? "لا توجد محادثة" : "No conversation";
   if (status === "resolved" || status === "closed") {
     return lang === "ar" ? "مغلقة" : "Resolved";
@@ -589,20 +585,20 @@ export function UncalledLeadsDialog({
                             {!employee && (
                               <small className="mt-0.5 block truncate text-[10px] text-text-muted">
                                 {lang === "ar" ? "المسؤول" : "Owner"}: {lead.salesperson || "—"}
-                              {scope === "owner" && lead.calledBy.length > 0 && (
+                                {scope === "owner" && lead.calledBy.length > 0 && (
                                   <>
                                     {" "}
                                     · {lang === "ar" ? "اتصل بها" : "called by"}{" "}
                                     {lead.calledBy.join("، ")}
                                   </>
-                              )}
-                              {scope === "owner" && lead.chatAssignees.length > 0 && (
-                                <>
-                                  {" "}
-                                  · {lang === "ar" ? "Chatwoot مع" : "Chatwoot by"}{" "}
-                                  {lead.chatAssignees.join("، ")}
-                                </>
-                              )}
+                                )}
+                                {scope === "owner" && lead.chatAssignees.length > 0 && (
+                                  <>
+                                    {" "}
+                                    · {lang === "ar" ? "Chatwoot مع" : "Chatwoot by"}{" "}
+                                    {lead.chatAssignees.join("، ")}
+                                  </>
+                                )}
                               </small>
                             )}
                             {lead.reasons.length > 0 && (

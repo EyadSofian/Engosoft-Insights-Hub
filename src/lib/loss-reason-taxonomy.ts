@@ -57,7 +57,10 @@ export const LOSS_REASON_TAXONOMY: readonly TaxonomyEntry[] = [
     key: "unreachable_number",
     ar: "الرقم لا يمكن الاتصال به",
     en: "Number cannot be reached",
-    synonyms: ["الرقم لايمكن الاتصال به ولا يوجد واتس اب", "الرقم لا يمكن الاتصال به ولا يوجد واتس اب"],
+    synonyms: [
+      "الرقم لايمكن الاتصال به ولا يوجد واتس اب",
+      "الرقم لا يمكن الاتصال به ولا يوجد واتس اب",
+    ],
   },
   {
     key: "wrong_number",
@@ -236,12 +239,17 @@ export function groupByCanonicalReason<T>(
   rows: readonly T[],
   reasonOf: (row: T) => string,
 ): CanonicalReasonGroup[] {
-  const groups = new Map<string, { reason: CanonicalLossReason; count: number; raw: Map<string, number> }>();
+  const groups = new Map<
+    string,
+    { reason: CanonicalLossReason; count: number; raw: Map<string, number> }
+  >();
   for (const row of rows) {
     const reason = canonicalLossReason(reasonOf(row));
-    const group =
-      groups.get(reason.canonicalReasonKey) ??
-      { reason, count: 0, raw: new Map<string, number>() };
+    const group = groups.get(reason.canonicalReasonKey) ?? {
+      reason,
+      count: 0,
+      raw: new Map<string, number>(),
+    };
     group.count += 1;
     group.raw.set(reason.rawReason, (group.raw.get(reason.rawReason) ?? 0) + 1);
     groups.set(reason.canonicalReasonKey, group);

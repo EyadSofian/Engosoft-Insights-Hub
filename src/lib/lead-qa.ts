@@ -83,7 +83,8 @@ const IMPLIED: Partial<
 export function validateLeadQaInput(
   raw: unknown,
 ): { ok: true; value: LeadQaInput } | { ok: false; errors: string[] } {
-  const body = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const body =
+    raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const errors: string[] = [];
   const crmLeadId = text(body.crmLeadId);
   if (!/^\d{1,12}$/.test(crmLeadId)) errors.push("crmLeadId must be an Odoo numeric id");
@@ -103,7 +104,9 @@ export function validateLeadQaInput(
   if (salesperson.length > LEAD_QA_LIMITS.salesperson) errors.push("salesperson is too long");
 
   const snapshot =
-    body.evidenceSnapshot && typeof body.evidenceSnapshot === "object" && !Array.isArray(body.evidenceSnapshot)
+    body.evidenceSnapshot &&
+    typeof body.evidenceSnapshot === "object" &&
+    !Array.isArray(body.evidenceSnapshot)
       ? (body.evidenceSnapshot as Record<string, unknown>)
       : {};
   if (JSON.stringify(snapshot).length > LEAD_QA_LIMITS.evidenceSnapshotBytes)
@@ -122,7 +125,11 @@ export function validateLeadQaInput(
         errors.push(`${verificationStatus} requires leadQualityVerdict "${implied.quality}"`);
       leadQualityVerdict = implied.quality;
     }
-    if ((verificationStatus === "verified_bad_lead" || verificationStatus === "disputed") && !reason && !notes)
+    if (
+      (verificationStatus === "verified_bad_lead" || verificationStatus === "disputed") &&
+      !reason &&
+      !notes
+    )
       errors.push(`${verificationStatus} needs a reason or notes`);
   }
 
@@ -165,7 +172,10 @@ export interface LeadQaSummary {
  */
 export function summarizeLeadQa(
   leadIds: readonly string[],
-  verifications: ReadonlyMap<string, Pick<LeadQaVerification, "verificationStatus" | "leadQualityVerdict">>,
+  verifications: ReadonlyMap<
+    string,
+    Pick<LeadQaVerification, "verificationStatus" | "leadQualityVerdict">
+  >,
 ): LeadQaSummary {
   const ids = [...new Set(leadIds.filter(Boolean))];
   const summary: LeadQaSummary = {
@@ -189,9 +199,15 @@ export function summarizeLeadQa(
     if (status === "disputed") summary.disputed += 1;
     if (status === "verified_contacted") summary.verifiedContacted += 1;
     if (status === "verified_uncontacted") summary.verifiedUncontacted += 1;
-    if (isVerifiedStatus(status) && (status === "verified_valid_lead" || row?.leadQualityVerdict === "valid"))
+    if (
+      isVerifiedStatus(status) &&
+      (status === "verified_valid_lead" || row?.leadQualityVerdict === "valid")
+    )
       summary.verifiedValid += 1;
-    if (isVerifiedStatus(status) && (status === "verified_bad_lead" || row?.leadQualityVerdict === "invalid"))
+    if (
+      isVerifiedStatus(status) &&
+      (status === "verified_bad_lead" || row?.leadQualityVerdict === "invalid")
+    )
       summary.verifiedInvalid += 1;
   }
   summary.verificationRate = ids.length ? (summary.verified / ids.length) * 100 : null;

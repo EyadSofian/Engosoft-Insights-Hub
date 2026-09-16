@@ -1,4 +1,8 @@
-import { callCanCoverLead, leadCallAggregateKey, type DatedLeadCallAggregate } from "./uncalled-leads";
+import {
+  callCanCoverLead,
+  leadCallAggregateKey,
+  type DatedLeadCallAggregate,
+} from "./uncalled-leads";
 
 /**
  * One contact-evidence resolver for every lead-level question.
@@ -206,7 +210,9 @@ export interface LeadContactEvidence<C extends EvidenceCall = EvidenceCall> {
   ownerMatchedCalls: C[];
 }
 
-export function indexCallsByPhone<C extends { phone: string }>(calls: readonly C[]): Map<string, C[]> {
+export function indexCallsByPhone<C extends { phone: string }>(
+  calls: readonly C[],
+): Map<string, C[]> {
   const index = new Map<string, C[]>();
   for (const call of calls) {
     const key = phoneMatchKey(call.phone);
@@ -229,7 +235,10 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
 ): LeadContactEvidence<C> {
   const phones = [lead.phone, lead.mobile]
     .map(normalizePhone)
-    .filter((phone, index, all) => phone.key && all.findIndex((other) => other.key === phone.key) === index);
+    .filter(
+      (phone, index, all) =>
+        phone.key && all.findIndex((other) => other.key === phone.key) === index,
+    );
   const phoneKeys = phones.map((phone) => phone.key);
 
   const matches = new Map<string, C>();
@@ -256,7 +265,8 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
 
   const conversations = new Map<number, EvidenceChat>();
   for (const key of phoneKeys) {
-    for (const chat of context.chatsByPhone.get(key) ?? []) conversations.set(chat.conversationId, chat);
+    for (const chat of context.chatsByPhone.get(key) ?? [])
+      conversations.set(chat.conversationId, chat);
   }
   const chats = [...conversations.values()];
   const listed = chats
@@ -264,7 +274,9 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
     .sort((left, right) => right.lastActivityAt - left.lastActivityAt);
   const employeeChats = chats.filter(
     (chat) =>
-      chat.agentContactedAt > 0 && chat.agentContactedAt >= floor && chat.agentContactedAt <= windowEnd,
+      chat.agentContactedAt > 0 &&
+      chat.agentContactedAt >= floor &&
+      chat.agentContactedAt <= windowEnd,
   );
   const chatNames = (chat: EvidenceChat) =>
     [...(chat.agentNames ?? []), chat.assigneeName].filter(Boolean);
@@ -274,7 +286,10 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
     (chat) => chat.awaitingReply && chat.customerMessagedAt >= createdFloor,
   );
   const customerOnlyChat = listed.some(
-    (chat) => chat.customerMessagedAt >= createdFloor && chat.customerMessagedAt > 0 && !(chat.agentContactedAt > 0),
+    (chat) =>
+      chat.customerMessagedAt >= createdFloor &&
+      chat.customerMessagedAt > 0 &&
+      !(chat.agentContactedAt > 0),
   );
 
   const calledByAny = matchedCalls.length > 0;
@@ -298,7 +313,9 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
     contacted ? "contacted" : evidenceComplete ? "not_contacted" : "unknown";
 
   const latestChat = listed[0] ?? null;
-  const callTimes = matchedCalls.flatMap((call) => [call.firstCallAt, call.latestCallAt]).filter(Boolean);
+  const callTimes = matchedCalls
+    .flatMap((call) => [call.firstCallAt, call.latestCallAt])
+    .filter(Boolean);
   return {
     leadId: lead.id,
     phoneKeys,
@@ -321,7 +338,11 @@ export function resolveLeadContactEvidence<C extends EvidenceCall>(
     chatAssignees: [...new Set(listed.flatMap(chatNames))],
     latestChatAt: latestChat?.lastActivityAt ?? null,
     latestChatUrl: latestChat?.url ?? null,
-    latestChatStatus: latestChat ? String(latestChat.status || "").trim().toLowerCase() || null : null,
+    latestChatStatus: latestChat
+      ? String(latestChat.status || "")
+          .trim()
+          .toLowerCase() || null
+      : null,
     evidenceComplete,
     evidenceSources,
     missingSources,

@@ -90,7 +90,9 @@ const lineDate = (line: CohortInvoiceLine) =>
 function daysBetween(from: string, to: string): number | null {
   const start = Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
   const end = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
-  return Number.isFinite(start) && Number.isFinite(end) ? Math.round((end - start) / 86_400_000) : null;
+  return Number.isFinite(start) && Number.isFinite(end)
+    ? Math.round((end - start) / 86_400_000)
+    : null;
 }
 
 function median(values: number[]): number | null {
@@ -145,7 +147,8 @@ export function buildEntryMonthCohorts(input: {
     Boolean(date) && (!window.from || date >= window.from) && (!window.to || date <= window.to);
 
   const leadById = new Map<string, CohortCrmLead>();
-  for (const lead of input.leads) if (lead.id && !leadById.has(lead.id)) leadById.set(lead.id, lead);
+  for (const lead of input.leads)
+    if (lead.id && !leadById.has(lead.id)) leadById.set(lead.id, lead);
   const opportunityByOrder = new Map<string, string>();
   const ambiguousOrders = new Set<string>();
   for (const link of input.links) {

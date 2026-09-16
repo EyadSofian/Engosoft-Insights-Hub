@@ -26,12 +26,16 @@ describe("bilingual loss reason normalization", () => {
     expect(canonicalLossReason("Didn’t register").canonicalReasonKey).toBe("did_not_register");
     expect(canonicalLossReason("العميل مكرر").canonicalReasonKey).toBe("duplicate");
     expect(canonicalLossReason("محتاج دراسة دبلوم").canonicalReasonKey).toBe("wants_diploma");
-    expect(normalizeReasonText("شهادات أخرى (أسم الشهادة )")).toBe(normalizeReasonText("شهادات أخري"));
+    expect(normalizeReasonText("شهادات أخرى (أسم الشهادة )")).toBe(
+      normalizeReasonText("شهادات أخري"),
+    );
   });
 
   it("keeps the placeholder-bearing reasons recognisable when a value is filled in", () => {
     expect(canonicalLossReason("تخصص اخر (مدني)").canonicalReasonKey).toBe("other_specialization");
-    expect(canonicalLossReason("محتوى بلغة مختلفة (الإنجليزية)").canonicalReasonKey).toBe("language_barrier");
+    expect(canonicalLossReason("محتوى بلغة مختلفة (الإنجليزية)").canonicalReasonKey).toBe(
+      "language_barrier",
+    );
   });
 
   it("keeps near-but-different reasons apart", () => {
@@ -60,7 +64,15 @@ describe("bilingual loss reason normalization", () => {
   });
 
   it("groups by canonical key without dropping a single row", () => {
-    const rows = ["غير مهتم", "Not Interested", "Not Interested", "", "شيء آخر", "Duplicate", "ليد مكرر"];
+    const rows = [
+      "غير مهتم",
+      "Not Interested",
+      "Not Interested",
+      "",
+      "شيء آخر",
+      "Duplicate",
+      "ليد مكرر",
+    ];
     const groups = groupByCanonicalReason(rows, (value) => value);
     expect(groups.reduce((sum, group) => sum + group.count, 0)).toBe(rows.length);
     const notInterested = groups.find((group) => group.canonicalReasonKey === "not_interested")!;
@@ -70,6 +82,8 @@ describe("bilingual loss reason normalization", () => {
       { rawReason: "غير مهتم", count: 1 },
     ]);
     expect(groups.find((group) => group.canonicalReasonKey === "unknown")?.count).toBe(1);
-    expect(groups.find((group) => group.canonicalReasonKey === "other")?.rawReasons[0]?.rawReason).toBe("شيء آخر");
+    expect(
+      groups.find((group) => group.canonicalReasonKey === "other")?.rawReasons[0]?.rawReason,
+    ).toBe("شيء آخر");
   });
 });

@@ -34,6 +34,7 @@ export type MetricKey =
   | "revenuePerLead"
   | "cpa"
   | "roas"
+  | "collectionsToSpend"
   | "acos";
 
 /** The four bands a metric belongs to, used for card order and table headers. */
@@ -557,6 +558,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     },
   },
 
+  // Campaign, ad-set and ad rows: revenue attributed to that entity ÷ its own spend.
   roas: {
     key: "roas",
     group: "efficiency",
@@ -564,20 +566,49 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     ar: {
       label: "العائد على الإنفاق الإعلاني (ROAS)",
       short: "العائد",
-      formula: "الإيراد ÷ الإنفاق",
-      what: "كل دولار إعلانات رجّع كام دولار تحصيل. فوق ١× يعني الفلوس رجعت.",
-      how: "الإيراد المحصّل مقسوم على إجمالي الإنفاق الإعلاني.",
-      source: "البسط: Accounting — الفواتير المدفوعة. المقام: الإنفاق من تبويبات الإعلانات.",
+      formula: "الإيراد المرتبط ÷ الإنفاق",
+      what: "كل دولار اتصرف على الحملة دي رجّع كام دولار تحصيل مرتبط بيها. فوق ١× يعني الفلوس رجعت.",
+      how: "الإيراد المحصّل المرتبط بنفس الحملة أو المجموعة أو الإعلان، مقسوم على إنفاقه.",
+      source:
+        "البسط: Accounting — الفواتير المدفوعة المرتبطة بالحملة. المقام: إنفاق نفس الحملة من تبويبات الإعلانات.",
       dateBasis: "تاريخ الدفع للإيراد، وتاريخ الإعلان للإنفاق.",
       whenEmpty: "شرطة لو مفيش إنفاق — القسمة على صفر مش صفر، دي قيمة مش موجودة.",
     },
     en: {
       label: "Return on ad spend (ROAS)",
       short: "ROAS",
-      formula: "Revenue ÷ Spend",
-      what: "What each advertising dollar returned in collections. Above 1× means the money came back.",
-      how: "Collected revenue divided by total ad spend.",
-      source: "Numerator: Accounting paid invoices. Denominator: spend from the ad tabs.",
+      formula: "Attributed revenue ÷ Spend",
+      what: "What each dollar spent on this campaign returned in collections linked to it. Above 1× means the money came back.",
+      how: "Collected revenue linked to the same campaign, ad set or ad, divided by its spend.",
+      source:
+        "Numerator: Accounting paid invoices linked to the campaign. Denominator: that campaign's spend from the ad tabs.",
+      dateBasis: "Payment Date for revenue, ad date for spend.",
+      whenEmpty: "A dash when there was no spend — dividing by zero is undefined, not zero.",
+    },
+  },
+
+  // Totals: ALL collections ÷ ALL spend. Not attributed, so it is never called ROAS.
+  collectionsToSpend: {
+    key: "collectionsToSpend",
+    group: "efficiency",
+    needsSpend: true,
+    ar: {
+      label: "نسبة التحصيل إلى الصرف الإعلاني",
+      short: "التحصيل ÷ الصرف",
+      formula: "كل التحصيل ÷ كل الإنفاق",
+      what: "كل التحصيل في الفترة مقابل كل الإنفاق الإعلاني. ليست ROAS: البسط يشمل تحصيلًا لا علاقة له بالإعلانات.",
+      how: "كل الإيراد المحصّل في الفترة مقسوم على إجمالي الإنفاق الإعلاني، بدون أي إسناد.",
+      source: "البسط: Accounting — كل الفواتير المدفوعة. المقام: الإنفاق من تبويبات الإعلانات.",
+      dateBasis: "تاريخ الدفع للإيراد، وتاريخ الإعلان للإنفاق.",
+      whenEmpty: "شرطة لو مفيش إنفاق — القسمة على صفر مش صفر، دي قيمة مش موجودة.",
+    },
+    en: {
+      label: "Collections-to-spend ratio",
+      short: "Collections ÷ spend",
+      formula: "All collections ÷ All spend",
+      what: "All money collected in the window against all ad spend. Not ROAS: the numerator includes collections unrelated to ads.",
+      how: "All collected revenue in the window divided by total ad spend, with no attribution.",
+      source: "Numerator: every Accounting paid invoice. Denominator: spend from the ad tabs.",
       dateBasis: "Payment Date for revenue, ad date for spend.",
       whenEmpty: "A dash when there was no spend — dividing by zero is undefined, not zero.",
     },
@@ -593,7 +624,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "نسبة الإنفاق للإيراد",
       formula: "الإنفاق ÷ الإيراد × ١٠٠",
       what: "الإعلانات بتاكل كام في المية من التحصيل. كل ما تقل كل ما يكون أحسن.",
-      how: "الإنفاق مقسوم على الإيراد المحصّل ومضروب في ١٠٠. هي المقلوب المئوي للعائد.",
+      how: "الإنفاق مقسوم على الإيراد المحصّل ومضروب في ١٠٠. هي المقلوب المئوي لنسبة التحصيل إلى الصرف.",
       source: "البسط: الإنفاق من تبويبات الإعلانات. المقام: Accounting — الفواتير المدفوعة.",
       dateBasis: "تاريخ الإعلان للإنفاق، وتاريخ الدفع للإيراد.",
       whenEmpty: "شرطة لو مفيش إيراد، أو لو المنصة ملهاش تبويب إنفاق — صفر هنا هيبقى معلومة غلط.",
@@ -603,7 +634,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "ACOS",
       formula: "Spend ÷ Revenue × 100",
       what: "What percentage of collections advertising eats. Lower is better.",
-      how: "Spend divided by collected revenue, times 100 — the percentage inverse of ROAS.",
+      how: "Spend divided by collected revenue, times 100 — the percentage inverse of the collections-to-spend ratio.",
       source: "Numerator: spend from the ad tabs. Denominator: Accounting paid invoices.",
       dateBasis: "Ad date for spend, Payment Date for revenue.",
       whenEmpty:
@@ -633,6 +664,7 @@ export const GLOSSARY_ORDER: MetricKey[] = [
   "cpm",
   "cpc",
   "roas",
+  "collectionsToSpend",
   "acos",
 ];
 

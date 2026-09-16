@@ -1675,7 +1675,9 @@ export async function buildAgentAnalytics(
         ids.push(lead.id);
         idsByOwner.set(key, ids);
       }
-      const verifications = await readLeadQaVerifications([...new Set([...idsByOwner.values()].flat())]);
+      const verifications = await readLeadQaVerifications([
+        ...new Set([...idsByOwner.values()].flat()),
+      ]);
       return new Map(
         [...idsByOwner.entries()].map(([key, ids]) => [key, summarizeLeadQa(ids, verifications)]),
       );
@@ -1889,7 +1891,9 @@ export async function buildAgentAnalytics(
       createdAndLostInPeriod: 0,
       olderCohortClosedLostInPeriod: 0,
       undatedCohortClosedLostInPeriod: 0,
-      contactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable ? 0 : (null as number | null),
+      contactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
       ownerContactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable
         ? 0
         : (null as number | null),

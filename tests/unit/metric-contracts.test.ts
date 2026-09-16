@@ -6,7 +6,14 @@ import { METRIC_CONTRACTS } from "@/lib/metric-contracts";
 
 const overview = closedLoopKpis({
   all: finalizeMetrics({ ...emptyMetrics(), leads: 10, crmMatched: 4, won: 1, revenue: 50 }),
-  tracked: finalizeMetrics({ ...emptyMetrics(), leads: 4, crmMatched: 4, qualified: 2, won: 1, revenue: 50 }),
+  tracked: finalizeMetrics({
+    ...emptyMetrics(),
+    leads: 4,
+    crmMatched: 4,
+    qualified: 2,
+    won: 1,
+    revenue: 50,
+  }),
   totalSpend: 100,
   trackedSpend: 80,
   spendSynced: true,
@@ -54,9 +61,13 @@ describe("Marketing Overview KPI contracts", () => {
   it("names the second date basis whenever a ratio divides across two dates", () => {
     for (const kpi of Object.values(overview).filter((row) => row.kind === "ratio")) {
       const contract = kpi.contract!;
-      const crossesDates = ["roasAllSpend", "roasTracked", "blendedRoas", "costPerCrmLead", "cplTracked"].includes(
-        kpi.key,
-      );
+      const crossesDates = [
+        "roasAllSpend",
+        "roasTracked",
+        "collectionsToSpend",
+        "costPerCrmLead",
+        "cplTracked",
+      ].includes(kpi.key);
       if (crossesDates) expect(contract.denominatorDateBasis, kpi.key).toBeTruthy();
     }
   });

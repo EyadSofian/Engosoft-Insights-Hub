@@ -133,9 +133,13 @@ function date(value: unknown): string {
   return dateTime(value).slice(0, 10);
 }
 
-function dateTime(value: unknown): string {
+export function dateTime(value: unknown): string {
+  // Odoo serialises an empty date/datetime as the boolean `false`. Turning it
+  // into the literal string "false" makes it truthy and prevents every
+  // documented fallback (`lost_verification_date` -> stage date -> close date).
+  if (value === false || value === null || value === undefined) return "";
   const raw = String(value ?? "").trim();
-  if (!raw) return "";
+  if (!raw || raw.toLowerCase() === "false") return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const instant = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`);
   if (!Number.isFinite(instant.getTime())) return raw;
@@ -304,6 +308,18 @@ function lossDate(lead: OdooCrmLead): string {
     : dateTime(lead.date_closed) || dateTime(lead.write_date);
 }
 
+function lossDateBasis(lead: OdooCrmLead): string {
+  if (normalize(lead.type) === "opportunity") {
+    if (dateTime(lead.lost_verification_date)) return "lost_verification_date";
+    if (dateTime(lead.date_last_stage_update)) return "date_last_stage_update_fallback";
+    if (dateTime(lead.date_closed)) return "date_closed_fallback";
+    return "missing";
+  }
+  if (dateTime(lead.date_closed)) return "date_closed";
+  if (dateTime(lead.write_date)) return "write_date_fallback";
+  return "missing";
+}
+
 function priorityLabel(lead: OdooCrmLead): string {
   const business = display(lead.priority2);
   if (business) return { "0": "Cold", "1": "Intermediate", "2": "Hot" }[business] ?? business;
@@ -353,6 +369,7 @@ function commonRaw(
     "التاريخ المقفل": dateTime(lead.date_closed),
     "Closing Date": date(lead.date_closed),
     "Lost Date": lossDate(lead),
+    "Lost Date Basis": lossDateBasis(lead),
     "Won Date": dateTime(lead.won_date),
     "Conversion Date": dateTime(lead.date_conversion),
     Source: rawSource,
@@ -418,6 +435,13 @@ function toLostRaw(
   const canonicalLostDate = lossDate(lead);
   return {
     ...raw,
+    // Private authority fields are deliberately outside the legacy Sheet
+    // schema. Stored/enrichment rows have historically reused the visible
+    // `Closing Date`/`Lost Date` columns with different meanings; keeping the
+    // canonical Odoo values under dedicated keys prevents that old payload
+    // from changing an operational closure count during a merge.
+    __canonical_lost_date: canonicalLostDate,
+    __canonical_lost_date_basis: lossDateBasis(lead),
     "مندوب المبيعات": raw.Salesperson,
     المرحلة: raw.Stage,
     المصدر: raw.Source,

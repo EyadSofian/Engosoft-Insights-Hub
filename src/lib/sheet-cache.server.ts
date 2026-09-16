@@ -2587,11 +2587,17 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           sourceKey: normalizeSource(source),
           stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
           createdAt: parseDate(r["أنشئ في"]),
-          closeDate: parseDate(r["Closing Date"]) || parseDate(r["التاريخ المقفل"]),
-          lostDate:
+          closeDate:
+            parseDate(r["__canonical_lost_date"]) ||
             parseDate(r["Lost Date"]) ||
             parseDate(r["Closing Date"]) ||
             parseDate(r["التاريخ المقفل"]),
+          lostDate:
+            parseDate(r["__canonical_lost_date"]) ||
+            parseDate(r["Lost Date"]) ||
+            parseDate(r["Closing Date"]) ||
+            parseDate(r["التاريخ المقفل"]),
+          lostDateBasis: str(r["__canonical_lost_date_basis"]) || str(r["Lost Date Basis"]),
           lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
           lostCategory: str(r["Lost Category"]),
           probability: num(r["Probability"]),

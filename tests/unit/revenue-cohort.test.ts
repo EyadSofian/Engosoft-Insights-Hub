@@ -33,7 +33,14 @@ const lines = [
   // Lead 1 (July): two invoices, one paid in September, and a partial credit note.
   line({ orderRef: "S1", movement: "INV/1", usdPaid: 300, paymentDate: "2026-07-25" }),
   line({ orderRef: "S1b", movement: "INV/2", usdPaid: 200, paymentDate: "2026-09-03" }),
-  line({ orderRef: "S1", movement: "RINV/1", usdPaid: -50, paymentDate: "", invoiceDate: "2026-09-05", isCreditNote: true }),
+  line({
+    orderRef: "S1",
+    movement: "RINV/1",
+    usdPaid: -50,
+    paymentDate: "",
+    invoiceDate: "2026-09-05",
+    isCreditNote: true,
+  }),
   // Lead 3 (August): paid in September.
   line({ orderRef: "S3", movement: "INV/3", usdPaid: 400, paymentDate: "2026-09-01" }),
   // Lead 9 (May, outside the window).
@@ -94,7 +101,10 @@ describe("accounting entry-month cohorts", () => {
     expect(r.linkedUnknownCrmRevenue).toBe(25);
     expect(r.unlinkedRevenue).toBe(150);
     expect(
-      Math.round((r.cohortRevenue + r.otherCohortsRevenue + r.linkedUnknownCrmRevenue + r.unlinkedRevenue) * 100) / 100,
+      Math.round(
+        (r.cohortRevenue + r.otherCohortsRevenue + r.linkedUnknownCrmRevenue + r.unlinkedRevenue) *
+          100,
+      ) / 100,
     ).toBe(r.totalAccountingRevenue);
     expect(result.totals.paidRevenue).toBe(r.cohortRevenue);
   });

@@ -18,11 +18,12 @@ import type { Platform } from "./types";
  */
 
 export type ManagementScope =
-  | { kind: "all" }
-  | { kind: "platform"; platform: Platform }
-  | { kind: "organic" };
+  { kind: "all" } | { kind: "platform"; platform: Platform } | { kind: "organic" };
 
-export function managementScopeFrom(filters: { platform?: string; channel?: string }): ManagementScope {
+export function managementScopeFrom(filters: {
+  platform?: string;
+  channel?: string;
+}): ManagementScope {
   if (filters.channel === "organic") return { kind: "organic" };
   const platform = filters.platform;
   if (
@@ -45,7 +46,13 @@ export function exactAttributionAvailable(scope: ManagementScope): boolean {
   return scope.kind === "all" || (scope.kind === "platform" && scope.platform === "meta");
 }
 
-const META_SOURCE_PLATFORMS = new Set(["facebook", "instagram", "messenger", "audience_network", "meta"]);
+const META_SOURCE_PLATFORMS = new Set([
+  "facebook",
+  "instagram",
+  "messenger",
+  "audience_network",
+  "meta",
+]);
 
 /**
  * Whether an acquisition event belongs to the scope. An event whose platform is
@@ -102,7 +109,10 @@ export interface ScopeSpend {
  * leads but no rows (TikTok before its spend source existed) the spend is
  * unknown, and the total is marked `partial` rather than presented as complete.
  */
-export function scopeSpend(scope: ManagementScope, platforms: readonly PlatformSpendInput[]): ScopeSpend {
+export function scopeSpend(
+  scope: ManagementScope,
+  platforms: readonly PlatformSpendInput[],
+): ScopeSpend {
   if (scope.kind === "organic") {
     return {
       value: null,
@@ -129,13 +139,21 @@ export function scopeSpend(scope: ManagementScope, platforms: readonly PlatformS
       crmLeads: row.crmLeads,
     };
   });
-  const includedPlatforms = byPlatform.filter((row) => row.state === "available").map((row) => row.platform);
+  const includedPlatforms = byPlatform
+    .filter((row) => row.state === "available")
+    .map((row) => row.platform);
   const unavailablePlatforms = byPlatform
     .filter((row) => row.state === "source_unavailable")
     .map((row) => row.platform);
   const total = byPlatform.reduce((sum, row) => sum + (row.spend ?? 0), 0);
   if (scope.kind === "platform" && unavailablePlatforms.length) {
-    return { value: null, status: "pending_sync", byPlatform, includedPlatforms, unavailablePlatforms };
+    return {
+      value: null,
+      status: "pending_sync",
+      byPlatform,
+      includedPlatforms,
+      unavailablePlatforms,
+    };
   }
   return {
     value: Math.round(total * 100) / 100,
@@ -224,8 +242,12 @@ export function managementHealth(input: {
 }): ManagementHealthIndicator[] {
   const out: ManagementHealthIndicator[] = [];
   const metaInScope =
-    input.scope.kind === "all" || (input.scope.kind === "platform" && input.scope.platform === "meta");
-  if (metaInScope && (!input.metaAdsSyncedThrough || input.metaAdsSyncedThrough < input.window.to)) {
+    input.scope.kind === "all" ||
+    (input.scope.kind === "platform" && input.scope.platform === "meta");
+  if (
+    metaInScope &&
+    (!input.metaAdsSyncedThrough || input.metaAdsSyncedThrough < input.window.to)
+  ) {
     out.push({
       key: "spend_sync_incomplete",
       severity: "warning",
@@ -265,7 +287,10 @@ export function managementHealth(input: {
         en: "CRM synced after the last link-graph refresh; the newest CRM changes appear after the next refresh.",
         ar: "تمت مزامنة CRM بعد آخر تحديث للربط؛ أحدث تغييرات CRM تظهر بعد التحديث القادم.",
       },
-      detail: { crmSyncedAt: input.crmSyncedAt, closedLoopRefreshedAt: input.closedLoopRefreshedAt },
+      detail: {
+        crmSyncedAt: input.crmSyncedAt,
+        closedLoopRefreshedAt: input.closedLoopRefreshedAt,
+      },
     });
   }
   if (!exactAttributionAvailable(input.scope)) {
@@ -277,7 +302,11 @@ export function managementHealth(input: {
         ar: "الإسناد الدقيق من الإعلان للإيراد متاح لـ Meta فقط؛ الأرقام المُسندة غير متاحة لهذا الاختيار.",
       },
     });
-  } else if (input.events > 0 && input.exactShareOfEvents !== null && input.exactShareOfEvents < 50) {
+  } else if (
+    input.events > 0 &&
+    input.exactShareOfEvents !== null &&
+    input.exactShareOfEvents < 50
+  ) {
     out.push({
       key: "attribution_coverage_incomplete",
       severity: "warning",

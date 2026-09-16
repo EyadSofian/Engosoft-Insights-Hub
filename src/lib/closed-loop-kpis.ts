@@ -1,6 +1,10 @@
 import type { QualityMetrics } from "./closed-loop";
 import { metricContract, type MetricContract } from "./metric-contracts";
-import { exactAttributionAvailable, type ManagementScope, type ScopeSpend } from "./management-scope";
+import {
+  exactAttributionAvailable,
+  type ManagementScope,
+  type ScopeSpend,
+} from "./management-scope";
 
 /**
  * Management KPIs for the Marketing Overview, with their scopes spelled out.
@@ -120,7 +124,8 @@ function ratio(
   if (gate !== "ok") return withContract({ ...shell, value: null, status: gate });
   if (!denominator.value) return withContract({ ...shell, value: null, status: "no_denominator" });
   const raw = numerator.value / denominator.value;
-  const value = base.format === "usd" || base.format === "ratio" ? Math.round(raw * 100) / 100 : raw;
+  const value =
+    base.format === "usd" || base.format === "ratio" ? Math.round(raw * 100) / 100 : raw;
   return withContract({ ...shell, value, status: "ok" });
 }
 
@@ -159,7 +164,11 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
   const exactMatchesInScope = input.exactCrmMatchesInScope ?? input.tracked.crmMatched;
 
   const part = {
-    metaSpend: { label: t("All Meta ad spend", "كل صرف إعلانات Meta"), value: input.totalSpend, format: "usd" as const },
+    metaSpend: {
+      label: t("All Meta ad spend", "كل صرف إعلانات Meta"),
+      value: input.totalSpend,
+      format: "usd" as const,
+    },
     trackedSpend: {
       label: t("Spend on tracked Meta campaigns", "صرف حملات Meta المتتبَّعة"),
       value: input.trackedSpend,
@@ -190,14 +199,26 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       value: exactMatchesInScope,
       format: "count" as const,
     },
-    interested: { label: t("Interested (exact)", "مهتمون (دقيق)"), value: input.tracked.interested, format: "count" as const },
-    qualified: { label: t("Qualified (exact)", "مؤهلون (دقيق)"), value: input.tracked.qualified, format: "count" as const },
+    interested: {
+      label: t("Interested (exact)", "مهتمون (دقيق)"),
+      value: input.tracked.interested,
+      format: "count" as const,
+    },
+    qualified: {
+      label: t("Qualified (exact)", "مؤهلون (دقيق)"),
+      value: input.tracked.qualified,
+      format: "count" as const,
+    },
     quotations: {
       label: t("Quotations (exact)", "عروض أسعار (دقيق)"),
       value: input.tracked.quotations,
       format: "count" as const,
     },
-    won: { label: t("Won (exact)", "مكسوب (دقيق)"), value: input.tracked.won, format: "count" as const },
+    won: {
+      label: t("Won (exact)", "مكسوب (دقيق)"),
+      value: input.tracked.won,
+      format: "count" as const,
+    },
     revenue: {
       label: t("Cohort paid revenue (exact)", "إيراد الكوهورت المدفوع (دقيق)"),
       value: input.tracked.revenue,
@@ -212,7 +233,11 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
   if (scopeTotals) {
     const spend = scopeTotals.spend;
     const spendStatus: KpiStatus =
-      spend.status === "not_applicable" ? "not_available" : spend.status === "pending_sync" ? "pending_sync" : "ok";
+      spend.status === "not_applicable"
+        ? "not_available"
+        : spend.status === "pending_sync"
+          ? "pending_sync"
+          : "ok";
     const ratioSpendGate: KpiStatus =
       spend.status === "ok" ? "ok" : spend.status === "partial" ? "incomplete_source" : spendStatus;
     const scopeName = scopeTotals.scopeLabel;
@@ -272,7 +297,11 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         "ok",
       ),
     );
-    const spendPart = { label: t("Ad spend in scope", "الصرف في النطاق"), value: spend.value ?? 0, format: "usd" as const };
+    const spendPart = {
+      label: t("Ad spend in scope", "الصرف في النطاق"),
+      value: spend.value ?? 0,
+      format: "usd" as const,
+    };
     kpis.push(
       ratio(
         spendPart,
@@ -302,9 +331,12 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         },
         spendPart,
         {
-          key: "blendedRoas",
+          key: "collectionsToSpend",
           scope: "all",
-          label: t("Collections ÷ ad spend (not attributed)", "التحصيل ÷ صرف الإعلانات (بدون إسناد)"),
+          label: t(
+            "Collections-to-spend ratio (not attributed, not ROAS)",
+            "نسبة التحصيل إلى الصرف (بدون إسناد، ليست ROAS)",
+          ),
           definition: t(
             "Payment-date collections in scope divided by ad spend in scope. Not an attributed return: it includes money from older leads and non-ad sources.",
             "تحصيل النطاق بتاريخ الدفع مقسومًا على صرف النطاق. ليس عائدًا مُسندًا: يشمل أموالًا من ليدز أقدم ومصادر غير إعلانية.",
@@ -321,7 +353,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         "adSpend",
         "all",
         t("Meta ad spend", "صرف إعلانات Meta"),
-        t("Money spent on Meta ads in the selected period.", "المبلغ المصروف على إعلانات Meta في الفترة المختارة."),
+        t(
+          "Money spent on Meta ads in the selected period.",
+          "المبلغ المصروف على إعلانات Meta في الفترة المختارة.",
+        ),
         input.totalSpend,
         "usd",
         exactGate(spendGate),
@@ -371,7 +406,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       "trackedLeads",
       "tracked",
       part.trackedLeads.label,
-      t("Acquisition events whose exact Meta ad is known.", "أحداث الاستحواذ التي نعرف إعلان Meta الخاص بها بالضبط."),
+      t(
+        "Acquisition events whose exact Meta ad is known.",
+        "أحداث الاستحواذ التي نعرف إعلان Meta الخاص بها بالضبط.",
+      ),
       input.tracked.leads,
       "count",
       exactGate("ok"),
@@ -425,7 +463,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       "exactUniqueWon",
       "tracked",
       t("Unique won customers (exact)", "عملاء مكسوبون فريدون (دقيق)"),
-      t("Distinct won CRM records behind the exact CRM matches.", "سجلات CRM المكسوبة المميزة خلف المطابقات الدقيقة."),
+      t(
+        "Distinct won CRM records behind the exact CRM matches.",
+        "سجلات CRM المكسوبة المميزة خلف المطابقات الدقيقة.",
+      ),
       exactUniqueWon,
       "count",
       exactGate(crmGate),
@@ -463,7 +504,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
       {
         key: "roasTracked",
         scope: "tracked",
-        label: t("Cohort ROAS on tracked Meta campaigns", "العائد (كوهورت) على حملات Meta المتتبَّعة"),
+        label: t(
+          "Cohort ROAS on tracked Meta campaigns",
+          "العائد (كوهورت) على حملات Meta المتتبَّعة",
+        ),
         definition: t(
           "Cohort paid revenue of exactly attributed leads divided by the Meta spend of the campaigns those leads came from.",
           "إيراد الكوهورت للعملاء بإسناد دقيق مقسومًا على صرف حملات Meta التي جاؤوا منها.",
@@ -509,7 +553,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "costPerInterested",
         scope: "tracked",
         label: t("Cost per interested lead", "تكلفة العميل المهتم"),
-        definition: t("Tracked-campaign spend divided by interested leads.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المهتمين."),
+        definition: t(
+          "Tracked-campaign spend divided by interested leads.",
+          "صرف الحملات المتتبَّعة مقسومًا على العملاء المهتمين.",
+        ),
         format: "usd",
       },
       exactGate(both),
@@ -521,7 +568,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "costPerQualified",
         scope: "tracked",
         label: t("Cost per qualified lead", "تكلفة العميل المؤهل"),
-        definition: t("Tracked-campaign spend divided by qualified leads.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المؤهلين."),
+        definition: t(
+          "Tracked-campaign spend divided by qualified leads.",
+          "صرف الحملات المتتبَّعة مقسومًا على العملاء المؤهلين.",
+        ),
         format: "usd",
       },
       exactGate(both),
@@ -563,7 +613,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "costPerCustomerTracked",
         scope: "tracked",
         label: t("CAC on tracked Meta campaigns", "تكلفة العميل المكسوب (الحملات المتتبَّعة)"),
-        definition: t("Tracked-campaign spend divided by exactly attributed won customers.", "صرف الحملات المتتبَّعة مقسومًا على العملاء المكسوبين بإسناد دقيق."),
+        definition: t(
+          "Tracked-campaign spend divided by exactly attributed won customers.",
+          "صرف الحملات المتتبَّعة مقسومًا على العملاء المكسوبين بإسناد دقيق.",
+        ),
         format: "usd",
       },
       exactGate(both),
@@ -605,7 +658,10 @@ export function closedLoopKpis(input: KpiInputs): Record<string, Kpi> {
         key: "qualificationRate",
         scope: "tracked",
         label: t("Qualification rate (exact CRM matches)", "معدل التأهيل (مطابقات دقيقة)"),
-        definition: t("Qualified divided by exact CRM matches.", "المؤهلون مقسومين على المطابقات الدقيقة."),
+        definition: t(
+          "Qualified divided by exact CRM matches.",
+          "المؤهلون مقسومين على المطابقات الدقيقة.",
+        ),
         format: "percent",
       },
       exactGate(crmGate),

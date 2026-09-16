@@ -160,7 +160,7 @@ function courseMetrics(
         { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(linked.spend) },
         {
           key: "roas",
-          label: A ? "العائد" : "Return",
+          label: A ? "التحصيل ÷ الصرف" : "Collections ÷ spend",
           value: linked.spend > 0 ? fmtRoas(linked.revenue / linked.spend) : "—",
         },
       ],
@@ -212,7 +212,7 @@ function courseMetrics(
         },
         {
           id: "returns",
-          title: A ? "أعلى الدورات عائدًا" : "Courses with the best return",
+          title: A ? "أعلى الدورات في التحصيل ÷ الصرف" : "Highest collections ÷ spend",
           rows: byCourse((course) => course.roas ?? 0, fmtRoas, "mint"),
           emptyLabel: A ? "لا توجد دورة مؤهلة" : "No eligible course",
         },
@@ -518,7 +518,7 @@ const COURSE_RANKS: Record<
   spend: { ar: "الإنفاق", en: "Spend", value: (course) => course.spend },
   won: { ar: "الصفقات", en: "Won", value: (course) => course.won },
   leads: { ar: "الليدز", en: "Leads", value: (course) => course.crmLeads },
-  roas: { ar: "العائد", en: "ROAS", value: (course) => course.roas ?? -1 },
+  roas: { ar: "التحصيل ÷ الصرف", en: "Collections ÷ spend", value: (course) => course.roas ?? -1 },
 };
 
 function CoursePortfolioNavigator({
@@ -709,7 +709,10 @@ function CoursePortfolioNavigator({
                     label={lang === "ar" ? "Won" : "Won"}
                     value={fmtNum(course.won)}
                   />
-                  <CourseCardMetric label="ROAS" value={fmtRoas(course.roas)} />
+                  <CourseCardMetric
+                    label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
+                    value={fmtRoas(course.roas)}
+                  />
                 </div>
 
                 <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -1283,7 +1286,10 @@ function CourseDetailPanel({
               label={lang === "ar" ? "محصل الفترة" : "Period revenue"}
               value={fmtUSD(course.revenue)}
             />
-            <HeaderStat label={lang === "ar" ? "ROAS" : "ROAS"} value={fmtRoas(course.roas)} />
+            <HeaderStat
+              label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
+              value={fmtRoas(course.roas)}
+            />
           </div>
         </div>
 
@@ -1502,7 +1508,7 @@ function CourseDetailPanel({
               format={fmtUSD}
             />
             <MonthMetricCard
-              label="ROAS"
+              label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
               first={compareA.roas}
               second={compareB.roas}
               firstLabel={formatMonth(monthA, lang)}

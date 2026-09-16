@@ -117,7 +117,9 @@ export const Route = createFileRoute("/api/employee-evidence")({
           if (!leadMap.has(key)) leadMap.set(key, lead);
         }
         const page = capped(
-          [...leadMap.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+          [...leadMap.values()].sort((left, right) =>
+            right.createdAt.localeCompare(left.createdAt),
+          ),
           100,
         );
 
@@ -132,10 +134,12 @@ export const Route = createFileRoute("/api/employee-evidence")({
             );
             chatsByPhone = batch.evidence;
             chatwootPhoneAvailable = true;
-            if (!batch.complete) chatwootPhoneError = `Chatwoot sync is warming ${batch.missing} phone records`;
+            if (!batch.complete)
+              chatwootPhoneError = `Chatwoot sync is warming ${batch.missing} phone records`;
             else if (batch.error) chatwootPhoneError = batch.error;
           } catch (error) {
-            chatwootPhoneError = error instanceof Error ? error.message : "Chatwoot matching is unavailable";
+            chatwootPhoneError =
+              error instanceof Error ? error.message : "Chatwoot matching is unavailable";
           }
         }
 

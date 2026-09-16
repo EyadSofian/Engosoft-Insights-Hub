@@ -1064,10 +1064,10 @@ export function AccountingAgentsView() {
             b.closedLostInPeriod - a.closedLostInPeriod ||
             b.olderCohortClosedLostInPeriod - a.olderCohortClosedLostInPeriod ||
             a.displayName.localeCompare(b.displayName)
-        : sortBy === "calls"
-          ? (b.outboundCalls ?? -1) - (a.outboundCalls ?? -1) ||
-            (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
-          : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
+          : sortBy === "calls"
+            ? (b.outboundCalls ?? -1) - (a.outboundCalls ?? -1) ||
+              (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
+            : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
     );
   const selectedAgent = data.agents.find((row) => row.key === selectedAgentKey) ?? null;
   const targetUnitRollup = buildTargetUnitRollup(
@@ -2911,11 +2911,11 @@ function AgentCards({
                 ? fmtNum(row.slaWon)
                 : sortBy === "closedLost"
                   ? fmtNum(row.closedLostInPeriod)
-                : sortBy === "calls"
-                  ? row.outboundCalls === null
-                    ? "—"
-                    : fmtNum(row.outboundCalls)
-                  : fmtUSDExact(row.paidRevenue)}
+                  : sortBy === "calls"
+                    ? row.outboundCalls === null
+                      ? "—"
+                      : fmtNum(row.outboundCalls)
+                    : fmtUSDExact(row.paidRevenue)}
             </div>
           </div>
 
@@ -3389,7 +3389,11 @@ function AgentPerformanceSheet({
                 <ProfileMetric
                   label={lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices"}
                   value={fmtNum(row.invoices)}
-                  sub={lang === "ar" ? "فواتير مميزة بتاريخ الدفع" : "Distinct invoices by payment date"}
+                  sub={
+                    lang === "ar"
+                      ? "فواتير مميزة بتاريخ الدفع"
+                      : "Distinct invoices by payment date"
+                  }
                   icon={<ReceiptText size={17} />}
                   evidenceHref="#employee-sales-evidence"
                 />
@@ -3407,7 +3411,9 @@ function AgentPerformanceSheet({
                   label={lang === "ar" ? "إنجاز التارجت" : "Target achievement"}
                   explain="achievementPaid"
                   value={
-                    row.target && row.target.target !== null ? fmtPct(row.target.achievementPaid, 1) : "—"
+                    row.target && row.target.target !== null
+                      ? fmtPct(row.target.achievementPaid, 1)
+                      : "—"
                   }
                   sub={
                     row.target && row.target.target !== null
@@ -3425,9 +3431,13 @@ function AgentPerformanceSheet({
             {/* 2 — Leads: "دخل له كام ليد وعمل فيهم إيه؟" */}
             <section className="space-y-3" aria-labelledby="employee-leads-title">
               <div>
-                <div className="text-xs font-semibold text-brand">{lang === "ar" ? "٢ · الليدز" : "2 · Leads"}</div>
+                <div className="text-xs font-semibold text-brand">
+                  {lang === "ar" ? "٢ · الليدز" : "2 · Leads"}
+                </div>
                 <h3 id="employee-leads-title" className="mt-0.5 text-lg font-bold text-text">
-                  {lang === "ar" ? "دخل له كام ليد وعمل فيهم إيه؟" : "How many leads came in, and what happened?"}
+                  {lang === "ar"
+                    ? "دخل له كام ليد وعمل فيهم إيه؟"
+                    : "How many leads came in, and what happened?"}
                 </h3>
               </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -3458,7 +3468,11 @@ function AgentPerformanceSheet({
                 <ProfileMetric
                   label={lang === "ar" ? "خسارة الكوهورت" : "Cohort Lost"}
                   value={fmtNum(row.cohortLost)}
-                  sub={lang === "ar" ? "ليدز الفترة التي انتهت Lost (بتاريخ الإنشاء)" : "Period leads now Lost (by creation date)"}
+                  sub={
+                    lang === "ar"
+                      ? "ليدز الفترة التي انتهت Lost (بتاريخ الإنشاء)"
+                      : "Period leads now Lost (by creation date)"
+                  }
                   icon={<ChartNoAxesCombined size={17} />}
                   evidenceHref="#employee-lead-evidence"
                 />
@@ -3475,7 +3489,11 @@ function AgentPerformanceSheet({
                 <ProfileMetric
                   label={lang === "ar" ? "مفتوحة / متابعة" : "Open / follow-up"}
                   value={fmtNum(Math.max(0, row.cleanLeads - row.won - row.cohortLost))}
-                  sub={lang === "ar" ? "ليدز الفترة غير الرابحة وغير الخاسرة" : "Period leads neither won nor lost"}
+                  sub={
+                    lang === "ar"
+                      ? "ليدز الفترة غير الرابحة وغير الخاسرة"
+                      : "Period leads neither won nor lost"
+                  }
                   icon={<Users size={17} />}
                 />
                 <ProfileMetric
@@ -3500,13 +3518,19 @@ function AgentPerformanceSheet({
                   {lang === "ar" ? "٣ · التواصل والتحقق" : "3 · Contact & QA"}
                 </div>
                 <h3 id="employee-contact-qa-title" className="mt-0.5 text-lg font-bold text-text">
-                  {lang === "ar" ? "تواصل مع ليدزه؟ وهل اتأكدنا؟" : "Were the leads contacted, and verified?"}
+                  {lang === "ar"
+                    ? "تواصل مع ليدزه؟ وهل اتأكدنا؟"
+                    : "Were the leads contacted, and verified?"}
                 </h3>
               </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <ProfileMetric
                   label={lang === "ar" ? "تواصل معها الموظف" : "Contacted by employee"}
-                  value={row.ownerCalledDistributedLeads === null ? "—" : fmtNum(row.ownerCalledDistributedLeads)}
+                  value={
+                    row.ownerCalledDistributedLeads === null
+                      ? "—"
+                      : fmtNum(row.ownerCalledDistributedLeads)
+                  }
                   sub={
                     lang === "ar"
                       ? `تغطية ${fmtPct(row.leadOwnerCallCoverageRate, 1)} من ${fmtNum(row.distributedLeads)} ليد`
@@ -3517,7 +3541,9 @@ function AgentPerformanceSheet({
                 />
                 <ProfileMetric
                   label={lang === "ar" ? "تواصل معها أي موظف" : "Contacted by anyone"}
-                  value={row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)}
+                  value={
+                    row.calledDistributedLeads === null ? "—" : fmtNum(row.calledDistributedLeads)
+                  }
                   sub={
                     lang === "ar"
                       ? `${row.chatRepliedDistributedLeads === null ? "—" : fmtNum(row.chatRepliedDistributedLeads)} برد في Chatwoot`
@@ -3527,7 +3553,11 @@ function AgentPerformanceSheet({
                 />
                 <ProfileMetric
                   label={lang === "ar" ? "لم يتواصل معها أحد (مؤكد)" : "Not contacted (confirmed)"}
-                  value={row.uncalledDistributedLeads === null ? "—" : fmtNum(row.uncalledDistributedLeads)}
+                  value={
+                    row.uncalledDistributedLeads === null
+                      ? "—"
+                      : fmtNum(row.uncalledDistributedLeads)
+                  }
                   sub={
                     lang === "ar"
                       ? `+ ${row.contactUnknownDistributedLeads === null ? "—" : fmtNum(row.contactUnknownDistributedLeads)} غير مؤكد لأن الدليل ناقص`
@@ -3538,7 +3568,9 @@ function AgentPerformanceSheet({
                 <ProfileMetric
                   label={lang === "ar" ? "ينتظرون رده في Chatwoot" : "Awaiting a Chatwoot reply"}
                   value={row.chatAwaitingReply === null ? "—" : fmtNum(row.chatAwaitingReply)}
-                  sub={lang === "ar" ? "حالة الآن، لا تتبع الفترة" : "Current state, not the period"}
+                  sub={
+                    lang === "ar" ? "حالة الآن، لا تتبع الفترة" : "Current state, not the period"
+                  }
                   icon={<Users size={17} />}
                 />
                 <ProfileMetric
@@ -3557,13 +3589,21 @@ function AgentPerformanceSheet({
                 />
                 <ProfileMetric
                   label={lang === "ar" ? "يحتاج مراجعة / متنازع" : "Needs review / disputed"}
-                  value={row.leadQa ? `${fmtNum(row.leadQa.needsReview)} / ${fmtNum(row.leadQa.disputed)}` : "—"}
+                  value={
+                    row.leadQa
+                      ? `${fmtNum(row.leadQa.needsReview)} / ${fmtNum(row.leadQa.disputed)}`
+                      : "—"
+                  }
                   sub={lang === "ar" ? "من التحقق اليدوي" : "From manual QA"}
                   icon={<Users size={17} />}
                 />
                 <ProfileMetric
                   label={lang === "ar" ? "ليدز صالحة / غير صالحة" : "Valid / invalid leads"}
-                  value={row.leadQa ? `${fmtNum(row.leadQa.verifiedValid)} / ${fmtNum(row.leadQa.verifiedInvalid)}` : "—"}
+                  value={
+                    row.leadQa
+                      ? `${fmtNum(row.leadQa.verifiedValid)} / ${fmtNum(row.leadQa.verifiedInvalid)}`
+                      : "—"
+                  }
                   sub={lang === "ar" ? "تحقق يدوي لجودة الليد" : "Manual lead-quality verdicts"}
                   icon={<Users size={17} />}
                 />

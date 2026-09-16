@@ -81,7 +81,8 @@ const META_SPEND: MetricPart = {
   source: "dashboard_rows dataset meta_ads",
 };
 const TRACKED_SPEND: MetricPart = {
-  description: "Meta spend of campaigns that produced at least one exactly attributed acquisition in the window",
+  description:
+    "Meta spend of campaigns that produced at least one exactly attributed acquisition in the window",
   source: "dashboard_rows meta_ads ⨝ meta_entity_graph",
 };
 const EXACT_EVENTS: MetricPart = {
@@ -91,7 +92,8 @@ const EXACT_EVENTS: MetricPart = {
 const EXACT_COHORT_REVENUE: MetricPart = {
   description:
     "Accounting USD paid (FX authority), any payment date to date, on sale orders linked to the CRM records of exactly attributed acquisitions in the window",
-  source: "Accounting paid invoices ⨝ crm_sale_order_links ⨝ acquisition_crm_links (primary, exact)",
+  source:
+    "Accounting paid invoices ⨝ crm_sale_order_links ⨝ acquisition_crm_links (primary, exact)",
 };
 
 const c = (contract: MetricContract) => contract;
@@ -122,7 +124,10 @@ export const METRIC_CONTRACTS = {
     dateBasis: "ad_spend_date",
     attributionScope: "none",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "Meta spend is not synced through the window"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "Meta spend is not synced through the window",
+    ],
   }),
   trackedSpend: c({
     key: "trackedSpend",
@@ -134,7 +139,10 @@ export const METRIC_CONTRACTS = {
     dateBasis: "ad_spend_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "Meta spend is not synced through the window"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "Meta spend is not synced through the window",
+    ],
   }),
   leads: c({
     key: "leads",
@@ -143,7 +151,8 @@ export const METRIC_CONTRACTS = {
     source: ["acquisition_events: meta leads, Chatwoot conversations, landing submissions"],
     grain: "acquisition event (not a unique person)",
     numerator: {
-      description: "Count of acquisition events whose occurred_at falls in the window and whose source platform is in scope",
+      description:
+        "Count of acquisition events whose occurred_at falls in the window and whose source platform is in scope",
       source: "acquisition_events",
     },
     dateBasis: "acquisition_event_date",
@@ -158,7 +167,8 @@ export const METRIC_CONTRACTS = {
     source: ["dashboard_rows crm + lost (disjoint by Odoo id)"],
     grain: "unique CRM record (crm.lead id)",
     numerator: {
-      description: "Active CRM records plus canonical Lost records created in the window, narrowed by platform campaign/source",
+      description:
+        "Active CRM records plus canonical Lost records created in the window, narrowed by platform campaign/source",
       source: "Odoo CRM via dashboard_rows crm, lost",
     },
     dateBasis: "crm_created_date",
@@ -185,13 +195,17 @@ export const METRIC_CONTRACTS = {
     source: ["acquisition_crm_links (primary, exact) ⨝ crm_lead_outcomes"],
     grain: "unique CRM record",
     numerator: {
-      description: "Distinct CRM ids behind exactly attributed acquisitions matched to CRM by provider lead ID",
+      description:
+        "Distinct CRM ids behind exactly attributed acquisitions matched to CRM by provider lead ID",
       source: "acquisition_crm_links",
     },
     dateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   crmMatched: c({
     key: "crmMatched",
@@ -206,7 +220,10 @@ export const METRIC_CONTRACTS = {
     dateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   qualified: c({
     key: "qualified",
@@ -215,13 +232,17 @@ export const METRIC_CONTRACTS = {
     source: ["crm_lead_outcomes.qualified"],
     grain: "acquisition event with exact CRM link",
     numerator: {
-      description: "Exact CRM matches whose record is past Open or has Intermediate/Hot priority (current state)",
+      description:
+        "Exact CRM matches whose record is past Open or has Intermediate/Hot priority (current state)",
       source: "crm_lead_outcomes",
     },
     dateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   won: c({
     key: "won",
@@ -236,7 +257,10 @@ export const METRIC_CONTRACTS = {
     dateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   uniqueWonCustomers: c({
     key: "uniqueWonCustomers",
@@ -245,7 +269,8 @@ export const METRIC_CONTRACTS = {
     source: ["dashboard_rows crm"],
     grain: "unique CRM record",
     numerator: {
-      description: "Active CRM records created in the window that are Won, narrowed by platform campaign/source",
+      description:
+        "Active CRM records created in the window that are Won, narrowed by platform campaign/source",
       source: "Odoo CRM via dashboard_rows crm",
     },
     dateBasis: "crm_created_date",
@@ -266,7 +291,10 @@ export const METRIC_CONTRACTS = {
     dateBasis: "lead_created_cohort_all_payment_dates",
     attributionScope: "exact_sale_order_opportunity_link",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   collectedRevenue: c({
     key: "collectedRevenue",
@@ -275,7 +303,8 @@ export const METRIC_CONTRACTS = {
     source: ["dashboard_rows accounting (Odoo paid invoices), USD with dashboard FX rates"],
     grain: "Accounting invoice product line",
     numerator: {
-      description: "USD paid on invoice lines whose Payment Date (credit notes: invoice date) is in the window; with a platform selected, only lines linked to that platform's campaigns or sources",
+      description:
+        "USD paid on invoice lines whose Payment Date (credit notes: invoice date) is in the window; with a platform selected, only lines linked to that platform's campaigns or sources",
       source: "Accounting",
     },
     dateBasis: "payment_date",
@@ -299,7 +328,10 @@ export const METRIC_CONTRACTS = {
   }),
   roasTracked: c({
     key: "roasTracked",
-    label: { en: "Cohort ROAS on tracked Meta campaigns", ar: "العائد (كوهورت) على حملات Meta المتتبَّعة" },
+    label: {
+      en: "Cohort ROAS on tracked Meta campaigns",
+      ar: "العائد (كوهورت) على حملات Meta المتتبَّعة",
+    },
     engine: "closed-loop",
     source: [EXACT_COHORT_REVENUE.source, TRACKED_SPEND.source],
     grain: "ratio",
@@ -311,9 +343,12 @@ export const METRIC_CONTRACTS = {
     platformScope: "meta_only_exact",
     nullWhen: ["a non-Meta platform or Organic is selected", "tracked spend is zero or not synced"],
   }),
-  blendedRoas: c({
-    key: "blendedRoas",
-    label: { en: "Collections ÷ ad spend (not attributed)", ar: "التحصيل ÷ صرف الإعلانات (بدون إسناد)" },
+  collectionsToSpend: c({
+    key: "collectionsToSpend",
+    label: {
+      en: "Collections-to-spend ratio (not attributed, not ROAS)",
+      ar: "نسبة التحصيل إلى الصرف (بدون إسناد، ليست ROAS)",
+    },
     engine: "metrics.server",
     source: ["Accounting paid invoices", SPEND.source],
     grain: "ratio",
@@ -335,7 +370,10 @@ export const METRIC_CONTRACTS = {
     source: [SPEND.source, "dashboard_rows crm + lost"],
     grain: "ratio",
     numerator: SPEND,
-    denominator: { description: "Unique CRM leads created in the window in scope", source: "Odoo CRM" },
+    denominator: {
+      description: "Unique CRM leads created in the window in scope",
+      source: "Odoo CRM",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "crm_created_date",
     attributionScope: "campaign_or_source_match",
@@ -349,7 +387,10 @@ export const METRIC_CONTRACTS = {
     source: [META_SPEND.source, "acquisition_events in Meta scope"],
     grain: "ratio",
     numerator: META_SPEND,
-    denominator: { description: "Acquisition events in the Meta scope in the window", source: "acquisition_events" },
+    denominator: {
+      description: "Acquisition events in the Meta scope in the window",
+      source: "acquisition_events",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "acquisition_event_date",
     attributionScope: "none",
@@ -377,7 +418,10 @@ export const METRIC_CONTRACTS = {
     source: [META_SPEND.source, "crm_lead_outcomes.won"],
     grain: "ratio",
     numerator: META_SPEND,
-    denominator: { description: "Exact-attributed acquisitions whose CRM record is won", source: "crm_lead_outcomes" },
+    denominator: {
+      description: "Exact-attributed acquisitions whose CRM record is won",
+      source: "crm_lead_outcomes",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
@@ -448,13 +492,17 @@ export const METRIC_CONTRACTS = {
     source: ["acquisition_crm_links (primary, exact) ⨝ crm_lead_outcomes.won"],
     grain: "unique CRM record",
     numerator: {
-      description: "Distinct won CRM ids behind exactly attributed acquisitions with an exact CRM link",
+      description:
+        "Distinct won CRM ids behind exactly attributed acquisitions with an exact CRM link",
       source: "acquisition_crm_links, crm_lead_outcomes",
     },
     dateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
     platformScope: "meta_only_exact",
-    nullWhen: ["a non-Meta platform or Organic is selected", "the CRM link graph has never been built"],
+    nullWhen: [
+      "a non-Meta platform or Organic is selected",
+      "the CRM link graph has never been built",
+    ],
   }),
   costPerInterested: c({
     key: "costPerInterested",
@@ -463,7 +511,10 @@ export const METRIC_CONTRACTS = {
     source: [TRACKED_SPEND.source, "crm_lead_outcomes.interested"],
     grain: "ratio",
     numerator: TRACKED_SPEND,
-    denominator: { description: "Exact CRM matches that are interested (current state)", source: "crm_lead_outcomes" },
+    denominator: {
+      description: "Exact CRM matches that are interested (current state)",
+      source: "crm_lead_outcomes",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
@@ -477,7 +528,10 @@ export const METRIC_CONTRACTS = {
     source: [TRACKED_SPEND.source, "crm_lead_outcomes.qualified"],
     grain: "ratio",
     numerator: TRACKED_SPEND,
-    denominator: { description: "Exact CRM matches that are qualified (current state)", source: "crm_lead_outcomes" },
+    denominator: {
+      description: "Exact CRM matches that are qualified (current state)",
+      source: "crm_lead_outcomes",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
@@ -508,7 +562,10 @@ export const METRIC_CONTRACTS = {
     source: [TRACKED_SPEND.source, "crm_lead_outcomes.won"],
     grain: "ratio",
     numerator: TRACKED_SPEND,
-    denominator: { description: "Exact-attributed acquisitions whose CRM record is won", source: "crm_lead_outcomes" },
+    denominator: {
+      description: "Exact-attributed acquisitions whose CRM record is won",
+      source: "crm_lead_outcomes",
+    },
     dateBasis: "ad_spend_date",
     denominatorDateBasis: "acquisition_event_date",
     attributionScope: "exact_meta_provider_ids",
@@ -523,7 +580,10 @@ export const METRIC_CONTRACTS = {
     engine: "lost-classification",
     source: ["dashboard_rows lost (Odoo 1.26 canonical Lost)"],
     grain: "unique CRM record",
-    numerator: { description: "Canonical Lost records created in the window", source: "Odoo CRM Lost" },
+    numerator: {
+      description: "Canonical Lost records created in the window",
+      source: "Odoo CRM Lost",
+    },
     dateBasis: "crm_created_date",
     attributionScope: "campaign_or_source_match",
     platformScope: "selected_scope",
@@ -536,7 +596,8 @@ export const METRIC_CONTRACTS = {
     source: ["dashboard_rows lost (Odoo 1.26 canonical Lost)"],
     grain: "unique CRM record",
     numerator: {
-      description: "Canonical Lost records whose Lost/Close Date is in the window = created-and-lost + older-cohort + undated-cohort",
+      description:
+        "Canonical Lost records whose Lost/Close Date is in the window = created-and-lost + older-cohort + undated-cohort",
       source: "Odoo CRM Lost",
     },
     dateBasis: "lost_close_date",
@@ -546,7 +607,10 @@ export const METRIC_CONTRACTS = {
   }),
   olderCohortClosedLostInPeriod: c({
     key: "olderCohortClosedLostInPeriod",
-    label: { en: "Older-cohort Closed Lost during period", ar: "Lost اتقفل في الفترة من كوهورت أقدم" },
+    label: {
+      en: "Older-cohort Closed Lost during period",
+      ar: "Lost اتقفل في الفترة من كوهورت أقدم",
+    },
     engine: "lost-classification",
     source: ["dashboard_rows lost"],
     grain: "unique CRM record",
@@ -565,16 +629,22 @@ export const METRIC_CONTRACTS = {
     key: "leadContactEvidence",
     label: { en: "Lead contact evidence", ar: "دليل التواصل مع الليد" },
     engine: "lead-contact-evidence",
-    source: ["Calls Hub lead-calls (Yeastar)", "Chatwoot phone evidence (dataset chatwoot_phone_evidence + API)"],
+    source: [
+      "Calls Hub lead-calls (Yeastar)",
+      "Chatwoot phone evidence (dataset chatwoot_phone_evidence + API)",
+    ],
     grain: "CRM lead",
     numerator: {
-      description: "Calls on phone or mobile on/after creation; employee Chatwoot replies inside the window after creation",
+      description:
+        "Calls on phone or mobile on/after creation; employee Chatwoot replies inside the window after creation",
       source: "Yeastar, Chatwoot",
     },
     dateBasis: "call_and_chat_within_window_after_creation",
     attributionScope: "phone_match",
     platformScope: "not_platform_scoped",
-    nullWhen: ["contact status is `unknown` when Yeastar or Chatwoot evidence is incomplete for the lead's numbers"],
+    nullWhen: [
+      "contact status is `unknown` when Yeastar or Chatwoot evidence is incomplete for the lead's numbers",
+    ],
   }),
   leadQaVerificationRate: c({
     key: "leadQaVerificationRate",
@@ -582,8 +652,14 @@ export const METRIC_CONTRACTS = {
     engine: "lead-qa",
     source: ["lead_quality_verifications"],
     grain: "ratio",
-    numerator: { description: "Assigned leads with a verified_* verdict", source: "lead_quality_verifications" },
-    denominator: { description: "Leads assigned to the employee and created in the window", source: "Odoo CRM" },
+    numerator: {
+      description: "Assigned leads with a verified_* verdict",
+      source: "lead_quality_verifications",
+    },
+    denominator: {
+      description: "Leads assigned to the employee and created in the window",
+      source: "Odoo CRM",
+    },
     dateBasis: "verdict_on_leads_created_in_window",
     attributionScope: "none",
     platformScope: "not_platform_scoped",
@@ -601,7 +677,8 @@ export const METRIC_CONTRACTS = {
     source: ["Accounting paid invoices", "crm_sale_order_links", "dashboard_rows crm + lost"],
     grain: "Accounting invoice product line credited to a CRM creation month",
     numerator: {
-      description: "USD paid (FX authority), any payment date up to today, on sale orders whose opportunity was created in the entry month",
+      description:
+        "USD paid (FX authority), any payment date up to today, on sale orders whose opportunity was created in the entry month",
       source: "Accounting ⨝ crm_sale_order_links ⨝ CRM",
     },
     dateBasis: "lead_created_cohort_all_payment_dates",

@@ -1829,9 +1829,9 @@ function buildColumns({
   // after the identity columns (in RTL the table mirrors, keeping them adjacent).
   // Column order only: every value above is rendered exactly as before.
   const FINANCIAL_KEYS = ["spend", "revenue", "roas"];
-  const financial = FINANCIAL_KEYS.flatMap((key) => columns.filter((column) => column.key === key)).map(
-    (column) => ({ ...column, group: "financial", hideByDefault: false }),
-  );
+  const financial = FINANCIAL_KEYS.flatMap((key) =>
+    columns.filter((column) => column.key === key),
+  ).map((column) => ({ ...column, group: "financial", hideByDefault: false }));
   const rest = columns.filter((column) => !FINANCIAL_KEYS.includes(column.key));
   const firstMetric = rest.findIndex((column) => column.group !== "identity");
   const insertAt = firstMetric === -1 ? rest.length : firstMetric;

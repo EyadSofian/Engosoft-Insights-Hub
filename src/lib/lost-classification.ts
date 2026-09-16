@@ -58,7 +58,10 @@ export function dayInWindow(value: string, window: ReportingWindow): boolean {
   return true;
 }
 
-export function classifyLostRow(row: LostClassifiable, window: ReportingWindow): LostRowClassification {
+export function classifyLostRow(
+  row: LostClassifiable,
+  window: ReportingWindow,
+): LostRowClassification {
   const cohortLost = dayInWindow(row.createdAt, window);
   const closedLostInPeriod = dayInWindow(row.closeDate, window);
   if (!closedLostInPeriod) return { cohortLost, closedLostInPeriod, closedSplit: null };

@@ -527,7 +527,7 @@ function Ads() {
                 <MetricCardDetailTrigger
                   detail={metrics!.roas}
                   card={{
-                    metric: "roas",
+                    metric: "collectionsToSpend",
                     index: 4,
                     icon: <TrendingUp size={14} />,
                     value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
