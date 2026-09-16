@@ -13,10 +13,24 @@ export const CRM_CONTRACT_VERSION = "17.0.1.26.0";
  *
  * The Odoo module version alone is not enough to invalidate last-good rows:
  * dashboard-only authority fields can change without a module upgrade. Bump
- * this value whenever the persisted raw-row shape or its date semantics
- * change so a deploy cannot keep serving a structurally stale snapshot.
+ * this value whenever the persisted raw-row shape, date semantics, or source
+ * scope changes so a deploy cannot keep serving a stale snapshot.
  */
-export const CRM_SNAPSHOT_SCHEMA_REVISION = "lost-date-authority-v2";
+export const CRM_SNAPSHOT_SCHEMA_REVISION = "normal-crm-inventory-scope-v3";
+
+/**
+ * Stable business scope for every normal CRM dashboard population.
+ *
+ * This condition must travel with the Odoo query. Relying on the integration
+ * user's record rules would make dashboard totals change when that user's
+ * groups change. Preparation is deliberately absent: it is a normal CRM stage,
+ * not a synonym for Data Inventory.
+ */
+export const CRM_NORMAL_SCOPE_FILTER = ["inventory_bucket", "=", false] as const;
+
+export function crmNormalScopeDomain(domain: readonly unknown[] = []): unknown[] {
+  return [[...CRM_NORMAL_SCOPE_FILTER], ...domain];
+}
 
 export type CrmRecordType = "lead" | "opportunity";
 export type CrmBusinessStatus = "lead" | "open" | "won" | "lost";

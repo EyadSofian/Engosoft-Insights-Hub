@@ -19,6 +19,7 @@ import {
   type M2O,
 } from "./odoo.server";
 import {
+  crmNormalScopeDomain,
   crmBusinessStatus,
   crmStageKeyForExternalId,
   isCanonicalLost,
@@ -29,10 +30,34 @@ import {
 
 export type CrmRawRow = Record<string, string>;
 
-interface OdooField {
+export interface OdooField {
   string?: string;
   type?: string;
   relation?: string;
+}
+
+export function buildCrmCandidateDomains(
+  metadata: Record<string, OdooField>,
+  floor: string,
+): { activeDomain: Domain; inactiveDomain: Domain } {
+  return {
+    activeDomain: crmNormalScopeDomain([
+      ["active", "=", true],
+      ...dateSinceDomain(
+        metadata,
+        ["create_date", "lost_verification_date", "date_last_stage_update"],
+        floor,
+      ),
+    ]),
+    inactiveDomain: crmNormalScopeDomain([
+      ["active", "=", false],
+      ...dateSinceDomain(
+        metadata,
+        ["create_date", "date_closed", "lost_verification_date", "date_last_stage_update"],
+        floor,
+      ),
+    ]),
+  };
 }
 
 interface OdooCrmLead {
@@ -526,22 +551,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const floorDay = new Date(`${cfg.startDate}T00:00:00Z`);
   floorDay.setUTCDate(floorDay.getUTCDate() - 1);
   const floor = `${floorDay.toISOString().slice(0, 10)} 00:00:00`;
-  const activeDomain: Domain = [
-    ["active", "=", true],
-    ...dateSinceDomain(
-      metadata,
-      ["create_date", "lost_verification_date", "date_last_stage_update"],
-      floor,
-    ),
-  ];
-  const inactiveDomain: Domain = [
-    ["active", "=", false],
-    ...dateSinceDomain(
-      metadata,
-      ["create_date", "date_closed", "lost_verification_date", "date_last_stage_update"],
-      floor,
-    ),
-  ];
+  const { activeDomain, inactiveDomain } = buildCrmCandidateDomains(metadata, floor);
 
   const [activeCandidates, inactiveCandidates, stageKeys] = await Promise.all([
     searchRead<OdooCrmLead>("crm.lead", activeDomain, fields, {
@@ -599,7 +609,8 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
         crmDiagnostics.wrongType++;
         return false;
       }
-      // Operational dashboard scope mirrors the Leads/Pipeline actions.
+      // Defence in depth: the Odoo query already applies the normal-CRM scope,
+      // but a malformed or mocked RPC response must not leak inventory rows.
       if (display(lead.inventory_bucket)) {
         crmDiagnostics.excludedStage++;
         return false;
@@ -628,6 +639,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
         lostDiagnostics.wrongType++;
         return false;
       }
+      // Same defence for the disjoint Lost population.
       if (display(lead.inventory_bucket)) {
         lostDiagnostics.excludedStage++;
         return false;

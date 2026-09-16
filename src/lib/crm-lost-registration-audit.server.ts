@@ -8,6 +8,7 @@ import {
   type Domain,
   type M2O,
 } from "./odoo.server";
+import { crmNormalScopeDomain } from "./crm-contract";
 
 interface OdooField {
   type?: string;
@@ -80,6 +81,66 @@ const text = (value: unknown): string => (value === false ? "" : String(value ??
 let cached: { expiresAt: number; value: LostRegistrationAudit } | null = null;
 const CACHE_MS = 5 * 60_000;
 
+export function buildLostRegistrationDomains(options: {
+  hasWonStatus: boolean;
+  hasStageLost: boolean;
+}): {
+  unregistered: Domain;
+  registeredLostLeads: Domain;
+  currentLostOpportunities: Domain;
+  historicalLostOpportunities: Domain;
+  staleReasonOpenOpportunities: Domain;
+} {
+  const { hasWonStatus, hasStageLost } = options;
+  return {
+    unregistered: crmNormalScopeDomain([
+      ["type", "=", "lead"],
+      ["active", "=", false],
+      ["lost_reason_id", "=", false],
+      ...(hasWonStatus ? [["won_status", "=", "lost"]] : [["probability", "=", 0]]),
+    ]),
+    registeredLostLeads: crmNormalScopeDomain([
+      ["type", "=", "lead"],
+      ["active", "=", false],
+      ["lost_reason_id", "!=", false],
+    ]),
+    currentLostOpportunities: crmNormalScopeDomain(
+      hasStageLost
+        ? [
+            ["type", "=", "opportunity"],
+            ["active", "=", true],
+            ["stage_is_lost", "=", true],
+          ]
+        : [["id", "=", -1]],
+    ),
+    historicalLostOpportunities: crmNormalScopeDomain(
+      hasStageLost
+        ? [
+            ["type", "=", "opportunity"],
+            ["active", "=", false],
+            "|",
+            ["lost_reason_id", "!=", false],
+            ["stage_is_lost", "=", true],
+          ]
+        : [
+            ["type", "=", "opportunity"],
+            ["active", "=", false],
+            ["lost_reason_id", "!=", false],
+          ],
+    ),
+    staleReasonOpenOpportunities: crmNormalScopeDomain(
+      hasStageLost
+        ? [
+            ["type", "=", "opportunity"],
+            ["active", "=", true],
+            ["lost_reason_id", "!=", false],
+            ["stage_is_lost", "=", false],
+          ]
+        : [["id", "=", -1]],
+    ),
+  };
+}
+
 /**
  * Live, read-only audit of records Odoo considers Lost but which cannot enter
  * the canonical Registered Lost population because `lost_reason_id` is empty.
@@ -112,12 +173,7 @@ export async function loadLostRegistrationAudit(): Promise<LostRegistrationAudit
       ? "odoo_lost_status"
       : "archived_zero_probability";
 
-    const unregisteredDomain: Domain = [
-      ["type", "=", "lead"],
-      ["active", "=", false],
-      ["lost_reason_id", "=", false],
-      ...(hasWonStatus ? [["won_status", "=", "lost"]] : [["probability", "=", 0]]),
-    ];
+    const domains = buildLostRegistrationDomains({ hasWonStatus, hasStageLost });
     const fields = [
       "id",
       "name",
@@ -138,35 +194,6 @@ export async function loadLostRegistrationAudit(): Promise<LostRegistrationAudit
       ...(hasWonStatus ? ["won_status"] : []),
     ].filter((field) => Boolean(metadata[field]));
 
-    const currentLostOppDomain: Domain = hasStageLost
-      ? [
-          ["type", "=", "opportunity"],
-          ["active", "=", true],
-          ["stage_is_lost", "=", true],
-        ]
-      : [["id", "=", -1]];
-    const historicalLostOppDomain: Domain = hasStageLost
-      ? [
-          ["type", "=", "opportunity"],
-          ["active", "=", false],
-          "|",
-          ["lost_reason_id", "!=", false],
-          ["stage_is_lost", "=", true],
-        ]
-      : [
-          ["type", "=", "opportunity"],
-          ["active", "=", false],
-          ["lost_reason_id", "!=", false],
-        ];
-    const staleReasonDomain: Domain = hasStageLost
-      ? [
-          ["type", "=", "opportunity"],
-          ["active", "=", true],
-          ["lost_reason_id", "!=", false],
-          ["stage_is_lost", "=", false],
-        ]
-      : [["id", "=", -1]];
-
     const [
       rows,
       registeredLostLeads,
@@ -174,22 +201,14 @@ export async function loadLostRegistrationAudit(): Promise<LostRegistrationAudit
       historicalLostOpportunities,
       stale,
     ] = await Promise.all([
-      searchRead<UnregisteredLostRow>("crm.lead", unregisteredDomain, fields, {
+      searchRead<UnregisteredLostRow>("crm.lead", domains.unregistered, fields, {
         order: "date_closed desc, id desc",
         context: { active_test: false },
       }),
-      searchCount(
-        "crm.lead",
-        [
-          ["type", "=", "lead"],
-          ["active", "=", false],
-          ["lost_reason_id", "!=", false],
-        ],
-        { active_test: false },
-      ),
-      searchCount("crm.lead", currentLostOppDomain, { active_test: false }),
-      searchCount("crm.lead", historicalLostOppDomain, { active_test: false }),
-      searchCount("crm.lead", staleReasonDomain, { active_test: false }),
+      searchCount("crm.lead", domains.registeredLostLeads, { active_test: false }),
+      searchCount("crm.lead", domains.currentLostOpportunities, { active_test: false }),
+      searchCount("crm.lead", domains.historicalLostOpportunities, { active_test: false }),
+      searchCount("crm.lead", domains.staleReasonOpenOpportunities, { active_test: false }),
     ]);
 
     const baseUrl = odooConfig().url;

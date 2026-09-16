@@ -183,8 +183,8 @@ function stageCopy(stage: Exclude<CrmStageKey, "other">, lang: "ar" | "en") {
   const ar = {
     preparation: {
       name: "التجهيز",
-      note: "مساحة إدارية للحصر، وليست نقطة دخول العميل الجديد.",
-      fields: ["Inventory Bucket", "Lead Segment", "Sales Team"],
+      note: "مرحلة CRM مستقلة، وتظهر طبيعيًا ما دام السجل ليس Data Inventory.",
+      fields: ["Lead Segment", "Sales Team", "Source"],
     },
     new: {
       name: "جديد",
@@ -215,8 +215,8 @@ function stageCopy(stage: Exclude<CrmStageKey, "other">, lang: "ar" | "en") {
   const en = {
     preparation: {
       name: "Preparation",
-      note: "A management inventory area, not the normal entry point.",
-      fields: ["Inventory Bucket", "Lead Segment", "Sales Team"],
+      note: "A normal CRM stage, included whenever the record is not Data Inventory.",
+      fields: ["Lead Segment", "Sales Team", "Source"],
     },
     new: {
       name: "New",

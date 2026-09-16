@@ -21,7 +21,7 @@ const record = (overrides = {}) => ({
 });
 
 assert.equal(CRM_CONTRACT_VERSION, "17.0.1.26.0");
-assert.equal(CRM_SNAPSHOT_SCHEMA_REVISION, "lost-date-authority-v2");
+assert.equal(CRM_SNAPSHOT_SCHEMA_REVISION, "normal-crm-inventory-scope-v3");
 
 assert.equal(crmBusinessStatus(record()), "lead", "active Lead stays workable");
 assert.equal(

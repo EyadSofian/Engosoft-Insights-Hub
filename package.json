@@ -73,7 +73,8 @@
     "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs",
     "audit:agent-coverage": "node --experimental-strip-types scripts/audit-agent-coverage.mjs",
     "audit:agent-coverage:self-test": "node --experimental-strip-types scripts/audit-agent-coverage.mjs --self-test",
-    "audit:crm-lost": "vite-node scripts/audit-crm-lost.mjs"
+    "audit:crm-lost": "vite-node scripts/audit-crm-lost.mjs",
+    "audit:crm-inventory-scope": "vite-node scripts/audit-crm-inventory-scope.mjs"
   },
   "dependencies": {
     "@botpress/webchat": "^5.5.1",
