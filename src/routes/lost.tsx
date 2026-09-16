@@ -8,7 +8,6 @@ import {
   Info,
   MessageSquareWarning,
   Percent,
-  ShieldAlert,
   TrendingDown,
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
@@ -23,13 +22,12 @@ import {
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
-import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
-import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
+import type { Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import {
   Dialog,
@@ -88,26 +86,6 @@ interface LostRowView {
   stage: string;
 }
 
-interface UnregisteredLostRowView {
-  id: string;
-  name: string;
-  contact: string;
-  recordType: "lead";
-  stage: string;
-  salesperson: string;
-  salesTeam: string;
-  source: string;
-  createdAt: string;
-  closeDate: string;
-  lastStageUpdate: string;
-  writeDate: string;
-  stateEvidence: "odoo_lost_status" | "archived_zero_probability";
-  issue: "missing_structured_lost_reason";
-  odooUrl: string;
-}
-
-type SelectedLostRecord = LostRowView | UnregisteredLostRowView;
-
 interface LostDuplicateAuditView {
   declaredCount: number;
   declaredShare: number | null;
@@ -121,20 +99,6 @@ interface LostDuplicateAuditView {
 interface Resp {
   breakdown: LostBreakdown;
   duplicateAudit: LostDuplicateAuditView;
-  registrationAudit: {
-    available: boolean;
-    checkedAt: string;
-    basis: "odoo_lost_status" | "archived_zero_probability" | "unavailable";
-    counts: {
-      registeredLostLeads: number | null;
-      currentLostOpportunities: number | null;
-      historicalLostOpportunities: number | null;
-      unregisteredLostLeads: number | null;
-      staleReasonOpenOpportunities: number | null;
-    };
-    rows: UnregisteredLostRowView[];
-    error?: string;
-  };
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -160,7 +124,6 @@ interface Resp {
     limit: number;
     reasonKey?: string;
   };
-  health: DataHealth;
 }
 
 /** A Lost distribution the response already carried, as a drill-down section. */
@@ -318,7 +281,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
     },
     closed: {
       id: "lost.closed",
-      title: A ? "اتقفل خلال الفترة" : "Closed in period",
+      title: A ? "Lost بتاريخ إغلاق داخل الفترة" : "Lost by close date in period",
       value: fmtNum(M.closedLost),
       tone: "amber",
       icon: <CalendarClock size={16} />,
@@ -397,7 +360,7 @@ function Lost() {
   const [shareView, setShareView] = useState<ShareView>("reason");
   const [selectedReason, setSelectedReason] = useState<{ key: string; label: string } | null>(null);
   const [reasonOffset, setReasonOffset] = useState(0);
-  const [selectedRecord, setSelectedRecord] = useState<SelectedLostRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<LostRowView | null>(null);
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
   const reasonQuery = useApi<Resp>(
     `/api/lost?detailReason=${encodeURIComponent(selectedReason?.key ?? "")}&detailOffset=${reasonOffset}&detailLimit=50`,
@@ -564,55 +527,6 @@ function Lost() {
         </>
       ) : (
         <>
-          {/* The reader is told exactly what is wrong with the figures — that
-              they are stopped, or that they are a stored copy — because both
-              change what the page means. What they are not told on the page
-              itself is which store the copy lives in: naming the database is
-              an instruction to nobody who reads this report. It stays one
-              disclosure away, for whoever can act on it. */}
-          {!hasReportableLost(data.health.lostAuthority) && (
-            <DataHealthSummary
-              issues={[
-                {
-                  tone: "danger",
-                  message:
-                    lang === "ar"
-                      ? "أرقام الخسائر متوقفة في هذه الفترة."
-                      : "Lost figures are stopped for this period.",
-                  impact:
-                    lang === "ar"
-                      ? "المصدر المعتمد للخسائر غير متاح، ونعرض توقفاً بدلاً من صفر مضلل."
-                      : "The approved Lost source is unavailable, so the report stops rather than showing a misleading zero.",
-                  technical:
-                    lang === "ar"
-                      ? "Canonical CRM Lost غير متاح من Odoo مباشرة ولا من آخر نسخة مخزّنة."
-                      : "Canonical CRM Lost is unavailable from Odoo directly and from the last stored snapshot.",
-                },
-              ]}
-            />
-          )}
-          {usesStoredLost(data.health.lostAuthority) && (
-            <DataHealthSummary
-              issues={[
-                {
-                  tone: "warning",
-                  message:
-                    lang === "ar"
-                      ? "أرقام الخسائر معروضة من آخر نسخة ناجحة."
-                      : "Lost figures are served from the last good copy.",
-                  impact:
-                    lang === "ar"
-                      ? "البيانات موجودة وغير محسوبة صفراً، لكن أحدث الصفوف قد تنقص."
-                      : "The data is present and is not counted as zero, but the newest rows may be missing.",
-                  technical:
-                    lang === "ar"
-                      ? "مصدر Odoo CRM المباشر متعذر مؤقتاً؛ يتم استخدام آخر لقطة صحيحة لتصنيف Lost."
-                      : "The direct Odoo CRM source is temporarily unreachable; the last valid Lost classification is in use.",
-                },
-              ]}
-            />
-          )}
-
           {/* Four coloured cards rather than four cells of a divided strip
               inside a card. Same four figures, each of them now openable — and
               one less card-inside-a-card. */}
@@ -635,7 +549,10 @@ function Lost() {
               detail={metrics!.closed}
               card={{
                 index: 2,
-                sub: lang === "ar" ? "حسب تاريخ Lost المعتمد" : "By canonical Lost date",
+                sub:
+                  lang === "ar"
+                    ? `يشمل ${fmtNum(data.closureMovement.fromOlderCohorts)} سجلًا من إنشاء أقدم`
+                    : `Includes ${fmtNum(data.closureMovement.fromOlderCohorts)} older-created records`,
               }}
             />
             <MetricDetailTrigger
@@ -650,148 +567,57 @@ function Lost() {
             />
           </KpiRow>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card
-              className={
-                data.registrationAudit.rows.length
-                  ? "border-warning/35 bg-warning-soft/25"
-                  : "border-success/25 bg-success-soft/20"
+          <Card className="border-danger/25 bg-danger-soft/15">
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "نسبة Duplicate هي تصنيف بشري في Odoo. نتحقق بشكل مستقل من وجود سجل آخر بنفس Provider Lead ID أو رقم الهاتف بعد التطبيع."
+                  : "Duplicate is a human Odoo classification. It is independently checked against another record sharing a provider lead id or normalized phone."
               }
             >
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "فحص مباشر من Odoo لكل Lead حالته Lost لكن سبب الخسارة الهيكلي غير مسجل. هذه السجلات لا تدخل الرقم الرسمي حتى تُصحح."
-                    : "A live Odoo check for Leads marked Lost without a structured Lost Reason. They stay outside the official total until corrected."
-                }
-              >
-                <span className="inline-flex items-center gap-2">
-                  <ShieldAlert
-                    size={17}
-                    className={data.registrationAudit.rows.length ? "text-warning" : "text-success"}
-                  />
-                  {lang === "ar" ? "مراجعة تسجيل الـLost" : "Lost registration audit"}
-                </span>
-              </SectionTitle>
-
-              {!data.registrationAudit.available ? (
-                <Notice tone="warning">
-                  {lang === "ar"
-                    ? "تعذر فحص حالات Lost غير المسجلة من Odoo الآن؛ لا نعرضها كصفر."
-                    : "The unregistered Lost check is unavailable; it is not shown as zero."}
-                </Notice>
+              <span className="inline-flex items-center gap-2">
+                <MessageSquareWarning size={17} className="text-danger" />
+                {lang === "ar" ? "تدقيق سبب Duplicate" : "Duplicate reason audit"}
+              </span>
+            </SectionTitle>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                [
+                  lang === "ar" ? "مصنفة Duplicate" : "Declared duplicate",
+                  fmtNum(data.duplicateAudit.declaredCount),
+                ],
+                [
+                  lang === "ar" ? "من كل Lost" : "Share of Lost",
+                  fmtPct(data.duplicateAudit.declaredShare, 1),
+                ],
+                [
+                  lang === "ar" ? "بدليل هوية" : "Identity-supported",
+                  fmtNum(data.duplicateAudit.supportedCount),
+                ],
+                [
+                  lang === "ar" ? "تحتاج مراجعة" : "Needs review",
+                  fmtNum(data.duplicateAudit.unsupportedCount),
+                ],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-border bg-surface p-3">
+                  <div className="text-[10px] leading-snug text-text-muted">{label}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{value}</div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 flex items-start gap-2 text-xs leading-6 text-text-muted">
+              {data.duplicateAudit.unsupportedCount > 0 ? (
+                <AlertTriangle size={15} className="mt-1 shrink-0 text-warning" />
               ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {[
-                      [
-                        lang === "ar" ? "Lost Leads مسجلة" : "Registered Lost Leads",
-                        data.registrationAudit.counts.registeredLostLeads,
-                      ],
-                      [
-                        lang === "ar" ? "Lost غير مسجلة" : "Unregistered Lost",
-                        data.registrationAudit.counts.unregisteredLostLeads,
-                      ],
-                      [
-                        lang === "ar" ? "سبب قديم على فرصة مفتوحة" : "Stale reason on open opp",
-                        data.registrationAudit.counts.staleReasonOpenOpportunities,
-                      ],
-                    ].map(([label, value]) => (
-                      <div
-                        key={String(label)}
-                        className="rounded-xl border border-border bg-surface p-3"
-                      >
-                        <div className="text-[10px] leading-snug text-text-muted">{label}</div>
-                        <div className="num mt-1 text-xl font-bold text-text">
-                          {value === null ? "—" : fmtNum(Number(value))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {data.registrationAudit.rows.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-xs leading-6 text-warning">
-                        {lang === "ar"
-                          ? "السجلات التالية LOST فعلًا في Odoo، لكن Lost Reason فاضي. اضغط على أي سجل لمراجعته وفتحه للتعديل."
-                          : "These records are Lost in Odoo, but Lost Reason is empty. Select one to review and edit it."}
-                      </p>
-                      {data.registrationAudit.rows.map((row) => (
-                        <button
-                          key={row.id}
-                          type="button"
-                          onClick={() => setSelectedRecord(row)}
-                          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-warning/25 bg-surface px-3 py-2 text-start transition hover:-translate-y-0.5 hover:border-warning/50 hover:shadow-sm"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-text">
-                              {row.contact || row.name || `CRM #${row.id}`}
-                            </span>
-                            <span className="num block text-[10px] text-text-muted">
-                              CRM #{row.id} · {fmtDate(row.closeDate || row.createdAt, lang)}
-                            </span>
-                          </span>
-                          <ExternalLink size={15} className="shrink-0 text-warning" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
+                <CheckCircle2 size={15} className="mt-1 shrink-0 text-success" />
               )}
-            </Card>
-
-            <Card className="border-danger/25 bg-danger-soft/15">
-              <SectionTitle
-                hint={
-                  lang === "ar"
-                    ? "نسبة Duplicate هي تصنيف بشري في Odoo. نتحقق بشكل مستقل من وجود سجل آخر بنفس Provider Lead ID أو رقم الهاتف بعد التطبيع."
-                    : "Duplicate is a human Odoo classification. It is independently checked against another record sharing a provider lead id or normalized phone."
-                }
-              >
-                <span className="inline-flex items-center gap-2">
-                  <MessageSquareWarning size={17} className="text-danger" />
-                  {lang === "ar" ? "تدقيق سبب Duplicate" : "Duplicate reason audit"}
-                </span>
-              </SectionTitle>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
-                  [
-                    lang === "ar" ? "مصنفة Duplicate" : "Declared duplicate",
-                    fmtNum(data.duplicateAudit.declaredCount),
-                  ],
-                  [
-                    lang === "ar" ? "من كل Lost" : "Share of Lost",
-                    fmtPct(data.duplicateAudit.declaredShare, 1),
-                  ],
-                  [
-                    lang === "ar" ? "بدليل هوية" : "Identity-supported",
-                    fmtNum(data.duplicateAudit.supportedCount),
-                  ],
-                  [
-                    lang === "ar" ? "تحتاج مراجعة" : "Needs review",
-                    fmtNum(data.duplicateAudit.unsupportedCount),
-                  ],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-border bg-surface p-3">
-                    <div className="text-[10px] leading-snug text-text-muted">{label}</div>
-                    <div className="num mt-1 text-lg font-bold text-text">{value}</div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 flex items-start gap-2 text-xs leading-6 text-text-muted">
-                {data.duplicateAudit.unsupportedCount > 0 ? (
-                  <AlertTriangle size={15} className="mt-1 shrink-0 text-warning" />
-                ) : (
-                  <CheckCircle2 size={15} className="mt-1 shrink-0 text-success" />
-                )}
-                <span>
-                  {lang === "ar"
-                    ? `التحقق غطّى ${fmtNum(data.duplicateAudit.universeRecords)} سجل CRM. عدم وجود تطابق لا يثبت أن التصنيف خطأ، لكنه يمنع اعتماد النسبة كحقيقة بدون مراجعة.`
-                    : `The check covered ${fmtNum(data.duplicateAudit.universeRecords)} CRM records. Missing identity support does not prove the label is wrong, but it prevents treating the percentage as verified.`}
-                </span>
-              </p>
-            </Card>
-          </div>
+              <span>
+                {lang === "ar"
+                  ? `التحقق غطّى ${fmtNum(data.duplicateAudit.universeRecords)} سجل CRM. عدم وجود تطابق لا يثبت أن التصنيف خطأ، لكنه يمنع اعتماد النسبة كحقيقة بدون مراجعة.`
+                  : `The check covered ${fmtNum(data.duplicateAudit.universeRecords)} CRM records. Missing identity support does not prove the label is wrong, but it prevents treating the percentage as verified.`}
+              </span>
+            </p>
+          </Card>
 
           <Card className="border-brand/20 bg-brand-soft/35">
             <SectionTitle
@@ -1179,26 +1005,21 @@ function LostRecordSheet({
   lang,
   onOpenChange,
 }: {
-  record: SelectedLostRecord | null;
+  record: LostRowView | null;
   lang: "ar" | "en";
   onOpenChange: (open: boolean) => void;
 }) {
-  const unregistered = Boolean(record && "issue" in record);
-  const canonical = record && !unregistered ? (record as LostRowView) : null;
-  const anomaly = record && unregistered ? (record as UnregisteredLostRowView) : null;
-  const reason = canonical
-    ? (lang === "ar" ? canonical.canonicalReasonLabelAr : canonical.canonicalReasonLabelEn) ||
-      canonical.reason ||
+  const reason = record
+    ? (lang === "ar" ? record.canonicalReasonLabelAr : record.canonicalReasonLabelEn) ||
+      record.reason ||
       "—"
-    : lang === "ar"
-      ? "غير مسجل"
-      : "Not registered";
+    : "—";
   const facts: [string, string][] = [];
   if (record) {
     facts.push(
       [lang === "ar" ? "CRM ID" : "CRM ID", record.id],
       [lang === "ar" ? "النوع" : "Type", record.recordType],
-      [lang === "ar" ? "الحالة" : "Status", unregistered ? "LOST" : "Registered Lost"],
+      [lang === "ar" ? "الحالة" : "Status", "Registered Lost"],
       [lang === "ar" ? "سبب الخسارة" : "Loss reason", reason],
       [lang === "ar" ? "المرحلة" : "Stage", record.stage || "—"],
       [lang === "ar" ? "تاريخ الإنشاء" : "Created", record.createdAt || "—"],
@@ -1207,13 +1028,11 @@ function LostRecordSheet({
       [lang === "ar" ? "الموظف" : "Salesperson", record.salesperson || "—"],
       [lang === "ar" ? "المصدر" : "Source", record.source || "—"],
     );
-    if (canonical) {
-      facts.push(
-        [lang === "ar" ? "أساس تاريخ Lost" : "Lost date basis", canonical.lostDateBasis || "—"],
-        [lang === "ar" ? "الدورة" : "Course", canonical.course || "—"],
-        [lang === "ar" ? "الحملة" : "Campaign", canonical.campaign || "—"],
-      );
-    }
+    facts.push(
+      [lang === "ar" ? "أساس تاريخ Lost" : "Lost date basis", record.lostDateBasis || "—"],
+      [lang === "ar" ? "الدورة" : "Course", record.course || "—"],
+      [lang === "ar" ? "الحملة" : "Campaign", record.campaign || "—"],
+    );
   }
 
   return (
@@ -1227,17 +1046,11 @@ function LostRecordSheet({
           <>
             <SheetHeader className="border-b border-border bg-surface-2/60 px-5 py-5 pe-12 text-start">
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <Pill tone={unregistered ? "warning" : "danger"}>
-                  {unregistered
-                    ? lang === "ar"
-                      ? "Lost غير مسجل"
-                      : "Unregistered Lost"
-                    : "Registered Lost"}
-                </Pill>
+                <Pill tone="danger">Registered Lost</Pill>
                 <span className="num text-[11px] text-text-muted">CRM #{record.id}</span>
               </div>
               <SheetTitle className="text-start text-xl text-text">
-                {record.contact || (anomaly?.name ?? `CRM #${record.id}`)}
+                {record.contact || `CRM #${record.id}`}
               </SheetTitle>
               <SheetDescription className="text-start text-xs leading-6 text-text-muted">
                 {lang === "ar"
@@ -1247,29 +1060,21 @@ function LostRecordSheet({
             </SheetHeader>
 
             <div className="space-y-4 p-5">
-              {unregistered && (
-                <Notice tone="warning">
-                  {lang === "ar"
-                    ? "Odoo يعتبر السجل LOST، لكن حقل Lost Reason الهيكلي فاضي؛ لذلك السجل ظاهر في قائمة المراجعة ولا يدخل إجمالي Registered Lost."
-                    : "Odoo considers this record LOST, but its structured Lost Reason is empty. It appears in the review queue and stays outside Registered Lost totals."}
-                </Notice>
-              )}
-
-              {canonical?.canonicalReasonKey === "duplicate" && (
+              {record.canonicalReasonKey === "duplicate" && (
                 <Notice
-                  tone={canonical.duplicateEvidence?.supported ? "info" : "warning"}
+                  tone={record.duplicateEvidence?.supported ? "info" : "warning"}
                   icon={
-                    canonical.duplicateEvidence?.supported ? (
+                    record.duplicateEvidence?.supported ? (
                       <CheckCircle2 size={16} className="text-success" />
                     ) : (
                       <AlertTriangle size={16} />
                     )
                   }
                 >
-                  {canonical.duplicateEvidence?.supported
+                  {record.duplicateEvidence?.supported
                     ? lang === "ar"
-                      ? `يوجد دليل هوية مطابق مع ${fmtNum(canonical.duplicateEvidence.matchedRecordCount)} سجل CRM آخر عبر ${canonical.duplicateEvidence.sources.includes("provider_id") ? "Provider Lead ID" : "رقم الهاتف"}.`
-                      : `Identity evidence matches ${fmtNum(canonical.duplicateEvidence.matchedRecordCount)} other CRM record(s).`
+                      ? `يوجد دليل هوية مطابق مع ${fmtNum(record.duplicateEvidence.matchedRecordCount)} سجل CRM آخر عبر ${record.duplicateEvidence.sources.includes("provider_id") ? "Provider Lead ID" : "رقم الهاتف"}.`
+                      : `Identity evidence matches ${fmtNum(record.duplicateEvidence.matchedRecordCount)} other CRM record(s).`
                     : lang === "ar"
                       ? "لم نجد سجلًا آخر مطابقًا بالـProvider Lead ID أو الهاتف داخل نطاق بيانات الداشبورد؛ السبب يحتاج مراجعة يدوية."
                       : "No other record matched by provider lead id or phone in dashboard scope; the reason needs manual review."}
@@ -1290,17 +1095,15 @@ function LostRecordSheet({
                 ))}
               </dl>
 
-              {canonical && (canonical.phone || canonical.mobile || canonical.email) && (
+              {(record.phone || record.mobile || record.email) && (
                 <div className="rounded-2xl border border-border bg-surface-2/45 p-4">
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
                     {lang === "ar" ? "بيانات التواصل" : "Contact details"}
                   </div>
                   <div className="space-y-1 text-sm text-text" dir="ltr">
-                    {canonical.phone && <div>{canonical.phone}</div>}
-                    {canonical.mobile && canonical.mobile !== canonical.phone && (
-                      <div>{canonical.mobile}</div>
-                    )}
-                    {canonical.email && <div>{canonical.email}</div>}
+                    {record.phone && <div>{record.phone}</div>}
+                    {record.mobile && record.mobile !== record.phone && <div>{record.mobile}</div>}
+                    {record.email && <div>{record.email}</div>}
                   </div>
                 </div>
               )}

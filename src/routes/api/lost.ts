@@ -16,8 +16,6 @@ export const Route = createFileRoute("/api/lost")({
           await import("@/lib/lost-classification");
         const { canonicalLossReason } = await import("@/lib/loss-reason-taxonomy");
         const { auditDuplicateReasons } = await import("@/lib/lost-duplicate-audit");
-        const { loadLostRegistrationAudit } =
-          await import("@/lib/crm-lost-registration-audit.server");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
 
@@ -29,10 +27,9 @@ export const Route = createFileRoute("/api/lost")({
           200,
           Math.max(1, Number(requestParams.get("detailLimit")) || 50),
         );
-        const [data, closedData, registrationAudit] = await Promise.all([
+        const [data, closedData] = await Promise.all([
           getFiltered(filters),
           getFiltered({ ...filters, lostDateBasis: "closed" }),
-          loadLostRegistrationAudit(),
         ]);
         const labels = data.snapshot.sourceLabels;
         const window = { from: filters.from, to: filters.to };
@@ -152,7 +149,6 @@ export const Route = createFileRoute("/api/lost")({
             identityGroups: duplicateAudit.identityGroups,
             universeRecords: duplicateAudit.universeRecords,
           },
-          registrationAudit,
           teamLostRates,
           totals: computeTotals(data),
           /**
