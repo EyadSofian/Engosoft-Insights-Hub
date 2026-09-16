@@ -9,7 +9,7 @@ vi.mock("@/lib/odoo.server", () => ({
   m2oId: (v?: [number, string] | false) => (v ? v[0] : 0),
   m2oName: (v?: [number, string] | false) => (v ? v[1] : ""),
 }));
-import { loadCrmRawByIds } from "@/lib/crm-odoo.server";
+import { loadCrmRawByDomain, loadCrmRawByIds } from "@/lib/crm-odoo.server";
 describe("event record universe", () => {
   it("explicitly excludes Inventory, keeps Preparation and old records, and does not restrict current active/Lost state", async () => {
     mocks.call.mockImplementation(async (_model, method) =>
@@ -69,5 +69,11 @@ describe("event record universe", () => {
     expect(
       mocks.call.mock.calls.every((c) => ["fields_get", "get_external_id"].includes(c[1])),
     ).toBe(true);
+    mocks.read.mockClear();
+    await loadCrmRawByDomain([["active", "=", true]], { attempts: 1, timeoutMs: 30_000 });
+    expect(mocks.read.mock.calls.find((c) => c[0] === "crm.lead")?.[1]).toEqual([
+      ["inventory_bucket", "=", false],
+      ["active", "=", true],
+    ]);
   });
 });

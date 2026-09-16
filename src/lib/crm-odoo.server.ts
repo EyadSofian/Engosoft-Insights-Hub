@@ -465,6 +465,26 @@ export async function loadCrmRawByIds(
   policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
 ): Promise<CrmRawRow[]> {
   if (!ids.length) return [];
+  const domains: unknown[][] = [];
+  for (let offset = 0; offset < ids.length; offset += 1000)
+    domains.push([["id", "in", ids.slice(offset, offset + 1000)]]);
+  return loadCrmRawFromDomains(domains, policy);
+}
+
+/** Direct current-state reads share the same explicit normal-CRM scope.
+ * The caller supplies business/date predicates, never a permission fallback.
+ */
+export async function loadCrmRawByDomain(
+  domain: readonly unknown[],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
+  return loadCrmRawFromDomains([[...domain]], policy);
+}
+
+async function loadCrmRawFromDomains(
+  domains: readonly unknown[][],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
   const metadata = await odooCallWithPolicy<Record<string, OdooField>>(
     "crm.lead",
     "fields_get",
@@ -503,13 +523,11 @@ export async function loadCrmRawByIds(
   ];
   const stages = await loadStageKeys(policy);
   const out: CrmRawRow[] = [];
-  for (let offset = 0; offset < ids.length; offset += 1000) {
-    const rows = await searchRead<OdooCrmLead>(
-      "crm.lead",
-      crmNormalScopeDomain([["id", "in", ids.slice(offset, offset + 1000)]]),
-      fields,
-      { context: { active_test: false, lang: "en_US" }, policy },
-    );
+  for (const domain of domains) {
+    const rows = await searchRead<OdooCrmLead>("crm.lead", crmNormalScopeDomain(domain), fields, {
+      context: { active_test: false, lang: "en_US" },
+      policy,
+    });
     out.push(
       ...rows
         .filter((r) => !display(r.inventory_bucket))

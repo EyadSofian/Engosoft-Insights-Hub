@@ -8,6 +8,8 @@ export const Route = createFileRoute("/api/leads")({
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
         const { loadLostMovement } = await import("@/lib/crm-lost-movement.server");
+        const { loadFreshLostPipeline, loadArchivedLostLeads } =
+          await import("@/lib/crm-fresh-lost.server");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
@@ -15,7 +17,11 @@ export const Route = createFileRoute("/api/leads")({
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
-        const movement = await loadLostMovement(filters, data.snapshot);
+        const [movement, freshPipeline, archivedLeads] = await Promise.all([
+          loadLostMovement(filters, data.snapshot),
+          loadFreshLostPipeline(filters, data.snapshot),
+          loadArchivedLostLeads(filters, data.snapshot),
+        ]);
         const odooBaseUrl = odooConfig().url;
 
         const activeRows = data.crm.map((row) => ({
@@ -240,11 +246,31 @@ export const Route = createFileRoute("/api/leads")({
             freshRecords: undefined,
             olderRecords: undefined,
           },
+          freshLostPipeline: { ...freshPipeline, records: undefined },
+          freshLostPipelineFacets: {
+            bySource: top(freshPipeline.records, (row) => row.source),
+            byTeam: top(freshPipeline.records, (row) => row.salesTeam),
+            byLostReason: top(freshPipeline.records, (row) => row.lossReason),
+            byLostCategory: top(freshPipeline.records, (row) => row.lostCategory),
+          },
+          freshLostPipelineDetail: capped(freshPipeline.records),
+          archivedLostLeads: { ...archivedLeads, records: undefined },
+          archivedLostLeadsFacets: {
+            bySource: top(archivedLeads.records, (row) => row.source),
+            byTeam: top(archivedLeads.records, (row) => row.salesTeam),
+            byLostReason: top(archivedLeads.records, (row) => row.lossReason),
+            byLostCategory: top(archivedLeads.records, (row) => row.lostCategory),
+          },
+          archivedLostLeadsDetail: capped(archivedLeads.records),
           lostMovementFacets: eventFacets(movement.records),
           lostMovementCohortFacets: {
             fresh: eventFacets(movement.freshRecords),
             older: eventFacets(movement.olderRecords),
           },
+          olderLostCreationMonths: groupBy(
+            movement.olderRecords,
+            (row) => row.createdAt.slice(0, 7) || "—",
+          ),
           lostMovementDetail: {
             all: capped(movement.records),
             fresh: capped(movement.freshRecords),
