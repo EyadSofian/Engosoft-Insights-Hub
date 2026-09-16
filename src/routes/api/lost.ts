@@ -170,12 +170,6 @@ export const Route = createFileRoute("/api/lost")({
             lostLeads: closedLostRows.filter((row) => row.recordType === "lead").length,
             lostOpportunities: closedLostRows.filter((row) => row.recordType === "opportunity")
               .length,
-            currentOpportunities: closedLostRows.filter(
-              (row) => row.recordType === "opportunity" && row.active,
-            ).length,
-            historicalOpportunities: closedLostRows.filter(
-              (row) => row.recordType === "opportunity" && !row.active,
-            ).length,
             dateBasisCounts: Object.fromEntries(
               [...new Set(closedLostRows.map((row) => row.lostDateBasis || "unknown"))].map(
                 (basis) => [

@@ -86,19 +86,8 @@ interface LostRowView {
   stage: string;
 }
 
-interface LostDuplicateAuditView {
-  declaredCount: number;
-  declaredShare: number | null;
-  supportedCount: number;
-  unsupportedCount: number;
-  supportRate: number | null;
-  identityGroups: number;
-  universeRecords: number;
-}
-
 interface Resp {
   breakdown: LostBreakdown;
-  duplicateAudit: LostDuplicateAuditView;
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -111,8 +100,6 @@ interface Resp {
     undatedCohortClosedLostInPeriod?: number;
     lostLeads: number;
     lostOpportunities: number;
-    currentOpportunities: number;
-    historicalOpportunities: number;
     dateBasisCounts: Record<string, number>;
     dateFieldAudit: { closeDateInPeriod: number; lostDateInPeriod: number };
   };
@@ -567,58 +554,6 @@ function Lost() {
             />
           </KpiRow>
 
-          <Card className="border-danger/25 bg-danger-soft/15">
-            <SectionTitle
-              hint={
-                lang === "ar"
-                  ? "نسبة Duplicate هي تصنيف بشري في Odoo. نتحقق بشكل مستقل من وجود سجل آخر بنفس Provider Lead ID أو رقم الهاتف بعد التطبيع."
-                  : "Duplicate is a human Odoo classification. It is independently checked against another record sharing a provider lead id or normalized phone."
-              }
-            >
-              <span className="inline-flex items-center gap-2">
-                <MessageSquareWarning size={17} className="text-danger" />
-                {lang === "ar" ? "تدقيق سبب Duplicate" : "Duplicate reason audit"}
-              </span>
-            </SectionTitle>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {[
-                [
-                  lang === "ar" ? "مصنفة Duplicate" : "Declared duplicate",
-                  fmtNum(data.duplicateAudit.declaredCount),
-                ],
-                [
-                  lang === "ar" ? "من كل Lost" : "Share of Lost",
-                  fmtPct(data.duplicateAudit.declaredShare, 1),
-                ],
-                [
-                  lang === "ar" ? "بدليل هوية" : "Identity-supported",
-                  fmtNum(data.duplicateAudit.supportedCount),
-                ],
-                [
-                  lang === "ar" ? "تحتاج مراجعة" : "Needs review",
-                  fmtNum(data.duplicateAudit.unsupportedCount),
-                ],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-border bg-surface p-3">
-                  <div className="text-[10px] leading-snug text-text-muted">{label}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{value}</div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 flex items-start gap-2 text-xs leading-6 text-text-muted">
-              {data.duplicateAudit.unsupportedCount > 0 ? (
-                <AlertTriangle size={15} className="mt-1 shrink-0 text-warning" />
-              ) : (
-                <CheckCircle2 size={15} className="mt-1 shrink-0 text-success" />
-              )}
-              <span>
-                {lang === "ar"
-                  ? `التحقق غطّى ${fmtNum(data.duplicateAudit.universeRecords)} سجل CRM. عدم وجود تطابق لا يثبت أن التصنيف خطأ، لكنه يمنع اعتماد النسبة كحقيقة بدون مراجعة.`
-                  : `The check covered ${fmtNum(data.duplicateAudit.universeRecords)} CRM records. Missing identity support does not prove the label is wrong, but it prevents treating the percentage as verified.`}
-              </span>
-            </p>
-          </Card>
-
           <Card className="border-brand/20 bg-brand-soft/35">
             <SectionTitle
               hint={
@@ -636,8 +571,8 @@ function Lost() {
             </SectionTitle>
             <p className="mb-4 text-sm leading-7 text-text-muted">
               {lang === "ar"
-                ? `خلال الفترة اتسجل ${fmtNum(data.closureMovement.closedLost)} حالة Lost: ${fmtNum(data.closureMovement.lostLeads)} Leads و${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. منها ${fmtNum(data.closureMovement.currentOpportunities)} فرصة حالية داخل Lost stage.`
-                : `${fmtNum(data.closureMovement.closedLost)} losses were dated in the period: ${fmtNum(data.closureMovement.lostLeads)} Leads and ${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. ${fmtNum(data.closureMovement.currentOpportunities)} are current Opportunities in the Lost stage.`}
+                ? `خلال الفترة اتسجل ${fmtNum(data.closureMovement.closedLost)} حالة Lost: ${fmtNum(data.closureMovement.lostLeads)} Leads و${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. منها ${fmtNum(data.closureMovement.createdInPeriod)} أُنشئت داخل الفترة و${fmtNum(data.closureMovement.fromOlderCohorts)} من إنشاء أقدم.`
+                : `${fmtNum(data.closureMovement.closedLost)} losses were dated in the period: ${fmtNum(data.closureMovement.lostLeads)} Leads and ${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. ${fmtNum(data.closureMovement.createdInPeriod)} were created in-period and ${fmtNum(data.closureMovement.fromOlderCohorts)} came from older cohorts.`}
             </p>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {[
@@ -648,8 +583,8 @@ function Lost() {
                   data.closureMovement.lostOpportunities,
                 ],
                 [
-                  lang === "ar" ? "فرص حالية في Lost" : "Current Lost-stage opps",
-                  data.closureMovement.currentOpportunities,
+                  lang === "ar" ? "من إنشاء أقدم" : "Created before period",
+                  data.closureMovement.fromOlderCohorts,
                 ],
               ].map(([label, value]) => (
                 <div

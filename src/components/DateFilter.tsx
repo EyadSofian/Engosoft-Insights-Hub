@@ -16,13 +16,20 @@ import { cn } from "@/lib/utils";
 /* -------------------------------------------------------------------------- */
 
 type PresetKey =
-  "preset_today" | "preset_7" | "preset_30" | "preset_month" | "preset_year" | "preset_all";
+  | "preset_today"
+  | "preset_7"
+  | "preset_30"
+  | "preset_month"
+  | "preset_prev_month"
+  | "preset_year"
+  | "preset_all";
 
 const PRESETS: { value: DatePreset; key: PresetKey; full?: boolean }[] = [
   { value: "today", key: "preset_today" },
   { value: "7d", key: "preset_7" },
   { value: "30d", key: "preset_30" },
   { value: "month", key: "preset_month" },
+  { value: "prev_month", key: "preset_prev_month" },
   { value: "year", key: "preset_year" },
   { value: "all", key: "preset_all", full: true },
 ];
@@ -32,6 +39,7 @@ const PRESET_KEY: Record<DatePreset, PresetKey> = {
   "7d": "preset_7",
   "30d": "preset_30",
   month: "preset_month",
+  prev_month: "preset_prev_month",
   year: "preset_year",
   all: "preset_all",
 };
@@ -53,7 +61,7 @@ function activePreset(
     if (w.from === f.from && w.to === f.to) return preferred;
   }
 
-  for (const p of ["today", "7d", "30d", "month", "year"] as const) {
+  for (const p of ["today", "7d", "30d", "month", "prev_month", "year"] as const) {
     if (p === preferred) continue;
     const w = presetWindow(p, latest);
     if (w.from === f.from && w.to === f.to) return p;
