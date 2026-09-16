@@ -84,6 +84,7 @@ async function rpc(
   method: string,
   args: unknown[],
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const cfg = odooConfig();
   const res = await fetch(`${cfg.url}/jsonrpc`, {
@@ -95,7 +96,9 @@ async function rpc(
       params: { service, method, args },
       id: Math.floor(Math.random() * 1e9),
     }),
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs),
   });
 
   if (!res.ok) throw new OdooError(`Odoo responded ${res.status}`, "server");
@@ -161,7 +164,7 @@ export async function odooCallWithPolicy<T>(
   method: string,
   args: unknown[] = [],
   kwargs: Record<string, unknown> = {},
-  policy: { attempts?: number; timeoutMs?: number } = {},
+  policy: { attempts?: number; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<T> {
   const cfg = odooConfig();
   let lastError: unknown;
@@ -170,12 +173,14 @@ export async function odooCallWithPolicy<T>(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
+      policy.signal?.throwIfAborted();
       const user = await uid();
       return (await rpc(
         "object",
         "execute_kw",
         [cfg.db, user, cfg.apiKey, model, method, args, kwargs],
         timeoutMs,
+        policy.signal,
       )) as T;
     } catch (err) {
       lastError = err;
@@ -209,7 +214,12 @@ export async function searchRead<T extends { id: number }>(
   model: string,
   domain: Domain,
   fields: string[],
-  options: { order?: string; limit?: number; context?: Record<string, unknown> } = {},
+  options: {
+    order?: string;
+    limit?: number;
+    context?: Record<string, unknown>;
+    policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal };
+  } = {},
 ): Promise<T[]> {
   const pageSize = 2000;
   const out: T[] = [];
@@ -217,12 +227,18 @@ export async function searchRead<T extends { id: number }>(
 
   for (let offset = 0; out.length < hardLimit; offset += pageSize) {
     const take = Math.min(pageSize, hardLimit - out.length);
-    const page = await odooCall<T[]>(model, "search_read", [domain, fields], {
-      offset,
-      limit: take,
-      order: options.order ?? "id",
-      context: companyContext(options.context),
-    });
+    const page = await odooCallWithPolicy<T[]>(
+      model,
+      "search_read",
+      [domain, fields],
+      {
+        offset,
+        limit: take,
+        order: options.order ?? "id",
+        context: companyContext(options.context),
+      },
+      options.policy,
+    );
     out.push(...page);
     if (page.length < take) break;
   }

@@ -13,6 +13,7 @@ import {
   m2oId,
   m2oName,
   odooCall,
+  odooCallWithPolicy,
   odooConfig,
   searchRead,
   type Domain,
@@ -283,17 +284,23 @@ function contractRecord(
  * that account's access to system metadata. The mapping includes documented
  * legacy aliases where a stage has more than one XMLID.
  */
-async function loadStageKeys(): Promise<Map<number, CrmStageKey>> {
+async function loadStageKeys(policy?: {
+  attempts?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<Map<number, CrmStageKey>> {
   const stages = await searchRead<{ id: number }>("crm.stage", [], ["id"], {
     context: { active_test: false },
+    policy,
   });
   if (!stages.length) return new Map();
 
-  const externalIds = await odooCall<Record<string, string | false>>(
+  const externalIds = await odooCallWithPolicy<Record<string, string | false>>(
     "crm.stage",
     "get_external_id",
     [stages.map((stage) => stage.id)],
-    { context: { active_test: false } },
+    { context: companyContext({ active_test: false }) },
+    policy,
   );
   return new Map(
     stages.map((stage) => [stage.id, crmStageKeyForExternalId(externalIds[String(stage.id)])]),
@@ -366,6 +373,7 @@ function commonRaw(
   const status = crmBusinessStatus(contract);
   return {
     __odoo_id: String(lead.id),
+    __odoo_create_date_utc: display(lead.create_date),
     __odoo_write_date: dateTime(lead.write_date),
     "Record Type": contract.type,
     "Record Active": String(contract.active),
@@ -447,6 +455,68 @@ function toCrmRaw(
   tagNames: Map<number, string>,
 ): CrmRawRow {
   return commonRaw(lead, fields, stageKeys, productNames, tagNames);
+}
+
+/** Event analytics must fetch the event's records, including older/reopened
+ * records. The acquisition floor and current Lost state do not restrict this read.
+ */
+export async function loadCrmRawByIds(
+  ids: readonly number[],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
+  if (!ids.length) return [];
+  const metadata = await odooCallWithPolicy<Record<string, OdooField>>(
+    "crm.lead",
+    "fields_get",
+    [],
+    {
+      attributes: ["string", "type", "relation"],
+      context: companyContext({ active_test: false, lang: "en_US" }),
+    },
+    policy,
+  );
+  if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
+  const plan = customFieldPlan(metadata);
+  const standard = [
+    "id",
+    "name",
+    "contact_name",
+    "partner_name",
+    "type",
+    "active",
+    "create_date",
+    "date_conversion",
+    "inventory_bucket",
+    "stage_id",
+    "stage_is_lost",
+    "stage_is_won",
+    "source_id",
+    "company_id",
+    "user_id",
+    "team_id",
+    "campaign_id",
+    "lost_reason_id",
+    "lost_category_id",
+  ];
+  const fields = [
+    ...new Set([...standard.filter((f) => metadata[f]), ...Object.values(plan).filter(Boolean)]),
+  ];
+  const stages = await loadStageKeys(policy);
+  const out: CrmRawRow[] = [];
+  for (let offset = 0; offset < ids.length; offset += 1000) {
+    const rows = await searchRead<OdooCrmLead>(
+      "crm.lead",
+      crmNormalScopeDomain([["id", "in", ids.slice(offset, offset + 1000)]]),
+      fields,
+      { context: { active_test: false, lang: "en_US" }, policy },
+    );
+    out.push(
+      ...rows
+        .filter((r) => !display(r.inventory_bucket))
+        .map((r) => commonRaw(r, plan, stages, new Map(), new Map())),
+    );
+  }
+  return out;
 }
 
 function toLostRaw(

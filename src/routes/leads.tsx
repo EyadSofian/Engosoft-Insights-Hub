@@ -42,6 +42,7 @@ import type {
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import type { LostMovementRecord, LostMovementResult } from "@/lib/crm-lost-movement.server";
 
 export const Route = createFileRoute("/leads")({ component: CrmWorkspace });
 
@@ -149,18 +150,16 @@ interface Resp {
   stageFacets: Partial<Record<CrmStageKey, Facets>>;
   statusFacets: Record<WorkspaceView | "activeLeads" | "ready" | "open", Facets>;
   lostTypeFacets: { leads: Facets; opportunities: Facets };
-  lostOpportunityMovement: {
-    total: number;
-    fresh: number;
-    older: number;
-    undated: number;
-    dateBasisCounts: Record<string, number>;
-  };
-  lostOpportunityMovementFacets: Facets;
-  lostOpportunityMovementDetail: {
-    all: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
-    fresh: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
-    older: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
+  lostMovement: Omit<LostMovementResult, "records" | "freshRecords" | "olderRecords">;
+  lostMovementFacets: Pick<
+    Facets,
+    "byType" | "bySource" | "byTeam" | "byLostReason" | "byLostCategory"
+  >;
+  lostMovementCohortFacets: Record<"fresh" | "older", Resp["lostMovementFacets"]>;
+  lostMovementDetail: {
+    all: { rows: LostMovementRecord[]; total: number; truncated: boolean };
+    fresh: { rows: LostMovementRecord[]; total: number; truncated: boolean };
+    older: { rows: LostMovementRecord[]; total: number; truncated: boolean };
   };
   detail: { rows: CrmWorkspaceRow[]; total: number; truncated: boolean };
   health: DataHealth;
@@ -282,7 +281,9 @@ function statusLabel(status: CrmBusinessStatus, lang: "ar" | "en") {
 function CrmWorkspace() {
   const { lang } = useI18n();
   const period = useReportingPeriod();
-  const { data, isLoading, error, refetch } = useApi<Resp>("/api/leads");
+  const { data, isLoading, error, refetch } = useApi<Resp>("/api/leads", {
+    refetchInterval: 30_000,
+  });
   const [view, setView] = useState<WorkspaceView>("all");
   const [stage, setStage] = useState<Exclude<CrmStageKey, "other"> | null>(null);
 
@@ -314,7 +315,7 @@ function CrmWorkspace() {
 
   const A = lang === "ar";
   const summary = data.summary;
-  const lostOpportunityMovement = data.lostOpportunityMovement;
+  const lostMovement = data.lostMovement;
   const tabs: { key: WorkspaceView; label: string; count: number; icon: ReactNode }[] = [
     {
       key: "all",
@@ -578,110 +579,199 @@ function CrmWorkspace() {
       report: { to: "/lost", label: A ? "فتح تحليل Lost Leads" : "Open Lost Lead analysis" },
     },
     lostOpportunities: {
-      id: "crm-lost-opportunities",
-      title: A ? "Lost Opportunities خلال الفترة" : "Lost Opportunities in period",
-      value: fmtNum(lostOpportunityMovement.total),
+      id: "crm-marked-lost-in-period",
+      title: A ? "سجلات اتعملها Lost خلال الفترة" : "CRM records marked Lost in period",
+      value:
+        lostMovement.availability === "available"
+          ? fmtNum(lostMovement.total)
+          : A
+            ? "غير متاح"
+            : "Unavailable",
       tone: "violet",
       icon: <XCircle size={17} />,
       definition: A
-        ? "كل Opportunity سُجّل لها تاريخ Lost داخل الفترة المحددة. نقسمها حسب create_date إلى Fresh أُنشئت داخل نفس الفترة، وOld Cohort أُنشئت قبلها."
-        : "Every Opportunity whose canonical Lost date falls inside the selected period, split by create_date into Fresh records created in the same period and Older Cohorts created before it.",
-      formula: A
-        ? `${fmtNum(lostOpportunityMovement.fresh)} Fresh + ${fmtNum(lostOpportunityMovement.older)} من شهور أقدم${lostOpportunityMovement.undated ? ` + ${fmtNum(lostOpportunityMovement.undated)} بلا create_date صالح` : ""} = ${fmtNum(lostOpportunityMovement.total)}`
-        : `${fmtNum(lostOpportunityMovement.fresh)} Fresh + ${fmtNum(lostOpportunityMovement.older)} Older Cohort${lostOpportunityMovement.undated ? ` + ${fmtNum(lostOpportunityMovement.undated)} without a valid create_date` : ""} = ${fmtNum(lostOpportunityMovement.total)}`,
+        ? "سجلات CRM فريدة لها حدث Lost مؤكد خلال الفترة، سواء Lead أو Opportunity وقت الحدث، حتى لو اتفتحت بعدها. Fresh تعني الإنشاء داخل الفترة؛ Old Cohort تعني الإنشاء قبلها. لا نستبعد التجهيز، ونستبعد Data Inventory صراحة."
+        : "Unique CRM records with a confirmed Lost event in the period, whether Lead or Opportunity at the event, even if reopened later. Fresh means created in the period; Older Cohort means created earlier. Preparation is allowed; Data Inventory is explicitly excluded.",
+      formula:
+        lostMovement.availability === "available"
+          ? `${fmtNum(lostMovement.fresh)} Fresh + ${fmtNum(lostMovement.older)} Old Cohort + ${fmtNum(lostMovement.undated)} invalid creation dates = ${fmtNum(lostMovement.total)} unique records`
+          : undefined,
       provenance: {
-        system: A ? "Odoo CRM مباشرة ← /api/leads" : "Direct Odoo CRM → /api/leads",
-        model: "crm.lead",
+        system: A
+          ? "Odoo — سجل التغييرات مباشرة عبر /api/leads"
+          : "Odoo — direct lifecycle tracking via /api/leads",
+        model: "crm.lead + mail.message + mail.tracking.value",
         query:
-          "inventory_bucket = False AND type = 'opportunity' AND canonical Lost date inside selected period",
+          "inventory_bucket = False; DISTINCT crm.lead.id with mail.message.date in [start_utc, end_utc) AND ((stage_id changes to XMLID-resolved Lost AND lost_reason_id is set in the SAME message) OR (active changes 1→0 AND (reason is set OR Lost Comment in the SAME message))); type reconstructed at event time",
         fields: [
           "inventory_bucket",
-          "type",
-          "active",
-          "stage_id",
-          "stage XMLID",
-          "lost_reason_id",
           "create_date",
-          "lost_verification_date",
-          "date_last_stage_update",
+          "mail.message.id",
+          "mail.message.date",
+          "field_id",
+          "old_value_integer",
+          "new_value_integer",
+          "old_value_char",
+          "new_value_char",
+          "stage XMLID",
         ],
         dateBasis: A
-          ? "تاريخ Lost = lost_verification_date، ومع غيابه نستخدم date_last_stage_update كـfallback. وبعدها create_date يفصل Fresh عن Old Cohort."
-          : "Lost date = lost_verification_date, falling back to date_last_stage_update when absent. create_date then separates Fresh from Older Cohorts.",
+          ? "تاريخ الخسارة = تاريخ رسالة الحدث المؤكد فقط. حدود الفترة نصف مفتوحة بتوقيت القاهرة ومحوّلة إلى UTC؛ create_date يفصل الكارتين. لا نستخدم write_date أو lost_verification_date أو تاريخ آخر مرحلة."
+          : "Lost date is the confirmed event message date only. Half-open Cairo boundaries are converted to UTC; create_date separates the two cards. No write_date, lost_verification_date or stage-date fallback.",
         note: A
-          ? `${fmtNum(lostOpportunityMovement.dateBasisCounts.lost_verification_date ?? 0)} بسجل Lost Verification Date مباشر، و${fmtNum(lostOpportunityMovement.dateBasisCounts.date_last_stage_update_fallback ?? 0)} محسوبة من آخر تغيير للمرحلة كـfallback.`
-          : `${fmtNum(lostOpportunityMovement.dateBasisCounts.lost_verification_date ?? 0)} use a direct Lost Verification Date; ${fmtNum(lostOpportunityMovement.dateBasisCounts.date_last_stage_update_fallback ?? 0)} use the last stage update fallback.`,
+          ? `حساب الاتصال: ${lostMovement.integrationLogin}. الشركات: ${lostMovement.companyIds.join(", ")}، مع السجلات بلا شركة عند عدم اختيار شركة. UTC: [${lostMovement.bounds.start ?? "all history"}, ${lostMovement.bounds.end ?? "now"}). المصدر والمالك والفريق والشركة قيم حالية وليست وقت الحدث. ${lostMovement.confidence}.`
+          : `Integration: ${lostMovement.integrationLogin}. Companies: ${lostMovement.companyIds.join(", ")}; unassigned company included unless a company is selected. UTC: [${lostMovement.bounds.start ?? "all history"}, ${lostMovement.bounds.end ?? "now"}). Source, owner, team and company are CURRENT values. ${lostMovement.confidence}.`,
       },
       caveat:
-        data.health.lostAuthority === "unavailable"
+        lostMovement.availability !== "available"
           ? A
-            ? "مصدر Lost الموثوق غير متاح الآن؛ لا تعتبر الصفر نتيجة أعمال."
-            : "The authoritative Lost source is unavailable; do not treat zero as a business result."
-          : lostOpportunityMovement.undated
-            ? A
-              ? `${fmtNum(lostOpportunityMovement.undated)} سجل له Lost Date داخل الفترة لكن create_date غير صالح؛ ظاهر في المعادلة ولا نخبّيه داخل أي كارت.`
-              : `${fmtNum(lostOpportunityMovement.undated)} records have an in-period Lost date but no valid create_date; they stay visible in the equation and are not hidden in either card.`
-            : undefined,
+            ? "لا يمكن إثبات وقت الخسارة: حساب التكامل يحتاج صلاحية قراءة mail.tracking.value أو مصدر الأحداث غير متاح. لم نعرض صفرًا ولم نستبدل الدليل بتاريخ تحديث."
+            : "Lost timing cannot be verified: the integration account needs mail.tracking.value read access or the event source is unavailable. No zero or mutable date substitute is shown."
+          : A
+            ? `${fmtNum(lostMovement.ambiguousEvents)} حدثًا غير مؤكد و${fmtNum(lostMovement.unknownArchiveEvents)} أرشفة بلا دليل Lost خارج الكارتين. ${fmtNum(lostMovement.eventCount)} حدثًا مؤكّدًا تخص ${fmtNum(lostMovement.total)} سجلًا؛ ${fmtNum(lostMovement.repeatedRecords)} سجلًا تكررت خسارته. ${fmtNum(lostMovement.undated)} سجلًا بلا تاريخ إنشاء صالح خارج الكارتين.`
+            : `${fmtNum(lostMovement.ambiguousEvents)} ambiguous events and ${fmtNum(lostMovement.unknownArchiveEvents)} unproven archives are excluded. ${fmtNum(lostMovement.eventCount)} confirmed events for ${fmtNum(lostMovement.total)} unique records; ${fmtNum(lostMovement.repeatedRecords)} repeatedly lost records. ${fmtNum(lostMovement.undated)} invalid creation dates are outside both cards.`,
       breakdowns: [
         breakdown(
-          "lost-opportunity-category",
-          A ? "حسب فئة الخسارة" : "By Lost category",
-          data.lostOpportunityMovementFacets.byLostCategory,
+          "lost-event-type",
+          A ? "نوع السجل وقت الخسارة" : "Type at Lost event",
+          data.lostMovementFacets.byType,
         ),
         breakdown(
-          "lost-opportunity-reason",
-          A ? "حسب سبب الخسارة" : "By Lost reason",
-          data.lostOpportunityMovementFacets.byLostReason,
+          "lost-event-category",
+          A ? "فئة سبب الخسارة المثبت" : "Confirmed Lost reason category",
+          data.lostMovementFacets.byLostCategory,
         ),
         breakdown(
-          "lost-opportunity-source",
-          A ? "جاءت من أي مصدر؟" : "Which source produced them?",
-          data.lostOpportunityMovementFacets.bySource,
+          "lost-event-reason",
+          A ? "سبب الخسارة في الحدث" : "Reason in the Lost event",
+          data.lostMovementFacets.byLostReason,
+        ),
+        breakdown(
+          "lost-event-source",
+          A ? "المصدر الحالي" : "Current source",
+          data.lostMovementFacets.bySource,
         ),
       ],
       supporting: [
         {
-          key: "fresh-lost-opportunities",
-          label: A ? "Fresh ودخلت Lost في الفترة" : "Fresh → Lost in period",
-          value: fmtNum(lostOpportunityMovement.fresh),
-          hint: A
-            ? "create_date وLost Date كلاهما داخل الفترة"
-            : "Both create_date and Lost date are inside the period",
+          key: "fresh",
+          label: A ? "إنشاء وخسارة خلال الفترة" : "Created and marked Lost in period",
+          value:
+            lostMovement.availability === "available"
+              ? fmtNum(lostMovement.fresh)
+              : A
+                ? "غير متاح"
+                : "Unavailable",
         },
         {
-          key: "older-cohort-lost-opportunities",
-          label: A ? "Old Cohort ودخلت Lost في الفترة" : "Older Cohort → Lost in period",
-          value: fmtNum(lostOpportunityMovement.older),
-          hint: A
-            ? "create_date قبل الفترة وLost Date داخلها"
-            : "create_date is before the period; Lost date is inside it",
+          key: "older",
+          label: A ? "إنشاء أقدم وخسارة خلال الفترة" : "Older creation, marked Lost in period",
+          value:
+            lostMovement.availability === "available"
+              ? fmtNum(lostMovement.older)
+              : A
+                ? "غير متاح"
+                : "Unavailable",
         },
       ],
       records: {
-        title: A
-          ? "أحدث Opportunities دخلت Lost داخل الفترة"
-          : "Latest Opportunities that became Lost in the period",
+        title: A ? "السجلات التي كوّنت الرقم" : "Records behind the figure",
         hint: A
-          ? "كل صف يعرض تاريخ الإنشاء وتاريخ Lost؛ اضغط علامة الفتح لمراجعة السجل داخل Odoo."
-          : "Each row shows its creation and Lost dates; use the open icon to inspect it in Odoo.",
-        rows: data.lostOpportunityMovementDetail.all.rows.slice(0, 8).map((row) => ({
+          ? "تاريخ ومعرّف أحدث حدث Lost مؤكد داخل الفترة، ورابط نفس السجل في Odoo."
+          : "Date and message ID of the latest confirmed in-period Lost event, linked to the exact Odoo record.",
+        rows: data.lostMovementDetail.all.rows.slice(0, 8).map((row) => ({
           key: row.id,
           title: row.contact || `#${row.id}`,
-          subtitle: A
-            ? `إنشاء ${fmtDate(row.createdAt, lang)} · Lost ${fmtDate(row.lostDate, lang)}`
-            : `Created ${fmtDate(row.createdAt, lang)} · Lost ${fmtDate(row.lostDate, lang)}`,
-          value: row.source || row.salesperson || undefined,
-          href: row.odooUrl || undefined,
+          subtitle: `Created ${row.createdAt} · Lost ${row.lostDate} · message #${row.messageId} · ${row.typeAtEvent}`,
+          value: row.lossReason || undefined,
+          href: row.odooUrl,
         })),
-        emptyLabel: A
-          ? "لا توجد Opportunities دخلت Lost داخل الفترة."
-          : "No Opportunities became Lost inside the period.",
-      },
-      report: {
-        to: "/lost",
-        label: A ? "فتح تحليل Lost Opportunities" : "Open Lost Opportunity analysis",
+        emptyLabel:
+          lostMovement.availability === "available"
+            ? A
+              ? "لا توجد أحداث Lost مؤكدة في الفترة."
+              : "No confirmed Lost events in the period."
+            : A
+              ? "الأحداث غير متاحة للتحقق؛ القائمة الفارغة ليست صفر خسائر."
+              : "Evidence unavailable; an empty list does not mean zero losses.",
       },
     },
+  };
+
+  const eventCohortCard = (cohort: "fresh" | "older"): MetricDetail => {
+    const base = metricDetails.lostOpportunities;
+    const rows = data.lostMovementDetail[cohort];
+    const facets = data.lostMovementCohortFacets[cohort];
+    return {
+      ...base,
+      id: `crm-lost-event-${cohort}`,
+      title:
+        cohort === "fresh"
+          ? A
+            ? "Fresh — إنشاء وخسارة خلال الفترة"
+            : "Fresh — created and marked Lost in period"
+          : A
+            ? "Old Cohort — إنشاء أقدم وخسارة خلال الفترة"
+            : "Older Cohort — marked Lost in period",
+      value:
+        lostMovement.availability === "available"
+          ? fmtNum(lostMovement[cohort])
+          : A
+            ? "غير متاح"
+            : "Unavailable",
+      definition:
+        cohort === "fresh"
+          ? A
+            ? "سجلات CRM أُنشئت داخل الفترة المحددة ولها حدث Lost مؤكد داخل نفس الفترة؛ النوع وقت الخسارة موضح أدناه. السجل يُحسب مرة واحدة حتى لو تكررت خسارته أو اتفتح بعدها."
+            : "CRM records created in the selected period with a confirmed Lost event in the same period. Type at event is shown below. Each record counts once, even if repeatedly lost or reopened."
+          : A
+            ? "سجلات CRM أُنشئت قبل بداية الفترة المحددة ولها حدث Lost مؤكد داخل الفترة، مهما كانت حالتها الحالية. السجل يُحسب مرة واحدة؛ لا نعتبر تحديثات الترحيل أحداث خسارة."
+            : "CRM records created before the selected period with a confirmed Lost event in it, regardless of current state. Each record counts once; migration writes are not Lost events.",
+      formula:
+        cohort === "fresh"
+          ? "DISTINCT crm.lead.id: create_date in period AND confirmed Lost event in period"
+          : "DISTINCT crm.lead.id: create_date before period AND confirmed Lost event in period",
+      provenance: {
+        ...base.provenance!,
+        query: `${base.provenance!.query}; AND ${cohort === "fresh" ? "create_date in [start_utc, end_utc)" : "create_date < start_utc"}`,
+      },
+      supporting: [
+        {
+          key: "total",
+          label: A
+            ? "كل السجلات ذات حدث Lost مؤكد خلال الفترة"
+            : "All records with confirmed in-period Lost",
+          value: lostMovement.availability === "available" ? fmtNum(lostMovement.total) : "—",
+        },
+      ],
+      breakdowns: [
+        breakdown(`${cohort}-type`, A ? "نوع السجل وقت الخسارة" : "Type at event", facets.byType),
+        breakdown(
+          `${cohort}-reason`,
+          A ? "سبب الخسارة المثبت في الحدث" : "Confirmed event reason",
+          facets.byLostReason,
+        ),
+        breakdown(`${cohort}-source`, A ? "المصدر الحالي" : "Current source", facets.bySource),
+      ],
+      records: {
+        ...base.records!,
+        rows: rows.rows.slice(0, 8).map((row) => ({
+          key: row.id,
+          title: row.contact || `#${row.id}`,
+          subtitle: `Created ${row.createdAt} · Lost ${row.lostDate} · message #${row.messageId} · ${row.typeAtEvent}`,
+          value: row.lossReason || undefined,
+          href: row.odooUrl,
+        })),
+        hint:
+          lostMovement.availability === "available"
+            ? A
+              ? `كل الرقم محسوب من ${fmtNum(rows.total)} سجلًا؛ معرّف الرسالة يثبت الحدث. القائمة المعروضة أمثلة فقط.`
+              : `The figure is computed from ${fmtNum(rows.total)} records; message IDs identify the evidence. The displayed list is a sample only.`
+            : A
+              ? "السجلات غير متاحة للتحقق؛ لا يمكن تحديد عددها من هذا المصدر الآن."
+              : "Evidence records are unavailable; their count cannot be determined from this source right now.",
+      },
+    };
   };
 
   const selectView = (next: WorkspaceView) => {
@@ -789,16 +879,49 @@ function CrmWorkspace() {
                 sub: A ? "مؤرشف + Lost Reason" : "Archived + Lost Reason",
               }}
             />
+          </KpiRow>
+        </PageSection>
+
+        <PageSection
+          level="primary"
+          title={A ? "الخسائر التي حدثت خلال الفترة" : "Losses that happened in the period"}
+          hint={
+            A
+              ? "كارتان منفصلان حسب تاريخ الإنشاء، محسوبان من أحداث Odoo المؤكدة وليس الحالة الحالية."
+              : "Two creation cohorts, computed from confirmed Odoo events, not current state."
+          }
+          icon={<XCircle size={17} />}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
             <MetricDetailTrigger
-              detail={metricDetails.lostOpportunities}
+              detail={eventCohortCard("fresh")}
               card={{
-                index: 6,
+                index: 0,
                 sub: A
-                  ? `${fmtNum(lostOpportunityMovement.fresh)} Fresh · ${fmtNum(lostOpportunityMovement.older)} من شهور أقدم`
-                  : `${fmtNum(lostOpportunityMovement.fresh)} Fresh · ${fmtNum(lostOpportunityMovement.older)} Older Cohort`,
+                  ? "إنشاء داخل الفترة + حدث Lost داخلها"
+                  : "Created in period + Lost event in period",
               }}
             />
-          </KpiRow>
+            <MetricDetailTrigger
+              detail={eventCohortCard("older")}
+              card={{
+                index: 1,
+                sub: A
+                  ? "إنشاء قبل الفترة + حدث Lost داخلها"
+                  : "Created before period + Lost event in period",
+              }}
+            />
+          </div>
+          {lostMovement.availability !== "available" && (
+            <div
+              role="status"
+              className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            >
+              {A
+                ? "الأرقام غير متاحة للتحقق: صلاحية قراءة تفاصيل سجل التغييرات لم تُمنح بعد أو اتصال الأحداث غير متاح. لم نعرض أرقامًا تخمينية."
+                : "Figures cannot be verified: tracking read access is not granted yet or the event connection is unavailable. No estimated figures are shown."}
+            </div>
+          )}
         </PageSection>
 
         <PageSection

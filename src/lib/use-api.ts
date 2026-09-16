@@ -6,7 +6,10 @@ import { useFilters } from "@/lib/filter-store";
  * its own query string (e.g. `?grain=adset`); those params are merged rather
  * than concatenated, which would otherwise produce a second `?` and be dropped.
  */
-export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
+export function useApi<T>(
+  path: string,
+  options: { enabled?: boolean; refetchInterval?: number } = {},
+) {
   const filters = useFilters();
 
   const [base, own = ""] = path.split("?");
@@ -41,5 +44,6 @@ export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
       return res.json();
     },
     staleTime: 30_000,
+    refetchInterval: options.refetchInterval,
   });
 }

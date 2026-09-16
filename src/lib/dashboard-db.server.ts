@@ -109,6 +109,12 @@ function getPool(): Pool {
           ? false
           : { rejectUnauthorized: false },
     });
+    // pg removes failed idle clients itself. Handle the event so a temporary
+    // disconnect does not crash CRM requests or dump a client/credentials.
+    pool.on("error", (error: Error & { code?: string }) => {
+      const code = /^[A-Z0-9_]{1,16}$/.test(error.code || "") ? error.code : "UNKNOWN";
+      console.error("[dashboard-db] idle connection lost", { code });
+    });
   }
   return pool;
 }

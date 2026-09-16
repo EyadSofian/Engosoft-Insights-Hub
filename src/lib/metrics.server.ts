@@ -292,6 +292,24 @@ class PerformanceDimensionIndex {
 
 /* --- filtering ------------------------------------------------------------ */
 
+/** Event analytics uses exactly the same stable ad/adset identity rules. */
+const performanceFilterIndexes = new WeakMap<AdRow[], PerformanceDimensionIndex>();
+export function matchesPerformanceDimensionFilters(
+  row: AttributedFact,
+  filters: GlobalFilters,
+  ads: AdRow[],
+): boolean {
+  if (!filters.adKey && !filters.adsetKey) return true;
+  let dimensions = performanceFilterIndexes.get(ads);
+  if (!dimensions) {
+    dimensions = new PerformanceDimensionIndex(ads);
+    performanceFilterIndexes.set(ads, dimensions);
+  }
+  if (filters.adsetKey && dimensions.fromFact(row, "adset").key !== filters.adsetKey) return false;
+  if (filters.adKey && dimensions.fromFact(row, "ad").key !== filters.adKey) return false;
+  return true;
+}
+
 export interface FilteredData {
   ads: AdRow[];
   crm: CrmLeadRow[];

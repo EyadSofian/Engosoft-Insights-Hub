@@ -371,7 +371,7 @@ function adCourseHint(raw: unknown): string {
   return isKnownCourse(course) ? course : "";
 }
 
-function canonicalMainCategory(
+export function canonicalMainCategory(
   raw: unknown,
   course: string,
   productCategory: unknown = "",

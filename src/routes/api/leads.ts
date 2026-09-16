@@ -7,24 +7,15 @@ export const Route = createFileRoute("/api/leads")({
         const { getFiltered, authoritativeLostLeads, groupBy } =
           await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
-        const { lostPopulations, lostPopulationCounts } = await import("@/lib/lost-classification");
+        const { loadLostMovement } = await import("@/lib/crm-lost-movement.server");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
-        const [data, closedData] = await Promise.all([
-          getFiltered(filters),
-          getFiltered({ ...filters, lostDateBasis: "closed" }),
-        ]);
+        const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
         const canonicalLost = authoritativeLostLeads(data);
-        const closedCanonicalLost = authoritativeLostLeads(closedData);
-        const opportunityMovement = lostPopulations({
-          cohortRows: canonicalLost.filter((row) => row.recordType === "opportunity"),
-          closedRows: closedCanonicalLost.filter((row) => row.recordType === "opportunity"),
-          window: { from: filters.from, to: filters.to },
-        });
-        const opportunityMovementCounts = lostPopulationCounts(opportunityMovement);
+        const movement = await loadLostMovement(filters, data.snapshot);
         const odooBaseUrl = odooConfig().url;
 
         const activeRows = data.crm.map((row) => ({
@@ -147,12 +138,6 @@ export const Route = createFileRoute("/api/leads")({
           daysToClose: null,
         });
         const lostRows = canonicalLost.map(toLostWorkspaceRow);
-        const closedLostOpportunityRows =
-          opportunityMovement.closedLostInPeriod.map(toLostWorkspaceRow);
-        const freshLostOpportunityRows =
-          opportunityMovement.createdAndLostInPeriod.map(toLostWorkspaceRow);
-        const olderLostOpportunityRows =
-          opportunityMovement.olderCohortClosedLostInPeriod.map(toLostWorkspaceRow);
 
         const workspaceRows = [...activeRows, ...lostRows];
         const stageKeys = ["preparation", "new", "open", "quotation", "won", "lost"] as const;
@@ -160,6 +145,13 @@ export const Route = createFileRoute("/api/leads")({
           workspaceRows.filter((row) => row.displayStageKey === key);
         const top = <T>(rows: T[], pick: (row: T) => string) =>
           groupBy(rows, (row) => pick(row) || "—").slice(0, 8);
+        const eventFacets = (rows: typeof movement.records) => ({
+          byType: top(rows, (row) => (row.typeAtEvent === "lead" ? "Lead" : "Opportunity")),
+          bySource: top(rows, (row) => row.source),
+          byTeam: top(rows, (row) => row.salesTeam),
+          byLostReason: top(rows, (row) => row.lossReason),
+          byLostCategory: top(rows, (row) => row.lostCategory),
+        });
         const facets = (rows: typeof workspaceRows) => ({
           byType: top(rows, (row) => (row.recordType === "lead" ? "Lead" : "Opportunity")),
           bySource: top(rows, (row) => row.source),
@@ -191,6 +183,7 @@ export const Route = createFileRoute("/api/leads")({
 
         return json({
           contractVersion: CRM_CONTRACT_VERSION,
+          lostEventContract: "2026-09-16-tracking-cohorts-v1",
           summary: {
             total: workspaceRows.length,
             activeLeads: activeRows.filter((row) => row.recordType === "lead").length,
@@ -241,36 +234,35 @@ export const Route = createFileRoute("/api/leads")({
             leads: facets(lostRows.filter((row) => row.recordType === "lead")),
             opportunities: facets(lostRows.filter((row) => row.recordType === "opportunity")),
           },
+          lostMovement: {
+            ...movement,
+            records: undefined,
+            freshRecords: undefined,
+            olderRecords: undefined,
+          },
+          lostMovementFacets: eventFacets(movement.records),
+          lostMovementCohortFacets: {
+            fresh: eventFacets(movement.freshRecords),
+            older: eventFacets(movement.olderRecords),
+          },
+          lostMovementDetail: {
+            all: capped(movement.records),
+            fresh: capped(movement.freshRecords),
+            older: capped(movement.olderRecords),
+          },
+          // Transitional shape for already-open pre-contract browser bundles.
+          // They must never receive the retired mutable-date proxy as a count.
           lostOpportunityMovement: {
-            total: opportunityMovementCounts.closedLostInPeriod,
-            fresh: opportunityMovementCounts.createdAndLostInPeriod,
-            older: opportunityMovementCounts.olderCohortClosedLostInPeriod,
-            undated: opportunityMovementCounts.undatedCohortClosedLostInPeriod,
-            dateBasisCounts: Object.fromEntries(
-              [...new Set(opportunityMovement.closedLostInPeriod.map((row) => row.lostDateBasis))]
-                .filter(Boolean)
-                .map((basis) => [
-                  basis,
-                  opportunityMovement.closedLostInPeriod.filter(
-                    (row) => row.lostDateBasis === basis,
-                  ).length,
-                ]),
-            ),
+            total: null,
+            fresh: null,
+            older: null,
+            undated: 0,
+            dateBasisCounts: {},
+            availability: "unavailable",
+            error: "Reload to use verified Lost event cohorts.",
           },
-          lostOpportunityMovementFacets: facets(closedLostOpportunityRows),
-          lostOpportunityMovementDetail: {
-            all: capped(
-              closedLostOpportunityRows
-                .slice()
-                .sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
-            ),
-            fresh: capped(
-              freshLostOpportunityRows.slice().sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
-            ),
-            older: capped(
-              olderLostOpportunityRows.slice().sort((a, b) => b.lostDate.localeCompare(a.lostDate)),
-            ),
-          },
+          lostOpportunityMovementFacets: facets([]),
+          lostOpportunityMovementDetail: { all: capped([]), fresh: capped([]), older: capped([]) },
           detail: capped(
             workspaceRows.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
           ),

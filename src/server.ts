@@ -7,37 +7,41 @@ import { startScheduler } from "./lib/scheduler.server";
 
 // Registered once at module load. `startScheduler` is idempotent and returns
 // early unless both Telegram variables are present.
-startScheduler();
+// Local read-only CRM verification must not start unrelated scheduled jobs.
+// Production behaviour is unchanged unless this explicit preview flag is set.
+if (process.env.CRM_AUDIT_READ_ONLY_PREVIEW !== "true") {
+  startScheduler();
 
-void import("./lib/meta-message-attribution.server")
-  .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
-  .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
+  void import("./lib/meta-message-attribution.server")
+    .then(({ startMetaAttributionWorker }) => startMetaAttributionWorker())
+    .catch((error) => console.error("[meta-attribution] worker bootstrap failed:", error));
 
-// Explicit, idempotent schema migration for manual lead QA. Request handlers
-// only verify the tables exist; they never create them.
-void import("./lib/lead-qa.server")
-  .then(({ startLeadQaMigration }) => startLeadQaMigration())
-  .catch((error) => console.error("[lead-qa] migration bootstrap failed:", error));
+  // Explicit, idempotent schema migration for manual lead QA. Request handlers
+  // only verify the tables exist; they never create them.
+  void import("./lib/lead-qa.server")
+    .then(({ startLeadQaMigration }) => startLeadQaMigration())
+    .catch((error) => console.error("[lead-qa] migration bootstrap failed:", error));
 
-void import("./lib/closed-loop.server")
-  .then(({ startClosedLoopWorker }) => startClosedLoopWorker())
-  .catch((error) => console.error("[closed-loop] worker bootstrap failed:", error));
+  void import("./lib/closed-loop.server")
+    .then(({ startClosedLoopWorker }) => startClosedLoopWorker())
+    .catch((error) => console.error("[closed-loop] worker bootstrap failed:", error));
 
-void import("./lib/chatwoot-attribution-reconcile.server")
-  .then(({ startChatwootReconcileWorker }) => startChatwootReconcileWorker())
-  .catch((error) => console.error("[chatwoot-reconcile] worker bootstrap failed:", error));
+  void import("./lib/chatwoot-attribution-reconcile.server")
+    .then(({ startChatwootReconcileWorker }) => startChatwootReconcileWorker())
+    .catch((error) => console.error("[chatwoot-reconcile] worker bootstrap failed:", error));
 
-void import("./lib/meta-credential-health.server")
-  .then(({ startMetaCredentialWorker }) => startMetaCredentialWorker())
-  .catch((error) => console.error("[meta-credential] worker bootstrap failed:", error));
+  void import("./lib/meta-credential-health.server")
+    .then(({ startMetaCredentialWorker }) => startMetaCredentialWorker())
+    .catch((error) => console.error("[meta-credential] worker bootstrap failed:", error));
 
-void import("./lib/meta-messaging-readiness.server")
-  .then(({ startMessagingReadinessWorker }) => startMessagingReadinessWorker())
-  .catch((error) => console.error("[messaging-readiness] worker bootstrap failed:", error));
+  void import("./lib/meta-messaging-readiness.server")
+    .then(({ startMessagingReadinessWorker }) => startMessagingReadinessWorker())
+    .catch((error) => console.error("[messaging-readiness] worker bootstrap failed:", error));
 
-void import("./lib/meta-leadgen.server")
-  .then(({ startMetaLeadAdsWorker }) => startMetaLeadAdsWorker())
-  .catch((error) => console.error("[meta-lead-ads] worker bootstrap failed:", error));
+  void import("./lib/meta-leadgen.server")
+    .then(({ startMetaLeadAdsWorker }) => startMetaLeadAdsWorker())
+    .catch((error) => console.error("[meta-lead-ads] worker bootstrap failed:", error));
+}
 
 /**
  * Pull the data snapshot into memory while the process is starting, rather than
