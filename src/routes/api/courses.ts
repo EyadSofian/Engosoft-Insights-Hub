@@ -8,6 +8,7 @@ export const Route = createFileRoute("/api/courses")({
           await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { buildCourseDrill } = await import("@/lib/course-intelligence.server");
+        const { buildCourseLeadLossReport } = await import("@/lib/course-lead-loss");
 
         const filters = await parseFilters(request);
         const organicScope = filters.channel === "organic";
@@ -15,10 +16,20 @@ export const Route = createFileRoute("/api/courses")({
         const prevRange = previousPeriod(filters.from, filters.to);
         // No prior-period revenue delta when that window predates the data.
         const prevComparable = await isPreviousComparable(prevRange);
-        const prevData =
-          prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
+        // CRM cohort comparison remains useful even when the accounting source
+        // predates the comparison window. Only revenue delta is gated by the
+        // accounting comparability check.
+        const prevData = prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
 
-        const courses = computeCourses(data, prevData ?? undefined);
+        const courses = computeCourses(data, prevComparable ? (prevData ?? undefined) : undefined);
+        const courseLeadLoss = buildCourseLeadLossReport({
+          active: data.crm,
+          lost: data.lost,
+          previousActive: prevData?.crm,
+          previousLost: prevData?.lost,
+          currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
+          previousRange: prevRange,
+        });
         const detail = new URL(request.url).searchParams.get("detail")?.trim() ?? "";
 
         // The drill-down lives in src/lib/course-intelligence.server.ts so the
@@ -28,6 +39,7 @@ export const Route = createFileRoute("/api/courses")({
 
         return json({
           courses,
+          courseLeadLoss,
           totals: computeTotals(data),
           drill,
           prevRange,

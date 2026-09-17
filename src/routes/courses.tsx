@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery";
+import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { MoreDetails } from "@/components/dashboard-bits";
 import { OverviewCourseContribution } from "@/components/overview-records";
@@ -33,6 +34,7 @@ import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
+import type { CourseLeadLossReport } from "@/lib/course-lead-loss";
 import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
@@ -102,6 +104,7 @@ interface CourseDrill {
 
 interface CoursesResponse {
   courses: CourseAgg[];
+  courseLeadLoss: CourseLeadLossReport;
   totals: Totals;
   drill?: CourseDrill | null;
 }
@@ -458,6 +461,8 @@ function Courses() {
                   },
             ]}
           />
+
+          <CourseLeadLossComparison report={data.courseLeadLoss} />
 
           <CoursePortfolioNavigator
             courses={visibleCourses}

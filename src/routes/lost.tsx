@@ -23,11 +23,13 @@ import {
   Skeleton,
 } from "@/components/ui-bits";
 import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
+import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
+import type { CourseLeadLossReport } from "@/lib/course-lead-loss";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import {
   Dialog,
@@ -88,6 +90,7 @@ interface LostRowView {
 
 interface Resp {
   breakdown: LostBreakdown;
+  courseLeadLoss: CourseLeadLossReport;
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -606,6 +609,8 @@ function Lost() {
               </Notice>
             )}
           </Card>
+
+          <CourseLeadLossComparison report={data.courseLeadLoss} />
 
           <Card>
             <SectionTitle

@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/lost")({
           computeLost,
           computeTotals,
           authoritativeLostLeads,
+          previousPeriod,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
         const { lostPopulations, lostPopulationCounts, classifyLostRow } =
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/api/lost")({
         const { auditDuplicateReasons } = await import("@/lib/lost-duplicate-audit");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
+        const { buildCourseLeadLossReport } = await import("@/lib/course-lead-loss");
 
         const filters = await parseFilters(request);
         const requestParams = new URL(request.url).searchParams;
@@ -27,9 +29,11 @@ export const Route = createFileRoute("/api/lost")({
           200,
           Math.max(1, Number(requestParams.get("detailLimit")) || 50),
         );
-        const [data, closedData] = await Promise.all([
+        const prevRange = previousPeriod(filters.from, filters.to);
+        const [data, closedData, prevData] = await Promise.all([
           getFiltered(filters),
           getFiltered({ ...filters, lostDateBasis: "closed" }),
+          prevRange ? getFiltered({ ...filters, ...prevRange }) : Promise.resolve(null),
         ]);
         const labels = data.snapshot.sourceLabels;
         const window = { from: filters.from, to: filters.to };
@@ -44,6 +48,14 @@ export const Route = createFileRoute("/api/lost")({
           window,
         });
         const counts = lostPopulationCounts(populations);
+        const courseLeadLoss = buildCourseLeadLossReport({
+          active: data.crm,
+          lost: lostRows,
+          previousActive: prevData?.crm,
+          previousLost: prevData ? authoritativeLostLeads(prevData) : [],
+          currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
+          previousRange: prevRange,
+        });
         const duplicateAudit = auditDuplicateReasons(lostRows, [
           ...data.snapshot.crm,
           ...data.snapshot.lost,
@@ -140,6 +152,7 @@ export const Route = createFileRoute("/api/lost")({
 
         return json({
           breakdown: computeLost(data),
+          courseLeadLoss,
           duplicateAudit: {
             declaredCount: duplicateAudit.declaredCount,
             declaredShare: duplicateAudit.declaredShare,
