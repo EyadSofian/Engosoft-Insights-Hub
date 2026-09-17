@@ -14,6 +14,7 @@ const MAX_PAGES = 100;
 // other TikTok call made by the same process.
 const MIN_REQUEST_GAP_MS = 150;
 const MAX_RATE_LIMIT_RETRIES = 5;
+const MAX_TRANSIENT_RETRIES = 3;
 const REPORT_CACHE_MS = 30 * 60 * 1000;
 
 let requestSchedule: Promise<void> = Promise.resolve();
@@ -85,7 +86,10 @@ export interface TikTokFetchResult {
   configured: boolean;
   rows: TikTokAdDaily[];
   syncedAt: string;
+  /** Fatal report failures. Any entry means the API dataset is incomplete. */
   errors: string[];
+  /** Non-fatal enrichment failures; report totals remain usable. */
+  warnings: string[];
 }
 
 let reportCache: { value: TikTokFetchResult; expiresAt: number } | null = null;
@@ -169,6 +173,16 @@ function isRateLimited(response: Response, body: ApiEnvelope<unknown>): boolean 
   );
 }
 
+/** TikTok sometimes returns upstream timeouts as HTTP 200 + API code 1204. */
+export function isRetryableTikTokFailure(status: number, message: string): boolean {
+  return (
+    [408, 425, 500, 502, 503, 504].includes(status) ||
+    /error_code\s*=\s*1204|request timeout|connect_timeout|network error|temporar(?:y|ily)/i.test(
+      message,
+    )
+  );
+}
+
 async function getApi<T>(
   path: string,
   params: Record<string, string>,
@@ -177,12 +191,22 @@ async function getApi<T>(
   const url = new URL(`${API}${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
-  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+  const maxAttempts = Math.max(MAX_RATE_LIMIT_RETRIES, MAX_TRANSIENT_RETRIES);
+  for (let attempt = 0; attempt <= maxAttempts; attempt++) {
     await waitForRequestSlot();
-    const response = await fetch(url, {
-      headers: { "Access-Token": accessToken },
-      cache: "no-store",
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { "Access-Token": accessToken },
+        cache: "no-store",
+      });
+    } catch (error) {
+      if (attempt < MAX_TRANSIENT_RETRIES) {
+        await delay(Math.min(5_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 200));
+        continue;
+      }
+      throw error;
+    }
     const body = (await response.json().catch(() => ({}))) as ApiEnvelope<T>;
     if (response.ok && body.code === 0 && body.data) return body.data;
 
@@ -190,6 +214,13 @@ async function getApi<T>(
       // TikTok's quota is a rolling window. Exponential backoff lets that
       // window drain even if another deployment instance is also refreshing.
       await delay(Math.min(8_000, 750 * 2 ** attempt) + Math.floor(Math.random() * 250));
+      continue;
+    }
+    if (
+      isRetryableTikTokFailure(response.status, body.message?.trim() ?? "") &&
+      attempt < MAX_TRANSIENT_RETRIES
+    ) {
+      await delay(Math.min(5_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 200));
       continue;
     }
     throw new Error(safeMessage(path, body, response.status));
@@ -335,10 +366,11 @@ async function adIndex(cfg: TikTokConfig, advertiserId: string): Promise<Map<str
 
 async function fetchTikTokAdsUncached(): Promise<TikTokFetchResult> {
   const cfg = config();
-  if (!cfg) return { configured: false, rows: [], syncedAt: "", errors: [] };
+  if (!cfg) return { configured: false, rows: [], syncedAt: "", errors: [], warnings: [] };
 
   const syncedAt = new Date().toISOString();
   const errors: string[] = [];
+  const warnings: string[] = [];
   const names = await authorizedAccounts(cfg);
   const jobs = cfg.advertiserIds.flatMap((advertiserId) =>
     dateChunks(cfg.startDate, cfg.endDate).map((range) => ({ advertiserId, ...range })),
@@ -368,8 +400,8 @@ async function fetchTikTokAdsUncached(): Promise<TikTokFetchResult> {
     try {
       indexes.set(advertiserId, await adIndex(cfg, advertiserId));
     } catch (error) {
-      if (errors.length < 8) {
-        errors.push(
+      if (warnings.length < 8) {
+        warnings.push(
           `${names.get(advertiserId) ?? advertiserId} hierarchy: ${
             error instanceof Error ? error.message : String(error)
           }`,
@@ -407,7 +439,7 @@ async function fetchTikTokAdsUncached(): Promise<TikTokFetchResult> {
     }
   }
 
-  return { configured: true, rows, syncedAt, errors };
+  return { configured: true, rows, syncedAt, errors, warnings };
 }
 
 /** Share one year-to-date report across dashboard snapshot rebuilds. */

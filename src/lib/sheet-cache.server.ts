@@ -1140,6 +1140,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         rows: [],
         syncedAt: "",
         errors: [error instanceof Error ? error.message : String(error)],
+        warnings: [],
       }));
     const safeGoogle = () =>
       fetchGoogleAds(refreshRemoteSources).catch((error: unknown) => ({
@@ -3020,6 +3021,19 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           creatives: openAIResult.creatives.length,
           syncedAt: openAIResult.syncedAt,
           message: openAIResult.health.message,
+        },
+        tiktok: {
+          configured: tiktokResult.configured,
+          ok: tiktokApiUsable,
+          source: tiktokApiUsable ? "api" : tiktokRaw.length ? "sheet" : "none",
+          rows: tiktok.length,
+          creatives: 0,
+          syncedAt: tiktokApiUsable ? tiktokResult.syncedAt : maxOf(tiktokRaw, "__synced_at"),
+          message: tiktokResult.warnings.length
+            ? `TikTok delivery loaded; hierarchy enrichment warning: ${tiktokResult.warnings.join(" · ")}`
+            : tiktokApiUsable
+              ? "TikTok delivery loaded from the Marketing API."
+              : "TikTok delivery is unavailable.",
         },
       },
       crmAuthority,
