@@ -8,6 +8,8 @@ import type { GlobalFilters } from "./types";
 
 export interface FreshLostPipelineRecord {
   id: string;
+  recordType: "lead" | "opportunity";
+  active: boolean;
   contact: string;
   createdAt: string;
   stage: string;
@@ -15,6 +17,7 @@ export interface FreshLostPipelineRecord {
   salesperson: string;
   salesTeam: string;
   company: string;
+  course: string;
   lossReason: string;
   lostCategory: string;
   odooUrl: string;
@@ -101,6 +104,8 @@ async function readFreshLostPipeline(
       if (!id) continue;
       records.set(id, {
         id,
+        recordType: row["Record Type"] === "lead" ? "lead" : "opportunity",
+        active: row["Record Active"] === "true",
         contact: row["اسم جهة الاتصال"] || "",
         createdAt: cairoDate(createdUtc),
         stage: row.Stage || "",
@@ -108,6 +113,7 @@ async function readFreshLostPipeline(
         salesperson: row.Salesperson || "",
         salesTeam: row["Sales Team"] || "",
         company: row.Company || "",
+        course: row.Course || "",
         lossReason: row["سبب الضياع"] || "",
         lostCategory: row["فئة الضياع"] || row["Lost Category"] || "",
         odooUrl: `${cfg.url}/web#id=${encodeURIComponent(id)}&model=crm.lead&view_type=form`,

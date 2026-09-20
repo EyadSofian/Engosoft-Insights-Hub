@@ -22,12 +22,20 @@ export const Route = createFileRoute("/api/lost")({
         const { buildCourseLeadLossReport, buildCourseLostMovementReport } =
           await import("@/lib/course-lead-loss");
         const { normalizeCourseKey } = await import("@/lib/course-taxonomy");
+        const { loadFreshLostPipeline, loadArchivedLostLeads } =
+          await import("@/lib/crm-fresh-lost.server");
 
         const filters = await parseFilters(request);
         const requestParams = new URL(request.url).searchParams;
         const detailReasonKey = requestParams.get("detailReason")?.trim() || "";
         const detailCourseKey = requestParams.get("detailCourse")?.trim() || "";
-        const detailScope = requestParams.get("detailScope") === "closed" ? "closed" : "cohort";
+        const requestedDetailScope = requestParams.get("detailScope");
+        const detailScope =
+          requestedDetailScope === "closed"
+            ? "closed"
+            : requestedDetailScope === "cohort-live"
+              ? "cohort-live"
+              : "cohort";
         const detailOffset = Math.max(0, Number(requestParams.get("detailOffset")) || 0);
         const detailLimit = Math.min(
           200,
@@ -41,6 +49,15 @@ export const Route = createFileRoute("/api/lost")({
         ]);
         const labels = data.snapshot.sourceLabels;
         const window = { from: filters.from, to: filters.to };
+        const [freshPipeline, archivedLeads] = await Promise.all([
+          loadFreshLostPipeline(filters, data.snapshot),
+          loadArchivedLostLeads(filters, data.snapshot),
+        ]);
+        const liveCohortAvailable =
+          freshPipeline.availability === "available" && archivedLeads.availability === "available";
+        const liveCohortRows = liveCohortAvailable
+          ? [...freshPipeline.records, ...archivedLeads.records]
+          : [];
 
         // Both reads apply every dimension filter identically; only the date
         // column differs. The canonical classification splits them.
@@ -54,7 +71,7 @@ export const Route = createFileRoute("/api/lost")({
         const counts = lostPopulationCounts(populations);
         const courseLeadLoss = buildCourseLeadLossReport({
           active: data.crm,
-          lost: lostRows,
+          lost: liveCohortAvailable ? liveCohortRows : lostRows,
           previousActive: prevData?.crm,
           previousLost: prevData ? authoritativeLostLeads(prevData) : [],
           currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
@@ -103,7 +120,7 @@ export const Route = createFileRoute("/api/lost")({
                 (row) => canonicalLossReason(row.lossReason).canonicalReasonKey === detailReasonKey,
               )
             : lostRows;
-        const detailRows = detailSource
+        const snapshotDetailRows = detailSource
           .map((l) => {
             const reason = canonicalLossReason(l.lossReason);
             const evidence = duplicateEvidence.get(l.id);
@@ -152,6 +169,64 @@ export const Route = createFileRoute("/api/lost")({
                 String(a.reportingDate || a.closeDate),
               ) || Number(b.id) - Number(a.id),
           );
+        const liveCourseDetailRows =
+          detailCourseKey && detailScope === "cohort-live" && liveCohortAvailable
+            ? liveCohortRows
+                .filter(
+                  (row) =>
+                    normalizeCourseKey(row.course.trim() || "Unclassified") === detailCourseKey,
+                )
+                .map((row) => ({
+                  id: row.id,
+                  contact: row.contact,
+                  phone: "",
+                  mobile: "",
+                  email: "",
+                  odooUrl: row.odooUrl,
+                  createdAt: row.createdAt,
+                  closeDate: "",
+                  lostDateBasis: "creation_cohort_live_odoo",
+                  recordType: row.recordType,
+                  active: row.active,
+                  category: row.lostCategory,
+                  reportingDate: row.createdAt,
+                  closedInPeriod: false,
+                  campaign: "",
+                  adName: "",
+                  reason: row.lossReason,
+                  rawReason: row.lossReason,
+                  canonicalReasonKey: canonicalLossReason(row.lossReason).canonicalReasonKey,
+                  canonicalReasonLabelAr: canonicalLossReason(row.lossReason)
+                    .canonicalReasonLabelAr,
+                  canonicalReasonLabelEn: canonicalLossReason(row.lossReason)
+                    .canonicalReasonLabelEn,
+                  duplicateEvidence: null,
+                  course: row.course,
+                  mainCategory: "",
+                  salesTeam: row.salesTeam,
+                  salesperson: row.salesperson,
+                  source: row.source,
+                  stage: row.stage,
+                }))
+                .sort(
+                  (a, b) =>
+                    String(b.createdAt).localeCompare(String(a.createdAt)) ||
+                    Number(b.id) - Number(a.id),
+                )
+            : null;
+        const detailRows = liveCourseDetailRows ?? snapshotDetailRows;
+        const snapshotTotals = computeTotals(data);
+        const authoritativeLost = liveCohortAvailable ? liveCohortRows.length : snapshotTotals.lost;
+        const totals = {
+          ...snapshotTotals,
+          lost: authoritativeLost,
+          archivedLeads: authoritativeLost,
+          totalLeads: data.crm.length + authoritativeLost,
+          lostRate:
+            data.crm.length + authoritativeLost > 0
+              ? (authoritativeLost / (data.crm.length + authoritativeLost)) * 100
+              : null,
+        };
         const detail =
           detailReasonKey || detailCourseKey
             ? {
@@ -180,7 +255,22 @@ export const Route = createFileRoute("/api/lost")({
             universeRecords: duplicateAudit.universeRecords,
           },
           teamLostRates,
-          totals: computeTotals(data),
+          totals,
+          cohortAuthority: {
+            source: liveCohortAvailable ? "odoo_live" : "snapshot_fallback",
+            total: authoritativeLost,
+            lostLeads: liveCohortAvailable
+              ? archivedLeads.records.length
+              : courseLeadLoss.totals.lostLeads,
+            lostOpportunities: liveCohortAvailable
+              ? freshPipeline.records.length
+              : courseLeadLoss.totals.lostOpportunities,
+            snapshotTotal: snapshotTotals.lost,
+            snapshotDelta: authoritativeLost - snapshotTotals.lost,
+            fetchedAt: liveCohortAvailable
+              ? [freshPipeline.fetchedAt, archivedLeads.fetchedAt].sort().at(-1)
+              : "",
+          },
           /**
            * The three canonical Lost populations. `closedLostInPeriod` always
            * equals created-and-lost + older-cohort + undated-cohort.

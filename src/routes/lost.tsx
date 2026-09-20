@@ -30,11 +30,7 @@ import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
-import type {
-  CourseLeadLossReport,
-  CourseLostMovementReport,
-  CourseLostMovementRow,
-} from "@/lib/course-lead-loss";
+import type { CourseLeadLossReport, CourseLostMovementReport } from "@/lib/course-lead-loss";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import {
   Dialog,
@@ -97,6 +93,15 @@ interface Resp {
   breakdown: LostBreakdown;
   courseLeadLoss: CourseLeadLossReport;
   courseLostMovement: CourseLostMovementReport;
+  cohortAuthority: {
+    source: "odoo_live" | "snapshot_fallback";
+    total: number;
+    lostLeads: number;
+    lostOpportunities: number;
+    snapshotTotal: number;
+    snapshotDelta: number;
+    fetchedAt: string;
+  };
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -120,7 +125,7 @@ interface Resp {
     limit: number;
     reasonKey?: string;
     courseKey?: string;
-    scope?: "closed" | "cohort";
+    scope?: "closed" | "cohort" | "cohort-live";
   };
 }
 
@@ -352,7 +357,7 @@ function Lost() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
-  const [courseReportView, setCourseReportView] = useState<"movement" | "cohort">("movement");
+  const [courseReportView, setCourseReportView] = useState<"movement" | "cohort">("cohort");
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
   useRegisterNexusView("lost", {
@@ -361,7 +366,11 @@ function Lost() {
   });
   const [shareView, setShareView] = useState<ShareView>("reason");
   const [selectedReason, setSelectedReason] = useState<{ key: string; label: string } | null>(null);
-  const [selectedCourse, setSelectedCourse] = useState<CourseLostMovementRow | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<{
+    key: string;
+    label: string;
+    scope: "closed" | "cohort-live";
+  } | null>(null);
   const [reasonOffset, setReasonOffset] = useState(0);
   const [courseOffset, setCourseOffset] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<LostRowView | null>(null);
@@ -371,7 +380,7 @@ function Lost() {
     { enabled: selectedReason !== null },
   );
   const courseQuery = useApi<Resp>(
-    `/api/lost?detailCourse=${encodeURIComponent(selectedCourse?.key ?? "")}&detailScope=closed&detailOffset=${courseOffset}&detailLimit=50`,
+    `/api/lost?detailCourse=${encodeURIComponent(selectedCourse?.key ?? "")}&detailScope=${selectedCourse?.scope ?? "cohort-live"}&detailOffset=${courseOffset}&detailLimit=50`,
     { enabled: selectedCourse !== null },
   );
 
@@ -629,6 +638,14 @@ function Lost() {
             )}
           </Card>
 
+          {data.cohortAuthority.snapshotDelta !== 0 && (
+            <Notice tone="warning" icon={<AlertTriangle size={16} />}>
+              {lang === "ar"
+                ? `Odoo المباشر = ${fmtNum(data.cohortAuthority.total)} (${fmtNum(data.cohortAuthority.lostLeads)} Lost Leads + ${fmtNum(data.cohortAuthority.lostOpportunities)} Lost Opportunities). الـsnapshot المتأخر كان ${fmtNum(data.cohortAuthority.snapshotTotal)}؛ لذلك الأرقام أدناه تعتمد Odoo المباشر.`
+                : `Live Odoo = ${fmtNum(data.cohortAuthority.total)} (${fmtNum(data.cohortAuthority.lostLeads)} Lost Leads + ${fmtNum(data.cohortAuthority.lostOpportunities)} Lost Opportunities). The delayed snapshot was ${fmtNum(data.cohortAuthority.snapshotTotal)}, so the figures below use live Odoo.`}
+            </Notice>
+          )}
+
           <div className="rounded-2xl border border-border bg-surface p-1.5 shadow-sm">
             <div
               className="grid grid-cols-2 gap-1.5"
@@ -638,36 +655,46 @@ function Lost() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={courseReportView === "movement"}
-                onClick={() => setCourseReportView("movement")}
-                className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
-              >
-                {lang === "ar" ? "Lost حسب الكورس · تاريخ الإغلاق" : "Lost by course · close date"}
-                <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
-                  {fmtNum(data.courseLostMovement.totals.lost)}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
                 aria-selected={courseReportView === "cohort"}
                 onClick={() => setCourseReportView("cohort")}
                 className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "cohort" ? "bg-brand text-white shadow-md shadow-brand/20" : "text-text-muted hover:bg-surface-2"}`}
               >
                 {lang === "ar"
-                  ? "جودة ليدز الفترة · تاريخ الإنشاء"
-                  : "Period lead quality · creation date"}
+                  ? "Lost حسب الكورس · Creation Date"
+                  : "Lost by course · creation date"}
                 <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
                   {fmtNum(data.courseLeadLoss.totals.lost)}
+                </span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={courseReportView === "movement"}
+                onClick={() => setCourseReportView("movement")}
+                className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
+              >
+                {lang === "ar" ? "حركة Lost · تاريخ الإغلاق" : "Lost movement · close date"}
+                <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
+                  {fmtNum(data.courseLostMovement.totals.lost)}
                 </span>
               </button>
             </div>
           </div>
 
           {courseReportView === "movement" ? (
-            <CourseLostMovement report={data.courseLostMovement} onSelect={setSelectedCourse} />
+            <CourseLostMovement
+              report={data.courseLostMovement}
+              onSelect={(row) =>
+                setSelectedCourse({ key: row.key, label: row.label, scope: "closed" })
+              }
+            />
           ) : (
-            <CourseLeadLossComparison report={data.courseLeadLoss} />
+            <CourseLeadLossComparison
+              report={data.courseLeadLoss}
+              onSelect={(row) =>
+                setSelectedCourse({ key: row.key, label: row.label, scope: "cohort-live" })
+              }
+            />
           )}
 
           <Card>
@@ -918,9 +945,13 @@ function Lost() {
               )}
             </DialogTitle>
             <DialogDescription className="text-xs leading-6 text-text-muted">
-              {lang === "ar"
-                ? "كل الـLeads والـOpportunities التي اتقفلت Lost خلال الفترة تحت الكورس ده. اضغط على أي صف لعرض بياناته وفتحه في Odoo."
-                : "Every Lead and Opportunity closed Lost during the period for this course. Select a row to inspect it and open it in Odoo."}
+              {selectedCourse?.scope === "cohort-live"
+                ? lang === "ar"
+                  ? "كل الـLeads والـOpportunities التي Creation Date بتاعها داخل الفترة وأصبحت Lost تحت الكورس ده — من Odoo المباشر. اضغط على أي صف لفتحه في Odoo."
+                  : "Every Lead and Opportunity created in the period that became Lost for this course, read from live Odoo. Select a row to open it in Odoo."
+                : lang === "ar"
+                  ? "كل الـLeads والـOpportunities التي اتقفلت Lost خلال الفترة تحت الكورس ده. اضغط على أي صف لعرض بياناته وفتحه في Odoo."
+                  : "Every Lead and Opportunity closed Lost during the period for this course. Select a row to inspect it and open it in Odoo."}
             </DialogDescription>
           </DialogHeader>
           <div className="p-3 sm:p-4">

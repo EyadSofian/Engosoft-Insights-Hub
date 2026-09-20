@@ -2,7 +2,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BookOpenCheck,
-  CalendarRange,
+  ExternalLink,
   Minus,
   Users,
 } from "lucide-react";
@@ -34,7 +34,13 @@ function Delta({ row }: { row: Pick<CourseLeadLossRow, "leadDelta" | "leadDeltaR
   );
 }
 
-export function CourseLeadLossComparison({ report }: { report: CourseLeadLossReport }) {
+export function CourseLeadLossComparison({
+  report,
+  onSelect,
+}: {
+  report: CourseLeadLossReport;
+  onSelect?: (row: CourseLeadLossRow) => void;
+}) {
   const { lang } = useI18n();
   const A = lang === "ar";
   const previous = report.previousRange;
@@ -64,7 +70,7 @@ export function CourseLeadLossComparison({ report }: { report: CourseLeadLossRep
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:min-w-[470px]">
+          <div className="grid grid-cols-2 gap-2 xl:min-w-[560px] xl:grid-cols-4">
             <div className="rounded-2xl border border-brand/15 bg-surface/90 px-4 py-3">
               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
                 <Users size={12} />
@@ -76,19 +82,26 @@ export function CourseLeadLossComparison({ report }: { report: CourseLeadLossRep
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
               <div className="text-[10px] font-semibold text-text-muted">
-                {A ? "خسائر نفس الكوهورت" : "Lost from those leads"}
+                {A ? "إجمالي Lost" : "Total Lost"}
               </div>
               <div className="num mt-1 text-xl font-bold text-danger">
                 {fmtNum(report.totals.lost)}
               </div>
             </div>
-            <div className="col-span-2 rounded-2xl border border-border bg-surface/90 px-4 py-3 sm:col-span-1">
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
-                <CalendarRange size={12} />
-                {A ? "نسبة الخسارة" : "Lost rate"}
+            <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
+              <div className="text-[10px] font-semibold text-text-muted">
+                {A ? "Lost Leads" : "Lost Leads"}
               </div>
-              <div className="num mt-1 text-xl font-bold text-text">
-                {fmtPct(report.totals.lostRate, 1)}
+              <div className="num mt-1 text-xl font-bold text-danger">
+                {fmtNum(report.totals.lostLeads)}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
+              <div className="text-[10px] font-semibold text-text-muted">
+                {A ? "Lost Opportunities" : "Lost Opportunities"}
+              </div>
+              <div className="num mt-1 text-xl font-bold text-danger">
+                {fmtNum(report.totals.lostOpportunities)}
               </div>
             </div>
           </div>
@@ -134,12 +147,23 @@ export function CourseLeadLossComparison({ report }: { report: CourseLeadLossRep
             {report.rows.map((row) => (
               <tr
                 key={row.key}
-                className="border-b border-border/75 transition-colors hover:bg-brand-soft/20"
+                role={onSelect ? "button" : undefined}
+                tabIndex={onSelect ? 0 : undefined}
+                onClick={() => onSelect?.(row)}
+                onKeyDown={(event) => {
+                  if (onSelect && (event.key === "Enter" || event.key === " ")) onSelect(row);
+                }}
+                className={`border-b border-border/75 transition-colors hover:bg-brand-soft/20 ${onSelect ? "cursor-pointer focus:bg-brand-soft/30 focus:outline-none" : ""}`}
               >
                 <td className="px-5 py-4 lg:px-7">
                   <div className="font-semibold text-text">{row.label}</div>
                   {row.course !== row.label && (
                     <div className="mt-0.5 text-[10px] text-text-subtle">Odoo: {row.course}</div>
+                  )}
+                  {onSelect && (
+                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand">
+                      {A ? "عرض الليدز" : "View leads"} <ExternalLink size={10} />
+                    </div>
                   )}
                 </td>
                 <td className="num px-4 py-4 text-start text-lg font-bold text-text">
@@ -205,7 +229,11 @@ export function CourseLeadLossComparison({ report }: { report: CourseLeadLossRep
 
       <div className="divide-y divide-border md:hidden">
         {report.rows.map((row) => (
-          <article key={row.key} className="px-4 py-4">
+          <article
+            key={row.key}
+            onClick={() => onSelect?.(row)}
+            className={`px-4 py-4 ${onSelect ? "cursor-pointer active:bg-brand-soft/30" : ""}`}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-bold text-text">{row.label}</h3>
