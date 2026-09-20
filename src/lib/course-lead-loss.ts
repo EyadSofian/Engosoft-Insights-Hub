@@ -34,6 +34,23 @@ export interface CourseLeadLossReport {
   totals: Omit<CourseLeadLossRow, "key" | "course" | "label">;
 }
 
+export interface CourseLostMovementRow {
+  key: string;
+  course: string;
+  label: string;
+  lost: number;
+  lostLeads: number;
+  lostOpportunities: number;
+  share: number;
+}
+
+export interface CourseLostMovementReport {
+  definition: "closed_in_period";
+  range: CourseLeadLossRange;
+  rows: CourseLostMovementRow[];
+  totals: Pick<CourseLostMovementRow, "lost" | "lostLeads" | "lostOpportunities">;
+}
+
 const UNCLASSIFIED = "Unclassified";
 
 const DISPLAY_NAMES: Record<string, string> = {
@@ -57,6 +74,41 @@ const identity = (course: string) => {
     label: DISPLAY_NAMES[value] ?? value,
   };
 };
+
+/** Lost movement grouped by course; the input must already be close-date filtered. */
+export function buildCourseLostMovementReport(args: {
+  lost: CourseLeadLossSourceRow[];
+  range: CourseLeadLossRange;
+}): CourseLostMovementReport {
+  const grouped = new Map<string, Omit<CourseLostMovementRow, "share">>();
+  for (const source of args.lost) {
+    const value = identity(source.course);
+    const row = grouped.get(value.key) ?? {
+      ...value,
+      lost: 0,
+      lostLeads: 0,
+      lostOpportunities: 0,
+    };
+    row.lost += 1;
+    if (source.recordType === "lead") row.lostLeads += 1;
+    else row.lostOpportunities += 1;
+    grouped.set(value.key, row);
+  }
+  const lost = args.lost.length;
+  const rows = [...grouped.values()]
+    .map((row) => ({ ...row, share: lost > 0 ? (row.lost / lost) * 100 : 0 }))
+    .sort((a, b) => b.lost - a.lost || a.label.localeCompare(b.label));
+  return {
+    definition: "closed_in_period",
+    range: args.range,
+    rows,
+    totals: {
+      lost,
+      lostLeads: rows.reduce((sum, row) => sum + row.lostLeads, 0),
+      lostOpportunities: rows.reduce((sum, row) => sum + row.lostOpportunities, 0),
+    },
+  };
+}
 
 interface Accumulator {
   key: string;

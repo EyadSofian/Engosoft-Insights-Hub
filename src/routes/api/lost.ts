@@ -19,11 +19,15 @@ export const Route = createFileRoute("/api/lost")({
         const { auditDuplicateReasons } = await import("@/lib/lost-duplicate-audit");
         const { odooConfig } = await import("@/lib/odoo.server");
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
-        const { buildCourseLeadLossReport } = await import("@/lib/course-lead-loss");
+        const { buildCourseLeadLossReport, buildCourseLostMovementReport } =
+          await import("@/lib/course-lead-loss");
+        const { normalizeCourseKey } = await import("@/lib/course-taxonomy");
 
         const filters = await parseFilters(request);
         const requestParams = new URL(request.url).searchParams;
         const detailReasonKey = requestParams.get("detailReason")?.trim() || "";
+        const detailCourseKey = requestParams.get("detailCourse")?.trim() || "";
+        const detailScope = requestParams.get("detailScope") === "closed" ? "closed" : "cohort";
         const detailOffset = Math.max(0, Number(requestParams.get("detailOffset")) || 0);
         const detailLimit = Math.min(
           200,
@@ -56,6 +60,10 @@ export const Route = createFileRoute("/api/lost")({
           currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
           previousRange: prevRange,
         });
+        const courseLostMovement = buildCourseLostMovementReport({
+          lost: closedLostRows,
+          range: { from: filters.from ?? "", to: filters.to ?? "" },
+        });
         const duplicateAudit = auditDuplicateReasons(lostRows, [
           ...data.snapshot.crm,
           ...data.snapshot.lost,
@@ -85,11 +93,16 @@ export const Route = createFileRoute("/api/lost")({
           })
           .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
 
-        const detailSource = detailReasonKey
-          ? lostRows.filter(
-              (row) => canonicalLossReason(row.lossReason).canonicalReasonKey === detailReasonKey,
+        const baseDetailRows = detailScope === "closed" ? closedLostRows : lostRows;
+        const detailSource = detailCourseKey
+          ? baseDetailRows.filter(
+              (row) => normalizeCourseKey(row.course.trim() || "Unclassified") === detailCourseKey,
             )
-          : lostRows;
+          : detailReasonKey
+            ? lostRows.filter(
+                (row) => canonicalLossReason(row.lossReason).canonicalReasonKey === detailReasonKey,
+              )
+            : lostRows;
         const detailRows = detailSource
           .map((l) => {
             const reason = canonicalLossReason(l.lossReason);
@@ -139,20 +152,24 @@ export const Route = createFileRoute("/api/lost")({
                 String(a.reportingDate || a.closeDate),
               ) || Number(b.id) - Number(a.id),
           );
-        const detail = detailReasonKey
-          ? {
-              rows: detailRows.slice(detailOffset, detailOffset + detailLimit),
-              total: detailRows.length,
-              truncated: detailOffset + detailLimit < detailRows.length,
-              offset: detailOffset,
-              limit: detailLimit,
-              reasonKey: detailReasonKey,
-            }
-          : { ...capped(detailRows), offset: 0, limit: Math.min(detailRows.length, 3000) };
+        const detail =
+          detailReasonKey || detailCourseKey
+            ? {
+                rows: detailRows.slice(detailOffset, detailOffset + detailLimit),
+                total: detailRows.length,
+                truncated: detailOffset + detailLimit < detailRows.length,
+                offset: detailOffset,
+                limit: detailLimit,
+                reasonKey: detailReasonKey,
+                courseKey: detailCourseKey,
+                scope: detailScope,
+              }
+            : { ...capped(detailRows), offset: 0, limit: Math.min(detailRows.length, 3000) };
 
         return json({
           breakdown: computeLost(data),
           courseLeadLoss,
+          courseLostMovement,
           duplicateAudit: {
             declaredCount: duplicateAudit.declaredCount,
             declaredShare: duplicateAudit.declaredShare,

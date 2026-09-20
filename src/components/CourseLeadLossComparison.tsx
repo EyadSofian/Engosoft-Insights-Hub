@@ -53,7 +53,7 @@ export function CourseLeadLossComparison({ report }: { report: CourseLeadLossRep
                   {A ? "تحليل الكوهورت" : "Course cohort"}
                 </p>
                 <h2 className="text-lg font-bold text-text sm:text-xl">
-                  {A ? "الليدز والخسائر حسب الكورس" : "Leads and losses by course"}
+                  {A ? "جودة ليدز الفترة حسب الكورس" : "Period lead quality by course"}
                 </h2>
               </div>
             </div>

@@ -24,12 +24,17 @@ import {
 } from "@/components/ui-bits";
 import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
 import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
+import { CourseLostMovement } from "@/components/CourseLostMovement";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
 import type { Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
-import type { CourseLeadLossReport } from "@/lib/course-lead-loss";
+import type {
+  CourseLeadLossReport,
+  CourseLostMovementReport,
+  CourseLostMovementRow,
+} from "@/lib/course-lead-loss";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import {
   Dialog,
@@ -91,6 +96,7 @@ interface LostRowView {
 interface Resp {
   breakdown: LostBreakdown;
   courseLeadLoss: CourseLeadLossReport;
+  courseLostMovement: CourseLostMovementReport;
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -113,6 +119,8 @@ interface Resp {
     offset: number;
     limit: number;
     reasonKey?: string;
+    courseKey?: string;
+    scope?: "closed" | "cohort";
   };
 }
 
@@ -344,20 +352,31 @@ function Lost() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
+  const [courseReportView, setCourseReportView] = useState<"movement" | "cohort">("movement");
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
-  useRegisterNexusView("lost", { tab: matrixView });
+  useRegisterNexusView("lost", {
+    tab: matrixView,
+    parameters: { courseReport: courseReportView },
+  });
   const [shareView, setShareView] = useState<ShareView>("reason");
   const [selectedReason, setSelectedReason] = useState<{ key: string; label: string } | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<CourseLostMovementRow | null>(null);
   const [reasonOffset, setReasonOffset] = useState(0);
+  const [courseOffset, setCourseOffset] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<LostRowView | null>(null);
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
   const reasonQuery = useApi<Resp>(
     `/api/lost?detailReason=${encodeURIComponent(selectedReason?.key ?? "")}&detailOffset=${reasonOffset}&detailLimit=50`,
     { enabled: selectedReason !== null },
   );
+  const courseQuery = useApi<Resp>(
+    `/api/lost?detailCourse=${encodeURIComponent(selectedCourse?.key ?? "")}&detailScope=closed&detailOffset=${courseOffset}&detailLimit=50`,
+    { enabled: selectedCourse !== null },
+  );
 
   useEffect(() => setReasonOffset(0), [selectedReason?.key]);
+  useEffect(() => setCourseOffset(0), [selectedCourse?.key]);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -610,7 +629,46 @@ function Lost() {
             )}
           </Card>
 
-          <CourseLeadLossComparison report={data.courseLeadLoss} />
+          <div className="rounded-2xl border border-border bg-surface p-1.5 shadow-sm">
+            <div
+              className="grid grid-cols-2 gap-1.5"
+              role="tablist"
+              aria-label={lang === "ar" ? "تقارير Lost حسب الكورس" : "Course Lost reports"}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={courseReportView === "movement"}
+                onClick={() => setCourseReportView("movement")}
+                className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
+              >
+                {lang === "ar" ? "Lost حسب الكورس · تاريخ الإغلاق" : "Lost by course · close date"}
+                <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
+                  {fmtNum(data.courseLostMovement.totals.lost)}
+                </span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={courseReportView === "cohort"}
+                onClick={() => setCourseReportView("cohort")}
+                className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "cohort" ? "bg-brand text-white shadow-md shadow-brand/20" : "text-text-muted hover:bg-surface-2"}`}
+              >
+                {lang === "ar"
+                  ? "جودة ليدز الفترة · تاريخ الإنشاء"
+                  : "Period lead quality · creation date"}
+                <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
+                  {fmtNum(data.courseLeadLoss.totals.lost)}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {courseReportView === "movement" ? (
+            <CourseLostMovement report={data.courseLostMovement} onSelect={setSelectedCourse} />
+          ) : (
+            <CourseLeadLossComparison report={data.courseLeadLoss} />
+          )}
 
           <Card>
             <SectionTitle
@@ -834,6 +892,77 @@ function Lost() {
                   source: r.source,
                   campaign: r.campaign,
                   stage: r.stage,
+                })}
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={selectedCourse !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCourse(null);
+        }}
+      >
+        <DialogContent
+          dir={lang === "ar" ? "rtl" : "ltr"}
+          className="max-h-[90vh] w-[min(97vw,1180px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
+        >
+          <DialogHeader className="sticky top-0 z-20 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <span>{lang === "ar" ? "Lost حسب الكورس:" : "Lost by course:"}</span>
+              <span>{selectedCourse?.label}</span>
+              {courseQuery.data && (
+                <Pill tone="danger">{fmtNum(courseQuery.data.detail.total)}</Pill>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-6 text-text-muted">
+              {lang === "ar"
+                ? "كل الـLeads والـOpportunities التي اتقفلت Lost خلال الفترة تحت الكورس ده. اضغط على أي صف لعرض بياناته وفتحه في Odoo."
+                : "Every Lead and Opportunity closed Lost during the period for this course. Select a row to inspect it and open it in Odoo."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 sm:p-4">
+            {courseQuery.isLoading ? (
+              <Skeleton className="h-[420px]" />
+            ) : courseQuery.error ? (
+              <ErrorState
+                message={(courseQuery.error as Error).message}
+                onRetry={() => courseQuery.refetch()}
+              />
+            ) : courseQuery.data ? (
+              <DataTable
+                rows={courseQuery.data.detail.rows}
+                cols={cols}
+                onRowClick={setSelectedRecord}
+                rowKey={(r) => r.id}
+                searchable={(r) =>
+                  `${r.id} ${r.contact} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.source} ${r.reason}`
+                }
+                serverPage={{
+                  offset: courseQuery.data.detail.offset,
+                  total: courseQuery.data.detail.total,
+                  size: courseQuery.data.detail.limit,
+                  onOffset: setCourseOffset,
+                }}
+                maxHeight={560}
+                csvFilename={`engosoft-lost-course-${selectedCourse?.key ?? "course"}`}
+                csvRow={(r) => ({
+                  crm_id: r.id,
+                  contact: r.contact,
+                  created: r.createdAt,
+                  close_date: r.closeDate,
+                  lost_date_basis: r.lostDateBasis,
+                  record_type: r.recordType,
+                  reason: r.reason,
+                  course: r.course,
+                  sales_team: r.salesTeam,
+                  salesperson: r.salesperson,
+                  source: r.source,
+                  campaign: r.campaign,
+                  stage: r.stage,
+                  odoo_url: r.odooUrl,
                 })}
               />
             ) : null}

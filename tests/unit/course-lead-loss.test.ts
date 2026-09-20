@@ -1,9 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { buildCourseLeadLossReport } from "@/lib/course-lead-loss";
+import { buildCourseLeadLossReport, buildCourseLostMovementReport } from "@/lib/course-lead-loss";
 
 const active = (course: string, recordType: "lead" | "opportunity" = "opportunity") => ({
   course,
   recordType,
+});
+
+describe("course Lost movement", () => {
+  it("groups the close-date population by course and preserves the type split", () => {
+    const report = buildCourseLostMovementReport({
+      lost: [
+        { course: "Auto", recordType: "lead" },
+        { course: "Auto", recordType: "opportunity" },
+        { course: "PMP", recordType: "opportunity" },
+      ],
+      range: { from: "2026-09-01", to: "2026-09-20" },
+    });
+    expect(report.totals).toEqual({ lost: 3, lostLeads: 1, lostOpportunities: 2 });
+    expect(report.rows[0]).toMatchObject({
+      key: "auto",
+      label: "Automotive",
+      lost: 2,
+      lostLeads: 1,
+      lostOpportunities: 1,
+    });
+  });
 });
 
 describe("course lead/loss creation cohort", () => {
