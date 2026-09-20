@@ -59,6 +59,32 @@ export const Route = createFileRoute("/api/lost")({
           ? [...freshPipeline.records, ...archivedLeads.records]
           : [];
 
+        // Lost is a live Odoo metric. Never silently replace it with the
+        // sheet snapshot: a stale number is more dangerous than an explicit
+        // unavailable state while reconciling Odoo.
+        if (!liveCohortAvailable) {
+          return json(
+            {
+              error: "Live Odoo Lost cohort is unavailable; no snapshot fallback was used.",
+              code: "ODOO_LIVE_UNAVAILABLE",
+              cohortAuthority: {
+                source: "odoo_unavailable",
+                total: null,
+                lostLeads: null,
+                lostOpportunities: null,
+                snapshotTotal: computeTotals(data).lost,
+                snapshotDelta: null,
+                fetchedAt: new Date().toISOString(),
+              },
+              details: {
+                pipeline: freshPipeline.error ?? null,
+                archivedLeads: archivedLeads.error ?? null,
+              },
+            },
+            503,
+          );
+        }
+
         // Both reads apply every dimension filter identically; only the date
         // column differs. The canonical classification splits them.
         const lostRows = authoritativeLostLeads(data);
@@ -71,7 +97,7 @@ export const Route = createFileRoute("/api/lost")({
         const counts = lostPopulationCounts(populations);
         const courseLeadLoss = buildCourseLeadLossReport({
           active: data.crm,
-          lost: liveCohortAvailable ? liveCohortRows : lostRows,
+          lost: liveCohortRows,
           previousActive: prevData?.crm,
           previousLost: prevData ? authoritativeLostLeads(prevData) : [],
           currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
@@ -174,7 +200,7 @@ export const Route = createFileRoute("/api/lost")({
               ) || Number(b.id) - Number(a.id),
           );
         const liveCourseDetailRows =
-          detailCourseKey && detailScope === "cohort-live" && liveCohortAvailable
+          detailCourseKey && detailScope === "cohort-live"
             ? liveCohortRows
                 .filter((row) => reportCourseKey(row.course) === detailCourseKey)
                 .map((row) => ({
@@ -217,7 +243,7 @@ export const Route = createFileRoute("/api/lost")({
             : null;
         const detailRows = liveCourseDetailRows ?? snapshotDetailRows;
         const snapshotTotals = computeTotals(data);
-        const authoritativeLost = liveCohortAvailable ? liveCohortRows.length : snapshotTotals.lost;
+        const authoritativeLost = liveCohortRows.length;
         const totals = {
           ...snapshotTotals,
           lost: authoritativeLost,
@@ -258,19 +284,13 @@ export const Route = createFileRoute("/api/lost")({
           teamLostRates,
           totals,
           cohortAuthority: {
-            source: liveCohortAvailable ? "odoo_live" : "snapshot_fallback",
+            source: "odoo_live",
             total: authoritativeLost,
-            lostLeads: liveCohortAvailable
-              ? archivedLeads.records.length
-              : courseLeadLoss.totals.lostLeads,
-            lostOpportunities: liveCohortAvailable
-              ? freshPipeline.records.length
-              : courseLeadLoss.totals.lostOpportunities,
+            lostLeads: archivedLeads.records.length,
+            lostOpportunities: freshPipeline.records.length,
             snapshotTotal: snapshotTotals.lost,
             snapshotDelta: authoritativeLost - snapshotTotals.lost,
-            fetchedAt: liveCohortAvailable
-              ? [freshPipeline.fetchedAt, archivedLeads.fetchedAt].sort().at(-1)
-              : "",
+            fetchedAt: [freshPipeline.fetchedAt, archivedLeads.fetchedAt].sort().at(-1),
           },
           /**
            * The three canonical Lost populations. `closedLostInPeriod` always
