@@ -73,4 +73,28 @@ describe("course lead/loss creation cohort", () => {
       leadDelta: -1,
     });
   });
+
+  it("merges Odoo category labels with their canonical dashboard course codes", () => {
+    const canonicalReport = buildCourseLeadLossReport({
+      active: [active("Auto"), active("PMP")],
+      lost: [active("Automotive"), active("Management", "lead")],
+      currentRange: { from: "2026-09-01", to: "2026-09-20" },
+    });
+
+    expect(canonicalReport.rows).toHaveLength(2);
+    expect(canonicalReport.rows.find((row) => row.key === "auto")).toMatchObject({
+      course: "Auto",
+      label: "Automotive",
+      leads: 2,
+      lost: 1,
+      lostOpportunities: 1,
+    });
+    expect(canonicalReport.rows.find((row) => row.key === "pmp")).toMatchObject({
+      course: "PMP",
+      label: "Management (PMP)",
+      leads: 2,
+      lost: 1,
+      lostLeads: 1,
+    });
+  });
 });

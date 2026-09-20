@@ -1,4 +1,4 @@
-import { normalizeCourseKey } from "./course-taxonomy";
+import { canonicalCourseValue, normalizeCourseKey } from "./course-taxonomy";
 import type { CrmRecordType } from "./types";
 
 export interface CourseLeadLossSourceRow {
@@ -67,7 +67,8 @@ const DISPLAY_NAMES: Record<string, string> = {
 };
 
 const identity = (course: string) => {
-  const value = course.trim() || UNCLASSIFIED;
+  const rawValue = course.trim() || UNCLASSIFIED;
+  const value = rawValue === UNCLASSIFIED ? rawValue : canonicalCourseValue(rawValue) || rawValue;
   return {
     key: normalizeCourseKey(value),
     course: value,

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/lost")({
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
         const { buildCourseLeadLossReport, buildCourseLostMovementReport } =
           await import("@/lib/course-lead-loss");
-        const { normalizeCourseKey } = await import("@/lib/course-taxonomy");
+        const { canonicalCourseValue, normalizeCourseKey } = await import("@/lib/course-taxonomy");
         const { loadFreshLostPipeline, loadArchivedLostLeads } =
           await import("@/lib/crm-fresh-lost.server");
 
@@ -89,6 +89,12 @@ export const Route = createFileRoute("/api/lost")({
         const odooBaseUrl = odooConfig().url;
         const hasCampaign = (row: (typeof closedLostRows)[number]) =>
           Boolean(row.campaignId || row.campaignName.trim());
+        const reportCourseKey = (course: string) => {
+          const rawCourse = course.trim() || "Unclassified";
+          const canonicalCourse =
+            rawCourse === "Unclassified" ? rawCourse : canonicalCourseValue(rawCourse) || rawCourse;
+          return normalizeCourseKey(canonicalCourse);
+        };
 
         // Each team's denominator is its active non-Lost population plus that
         // team's canonical 1.26 losses. The two arrays are disjoint by design.
@@ -112,9 +118,7 @@ export const Route = createFileRoute("/api/lost")({
 
         const baseDetailRows = detailScope === "closed" ? closedLostRows : lostRows;
         const detailSource = detailCourseKey
-          ? baseDetailRows.filter(
-              (row) => normalizeCourseKey(row.course.trim() || "Unclassified") === detailCourseKey,
-            )
+          ? baseDetailRows.filter((row) => reportCourseKey(row.course) === detailCourseKey)
           : detailReasonKey
             ? lostRows.filter(
                 (row) => canonicalLossReason(row.lossReason).canonicalReasonKey === detailReasonKey,
@@ -172,10 +176,7 @@ export const Route = createFileRoute("/api/lost")({
         const liveCourseDetailRows =
           detailCourseKey && detailScope === "cohort-live" && liveCohortAvailable
             ? liveCohortRows
-                .filter(
-                  (row) =>
-                    normalizeCourseKey(row.course.trim() || "Unclassified") === detailCourseKey,
-                )
+                .filter((row) => reportCourseKey(row.course) === detailCourseKey)
                 .map((row) => ({
                   id: row.id,
                   contact: row.contact,
