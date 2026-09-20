@@ -4,8 +4,7 @@ export const Route = createFileRoute("/api/leads")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, authoritativeLostLeads, groupBy } =
-          await import("@/lib/metrics.server");
+        const { getFiltered, groupBy } = await import("@/lib/metrics.server");
         const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
         const { loadFreshLostPipeline, loadArchivedLostLeads } =
           await import("@/lib/crm-fresh-lost.server");
@@ -15,12 +14,30 @@ export const Route = createFileRoute("/api/leads")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
-        const canonicalLost = authoritativeLostLeads(data);
         const [freshPipeline, archivedLeads] = await Promise.all([
           loadFreshLostPipeline(filters, data.snapshot),
           loadArchivedLostLeads(filters, data.snapshot),
         ]);
         const odooBaseUrl = odooConfig().url;
+
+        // The workspace and the Lost analysis must agree on a single live
+        // Odoo population. A snapshot fallback made their totals drift.
+        if (
+          freshPipeline.availability !== "available" ||
+          archivedLeads.availability !== "available"
+        ) {
+          return json(
+            {
+              error: "Live Odoo Lost records are unavailable; no snapshot fallback was used.",
+              code: "ODOO_LIVE_UNAVAILABLE",
+              details: {
+                opportunities: freshPipeline.error ?? null,
+                leads: archivedLeads.error ?? null,
+              },
+            },
+            503,
+          );
+        }
 
         const activeRows = data.crm.map((row) => ({
           id: row.id,
@@ -81,67 +98,67 @@ export const Route = createFileRoute("/api/leads")({
           daysToClose: row.daysToClose,
         }));
 
-        const toLostWorkspaceRow = (row: (typeof canonicalLost)[number]) => ({
+        const toLostWorkspaceRow = (row: (typeof freshPipeline.records)[number]) => ({
           id: row.id,
-          odooUrl: row.id
-            ? `${odooBaseUrl}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
-            : "",
+          odooUrl: row.odooUrl,
           createdAt: row.createdAt,
           contact: row.contact,
-          phone: row.phone,
-          mobile: row.mobile,
-          email: row.email,
+          phone: "",
+          mobile: "",
+          email: "",
           recordType: row.recordType,
           active: row.active,
           status: "lost" as const,
-          // A Lost Lead keeps its real stage in Odoo. `displayStageKey` is the
-          // lifecycle lane, while `stageKey` and `stage` preserve its actual stage.
-          stageKey: row.stageKey,
+          // The live Lost reads carry the original stage label, but not its
+          // XMLID. The display lane remains Lost for both record types.
+          stageKey: "other" as const,
           displayStageKey: "lost" as const,
           stage: row.stage,
-          source: labels.get(row.sourceKey) ?? row.source,
-          medium: row.medium,
-          communicationLanguage: row.communicationLanguage,
-          campaign: row.campaignName,
-          campaignId: row.campaignId,
-          adName: row.adName,
-          adId: row.adId,
-          adset: row.adset,
+          source: row.source,
+          medium: "",
+          communicationLanguage: "",
+          campaign: "",
+          campaignId: "",
+          adName: "",
+          adId: "",
+          adset: "",
           course: row.course,
-          courses: row.courses,
+          courses: row.course,
           salesperson: row.salesperson,
           salesTeam: row.salesTeam,
-          probability: row.probability,
-          automatedProbability: row.automatedProbability,
-          closingDurationDays: row.closingDurationDays,
-          priority: row.priority,
-          readyToConvert: row.readyToConvert,
-          leadSegment: row.leadSegment,
-          openStatus: row.openStatus,
-          closingChannel: row.closingChannel,
+          probability: 0,
+          automatedProbability: 0,
+          closingDurationDays: null,
+          priority: "",
+          readyToConvert: false,
+          leadSegment: "",
+          openStatus: "",
+          closingChannel: "",
           lostCategory: row.lostCategory,
           lossReason: row.lossReason,
-          inventoryBucket: row.inventoryBucket,
-          courseLanguage: row.courseLanguage,
-          courseType: row.courseType,
-          customerType: row.customerType,
-          callingReply: row.callingReply,
-          jobType: row.jobType,
-          howFoundUs: row.howFoundUs,
+          inventoryBucket: "",
+          courseLanguage: "",
+          courseType: "",
+          customerType: "",
+          callingReply: "",
+          jobType: "",
+          howFoundUs: "",
           company: row.company,
-          tags: row.tags,
-          targetName: row.targetName,
-          resignTarget: row.resignTarget,
-          facebookLeadId: row.facebookLeadId,
-          validateClosedReason: row.validateClosedReason,
-          lastStageUpdate: row.lastStageUpdate,
-          wonDate: row.wonDate,
-          lostDate: row.lostDate || row.closeDate,
-          conversionDate: row.conversionDate,
-          closedAt: row.closeDate,
+          tags: "",
+          targetName: "",
+          resignTarget: "",
+          facebookLeadId: "",
+          validateClosedReason: "",
+          lastStageUpdate: "",
+          wonDate: "",
+          lostDate: "",
+          conversionDate: "",
+          closedAt: "",
           daysToClose: null,
         });
-        const lostRows = canonicalLost.map(toLostWorkspaceRow);
+        const lostRows = [...freshPipeline.records, ...archivedLeads.records].map(
+          toLostWorkspaceRow,
+        );
 
         const workspaceRows = [...activeRows, ...lostRows];
         const stageKeys = ["preparation", "new", "open", "quotation", "won", "lost"] as const;
