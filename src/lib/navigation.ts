@@ -69,6 +69,8 @@ const acquisitionSection = (search: LocationSearch) =>
   typeof search.section === "string" ? search.section : undefined;
 const accountingView = (search: LocationSearch) =>
   typeof search.view === "string" ? search.view : undefined;
+const courseView = (search: LocationSearch) =>
+  typeof search.view === "string" ? search.view : undefined;
 
 /**
  * Six primary destinations, each answering one management question. Every
@@ -106,6 +108,14 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: "campaigns",
         icon: Megaphone,
         tabLabel: { ar: "الحملات", en: "Campaigns" },
+      },
+      {
+        to: "/courses",
+        key: "courses",
+        icon: GraduationCap,
+        tabLabel: { ar: "إعلانات الكورسات", en: "Course ads" },
+        search: { view: "ads" },
+        matches: (search) => courseView(search) === "ads",
       },
       {
         to: "/acquisition",
@@ -172,7 +182,9 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         to: "/courses",
         key: "courses",
         icon: GraduationCap,
-        tabLabel: { ar: "الكورسات", en: "Courses" },
+        tabLabel: { ar: "مبيعات الكورسات", en: "Course sales" },
+        search: { view: "sales" },
+        matches: (search) => courseView(search) !== "ads",
       },
     ],
   },

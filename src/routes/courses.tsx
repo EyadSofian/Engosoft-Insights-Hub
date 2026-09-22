@@ -44,7 +44,13 @@ import {
   useRegisterNexusView,
 } from "@/components/engo-nexus/state/nexus-view-context";
 
-export const Route = createFileRoute("/courses")({ component: Courses });
+type CourseWorkspaceView = "sales" | "ads";
+
+export const Route = createFileRoute("/courses")({
+  validateSearch: (search: Record<string, unknown>): { view?: CourseWorkspaceView } =>
+    search.view === "ads" ? { view: "ads" } : search.view === "sales" ? { view: "sales" } : {},
+  component: Courses,
+});
 
 type AttributionSource = "source_mapping" | "campaign_name" | "crm_leads";
 
@@ -342,6 +348,8 @@ function Courses() {
   const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
   const filters = useFilters();
+  const workspaceView: CourseWorkspaceView = Route.useSearch().view ?? "sales";
+  const adsView = workspaceView === "ads";
   const organicScope = filters.channel === "organic";
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
@@ -388,15 +396,27 @@ function Courses() {
       <DashboardPageHeader
         flush
         icon={<GraduationCap size={20} />}
-        title={lang === "ar" ? "مركز أداء الكورسات" : "Course performance center"}
+        title={
+          adsView
+            ? lang === "ar"
+              ? "إعلانات الكورسات"
+              : "Course ads"
+            : lang === "ar"
+              ? "مبيعات الكورسات"
+              : "Course sales"
+        }
         subtitle={
           organicScope
             ? lang === "ar"
               ? "كل دورة من مصادر Odoo غير المدفوعة، وتحتها حملات الأورجانيك المسجلة ومقارنتها شهرًا بشهر."
               : "Each course from non-paid Odoo sources, with its recorded Organic campaigns and month-to-month comparison."
-            : lang === "ar"
-              ? "اختار الكورس، شوف أفضل الكرياتيفات الشغّالة فورًا، وبعدها أداء الحملات والمبيعات في مكان واحد."
-              : "Choose a course, see its best live creatives first, then review campaign and sales performance in one place."
+            : adsView
+              ? lang === "ar"
+                ? "كل كورس له حملاته وكرياتيفاته وصرفه وليدزه في مساحة منفصلة قابلة للفتح."
+                : "Each course has its campaigns, creatives, spend, and leads in a separate drill-down."
+              : lang === "ar"
+                ? "كل كورس له تحصيله وأوامر بيعه ونتائجه ومقارنة شهرية مستقلة."
+                : "Each course has its collections, sales orders, outcomes, and its own monthly comparison."
         }
         period={reportingPeriod}
       />
@@ -415,11 +435,26 @@ function Courses() {
       ) : (
         <>
           <KpiRow>
-            <MetricDetailTrigger detail={courseTotals.revenue} card={{ index: 0, hero: true }} />
-            <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 1 }} />
-            <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 2 }} />
-            <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 3 }} />
-            <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 4 }} />
+            {adsView ? (
+              <>
+                <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 0, hero: true }} />
+                <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 1 }} />
+                <MetricDetailTrigger detail={courseTotals.revenue} card={{ index: 2 }} />
+                <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 3 }} />
+                <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 4 }} />
+              </>
+            ) : (
+              <>
+                <MetricDetailTrigger
+                  detail={courseTotals.revenue}
+                  card={{ index: 0, hero: true }}
+                />
+                <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 1 }} />
+                <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 2 }} />
+                <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 3 }} />
+                <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 4 }} />
+              </>
+            )}
           </KpiRow>
 
           {/* The attribution chain is what makes a course figure trustworthy or
@@ -448,12 +483,20 @@ function Courses() {
                     tone: "info",
                     message:
                       lang === "ar"
-                        ? "إنفاق كل دورة مستنتَج من أسماء الحملات، وليس مسجّلاً على الدورة."
-                        : "Each course's ad spend is inferred from campaign names, not recorded against the course.",
+                        ? adsView
+                          ? "إعلانات كل دورة معروضة منفصلة؛ صرفها مربوط من أسماء الحملات وفق قواعد الإسناد."
+                          : "التحصيل من الفواتير المدفوعة، والإنفاق بجانبه لتوضيح العائد لكل دورة."
+                        : adsView
+                          ? "Each course's ads are separate; spend is linked from campaign names under the attribution rules."
+                          : "Collections come from paid invoices; spend is shown alongside them to explain each course's return.",
                     impact:
                       lang === "ar"
-                        ? "كل بطاقة حملة تذكر مصدر الربط الذي اعتُمد عليها."
-                        : "Every campaign card states the attribution source it relied on.",
+                        ? adsView
+                          ? "كل حملة تذكر مصدر الربط الذي اعتُمد عليها."
+                          : "افتح أي كورس لمراجعة تحصيله وصرفه والحملات التي كوّنت السياق."
+                        : adsView
+                          ? "Every campaign states the attribution source it relied on."
+                          : "Open any course to review its collections, spend, and campaign context.",
                     technical:
                       lang === "ar"
                         ? "اسم الحملة هو الأساس، ثم الدورة المرتبطة بأداء الحملة. اسم الكرياتيف والإعلان والمجموعة يُستخدم كاكتشاف احتياطي إذا لم تكن الحملة مصنفة. الليدز من CRM والإيراد من الفواتير المدفوعة."
@@ -462,7 +505,7 @@ function Courses() {
             ]}
           />
 
-          <CourseLeadLossComparison report={data.courseLeadLoss} />
+          {!adsView && <CourseLeadLossComparison report={data.courseLeadLoss} />}
 
           <CoursePortfolioNavigator
             courses={visibleCourses}
@@ -471,6 +514,7 @@ function Courses() {
             search={search}
             onSearchChange={setSearch}
             onSelect={setSelectedKey}
+            mode={workspaceView}
           />
 
           {selectedCourse && (
@@ -480,35 +524,39 @@ function Courses() {
               loading={detailQuery.isLoading}
               error={detailQuery.error as Error | null}
               organicScope={organicScope}
+              mode={workspaceView}
             />
           )}
 
-          {leadAlerts.isLoading || !leadAlerts.data ? (
-            <Skeleton className="h-[250px]" />
-          ) : leadAlerts.error ? (
-            <Notice tone="danger" icon={<TriangleAlert size={17} />}>
-              {lang === "ar"
-                ? `تعذّر تحميل مراقبة الليدز اليومية: ${(leadAlerts.error as Error).message}`
-                : `Daily lead monitor failed: ${(leadAlerts.error as Error).message}`}
-            </Notice>
-          ) : (
-            <CourseLeadMonitor report={leadAlerts.data} />
-          )}
+          {adsView &&
+            (leadAlerts.isLoading || !leadAlerts.data ? (
+              <Skeleton className="h-[250px]" />
+            ) : leadAlerts.error ? (
+              <Notice tone="danger" icon={<TriangleAlert size={17} />}>
+                {lang === "ar"
+                  ? `تعذّر تحميل مراقبة الليدز اليومية: ${(leadAlerts.error as Error).message}`
+                  : `Daily lead monitor failed: ${(leadAlerts.error as Error).message}`}
+              </Notice>
+            ) : (
+              <CourseLeadMonitor report={leadAlerts.data} />
+            ))}
         </>
       )}
 
       {/* Contribution and average selling price: the pair that used to sit on
           the executive summary, now in the report about courses. */}
-      <MoreDetails
-        label={lang === "ar" ? "مساهمة الكورسات في الإيراد" : "Course contribution to revenue"}
-        hint={
-          lang === "ar"
-            ? "أعلى الكورسات إيرادًا في الفترة، ونصيب كل كورس ومتوسط سعر بيعه"
-            : "The period's top courses, each one's share and its average selling price"
-        }
-      >
-        <OverviewCourseContribution />
-      </MoreDetails>
+      {!adsView && (
+        <MoreDetails
+          label={lang === "ar" ? "مساهمة الكورسات في الإيراد" : "Course contribution to revenue"}
+          hint={
+            lang === "ar"
+              ? "أعلى الكورسات إيرادًا في الفترة، ونصيب كل كورس ومتوسط سعر بيعه"
+              : "The period's top courses, each one's share and its average selling price"
+          }
+        >
+          <OverviewCourseContribution />
+        </MoreDetails>
+      )}
     </div>
   );
 }
@@ -533,6 +581,7 @@ function CoursePortfolioNavigator({
   search,
   onSearchChange,
   onSelect,
+  mode,
 }: {
   courses: CourseAgg[];
   totalCourses: number;
@@ -540,10 +589,15 @@ function CoursePortfolioNavigator({
   search: string;
   onSearchChange: (value: string) => void;
   onSelect: (key: string) => void;
+  mode: CourseWorkspaceView;
 }) {
   const { lang } = useI18n();
-  const [rank, setRank] = useState<CourseRank>("revenue");
+  const [rank, setRank] = useState<CourseRank>(mode === "ads" ? "spend" : "revenue");
   const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    setRank(mode === "ads" ? "spend" : "revenue");
+    setExpanded(false);
+  }, [mode]);
   const ranked = useMemo(
     () =>
       [...courses].sort(
@@ -597,14 +651,24 @@ function CoursePortfolioNavigator({
                   {lang === "ar" ? "Course command center" : "Course command center"}
                 </p>
                 <h2 className="text-lg font-bold text-text sm:text-xl">
-                  {lang === "ar" ? "اختار الكورس وخُد القرار" : "Choose a course and decide"}
+                  {mode === "ads"
+                    ? lang === "ar"
+                      ? "إعلانات كل كورس في مكانها"
+                      : "Each course's ads in one place"
+                    : lang === "ar"
+                      ? "مبيعات كل كورس بوضوح"
+                      : "Each course's sales, clearly"}
                 </h2>
               </div>
             </div>
             <p className="mt-2 max-w-2xl text-xs leading-5 text-text-muted">
               {lang === "ar"
-                ? "كل كورس في بطاقة واحدة. افتحه لتشوف فورًا أفضل الإعلانات والكرياتيفات الشغّالة، ثم أداء الحملات والتاريخ."
-                : "One card per course. Open it to see live winning creatives first, followed by campaign performance and history."}
+                ? mode === "ads"
+                  ? "اختار كورس لتشوف حملاته وكرياتيفاته وصرفه وليدزه؛ كل التفاصيل لا تخص غيره."
+                  : "اختار كورس لتشوف تحصيله وأوامر بيعه ونتائجه ومقارنة الشهور الخاصة به."
+                : mode === "ads"
+                  ? "Select a course to inspect only its campaigns, creatives, spend, and leads."
+                  : "Select a course to inspect only its collections, sales orders, outcomes, and monthly comparison."}
             </p>
           </div>
 
@@ -702,17 +766,31 @@ function CoursePortfolioNavigator({
 
                 <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
                   <CourseCardMetric
-                    label={lang === "ar" ? "المحصل" : "Revenue"}
-                    value={fmtUSD(course.revenue)}
+                    label={
+                      mode === "ads"
+                        ? lang === "ar"
+                          ? "الإنفاق"
+                          : "Spend"
+                        : lang === "ar"
+                          ? "المحصل"
+                          : "Revenue"
+                    }
+                    value={mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
                     strong
                   />
                   <CourseCardMetric
-                    label={lang === "ar" ? "الإنفاق" : "Spend"}
-                    value={fmtUSD(course.spend)}
+                    label={mode === "ads" ? (lang === "ar" ? "الليدز" : "Leads") : "Won"}
+                    value={mode === "ads" ? fmtNum(course.crmLeads) : fmtNum(course.won)}
                   />
                   <CourseCardMetric
-                    label={lang === "ar" ? "Won" : "Won"}
-                    value={fmtNum(course.won)}
+                    label={mode === "ads" ? "CPL" : lang === "ar" ? "أوامر البيع" : "Sales orders"}
+                    value={
+                      mode === "ads"
+                        ? course.crmLeads > 0
+                          ? fmtUSD(course.spend / course.crmLeads)
+                          : "—"
+                        : fmtNum(course.orders)
+                    }
                   />
                   <CourseCardMetric
                     label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
@@ -736,9 +814,13 @@ function CoursePortfolioNavigator({
                       ? lang === "ar"
                         ? "مفتوح الآن"
                         : "Open now"
-                      : lang === "ar"
-                        ? "أفضل الكرياتيفات"
-                        : "Best creatives"}
+                      : mode === "ads"
+                        ? lang === "ar"
+                          ? "الحملات والكرياتيفات"
+                          : "Campaigns & creatives"
+                        : lang === "ar"
+                          ? "تفاصيل المبيعات"
+                          : "Sales detail"}
                   </span>
                 </div>
               </button>
@@ -1202,12 +1284,14 @@ function CourseDetailPanel({
   loading,
   error,
   organicScope,
+  mode,
 }: {
   course: CourseAgg;
   drill: CourseDrill | null;
   loading: boolean;
   error: Error | null;
   organicScope: boolean;
+  mode: CourseWorkspaceView;
 }) {
   const { lang } = useI18n();
   const months = drill?.monthly ?? [];
@@ -1262,7 +1346,13 @@ function CourseDetailPanel({
             </span>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                {lang === "ar" ? "تفاصيل الدورة المختارة" : "Selected course detail"}
+                {mode === "ads"
+                  ? lang === "ar"
+                    ? "تفاصيل إعلانات الكورس"
+                    : "Course ads detail"
+                  : lang === "ar"
+                    ? "تفاصيل مبيعات الكورس"
+                    : "Course sales detail"}
               </p>
               <h2 className="mt-0.5 truncate text-xl font-semibold text-text">{course.name}</h2>
               <p className="mt-1 text-xs text-text-muted">
@@ -1330,9 +1420,9 @@ function CourseDetailPanel({
         )}
       </div>
 
-      {!organicScope && <CourseCreativeGallery courseName={course.name} />}
+      {!organicScope && mode === "ads" && <CourseCreativeGallery courseName={course.name} />}
 
-      {!organicScope && (
+      {!organicScope && mode === "ads" && (
         <div>
           <SectionHeading
             icon={<Activity size={18} />}
@@ -1367,57 +1457,59 @@ function CourseDetailPanel({
         </div>
       )}
 
-      <div>
-        <SectionHeading
-          icon={organicScope ? <Leaf size={18} /> : <History size={18} />}
-          title={
-            organicScope
-              ? lang === "ar"
-                ? "حملات الأورجانيك المسجلة للدورة"
-                : "Recorded Organic campaigns for the course"
-              : lang === "ar"
-                ? "الحملات السابقة للدورة"
-                : "Previous course campaigns"
-          }
-          hint={
-            organicScope
-              ? lang === "ar"
-                ? "الأسماء والمصادر جاية من Campaign وSource في Odoo؛ لا يتم خلطها بحملات منصات الإعلانات الشغالة."
-                : "Names and sources come from Odoo Campaign and Source; active paid-media campaigns are kept out of this list."
-              : lang === "ar"
-                ? "حملات ظهرت وصرفت في الفترة المختارة، لكنها مش جاهزة للتشغيل حاليًا."
-                : "Campaigns with spend in the selected period that aren't eligible to run now."
-          }
-          count={drill.previousCampaignCount}
-        />
-        {drill.previousCampaigns.length ? (
-          <div className="card-grid lg:grid-cols-2 xl:grid-cols-3">
-            {drill.previousCampaigns.map((campaign) => (
-              <CampaignCard
-                key={campaign.key}
-                campaign={campaign}
-                active={false}
-                organic={organicScope}
+      {mode === "ads" && (
+        <div>
+          <SectionHeading
+            icon={organicScope ? <Leaf size={18} /> : <History size={18} />}
+            title={
+              organicScope
+                ? lang === "ar"
+                  ? "حملات الأورجانيك المسجلة للدورة"
+                  : "Recorded Organic campaigns for the course"
+                : lang === "ar"
+                  ? "الحملات السابقة للدورة"
+                  : "Previous course campaigns"
+            }
+            hint={
+              organicScope
+                ? lang === "ar"
+                  ? "الأسماء والمصادر جاية من Campaign وSource في Odoo؛ لا يتم خلطها بحملات منصات الإعلانات الشغالة."
+                  : "Names and sources come from Odoo Campaign and Source; active paid-media campaigns are kept out of this list."
+                : lang === "ar"
+                  ? "حملات ظهرت وصرفت في الفترة المختارة، لكنها مش جاهزة للتشغيل حاليًا."
+                  : "Campaigns with spend in the selected period that aren't eligible to run now."
+            }
+            count={drill.previousCampaignCount}
+          />
+          {drill.previousCampaigns.length ? (
+            <div className="card-grid lg:grid-cols-2 xl:grid-cols-3">
+              {drill.previousCampaigns.map((campaign) => (
+                <CampaignCard
+                  key={campaign.key}
+                  campaign={campaign}
+                  active={false}
+                  organic={organicScope}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="card">
+              <EmptyState
+                label={
+                  organicScope
+                    ? lang === "ar"
+                      ? "مفيش أسماء حملات أورجانيك مسجلة للدورة في الفترة"
+                      : "No Organic campaign names are recorded for this course in the period"
+                    : lang === "ar"
+                      ? "مفيش حملات سابقة في الفترة"
+                      : "No previous campaigns in this period"
+                }
+                compact
               />
-            ))}
-          </div>
-        ) : (
-          <div className="card">
-            <EmptyState
-              label={
-                organicScope
-                  ? lang === "ar"
-                    ? "مفيش أسماء حملات أورجانيك مسجلة للدورة في الفترة"
-                    : "No Organic campaign names are recorded for this course in the period"
-                  : lang === "ar"
-                    ? "مفيش حملات سابقة في الفترة"
-                    : "No previous campaigns in this period"
-              }
-              compact
-            />
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card p-4 sm:p-5">
         <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -1425,9 +1517,13 @@ function CourseDetailPanel({
             <div className="flex items-center gap-2">
               <BarChart3 size={18} className="text-brand" />
               <h3 className="text-base font-semibold text-text">
-                {lang === "ar"
-                  ? `مقارنة شهرين لنفس دورة ${course.name}`
-                  : `Two-month comparison for ${course.name}`}
+                {mode === "ads"
+                  ? lang === "ar"
+                    ? `أداء الحملات شهريًا لدورة ${course.name}`
+                    : `Monthly campaign performance for ${course.name}`
+                  : lang === "ar"
+                    ? `مقارنة مبيعات شهرين لدورة ${course.name}`
+                    : `Two-month sales comparison for ${course.name}`}
               </h3>
             </div>
             <p className="mt-1 text-xs text-text-muted">

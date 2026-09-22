@@ -696,20 +696,6 @@ function CrmWorkspace() {
   const lens = lensFor(stage, view, A);
   const selectedStage = stage ? stageCopy(stage, lang) : null;
   const crmHealthIssues = [
-    ...(data.health.crmAuthority !== "odoo-direct"
-      ? [
-          {
-            tone: "warning" as const,
-            message: A
-              ? "الـCRM معروض من آخر نسخة متاحة."
-              : "CRM is using the latest available copy.",
-            impact: A
-              ? "قد تتأخر أحدث تغييرات المراحل والحالات حتى عودة الاتصال المباشر."
-              : "The latest stage and status changes may lag until the direct connection returns.",
-            technical: `CRM authority: ${data.health.crmAuthority}`,
-          },
-        ]
-      : []),
     ...(summary.unmappedOperationalStages > 0
       ? [
           {
