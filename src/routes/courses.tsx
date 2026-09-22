@@ -27,7 +27,7 @@ import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery"
 import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { OverviewCourseContribution } from "@/components/overview-records";
-import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
@@ -438,28 +438,55 @@ function Courses() {
         </>
       ) : (
         <>
-          <KpiRow>
+          <div className="card-grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
             {adsView ? (
               <>
-                <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 0, hero: true }} />
-                <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 1 }} />
-                <MetricDetailTrigger detail={courseTotals.revenue} card={{ index: 2 }} />
-                <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 3 }} />
-                <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 4 }} />
+                <MetricDetailTrigger
+                  detail={courseTotals.spend}
+                  card={{ index: 0, hero: true, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.leads}
+                  card={{ index: 1, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.revenue}
+                  card={{ index: 2, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.salesOrders}
+                  card={{ index: 3, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.invoices}
+                  card={{ index: 4, compact: true }}
+                />
               </>
             ) : (
               <>
                 <MetricDetailTrigger
                   detail={courseTotals.revenue}
-                  card={{ index: 0, hero: true }}
+                  card={{ index: 0, hero: true, compact: true }}
                 />
-                <MetricDetailTrigger detail={courseTotals.invoices} card={{ index: 1 }} />
-                <MetricDetailTrigger detail={courseTotals.salesOrders} card={{ index: 2 }} />
-                <MetricDetailTrigger detail={courseTotals.spend} card={{ index: 3 }} />
-                <MetricDetailTrigger detail={courseTotals.leads} card={{ index: 4 }} />
+                <MetricDetailTrigger
+                  detail={courseTotals.invoices}
+                  card={{ index: 1, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.salesOrders}
+                  card={{ index: 2, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.spend}
+                  card={{ index: 3, compact: true }}
+                />
+                <MetricDetailTrigger
+                  detail={courseTotals.leads}
+                  card={{ index: 4, compact: true }}
+                />
               </>
             )}
-          </KpiRow>
+          </div>
 
           <CourseWorkspaceTabs
             mode={workspaceView}
