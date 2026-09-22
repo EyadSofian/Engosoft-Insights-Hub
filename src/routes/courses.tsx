@@ -26,7 +26,6 @@ import { FilterSummary } from "@/components/ads/FilterSummary";
 import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery";
 import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
-import { MoreDetails } from "@/components/dashboard-bits";
 import { OverviewCourseContribution } from "@/components/overview-records";
 import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
@@ -45,6 +44,7 @@ import {
 } from "@/components/engo-nexus/state/nexus-view-context";
 
 type CourseWorkspaceView = "sales" | "ads";
+type CourseWorkspaceSection = "overview" | "courses" | "monitor" | "quality" | "contribution";
 
 export const Route = createFileRoute("/courses")({
   validateSearch: (search: Record<string, unknown>): { view?: CourseWorkspaceView } =>
@@ -353,6 +353,7 @@ function Courses() {
   const organicScope = filters.channel === "organic";
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
+  const [section, setSection] = useState<CourseWorkspaceSection>("overview");
   const { data, isLoading, error, refetch } = useApi<CoursesResponse>("/api/courses");
   const leadAlerts = useApi<CourseLeadAlertReport>("/api/course-lead-alerts");
 
@@ -375,6 +376,10 @@ function Courses() {
     );
   }, [courses, lang, search]);
 
+  useEffect(() => {
+    setSection("overview");
+  }, [workspaceView]);
+
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const linked = courses.reduce(
@@ -390,7 +395,6 @@ function Courses() {
   );
   // One description per figure, built from the course rows already on screen.
   const courseTotals = courseMetrics(courses, linked, lang);
-
   return (
     <div className="page-sections">
       <DashboardPageHeader
@@ -457,78 +461,95 @@ function Courses() {
             )}
           </KpiRow>
 
-          {/* The attribution chain is what makes a course figure trustworthy or
-              not, so it stays on the page — but as a data-health statement
-              with its mechanics folded away, not as a five-line paragraph
-              between the figures and the table they explain. */}
-          <DataHealthSummary
-            issues={[
-              organicScope
-                ? {
-                    tone: "info",
-                    message:
-                      lang === "ar"
-                        ? "هذه القراءة تشمل المصادر غير المدفوعة فقط."
-                        : "This reading covers non-paid sources only.",
-                    impact:
-                      lang === "ar"
-                        ? "الإنفاق يظل صفراً لأن هذه ليست إعلانات مدفوعة."
-                        : "Spend stays at zero because this is not paid advertising.",
-                    technical:
-                      lang === "ar"
-                        ? "النطاق مقصور على مصادر Odoo غير المدفوعة؛ كل صف دورة، وفتحه يعرض حملات الأورجانيك المسجلة ومصادرها وليدزها ومبيعاتها."
-                        : "Scoped to non-paid Odoo sources; each row is a course, and opening it lists its recorded Organic campaigns, sources, leads and sales.",
-                  }
-                : {
-                    tone: "info",
-                    message:
-                      lang === "ar"
-                        ? adsView
-                          ? "إعلانات كل دورة معروضة منفصلة؛ صرفها مربوط من أسماء الحملات وفق قواعد الإسناد."
-                          : "التحصيل من الفواتير المدفوعة، والإنفاق بجانبه لتوضيح العائد لكل دورة."
-                        : adsView
-                          ? "Each course's ads are separate; spend is linked from campaign names under the attribution rules."
-                          : "Collections come from paid invoices; spend is shown alongside them to explain each course's return.",
-                    impact:
-                      lang === "ar"
-                        ? adsView
-                          ? "كل حملة تذكر مصدر الربط الذي اعتُمد عليها."
-                          : "افتح أي كورس لمراجعة تحصيله وصرفه والحملات التي كوّنت السياق."
-                        : adsView
-                          ? "Every campaign states the attribution source it relied on."
-                          : "Open any course to review its collections, spend, and campaign context.",
-                    technical:
-                      lang === "ar"
-                        ? "اسم الحملة هو الأساس، ثم الدورة المرتبطة بأداء الحملة. اسم الكرياتيف والإعلان والمجموعة يُستخدم كاكتشاف احتياطي إذا لم تكن الحملة مصنفة. الليدز من CRM والإيراد من الفواتير المدفوعة."
-                        : "Campaign name is authoritative, followed by the campaign's joined course. Creative, ad and ad-set names are discovery fallbacks only when the campaign is unclassified. Leads come from CRM and revenue from paid invoices.",
-                  },
-            ]}
-          />
-
-          {!adsView && <CourseLeadLossComparison report={data.courseLeadLoss} />}
-
-          <CoursePortfolioNavigator
-            courses={visibleCourses}
-            totalCourses={courses.length}
-            selectedKey={selectedCourse?.key ?? ""}
-            search={search}
-            onSearchChange={setSearch}
-            onSelect={setSelectedKey}
+          <CourseWorkspaceTabs
             mode={workspaceView}
+            active={section}
+            onChange={setSection}
+            alertCount={leadAlerts.data?.summary.alertCount ?? 0}
           />
 
-          {selectedCourse && (
-            <CourseDetailPanel
-              course={selectedCourse}
-              drill={detailQuery.data?.drill ?? null}
-              loading={detailQuery.isLoading}
-              error={detailQuery.error as Error | null}
-              organicScope={organicScope}
-              mode={workspaceView}
-            />
+          {section === "overview" && (
+            <>
+              {/* The attribution chain stays available, but it is deliberately
+                  kept in the overview rather than interrupting every task. */}
+              <DataHealthSummary
+                issues={[
+                  organicScope
+                    ? {
+                        tone: "info",
+                        message:
+                          lang === "ar"
+                            ? "هذه القراءة تشمل المصادر غير المدفوعة فقط."
+                            : "This reading covers non-paid sources only.",
+                        impact:
+                          lang === "ar"
+                            ? "الإنفاق يظل صفراً لأن هذه ليست إعلانات مدفوعة."
+                            : "Spend stays at zero because this is not paid advertising.",
+                        technical:
+                          lang === "ar"
+                            ? "النطاق مقصور على مصادر Odoo غير المدفوعة؛ كل صف دورة، وفتحه يعرض حملات الأورجانيك المسجلة ومصادرها وليدزها ومبيعاتها."
+                            : "Scoped to non-paid Odoo sources; each row is a course, and opening it lists its recorded Organic campaigns, sources, leads and sales.",
+                      }
+                    : {
+                        tone: "info",
+                        message:
+                          lang === "ar"
+                            ? adsView
+                              ? "إعلانات كل دورة معروضة منفصلة؛ صرفها مربوط من أسماء الحملات وفق قواعد الإسناد."
+                              : "التحصيل من الفواتير المدفوعة، والإنفاق بجانبه لتوضيح العائد لكل دورة."
+                            : adsView
+                              ? "Each course's ads are separate; spend is linked from campaign names under the attribution rules."
+                              : "Collections come from paid invoices; spend is shown alongside them to explain each course's return.",
+                        impact:
+                          lang === "ar"
+                            ? adsView
+                              ? "كل حملة تذكر مصدر الربط الذي اعتُمد عليها."
+                              : "افتح أي كورس لمراجعة تحصيله وصرفه والحملات التي كوّنت السياق."
+                            : adsView
+                              ? "Every campaign states the attribution source it relied on."
+                              : "Open any course to review its collections, spend, and campaign context.",
+                        technical:
+                          lang === "ar"
+                            ? "اسم الحملة هو الأساس، ثم الدورة المرتبطة بأداء الحملة. اسم الكرياتيف والإعلان والمجموعة يُستخدم كاكتشاف احتياطي إذا لم تكن الحملة مصنفة. الليدز من CRM والإيراد من الفواتير المدفوعة."
+                            : "Campaign name is authoritative, followed by the campaign's joined course. Creative, ad and ad-set names are discovery fallbacks only when the campaign is unclassified. Leads come from CRM and revenue from paid invoices.",
+                      },
+                ]}
+              />
+              <CourseSnapshotCards courses={courses} mode={workspaceView} />
+            </>
           )}
 
-          {adsView &&
+          {section === "courses" && (
+            <>
+              <CoursePortfolioNavigator
+                courses={visibleCourses}
+                totalCourses={courses.length}
+                selectedKey={selectedCourse?.key ?? ""}
+                search={search}
+                onSearchChange={setSearch}
+                onSelect={setSelectedKey}
+                mode={workspaceView}
+              />
+
+              {selectedCourse && (
+                <CourseDetailPanel
+                  course={selectedCourse}
+                  drill={detailQuery.data?.drill ?? null}
+                  loading={detailQuery.isLoading}
+                  error={detailQuery.error as Error | null}
+                  organicScope={organicScope}
+                  mode={workspaceView}
+                />
+              )}
+            </>
+          )}
+
+          {section === "quality" && !adsView && (
+            <CourseLeadLossComparison report={data.courseLeadLoss} />
+          )}
+
+          {section === "monitor" &&
+            adsView &&
             (leadAlerts.isLoading || !leadAlerts.data ? (
               <Skeleton className="h-[250px]" />
             ) : leadAlerts.error ? (
@@ -540,24 +561,165 @@ function Courses() {
             ) : (
               <CourseLeadMonitor report={leadAlerts.data} />
             ))}
+
+          {section === "contribution" && !adsView && <OverviewCourseContribution />}
         </>
       )}
-
-      {/* Contribution and average selling price: the pair that used to sit on
-          the executive summary, now in the report about courses. */}
-      {!adsView && (
-        <MoreDetails
-          label={lang === "ar" ? "مساهمة الكورسات في الإيراد" : "Course contribution to revenue"}
-          hint={
-            lang === "ar"
-              ? "أعلى الكورسات إيرادًا في الفترة، ونصيب كل كورس ومتوسط سعر بيعه"
-              : "The period's top courses, each one's share and its average selling price"
-          }
-        >
-          <OverviewCourseContribution />
-        </MoreDetails>
-      )}
     </div>
+  );
+}
+
+function CourseWorkspaceTabs({
+  mode,
+  active,
+  onChange,
+  alertCount,
+}: {
+  mode: CourseWorkspaceView;
+  active: CourseWorkspaceSection;
+  onChange: (section: CourseWorkspaceSection) => void;
+  alertCount: number;
+}) {
+  const { lang } = useI18n();
+  const tabs: Array<{
+    key: CourseWorkspaceSection;
+    label: string;
+    icon: ReactNode;
+    badge?: number;
+  }> =
+    mode === "ads"
+      ? [
+          {
+            key: "overview",
+            label: lang === "ar" ? "ملخص الإعلانات" : "Ads overview",
+            icon: <BarChart3 size={16} />,
+          },
+          {
+            key: "courses",
+            label: lang === "ar" ? "إعلانات كل كورس" : "Course ads",
+            icon: <LayoutGrid size={16} />,
+          },
+          {
+            key: "monitor",
+            label: lang === "ar" ? "مراقبة الليدز" : "Lead monitor",
+            icon: <BellRing size={16} />,
+            badge: alertCount || undefined,
+          },
+        ]
+      : [
+          {
+            key: "overview",
+            label: lang === "ar" ? "ملخص المبيعات" : "Sales overview",
+            icon: <BarChart3 size={16} />,
+          },
+          {
+            key: "courses",
+            label: lang === "ar" ? "مبيعات كل كورس" : "Course sales",
+            icon: <LayoutGrid size={16} />,
+          },
+          {
+            key: "quality",
+            label: lang === "ar" ? "جودة الليدز والخسائر" : "Lead quality & loss",
+            icon: <Users size={16} />,
+          },
+          {
+            key: "contribution",
+            label: lang === "ar" ? "مساهمة الإيراد" : "Revenue contribution",
+            icon: <CircleDollarSign size={16} />,
+          },
+        ];
+
+  return (
+    <nav
+      aria-label={lang === "ar" ? "أقسام تقرير الكورسات" : "Course report sections"}
+      className="flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface p-2 shadow-sm"
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onChange(tab.key)}
+          aria-pressed={active === tab.key}
+          className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors ${
+            active === tab.key
+              ? "bg-brand text-white shadow-sm"
+              : "text-text-muted hover:bg-surface-2 hover:text-text"
+          }`}
+        >
+          {tab.icon}
+          <span>{tab.label}</span>
+          {tab.badge ? (
+            <span className="num rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
+              {tab.badge}
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function CourseSnapshotCards({
+  courses,
+  mode,
+}: {
+  courses: CourseAgg[];
+  mode: CourseWorkspaceView;
+}) {
+  const { lang } = useI18n();
+  const topCourses = useMemo(
+    () =>
+      [...courses]
+        .sort((a, b) => (mode === "ads" ? b.spend - a.spend : b.revenue - a.revenue))
+        .slice(0, 3),
+    [courses, mode],
+  );
+
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand">
+            {lang === "ar" ? "نظرة سريعة" : "Quick glance"}
+          </p>
+          <h2 className="text-base font-bold text-text">
+            {mode === "ads"
+              ? lang === "ar"
+                ? "أعلى 3 كورسات إنفاقًا"
+                : "Top 3 courses by spend"
+              : lang === "ar"
+                ? "أعلى 3 كورسات تحصيلًا"
+                : "Top 3 courses by collections"}
+          </h2>
+        </div>
+        <Pill tone="brand">
+          {lang === "ar" ? "افتح تبويب الكورسات للتفاصيل" : "Open courses for detail"}
+        </Pill>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {topCourses.map((course, index) => (
+          <article key={course.key} className="rounded-xl border border-border bg-surface-2/45 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="truncate text-sm font-bold text-text" title={course.name}>
+                {course.name}
+              </h3>
+              <span className="num grid h-6 w-6 place-items-center rounded-lg bg-brand-soft text-[10px] font-bold text-brand">
+                {index + 1}
+              </span>
+            </div>
+            <div className="num mt-3 text-lg font-bold text-text">
+              {mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[10px] text-text-muted">
+              <span>{mode === "ads" ? (lang === "ar" ? "الليدز" : "Leads") : "Won"}</span>
+              <span className="num font-semibold text-text">
+                {fmtNum(mode === "ads" ? course.crmLeads : course.won)}
+              </span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -608,13 +770,14 @@ function CoursePortfolioNavigator({
       ),
     [courses, rank],
   );
-  const initial = ranked.slice(0, 9);
+  // Keep the landing view intentionally short. The full catalog is explicit.
+  const initial = ranked.slice(0, 3);
   const selected = ranked.find((course) => course.key === selectedKey) ?? null;
   const visible =
     search.trim() || expanded
       ? ranked
       : selected && !initial.some((course) => course.key === selected.key)
-        ? [selected, ...initial.slice(0, 8)]
+        ? [selected, ...initial.slice(0, 2)]
         : initial;
   const peak = Math.max(
     1,
@@ -623,11 +786,6 @@ function CoursePortfolioNavigator({
 
   const selectCourse = (key: string) => {
     onSelect(key);
-    requestAnimationFrame(() =>
-      document
-        .getElementById("course-detail")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
   };
 
   return (
@@ -836,7 +994,7 @@ function CoursePortfolioNavigator({
         </div>
       )}
 
-      {!search.trim() && ranked.length > 9 && (
+      {!search.trim() && ranked.length > 3 && (
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
@@ -845,8 +1003,8 @@ function CoursePortfolioNavigator({
           <BookOpenCheck size={15} />
           {expanded
             ? lang === "ar"
-              ? "اعرض أهم 9 كورسات فقط"
-              : "Show the top 9 only"
+              ? "اعرض أهم 3 كورسات فقط"
+              : "Show the top 3 only"
             : lang === "ar"
               ? `اعرض كل الكورسات (${fmtNum(ranked.length)})`
               : `Show all courses (${fmtNum(ranked.length)})`}
@@ -1298,6 +1456,9 @@ function CourseDetailPanel({
   const monthKey = months.map((row) => row.month).join("|");
   const [monthA, setMonthA] = useState("");
   const [monthB, setMonthB] = useState("");
+  const [detailTab, setDetailTab] = useState<
+    "summary" | "creatives" | "active" | "history" | "compare"
+  >("summary");
 
   useEffect(() => {
     const latest = months[months.length - 1]?.month ?? "";
@@ -1307,6 +1468,10 @@ function CourseDetailPanel({
     // Reset only when the selected course's month population changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course.key, monthKey]);
+
+  useEffect(() => {
+    setDetailTab("summary");
+  }, [course.key]);
 
   if (error)
     return (
@@ -1388,7 +1553,66 @@ function CourseDetailPanel({
           </div>
         </div>
 
-        {!organicScope && (
+        <div className="flex gap-2 overflow-x-auto border-b border-border bg-surface-2/30 px-4 py-2 sm:px-5">
+          {(
+            [
+              {
+                key: "summary",
+                label: lang === "ar" ? "الملخص" : "Summary",
+                icon: <BarChart3 size={14} />,
+              },
+              ...(mode === "ads" && !organicScope
+                ? [
+                    {
+                      key: "creatives",
+                      label: lang === "ar" ? "الكرياتيفات" : "Creatives",
+                      icon: <Sparkles size={14} />,
+                    },
+                  ]
+                : []),
+              ...(mode === "ads" && !organicScope
+                ? [
+                    {
+                      key: "active",
+                      label: lang === "ar" ? "حملات شغالة" : "Live campaigns",
+                      icon: <Activity size={14} />,
+                    },
+                  ]
+                : []),
+              ...(mode === "ads"
+                ? [
+                    {
+                      key: "history",
+                      label: lang === "ar" ? "الحملات السابقة" : "Past campaigns",
+                      icon: <History size={14} />,
+                    },
+                  ]
+                : []),
+              {
+                key: "compare",
+                label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison",
+                icon: <CalendarDays size={14} />,
+              },
+            ] as Array<{ key: typeof detailTab; label: string; icon: ReactNode }>
+          ).map((tab) => (
+            <button
+              type="button"
+              key={tab.key}
+              onClick={() => setDetailTab(tab.key)}
+              aria-pressed={detailTab === tab.key}
+              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold ${
+                detailTab === tab.key
+                  ? "bg-brand text-white"
+                  : "text-text-muted hover:bg-surface hover:text-text"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {!organicScope && detailTab === "summary" && (
           <div className="p-4 sm:p-5">
             <div className="mb-3 flex items-center gap-2">
               <Target size={16} className="text-brand" />
@@ -1420,9 +1644,11 @@ function CourseDetailPanel({
         )}
       </div>
 
-      {!organicScope && mode === "ads" && <CourseCreativeGallery courseName={course.name} />}
+      {!organicScope && mode === "ads" && detailTab === "creatives" && (
+        <CourseCreativeGallery courseName={course.name} />
+      )}
 
-      {!organicScope && mode === "ads" && (
+      {!organicScope && mode === "ads" && detailTab === "active" && (
         <div>
           <SectionHeading
             icon={<Activity size={18} />}
@@ -1457,7 +1683,7 @@ function CourseDetailPanel({
         </div>
       )}
 
-      {mode === "ads" && (
+      {mode === "ads" && detailTab === "history" && (
         <div>
           <SectionHeading
             icon={organicScope ? <Leaf size={18} /> : <History size={18} />}
@@ -1511,123 +1737,125 @@ function CourseDetailPanel({
         </div>
       )}
 
-      <div className="card p-4 sm:p-5">
-        <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <BarChart3 size={18} className="text-brand" />
-              <h3 className="text-base font-semibold text-text">
-                {mode === "ads"
-                  ? lang === "ar"
-                    ? `أداء الحملات شهريًا لدورة ${course.name}`
-                    : `Monthly campaign performance for ${course.name}`
-                  : lang === "ar"
-                    ? `مقارنة مبيعات شهرين لدورة ${course.name}`
-                    : `Two-month sales comparison for ${course.name}`}
-              </h3>
+      {detailTab === "compare" && (
+        <div className="card p-4 sm:p-5">
+          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-brand" />
+                <h3 className="text-base font-semibold text-text">
+                  {mode === "ads"
+                    ? lang === "ar"
+                      ? `أداء الحملات شهريًا لدورة ${course.name}`
+                      : `Monthly campaign performance for ${course.name}`
+                    : lang === "ar"
+                      ? `مقارنة مبيعات شهرين لدورة ${course.name}`
+                      : `Two-month sales comparison for ${course.name}`}
+                </h3>
+              </div>
+              <p className="mt-1 text-xs text-text-muted">
+                {lang === "ar"
+                  ? "اختار أي شهرين، وكل الأرقام تفضل خاصة بنفس الدورة."
+                  : "Choose any two months; every metric stays scoped to this course."}
+              </p>
             </div>
-            <p className="mt-1 text-xs text-text-muted">
-              {lang === "ar"
-                ? "اختار أي شهرين، وكل الأرقام تفضل خاصة بنفس الدورة."
-                : "Choose any two months; every metric stays scoped to this course."}
-            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <MonthSelect
+                label={lang === "ar" ? "الشهر الأول" : "First month"}
+                value={monthA}
+                months={months}
+                onChange={setMonthA}
+              />
+              <MonthSelect
+                label={lang === "ar" ? "الشهر الثاني" : "Second month"}
+                value={monthB}
+                months={months}
+                onChange={setMonthB}
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <MonthSelect
-              label={lang === "ar" ? "الشهر الأول" : "First month"}
-              value={monthA}
-              months={months}
-              onChange={setMonthA}
-            />
-            <MonthSelect
-              label={lang === "ar" ? "الشهر الثاني" : "Second month"}
-              value={monthB}
-              months={months}
-              onChange={setMonthB}
-            />
-          </div>
-        </div>
 
-        {compareA && compareB ? (
-          <div className="mt-4 card-grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-            <MonthMetricCard
-              label={lang === "ar" ? "الإنفاق" : "Spend"}
-              first={compareA.spend}
-              second={compareB.spend}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtUSD}
-              invert
+          {compareA && compareB ? (
+            <div className="mt-4 card-grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <MonthMetricCard
+                label={lang === "ar" ? "الإنفاق" : "Spend"}
+                first={compareA.spend}
+                second={compareB.spend}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtUSD}
+                invert
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "ليدز CRM" : "CRM leads"}
+                first={compareA.leads}
+                second={compareB.leads}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtNum}
+              />
+              <MonthMetricCard
+                label="Lost"
+                first={compareA.lost}
+                second={compareB.lost}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtNum}
+                invert
+              />
+              <MonthMetricCard
+                label="Won"
+                first={compareA.won}
+                second={compareB.won}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtNum}
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
+                first={compareA.salesOrders}
+                second={compareB.salesOrders}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtNum}
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "الفواتير" : "Paid invoices"}
+                first={compareA.invoices}
+                second={compareB.invoices}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtNum}
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "المحصل" : "Revenue"}
+                first={compareA.revenue}
+                second={compareB.revenue}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtUSD}
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
+                first={compareA.roas}
+                second={compareB.roas}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtRoas}
+              />
+            </div>
+          ) : (
+            <EmptyState
+              label={
+                lang === "ar"
+                  ? "مفيش شهرين متاحين للمقارنة في الفترة"
+                  : "Two months are not available for comparison"
+              }
+              compact
             />
-            <MonthMetricCard
-              label={lang === "ar" ? "ليدز CRM" : "CRM leads"}
-              first={compareA.leads}
-              second={compareB.leads}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtNum}
-            />
-            <MonthMetricCard
-              label="Lost"
-              first={compareA.lost}
-              second={compareB.lost}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtNum}
-              invert
-            />
-            <MonthMetricCard
-              label="Won"
-              first={compareA.won}
-              second={compareB.won}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtNum}
-            />
-            <MonthMetricCard
-              label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
-              first={compareA.salesOrders}
-              second={compareB.salesOrders}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtNum}
-            />
-            <MonthMetricCard
-              label={lang === "ar" ? "الفواتير" : "Paid invoices"}
-              first={compareA.invoices}
-              second={compareB.invoices}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtNum}
-            />
-            <MonthMetricCard
-              label={lang === "ar" ? "المحصل" : "Revenue"}
-              first={compareA.revenue}
-              second={compareB.revenue}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtUSD}
-            />
-            <MonthMetricCard
-              label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
-              first={compareA.roas}
-              second={compareB.roas}
-              firstLabel={formatMonth(monthA, lang)}
-              secondLabel={formatMonth(monthB, lang)}
-              format={fmtRoas}
-            />
-          </div>
-        ) : (
-          <EmptyState
-            label={
-              lang === "ar"
-                ? "مفيش شهرين متاحين للمقارنة في الفترة"
-                : "Two months are not available for comparison"
-            }
-            compact
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
