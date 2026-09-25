@@ -34,16 +34,13 @@ const targets = [
 const result = buildTargetUnitRollup(targets);
 
 assert.equal(result.target, 162000, "grand target must match the approved September target");
-assert.equal(result.units[0].target, 75000, "Bahaa unit target");
-assert.equal(result.units[0].leaders[0].target, 54000, "Bahaa Ramadan team target");
+assert.equal(result.units[0].target, 84000, "Bahaa unit target");
+assert.equal(result.units[0].leaders[0].target, 63000, "Bahaa Ramadan team target");
 assert.equal(result.units[0].leaders[1].target, 21000, "Ahmed Saeed team target");
-assert.equal(result.units[1].target, 66000, "Asmaa unit target");
+assert.equal(result.units[1].target, 78000, "Asmaa unit target");
 assert.equal(result.units[1].leaders[0].target, 60000, "Nader Aziz team target");
-assert.equal(result.units[1].leaders[1].target, 6000, "Asmaa Fathy team target");
-assert.deepEqual(
-  result.standalone.map((member) => member.target),
-  [12000, 9000],
-);
+assert.equal(result.units[1].leaders[1].target, 18000, "Asmaa Fathy team target");
+assert.deepEqual(result.standalone, [], "moved members are no longer standalone");
 assert.equal(result.unassigned.length, 0);
 assert.equal(result.paidRevenue, 9000);
 assert.equal(result.achievement, (9000 / 162000) * 100);

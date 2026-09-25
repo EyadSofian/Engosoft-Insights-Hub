@@ -15,7 +15,8 @@ export const TARGET_UNIT_LAYOUT = [
         key: "bahaa-ramadan",
         nameAr: "فريق بهاء رمضان",
         nameEn: "Bahaa Ramadan Team",
-        employeeIds: ["238", "338", "482", "503", "606", "346"],
+        // Hady (319) is a member of Bahaa's team, not an independent target.
+        employeeIds: ["238", "338", "482", "503", "606", "346", "319"],
       },
       {
         key: "ahmed-saeed",
@@ -40,13 +41,14 @@ export const TARGET_UNIT_LAYOUT = [
         key: "asmaa-fathy",
         nameAr: "فريق أسماء فتحي",
         nameEn: "Asmaa Fathy Team",
-        employeeIds: ["235", "597"],
+        // Abdullah Mohsen (335) is a member of Asmaa's team, not an independent target.
+        employeeIds: ["235", "597", "335"],
       },
     ],
   },
 ] as const;
 
-export const STANDALONE_TARGET_EMPLOYEE_IDS = ["335", "319"] as const;
+export const STANDALONE_TARGET_EMPLOYEE_IDS = [] as const;
 
 export interface TargetUnitMemberInput {
   key: string;
