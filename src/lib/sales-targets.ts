@@ -310,6 +310,20 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
       target: null,
       note: "أضيف إلى فريق المبيعات من سبتمبر 2026؛ لا يوجد له تارجت أغسطس منشور",
     },
+    {
+      // Sara already has paid sales in Odoo, but management has not published
+      // a personal quota for her. Keep the email as the stable identity until
+      // the HR employee id is supplied, and show her revenue without inventing
+      // a target value.
+      employeeId: "sara.abdullah@engosoft.com",
+      name: "Sara Abdullah Ahmed",
+      aliases: ["sara.abdullah@engosoft.com"],
+      teamLeader: "Asmaa Fathy",
+      supervisor: "Asmaa Fathy",
+      branch: "Egypt",
+      target: null,
+      note: "مبيعات ضمن فريق أسماء فتحي؛ لا يوجد تارجت شخصي منشور",
+    },
 
     // Website salespeople listed separately in the workbook. The report calls
     // employee 381 “Direct Website”; Odoo's linked user is Amira.

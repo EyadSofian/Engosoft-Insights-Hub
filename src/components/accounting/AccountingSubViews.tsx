@@ -77,6 +77,7 @@ import type {
 import type { CallsHubCall, CallsHubEmployeeCalls } from "@/lib/calls-hub.server";
 import {
   buildTargetUnitRollup,
+  isTargetUnitEmployee,
   type TargetLeaderRollup,
   type TargetUnitMember,
   type TargetUnitRollup,
@@ -1073,8 +1074,10 @@ export function AccountingAgentsView() {
   const targetUnitRollup = buildTargetUnitRollup(
     data.agents
       .filter(
-        (row): row is AgentRow & { target: AgentTarget & { target: number } } =>
-          row.target?.target !== null && row.target?.target !== undefined,
+        (row): row is AgentRow & { target: AgentTarget } =>
+          row.target !== null &&
+          row.target !== undefined &&
+          (row.target.target !== null || isTargetUnitEmployee(row.target.employeeId)),
       )
       .map((row) => ({
         key: row.key,
@@ -1915,6 +1918,15 @@ function TargetLeaderCard({
   lang: Lang;
   onSelectEmployee: (key: string) => void;
 }) {
+  const memberAchievementTone = (achievement: number | null) =>
+    achievement === null
+      ? "neutral"
+      : achievement >= 100
+        ? "success"
+        : achievement >= 60
+          ? "warning"
+          : "neutral";
+
   return (
     <details className="group rounded-2xl border border-border bg-surface shadow-[0_1px_0_rgba(15,35,60,.03)]">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:content-none">
@@ -1974,18 +1986,14 @@ function TargetLeaderCard({
                   {fmtUSDFull(member.paidRevenue)}
                 </span>
                 <span className="block text-[9px] text-text-subtle">
-                  / {fmtUSDFull(member.target)}
+                  {member.target === null
+                    ? lang === "ar"
+                      ? "بدون تارجت منشور"
+                      : "No published target"
+                    : `/ ${fmtUSDFull(member.target)}`}
                 </span>
               </span>
-              <Pill
-                tone={
-                  member.achievement >= 100
-                    ? "success"
-                    : member.achievement >= 60
-                      ? "warning"
-                      : "neutral"
-                }
-              >
+              <Pill tone={memberAchievementTone(member.achievement)}>
                 {fmtPct(member.achievement, 1)}
               </Pill>
             </button>
@@ -2005,6 +2013,15 @@ function TargetMemberCard({
   lang: Lang;
   onSelect: () => void;
 }) {
+  const achievementTone =
+    member.achievement === null
+      ? "neutral"
+      : member.achievement >= 100
+        ? "success"
+        : member.achievement >= 60
+          ? "warning"
+          : "neutral";
+
   return (
     <button
       type="button"
@@ -2018,13 +2035,7 @@ function TargetMemberCard({
             {lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}
           </p>
         </div>
-        <Pill
-          tone={
-            member.achievement >= 100 ? "success" : member.achievement >= 60 ? "warning" : "neutral"
-          }
-        >
-          {fmtPct(member.achievement, 1)}
-        </Pill>
+        <Pill tone={achievementTone}>{fmtPct(member.achievement, 1)}</Pill>
       </div>
       <TargetProgress value={member.achievement} className="mt-4" />
       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -2067,7 +2078,15 @@ function TargetCompactMetric({
   );
 }
 
-function TargetProgress({ value, className = "" }: { value: number; className?: string }) {
+function TargetProgress({ value, className = "" }: { value: number | null; className?: string }) {
+  if (value === null) {
+    return (
+      <div
+        className={`h-2 rounded-full bg-surface-muted ${className}`}
+        aria-label="No published target"
+      />
+    );
+  }
   const width = Math.max(0, Math.min(100, value));
   const color = value >= 100 ? "bg-success" : value >= 60 ? "bg-warning" : "bg-brand";
   return (

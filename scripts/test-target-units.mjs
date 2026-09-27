@@ -22,6 +22,7 @@ const targets = [
   ["597", 3000],
   ["335", 12000],
   ["319", 9000],
+  ["sara.abdullah@engosoft.com", null],
 ].map(([employeeId, target], index) => ({
   key: `employee-${employeeId}`,
   employeeId,
@@ -41,6 +42,12 @@ assert.equal(result.units[1].target, 78000, "Asmaa unit target");
 assert.equal(result.units[1].leaders[0].target, 60000, "Nader Aziz team target");
 assert.equal(result.units[1].leaders[1].target, 18000, "Asmaa Fathy team target");
 assert.deepEqual(result.standalone, [], "moved members are no longer standalone");
+assert.equal(
+  result.units[1].leaders[1].members.at(-1).employeeId,
+  "sara.abdullah@engosoft.com",
+  "Sara is shown inside Asmaa Fathy team",
+);
+assert.equal(result.units[1].leaders[1].members.at(-1).target, null, "Sara has no quota published");
 assert.equal(result.unassigned.length, 0);
 assert.equal(result.paidRevenue, 9000);
 assert.equal(result.achievement, (9000 / 162000) * 100);

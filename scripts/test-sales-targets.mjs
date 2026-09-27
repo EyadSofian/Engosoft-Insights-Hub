@@ -20,7 +20,7 @@ const august = SALES_TARGETS[MONTH];
 const sum = (rows) => rows.reduce((total, row) => total + (row.target ?? 0), 0);
 const byLeader = (leader) => august.filter((row) => row.teamLeader === leader);
 
-assert.equal(august.length, 35, "the published roster plus the September starter is represented");
+assert.equal(august.length, 36, "the published roster plus the September starter is represented");
 assert.equal(
   august.filter((row) => row.target !== null).length,
   22,
@@ -52,7 +52,7 @@ assert.equal(teamLeader.target, null, "the updated sheet publishes no personal q
 
 assert.equal(
   august.filter((row) => row.target === null).length,
-  13,
+  14,
   "every blank target in the updated first sheet remains deliberately untargeted",
 );
 
@@ -79,6 +79,8 @@ assert.equal(resolve("Asmaa Fathy")?.employeeId, "350");
 assert.equal(resolve("Amira Muhammad Salah al-Din Awad")?.employeeId, "381");
 assert.equal(resolve("Mohamed Ehab Fathy")?.employeeId, "597");
 assert.equal(resolve("محمد إيهاب فتحي")?.employeeId, "597");
+assert.equal(resolve("Sara Abdullah Ahmed")?.employeeId, "sara.abdullah@engosoft.com");
+assert.equal(resolve("sara.abdullah@engosoft.com")?.employeeId, "sara.abdullah@engosoft.com");
 
 assert.equal(resolve("Abdullah Mohsen Abdul Hamid")?.employeeId, "335");
 assert.equal(resolve("Ahmed Farouk Mohamed Mohamed")?.employeeId, "378");
