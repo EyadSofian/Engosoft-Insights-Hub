@@ -431,6 +431,55 @@ describe("rollups", () => {
     ]);
   });
 
+  it("keeps ad names and lost outcomes separate when ads reuse a creative", () => {
+    const rows = rollupByGrain(
+      [
+        fact({ acquisitionEventId: "won", outcome: won }),
+        fact({
+          acquisitionEventId: "lost",
+          adId: "ad-2",
+          adName: "Second ad name",
+          creativeId: "cr-1",
+          outcome: outcome({ lost: true }),
+        }),
+      ],
+      [
+        {
+          campaignId: "camp-1",
+          adsetId: "set-1",
+          adId: "ad-1",
+          creativeId: "cr-1",
+          spend: 40,
+          impressions: 100,
+          clicks: 10,
+        },
+        {
+          campaignId: "camp-1",
+          adsetId: "set-1",
+          adId: "ad-2",
+          creativeId: "cr-1",
+          spend: 20,
+          impressions: 80,
+          clicks: 8,
+        },
+      ],
+      "ad",
+    );
+    expect(
+      rows.map(({ adName, spend, leads, won, lost, revenue }) => ({
+        adName,
+        spend,
+        leads,
+        won,
+        lost,
+        revenue,
+      })),
+    ).toEqual([
+      { adName: "Video 03", spend: 40, leads: 1, won: 1, lost: 0, revenue: 600 },
+      { adName: "Second ad name", spend: 20, leads: 1, won: 0, lost: 1, revenue: 0 },
+    ]);
+  });
+
   it("names an ad's creative only when every exact row agrees on it", () => {
     const spendRow = (adId: string, creativeId: string) => ({
       campaignId: "camp-1",

@@ -6,6 +6,7 @@ import {
   AssetPerformance,
   ChatwootAttributionHealth,
   ClosedLoopCoverage,
+  CreativeAdsTable,
   CreativeDetail,
   GrainPerformance,
   InferredLinkAudit,
@@ -365,16 +366,7 @@ function Acquisition() {
             />
           ) : null}
           {adView === "creatives" && creativeTable ? (
-            <GrainPerformance
-              data={data}
-              loading={loading}
-              grain="creative"
-              filter={{}}
-              onDrill={drill}
-              onClearFilter={() => setGrainFilter({})}
-              onOpenCreative={setCreativeId}
-              onShowRecords={showRecords}
-            />
+            <CreativeAdsTable data={data} loading={loading} onOpenCreative={setCreativeId} />
           ) : null}
           {adView === "assets" ? (
             <AssetPerformance data={data} loading={loading} onOpenCreative={setCreativeId} />

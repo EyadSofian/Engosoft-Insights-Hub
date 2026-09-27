@@ -474,6 +474,7 @@ export interface QualityMetrics {
   qualified: number;
   quotations: number;
   won: number;
+  lost: number;
   saleOrders: number;
   invoices: number;
   revenue: number;
@@ -532,6 +533,7 @@ export function emptyMetrics(): QualityMetrics {
     qualified: 0,
     quotations: 0,
     won: 0,
+    lost: 0,
     saleOrders: 0,
     invoices: 0,
     revenue: 0,
@@ -564,6 +566,7 @@ export function addFact(metrics: QualityMetrics, fact: AcquisitionFactRow): void
   if (outcome.qualified) metrics.qualified += 1;
   if (outcome.quotation) metrics.quotations += 1;
   if (outcome.won) metrics.won += 1;
+  if (outcome.lost) metrics.lost += 1;
   metrics.saleOrders += outcome.saleOrderIds.length;
   metrics.invoices += outcome.invoiceCount;
   metrics.revenue = Math.round((metrics.revenue + outcome.revenuePaidUsd) * 100) / 100;

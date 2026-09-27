@@ -715,6 +715,7 @@ const METRIC_DEFINITION: Partial<Record<keyof QualityMetrics, { en: string; ar: 
     ar: "العملاء المطابقون المستوفون لقاعدة التأهيل في CRM.",
   },
   won: { en: "CRM opportunities marked Won.", ar: "فرص CRM المسجلة كفوز." },
+  lost: { en: "CRM opportunities marked Lost.", ar: "فرص CRM المسجلة كخسارة." },
   revenue: {
     en: "Paid invoice revenue of these leads.",
     ar: "إيراد الفواتير المدفوعة لهؤلاء العملاء.",
@@ -760,6 +761,7 @@ function metricColumns<T>(
     qualified: { en: "Qualified", ar: "مؤهل", render: (m) => fmtNum(m.qualified) },
     quotations: { en: "Quotations", ar: "عروض أسعار", render: (m) => fmtNum(m.quotations) },
     won: { en: "Customers won", ar: "عملاء مكسوبون", render: (m) => fmtNum(m.won) },
+    lost: { en: "Customers lost", ar: "عملاء مفقودون", render: (m) => fmtNum(m.lost) },
     saleOrders: { en: "Sales orders", ar: "أوامر البيع", render: (m) => fmtNum(m.saleOrders) },
     invoices: { en: "Invoices", ar: "الفواتير", render: (m) => fmtNum(m.invoices) },
     revenue: { en: "Paid revenue", ar: "الإيراد المدفوع", render: (m) => fmtUSD(m.revenue) },
@@ -921,6 +923,170 @@ function identityColumns(
     });
   if (columns[0]) columns[0] = { ...columns[0], always: true, sticky: true };
   return columns;
+}
+
+/** The materials tab is an ad-level report: names and figures share one Ad ID. */
+export function CreativeAdsTable({
+  data,
+  loading,
+  onOpenCreative,
+}: {
+  data?: ClosedLoopResponse;
+  loading: boolean;
+  onOpenCreative: (creativeId: string) => void;
+}) {
+  const { lang } = useI18n();
+  const A = lang === "ar";
+  const [onlyWithAcquisitions, setOnlyWithAcquisitions] = useState(false);
+  const rows = (data?.grains?.ad ?? []).filter((row) => !onlyWithAcquisitions || row.leads > 0);
+  const spendAvailable = data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true;
+  const pending = A ? "بانتظار المزامنة" : "Pending sync";
+  const cols: Col<CreativeGrainRow>[] = [
+    {
+      key: "adName",
+      header: A ? "اسم الكرياتيف (Ad Name)" : "Creative name (Ad Name)",
+      minWidth: "330px",
+      sticky: true,
+      always: true,
+      render: (row) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          {row.thumbnailUrl ? (
+            <img
+              src={row.thumbnailUrl}
+              alt=""
+              loading="lazy"
+              className="h-12 w-12 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-surface-2 text-text-muted">
+              <ImageIcon size={16} />
+            </span>
+          )}
+          <div className="min-w-0">
+            {row.creativeId ? (
+              <button
+                type="button"
+                className="block max-w-[270px] text-start font-semibold hover:text-brand"
+                onClick={() => onOpenCreative(row.creativeId)}
+              >
+                {nameWithId(row.adName, row.adId)}
+              </button>
+            ) : (
+              nameWithId(row.adName, row.adId)
+            )}
+            <div
+              className="mt-0.5 max-w-[270px] truncate text-[10px] text-text-muted"
+              title={row.campaignName}
+            >
+              {A ? "الحملة" : "Campaign"}: {row.campaignName || "—"}
+            </div>
+            <div
+              className="max-w-[270px] truncate text-[10px] text-text-muted"
+              title={row.adsetName}
+            >
+              {A ? "المجموعة" : "Ad set"}: {row.adsetName || "—"}
+            </div>
+          </div>
+        </div>
+      ),
+      sortValue: (row) => row.adName || row.adId,
+    },
+    {
+      key: "spend",
+      header: A ? "الصرف" : "Spend",
+      align: "right",
+      render: (row) => (spendAvailable ? fmtUSD(row.spend) : pending),
+      sortValue: (row) => row.spend,
+    },
+    {
+      key: "leads",
+      header: A ? "عدد الليدز" : "Leads",
+      align: "right",
+      render: (row) => fmtNum(row.leads),
+      sortValue: (row) => row.leads,
+    },
+    {
+      key: "cpl",
+      header: A ? "سعر الليد" : "Cost per lead",
+      align: "right",
+      render: (row) => (spendAvailable ? money(row.cpl) : pending),
+      sortValue: (row) => row.cpl ?? -1,
+    },
+    {
+      key: "won",
+      header: A ? "عدد البيع" : "Won sales",
+      headerTitle: A ? "فرص CRM الرابحة" : "Won CRM opportunities",
+      align: "right",
+      render: (row) => fmtNum(row.won),
+      sortValue: (row) => row.won,
+    },
+    {
+      key: "lost",
+      header: A ? "عدد اللوست" : "Lost",
+      headerTitle: A ? "فرص CRM الخاسرة" : "Lost CRM opportunities",
+      align: "right",
+      render: (row) => fmtNum(row.lost),
+      sortValue: (row) => row.lost,
+    },
+    {
+      key: "conversion",
+      header: A ? "نسبة التحويل" : "Conversion rate",
+      headerTitle: A ? "عدد البيع ÷ عدد الليدز" : "Won sales / leads",
+      align: "right",
+      render: (row) => (row.leads > 0 ? fmtPct((row.won / row.leads) * 100, 1) : "—"),
+      sortValue: (row) => (row.leads > 0 ? row.won / row.leads : -1),
+    },
+    {
+      key: "revenue",
+      header: A ? "المبيعات" : "Revenue",
+      headerTitle: A ? "إيراد الفواتير المدفوعة" : "Paid invoice revenue",
+      align: "right",
+      render: (row) => fmtUSD(row.revenue),
+      sortValue: (row) => row.revenue,
+    },
+    {
+      key: "roas",
+      header: "ROAS",
+      headerTitle: A ? "المبيعات ÷ الصرف" : "Revenue / spend",
+      align: "right",
+      render: (row) =>
+        spendAvailable ? (row.roas == null ? "—" : `${row.roas.toFixed(2)}×`) : pending,
+      sortValue: (row) => row.roas ?? -1,
+    },
+  ];
+  return (
+    <PageSection
+      title={A ? "المواد الإعلانية حسب اسم الإعلان" : "Creatives by ad name"}
+      icon={<ImageIcon size={16} />}
+      tone="violet"
+      hint={
+        A
+          ? "كل صف إعلان واحد بمعرّفه الدقيق. الليدز من الاستحواذ الدقيق، والبيع واللوست من CRM، ونسبة التحويل = البيع ÷ الليدز."
+          : "One exact Ad ID per row. Leads are exact acquisitions, wins and losses come from CRM, and conversion = wins / leads."
+      }
+    >
+      <div className="space-y-3">
+        <label className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+          <input
+            type="checkbox"
+            checked={onlyWithAcquisitions}
+            onChange={(event) => setOnlyWithAcquisitions(event.target.checked)}
+          />
+          {A ? "صفوف بها استحواذ دقيق فقط" : "Only rows with exact acquisitions"}
+        </label>
+        <DataTable
+          rows={rows}
+          cols={cols}
+          loading={loading}
+          defaultVisibleLimit={9}
+          initialSort={{ key: "spend", dir: -1 }}
+          searchable={(row) => `${row.adName} ${row.adId} ${row.campaignName} ${row.adsetName}`}
+          rowKey={(row) => row.key}
+          csvFilename="engosoft-creative-ads"
+        />
+      </div>
+    </PageSection>
+  );
 }
 
 export function GrainPerformance({

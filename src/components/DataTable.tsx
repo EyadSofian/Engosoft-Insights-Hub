@@ -88,6 +88,7 @@ export function DataTable<T>({
   truncatedNote,
   groupLabels,
   columnChooser = false,
+  defaultVisibleLimit = DEFAULT_VISIBLE_COLUMNS,
   emptyState,
   serverSort,
   serverPage,
@@ -114,6 +115,8 @@ export function DataTable<T>({
   /** Display names for the `group` values used on the columns. */
   groupLabels?: Record<string, string>;
   columnChooser?: boolean;
+  /** Keep more than the usual eight columns visible when the report requires it. */
+  defaultVisibleLimit?: number;
   emptyState?: ReactNode;
   /**
    * Hands sorting to the caller.
@@ -147,12 +150,14 @@ export function DataTable<T>({
   // would then be meaningless. Re-seeding on identity change keeps the defaults
   // honest without wiping a choice the reader just made on the same set.
   const colIdentity = cols.map((c) => c.key).join("|");
-  const [hidden, setHidden] = useState<Set<string>>(() => defaultHiddenColumns(cols));
+  const [hidden, setHidden] = useState<Set<string>>(() =>
+    defaultHiddenColumns(cols, defaultVisibleLimit),
+  );
   useEffect(() => {
-    setHidden(defaultHiddenColumns(cols));
+    setHidden(defaultHiddenColumns(cols, defaultVisibleLimit));
     // Re-seed on the column set itself, not on every render of new col objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colIdentity]);
+  }, [colIdentity, defaultVisibleLimit]);
 
   const visibleCols = useMemo(
     () => cols.filter((c) => c.always || !hidden.has(c.key)),

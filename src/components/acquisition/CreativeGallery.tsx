@@ -6,9 +6,8 @@ import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import type { ClosedLoopResponse } from "./ClosedLoop";
 
 /**
- * Creatives as creatives: the picture or video first, then only the figures a
- * manager decides on. Everything else (clicks, CTR, IDs, assets) is one press
- * away in the creative's detail panel.
+ * Materials by Ad ID: the ad's name and media first, then the same figures as
+ * the table. A reused creative asset never merges two different ads here.
  */
 
 type SortKey = "revenue" | "roas" | "won" | "qualificationRate" | "leads" | "cpl";
@@ -40,9 +39,9 @@ export function CreativeGallery({
   const A = lang === "ar";
   const [sort, setSort] = useState<SortKey>("revenue");
   const [limit, setLimit] = useState(24);
-  const spendAvailable = data?.kpis?.adSpend ? data.kpis.adSpend.status === "ok" : true;
+  const spendAvailable = data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true;
   const rows = useMemo(() => {
-    const list = (data?.grains?.creative ?? []).filter((row) => row.leads > 0 || row.spend > 0);
+    const list = (data?.grains?.ad ?? []).filter((row) => row.leads > 0 || row.spend > 0);
     const score = (row: (typeof list)[number]): number => {
       switch (sort) {
         case "revenue":
@@ -64,13 +63,13 @@ export function CreativeGallery({
 
   return (
     <PageSection
-      title={A ? "المواد الإعلانية" : "Creatives"}
+      title={A ? "المواد الإعلانية حسب اسم الإعلان" : "Creatives by ad name"}
       icon={<ImageIcon size={16} />}
       tone="violet"
       hint={
         A
-          ? `الإيراد والعملاء لكل مادة بمعرّفها الدقيق. الترتيب بالنسب يحتاج ${MIN_LEADS_FOR_RATES} عميلًا على الأقل.`
-          : `Revenue and leads per creative, by its exact ID. Rate and ROAS sorting need at least ${MIN_LEADS_FOR_RATES} leads.`
+          ? `كل بطاقة إعلان واحد بمعرّفه الدقيق. الترتيب بالنسب يحتاج ${MIN_LEADS_FOR_RATES} ليد على الأقل.`
+          : `One exact Ad ID per card. Rate and ROAS sorting need at least ${MIN_LEADS_FOR_RATES} leads.`
       }
       action={
         <button
@@ -106,8 +105,8 @@ export function CreativeGallery({
         ) : rows.length === 0 ? (
           <Card padded className="text-sm text-text-muted">
             {A
-              ? "لا توجد مواد إعلانية لها صرف أو عملاء في هذه الفترة."
-              : "No creative has spend or leads in this period."}
+              ? "لا توجد إعلانات لها صرف أو ليدز في هذه الفترة."
+              : "No ad has spend or leads in this period."}
           </Card>
         ) : (
           <>
@@ -116,7 +115,7 @@ export function CreativeGallery({
                 <li key={row.key}>
                   <button
                     type="button"
-                    onClick={() => onOpenCreative(row.creativeId)}
+                    onClick={() => row.creativeId && onOpenCreative(row.creativeId)}
                     className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface text-start transition-colors hover:border-brand"
                   >
                     <div className="relative aspect-square w-full bg-surface-2">
@@ -149,11 +148,19 @@ export function CreativeGallery({
                     <div className="flex flex-1 flex-col gap-2 p-3">
                       <div
                         className="line-clamp-2 text-sm font-semibold text-text"
-                        title={row.creativeName}
+                        title={row.adName}
                       >
-                        {row.creativeName || (A ? "مادة بلا اسم" : "Unnamed creative")}
+                        {row.adName || (A ? `إعلان ${row.adId}` : `Ad ${row.adId}`)}
                       </div>
-                      <dl className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-xs">
+                      <div className="min-w-0 text-[10px] text-text-muted">
+                        <p className="truncate" title={row.campaignName}>
+                          {A ? "الحملة" : "Campaign"}: {row.campaignName || "—"}
+                        </p>
+                        <p className="truncate" title={row.adsetName}>
+                          {A ? "المجموعة" : "Ad set"}: {row.adsetName || "—"}
+                        </p>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
                         <Metric
                           label={A ? "الصرف" : "Spend"}
                           value={
@@ -164,28 +171,44 @@ export function CreativeGallery({
                                 : "Pending sync"
                           }
                         />
-                        <Metric label={A ? "العملاء" : "Leads"} value={fmtNum(row.leads)} />
-                        <Metric label={A ? "مؤهل" : "Qualified"} value={fmtNum(row.qualified)} />
-                        <Metric label={A ? "مكسوب" : "Won"} value={fmtNum(row.won)} />
+                        <Metric label={A ? "عدد الليدز" : "Leads"} value={fmtNum(row.leads)} />
                         <Metric
-                          label={A ? "إيراد مدفوع" : "Paid revenue"}
+                          label={A ? "سعر الليد" : "Cost per lead"}
+                          value={
+                            spendAvailable
+                              ? row.cpl == null
+                                ? "—"
+                                : fmtUSD(row.cpl)
+                              : A
+                                ? "بانتظار المزامنة"
+                                : "Pending sync"
+                          }
+                        />
+                        <Metric label={A ? "عدد البيع" : "Won sales"} value={fmtNum(row.won)} />
+                        <Metric label={A ? "عدد اللوست" : "Lost"} value={fmtNum(row.lost)} />
+                        <Metric
+                          label={A ? "نسبة التحويل" : "Conversion rate"}
+                          value={row.leads > 0 ? fmtPct((row.won / row.leads) * 100, 1) : "—"}
+                        />
+                        <Metric
+                          label={A ? "المبيعات" : "Revenue"}
                           value={fmtUSD(row.revenue)}
                           strong
                         />
                         <Metric
                           label="ROAS"
-                          value={row.roas == null ? "—" : `${row.roas.toFixed(2)}×`}
+                          value={
+                            spendAvailable
+                              ? row.roas == null
+                                ? "—"
+                                : `${row.roas.toFixed(2)}×`
+                              : A
+                                ? "بانتظار المزامنة"
+                                : "Pending sync"
+                          }
                           strong
                         />
                       </dl>
-                      <div className="mt-auto text-[11px] text-text-muted">
-                        {row.cpl == null
-                          ? ""
-                          : `${A ? "تكلفة العميل" : "Cost per lead"} ${fmtUSD(row.cpl)}`}
-                        {row.qualificationRate == null
-                          ? ""
-                          : ` · ${A ? "تأهيل" : "qualified"} ${fmtPct(row.qualificationRate * 100, 1)}`}
-                      </div>
                     </div>
                   </button>
                 </li>

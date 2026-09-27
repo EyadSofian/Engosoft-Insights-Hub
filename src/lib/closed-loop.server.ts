@@ -1529,10 +1529,14 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
       ad: new Map<string, string>(),
       creative: new Map<string, string>(),
     };
+    const creativeIdByAd = new Map<string, string>();
     for (const row of graphNames.rows) {
       if (s(row.campaign_id)) names.campaign.set(s(row.campaign_id), s(row.campaign_name));
       if (s(row.adset_id)) names.adset.set(s(row.adset_id), s(row.adset_name));
-      if (s(row.ad_id)) names.ad.set(s(row.ad_id), s(row.ad_name));
+      if (s(row.ad_id)) {
+        names.ad.set(s(row.ad_id), s(row.ad_name));
+        if (s(row.creative_id)) creativeIdByAd.set(s(row.ad_id), s(row.creative_id));
+      }
       if (s(row.creative_id))
         names.creative.set(s(row.creative_id), readableCreativeName(s(row.creative_name)));
     }
@@ -1543,6 +1547,19 @@ export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
         row.adName ||= names.ad.get(row.adId) ?? "";
         row.creativeName ||= names.creative.get(row.creativeId) ?? "";
       }
+    }
+    // The materials tab reports one Ad ID per row. Attach the ad's creative
+    // preview without changing its ad-level spend, leads or sales attribution.
+    for (const row of grains.ad) {
+      // A fact-bearing ad can intentionally have no creative ID when its
+      // sources disagree. Do not fill that ambiguity from today's catalog.
+      if (!row.creativeId && row.leads === 0) row.creativeId = creativeIdByAd.get(row.adId) ?? "";
+      row.creativeName ||= names.creative.get(row.creativeId) ?? "";
+      const m = media.get(row.creativeId);
+      Object.assign(row, {
+        thumbnailUrl: s(m?.thumbnail_url) || s(m?.image_url),
+        mediaType: s(m?.media_type),
+      });
     }
 
     const assets = await pool.query<Row>(
