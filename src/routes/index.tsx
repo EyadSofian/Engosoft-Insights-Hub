@@ -52,6 +52,7 @@ import { fxRatesFromFilters } from "@/lib/fx-rates";
 import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
+import { OverviewSalesAttribution } from "@/components/overview-sales-attribution";
 
 export const Route = createFileRoute("/")({ component: Overview });
 
@@ -349,7 +350,6 @@ function Overview() {
         lang === "ar"
           ? "الحملات والمواد الإعلانية ومصادر العملاء"
           : "Campaigns, creatives and where leads came from",
-      figure: `${fmtUSD(T.spend)} ${lang === "ar" ? "إنفاق" : "spend"}`,
       icon: <Megaphone size={17} />,
       tone: "sky",
     },
@@ -358,7 +358,6 @@ function Overview() {
       title: lang === "ar" ? "المبيعات والعملاء" : "Sales & CRM",
       description:
         lang === "ar" ? "العملاء والمتابعة والصفقات المفقودة" : "Leads, follow-up and lost deals",
-      figure: `${fmtNum(T.totalLeads)} ${lang === "ar" ? "عميل" : "leads"}`,
       icon: <Users size={17} />,
       tone: "violet",
     },
@@ -367,7 +366,6 @@ function Overview() {
       title: lang === "ar" ? "الإيرادات" : "Revenue",
       description:
         lang === "ar" ? "التحصيل والفواتير والكورسات" : "Collection, invoices and courses",
-      figure: `${fmtUSD(T.revenue)} ${lang === "ar" ? "تحصيل" : "collected"}`,
       icon: <Receipt size={17} />,
       tone: "mint",
     },
@@ -375,7 +373,6 @@ function Overview() {
       to: "/teams",
       title: lang === "ar" ? "أداء الفريق" : "Team",
       description: lang === "ar" ? "فريق المبيعات والميديا بايرز" : "Sales team and media buyers",
-      figure: business.bestEmployee?.name,
       icon: <UsersRound size={17} />,
       tone: "amber",
     },
@@ -493,6 +490,21 @@ function Overview() {
                 : `Change percentages are hidden because the previous period (${data.prevRange.from} → ${data.prevRange.to}) falls before the data begins.`}
             </Notice>
           )}
+          {data.prevComparable && data.prevRange && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border bg-surface-2/55 px-3 py-2 text-[11px] text-text-muted">
+              <span className="font-semibold text-text">
+                {lang === "ar" ? "المقارنة المعتمدة" : "Comparison basis"}
+              </span>
+              <span className="num">
+                {data.prevRange.from} → {data.prevRange.to}
+              </span>
+              <span>
+                {lang === "ar"
+                  ? "كل نسب التغير في البطاقات تقارن نفس التواريخ من الشهر الماضي."
+                  : "Every card delta compares the same calendar dates from last month."}
+              </span>
+            </div>
+          )}
         </PageSection>
 
         {/* LEVEL 2 — why: one trend and one funnel, side by side. */}
@@ -588,6 +600,20 @@ function Overview() {
         >
           <TodaysInsights signals={business} details={insights} lang={lang} />
         </PageSection>
+
+        {data.revenueLeadAttribution && (
+          <PageSection
+            level="primary"
+            title={lang === "ar" ? "من أين جاء التحصيل؟" : "Where did the collection come from?"}
+          >
+            <OverviewSalesAttribution
+              attribution={data.revenueLeadAttribution}
+              courses={data.courseSales}
+              lang={lang}
+              comparisonAvailable={data.prevComparable}
+            />
+          </PageSection>
+        )}
 
         <PageSection level="records" title={lang === "ar" ? "اذهب للتفاصيل" : "Go deeper"}>
           <WorkspaceLinks links={links} />

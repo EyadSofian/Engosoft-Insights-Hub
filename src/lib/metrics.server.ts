@@ -1785,6 +1785,92 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   return [...map.values()].sort((a, b) => b.revenue - a.revenue);
 }
 
+/* --- achieved-revenue lead cohorts --------------------------------------- */
+
+export interface RevenueLeadAttribution {
+  /** Leads created inside the selected window. */
+  currentLeads: number;
+  /** Leads created inside the same calendar window last month. */
+  previousLeads: number;
+  /** Paid revenue in the selected window. */
+  currentPeriodRevenue: number;
+  /** Paid revenue in the comparison window. */
+  previousPeriodRevenue: number;
+  /** Current-period revenue whose campaign is unique to current-period leads. */
+  currentLeadRevenue: number;
+  /** Current-period revenue whose campaign is unique to comparison-period leads. */
+  previousLeadRevenue: number;
+  /** Revenue that cannot be safely assigned to either cohort. */
+  otherLeadRevenue: number;
+  currentLeadRevenueShare: Maybe;
+  previousLeadRevenueShare: Maybe;
+  otherLeadRevenueShare: Maybe;
+  revenueDelta: Maybe;
+}
+
+/**
+ * Splits achieved revenue by the lead cohort that can be proved from the
+ * campaign bridge. A campaign present in both periods is deliberately kept in
+ * `otherLeadRevenue`: campaign-level data cannot tell which individual lead
+ * paid, so assigning it to one month would manufacture precision.
+ */
+export function computeRevenueLeadAttribution(
+  data: FilteredData,
+  previous: FilteredData | null | undefined,
+  courseKey?: string,
+): RevenueLeadAttribution {
+  const key = courseKey ? normalizeName(courseKey) : "";
+  const rows = (source: FilteredData) => [...source.crm, ...authoritativeLostLeads(source)];
+  const relevant = (row: { course?: string }) => !key || normalizeName(row.course ?? "") === key;
+  const currentRows = rows(data).filter(relevant);
+  const previousRows = previous ? rows(previous).filter(relevant) : [];
+  const currentCampaigns = new Set(currentRows.map((row) => row.campaignKey).filter(Boolean));
+  const previousCampaigns = new Set(previousRows.map((row) => row.campaignKey).filter(Boolean));
+
+  let currentLeadRevenue = 0;
+  let previousLeadRevenue = 0;
+  let otherLeadRevenue = 0;
+  for (const sale of data.accounting) {
+    if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) continue;
+    const campaign = sale.campaignKey;
+    if (campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)) {
+      currentLeadRevenue += sale.usdPaid;
+    } else if (campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)) {
+      previousLeadRevenue += sale.usdPaid;
+    } else {
+      otherLeadRevenue += sale.usdPaid;
+    }
+  }
+
+  const currentPeriodRevenue = data.accounting.reduce((sum, sale) => {
+    if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) return sum;
+    return sum + sale.usdPaid;
+  }, 0);
+  const previousPeriodRevenue = previous
+    ? previous.accounting.reduce((sum, sale) => {
+        if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) return sum;
+        return sum + sale.usdPaid;
+      }, 0)
+    : 0;
+
+  return {
+    currentLeads: currentRows.length,
+    previousLeads: previousRows.length,
+    currentPeriodRevenue,
+    previousPeriodRevenue,
+    currentLeadRevenue,
+    previousLeadRevenue,
+    otherLeadRevenue,
+    currentLeadRevenueShare: pctOf(currentLeadRevenue, currentPeriodRevenue),
+    previousLeadRevenueShare: pctOf(previousLeadRevenue, currentPeriodRevenue),
+    otherLeadRevenueShare: pctOf(otherLeadRevenue, currentPeriodRevenue),
+    revenueDelta:
+      previousPeriodRevenue > 0
+        ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+        : null,
+  };
+}
+
 /* --- teams & people --------------------------------------------------------- */
 
 export function computeTeams(data: FilteredData): TeamAgg[] {
@@ -2109,14 +2195,12 @@ export async function isPreviousComparable(
 }
 
 /**
- * The business comparison immediately preceding a selected window.
+ * The business comparison for the same calendar dates in the previous month.
  *
- * A month-to-date selection is special: managers read 1–9 September as a
- * comparison with 1–9 August, not with the final nine days of August. The old
- * equal-length rule produced a mathematically valid but operationally wrong
- * comparison in the executive report. A complete calendar month likewise
- * compares with the complete previous calendar month. Custom windows keep the
- * ordinary immediately-preceding, equal-length behaviour.
+ * The dashboard is read as a monthly operating report, so a custom selection
+ * such as 10–16 September must compare with 10–16 August — never with the
+ * immediately preceding seven days. End-of-month dates are clamped to the
+ * last valid day in the previous month (31 March → 28 February).
  */
 export function previousPeriod(from?: string, to?: string): { from: string; to: string } | null {
   if (!from || !to) return null;
@@ -2126,35 +2210,32 @@ export function previousPeriod(from?: string, to?: string): { from: string; to: 
 
   const start = new Date(a);
   const end = new Date(b);
-  const sameCalendarMonth =
-    start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth();
-  if (start.getUTCDate() === 1 && sameCalendarMonth) {
+  const currentMonthLastDay = new Date(
+    Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  if (start.getUTCDate() === 1 && end.getUTCDate() === currentMonthLastDay) {
     const previousMonthStart = new Date(
       Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - 1, 1),
     );
-    const currentMonthEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0));
     const previousMonthEnd = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 0));
-    const comparisonDay =
-      end.getUTCDate() === currentMonthEnd.getUTCDate()
-        ? previousMonthEnd.getUTCDate()
-        : Math.min(end.getUTCDate(), previousMonthEnd.getUTCDate());
-    const previousTo = new Date(
-      Date.UTC(
-        previousMonthStart.getUTCFullYear(),
-        previousMonthStart.getUTCMonth(),
-        comparisonDay,
-      ),
-    );
     return {
       from: previousMonthStart.toISOString().slice(0, 10),
-      to: previousTo.toISOString().slice(0, 10),
+      to: previousMonthEnd.toISOString().slice(0, 10),
     };
   }
 
-  const days = Math.round((b - a) / 86_400_000) + 1;
-  const prevTo = new Date(a - 86_400_000);
-  const prevFrom = new Date(prevTo.getTime() - (days - 1) * 86_400_000);
-  return { from: prevFrom.toISOString().slice(0, 10), to: prevTo.toISOString().slice(0, 10) };
+  const shiftOneMonthBack = (value: string): string => {
+    const date = new Date(value + "T00:00:00Z");
+    const previousMonthLastDay = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0),
+    ).getUTCDate();
+    const day = Math.min(date.getUTCDate(), previousMonthLastDay);
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, day))
+      .toISOString()
+      .slice(0, 10);
+  };
+
+  return { from: shiftOneMonthBack(from), to: shiftOneMonthBack(to) };
 }
 
 export function computeDeltas(now: Totals, prev: Totals): Deltas {

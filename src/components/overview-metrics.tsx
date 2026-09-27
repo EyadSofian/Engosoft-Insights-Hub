@@ -60,6 +60,32 @@ export interface CourseSaleContribution {
   contribution: number;
   paidInvoices: number;
   averageSalePrice: number | null;
+  leads?: number;
+  won?: number;
+  closureRate?: number | null;
+  avgCloseDays?: number | null;
+  currentLeadRevenue?: number;
+  previousLeadRevenue?: number;
+  otherLeadRevenue?: number;
+  currentLeadRevenueShare?: number | null;
+  previousLeadRevenueShare?: number | null;
+  otherLeadRevenueShare?: number | null;
+  previousPeriodRevenue?: number;
+  revenueDelta?: number | null;
+}
+
+export interface RevenueLeadAttribution {
+  currentLeads: number;
+  previousLeads: number;
+  currentPeriodRevenue: number;
+  previousPeriodRevenue: number;
+  currentLeadRevenue: number;
+  previousLeadRevenue: number;
+  otherLeadRevenue: number;
+  currentLeadRevenueShare: number | null;
+  previousLeadRevenueShare: number | null;
+  otherLeadRevenueShare: number | null;
+  revenueDelta: number | null;
 }
 
 export interface OverviewResp {
@@ -67,6 +93,7 @@ export interface OverviewResp {
   deltas: Deltas;
   prevRange: { from: string; to: string } | null;
   prevComparable: boolean;
+  revenueLeadAttribution?: RevenueLeadAttribution;
   trend: { date: string; spend: number; revenue: number; leads: number; won: number }[];
   courseSales: CourseSaleContribution[];
   funnel: FunnelStep[];

@@ -84,6 +84,13 @@ export function presetWindow(
       const last = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 0));
       return { from: iso(first), to: iso(last) };
     }
+    case "same_period_last_month": {
+      const first = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 1, 1));
+      const last = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 0));
+      const day = Math.min(anchor.getUTCDate(), last.getUTCDate());
+      const end = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), day));
+      return { from: iso(first), to: iso(end) };
+    }
     case "year": {
       const first = new Date(Date.UTC(anchor.getUTCFullYear(), 0, 1));
       return { from: iso(first), to: iso(anchor) };

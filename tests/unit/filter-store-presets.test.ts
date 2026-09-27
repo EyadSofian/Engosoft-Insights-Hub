@@ -15,4 +15,11 @@ describe("date filter presets", () => {
       to: "2025-12-31",
     });
   });
+
+  it("returns the same month-to-date window one month earlier", () => {
+    expect(presetWindow("same_period_last_month", "2026-09-16")).toEqual({
+      from: "2026-08-01",
+      to: "2026-08-16",
+    });
+  });
 });

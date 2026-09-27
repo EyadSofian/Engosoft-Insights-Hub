@@ -21,6 +21,7 @@ export const Route = createFileRoute("/api/overview")({
           computeDeltas,
           execSummary,
           computeRecentCampaignActivity,
+          computeRevenueLeadAttribution,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/api/overview")({
         const campaigns = computePerf(data, "campaign");
         const activity = await computeRecentCampaignActivity(filters, data);
 
-        // Previous equal-length window, for the delta on each KPI card. Skipped
+        // Same-calendar-dates-last-month window, for the delta on each KPI card. Skipped
         // entirely when that window predates the data — see isPreviousComparable.
         const prevRange = previousPeriod(filters.from, filters.to);
         const prevComparable = await isPreviousComparable(prevRange);
@@ -39,21 +40,39 @@ export const Route = createFileRoute("/api/overview")({
         const deltas = prevData ? computeDeltas(totals, computeTotals(prevData)) : {};
         const courses = computeCourses(data, prevData ?? undefined);
         const soldCourses = courses
-          .filter((course) => course.course !== "Unattributed" && course.revenue > 0)
+          .filter(
+            (course) =>
+              course.course !== "Unattributed" && (course.revenue > 0 || course.crmLeads > 0),
+          )
           .sort((a, b) => b.revenue - a.revenue);
         const classifiedCourseRevenue = soldCourses.reduce(
           (sum, course) => sum + course.revenue,
           0,
         );
-        const courseSales = soldCourses.map((course) => ({
-          course: course.course,
-          mainCategory: course.mainCategory,
-          revenue: course.revenue,
-          contribution:
-            classifiedCourseRevenue > 0 ? (course.revenue / classifiedCourseRevenue) * 100 : 0,
-          paidInvoices: course.invoices,
-          averageSalePrice: course.avgOrder,
-        }));
+        const courseSales = soldCourses.map((course) => {
+          const attribution = computeRevenueLeadAttribution(data, prevData, course.course);
+          return {
+            course: course.course,
+            mainCategory: course.mainCategory,
+            revenue: course.revenue,
+            contribution:
+              classifiedCourseRevenue > 0 ? (course.revenue / classifiedCourseRevenue) * 100 : 0,
+            paidInvoices: course.invoices,
+            averageSalePrice: course.avgOrder,
+            leads: course.crmLeads,
+            won: course.won,
+            closureRate: course.conversionRate,
+            avgCloseDays: course.avgCloseDays,
+            currentLeadRevenue: attribution.currentLeadRevenue,
+            previousLeadRevenue: attribution.previousLeadRevenue,
+            otherLeadRevenue: attribution.otherLeadRevenue,
+            currentLeadRevenueShare: attribution.currentLeadRevenueShare,
+            previousLeadRevenueShare: attribution.previousLeadRevenueShare,
+            otherLeadRevenueShare: attribution.otherLeadRevenueShare,
+            previousPeriodRevenue: attribution.previousPeriodRevenue,
+            revenueDelta: attribution.revenueDelta,
+          };
+        });
 
         const spending = campaigns.filter((c) => c.spend >= 50);
         const health = data.snapshot.health;
@@ -75,6 +94,7 @@ export const Route = createFileRoute("/api/overview")({
           topSpend: [...campaigns].sort((a, b) => b.spend - a.spend).slice(0, 6),
           topCourses: courses.slice(0, 6),
           courseSales,
+          revenueLeadAttribution: computeRevenueLeadAttribution(data, prevData),
           accounts: data.snapshot.accounts,
           summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,

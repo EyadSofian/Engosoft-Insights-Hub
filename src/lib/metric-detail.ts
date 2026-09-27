@@ -237,6 +237,7 @@ const PRESET_LABEL: Record<DatePreset, { ar: string; en: string }> = {
   "30d": { ar: "آخر 30 يوماً", en: "Last 30 days" },
   month: { ar: "الشهر الحالي", en: "This month" },
   prev_month: { ar: "الشهر السابق", en: "Previous month" },
+  same_period_last_month: { ar: "نفس الفترة الشهر الماضي", en: "Same period last month" },
   year: { ar: "السنة الحالية", en: "This year" },
   all: { ar: "كل الفترات", en: "All time" },
 };

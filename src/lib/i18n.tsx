@@ -156,6 +156,7 @@ export const DICT = {
   preset_30: { ar: "آخر ٣٠ يوماً", en: "Last 30 days" },
   preset_month: { ar: "هذا الشهر", en: "This month" },
   preset_prev_month: { ar: "الشهر السابق", en: "Previous month" },
+  preset_same_period_last_month: { ar: "نفس الفترة الشهر الماضي", en: "Same period last month" },
   preset_year: { ar: "هذا العام", en: "This year" },
   preset_all: { ar: "كل الفترات", en: "All time" },
   custom_range: { ar: "فترة مخصصة", en: "Custom range" },
