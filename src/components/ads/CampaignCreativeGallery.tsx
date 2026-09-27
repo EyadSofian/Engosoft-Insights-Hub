@@ -129,7 +129,7 @@ function CreativeCard({
   const { lang } = useI18n();
   const previewUrl = row.permalinkUrl || row.landingPageUrl;
   const title =
-    row.creativeName || row.ad || (lang === "ar" ? "كرياتيف بدون اسم" : "Unnamed creative");
+    row.ad || row.adset || row.creativeName || (lang === "ar" ? "إعلان بدون اسم" : "Unnamed ad");
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md">
@@ -166,10 +166,11 @@ function CreativeCard({
               >
                 {title}
               </h5>
-              <p className="mt-0.5 truncate text-[9.5px] text-text-subtle" title={row.ad}>
-                {showCampaign
-                  ? `${lang === "ar" ? "الحملة" : "Campaign"}: ${row.campaign || "—"}`
-                  : `${lang === "ar" ? "الإعلان" : "Ad"}: ${row.ad || "—"}`}
+              <p className="mt-0.5 truncate text-[9.5px] text-text-subtle" title={row.campaign}>
+                {lang === "ar" ? "الحملة" : "Campaign"}: {row.campaign || "—"}
+              </p>
+              <p className="truncate text-[9.5px] text-text-subtle" title={row.adset}>
+                {lang === "ar" ? "المجموعة الإعلانية" : "Ad set"}: {row.adset || "—"}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -198,15 +199,23 @@ function CreativeCard({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           <Metric
             label={lang === "ar" ? "إنفاق" : "Spend"}
             value={row.spend === null ? "—" : fmtUSD(row.spend)}
           />
-          <Metric label="CTR" value={fmtPct(row.ctrAll, 2)} />
-          <Metric label={lang === "ar" ? "ليد CRM" : "CRM leads"} value={fmtNum(row.crmLeads)} />
-          <Metric label={lang === "ar" ? "رابحة" : "Won"} value={fmtNum(row.won)} />
-          <Metric label={lang === "ar" ? "إيراد" : "Revenue"} value={fmtUSD(row.revenue)} />
+          <Metric label={lang === "ar" ? "عدد الليدز" : "Leads"} value={fmtNum(row.crmLeads)} />
+          <Metric
+            label={lang === "ar" ? "سعر الليد" : "Cost per lead"}
+            value={row.spend !== null && row.crmLeads > 0 ? fmtUSD(row.spend / row.crmLeads) : "—"}
+          />
+          <Metric label={lang === "ar" ? "عدد البيع" : "Won sales"} value={fmtNum(row.won)} />
+          <Metric label={lang === "ar" ? "عدد اللوست" : "Lost"} value={fmtNum(row.lost)} />
+          <Metric
+            label={lang === "ar" ? "نسبة التحويل" : "Conversion rate"}
+            value={row.crmLeads > 0 ? fmtPct((row.won / row.crmLeads) * 100, 1) : "—"}
+          />
+          <Metric label={lang === "ar" ? "المبيعات" : "Revenue"} value={fmtUSD(row.revenue)} />
           <Metric label="ROAS" value={row.roas === null ? "—" : `${row.roas.toFixed(2)}×`} />
         </div>
 

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { CreativeAnalyticsRow, PlatformSourceHealth } from "@/lib/types";
+import { coalesceCreativeAds } from "@/lib/creative-analytics";
 
 export const Route = createFileRoute("/api/ads-creatives")({
   server: {
@@ -55,8 +56,10 @@ export const Route = createFileRoute("/api/ads-creatives")({
           const { syncMetaCreativesDirect } = await import("@/lib/meta-creatives.server");
           metaSync = await syncMetaCreativesDirect(metaCandidates);
           if (metaSync.creatives.length) {
-            const byAd = new Map(creatives.map((creative) => [creative.adId, creative] as const));
-            for (const creative of metaSync.creatives) byAd.set(creative.adId, creative);
+            const keyOf = (creative: (typeof creatives)[number]) =>
+              `${creative.platform}:${creative.accountId || creative.account}:${creative.adId}`;
+            const byAd = new Map(creatives.map((creative) => [keyOf(creative), creative] as const));
+            for (const creative of metaSync.creatives) byAd.set(keyOf(creative), creative);
             creatives = [...byAd.values()];
           }
           if (metaSync.persisted) invalidateDataCache();
@@ -137,57 +140,17 @@ export const Route = createFileRoute("/api/ads-creatives")({
             roas: deliveryAvailable ? metrics!.roas : null,
           };
         });
-        const addMaybe = (left: number | null, right: number | null) =>
-          left === null && right === null ? null : (left ?? 0) + (right ?? 0);
-        const groupedRows = new Map<string, CreativeAnalyticsRow>();
-        for (const current of rawRows) {
-          const creativeKey = `${current.platform}\u001f${current.creativeId || current.adId}`;
-          const previous = groupedRows.get(creativeKey);
-          if (!previous) {
-            groupedRows.set(creativeKey, current);
-            continue;
-          }
-          const spend = addMaybe(previous.spend, current.spend);
-          const impressions = addMaybe(previous.impressions, current.impressions);
-          const clicksAll = addMaybe(previous.clicksAll, current.clicksAll);
-          const platformLeads = addMaybe(previous.platformLeads, current.platformLeads);
-          const revenue = previous.revenue + current.revenue;
-          groupedRows.set(creativeKey, {
-            ...previous,
-            // Prefer the richer copy when one ad only carried an id/name.
-            creativeName: previous.creativeName || current.creativeName,
-            headline: previous.headline || current.headline,
-            body: previous.body || current.body,
-            imageUrl: previous.imageUrl || current.imageUrl,
-            thumbnailUrl: previous.thumbnailUrl || current.thumbnailUrl,
-            videoUrl: previous.videoUrl || current.videoUrl,
-            videoId: previous.videoId || current.videoId,
-            permalinkUrl: previous.permalinkUrl || current.permalinkUrl,
-            landingPageUrl: previous.landingPageUrl || current.landingPageUrl,
-            spend,
-            impressions,
-            clicksAll,
-            ctrAll:
-              impressions !== null && impressions > 0 && clicksAll !== null
-                ? (clicksAll / impressions) * 100
-                : null,
-            cpc: clicksAll !== null && clicksAll > 0 && spend !== null ? spend / clicksAll : null,
-            platformLeads,
-            crmLeads: previous.crmLeads + current.crmLeads,
-            won: previous.won + current.won,
-            lost: previous.lost + current.lost,
-            revenue,
-            roas: spend !== null && spend > 0 ? revenue / spend : null,
-          });
-        }
-        const rows = [...groupedRows.values()];
+        // The report is at Ad ID grain. One creative resource may be reused by
+        // several ads with different names, ad sets and performance; merging by
+        // Creative ID hides those identities and makes the numbers ambiguous.
+        const rows = coalesceCreativeAds(rawRows);
         rows.sort(
           (a, b) =>
             b.won - a.won ||
             b.crmLeads - a.crmLeads ||
             (b.platformLeads ?? -1) - (a.platformLeads ?? -1) ||
             (b.spend ?? -1) - (a.spend ?? -1) ||
-            a.creativeName.localeCompare(b.creativeName),
+            a.ad.localeCompare(b.ad),
         );
 
         const unique = (values: string[]) => [...new Set(values.filter(Boolean))].sort();
