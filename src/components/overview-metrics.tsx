@@ -86,10 +86,14 @@ export interface RevenueLeadAttribution {
   otherBreakdown: {
     sharedCampaignRevenue: number;
     outsideSelectedCohortsRevenue: number;
-    noCampaignRevenue: number;
+    campaignNotLinkedRevenue: number;
+    sourceWithoutCampaignRevenue: number;
+    noSourceRevenue: number;
     sharedCampaignLines: number;
     outsideSelectedCohortsLines: number;
-    noCampaignLines: number;
+    campaignNotLinkedLines: number;
+    sourceWithoutCampaignLines: number;
+    noSourceLines: number;
   };
   sourceRows: {
     name: string;
@@ -100,7 +104,9 @@ export interface RevenueLeadAttribution {
       | "previous_period_campaign"
       | "shared_campaign"
       | "outside_selected_cohorts"
-      | "no_campaign";
+      | "campaign_not_linked"
+      | "source_without_campaign"
+      | "no_source";
     revenue: number;
     lines: number;
   }[];

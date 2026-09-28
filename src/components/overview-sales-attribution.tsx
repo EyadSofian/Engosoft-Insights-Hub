@@ -16,7 +16,9 @@ function sourceReason(reason: RevenueLeadAttribution["sourceRows"][number]["reas
       previous_period_campaign: "Campaign matched to previous-period leads only",
       shared_campaign: "Campaign shared by both periods",
       outside_selected_cohorts: "Campaign outside both lead periods",
-      no_campaign: "No campaign on accounting row",
+      campaign_not_linked: "Campaign recorded but not linked to these lead cohorts",
+      source_without_campaign: "Source recorded without campaign",
+      no_source: "No campaign or source recorded",
     }[reason];
   }
   return {
@@ -24,7 +26,9 @@ function sourceReason(reason: RevenueLeadAttribution["sourceRows"][number]["reas
     previous_period_campaign: "حملة مرتبطة بليدز الشهر الماضي فقط",
     shared_campaign: "حملة مشتركة بين الفترتين",
     outside_selected_cohorts: "حملة خارج فترتي الليدز",
-    no_campaign: "لا توجد حملة في سجل التحصيل",
+    campaign_not_linked: "اسم/معرف حملة موجود لكن غير مربوط بكوهورت الليدز",
+    source_without_campaign: "المصدر مسجل بدون حملة",
+    no_source: "لا توجد حملة أو مصدر مسجل",
   }[reason];
 }
 
@@ -154,7 +158,7 @@ export function OverviewSalesAttribution({
               ? "تفصيل المبلغ الذي لم يُنسب لفترة واحدة"
               : "Why this amount is not assigned to one period"}
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             {(
               [
                 [
@@ -168,9 +172,19 @@ export function OverviewSalesAttribution({
                   attribution.otherBreakdown.outsideSelectedCohortsLines,
                 ],
                 [
-                  "no_campaign",
-                  attribution.otherBreakdown.noCampaignRevenue,
-                  attribution.otherBreakdown.noCampaignLines,
+                  "campaign_not_linked",
+                  attribution.otherBreakdown.campaignNotLinkedRevenue,
+                  attribution.otherBreakdown.campaignNotLinkedLines,
+                ],
+                [
+                  "source_without_campaign",
+                  attribution.otherBreakdown.sourceWithoutCampaignRevenue,
+                  attribution.otherBreakdown.sourceWithoutCampaignLines,
+                ],
+                [
+                  "no_source",
+                  attribution.otherBreakdown.noSourceRevenue,
+                  attribution.otherBreakdown.noSourceLines,
                 ],
               ] as const
             ).map(([reason, revenue, lines]) => (
@@ -233,7 +247,15 @@ export function OverviewSalesAttribution({
                       className="max-w-[260px] truncate px-3 py-2 font-semibold text-text"
                       title={source.name}
                     >
-                      <div>{source.name === "No campaign" && A ? "بدون حملة" : source.name}</div>
+                      <div>
+                        {source.name === "No campaign"
+                          ? A
+                            ? "بدون حملة"
+                            : source.name
+                          : source.name === "No source recorded" && A
+                            ? "لا يوجد مصدر مسجل"
+                            : source.name}
+                      </div>
                       {(source.campaignId || source.source) && (
                         <div className="mt-0.5 truncate text-[9.5px] font-normal text-text-subtle">
                           {source.campaignId && <span dir="ltr">ID: {source.campaignId}</span>}

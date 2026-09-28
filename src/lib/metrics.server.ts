@@ -1806,10 +1806,14 @@ export interface RevenueLeadAttribution {
   otherBreakdown: {
     sharedCampaignRevenue: number;
     outsideSelectedCohortsRevenue: number;
-    noCampaignRevenue: number;
+    campaignNotLinkedRevenue: number;
+    sourceWithoutCampaignRevenue: number;
+    noSourceRevenue: number;
     sharedCampaignLines: number;
     outsideSelectedCohortsLines: number;
-    noCampaignLines: number;
+    campaignNotLinkedLines: number;
+    sourceWithoutCampaignLines: number;
+    noSourceLines: number;
   };
   /** Full payment-period collections grouped by source/campaign and attribution bucket. */
   sourceRows: {
@@ -1821,7 +1825,9 @@ export interface RevenueLeadAttribution {
       | "previous_period_campaign"
       | "shared_campaign"
       | "outside_selected_cohorts"
-      | "no_campaign";
+      | "campaign_not_linked"
+      | "source_without_campaign"
+      | "no_source";
     revenue: number;
     lines: number;
   }[];
@@ -1856,10 +1862,14 @@ export function computeRevenueLeadAttribution(
   const otherBreakdown = {
     sharedCampaignRevenue: 0,
     outsideSelectedCohortsRevenue: 0,
-    noCampaignRevenue: 0,
+    campaignNotLinkedRevenue: 0,
+    sourceWithoutCampaignRevenue: 0,
+    noSourceRevenue: 0,
     sharedCampaignLines: 0,
     outsideSelectedCohortsLines: 0,
-    noCampaignLines: 0,
+    campaignNotLinkedLines: 0,
+    sourceWithoutCampaignLines: 0,
+    noSourceLines: 0,
   };
   const sourceRows = new Map<
     string,
@@ -1872,7 +1882,9 @@ export function computeRevenueLeadAttribution(
         | "previous_period_campaign"
         | "shared_campaign"
         | "outside_selected_cohorts"
-        | "no_campaign";
+        | "campaign_not_linked"
+        | "source_without_campaign"
+        | "no_source";
       revenue: number;
       lines: number;
     }
@@ -1885,12 +1897,17 @@ export function computeRevenueLeadAttribution(
         ? "current_period_campaign"
         : campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)
           ? "previous_period_campaign"
-          : !campaign
-            ? "no_campaign"
-            : currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
-              ? "shared_campaign"
-              : "outside_selected_cohorts";
-    const name = sale.campaignName || (campaign ? "Campaign name unavailable" : "No campaign");
+          : campaign && currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
+            ? "shared_campaign"
+            : campaign
+              ? "outside_selected_cohorts"
+              : sale.campaignName || sale.campaignId
+                ? "campaign_not_linked"
+                : sale.source
+                  ? "source_without_campaign"
+                  : "no_source";
+    const name =
+      sale.campaignName || sale.campaignId || (sale.source ? "No campaign" : "No source recorded");
     const sourceKey = `${reason}\u001f${campaign || normalizeName(name)}\u001f${normalizeName(sale.source)}`;
     const source = sourceRows.get(sourceKey) ?? {
       name,
@@ -1916,9 +1933,15 @@ export function computeRevenueLeadAttribution(
       } else if (reason === "outside_selected_cohorts") {
         otherBreakdown.outsideSelectedCohortsRevenue += sale.usdPaid;
         otherBreakdown.outsideSelectedCohortsLines++;
+      } else if (reason === "campaign_not_linked") {
+        otherBreakdown.campaignNotLinkedRevenue += sale.usdPaid;
+        otherBreakdown.campaignNotLinkedLines++;
+      } else if (reason === "source_without_campaign") {
+        otherBreakdown.sourceWithoutCampaignRevenue += sale.usdPaid;
+        otherBreakdown.sourceWithoutCampaignLines++;
       } else {
-        otherBreakdown.noCampaignRevenue += sale.usdPaid;
-        otherBreakdown.noCampaignLines++;
+        otherBreakdown.noSourceRevenue += sale.usdPaid;
+        otherBreakdown.noSourceLines++;
       }
     }
   }
