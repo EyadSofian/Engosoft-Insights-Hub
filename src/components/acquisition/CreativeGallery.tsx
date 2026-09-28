@@ -3,11 +3,12 @@ import { Image as ImageIcon, LayoutGrid, PlayCircle, Table2 } from "lucide-react
 import { PageSection } from "@/components/dashboard-bits";
 import { Card, Segmented } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { groupAdsByName } from "@/lib/closed-loop";
+import { AdVariantBreakdown } from "./AdVariantBreakdown";
 import type { ClosedLoopResponse } from "./ClosedLoop";
 
 /**
- * Materials by Ad ID: the ad's name and media first, then the same figures as
- * the table. A reused creative asset never merges two different ads here.
+ * One material card per Ad Name. The underlying Ad IDs remain inspectable.
  */
 
 type SortKey = "revenue" | "roas" | "won" | "qualificationRate" | "leads" | "cpl";
@@ -41,7 +42,9 @@ export function CreativeGallery({
   const [limit, setLimit] = useState(24);
   const spendAvailable = data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true;
   const rows = useMemo(() => {
-    const list = (data?.grains?.ad ?? []).filter((row) => row.leads > 0 || row.spend > 0);
+    const list = groupAdsByName(data?.grains?.ad ?? []).filter(
+      (row) => row.leads > 0 || row.spend > 0,
+    );
     const score = (row: (typeof list)[number]): number => {
       switch (sort) {
         case "revenue":
@@ -68,8 +71,8 @@ export function CreativeGallery({
       tone="violet"
       hint={
         A
-          ? `كل بطاقة إعلان واحد بمعرّفه الدقيق. الترتيب بالنسب يحتاج ${MIN_LEADS_FOR_RATES} ليد على الأقل.`
-          : `One exact Ad ID per card. Rate and ROAS sorting need at least ${MIN_LEADS_FOR_RATES} leads.`
+          ? `كل اسم إعلان بطاقة واحدة بإجمالياته، وتفاصيل كل Ad ID داخلها. الترتيب بالنسب يحتاج ${MIN_LEADS_FOR_RATES} ليد على الأقل.`
+          : `One card per ad name, with each Ad ID's breakdown inside. Rate and ROAS sorting need at least ${MIN_LEADS_FOR_RATES} leads.`
       }
       action={
         <button
@@ -113,15 +116,11 @@ export function CreativeGallery({
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {rows.slice(0, limit).map((row) => (
                 <li key={row.key}>
-                  <button
-                    type="button"
-                    onClick={() => row.creativeId && onOpenCreative(row.creativeId)}
-                    className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface text-start transition-colors hover:border-brand"
-                  >
+                  <article className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface text-start transition-colors hover:border-brand">
                     <div className="relative aspect-square w-full bg-surface-2">
-                      {row.thumbnailUrl ? (
+                      {row.variants.find((variant) => variant.thumbnailUrl)?.thumbnailUrl ? (
                         <img
-                          src={row.thumbnailUrl}
+                          src={row.variants.find((variant) => variant.thumbnailUrl)?.thumbnailUrl}
                           alt=""
                           loading="lazy"
                           className="h-full w-full object-cover"
@@ -131,13 +130,13 @@ export function CreativeGallery({
                           <ImageIcon size={28} />
                         </div>
                       )}
-                      {row.mediaType === "video" ? (
+                      {row.variants.some((variant) => variant.mediaType === "video") ? (
                         <PlayCircle
                           size={28}
                           aria-hidden
                           className="absolute end-2 top-2 text-white drop-shadow"
                         />
-                      ) : row.mediaType === "carousel" ? (
+                      ) : row.variants.some((variant) => variant.mediaType === "carousel") ? (
                         <LayoutGrid
                           size={24}
                           aria-hidden
@@ -150,15 +149,12 @@ export function CreativeGallery({
                         className="line-clamp-2 text-sm font-semibold text-text"
                         title={row.adName}
                       >
-                        {row.adName || (A ? `إعلان ${row.adId}` : `Ad ${row.adId}`)}
+                        {row.adName}
                       </div>
                       <div className="min-w-0 text-[10px] text-text-muted">
-                        <p className="truncate" title={row.campaignName}>
-                          {A ? "الحملة" : "Campaign"}: {row.campaignName || "—"}
-                        </p>
-                        <p className="truncate" title={row.adsetName}>
-                          {A ? "المجموعة" : "Ad set"}: {row.adsetName || "—"}
-                        </p>
+                        {A
+                          ? `${fmtNum(row.variants.length)} إعلان ضمن الاسم`
+                          : `${fmtNum(row.variants.length)} ads under this name`}
                       </div>
                       <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
                         <Metric
@@ -209,8 +205,21 @@ export function CreativeGallery({
                           strong
                         />
                       </dl>
+                      <details className="mt-auto border-t border-border pt-2 text-xs">
+                        <summary className="cursor-pointer font-semibold text-brand">
+                          {A ? "تفصيل الإعلانات والحملات" : "Ad and campaign breakdown"}
+                        </summary>
+                        <div className="mt-2">
+                          <AdVariantBreakdown
+                            ads={row.variants}
+                            spendAvailable={spendAvailable}
+                            onOpenCreative={onOpenCreative}
+                            compact
+                          />
+                        </div>
+                      </details>
                     </div>
-                  </button>
+                  </article>
                 </li>
               ))}
             </ul>

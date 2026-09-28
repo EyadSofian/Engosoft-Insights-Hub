@@ -15,6 +15,7 @@ import {
   useClosedLoop,
 } from "@/components/acquisition/ClosedLoop";
 import { CreativeGallery } from "@/components/acquisition/CreativeGallery";
+import { AdSetComparison } from "@/components/acquisition/AdSetComparison";
 import { MessagingReadinessPanel } from "@/components/acquisition/MessagingReadiness";
 import { TelegramPanel } from "@/components/TelegramPanel";
 import {
@@ -52,7 +53,7 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 
 export const SECTIONS = ACQUISITION_SECTIONS.map((entry) => entry.value);
 type Section = (typeof SECTIONS)[number];
-const AD_VIEWS = ["campaigns", "adsets", "ads", "creatives", "assets"] as const;
+const AD_VIEWS = ["campaigns", "adsets", "ads", "creatives", "assets", "adset-compare"] as const;
 const LEAD_VIEWS = ["today", "forms", "landing", "quality"] as const;
 type AdView = (typeof AD_VIEWS)[number];
 type LeadView = (typeof LEAD_VIEWS)[number];
@@ -99,7 +100,10 @@ type RecordFilter = {
   label: string;
 };
 
-const GRAIN_OF: Record<Exclude<AdView, "creatives" | "assets">, ClosedLoopGrain> = {
+const GRAIN_OF: Record<
+  Exclude<AdView, "creatives" | "assets" | "adset-compare">,
+  ClosedLoopGrain
+> = {
   campaigns: "campaign",
   adsets: "adset",
   ads: "ad",
@@ -194,19 +198,27 @@ function Acquisition() {
         ? "كم صرفنا، كم عميلًا جاء، كم منهم اشترى، وكم دفعوا."
         : "What we spent, how many leads came, how many bought and what they paid.",
     },
-    ads: grain
-      ? {
-          title: A ? "الحملات بالإسناد الدقيق" : "Campaigns by exact attribution",
-          subtitle: A
-            ? "افتح حملة لترى مجموعاتها، ثم إعلاناتها، ثم المادة الإعلانية."
-            : "Open a campaign to see its ad sets, then its ads, then the creative.",
-        }
-      : {
-          title: A ? "المواد الإعلانية" : "Creatives",
-          subtitle: A
-            ? "كل مادة إعلانية بإنفاقها وعملائها ومبيعاتها. اضغط أي مادة للتفاصيل."
-            : "Every creative with its spend, leads and sales. Open one for the full story.",
-        },
+    ads:
+      adView === "adset-compare"
+        ? {
+            title: A ? "مقارنة Ad Sets" : "Ad Set comparison",
+            subtitle: A
+              ? "قارن نتائج المجموعات الإعلانية لتعرف أي جمهور يحقق ليدز ومبيعات أفضل."
+              : "Compare ad sets to see which audience produces better leads and sales.",
+          }
+        : grain
+          ? {
+              title: A ? "الحملات بالإسناد الدقيق" : "Campaigns by exact attribution",
+              subtitle: A
+                ? "افتح حملة لترى مجموعاتها، ثم إعلاناتها، ثم المادة الإعلانية."
+                : "Open a campaign to see its ad sets, then its ads, then the creative.",
+            }
+          : {
+              title: A ? "المواد الإعلانية" : "Creatives",
+              subtitle: A
+                ? "كل مادة إعلانية بإنفاقها وعملائها ومبيعاتها. اضغط أي مادة للتفاصيل."
+                : "Every creative with its spend, leads and sales. Open one for the full story.",
+            },
     leads: {
       title: A ? "مصادر العملاء" : "Lead sources",
       subtitle: A
@@ -305,7 +317,7 @@ function Acquisition() {
 
       {section === "ads" ? (
         <>
-          {breadcrumb ? (
+          {adView === "adset-compare" ? null : breadcrumb ? (
             <DrilldownBreadcrumb steps={breadcrumb} />
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -371,6 +383,7 @@ function Acquisition() {
           {adView === "assets" ? (
             <AssetPerformance data={data} loading={loading} onOpenCreative={setCreativeId} />
           ) : null}
+          {adView === "adset-compare" ? <AdSetComparison data={data} loading={loading} /> : null}
         </>
       ) : null}
 

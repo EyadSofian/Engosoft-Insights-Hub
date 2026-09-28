@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Search,
   Download,
@@ -94,6 +94,8 @@ export function DataTable<T>({
   serverPage,
   loading,
   rowKey,
+  expandedRowKey,
+  renderExpanded,
 }: {
   rows: T[];
   cols: Col<T>[];
@@ -133,6 +135,9 @@ export function DataTable<T>({
   loading?: boolean;
   /** Stable row identity. Falls back to the row's index within the page. */
   rowKey?: (r: T) => string;
+  /** Optional full-width detail immediately below one visible row. */
+  expandedRowKey?: string | null;
+  renderExpanded?: (r: T) => ReactNode;
 }) {
   const { t, lang } = useI18n();
   // Controlled when the caller passes `search`, so a sibling layout can share
@@ -442,43 +447,57 @@ export function DataTable<T>({
               ))}
             {!loading &&
               visible.map((r, i) => (
-                <tr
-                  key={rowKey ? rowKey(r) : i}
-                  onClick={() => onRowClick?.(r)}
-                  // A clickable row has to be reachable without a mouse, otherwise
-                  // the drill-down simply does not exist for keyboard users.
-                  tabIndex={onRowClick ? 0 : undefined}
-                  role={onRowClick ? "button" : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            onRowClick(r);
+                <Fragment key={rowKey ? rowKey(r) : i}>
+                  <tr
+                    onClick={() => onRowClick?.(r)}
+                    // A clickable row has to be reachable without a mouse, otherwise
+                    // the drill-down simply does not exist for keyboard users.
+                    tabIndex={onRowClick ? 0 : undefined}
+                    role={onRowClick ? "button" : undefined}
+                    aria-expanded={
+                      renderExpanded && onRowClick ? expandedRowKey === rowKey?.(r) : undefined
+                    }
+                    onKeyDown={
+                      onRowClick
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onRowClick(r);
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                  className={`group ${onRowClick ? "cursor-pointer" : ""}`}
-                >
-                  {visibleCols.map((c) => (
-                    <td
-                      key={c.key}
-                      className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
-                        i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
-                      } group-hover:bg-brand-soft ${
-                        c.align === "center"
-                          ? "text-center num whitespace-nowrap"
-                          : c.align === "right"
-                            ? "text-end num whitespace-nowrap"
-                            : ""
-                      } ${c.sticky ? "sticky-col font-medium" : ""}`}
-                      style={{ minWidth: c.minWidth }}
-                    >
-                      {c.render(r)}
-                    </td>
-                  ))}
-                </tr>
+                        : undefined
+                    }
+                    className={`group ${onRowClick ? "cursor-pointer" : ""}`}
+                  >
+                    {visibleCols.map((c) => (
+                      <td
+                        key={c.key}
+                        className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
+                          i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
+                        } group-hover:bg-brand-soft ${
+                          c.align === "center"
+                            ? "text-center num whitespace-nowrap"
+                            : c.align === "right"
+                              ? "text-end num whitespace-nowrap"
+                              : ""
+                        } ${c.sticky ? "sticky-col font-medium" : ""}`}
+                        style={{ minWidth: c.minWidth }}
+                      >
+                        {c.render(r)}
+                      </td>
+                    ))}
+                  </tr>
+                  {renderExpanded && expandedRowKey === rowKey?.(r) && (
+                    <tr className="bg-surface-2/60">
+                      <td
+                        colSpan={visibleCols.length}
+                        className="border-b border-border p-3 sm:p-4"
+                      >
+                        {renderExpanded(r)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
           </tbody>
         </table>

@@ -6,6 +6,7 @@ import {
   crmOutcome,
   emptyMetrics,
   finalizeMetrics,
+  groupAdsByName,
   linkAcquisitionsToCrm,
   metaLeadConfidence,
   rankByLeadQuality,
@@ -478,6 +479,66 @@ describe("rollups", () => {
       { adName: "Video 03", spend: 40, leads: 1, won: 1, lost: 0, revenue: 600 },
       { adName: "Second ad name", spend: 20, leads: 1, won: 0, lost: 1, revenue: 0 },
     ]);
+  });
+
+  it("combines repeated ad names but recalculates rates from total figures", () => {
+    const ads = rollupByGrain(
+      [
+        fact({ acquisitionEventId: "won", outcome: won, adName: "PMP-AD 3-AUG" }),
+        fact({
+          acquisitionEventId: "lost",
+          adId: "ad-2",
+          adName: "  pmp-ad  3-aug ",
+          creativeId: "cr-2",
+          outcome: outcome({ lost: true }),
+        }),
+      ],
+      [
+        {
+          campaignId: "camp-1",
+          adsetId: "set-1",
+          adId: "ad-1",
+          creativeId: "cr-1",
+          spend: 40,
+          impressions: 0,
+          clicks: 0,
+        },
+        {
+          campaignId: "camp-1",
+          adsetId: "set-1",
+          adId: "ad-2",
+          creativeId: "cr-2",
+          spend: 20,
+          impressions: 0,
+          clicks: 0,
+        },
+      ],
+      "ad",
+    );
+    const [group] = groupAdsByName(ads);
+    expect(group.variants).toHaveLength(2);
+    expect(group).toMatchObject({
+      spend: 60,
+      leads: 2,
+      won: 1,
+      lost: 1,
+      revenue: 600,
+      cpl: 30,
+      roas: 10,
+    });
+    expect(group.won / group.leads).toBe(0.5);
+  });
+
+  it("does not merge different unnamed ads", () => {
+    const ads = rollupByGrain(
+      [
+        fact({ acquisitionEventId: "one", adName: "", outcome: null }),
+        fact({ acquisitionEventId: "two", adId: "ad-2", adName: "", outcome: null }),
+      ],
+      [],
+      "ad",
+    );
+    expect(groupAdsByName(ads)).toHaveLength(2);
   });
 
   it("names an ad's creative only when every exact row agrees on it", () => {

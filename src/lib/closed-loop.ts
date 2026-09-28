@@ -507,6 +507,53 @@ export interface GrainRow extends QualityMetrics {
   creativeName: string;
 }
 
+export interface AdNameGroup<T extends GrainRow = GrainRow> extends QualityMetrics {
+  key: string;
+  adName: string;
+  variants: T[];
+}
+
+/** One displayed creative per Ad Name, retaining each Ad ID as a drill-down. */
+export function groupAdsByName<T extends GrainRow>(ads: readonly T[]): AdNameGroup<T>[] {
+  const groups = new Map<string, AdNameGroup<T>>();
+  const additive = [
+    "leads",
+    "conversations",
+    "metaFormLeads",
+    "landingLeads",
+    "crmMatched",
+    "interested",
+    "qualified",
+    "quotations",
+    "won",
+    "lost",
+    "saleOrders",
+    "invoices",
+    "revenue",
+    "spend",
+    "impressions",
+    "clicks",
+  ] as const;
+  for (const ad of ads) {
+    const name = ad.adName.trim().replace(/\s+/g, " ");
+    // A missing name must not merge unrelated ads under an "unknown" bucket.
+    const key = name ? `name:${name.toLocaleLowerCase()}` : `unnamed:${ad.key}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { ...emptyMetrics(), key, adName: name || ad.adId, variants: [] };
+      groups.set(key, group);
+    }
+    group.variants.push(ad);
+    for (const field of additive) group[field] += ad[field];
+  }
+  return [...groups.values()].map((group) => {
+    group.revenue = Math.round(group.revenue * 100) / 100;
+    group.variants.sort((a, b) => b.spend - a.spend || a.adId.localeCompare(b.adId));
+    finalizeMetrics(group);
+    return group;
+  });
+}
+
 const GRAIN_KEYS: Record<
   ClosedLoopGrain,
   readonly ("campaignId" | "adsetId" | "adId" | "creativeId")[]

@@ -7,6 +7,7 @@ import {
   Globe2,
   Image,
   LayoutDashboard,
+  Layers,
   Leaf,
   MapPinned,
   Megaphone,
@@ -110,6 +111,15 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         tabLabel: { ar: "الحملات", en: "Campaigns" },
       },
       {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Layers,
+        tabLabel: { ar: "Ad Sets", en: "Ad Sets" },
+        search: { section: "ads", view: "adset-compare" },
+        matches: (search) =>
+          acquisitionSection(search) === "ads" && search.view === "adset-compare",
+      },
+      {
         to: "/courses",
         key: "courses",
         icon: GraduationCap,
@@ -123,7 +133,8 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         icon: Image,
         tabLabel: { ar: "المواد الإعلانية", en: "Creatives" },
         search: { section: "ads", view: "creatives" },
-        matches: (search) => acquisitionSection(search) === "ads",
+        matches: (search) =>
+          acquisitionSection(search) === "ads" && search.view !== "adset-compare",
       },
       {
         to: "/website",

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   BadgeDollarSign,
+  ChevronDown,
   Filter,
   Gauge,
   Image as ImageIcon,
@@ -16,7 +17,14 @@ import { KpiRow, PageSection } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Card, Pill, Segmented } from "@/components/ui-bits";
 import { nameWithId } from "@/components/attribution/acquisition-labels";
-import type { ClosedLoopGrain, FunnelStep, GrainRow, QualityMetrics } from "@/lib/closed-loop";
+import {
+  groupAdsByName,
+  type AdNameGroup,
+  type ClosedLoopGrain,
+  type FunnelStep,
+  type GrainRow,
+  type QualityMetrics,
+} from "@/lib/closed-loop";
 import type { Kpi, KpiStatus } from "@/lib/closed-loop-kpis";
 import type {
   ManagementHealthIndicator,
@@ -27,6 +35,7 @@ import type {
 import { kpiDisplay } from "./ManagementOverview";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { AdVariantBreakdown } from "./AdVariantBreakdown";
 
 /**
  * Closed-loop Marketing → Sales views. Every entity row is credited only with
@@ -925,7 +934,7 @@ function identityColumns(
   return columns;
 }
 
-/** The materials tab is an ad-level report: names and figures share one Ad ID. */
+/** One summary per Ad Name with the contributing Ad IDs expanded underneath. */
 export function CreativeAdsTable({
   data,
   loading,
@@ -938,10 +947,13 @@ export function CreativeAdsTable({
   const { lang } = useI18n();
   const A = lang === "ar";
   const [onlyWithAcquisitions, setOnlyWithAcquisitions] = useState(false);
-  const rows = (data?.grains?.ad ?? []).filter((row) => !onlyWithAcquisitions || row.leads > 0);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const rows = groupAdsByName(data?.grains?.ad ?? []).filter(
+    (row) => !onlyWithAcquisitions || row.leads > 0,
+  );
   const spendAvailable = data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true;
   const pending = A ? "بانتظار المزامنة" : "Pending sync";
-  const cols: Col<CreativeGrainRow>[] = [
+  const cols: Col<AdNameGroup<CreativeGrainRow>>[] = [
     {
       key: "adName",
       header: A ? "اسم الكرياتيف (Ad Name)" : "Creative name (Ad Name)",
@@ -950,9 +962,9 @@ export function CreativeAdsTable({
       always: true,
       render: (row) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          {row.thumbnailUrl ? (
+          {row.variants.find((variant) => variant.thumbnailUrl)?.thumbnailUrl ? (
             <img
-              src={row.thumbnailUrl}
+              src={row.variants.find((variant) => variant.thumbnailUrl)?.thumbnailUrl}
               alt=""
               loading="lazy"
               className="h-12 w-12 shrink-0 rounded-lg object-cover"
@@ -963,33 +975,24 @@ export function CreativeAdsTable({
             </span>
           )}
           <div className="min-w-0">
-            {row.creativeId ? (
-              <button
-                type="button"
-                className="block max-w-[270px] text-start font-semibold hover:text-brand"
-                onClick={() => onOpenCreative(row.creativeId)}
-              >
-                {nameWithId(row.adName, row.adId)}
-              </button>
-            ) : (
-              nameWithId(row.adName, row.adId)
-            )}
-            <div
-              className="mt-0.5 max-w-[270px] truncate text-[10px] text-text-muted"
-              title={row.campaignName}
-            >
-              {A ? "الحملة" : "Campaign"}: {row.campaignName || "—"}
-            </div>
-            <div
-              className="max-w-[270px] truncate text-[10px] text-text-muted"
-              title={row.adsetName}
-            >
-              {A ? "المجموعة" : "Ad set"}: {row.adsetName || "—"}
-            </div>
+            <span className="flex items-center gap-1.5 font-semibold text-text">
+              <ChevronDown
+                size={14}
+                className={`shrink-0 text-brand transition-transform ${expandedKey === row.key ? "" : "-rotate-90"}`}
+              />
+              <bdi dir="auto" className="max-w-[250px] truncate" title={row.adName}>
+                {row.adName}
+              </bdi>
+            </span>
+            <span className="mt-1 block text-[10px] text-text-muted">
+              {A
+                ? `${fmtNum(row.variants.length)} إعلان · اضغط للتفاصيل`
+                : `${fmtNum(row.variants.length)} ads · open breakdown`}
+            </span>
           </div>
         </div>
       ),
-      sortValue: (row) => row.adName || row.adId,
+      sortValue: (row) => row.adName,
     },
     {
       key: "spend",
@@ -1061,8 +1064,8 @@ export function CreativeAdsTable({
       tone="violet"
       hint={
         A
-          ? "كل صف إعلان واحد بمعرّفه الدقيق. الليدز من الاستحواذ الدقيق، والبيع واللوست من CRM، ونسبة التحويل = البيع ÷ الليدز."
-          : "One exact Ad ID per row. Leads are exact acquisitions, wins and losses come from CRM, and conversion = wins / leads."
+          ? "كل اسم إعلان ظاهر مرة واحدة بمجموع أرقامه. افتح الصف لتفاصيل الحملات والمجموعات والإعلانات الأصلية؛ النسب محسوبة من الإجماليات مش بجمع النسب."
+          : "Each ad name appears once with combined totals. Open a row for its original campaigns, ad sets and Ad IDs; rates are recalculated from totals."
       }
     >
       <div className="space-y-3">
@@ -1080,8 +1083,19 @@ export function CreativeAdsTable({
           loading={loading}
           defaultVisibleLimit={9}
           initialSort={{ key: "spend", dir: -1 }}
-          searchable={(row) => `${row.adName} ${row.adId} ${row.campaignName} ${row.adsetName}`}
+          searchable={(row) =>
+            `${row.adName} ${row.variants.map((ad) => `${ad.adId} ${ad.campaignName} ${ad.adsetName}`).join(" ")}`
+          }
           rowKey={(row) => row.key}
+          onRowClick={(row) => setExpandedKey((current) => (current === row.key ? null : row.key))}
+          expandedRowKey={expandedKey}
+          renderExpanded={(row) => (
+            <AdVariantBreakdown
+              ads={row.variants}
+              spendAvailable={spendAvailable}
+              onOpenCreative={onOpenCreative}
+            />
+          )}
           csvFilename="engosoft-creative-ads"
         />
       </div>
