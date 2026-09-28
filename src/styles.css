@@ -725,6 +725,13 @@
     unicode-bidi: isolate;
   }
 
+  /* The browser centers unstyled table headings, which makes them miss their
+     column values in both Arabic and English. Numeric headings can still use
+     the explicit `text-end` utility. */
+  main table th {
+    text-align: start;
+  }
+
   /* A Latin course name, product code or invoice number inside an Arabic
      sentence. `bdi` already isolates; this stops it inheriting the Arabic
      line-height loosening and keeps it on one run. */
@@ -820,6 +827,13 @@
       --dur-chrome: 0ms;
     }
   }
+}
+
+/* Table headers keep the page's RTL direction, while numeric cells use LTR
+   to keep figures readable. `text-end` otherwise resolves to opposite sides.
+   This intentionally follows the generated utilities so both end edges match. */
+[dir="rtl"] main table td.num.text-end {
+  text-align: left;
 }
 
 /* --- surfaces ------------------------------------------------------------ */

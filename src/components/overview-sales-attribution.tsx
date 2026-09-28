@@ -137,63 +137,180 @@ export function OverviewSalesAttribution({
         </span>
       </div>
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[760px] text-[11.5px]">
+      <div className="mt-5 grid gap-2 md:hidden">
+        {courses.map((course) => (
+          <article
+            key={course.course}
+            className="rounded-xl border border-border bg-surface-2/45 p-3"
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium text-text-muted">{A ? "الدورة" : "Course"}</p>
+                <bdi
+                  dir="auto"
+                  className="bidi-name block truncate text-[13px] font-bold text-text"
+                  title={course.course}
+                >
+                  {course.course}
+                </bdi>
+              </div>
+              <div className="shrink-0 text-end">
+                <p className="text-[10px] font-medium text-text-muted">
+                  {A ? "التحصيل" : "Collected"}
+                </p>
+                <bdi dir="ltr" className="num block text-[14px] font-bold text-text">
+                  {fmtUSD(course.revenue)}
+                </bdi>
+                <bdi dir="ltr" className="num block text-[10px] text-text-subtle">
+                  {fmtPct(course.contribution, 1)} {A ? "من مبيعات الدورات" : "of course sales"}
+                </bdi>
+              </div>
+            </div>
+
+            <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-3">
+              <div>
+                <dt className="text-[10px] text-text-muted">
+                  {A ? "ليدز / مكسوب" : "Leads / won"}
+                </dt>
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
+                  {fmtNum(course.leads ?? 0)} / {fmtNum(course.won ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] text-text-muted">
+                  {A ? "معدل الإغلاق" : "Closure rate"}
+                </dt>
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
+                  {pct(course.closureRate ?? null, lang)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] text-text-muted">{A ? "دوران الليد" : "Lead cycle"}</dt>
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
+                  {course.avgCloseDays == null
+                    ? "—"
+                    : `${course.avgCloseDays.toFixed(1)} ${A ? "يوم" : "days"}`}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 border-t border-border/70 pt-3">
+              <p className="text-[10px] font-medium text-text-muted">
+                {A ? "مصدر التحصيل" : "Revenue source"}
+              </p>
+              <dl className="mt-1.5 grid grid-cols-3 gap-2">
+                <div>
+                  <dt className="text-[10px] text-text-muted">{A ? "حالي" : "Current"}</dt>
+                  <dd className="num text-[12px] font-semibold text-text">
+                    {pct(course.currentLeadRevenueShare ?? null, lang)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] text-text-muted">{A ? "ماضٍ" : "Previous"}</dt>
+                  <dd className="num text-[12px] font-semibold text-text">
+                    {pct(
+                      comparisonAvailable ? (course.previousLeadRevenueShare ?? null) : null,
+                      lang,
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] text-text-muted">{A ? "مشترك" : "Other"}</dt>
+                  <dd className="num text-[12px] font-semibold text-text">
+                    {pct(course.otherLeadRevenueShare ?? null, lang)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="table-wrap scroll-hint-x mt-5 hidden rounded-xl border border-border md:block">
+        <table className="mx-auto w-full min-w-[880px] max-w-[1400px] table-fixed text-[12px]">
+          <caption className="sr-only">
+            {A ? "التحصيل ومصدره ومعدل إغلاق كل دورة" : "Collection source and closure by course"}
+          </caption>
+          <colgroup>
+            <col className="w-[16%]" />
+            <col className="w-[18%]" />
+            <col className="w-[15%]" />
+            <col className="w-[13%]" />
+            <col className="w-[14%]" />
+            <col className="w-[24%]" />
+          </colgroup>
           <thead>
-            <tr className="border-b border-border text-start text-text-subtle">
-              <th className="pb-2 pe-3 font-semibold">{A ? "الدورة" : "Course"}</th>
-              <th className="pb-2 pe-3 text-end font-semibold">{A ? "التحصيل" : "Collected"}</th>
-              <th className="pb-2 pe-3 text-end font-semibold">
+            <tr className="border-b border-border bg-surface-2/70 text-text-muted">
+              <th scope="col" className="px-3 py-3 text-start font-semibold">
+                {A ? "الدورة" : "Course"}
+              </th>
+              <th scope="col" className="px-3 py-3 text-end font-semibold">
+                {A ? "التحصيل" : "Collected"}
+              </th>
+              <th scope="col" className="px-3 py-3 text-end font-semibold">
                 {A ? "ليدز / مكسوب" : "Leads / won"}
               </th>
-              <th className="pb-2 pe-3 text-end font-semibold">
+              <th scope="col" className="px-3 py-3 text-end font-semibold">
                 {A ? "معدل الإغلاق" : "Closure rate"}
               </th>
-              <th className="pb-2 pe-3 text-end font-semibold">
+              <th scope="col" className="px-3 py-3 text-end font-semibold">
                 {A ? "دوران الليد" : "Lead cycle"}
               </th>
-              <th className="pb-2 text-end font-semibold">
+              <th scope="col" className="px-3 py-3 text-end font-semibold">
                 {A ? "مصدر التحصيل" : "Revenue source"}
               </th>
             </tr>
           </thead>
           <tbody>
             {courses.map((course) => (
-              <tr key={course.course} className="border-b border-border/70 last:border-0">
-                <td className="py-2.5 pe-3 font-semibold text-text">{course.course}</td>
-                <td className="num py-2.5 pe-3 text-end font-semibold text-text">
-                  {fmtUSD(course.revenue)}
-                  <span className="ms-1 text-[10px] font-normal text-text-subtle">
-                    ({fmtPct(course.contribution, 1)})
+              <tr
+                key={course.course}
+                className="border-b border-border/70 align-middle transition-colors last:border-0 hover:bg-surface-2/45"
+              >
+                <td className="px-3 py-3 text-start font-semibold text-text">
+                  <bdi dir="auto" className="bidi-name block truncate" title={course.course}>
+                    {course.course}
+                  </bdi>
+                </td>
+                <td className="num px-3 py-3 text-end font-semibold text-text">
+                  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap" dir="ltr">
+                    <span>{fmtUSD(course.revenue)}</span>
+                    <span className="text-[10px] font-normal text-text-subtle">
+                      ({fmtPct(course.contribution, 1)})
+                    </span>
                   </span>
                 </td>
-                <td className="num py-2.5 pe-3 text-end text-text">
+                <td className="num px-3 py-3 text-end text-text">
                   {fmtNum(course.leads ?? 0)} / {fmtNum(course.won ?? 0)}
                 </td>
-                <td className="num py-2.5 pe-3 text-end font-semibold text-text">
+                <td className="num px-3 py-3 text-end font-semibold text-text">
                   {pct(course.closureRate ?? null, lang)}
                 </td>
-                <td className="num py-2.5 pe-3 text-end text-text">
-                  <span className="inline-flex items-center justify-end gap-1">
+                <td className="num px-3 py-3 text-end text-text">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
                     <Clock3 size={12} className="text-text-subtle" />
                     {course.avgCloseDays == null
                       ? "—"
                       : `${course.avgCloseDays.toFixed(1)} ${A ? "يوم" : "days"}`}
                   </span>
                 </td>
-                <td className="num py-2.5 text-end text-text-muted">
-                  <div>
-                    {A ? "حالي" : "Current"} {pct(course.currentLeadRevenueShare ?? null, lang)}
-                  </div>
-                  <div>
-                    {A ? "ماضٍ" : "Previous"}{" "}
-                    {pct(
-                      comparisonAvailable ? (course.previousLeadRevenueShare ?? null) : null,
-                      lang,
-                    )}
-                  </div>
-                  <div>
-                    {A ? "مشترك" : "Other"} {pct(course.otherLeadRevenueShare ?? null, lang)}
+                <td className="px-3 py-3 text-end text-text-muted">
+                  <div className="inline-grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 text-start leading-5">
+                    <span>{A ? "حالي" : "Current"}</span>
+                    <bdi dir="ltr" className="num font-medium text-text">
+                      {pct(course.currentLeadRevenueShare ?? null, lang)}
+                    </bdi>
+                    <span>{A ? "ماضٍ" : "Previous"}</span>
+                    <bdi dir="ltr" className="num font-medium text-text">
+                      {pct(
+                        comparisonAvailable ? (course.previousLeadRevenueShare ?? null) : null,
+                        lang,
+                      )}
+                    </bdi>
+                    <span>{A ? "مشترك" : "Other"}</span>
+                    <bdi dir="ltr" className="num font-medium text-text">
+                      {pct(course.otherLeadRevenueShare ?? null, lang)}
+                    </bdi>
                   </div>
                 </td>
               </tr>
