@@ -1,33 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarOff, CalendarRange, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
-import {
-  Card,
-  ErrorState,
-  EmptyState,
-  KpiCard,
-  SectionTitle,
-  Skeleton,
-} from "@/components/ui-bits";
-import {
-  DashboardPageHeader,
-  DashboardPanel,
-  InsightRow,
-  KpiRow,
-} from "@/components/dashboard-bits";
-import { useReportingPeriod } from "@/lib/use-reporting-period";
-import type { DataHealth, Maybe, YoyPoint, YoyResult } from "@/lib/types";
+import { useState } from "react";
+import { CalendarRange, CircleAlert } from "lucide-react";
+import { Card, ErrorState, SectionTitle, Skeleton } from "@/components/ui-bits";
+import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
-import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
-import { topRows, type MetricDetail } from "@/lib/metric-detail";
+import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
+import type { AnnualComparison, AnnualNumbers } from "@/lib/yearly-analysis";
 
-export const Route = createFileRoute("/yoy")({ component: Yoy });
+export const Route = createFileRoute("/yoy")({ component: YearlyPage });
 
-interface Resp extends YoyResult {
+interface Response {
   years: number[];
-  rowsPerYear: { year: number; ads: number; crm: number; accounting: number }[];
-  health: DataHealth;
+  annual: AnnualComparison;
+  sourceDates: { ads: string; crm: string; revenue: string };
+  today: string;
+  health: { crmAuthority: string; lostAuthority: string; accountingAuthority: string };
 }
 
 const MONTHS = {
@@ -48,575 +36,568 @@ const MONTHS = {
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
 };
 
-/** The four year-to-date metrics, named for a reader rather than by field key. */
-const YTD_LABEL: Record<string, { ar: string; en: string }> = {
-  spend: { ar: "الإنفاق", en: "Spend" },
-  revenue: { ar: "الإيراد", en: "Revenue" },
-  leads: { ar: "العملاء المحتملون", en: "Leads" },
-  won: { ar: "الصفقات الرابحة", en: "Won" },
-};
+type Measure = "revenue" | "spend" | "leads" | "won" | "lost";
+const MONTHLY_MEASURES: Measure[] = ["revenue", "spend", "leads", "won", "lost"];
 
-function metricLabel(metric: string, lang: "ar" | "en"): string {
-  return YTD_LABEL[metric]?.[lang] ?? metric;
+function rate(current: number, previous: number, comparable: boolean) {
+  return comparable && previous !== 0 ? ((current - previous) / Math.abs(previous)) * 100 : null;
 }
 
-/**
- * What each year-to-date comparison is made of.
- *
- * The monthly series and the per-course split are already in the response, so
- * opening "Revenue" shows the twelve months and the courses that moved it —
- * without a second request and without inventing a month the sheet never had.
- *
- * A metric with no history shows no delta and no chart: "0% year on year" from
- * an absent baseline reads as "flat", which is a claim the data has not made.
- */
-/**
- * The three readings of the year comparison.
- *
- * Two of them name a course and one states the scope. All three open, because
- * "largest gain" is a sort the reader cannot see and "the comparison ignores
- * your filters" is the single most useful thing to know about this page — and
- * both were previously stated on a card that did nothing.
- */
-function yoyInsights(
-  data: Resp,
-  movers: (YoyPoint & { metric: string })[],
-  decliner: (YoyPoint & { metric: string }) | null,
-  lang: "ar" | "en",
-): Record<string, MetricDetail> {
-  const A = lang === "ar";
-  const gainer = movers[0] ?? null;
-  const scopeNote = A
-    ? "المقارنة السنوية تقرأ الملف كاملًا ولا تتأثر بالفلاتر أو الفترة المختارة."
-    : "The year comparison reads the whole file and is deliberately unaffected by the filters or the selected period.";
+function moneyOrNumber(measure: Measure, value: number) {
+  return measure === "revenue" || measure === "spend" ? fmtUSDFull(value) : fmtNum(value);
+}
 
-  const courseRows = (pick: (row: YoyPoint) => number, tone: "mint" | "rose") =>
-    topRows(
-      movers.map((course) => ({
-        key: course.key,
-        label: course.key,
-        value: pick(course),
-        display: fmtUSD(pick(course)),
-        meta: `${fmtUSD(course.previous)} → ${fmtUSD(course.current)}`,
-        tone,
-      })),
-    );
-
-  const courseFacts = (row: (YoyPoint & { metric: string }) | null) =>
-    row
-      ? [
-          { key: "previous", label: String(data.previousYear), value: fmtUSD(row.previous) },
-          { key: "current", label: String(data.currentYear), value: fmtUSD(row.current) },
-          {
-            key: "delta",
-            label: A ? "الفرق" : "Change",
-            value: fmtUSD(row.current - row.previous),
-          },
-          { key: "growth", label: A ? "النمو" : "Growth", value: fmtPct(row.growth, 1) },
-        ]
-      : undefined;
-
-  return {
-    gainer: {
-      id: "yoy.largestGain",
-      title: A ? "أكبر نمو" : "Largest gain",
-      value: gainer ? gainer.key : "—",
-      tone: "mint",
-      icon: <TrendingUp size={16} />,
-      entity: gainer ? { type: "course", id: gainer.key, name: gainer.key } : null,
-      definition: A
-        ? "الدورة التي زاد إيرادها بأكبر مبلغ بين العامين. الترتيب بالمبلغ لا بالنسبة: نمو 300% على مئة دولار ليس حدثًا."
-        : "The course whose revenue grew by the largest amount between the two years. Ranked by amount, not by percentage: 300% growth on a hundred dollars is not an event.",
-      formula: gainer
-        ? `${fmtUSD(gainer.current)} − ${fmtUSD(gainer.previous)} = ${fmtUSD(gainer.current - gainer.previous)}`
-        : undefined,
-      caveat: scopeNote,
-      supporting: courseFacts(gainer),
-      breakdowns: [
-        {
-          id: "gains",
-          title: A ? "أكبر الزيادات بالمبلغ" : "Largest increases, by amount",
-          rows: courseRows((row) => Math.max(0, row.current - row.previous), "mint"),
-          emptyLabel: A ? "لا توجد زيادة في أي دورة" : "No course grew",
-        },
-      ],
-      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
-    },
-
-    decliner: {
-      id: "yoy.largestDecline",
-      title: A ? "أكبر تراجع" : "Largest decline",
-      value: decliner ? decliner.key : "—",
-      tone: "rose",
-      icon: <TrendingDown size={16} />,
-      deltaInvert: true,
-      entity: decliner ? { type: "course", id: decliner.key, name: decliner.key } : null,
-      definition: A
-        ? "الدورة التي انخفض إيرادها بأكبر مبلغ بين العامين."
-        : "The course whose revenue fell by the largest amount between the two years.",
-      formula: decliner
-        ? `${fmtUSD(decliner.current)} − ${fmtUSD(decliner.previous)} = ${fmtUSD(decliner.current - decliner.previous)}`
-        : undefined,
-      caveat: scopeNote,
-      supporting: courseFacts(decliner),
-      breakdowns: [
-        {
-          id: "declines",
-          title: A ? "أكبر التراجعات بالمبلغ" : "Largest declines, by amount",
-          rows: courseRows((row) => Math.min(0, row.current - row.previous), "rose"),
-          emptyLabel: A ? "لم تتراجع أي دورة" : "No course declined",
-        },
-      ],
-      report: { to: "/courses", label: A ? "فتح تقرير الدورات" : "Open the courses report" },
-    },
-
-    scope: {
-      id: "yoy.scope",
-      title: A ? "نطاق المقارنة" : "Comparison scope",
-      value: `${data.currentYear} ${A ? "مقابل" : "vs"} ${data.previousYear}`,
-      tone: "violet",
-      icon: <CalendarRange size={16} />,
-      definition: scopeNote,
-      formula: A
-        ? `يقارن كل ${data.currentYear} حتى اليوم بنفس الأيام من ${data.previousYear}.`
-        : `Compares ${data.currentYear} to date against the same days of ${data.previousYear}.`,
-      caveat: A
-        ? "أي مؤشر لا يملك تاريخًا في العام السابق يظهر بشرطة بدلًا من صفر يقرأه القارئ كتراجع."
-        : "A metric with no history in the previous year shows an em dash rather than a zero a reader would take for a collapse.",
-      supporting: [
-        {
-          key: "courses",
-          label: A ? "الدورات المقارَنة" : "Courses compared",
-          value: fmtNum(movers.length),
-        },
-        {
-          key: "rising",
-          label: A ? "دورات نمت" : "Courses that grew",
-          value: fmtNum(movers.filter((row) => row.current > row.previous).length),
-        },
-        {
-          key: "falling",
-          label: A ? "دورات تراجعت" : "Courses that fell",
-          value: fmtNum(movers.filter((row) => row.current < row.previous).length),
-        },
-        {
-          key: "metrics",
-          label: A ? "مؤشرات لها تاريخ" : "Metrics with history",
-          value: fmtNum(Object.values(data.metricAvailability).filter(Boolean).length),
-        },
-      ],
-      breakdowns: [
-        {
-          id: "ytd",
-          title: A ? "المقارنة حسب المؤشر" : "The comparison, by metric",
-          rows: data.ytd.map((row) => ({
-            key: row.metric,
-            label: row.metric,
-            value: row.current,
-            display:
-              row.metric === "spend" || row.metric === "revenue"
-                ? fmtUSD(row.current)
-                : fmtNum(row.current),
-            meta:
-              row.metric === "spend" || row.metric === "revenue"
-                ? `${data.previousYear}: ${fmtUSD(row.previous)}`
-                : `${data.previousYear}: ${fmtNum(row.previous)}`,
-            tone: "violet" as const,
-          })),
-          emptyLabel: A ? "لا توجد مؤشرات قابلة للمقارنة" : "No comparable metric",
-        },
-      ],
-    },
+function metricName(measure: Measure, lang: "ar" | "en") {
+  const names = {
+    revenue: { ar: "الإيراد المحصّل", en: "Collected revenue" },
+    spend: { ar: "صرف الإعلانات", en: "Ad spend" },
+    leads: { ar: "الليدز", en: "Leads" },
+    won: { ar: "Won", en: "Won" },
+    lost: { ar: "Lost", en: "Lost" },
   };
+  return names[measure][lang];
 }
 
-function yoyMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail> {
+function Change({
+  current,
+  previous,
+  comparable,
+  invert = false,
+}: {
+  current: number;
+  previous: number;
+  comparable: boolean;
+  invert?: boolean;
+}) {
+  const value = rate(current, previous, comparable);
+  if (value === null) return <span className="text-text-subtle">—</span>;
+  const good = invert ? value <= 0 : value >= 0;
+  return (
+    <span className={`num font-bold ${good ? "text-mint-ink" : "text-rose-ink"}`}>
+      {value > 0 ? "+" : ""}
+      {fmtPct(value, 1)}
+    </span>
+  );
+}
+
+function YearMetric({
+  measure,
+  current,
+  previous,
+  comparable,
+  previousYear,
+  lang,
+  currentAvailable = true,
+}: {
+  measure: Measure;
+  current: AnnualNumbers;
+  previous: AnnualNumbers;
+  comparable: boolean;
+  previousYear: number;
+  lang: "ar" | "en";
+  currentAvailable?: boolean;
+}) {
+  const accent =
+    measure === "revenue"
+      ? "border-t-mint-strong"
+      : measure === "spend"
+        ? "border-t-rose-strong"
+        : measure === "lost"
+          ? "border-t-amber-strong"
+          : "border-t-sky-strong";
+  return (
+    <Card className={`border-t-[3px] ${accent}`}>
+      <div className="text-xs font-semibold text-text-muted">{metricName(measure, lang)}</div>
+      <div className="num mt-2 text-2xl font-black tracking-tight text-text">
+        {currentAvailable ? moneyOrNumber(measure, current[measure]) : "—"}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-[11px]">
+        <span className="text-text-muted">
+          {previousYear}:{" "}
+          {comparable && currentAvailable ? moneyOrNumber(measure, previous[measure]) : "—"}
+        </span>
+        <Change
+          current={current[measure]}
+          previous={previous[measure]}
+          comparable={comparable && currentAvailable}
+          invert={measure === "spend" || measure === "lost"}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function YearlyPage() {
+  const { lang } = useI18n();
   const A = lang === "ar";
-  const TONE: Record<string, MetricDetail["tone"]> = {
-    spend: "rose",
-    revenue: "mint",
-    leads: "sky",
-    won: "violet",
-  };
-
-  const out: Record<string, MetricDetail> = {};
-  for (const row of data.ytd) {
-    const money = row.metric === "spend" || row.metric === "revenue";
-    const format = money ? fmtUSD : fmtNum;
-    const available = isAvailable(data, row.metric);
-    const monthly = (data[row.metric as "spend" | "revenue" | "leads" | "won"] ?? []) as YoyPoint[];
-    const courses = data.byCourse.filter((course) => course.metric === row.metric);
-
-    out[row.metric] = {
-      id: `yoy.${row.metric}`,
-      title: metricLabel(row.metric, lang),
-      value: available ? format(row.current) : "—",
-      tone: TONE[row.metric] ?? "slate",
-      delta: available && row.growth !== null ? row.growth : undefined,
-      deltaInvert: row.metric === "spend",
-      definition: available
-        ? A
-          ? `${metricLabel(row.metric, lang)} من بداية ${data.currentYear} حتى اليوم، مقابل نفس المدة من ${data.previousYear}. المقارنة على مدى متساوٍ من السنة، لا على سنة كاملة مقابل سنة ناقصة.`
-          : `${metricLabel(row.metric, lang)} from the start of ${data.currentYear} to today, against the same stretch of ${data.previousYear}. Equal spans of the year, never a full year against a partial one.`
-        : A
-          ? "لا توجد بيانات تاريخية لهذا المؤشر، فلا تُعرض مقارنة سنوية له."
-          : "There is no history for this metric, so no year-on-year comparison is shown for it.",
-      formula: available
-        ? A
-          ? `${format(row.previous)} في ${data.previousYear} ← ${format(row.current)} في ${data.currentYear}.`
-          : `${format(row.previous)} in ${data.previousYear} → ${format(row.current)} in ${data.currentYear}.`
-        : undefined,
-      supporting: available
-        ? [
-            {
-              key: "previous",
-              label: `${data.previousYear}`,
-              value: format(row.previous),
-            },
-            { key: "current", label: `${data.currentYear}`, value: format(row.current) },
-            {
-              key: "delta",
-              label: A ? "الفارق" : "Difference",
-              value: format(row.current - row.previous),
-            },
-            {
-              key: "growth",
-              label: A ? "النمو" : "Growth",
-              value: row.growth === null ? "—" : fmtPct(row.growth, 1),
-            },
-          ]
-        : undefined,
-      breakdowns: available
-        ? [
-            {
-              id: "months",
-              title: A ? "أكبر الشهور تغيّرًا" : "Months that moved the most",
-              hint: A
-                ? `الفارق بين ${data.currentYear} و${data.previousYear} لكل شهر.`
-                : `The difference between ${data.currentYear} and ${data.previousYear}, month by month.`,
-              rows: topRows(
-                monthly.map((point) => ({
-                  key: point.key,
-                  label: point.key,
-                  value: point.delta,
-                  display: format(point.delta),
-                  meta: point.growth === null ? undefined : fmtPct(point.growth, 1),
-                  tone: point.delta >= 0 ? ("mint" as const) : ("rose" as const),
-                })),
-              ),
-              emptyLabel: A ? "لا توجد شهور قابلة للمقارنة" : "No comparable months",
-            },
-            {
-              id: "courses",
-              title: A ? "أكبر الدورات تغيّرًا" : "Courses that moved the most",
-              rows: topRows(
-                courses.map((course) => ({
-                  key: course.key,
-                  label: course.key,
-                  value: course.delta,
-                  display: format(course.delta),
-                  meta: course.growth === null ? undefined : fmtPct(course.growth, 1),
-                  tone: course.delta >= 0 ? ("mint" as const) : ("rose" as const),
-                })),
-              ),
-              emptyLabel: A ? "لا توجد دورات قابلة للمقارنة" : "No comparable courses",
-            },
-          ]
-        : undefined,
-      report:
-        row.metric === "revenue"
-          ? { to: "/accounting", label: A ? "فتح تقرير الحسابات" : "Open the Accounting report" }
-          : row.metric === "spend"
-            ? { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" }
-            : { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the leads report" },
-    };
-  }
-  return out;
-}
-
-function Yoy() {
-  const reportingPeriod = useReportingPeriod();
-  // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
-  // have something to resolve against. Ids and state only — no figures.
-  useRegisterNexusView("yoy");
-  const { t, lang } = useI18n();
-  // Year-over-year is a property of the whole sheet, not of the active window,
-  // so this endpoint deliberately ignores the global filters.
-  const { data, isLoading, error, refetch } = useQuery<Resp>({
-    queryKey: ["yoy"],
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [courseQuery, setCourseQuery] = useState("");
+  const [monthlyMeasure, setMonthlyMeasure] = useState<Measure>("revenue");
+  useRegisterNexusView("yoy", {
+    parameters: {
+      year: selectedYear === null ? "" : String(selectedYear),
+      month: selectedMonth === null ? "" : String(selectedMonth),
+    },
+  });
+  const query = new URLSearchParams();
+  if (selectedYear) query.set("year", String(selectedYear));
+  if (selectedMonth) query.set("month", String(selectedMonth));
+  const { data, isLoading, error, refetch } = useQuery<Response>({
+    queryKey: ["yearly-analysis", selectedYear, selectedMonth],
     queryFn: async () => {
-      const res = await fetch("/api/yoy");
+      const res = await fetch(`/api/yoy${query.size ? `?${query}` : ""}`);
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       return res.json();
     },
     staleTime: 5 * 60_000,
   });
-
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-
-  // One description per figure, built once from the response on screen.
-  const metrics = data ? yoyMetrics(data, lang) : {};
-
-  // Courses ranked by how much money actually moved, not by percentage: a
-  // course that went from $80 to $320 is a 300% gain and a $240 event, and
-  // ranking it above a course that lost $9,000 would be a lie about which one
-  // mattered. Only courses with a real reading on both sides are eligible.
-  const movers = [...(data?.byCourse ?? [])]
-    .filter((course) => Number.isFinite(course.current) && Number.isFinite(course.previous))
-    .sort((a, b) => Math.abs(b.current - b.previous) - Math.abs(a.current - a.previous));
-  const decliner = movers.find((course) => course.current < course.previous) ?? null;
-  const insights = data ? yoyInsights(data, movers, decliner, lang) : null;
+  const annual = data?.annual;
+  const comparable = annual?.coverage.comparable;
+  const lostAvailable = !!data && data.health.lostAuthority !== "unavailable";
+  const courses =
+    annual?.courses.filter((row) =>
+      row.name.toLowerCase().includes(courseQuery.trim().toLowerCase()),
+    ) ?? [];
+  const currentPeriod = annual ? `${annual.currentFrom} → ${annual.currentTo}` : undefined;
+  const laggingSources =
+    annual && data
+      ? (
+          [
+            [A ? "الإعلانات" : "Ads", data.sourceDates.ads],
+            ["CRM", data.sourceDates.crm],
+            [A ? "التحصيل" : "Collections", data.sourceDates.revenue],
+          ] as const
+        ).filter(([, date]) => date && date < annual.currentTo)
+      : [];
 
   return (
     <div className="page-sections">
       <DashboardPageHeader
         flush
         icon={<CalendarRange size={20} />}
-        title={t("yoy")}
+        title={A ? "تحليل السنة" : "Yearly performance"}
         subtitle={
-          data
-            ? `${data.currentYear} ${lang === "ar" ? "مقابل" : "vs"} ${data.previousYear}`
-            : undefined
+          A
+            ? "المبيعات والليدز واللوست والصرف، شهرًا بشهر ولكل دورة."
+            : "Revenue, leads, lost and spend—month by month and by course."
         }
-        period={reportingPeriod}
+        period={currentPeriod}
       />
 
-      {isLoading || !data ? (
+      {isLoading || !annual || !data ? (
         <Skeleton className="h-96" />
-      ) : !data.available ? (
+      ) : (
         <>
+          <Card className="border-brand/20 bg-brand-soft/20">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
+                  {A ? "نطاق المقارنة" : "Comparison window"}
+                </div>
+                <h2 className="mt-1 text-lg font-black text-text">
+                  {annual.year}{" "}
+                  <span className="font-medium text-text-muted">{A ? "مقابل" : "versus"}</span>{" "}
+                  {annual.previousYear}
+                </h2>
+                <p className="mt-1 text-xs text-text-muted">
+                  {annual.currentFrom} → {annual.currentTo} <span className="mx-2">/</span>{" "}
+                  {annual.previousFrom} → {annual.previousTo}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-[11px] font-semibold text-text-muted">
+                  {A ? "السنة" : "Year"}
+                  <select
+                    value={annual.year}
+                    onChange={(event) => {
+                      setSelectedYear(Number(event.target.value));
+                      setSelectedMonth(null);
+                    }}
+                    className="mt-1 block min-w-28 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text"
+                  >
+                    {data.years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[11px] font-semibold text-text-muted">
+                  {A ? "حتى نهاية شهر" : "Through month"}
+                  <select
+                    value={annual.throughMonth}
+                    onChange={(event) => setSelectedMonth(Number(event.target.value))}
+                    className="mt-1 block min-w-32 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text"
+                  >
+                    {MONTHS[lang].map((label, index) => (
+                      <option
+                        key={label}
+                        value={index + 1}
+                        disabled={
+                          annual.year === Number(data.today.slice(0, 4)) &&
+                          index + 1 > Number(data.today.slice(5, 7))
+                        }
+                      >
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+            <p className="mt-3 border-t border-brand/15 pt-3 text-[11px] leading-relaxed text-text-muted">
+              {A
+                ? "المقارنة تبدأ من 1 يناير في العامين وتتوقف عند نفس اليوم من الشهر المحدد إذا كان الشهر الحالي لم ينتهِ؛ الشهور التالية لا تدخل في الإجمالي."
+                : "Both years start on January 1. For an unfinished current month, both stop on the same calendar day; later months are excluded."}
+            </p>
+          </Card>
+
+          {!comparable?.crm && (
+            <Card className="border-amber-border bg-amber-surface/40">
+              <div className="flex gap-2">
+                <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-ink" />
+                <div>
+                  <div className="text-sm font-bold text-text">
+                    {A
+                      ? "مقارنة CRM بالسنة الماضية غير مكتملة"
+                      : "Prior-year CRM comparison is incomplete"}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                    {A
+                      ? `بيانات ${annual.previousYear} فيها ${fmtNum(annual.coverage.previous.crm)} سجل CRM نشط في الفترة، فلا نعرض نمو الليدز أو Won أو Lost أو نسب الإغلاق/الخسارة مقابلها كأن الغياب صفر. أرقام السنة الحالية تظل معروضة.`
+                      : `Only ${fmtNum(annual.coverage.previous.crm)} prior-year active CRM rows are available in this window. Lead, Won and Lost growth and rate comparisons are withheld rather than treating missing history as zero. Current-year values remain visible.`}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {laggingSources.length > 0 && (
+            <Card className="border-amber-border bg-amber-surface/40">
+              <div className="flex gap-2">
+                <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-ink" />
+                <p className="text-xs leading-relaxed text-text-muted">
+                  {A
+                    ? "الفترة المختارة لم تصل لها كل المصادر بعد؛ الأرقام الحالية جزئية: "
+                    : "Some sources have not reached the selected date; current figures are partial: "}
+                  {laggingSources.map(([name, date]) => `${name} ${date}`).join(" · ")}
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {!lostAvailable && (
+            <Card className="border-amber-border bg-amber-surface/40">
+              <div className="flex gap-2">
+                <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-ink" />
+                <p className="text-xs leading-relaxed text-text-muted">
+                  {A
+                    ? "مصدر Odoo Lost غير متاح في اللقطة الحالية؛ أخفينا عدد اللوست ونسبته بدل عرضه صفر، وعدد الليدز الحالي جزئي حتى يعود المصدر."
+                    : "The Odoo Lost source is unavailable in this snapshot. Lost counts and rates are hidden rather than shown as zero; current lead totals are partial until it returns."}
+                </p>
+              </div>
+            </Card>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {MONTHLY_MEASURES.map((measure) => (
+              <YearMetric
+                key={measure}
+                measure={measure}
+                current={annual.current}
+                previous={annual.previous}
+                comparable={
+                  measure === "revenue"
+                    ? comparable!.revenue
+                    : measure === "spend"
+                      ? comparable!.spend
+                      : comparable!.crm
+                }
+                previousYear={annual.previousYear}
+                lang={lang}
+                currentAvailable={measure !== "lost" || lostAvailable}
+              />
+            ))}
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-[1.2fr_.8fr]">
+            <Card>
+              <SectionTitle
+                hint={
+                  A
+                    ? "من ليدز فترة الإنشاء نفسها؛ Lost يتبع تاريخ إنشاء الليد وليس يوم إغلاقه."
+                    : "From leads created in the period; Lost follows lead creation, not close date."
+                }
+              >
+                {A ? "مصير الليدز" : "Lead outcomes"}
+              </SectionTitle>
+              <div className="grid grid-cols-3 gap-2">
+                <Outcome
+                  label={A ? "إجمالي الليدز" : "All leads"}
+                  value={fmtNum(annual.current.leads)}
+                />
+                <Outcome
+                  label={A ? "نسبة الإغلاق" : "Won rate"}
+                  value={
+                    !lostAvailable || annual.current.wonRate === null
+                      ? "—"
+                      : fmtPct(annual.current.wonRate, 1)
+                  }
+                />
+                <Outcome
+                  label={A ? "نسبة اللوست" : "Lost rate"}
+                  value={
+                    !lostAvailable || annual.current.lostRate === null
+                      ? "—"
+                      : fmtPct(annual.current.lostRate, 1)
+                  }
+                />
+              </div>
+              <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-surface-3">
+                {lostAvailable && (
+                  <div
+                    className="bg-mint-strong"
+                    style={{ width: `${annual.current.wonRate ?? 0}%` }}
+                  />
+                )}
+                {lostAvailable && (
+                  <div
+                    className="bg-rose-strong"
+                    style={{ width: `${annual.current.lostRate ?? 0}%` }}
+                  />
+                )}
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle
+                hint={
+                  A
+                    ? "التحصيل من فواتير Odoo المدفوعة مقابل إجمالي الإنفاق الإعلاني؛ ليس ROAS منسوبًا للحملات."
+                    : "Odoo paid-invoice collections versus all ad spend; not campaign-attributed ROAS."
+                }
+              >
+                {A ? "التحصيل مقابل الصرف" : "Collections versus spend"}
+              </SectionTitle>
+              <div className="num text-3xl font-black text-text">
+                {annual.current.spend > 0
+                  ? `${(annual.current.revenue / annual.current.spend).toFixed(2)}×`
+                  : "—"}
+              </div>
+              <p className="mt-2 text-xs text-text-muted">
+                {fmtUSDFull(annual.current.revenue)} ÷ {fmtUSDFull(annual.current.spend)}
+              </p>
+            </Card>
+          </div>
+
           <Card>
-            <div className="py-8 text-center">
-              <CalendarOff size={30} className="text-text-subtle mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-sm font-medium text-text mb-1">
-                {lang === "ar"
-                  ? `لا توجد بيانات كافية لعام ${data.previousYear}`
-                  : `Not enough ${data.previousYear} data`}
-              </p>
-              <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
-                {t("yoy_empty")}
-              </p>
+            <SectionTitle
+              hint={
+                A
+                  ? "كل صف يقارن نفس الشهر من العامين؛ الشهر الجاري يتوقف عند نفس اليوم."
+                  : "Each row compares matching months; the current month stops on the same day in both years."
+              }
+              action={
+                <select
+                  aria-label={A ? "مؤشر مقارنة الشهور" : "Monthly comparison metric"}
+                  value={monthlyMeasure}
+                  onChange={(event) => setMonthlyMeasure(event.target.value as Measure)}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-text"
+                >
+                  {MONTHLY_MEASURES.map((measure) => (
+                    <option key={measure} value={measure}>
+                      {metricName(measure, lang)}
+                    </option>
+                  ))}
+                </select>
+              }
+            >
+              {A ? "مقارنة الشهور" : "Monthly comparison"}
+            </SectionTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[740px] table-fixed text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-text-muted">
+                    <th className="w-[16%] px-2 py-2 text-start">{A ? "الشهر" : "Month"}</th>
+                    <th className="w-[20%] px-2 py-2 text-end">{annual.year}</th>
+                    <th className="w-[20%] px-2 py-2 text-end">{annual.previousYear}</th>
+                    <th className="w-[18%] px-2 py-2 text-end">{A ? "الفرق" : "Difference"}</th>
+                    <th className="w-[16%] px-2 py-2 text-end">{A ? "التغير" : "Change"}</th>
+                    <th className="w-[10%] px-2 py-2 text-end">{A ? "تغطية" : "Scope"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {annual.months.map((row) => {
+                    const ok =
+                      monthlyMeasure === "revenue"
+                        ? comparable!.revenue
+                        : monthlyMeasure === "spend"
+                          ? comparable!.spend
+                          : comparable!.crm && (monthlyMeasure !== "lost" || lostAvailable);
+                    const currentAvailable = monthlyMeasure !== "lost" || lostAvailable;
+                    const current = row.current[monthlyMeasure];
+                    const previous = row.previous[monthlyMeasure];
+                    const maximum = Math.max(
+                      ...annual.months.map((item) => item.current[monthlyMeasure]),
+                      1,
+                    );
+                    return (
+                      <tr key={row.month} className="hover:bg-surface-2/60">
+                        <td className="px-2 py-3 font-semibold text-text">
+                          {MONTHS[lang][row.month - 1]}
+                        </td>
+                        <td className="px-2 py-3 text-end">
+                          <div className="num font-bold text-text">
+                            {currentAvailable ? moneyOrNumber(monthlyMeasure, current) : "—"}
+                          </div>
+                          <div className="ms-auto mt-1 h-1.5 max-w-32 rounded-full bg-surface-3">
+                            <div
+                              className="h-full rounded-full bg-brand"
+                              style={{ width: `${Math.max(0, current / maximum) * 100}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="num px-2 py-3 text-end text-text-muted">
+                          {ok && currentAvailable ? moneyOrNumber(monthlyMeasure, previous) : "—"}
+                        </td>
+                        <td className="num px-2 py-3 text-end">
+                          {ok && currentAvailable
+                            ? moneyOrNumber(monthlyMeasure, current - previous)
+                            : "—"}
+                        </td>
+                        <td className="px-2 py-3 text-end">
+                          <Change
+                            current={current}
+                            previous={previous}
+                            comparable={ok && currentAvailable}
+                            invert={monthlyMeasure === "spend" || monthlyMeasure === "lost"}
+                          />
+                        </td>
+                        <td className="num px-2 py-3 text-end text-[11px] text-text-muted">
+                          {row.month === annual.throughMonth && annual.partialMonth
+                            ? `${row.throughDay} ${A ? "يوم" : "days"}`
+                            : A
+                              ? "كامل"
+                              : "Full"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </Card>
 
           <Card>
             <SectionTitle
               hint={
-                lang === "ar"
-                  ? "تغطية البيانات المتاحة لكل عام"
-                  : "Available data coverage per year"
+                A
+                  ? "المبيعات من فواتير Odoo المدفوعة، الليدز واللوست من CRM، والصرف من بيانات المنصات."
+                  : "Paid Odoo invoices, CRM lead/lost cohorts, and platform spend."
+              }
+              action={
+                <input
+                  value={courseQuery}
+                  onChange={(event) => setCourseQuery(event.target.value)}
+                  placeholder={A ? "ابحث عن دورة" : "Search courses"}
+                  aria-label={A ? "ابحث عن دورة" : "Search courses"}
+                  className="w-36 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-text sm:w-44"
+                />
               }
             >
-              {lang === "ar" ? "تغطية البيانات" : "Data coverage"}
+              {A ? "تفصيل كل دورة" : "Course breakdown"}
             </SectionTitle>
-            <div className="table-wrap scroll-hint-x">
-              <table className="w-full text-sm min-w-[460px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] text-xs">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                    <th className="text-start py-2">{lang === "ar" ? "العام" : "Year"}</th>
-                    <th className="text-end py-2">{lang === "ar" ? "إعلانات" : "Ads"}</th>
-                    <th className="text-end py-2">{t("crm_leads")}</th>
-                    <th className="text-end py-2">{t("accounting")}</th>
+                  <tr className="border-b border-border text-text-muted">
+                    <th className="px-2 py-2 text-start">{A ? "الدورة" : "Course"}</th>
+                    <th className="px-2 py-2 text-end">{A ? "المبيعات" : "Revenue"}</th>
+                    <th className="px-2 py-2 text-end">{`${annual.previousYear} ${A ? "مبيعات" : "revenue"}`}</th>
+                    <th className="px-2 py-2 text-end">{A ? "التغير" : "Change"}</th>
+                    <th className="px-2 py-2 text-end">{A ? "الصرف" : "Spend"}</th>
+                    <th className="px-2 py-2 text-end">{A ? "الليدز" : "Leads"}</th>
+                    <th className="px-2 py-2 text-end">Won</th>
+                    <th className="px-2 py-2 text-end">Lost</th>
+                    <th className="px-2 py-2 text-end">{A ? "نسبة الإغلاق" : "Won rate"}</th>
+                    <th className="px-2 py-2 text-end">{A ? "نسبة اللوست" : "Lost rate"}</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {data.rowsPerYear.map((r) => (
-                    <tr key={r.year} className="border-t border-border">
-                      <td className="py-2.5 num font-medium">{r.year}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.ads)}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.crm)}</td>
-                      <td className="py-2.5 text-end num">{fmtNum(r.accounting)}</td>
+                <tbody className="divide-y divide-border">
+                  {courses.map((row) => (
+                    <tr key={row.name} className="hover:bg-surface-2/60">
+                      <td
+                        className="max-w-40 truncate px-2 py-3 font-semibold text-text"
+                        title={row.name}
+                      >
+                        {row.name}
+                      </td>
+                      <td className="num px-2 py-3 text-end font-bold text-text">
+                        {fmtUSDFull(row.current.revenue)}
+                      </td>
+                      <td className="num px-2 py-3 text-end text-text-muted">
+                        {comparable!.revenue ? fmtUSDFull(row.previous.revenue) : "—"}
+                      </td>
+                      <td className="px-2 py-3 text-end">
+                        <Change
+                          current={row.current.revenue}
+                          previous={row.previous.revenue}
+                          comparable={comparable!.revenue}
+                        />
+                      </td>
+                      <td className="num px-2 py-3 text-end">{fmtUSDFull(row.current.spend)}</td>
+                      <td className="num px-2 py-3 text-end">{fmtNum(row.current.leads)}</td>
+                      <td className="num px-2 py-3 text-end">{fmtNum(row.current.won)}</td>
+                      <td className="num px-2 py-3 text-end">
+                        {lostAvailable ? fmtNum(row.current.lost) : "—"}
+                      </td>
+                      <td className="num px-2 py-3 text-end">
+                        {!lostAvailable || row.current.wonRate === null
+                          ? "—"
+                          : fmtPct(row.current.wonRate, 1)}
+                      </td>
+                      <td className="num px-2 py-3 text-end">
+                        {!lostAvailable || row.current.lostRate === null
+                          ? "—"
+                          : fmtPct(row.current.lostRate, 1)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-text-muted mt-3 leading-relaxed">
-              {lang === "ar"
-                ? "لن تُعرض أي نسبة نمو مقابل أساس صفري — الرقم في تلك الحالة بلا معنى، لذلك تظهر شرطة."
-                : "No growth percentage is rendered against a zero baseline — that number is meaningless, so it shows an em dash."}
-            </p>
-          </Card>
-        </>
-      ) : (
-        <>
-          {/* The same four year-to-date comparisons, on the shared KPI card.
-              `delta` is the growth the API returned; a metric with no history
-              renders an em dash and no delta at all rather than a zero and a
-              0% that would read as "flat year on year". */}
-          <KpiRow>
-            {data.ytd.map((m, index) => {
-              const money = m.metric === "spend" || m.metric === "revenue";
-              const available = isAvailable(data, m.metric);
-              return (
-                <MetricDetailTrigger
-                  key={m.metric}
-                  detail={metrics[m.metric]}
-                  card={{
-                    index,
-                    sub: available
-                      ? `${data.previousYear}: ${money ? fmtUSD(m.previous) : fmtNum(m.previous)}`
-                      : lang === "ar"
-                        ? "لا توجد بيانات تاريخية لهذا المؤشر"
-                        : "No historical data for this metric",
-                  }}
-                />
-              );
-            })}
-          </KpiRow>
-
-          {movers.length > 0 && (
-            <>
-              <InsightRow>
-                {movers[0] && (
-                  <InsightDetailTrigger
-                    detail={insights!.gainer}
-                    card={{
-                      index: 0,
-                      kind: "best",
-                      eyebrow: lang === "ar" ? "أكبر نمو" : "Largest gain",
-                      title: movers[0].key,
-                      value: fmtUSD(movers[0].current - movers[0].previous),
-                      detail:
-                        lang === "ar"
-                          ? `${fmtUSD(movers[0].previous)} في ${data.previousYear} ← ${fmtUSD(movers[0].current)} في ${data.currentYear}`
-                          : `${fmtUSD(movers[0].previous)} in ${data.previousYear} → ${fmtUSD(movers[0].current)} in ${data.currentYear}`,
-                      actionLabel: lang === "ar" ? "ما ترتيب الدورات؟" : "How do courses rank?",
-                    }}
-                  />
-                )}
-                {decliner && (
-                  <InsightDetailTrigger
-                    detail={insights!.decliner}
-                    card={{
-                      index: 1,
-                      kind: "attention",
-                      eyebrow: lang === "ar" ? "أكبر تراجع" : "Largest decline",
-                      title: decliner.key,
-                      value: fmtUSD(decliner.current - decliner.previous),
-                      detail:
-                        lang === "ar"
-                          ? `${fmtUSD(decliner.previous)} في ${data.previousYear} ← ${fmtUSD(decliner.current)} في ${data.currentYear}`
-                          : `${fmtUSD(decliner.previous)} in ${data.previousYear} → ${fmtUSD(decliner.current)} in ${data.currentYear}`,
-                      actionLabel: lang === "ar" ? "ما الذي تراجع أيضًا؟" : "What else fell?",
-                    }}
-                  />
-                )}
-                <InsightDetailTrigger
-                  detail={insights!.scope}
-                  card={{
-                    index: 2,
-                    kind: "note",
-                    eyebrow: lang === "ar" ? "نطاق المقارنة" : "Comparison scope",
-                    title:
-                      lang === "ar"
-                        ? `${data.currentYear} مقابل ${data.previousYear}`
-                        : `${data.currentYear} against ${data.previousYear}`,
-                    detail:
-                      lang === "ar"
-                        ? "المقارنة السنوية تقرأ الملف كاملاً ولا تتأثر بالفلاتر أو الفترة المختارة."
-                        : "The year comparison reads the whole file and is deliberately unaffected by the filters or the selected period.",
-                    actionLabel: lang === "ar" ? "ما الذي يُقارَن؟" : "What is compared?",
-                  }}
-                />
-              </InsightRow>
-
-              <DashboardPanel
-                title={lang === "ar" ? "أكثر التغيّرات تأثيراً" : "Most consequential changes"}
-                hint={
-                  lang === "ar"
-                    ? "مرتّبة بحجم التغيّر بالدولار، لا بنسبته — نمو 300% على مئة دولار ليس حدثاً."
-                    : "Ranked by the size of the change in dollars, not its percentage — 300% on a hundred dollars is not an event."
-                }
-              >
-                <div className="table-wrap scroll-hint-x">
-                  <table className="w-full min-w-[460px] text-sm">
-                    <thead>
-                      <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                        <th className="py-2 text-start">#</th>
-                        <th className="py-2 text-start">{t("course")}</th>
-                        <th className="py-2 text-end">{lang === "ar" ? "التغيّر" : "Change"}</th>
-                        <th className="py-2 text-end">{t("growth")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {movers.slice(0, 5).map((course, index) => (
-                        <tr key={course.key} className="border-t border-border">
-                          <td className="num py-2.5 text-text-muted">{index + 1}</td>
-                          <td className="py-2.5">{course.key}</td>
-                          <td
-                            className="num py-2.5 text-end font-medium"
-                            style={{
-                              color:
-                                course.current >= course.previous
-                                  ? "var(--success)"
-                                  : "var(--danger)",
-                            }}
-                          >
-                            {course.current >= course.previous ? "+" : ""}
-                            {fmtUSD(course.current - course.previous)}
-                          </td>
-                          <td className="py-2.5 text-end">
-                            <Growth value={course.growth} inline />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </DashboardPanel>
-            </>
-          )}
-
-          <MonthTable
-            title={t("spend")}
-            points={data.spend}
-            money
-            available={data.metricAvailability.spend}
-          />
-          <MonthTable
-            title={t("revenue")}
-            points={data.revenue}
-            money
-            available={data.metricAvailability.revenue}
-          />
-          <MonthTable
-            title={t("crm_leads")}
-            points={data.leads}
-            available={data.metricAvailability.leads}
-          />
-          <MonthTable title={t("won")} points={data.won} available={data.metricAvailability.won} />
-
-          <Card>
-            <SectionTitle>{t("by_course")}</SectionTitle>
-            {data.byCourse.length === 0 ? (
-              <EmptyState label={t("no_data")} compact />
-            ) : (
-              <div className="table-wrap scroll-hint-x">
-                <table className="w-full text-sm min-w-[460px]">
-                  <thead>
-                    <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                      <th className="text-start py-2">{t("course")}</th>
-                      <th className="text-end py-2">{data.currentYear}</th>
-                      <th className="text-end py-2">{data.previousYear}</th>
-                      <th className="text-end py-2">{t("growth")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.byCourse.slice(0, 20).map((c) => (
-                      <tr key={c.key} className="border-t border-border">
-                        <td className="py-2.5">{c.key}</td>
-                        <td className="py-2.5 text-end num">{fmtUSD(c.current)}</td>
-                        <td className="py-2.5 text-end num">{fmtUSD(c.previous)}</td>
-                        <td className="py-2.5 text-end">
-                          <Growth value={c.growth} inline />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {courses.length === 0 && (
+              <p className="py-6 text-center text-xs text-text-muted">
+                {A ? "لا توجد دورة مطابقة" : "No matching course"}
+              </p>
             )}
+          </Card>
+
+          <Card className="border-dashed">
+            <SectionTitle>
+              {A ? "مصدر الأرقام وحدود المقارنة" : "Sources and comparison limits"}
+            </SectionTitle>
+            <div className="grid gap-2 text-xs text-text-muted sm:grid-cols-3">
+              <div>
+                Odoo CRM / Lost: {fmtNum(annual.coverage.current.crm)} /{" "}
+                {lostAvailable ? fmtNum(annual.coverage.current.lost) : "—"} ·{" "}
+                {data.health.crmAuthority}
+              </div>
+              <div>
+                {A ? "فواتير Odoo المدفوعة" : "Odoo paid invoices"}:{" "}
+                {fmtNum(annual.coverage.current.accounting)} · {data.health.accountingAuthority}
+              </div>
+              <div>
+                {A ? "صفوف الإنفاق الإعلاني" : "Ad spend rows"}:{" "}
+                {fmtNum(annual.coverage.current.ads)}
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+              {A
+                ? `آخر تواريخ المصدر: الإعلانات ${data.sourceDates.ads || "—"}، CRM ${data.sourceDates.crm || "—"}، التحصيل ${data.sourceDates.revenue || "—"}. نسب Won/Lost تخص مجموعة الليدز المنشأة في الفترة، والمبيعات تخص تاريخ الدفع؛ ليست نفس cohort البيعي.`
+                : `Source max dates: ads ${data.sourceDates.ads || "—"}, CRM ${data.sourceDates.crm || "—"}, collections ${data.sourceDates.revenue || "—"}. Won/Lost rates use the lead-creation cohort, while revenue uses payment date; these are not the same sales cohort.`}
+            </p>
           </Card>
         </>
       )}
@@ -624,83 +605,11 @@ function Yoy() {
   );
 }
 
-function isAvailable(data: Resp, metric: string): boolean {
-  return metric in data.metricAvailability
-    ? data.metricAvailability[metric as keyof Resp["metricAvailability"]]
-    : false;
-}
-
-function MonthTable({
-  title,
-  points,
-  money,
-  available,
-}: {
-  title: string;
-  points: YoyPoint[];
-  money?: boolean;
-  available: boolean;
-}) {
-  const { lang } = useI18n();
-  const fmt = money ? fmtUSD : fmtNum;
+function Outcome({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
-      <SectionTitle>{title}</SectionTitle>
-      {!available ? (
-        <EmptyState
-          label={
-            lang === "ar"
-              ? `بيانات ${title} التاريخية غير متاحة للمقارنة`
-              : `Historical ${title} data is unavailable for comparison`
-          }
-          compact
-        />
-      ) : (
-        <div className="table-wrap scroll-hint-x">
-          <table className="w-full text-sm min-w-[420px]">
-            <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                <th className="text-start py-2">{lang === "ar" ? "الشهر" : "Month"}</th>
-                <th className="text-end py-2">{lang === "ar" ? "الحالي" : "Current"}</th>
-                <th className="text-end py-2">{lang === "ar" ? "السابق" : "Previous"}</th>
-                <th className="text-end py-2">{lang === "ar" ? "الفرق" : "Delta"}</th>
-                <th className="text-end py-2">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {points.map((p, i) => (
-                <tr key={p.key} className="border-t border-border">
-                  <td className="py-2">{MONTHS[lang][i]}</td>
-                  <td className="py-2 text-end num">{fmt(p.current)}</td>
-                  <td className="py-2 text-end num">{fmt(p.previous)}</td>
-                  <td className="py-2 text-end num">{fmt(p.delta)}</td>
-                  <td className="py-2 text-end">
-                    <Growth value={p.growth} inline />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-/** An em dash where the baseline was zero — a growth % there is not a fact. */
-function Growth({ value, inline }: { value: Maybe; inline?: boolean }) {
-  if (value === null || !isFinite(value))
-    return (
-      <span className={`text-text-subtle num ${inline ? "" : "block mt-1 text-[11px]"}`}>—</span>
-    );
-  const good = value >= 0;
-  return (
-    <span
-      className={`num font-semibold ${inline ? "text-[13px]" : "block mt-1 text-[11px]"}`}
-      style={{ color: good ? "var(--success)" : "var(--danger)" }}
-    >
-      {good ? "+" : ""}
-      {fmtPct(value, 1)}
-    </span>
+    <div className="rounded-xl border border-border bg-surface-2 p-3">
+      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="num mt-1 text-lg font-black text-text">{value}</div>
+    </div>
   );
 }
