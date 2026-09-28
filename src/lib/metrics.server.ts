@@ -1802,6 +1802,29 @@ export interface RevenueLeadAttribution {
   previousLeadRevenue: number;
   /** Revenue that cannot be safely assigned to either cohort. */
   otherLeadRevenue: number;
+  /** Why a paid accounting row could not be placed in one of the two cohorts. */
+  otherBreakdown: {
+    sharedCampaignRevenue: number;
+    outsideSelectedCohortsRevenue: number;
+    noCampaignRevenue: number;
+    sharedCampaignLines: number;
+    outsideSelectedCohortsLines: number;
+    noCampaignLines: number;
+  };
+  /** Full payment-period collections grouped by source/campaign and attribution bucket. */
+  sourceRows: {
+    name: string;
+    campaignId: string;
+    source: string;
+    reason:
+      | "current_period_campaign"
+      | "previous_period_campaign"
+      | "shared_campaign"
+      | "outside_selected_cohorts"
+      | "no_campaign";
+    revenue: number;
+    lines: number;
+  }[];
   currentLeadRevenueShare: Maybe;
   previousLeadRevenueShare: Maybe;
   otherLeadRevenueShare: Maybe;
@@ -1830,15 +1853,73 @@ export function computeRevenueLeadAttribution(
   let currentLeadRevenue = 0;
   let previousLeadRevenue = 0;
   let otherLeadRevenue = 0;
+  const otherBreakdown = {
+    sharedCampaignRevenue: 0,
+    outsideSelectedCohortsRevenue: 0,
+    noCampaignRevenue: 0,
+    sharedCampaignLines: 0,
+    outsideSelectedCohortsLines: 0,
+    noCampaignLines: 0,
+  };
+  const sourceRows = new Map<
+    string,
+    {
+      name: string;
+      campaignId: string;
+      source: string;
+      reason:
+        | "current_period_campaign"
+        | "previous_period_campaign"
+        | "shared_campaign"
+        | "outside_selected_cohorts"
+        | "no_campaign";
+      revenue: number;
+      lines: number;
+    }
+  >();
   for (const sale of data.accounting) {
     if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) continue;
     const campaign = sale.campaignKey;
-    if (campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)) {
+    const reason =
+      campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)
+        ? "current_period_campaign"
+        : campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)
+          ? "previous_period_campaign"
+          : !campaign
+            ? "no_campaign"
+            : currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
+              ? "shared_campaign"
+              : "outside_selected_cohorts";
+    const name = sale.campaignName || (campaign ? "Campaign name unavailable" : "No campaign");
+    const sourceKey = `${reason}\u001f${campaign || normalizeName(name)}\u001f${normalizeName(sale.source)}`;
+    const source = sourceRows.get(sourceKey) ?? {
+      name,
+      campaignId: sale.campaignId,
+      source: sale.source,
+      reason,
+      revenue: 0,
+      lines: 0,
+    };
+    source.revenue += sale.usdPaid;
+    source.lines++;
+    sourceRows.set(sourceKey, source);
+
+    if (reason === "current_period_campaign") {
       currentLeadRevenue += sale.usdPaid;
-    } else if (campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)) {
+    } else if (reason === "previous_period_campaign") {
       previousLeadRevenue += sale.usdPaid;
     } else {
       otherLeadRevenue += sale.usdPaid;
+      if (reason === "shared_campaign") {
+        otherBreakdown.sharedCampaignRevenue += sale.usdPaid;
+        otherBreakdown.sharedCampaignLines++;
+      } else if (reason === "outside_selected_cohorts") {
+        otherBreakdown.outsideSelectedCohortsRevenue += sale.usdPaid;
+        otherBreakdown.outsideSelectedCohortsLines++;
+      } else {
+        otherBreakdown.noCampaignRevenue += sale.usdPaid;
+        otherBreakdown.noCampaignLines++;
+      }
     }
   }
 
@@ -1861,6 +1942,8 @@ export function computeRevenueLeadAttribution(
     currentLeadRevenue,
     previousLeadRevenue,
     otherLeadRevenue,
+    otherBreakdown,
+    sourceRows: [...sourceRows.values()].sort((a, b) => b.revenue - a.revenue),
     currentLeadRevenueShare: pctOf(currentLeadRevenue, currentPeriodRevenue),
     previousLeadRevenueShare: pctOf(previousLeadRevenue, currentPeriodRevenue),
     otherLeadRevenueShare: pctOf(otherLeadRevenue, currentPeriodRevenue),

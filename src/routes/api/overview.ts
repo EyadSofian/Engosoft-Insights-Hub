@@ -66,6 +66,7 @@ export const Route = createFileRoute("/api/overview")({
             currentLeadRevenue: attribution.currentLeadRevenue,
             previousLeadRevenue: attribution.previousLeadRevenue,
             otherLeadRevenue: attribution.otherLeadRevenue,
+            otherBreakdown: attribution.otherBreakdown,
             currentLeadRevenueShare: attribution.currentLeadRevenueShare,
             previousLeadRevenueShare: attribution.previousLeadRevenueShare,
             otherLeadRevenueShare: attribution.otherLeadRevenueShare,

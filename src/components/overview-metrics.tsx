@@ -70,6 +70,7 @@ export interface CourseSaleContribution {
   currentLeadRevenueShare?: number | null;
   previousLeadRevenueShare?: number | null;
   otherLeadRevenueShare?: number | null;
+  otherBreakdown?: RevenueLeadAttribution["otherBreakdown"];
   previousPeriodRevenue?: number;
   revenueDelta?: number | null;
 }
@@ -82,6 +83,27 @@ export interface RevenueLeadAttribution {
   currentLeadRevenue: number;
   previousLeadRevenue: number;
   otherLeadRevenue: number;
+  otherBreakdown: {
+    sharedCampaignRevenue: number;
+    outsideSelectedCohortsRevenue: number;
+    noCampaignRevenue: number;
+    sharedCampaignLines: number;
+    outsideSelectedCohortsLines: number;
+    noCampaignLines: number;
+  };
+  sourceRows: {
+    name: string;
+    campaignId: string;
+    source: string;
+    reason:
+      | "current_period_campaign"
+      | "previous_period_campaign"
+      | "shared_campaign"
+      | "outside_selected_cohorts"
+      | "no_campaign";
+    revenue: number;
+    lines: number;
+  }[];
   currentLeadRevenueShare: number | null;
   previousLeadRevenueShare: number | null;
   otherLeadRevenueShare: number | null;
