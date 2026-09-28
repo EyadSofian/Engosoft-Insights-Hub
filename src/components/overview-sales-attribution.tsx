@@ -1,6 +1,24 @@
-import { Clock3, Info, Layers3, Users } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowDownLeft,
+  Clock3,
+  ExternalLink,
+  Info,
+  Layers3,
+  LoaderCircle,
+  ReceiptText,
+  Users,
+} from "lucide-react";
 import { DashboardPanel } from "@/components/dashboard-bits";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { fmtDelta, fmtNum, fmtPct, fmtUSD, fmtUSDFull } from "@/lib/i18n";
+import { useApi } from "@/lib/use-api";
 import type { CourseSaleContribution, RevenueLeadAttribution } from "@/components/overview-metrics";
 
 type Lang = "ar" | "en";
@@ -55,6 +73,8 @@ function CohortCard({
   leads,
   tone,
   lang,
+  selected,
+  onClick,
 }: {
   label: string;
   value: number | null;
@@ -62,9 +82,16 @@ function CohortCard({
   leads?: number;
   tone: "mint" | "violet" | "amber";
   lang: Lang;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-2/65 p-3">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`rounded-xl border bg-surface-2/65 p-3 text-start transition hover:border-mint-strong/50 hover:bg-surface-2 ${selected ? "border-mint-strong ring-1 ring-mint-strong/25" : "border-border"}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold text-text-muted">{label}</span>
         <span className="num text-[15px] font-bold text-text">{pct(share, lang)}</span>
@@ -78,8 +105,49 @@ function CohortCard({
         </div>
       )}
       <ShareBar value={share} tone={tone} />
-    </div>
+      <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-mint-strong">
+        {lang === "ar" ? "اضغط لعرض المصادر" : "Click to inspect sources"}
+        <ArrowDownLeft size={12} />
+      </span>
+    </button>
   );
+}
+
+type SourceReason = RevenueLeadAttribution["sourceRows"][number]["reason"];
+type SourceDetailResponse = {
+  totalLines: number;
+  totalRevenue: number;
+  truncated: boolean;
+  lines: {
+    id: string;
+    movement: string;
+    paymentDate: string;
+    invoiceDate: string;
+    partner: string;
+    product: string;
+    course: string;
+    salesperson: string;
+    salesTeam: string;
+    campaignName: string;
+    campaignId: string;
+    adset: string;
+    adName: string;
+    source: string;
+    usdPaid: number;
+    currency: string;
+    isCreditNote: boolean;
+    orderRef: string;
+  }[];
+};
+
+function reasonGroup(reason: SourceReason): "current" | "previous" | "other" {
+  if (reason === "current_period_campaign") return "current";
+  if (reason === "previous_period_campaign") return "previous";
+  return "other";
+}
+
+function detailDate(line: SourceDetailResponse["lines"][number]) {
+  return line.paymentDate || line.invoiceDate || "—";
 }
 
 export function OverviewSalesAttribution({
@@ -94,6 +162,50 @@ export function OverviewSalesAttribution({
   comparisonAvailable?: boolean;
 }) {
   const A = lang === "ar";
+  const [selectedCohort, setSelectedCohort] = useState<"current" | "previous" | "other">("other");
+  const [selectedReason, setSelectedReason] = useState<SourceReason | "all">("all");
+  const [selectedSource, setSelectedSource] = useState<
+    RevenueLeadAttribution["sourceRows"][number] | null
+  >(null);
+  const detail = useApi<SourceDetailResponse>(
+    `/api/overview-revenue-source?sourceKey=${encodeURIComponent(selectedSource?.sourceKey ?? "")}`,
+    { enabled: Boolean(selectedSource) },
+  );
+  const reasonItems = [
+    [
+      "shared_campaign",
+      attribution.otherBreakdown.sharedCampaignRevenue,
+      attribution.otherBreakdown.sharedCampaignLines,
+    ],
+    [
+      "outside_selected_cohorts",
+      attribution.otherBreakdown.outsideSelectedCohortsRevenue,
+      attribution.otherBreakdown.outsideSelectedCohortsLines,
+    ],
+    [
+      "campaign_not_linked",
+      attribution.otherBreakdown.campaignNotLinkedRevenue,
+      attribution.otherBreakdown.campaignNotLinkedLines,
+    ],
+    [
+      "source_without_campaign",
+      attribution.otherBreakdown.sourceWithoutCampaignRevenue,
+      attribution.otherBreakdown.sourceWithoutCampaignLines,
+    ],
+    [
+      "no_source",
+      attribution.otherBreakdown.noSourceRevenue,
+      attribution.otherBreakdown.noSourceLines,
+    ],
+  ] as const;
+  const availableReasons = reasonItems
+    .filter(([, revenue]) => revenue !== 0)
+    .map(([reason]) => reason);
+  const visibleSources = attribution.sourceRows.filter(
+    (source) =>
+      reasonGroup(source.reason) === selectedCohort &&
+      (selectedReason === "all" || source.reason === selectedReason),
+  );
   return (
     <DashboardPanel
       icon={<Layers3 size={16} />}
@@ -133,6 +245,11 @@ export function OverviewSalesAttribution({
           leads={attribution.currentLeads}
           tone="mint"
           lang={lang}
+          selected={selectedCohort === "current"}
+          onClick={() => {
+            setSelectedCohort("current");
+            setSelectedReason("all");
+          }}
         />
         <CohortCard
           label={A ? "حملات ليدز الشهر الماضي فقط" : "Campaigns matched to last-month leads only"}
@@ -141,6 +258,11 @@ export function OverviewSalesAttribution({
           leads={comparisonAvailable ? attribution.previousLeads : undefined}
           tone="violet"
           lang={lang}
+          selected={selectedCohort === "previous"}
+          onClick={() => {
+            setSelectedCohort("previous");
+            setSelectedReason("all");
+          }}
         />
         <CohortCard
           label={A ? "مشترك أو خارج فترتي الليدز" : "Shared or outside lead periods"}
@@ -148,148 +270,262 @@ export function OverviewSalesAttribution({
           share={attribution.otherLeadRevenueShare}
           tone="amber"
           lang={lang}
+          selected={selectedCohort === "other"}
+          onClick={() => {
+            setSelectedCohort("other");
+            setSelectedReason("all");
+          }}
         />
       </div>
 
-      {attribution.otherLeadRevenue > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-border/70 bg-amber-surface/25 p-3">
-          <div className="mb-2 text-[11px] font-bold text-text">
-            {A
-              ? "تفصيل المبلغ الذي لم يُنسب لفترة واحدة"
-              : "Why this amount is not assigned to one period"}
+      <div className="mt-3 rounded-xl border border-border bg-surface-2/25 p-3">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-[12px] font-bold text-text">
+              {A ? "المصادر التي كوّنت المبلغ المحدد" : "Sources behind the selected amount"}
+            </div>
+            <div className="mt-0.5 text-[10px] text-text-muted">
+              {A
+                ? "اختر مصدرًا لعرض فواتيره وبنوده بالتفصيل."
+                : "Choose a source to inspect its invoices and accounting lines."}
+            </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            {(
-              [
-                [
-                  "shared_campaign",
-                  attribution.otherBreakdown.sharedCampaignRevenue,
-                  attribution.otherBreakdown.sharedCampaignLines,
-                ],
-                [
-                  "outside_selected_cohorts",
-                  attribution.otherBreakdown.outsideSelectedCohortsRevenue,
-                  attribution.otherBreakdown.outsideSelectedCohortsLines,
-                ],
-                [
-                  "campaign_not_linked",
-                  attribution.otherBreakdown.campaignNotLinkedRevenue,
-                  attribution.otherBreakdown.campaignNotLinkedLines,
-                ],
-                [
-                  "source_without_campaign",
-                  attribution.otherBreakdown.sourceWithoutCampaignRevenue,
-                  attribution.otherBreakdown.sourceWithoutCampaignLines,
-                ],
-                [
-                  "no_source",
-                  attribution.otherBreakdown.noSourceRevenue,
-                  attribution.otherBreakdown.noSourceLines,
-                ],
-              ] as const
-            ).map(([reason, revenue, lines]) => (
-              <div key={reason} className="rounded-lg border border-border bg-surface px-3 py-2">
-                <div className="text-[10px] leading-4 text-text-muted">
+          {selectedCohort === "other" && (
+            <span className="rounded-full bg-amber-surface px-2 py-1 text-[10px] font-semibold text-amber-strong">
+              {A ? "غير منسوب لفترة واحدة" : "Not assigned to one period"}
+            </span>
+          )}
+        </div>
+        {selectedCohort === "other" && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedReason("all")}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${selectedReason === "all" ? "border-text bg-text text-surface" : "border-border bg-surface text-text-muted"}`}
+            >
+              {A ? "كل الأنواع" : "All types"}
+            </button>
+            {availableReasons.map((reason) => {
+              const item = reasonItems.find(([key]) => key === reason);
+              return (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => setSelectedReason(reason)}
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${selectedReason === reason ? "border-amber-strong bg-amber-surface text-text" : "border-border bg-surface text-text-muted"}`}
+                >
                   {sourceReason(reason, lang)}
+                  {item ? ` · ${fmtUSDFull(item[1])}` : ""}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {visibleSources.length ? (
+          <div className="grid max-h-[380px] gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+            {visibleSources.map((source) => (
+              <button
+                key={source.sourceKey}
+                type="button"
+                onClick={() => setSelectedSource(source)}
+                className="group rounded-lg border border-border bg-surface p-3 text-start transition hover:border-mint-strong/60 hover:shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-bold text-text" title={source.name}>
+                      {source.name === "No campaign"
+                        ? A
+                          ? "بدون حملة"
+                          : source.name
+                        : source.name === "No source recorded" && A
+                          ? "لا يوجد مصدر مسجل"
+                          : source.name}
+                    </div>
+                    <div
+                      className="mt-1 truncate text-[9.5px] text-text-subtle"
+                      title={
+                        source.source || source.campaignId || sourceReason(source.reason, lang)
+                      }
+                    >
+                      {source.source
+                        ? `${A ? "المصدر" : "Source"}: ${source.source}`
+                        : source.campaignId
+                          ? `ID: ${source.campaignId}`
+                          : sourceReason(source.reason, lang)}
+                    </div>
+                  </div>
+                  <ExternalLink
+                    size={13}
+                    className="shrink-0 text-text-subtle transition group-hover:text-mint-strong"
+                  />
                 </div>
-                <div className="num mt-1 text-[14px] font-bold text-text">
-                  {fmtUSDFull(revenue)}
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <span className="num text-[14px] font-black text-text">
+                    {fmtUSDFull(source.revenue)}
+                  </span>
+                  <span className="text-[9.5px] text-text-muted">
+                    {fmtNum(source.lines)} {A ? "بند" : "lines"}
+                  </span>
                 </div>
-                <div className="mt-0.5 text-[10px] text-text-subtle">
-                  {fmtNum(lines)} {A ? "بند محاسبي" : "accounting lines"} ·{" "}
-                  {pct(
-                    attribution.currentPeriodRevenue > 0
-                      ? (revenue / attribution.currentPeriodRevenue) * 100
-                      : null,
-                    lang,
-                  )}{" "}
-                  {A ? "من الإجمالي" : "of total"}
-                </div>
-              </div>
+              </button>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-[11px] text-text-muted">
+            {A
+              ? "لا توجد مصادر ضمن هذا التصنيف في الفترة المحددة."
+              : "No sources in this category for the selected period."}
+          </div>
+        )}
+      </div>
 
-      {attribution.sourceRows.length > 0 && (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-surface">
-          <div className="border-b border-border bg-surface-2/45 px-3 py-2 text-[11px] font-bold text-text">
-            {A ? "كل مصادر التحصيل في الفترة" : "All collection sources in this period"}
+      <Dialog
+        open={Boolean(selectedSource)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSource(null);
+        }}
+      >
+        <DialogContent
+          className="max-h-[88vh] max-w-6xl overflow-hidden p-0"
+          dir={A ? "rtl" : "ltr"}
+        >
+          <div className="border-b border-border bg-surface-2/45 px-5 py-4 sm:px-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-start">
+                <ReceiptText size={18} />
+                {selectedSource?.name}
+              </DialogTitle>
+              <DialogDescription className="text-start">
+                {selectedSource && (
+                  <>
+                    {sourceReason(selectedSource.reason, lang)} ·{" "}
+                    {selectedSource.source || (A ? "لا يوجد مصدر مسجل" : "No source recorded")}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-text-muted">
+              <span>
+                {A ? "إجمالي البنود" : "Accounting lines"}:{" "}
+                <b className="num text-text">
+                  {fmtNum(detail.data?.totalLines ?? selectedSource?.lines ?? 0)}
+                </b>
+              </span>
+              <span>
+                {A ? "إجمالي التحصيل" : "Total collected"}:{" "}
+                <b className="num text-text">
+                  {fmtUSDFull(detail.data?.totalRevenue ?? selectedSource?.revenue ?? 0)}
+                </b>
+              </span>
+              {selectedSource?.campaignId && (
+                <span dir="ltr">
+                  Campaign ID: <b className="text-text">{selectedSource.campaignId}</b>
+                </span>
+              )}
+            </div>
           </div>
-          <div className="max-h-[340px] overflow-auto">
-            <table className="w-full min-w-[720px] text-[10.5px]">
-              <thead className="sticky top-0 bg-surface-2/90 text-text-muted backdrop-blur">
-                <tr className="border-b border-border">
-                  <th scope="col" className="px-3 py-2 text-start font-semibold">
-                    {A ? "الحملة وبيانات المصدر المسجلة" : "Campaign and recorded source details"}
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-start font-semibold">
-                    {A ? "الإسناد" : "Attribution"}
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-end font-semibold">
-                    {A ? "بنود محاسبية" : "Accounting lines"}
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-end font-semibold">
-                    {A ? "التحصيل" : "Collected"}
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-end font-semibold">
-                    {A ? "% من الإجمالي" : "% of total"}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {attribution.sourceRows.map((source) => (
-                  <tr
-                    key={`${source.reason}:${source.name}`}
-                    className="border-b border-border/60 last:border-0 hover:bg-surface-2/40"
-                  >
-                    <td
-                      className="max-w-[260px] truncate px-3 py-2 font-semibold text-text"
-                      title={source.name}
-                    >
-                      <div>
-                        {source.name === "No campaign"
-                          ? A
-                            ? "بدون حملة"
-                            : source.name
-                          : source.name === "No source recorded" && A
-                            ? "لا يوجد مصدر مسجل"
-                            : source.name}
-                      </div>
-                      {(source.campaignId || source.source) && (
-                        <div className="mt-0.5 truncate text-[9.5px] font-normal text-text-subtle">
-                          {source.campaignId && <span dir="ltr">ID: {source.campaignId}</span>}
-                          {source.campaignId && source.source ? " · " : ""}
-                          {source.source && (
-                            <span>
-                              {A ? "المصدر:" : "Source:"} {source.source}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-text-muted">
-                      {sourceReason(source.reason, lang)}
-                    </td>
-                    <td className="num px-3 py-2 text-end text-text">{fmtNum(source.lines)}</td>
-                    <td className="num whitespace-nowrap px-3 py-2 text-end font-bold text-text">
-                      {fmtUSDFull(source.revenue)}
-                    </td>
-                    <td className="num px-3 py-2 text-end text-text-muted">
-                      {pct(
-                        attribution.currentPeriodRevenue > 0
-                          ? (source.revenue / attribution.currentPeriodRevenue) * 100
-                          : null,
-                        lang,
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="max-h-[calc(88vh-145px)] overflow-auto p-4 sm:p-5">
+            {detail.isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-[12px] text-text-muted">
+                <LoaderCircle size={16} className="animate-spin" />
+                {A ? "جارٍ تحميل قيود المصدر…" : "Loading source records…"}
+              </div>
+            ) : detail.error ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-[12px] text-destructive">
+                {(detail.error as Error).message}
+              </div>
+            ) : detail.data ? (
+              <>
+                {detail.data.truncated && (
+                  <div className="mb-3 rounded-lg border border-amber-border bg-amber-surface/40 p-3 text-[11px] text-text">
+                    {A
+                      ? `المعروض أول ${fmtNum(detail.data.lines.length)} بند من ${fmtNum(detail.data.totalLines)}؛ الإجمالي أعلى الجدول يشمل الكل.`
+                      : `Showing the first ${fmtNum(detail.data.lines.length)} of ${fmtNum(detail.data.totalLines)} lines; the total above includes all lines.`}
+                  </div>
+                )}
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full min-w-[1020px] text-[10.5px]">
+                    <thead className="sticky top-0 bg-surface-2 text-text-muted">
+                      <tr className="border-b border-border">
+                        {[
+                          A ? "تاريخ السداد" : "Paid date",
+                          A ? "رقم الفاتورة" : "Invoice",
+                          A ? "العميل" : "Customer",
+                          A ? "الكورس / المنتج" : "Course / product",
+                          A ? "المندوب" : "Salesperson",
+                          A ? "الحملة / المجموعة / الإعلان" : "Campaign / ad set / ad",
+                          A ? "المصدر" : "Source",
+                          A ? "المبلغ" : "Amount",
+                        ].map((heading) => (
+                          <th key={heading} className="px-3 py-2.5 text-start font-semibold">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.data.lines.map((line, index) => (
+                        <tr
+                          key={line.id || `${line.movement}-${index}`}
+                          className="border-b border-border/60 last:border-0 hover:bg-surface-2/35"
+                        >
+                          <td className="num whitespace-nowrap px-3 py-2.5 text-text">
+                            {detailDate(line)}
+                          </td>
+                          <td className="px-3 py-2.5 text-text">
+                            <span dir="ltr">{line.movement || line.orderRef || "—"}</span>
+                            {line.isCreditNote && (
+                              <span className="ms-1 rounded bg-rose-100 px-1 py-0.5 text-[9px] text-rose-700">
+                                {A ? "إشعار دائن" : "Credit note"}
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className="max-w-44 truncate px-3 py-2.5 text-text"
+                            title={line.partner}
+                          >
+                            {line.partner || "—"}
+                          </td>
+                          <td className="max-w-52 px-3 py-2.5 text-text">
+                            <div className="truncate" title={line.course}>
+                              {line.course || "—"}
+                            </div>
+                            <div
+                              className="truncate text-[9px] text-text-subtle"
+                              title={line.product}
+                            >
+                              {line.product}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-text">
+                            <div>{line.salesperson || "—"}</div>
+                            <div className="text-[9px] text-text-subtle">{line.salesTeam}</div>
+                          </td>
+                          <td className="max-w-56 px-3 py-2.5 text-text">
+                            <div className="truncate" title={line.campaignName}>
+                              {line.campaignName || "—"}
+                            </div>
+                            <div
+                              className="truncate text-[9px] text-text-subtle"
+                              title={`${line.adset} · ${line.adName}`}
+                            >
+                              {[line.adset, line.adName].filter(Boolean).join(" · ") || "—"}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-text">{line.source || "—"}</td>
+                          <td className="num whitespace-nowrap px-3 py-2.5 text-end font-bold text-text">
+                            {fmtUSDFull(line.usdPaid)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-surface-2/45 px-3 py-2.5 text-[11px] text-text-muted">
         <span className="inline-flex items-center gap-1.5">

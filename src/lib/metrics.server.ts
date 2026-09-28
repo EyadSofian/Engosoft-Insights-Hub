@@ -1817,6 +1817,8 @@ export interface RevenueLeadAttribution {
   };
   /** Full payment-period collections grouped by source/campaign and attribution bucket. */
   sourceRows: {
+    /** Stable selector shared with the on-demand accounting-line drill-down. */
+    sourceKey: string;
     name: string;
     campaignId: string;
     source: string;
@@ -1835,6 +1837,59 @@ export interface RevenueLeadAttribution {
   previousLeadRevenueShare: Maybe;
   otherLeadRevenueShare: Maybe;
   revenueDelta: Maybe;
+}
+
+type RevenueSourceReason = RevenueLeadAttribution["sourceRows"][number]["reason"];
+
+function revenueSourceReason(
+  sale: AccountingRow,
+  currentCampaigns: Set<string>,
+  previousCampaigns: Set<string>,
+): RevenueSourceReason {
+  const campaign = sale.campaignKey;
+  return campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)
+    ? "current_period_campaign"
+    : campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)
+      ? "previous_period_campaign"
+      : campaign && currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
+        ? "shared_campaign"
+        : campaign
+          ? "outside_selected_cohorts"
+          : sale.campaignName || sale.campaignId
+            ? "campaign_not_linked"
+            : sale.source
+              ? "source_without_campaign"
+              : "no_source";
+}
+
+function revenueSourceBucketKey(
+  sale: AccountingRow,
+  reason: RevenueSourceReason,
+  name: string,
+): string {
+  return `${reason}\u001f${sale.campaignKey || normalizeName(name)}\u001f${normalizeName(sale.source)}`;
+}
+
+function revenueCohortCampaigns(data: FilteredData) {
+  return new Set(
+    [...data.crm, ...authoritativeLostLeads(data)].map((row) => row.campaignKey).filter(Boolean),
+  );
+}
+
+/** Returns only the accounting lines represented by one visible source bucket. */
+export function getRevenueSourceAccountingLines(
+  data: FilteredData,
+  previous: FilteredData | null | undefined,
+  sourceKey: string,
+): AccountingRow[] {
+  const currentCampaigns = revenueCohortCampaigns(data);
+  const previousCampaigns = previous ? revenueCohortCampaigns(previous) : new Set<string>();
+  return data.accounting.filter((sale) => {
+    const reason = revenueSourceReason(sale, currentCampaigns, previousCampaigns);
+    const name =
+      sale.campaignName || sale.campaignId || (sale.source ? "No campaign" : "No source recorded");
+    return revenueSourceBucketKey(sale, reason, name) === sourceKey;
+  });
 }
 
 /**
@@ -1875,6 +1930,7 @@ export function computeRevenueLeadAttribution(
     string,
     {
       name: string;
+      sourceKey: string;
       campaignId: string;
       source: string;
       reason:
@@ -1891,25 +1947,12 @@ export function computeRevenueLeadAttribution(
   >();
   for (const sale of data.accounting) {
     if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) continue;
-    const campaign = sale.campaignKey;
-    const reason =
-      campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)
-        ? "current_period_campaign"
-        : campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)
-          ? "previous_period_campaign"
-          : campaign && currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
-            ? "shared_campaign"
-            : campaign
-              ? "outside_selected_cohorts"
-              : sale.campaignName || sale.campaignId
-                ? "campaign_not_linked"
-                : sale.source
-                  ? "source_without_campaign"
-                  : "no_source";
+    const reason = revenueSourceReason(sale, currentCampaigns, previousCampaigns);
     const name =
       sale.campaignName || sale.campaignId || (sale.source ? "No campaign" : "No source recorded");
-    const sourceKey = `${reason}\u001f${campaign || normalizeName(name)}\u001f${normalizeName(sale.source)}`;
+    const sourceKey = revenueSourceBucketKey(sale, reason, name);
     const source = sourceRows.get(sourceKey) ?? {
+      sourceKey,
       name,
       campaignId: sale.campaignId,
       source: sale.source,

@@ -62,6 +62,7 @@ import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-pla
 import { Route as ApiMetaDestinationMixRouteImport } from './routes/api/meta-destination-mix'
 import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
+import { Route as ApiOverviewRevenueSourceRouteImport } from './routes/api/overview-revenue-source'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
@@ -389,6 +390,12 @@ const ApiOverviewRoute = ApiOverviewRouteImport.update({
   path: '/api/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOverviewRevenueSourceRoute =
+  ApiOverviewRevenueSourceRouteImport.update({
+    id: '/api/overview-revenue-source',
+    path: '/api/overview-revenue-source',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiProductsRoute = ApiProductsRouteImport.update({
   id: '/api/products',
   path: '/api/products',
@@ -755,6 +762,7 @@ export interface FileRoutesByFullPath {
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
@@ -869,6 +877,7 @@ export interface FileRoutesByTo {
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
@@ -984,6 +993,7 @@ export interface FileRoutesById {
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/refresh': typeof ApiRefreshRoute
@@ -1100,6 +1110,7 @@ export interface FileRouteTypes {
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
@@ -1214,6 +1225,7 @@ export interface FileRouteTypes {
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
@@ -1328,6 +1340,7 @@ export interface FileRouteTypes {
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
     | '/api/refresh'
@@ -1443,6 +1456,7 @@ export interface RootRouteChildren {
   ApiMetaDestinationMixRoute: typeof ApiMetaDestinationMixRoute
   ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
+  ApiOverviewRevenueSourceRoute: typeof ApiOverviewRevenueSourceRoute
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
@@ -1875,6 +1889,13 @@ declare module '@tanstack/react-router' {
       path: '/api/overview'
       fullPath: '/api/overview'
       preLoaderRoute: typeof ApiOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/overview-revenue-source': {
+      id: '/api/overview-revenue-source'
+      path: '/api/overview-revenue-source'
+      fullPath: '/api/overview-revenue-source'
+      preLoaderRoute: typeof ApiOverviewRevenueSourceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/products': {
@@ -2347,6 +2368,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMetaDestinationMixRoute: ApiMetaDestinationMixRoute,
   ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,
+  ApiOverviewRevenueSourceRoute: ApiOverviewRevenueSourceRoute,
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiRefreshRoute: ApiRefreshRoute,

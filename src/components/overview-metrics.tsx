@@ -96,6 +96,7 @@ export interface RevenueLeadAttribution {
     noSourceLines: number;
   };
   sourceRows: {
+    sourceKey: string;
     name: string;
     campaignId: string;
     source: string;
