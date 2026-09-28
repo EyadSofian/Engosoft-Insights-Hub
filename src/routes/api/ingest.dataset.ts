@@ -122,6 +122,11 @@ export const Route = createFileRoute("/api/ingest/dataset")({
         if (!isDashboardDataset(body.dataset)) {
           return Response.json({ ok: false, error: "Unknown dataset." }, { status: 400 });
         }
+        // These compact annual cohorts are written only by the Odoo reader.
+        // An ingest worker must not replace their provenance or completeness marker.
+        if (body.dataset === "annual_crm_2024" || body.dataset === "annual_crm_2025") {
+          return Response.json({ ok: false, error: "Dataset is Odoo-managed." }, { status: 403 });
+        }
         if (!Array.isArray(body.rows) || body.rows.length > MAX_ROWS_PER_REQUEST) {
           return Response.json(
             { ok: false, error: `rows must contain at most ${MAX_ROWS_PER_REQUEST} items.` },

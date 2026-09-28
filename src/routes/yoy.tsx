@@ -16,6 +16,14 @@ interface Response {
   sourceDates: { ads: string; crm: string; revenue: string };
   today: string;
   health: { crmAuthority: string; lostAuthority: string; accountingAuthority: string };
+  history: {
+    year: number;
+    status: "ready" | "refreshing" | "unavailable";
+    syncedAt: string;
+    error: string;
+    leads: number;
+    inventoryLeads: number;
+  }[];
 }
 
 const MONTHS = {
@@ -151,11 +159,26 @@ function YearlyPage() {
       return res.json();
     },
     staleTime: 5 * 60_000,
+    refetchInterval: (current) =>
+      current.state.data?.history.some((source) => source.status === "refreshing")
+        ? 10_000
+        : current.state.data?.history.some(
+              (source) => source.status === "unavailable" && source.error !== "Odoo not configured",
+            )
+          ? 60_000
+          : false,
   });
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   const annual = data?.annual;
   const comparable = annual?.coverage.comparable;
-  const lostAvailable = !!data && data.health.lostAuthority !== "unavailable";
+  const currentHistory = data?.history.find((source) => source.year === annual?.year);
+  const currentLeadsReady = !currentHistory || currentHistory.status === "ready";
+  const lostAvailable =
+    !!data &&
+    (data.health.lostAuthority !== "unavailable" ||
+      (Boolean(currentHistory) && currentHistory?.status === "ready"));
+  const currentRevenueAvailable = (annual?.coverage.current.accounting ?? 0) > 0;
+  const currentSpendAvailable = (annual?.coverage.current.ads ?? 0) > 0;
   const courses =
     annual?.courses.filter((row) =>
       row.name.toLowerCase().includes(courseQuery.trim().toLowerCase()),
@@ -254,6 +277,47 @@ function YearlyPage() {
             </p>
           </Card>
 
+          {data.history.length > 0 && (
+            <Card className="border-sky-border bg-sky-surface/30">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-text">
+                    {A ? "ليدز 2024 و2025 من Odoo" : "2024–2025 leads from Odoo"}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                    {A
+                      ? "تشمل كل ليدز السنتين، سواء في الـInventory الآن أو الـCRM العادي، بتاريخ إنشائها. Won/Lost بحسب حالتها الحالية؛ المبيعات حسب تاريخ التحصيل وليست بالضرورة من نفس الليدز."
+                      : "Includes all leads created in those years, whether now in Inventory or normal CRM. Won/Lost reflect current state; collections are not necessarily from the same lead cohort."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {data.history.map((source) => (
+                    <span
+                      key={source.year}
+                      className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold text-text"
+                      title={
+                        source.status === "ready"
+                          ? `${source.year}: ${fmtNum(source.leads)} total Odoo leads · ${fmtNum(source.inventoryLeads)} Inventory · ${source.syncedAt}`
+                          : source.error
+                      }
+                    >
+                      {source.year}:{" "}
+                      {source.status === "ready"
+                        ? `${fmtNum(source.year === annual.year ? annual.coverage.current.historical : annual.coverage.previous.historical)} ${A ? "ليد في الفترة" : "period leads"} · ${fmtNum(source.year === annual.year ? annual.coverage.current.inventory : annual.coverage.previous.inventory)} Inventory`
+                        : source.status === "refreshing"
+                          ? A
+                            ? "جارٍ تحميل الأرشيف"
+                            : "Loading archive"
+                          : A
+                            ? "المصدر غير متاح"
+                            : "Source unavailable"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {!comparable?.crm && (
             <Card className="border-amber-border bg-amber-surface/40">
               <div className="flex gap-2">
@@ -265,9 +329,13 @@ function YearlyPage() {
                       : "Prior-year CRM comparison is incomplete"}
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                    {A
-                      ? `بيانات ${annual.previousYear} فيها ${fmtNum(annual.coverage.previous.crm)} سجل CRM نشط في الفترة، فلا نعرض نمو الليدز أو Won أو Lost أو نسب الإغلاق/الخسارة مقابلها كأن الغياب صفر. أرقام السنة الحالية تظل معروضة.`
-                      : `Only ${fmtNum(annual.coverage.previous.crm)} prior-year active CRM rows are available in this window. Lead, Won and Lost growth and rate comparisons are withheld rather than treating missing history as zero. Current-year values remain visible.`}
+                    {annual.previousYear < 2024
+                      ? A
+                        ? `أرشيف ${annual.previousYear} غير مربوط في هذه الصفحة؛ نعرض ${annual.year} وحدها ولا نفترض أن السنة السابقة صفر.`
+                        : `${annual.previousYear} CRM history is not connected on this page; ${annual.year} remains visible without treating the previous year as zero.`
+                      : A
+                        ? `مقارنة الليدز مع ${annual.previousYear} معلّقة حتى يكتمل سحب Odoo التاريخي وتتوفر تغطية كافية. المتاح: ${fmtNum(annual.coverage.previous.historical)} تاريخي، منها ${fmtNum(annual.coverage.previous.inventory)} في Inventory. لا نعتبر البيانات الناقصة صفرًا.`
+                        : `Lead comparison with ${annual.previousYear} is withheld until the historical Odoo pull is ready and coverage is sufficient. Available: ${fmtNum(annual.coverage.previous.historical)} historical, including ${fmtNum(annual.coverage.previous.inventory)} in Inventory. Missing history is not treated as zero.`}
                   </p>
                 </div>
               </div>
@@ -301,6 +369,19 @@ function YearlyPage() {
             </Card>
           )}
 
+          {(!currentRevenueAvailable || !currentSpendAvailable) && (
+            <Card className="border-amber-border bg-amber-surface/40">
+              <div className="flex gap-2">
+                <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-ink" />
+                <p className="text-xs leading-relaxed text-text-muted">
+                  {A
+                    ? `لا توجد صفوف مصدر ${!currentRevenueAvailable ? "للتحصيل" : ""}${!currentRevenueAvailable && !currentSpendAvailable ? " أو " : ""}${!currentSpendAvailable ? "للصرف" : ""} في فترة ${annual.year} المختارة؛ أخفينا هذه القيم بدل عرضها صفرًا.`
+                    : `No ${!currentRevenueAvailable ? "collection" : ""}${!currentRevenueAvailable && !currentSpendAvailable ? " or " : ""}${!currentSpendAvailable ? "spend" : ""} source rows are available in the selected ${annual.year} window; these values are hidden rather than shown as zero.`}
+                </p>
+              </div>
+            </Card>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {MONTHLY_MEASURES.map((measure) => (
               <YearMetric
@@ -317,7 +398,13 @@ function YearlyPage() {
                 }
                 previousYear={annual.previousYear}
                 lang={lang}
-                currentAvailable={measure !== "lost" || lostAvailable}
+                currentAvailable={
+                  measure === "revenue"
+                    ? currentRevenueAvailable
+                    : measure === "spend"
+                      ? currentSpendAvailable
+                      : currentLeadsReady && (measure !== "lost" || lostAvailable)
+                }
               />
             ))}
           </div>
@@ -336,12 +423,12 @@ function YearlyPage() {
               <div className="grid grid-cols-3 gap-2">
                 <Outcome
                   label={A ? "إجمالي الليدز" : "All leads"}
-                  value={fmtNum(annual.current.leads)}
+                  value={currentLeadsReady ? fmtNum(annual.current.leads) : "—"}
                 />
                 <Outcome
                   label={A ? "نسبة الإغلاق" : "Won rate"}
                   value={
-                    !lostAvailable || annual.current.wonRate === null
+                    !currentLeadsReady || !lostAvailable || annual.current.wonRate === null
                       ? "—"
                       : fmtPct(annual.current.wonRate, 1)
                   }
@@ -349,20 +436,20 @@ function YearlyPage() {
                 <Outcome
                   label={A ? "نسبة اللوست" : "Lost rate"}
                   value={
-                    !lostAvailable || annual.current.lostRate === null
+                    !currentLeadsReady || !lostAvailable || annual.current.lostRate === null
                       ? "—"
                       : fmtPct(annual.current.lostRate, 1)
                   }
                 />
               </div>
               <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-surface-3">
-                {lostAvailable && (
+                {currentLeadsReady && lostAvailable && (
                   <div
                     className="bg-mint-strong"
                     style={{ width: `${annual.current.wonRate ?? 0}%` }}
                   />
                 )}
-                {lostAvailable && (
+                {currentLeadsReady && lostAvailable && (
                   <div
                     className="bg-rose-strong"
                     style={{ width: `${annual.current.lostRate ?? 0}%` }}
@@ -381,12 +468,13 @@ function YearlyPage() {
                 {A ? "التحصيل مقابل الصرف" : "Collections versus spend"}
               </SectionTitle>
               <div className="num text-3xl font-black text-text">
-                {annual.current.spend > 0
+                {currentRevenueAvailable && currentSpendAvailable && annual.current.spend > 0
                   ? `${(annual.current.revenue / annual.current.spend).toFixed(2)}×`
                   : "—"}
               </div>
               <p className="mt-2 text-xs text-text-muted">
-                {fmtUSDFull(annual.current.revenue)} ÷ {fmtUSDFull(annual.current.spend)}
+                {currentRevenueAvailable ? fmtUSDFull(annual.current.revenue) : "—"} ÷{" "}
+                {currentSpendAvailable ? fmtUSDFull(annual.current.spend) : "—"}
               </p>
             </Card>
           </div>
@@ -435,7 +523,12 @@ function YearlyPage() {
                         : monthlyMeasure === "spend"
                           ? comparable!.spend
                           : comparable!.crm && (monthlyMeasure !== "lost" || lostAvailable);
-                    const currentAvailable = monthlyMeasure !== "lost" || lostAvailable;
+                    const currentAvailable =
+                      monthlyMeasure === "revenue"
+                        ? currentRevenueAvailable
+                        : monthlyMeasure === "spend"
+                          ? currentSpendAvailable
+                          : currentLeadsReady && (monthlyMeasure !== "lost" || lostAvailable);
                     const current = row.current[monthlyMeasure];
                     const previous = row.previous[monthlyMeasure];
                     const maximum = Math.max(
@@ -534,7 +627,7 @@ function YearlyPage() {
                         {row.name}
                       </td>
                       <td className="num px-2 py-3 text-end font-bold text-text">
-                        {fmtUSDFull(row.current.revenue)}
+                        {currentRevenueAvailable ? fmtUSDFull(row.current.revenue) : "—"}
                       </td>
                       <td className="num px-2 py-3 text-end text-text-muted">
                         {comparable!.revenue ? fmtUSDFull(row.previous.revenue) : "—"}
@@ -546,19 +639,25 @@ function YearlyPage() {
                           comparable={comparable!.revenue}
                         />
                       </td>
-                      <td className="num px-2 py-3 text-end">{fmtUSDFull(row.current.spend)}</td>
-                      <td className="num px-2 py-3 text-end">{fmtNum(row.current.leads)}</td>
-                      <td className="num px-2 py-3 text-end">{fmtNum(row.current.won)}</td>
                       <td className="num px-2 py-3 text-end">
-                        {lostAvailable ? fmtNum(row.current.lost) : "—"}
+                        {currentSpendAvailable ? fmtUSDFull(row.current.spend) : "—"}
                       </td>
                       <td className="num px-2 py-3 text-end">
-                        {!lostAvailable || row.current.wonRate === null
+                        {currentLeadsReady ? fmtNum(row.current.leads) : "—"}
+                      </td>
+                      <td className="num px-2 py-3 text-end">
+                        {currentLeadsReady ? fmtNum(row.current.won) : "—"}
+                      </td>
+                      <td className="num px-2 py-3 text-end">
+                        {currentLeadsReady && lostAvailable ? fmtNum(row.current.lost) : "—"}
+                      </td>
+                      <td className="num px-2 py-3 text-end">
+                        {!currentLeadsReady || !lostAvailable || row.current.wonRate === null
                           ? "—"
                           : fmtPct(row.current.wonRate, 1)}
                       </td>
                       <td className="num px-2 py-3 text-end">
-                        {!lostAvailable || row.current.lostRate === null
+                        {!currentLeadsReady || !lostAvailable || row.current.lostRate === null
                           ? "—"
                           : fmtPct(row.current.lostRate, 1)}
                       </td>
@@ -580,9 +679,10 @@ function YearlyPage() {
             </SectionTitle>
             <div className="grid gap-2 text-xs text-text-muted sm:grid-cols-3">
               <div>
-                Odoo CRM / Lost: {fmtNum(annual.coverage.current.crm)} /{" "}
-                {lostAvailable ? fmtNum(annual.coverage.current.lost) : "—"} ·{" "}
-                {data.health.crmAuthority}
+                Odoo CRM / Lost / Historical (Inventory): {fmtNum(annual.coverage.current.crm)} /{" "}
+                {lostAvailable ? fmtNum(annual.coverage.current.lost) : "—"} /{" "}
+                {fmtNum(annual.coverage.current.historical)} (
+                {fmtNum(annual.coverage.current.inventory)}) · {data.health.crmAuthority}
               </div>
               <div>
                 {A ? "فواتير Odoo المدفوعة" : "Odoo paid invoices"}:{" "}

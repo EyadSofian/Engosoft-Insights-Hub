@@ -19,6 +19,8 @@ export type DashboardDataset =
   | "ads_legacy"
   | "crm"
   | "lost"
+  | "annual_crm_2024"
+  | "annual_crm_2025"
   | "invoiced"
   | "website_sales"
   | "pbx_extensions"
@@ -72,6 +74,8 @@ const DATASETS = new Set<DashboardDataset>([
   "ads_legacy",
   "crm",
   "lost",
+  "annual_crm_2024",
+  "annual_crm_2025",
   "invoiced",
   "website_sales",
   "pbx_extensions",

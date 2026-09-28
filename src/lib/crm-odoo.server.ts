@@ -28,6 +28,7 @@ import {
   type CrmContractRecord,
   type CrmStageKey,
 } from "./crm-contract";
+import { canonicalCourseValue } from "./course-taxonomy";
 
 export type CrmRawRow = Record<string, string>;
 
@@ -118,6 +119,81 @@ export interface DirectCrmSnapshot {
     crm: CrmExclusionDiagnostics;
     lost: CrmExclusionDiagnostics;
   };
+}
+
+/** A compact creation-day cohort from all historical Odoo CRM scopes. */
+export interface HistoricalCrmDay {
+  createdAt: string;
+  course: string;
+  leads: number;
+  won: number;
+  lost: number;
+  inventoryLeads: number;
+}
+
+export function historicalCrmYearDomain(year: 2024 | 2025): Domain {
+  return [
+    ["create_date", ">=", `${year - 1}-12-31 21:00:00`],
+    ["create_date", "<", `${year + 1}-01-01 22:00:00`],
+  ];
+}
+
+/**
+ * The operational CRM snapshot starts in 2026 and excludes Inventory. Read
+ * every 2024/2025 Odoo lead once here, including Inventory and any lead later
+ * moved back to normal CRM. Collapse rows before persisting anything.
+ */
+export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<HistoricalCrmDay[]> {
+  const metadata = await odooCall<Record<string, OdooField>>("crm.lead", "fields_get", [], {
+    attributes: ["string", "type", "relation"],
+    context: companyContext({ active_test: false }),
+  });
+  if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
+  const courseField = customFieldPlan(metadata).courseCategories;
+  const fields = [
+    "id",
+    "create_date",
+    "inventory_bucket",
+    "type",
+    "active",
+    "stage_id",
+    "stage_is_lost",
+    "stage_is_won",
+    "lost_reason_id",
+    courseField,
+  ].filter((field) => Boolean(field && metadata[field]));
+  const [leads, stageKeys] = await Promise.all([
+    searchRead<OdooCrmLead>("crm.lead", historicalCrmYearDomain(year), fields, {
+      context: { active_test: false },
+    }),
+    loadStageKeys(),
+  ]);
+  const days = new Map<string, HistoricalCrmDay>();
+  for (const lead of leads) {
+    const createdAt = date(lead.create_date);
+    if (!createdAt.startsWith(`${year}-`) || !isCrmRecordType(normalize(lead.type))) continue;
+    const course = canonicalCourseValue(custom(lead, courseField));
+    const key = `${createdAt}\u001f${course}`;
+    const day = days.get(key) ?? {
+      createdAt,
+      course,
+      leads: 0,
+      won: 0,
+      lost: 0,
+      inventoryLeads: 0,
+    };
+    const status = crmBusinessStatus(contractRecord(lead, stageKeys));
+    day.leads++;
+    if (status === "won") day.won++;
+    if (status === "lost") day.lost++;
+    if (display(lead.inventory_bucket)) day.inventoryLeads++;
+    days.set(key, day);
+  }
+  const archived = [...days.values()].reduce((sum, row) => sum + row.inventoryLeads, 0);
+  if (archived === 0) throw new Error(`Odoo Inventory records are missing for ${year}`);
+  return [...days.values()].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.course.localeCompare(b.course),
+  );
 }
 
 const emptyDiagnostics = (): CrmExclusionDiagnostics => ({

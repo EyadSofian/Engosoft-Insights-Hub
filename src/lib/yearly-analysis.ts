@@ -1,6 +1,7 @@
 import { accountingReportingDate } from "./accounting-policy";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import type { AccountingRow, AdRow, CrmLeadRow, LostRow, YoyPoint, YoyResult } from "./types";
+import type { HistoricalCrmDay } from "./crm-odoo.server";
 
 export interface AnnualNumbers {
   spend: number;
@@ -38,9 +39,24 @@ export interface AnnualComparison {
   months: AnnualMonth[];
   courses: { name: string; current: AnnualCourse; previous: AnnualCourse }[];
   coverage: {
-    current: { ads: number; accounting: number; crm: number; lost: number };
-    previous: { ads: number; accounting: number; crm: number; lost: number };
+    current: {
+      ads: number;
+      accounting: number;
+      crm: number;
+      lost: number;
+      historical: number;
+      inventory: number;
+    };
+    previous: {
+      ads: number;
+      accounting: number;
+      crm: number;
+      lost: number;
+      historical: number;
+      inventory: number;
+    };
     comparable: { spend: boolean; revenue: boolean; crm: boolean };
+    historicalReadyYears: number[];
   };
 }
 
@@ -49,6 +65,8 @@ export interface AnnualSource {
   accounting: AccountingRow[];
   crm: CrmLeadRow[];
   lost: LostRow[];
+  historicalCrm?: HistoricalCrmDay[];
+  historicalReadyYears?: number[];
 }
 
 const isoDay = (year: number, month: number, day: number) =>
@@ -88,9 +106,10 @@ function collect(
   const totals = blank();
   const months = Array.from({ length: 12 }, () => blank());
   const courses = new Map<string, AnnualCourse>();
-  const coverage = { ads: 0, accounting: 0, crm: 0, lost: 0 };
+  const coverage = { ads: 0, accounting: 0, crm: 0, lost: 0, historical: 0, inventory: 0 };
   const inWindow = (date: string) => !!date && date >= from && date <= to;
   const monthly = (date: string) => months[Number(date.slice(5, 7)) - 1];
+  const useHistorical = source.historicalReadyYears?.includes(Number(from.slice(0, 4))) ?? false;
 
   for (const row of source.ads) {
     if (!inWindow(row.date)) continue;
@@ -107,7 +126,7 @@ function collect(
     monthly(date).revenue += row.usdPaid;
     bucket(courses, row.course).revenue += row.usdPaid;
   }
-  for (const row of source.crm) {
+  for (const row of useHistorical ? [] : source.crm) {
     if (!inWindow(row.createdAt)) continue;
     coverage.crm++;
     totals.leads++;
@@ -122,7 +141,7 @@ function collect(
   }
   // Snapshot.crm and Snapshot.lost are disjoint under CRM contract 1.26.
   // Lost is attributed to lead creation month, not the month it was closed.
-  for (const row of source.lost) {
+  for (const row of useHistorical ? [] : source.lost) {
     if (!inWindow(row.createdAt)) continue;
     coverage.lost++;
     totals.leads++;
@@ -132,6 +151,24 @@ function collect(
     const course = bucket(courses, row.course);
     course.leads++;
     course.lost++;
+  }
+  // A complete historical Odoo year replaces, rather than supplements, the
+  // normal snapshot for that year. This prevents duplicate Lost records.
+  for (const row of useHistorical ? (source.historicalCrm ?? []) : []) {
+    if (!inWindow(row.createdAt)) continue;
+    const day = monthly(row.createdAt);
+    const course = bucket(courses, row.course);
+    coverage.historical += row.leads;
+    coverage.inventory += row.inventoryLeads;
+    totals.leads += row.leads;
+    totals.won += row.won;
+    totals.lost += row.lost;
+    day.leads += row.leads;
+    day.won += row.won;
+    day.lost += row.lost;
+    course.leads += row.leads;
+    course.won += row.won;
+    course.lost += row.lost;
   }
 
   return {
@@ -161,6 +198,9 @@ export function buildAnnualComparison(
   const previousTo = isoDay(previousYear, month, Math.min(day, lastDay(previousYear, month)));
   const current = collect(source, currentFrom, currentTo, courseOfAd);
   const previous = collect(source, previousFrom, previousTo, courseOfAd);
+  const historicalReadyYears = source.historicalReadyYears ?? [];
+  const leadSourceReady = (candidateYear: number) =>
+    candidateYear >= 2026 || historicalReadyYears.includes(candidateYear);
   const courseNames = new Set([...current.courses.keys(), ...previous.courses.keys()]);
 
   return {
@@ -190,12 +230,20 @@ export function buildAnnualComparison(
     coverage: {
       current: current.coverage,
       previous: previous.coverage,
+      historicalReadyYears,
       comparable: {
-        // The historical-source floor prevents a few surviving records from
-        // masquerading as a complete previous year.
+        // The historical-source floor prevents a few surviving ad/accounting
+        // rows from masquerading as a complete previous year. Historical CRM
+        // is a complete Odoo year pull, so it is gated by successful sync.
         spend: current.coverage.ads > 0 && previous.coverage.ads >= 100,
         revenue: current.coverage.accounting > 0 && previous.coverage.accounting >= 100,
-        crm: current.coverage.crm > 0 && previous.coverage.crm >= 100,
+        crm:
+          leadSourceReady(year) &&
+          leadSourceReady(previousYear) &&
+          (year <= 2025 || current.coverage.crm >= 100) &&
+          (previousYear <= 2025 || previous.coverage.crm >= 100) &&
+          current.totals.leads > 0 &&
+          previous.totals.leads > 0,
       },
     },
   };

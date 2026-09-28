@@ -9,6 +9,7 @@ export const Route = createFileRoute("/api/yoy")({
         const { annualAsYoyResult, buildAnnualComparison } = await import("@/lib/yearly-analysis");
         const { json } = await import("@/lib/api.server");
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { historicalCrm } = await import("@/lib/yearly-crm-history.server");
 
         const query = new URL(request.url).searchParams;
         const yearParam = Number(query.get("year"));
@@ -25,8 +26,9 @@ export const Route = createFileRoute("/api/yoy")({
         );
         const today = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
         const all = await loadAllData();
-        const latestYear = all.years.at(-1) ?? Number(todayParts.year);
-        const year = all.years.includes(yearParam) ? yearParam : latestYear;
+        const years = [...new Set([...all.years, 2024, 2025])].sort((a, b) => a - b);
+        const latestYear = years.at(-1) ?? Number(todayParts.year);
+        const year = years.includes(yearParam) ? yearParam : latestYear;
         const month =
           Number.isInteger(monthParam) && monthParam >= 1 && monthParam <= 12
             ? monthParam
@@ -35,8 +37,18 @@ export const Route = createFileRoute("/api/yoy")({
               : 12;
         const safeMonth =
           year === Number(todayParts.year) ? Math.min(month, Number(todayParts.month)) : month;
+        const historicalYears = [year, year - 1].filter(
+          (candidate): candidate is 2024 | 2025 => candidate === 2024 || candidate === 2025,
+        );
+        const history = await Promise.all(historicalYears.map(historicalCrm));
         const annual = buildAnnualComparison(
-          all,
+          {
+            ...all,
+            historicalCrm: history.flatMap((source) => source.rows),
+            historicalReadyYears: history
+              .filter((source) => source.status === "ready")
+              .map((source) => source.year),
+          },
           year,
           safeMonth,
           today,
@@ -52,11 +64,24 @@ export const Route = createFileRoute("/api/yoy")({
             revenue: all.revenueDateMax,
           },
           today,
-          years: all.years,
-          rowsPerYear: all.years.map((y) => ({
+          years,
+          history: history.map(({ year: historyYear, status, syncedAt, error, rows }) => ({
+            year: historyYear,
+            status,
+            syncedAt,
+            error,
+            leads: rows.reduce((total, row) => total + row.leads, 0),
+            inventoryLeads: rows.reduce((total, row) => total + row.inventoryLeads, 0),
+          })),
+          rowsPerYear: years.map((y) => ({
             year: y,
             ads: all.ads.filter((a) => a.date.startsWith(String(y))).length,
-            crm: all.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
+            crm: history.some((source) => source.year === y && source.status === "ready")
+              ? history
+                  .filter((source) => source.year === y)
+                  .flatMap((source) => source.rows)
+                  .reduce((total, row) => total + row.leads, 0)
+              : all.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
             accounting: all.accounting.filter((row) =>
               accountingReportingDate(row, "payment").startsWith(String(y)),
             ).length,

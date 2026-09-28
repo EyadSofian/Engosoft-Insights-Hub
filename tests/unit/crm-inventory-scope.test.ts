@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CRM_NORMAL_SCOPE_FILTER, crmNormalScopeDomain } from "../../src/lib/crm-contract";
-import { buildCrmCandidateDomains } from "../../src/lib/crm-odoo.server";
+import { buildCrmCandidateDomains, historicalCrmYearDomain } from "../../src/lib/crm-odoo.server";
 import { buildLostRegistrationDomains } from "../../src/lib/crm-lost-registration-audit.server";
 
 const inventoryFilter = [...CRM_NORMAL_SCOPE_FILTER];
@@ -50,6 +50,17 @@ describe("normal CRM Data Inventory scope", () => {
         expect(JSON.stringify(domains)).not.toContain("stage_id");
         expect(JSON.stringify(domains).toLowerCase()).not.toContain("preparation");
       }
+    }
+  });
+
+  it("reads 2024 and 2025 creation cohorts from all Odoo CRM scopes", () => {
+    for (const year of [2024, 2025] as const) {
+      const domain = historicalCrmYearDomain(year);
+      expect(domain).toEqual([
+        ["create_date", ">=", `${year - 1}-12-31 21:00:00`],
+        ["create_date", "<", `${year + 1}-01-01 22:00:00`],
+      ]);
+      expect(JSON.stringify(domain)).not.toContain("inventory_bucket");
     }
   });
 });
