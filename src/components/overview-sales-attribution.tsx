@@ -117,7 +117,8 @@ type SourceReason = RevenueLeadAttribution["sourceRows"][number]["reason"];
 type SourceDetailResponse = {
   totalLines: number;
   totalRevenue: number;
-  truncated: boolean;
+  offset: number;
+  limit: number;
   lines: {
     id: string;
     movement: string;
@@ -167,8 +168,9 @@ export function OverviewSalesAttribution({
   const [selectedSource, setSelectedSource] = useState<
     RevenueLeadAttribution["sourceRows"][number] | null
   >(null);
+  const [detailOffset, setDetailOffset] = useState(0);
   const detail = useApi<SourceDetailResponse>(
-    `/api/overview-revenue-source?sourceKey=${encodeURIComponent(selectedSource?.sourceKey ?? "")}`,
+    `/api/overview-revenue-source?sourceKey=${encodeURIComponent(selectedSource?.sourceKey ?? "")}&offset=${detailOffset}`,
     { enabled: Boolean(selectedSource) },
   );
   const reasonItems = [
@@ -327,7 +329,10 @@ export function OverviewSalesAttribution({
               <button
                 key={source.sourceKey}
                 type="button"
-                onClick={() => setSelectedSource(source)}
+                onClick={() => {
+                  setDetailOffset(0);
+                  setSelectedSource(source);
+                }}
                 className="group rounded-lg border border-border bg-surface p-3 text-start transition hover:border-mint-strong/60 hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -382,7 +387,10 @@ export function OverviewSalesAttribution({
       <Dialog
         open={Boolean(selectedSource)}
         onOpenChange={(open) => {
-          if (!open) setSelectedSource(null);
+          if (!open) {
+            setSelectedSource(null);
+            setDetailOffset(0);
+          }
         }}
       >
         <DialogContent
@@ -436,13 +444,20 @@ export function OverviewSalesAttribution({
               </div>
             ) : detail.data ? (
               <>
-                {detail.data.truncated && (
-                  <div className="mb-3 rounded-lg border border-amber-border bg-amber-surface/40 p-3 text-[11px] text-text">
-                    {A
-                      ? `المعروض أول ${fmtNum(detail.data.lines.length)} بند من ${fmtNum(detail.data.totalLines)}؛ الإجمالي أعلى الجدول يشمل الكل.`
-                      : `Showing the first ${fmtNum(detail.data.lines.length)} of ${fmtNum(detail.data.totalLines)} lines; the total above includes all lines.`}
-                  </div>
-                )}
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-text-muted">
+                  <span>
+                    {A ? "عرض البنود" : "Showing lines"} {fmtNum(detail.data.offset + 1)}–
+                    {fmtNum(
+                      Math.min(
+                        detail.data.offset + detail.data.lines.length,
+                        detail.data.totalLines,
+                      ),
+                    )}
+                    {A ? " من " : " of "}
+                    {fmtNum(detail.data.totalLines)}
+                  </span>
+                  <span>{A ? "الإجمالي يشمل كل الصفحات" : "Totals include every page"}</span>
+                </div>
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full min-w-[1020px] text-[10.5px]">
                     <thead className="sticky top-0 bg-surface-2 text-text-muted">
@@ -521,6 +536,32 @@ export function OverviewSalesAttribution({
                     </tbody>
                   </table>
                 </div>
+                {detail.data.totalLines > detail.data.limit && (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      disabled={detail.data.offset === 0}
+                      onClick={() =>
+                        setDetailOffset(Math.max(0, detail.data!.offset - detail.data!.limit))
+                      }
+                      className="rounded-lg border border-border px-3 py-2 text-[10px] font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {A ? "السابق" : "Previous"}
+                    </button>
+                    <span className="text-[10px] text-text-muted">
+                      {fmtNum(Math.floor(detail.data.offset / detail.data.limit) + 1)} /{" "}
+                      {fmtNum(Math.ceil(detail.data.totalLines / detail.data.limit))}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={detail.data.offset + detail.data.limit >= detail.data.totalLines}
+                      onClick={() => setDetailOffset(detail.data!.offset + detail.data!.limit)}
+                      className="rounded-lg border border-border px-3 py-2 text-[10px] font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {A ? "التالي" : "Next"}
+                    </button>
+                  </div>
+                )}
               </>
             ) : null}
           </div>

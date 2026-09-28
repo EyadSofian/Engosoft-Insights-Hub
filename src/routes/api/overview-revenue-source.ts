@@ -24,12 +24,17 @@ export const Route = createFileRoute("/api/overview-revenue-source")({
         if (lines.length === 0) return json({ error: "This source is no longer available." }, 404);
 
         const totalRevenue = lines.reduce((sum, row) => sum + row.usdPaid, 0);
-        const limit = 500;
+        const limit = 100;
+        const requestedOffset = Number(new URL(request.url).searchParams.get("offset") || 0);
+        const offset = Number.isFinite(requestedOffset)
+          ? Math.max(0, Math.min(Math.floor(requestedOffset), Math.max(lines.length - 1, 0)))
+          : 0;
         return json({
           totalLines: lines.length,
           totalRevenue,
-          truncated: lines.length > limit,
-          lines: lines.slice(0, limit).map((row) => ({
+          offset,
+          limit,
+          lines: lines.slice(offset, offset + limit).map((row) => ({
             id: row.id,
             movement: row.movement,
             paymentDate: row.paymentDate,
