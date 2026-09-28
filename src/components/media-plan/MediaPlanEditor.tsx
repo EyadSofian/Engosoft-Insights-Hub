@@ -237,6 +237,31 @@ export function MediaPlanEditor({
                   setDraft((current) => ({ ...current, leadGenerationBudgetUsd: value }))
                 }
               />
+              <Field
+                label={
+                  lang === "ar"
+                    ? "إجمالي ميزانية التسويق (لو التوزيع غير معروف)"
+                    : "Total marketing budget (if split unknown)"
+                }
+              >
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={draft.overallMarketingBudgetUsd ?? ""}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      overallMarketingBudgetUsd:
+                        event.target.value === ""
+                          ? undefined
+                          : Math.max(0, Number(event.target.value) || 0),
+                    }))
+                  }
+                  placeholder={lang === "ar" ? "اختياري" : "Optional"}
+                  className={`${inputClass} num`}
+                />
+              </Field>
               <NumberField
                 label={lang === "ar" ? "تارجت المبيعات بالدولار" : "Sales target (USD)"}
                 value={draft.salesTargetUsd}
@@ -399,7 +424,7 @@ export function MediaPlanEditor({
               {draft.additionalActivities.map((row) => (
                 <div
                   key={row.key}
-                  className="grid gap-2 rounded-2xl border border-border bg-surface-2/60 p-3 sm:grid-cols-[1fr_1fr_8rem_auto]"
+                  className="grid gap-2 rounded-2xl border border-border bg-surface-2/60 p-3 sm:grid-cols-2 lg:grid-cols-4"
                 >
                   <Field label={lang === "ar" ? "النشاط" : "Activity"} className="min-w-0 flex-1">
                     <input
@@ -423,11 +448,125 @@ export function MediaPlanEditor({
                       className={inputClass}
                     />
                   </Field>
+                  <Field label={lang === "ar" ? "نوع الهدف" : "Goal metric"}>
+                    <select
+                      value={row.metric ?? ""}
+                      onChange={(event) => {
+                        const metric = event.target.value as MediaPlanActivityBudget["metric"];
+                        patchActivity(row.key, {
+                          metric,
+                          unit: metric === "leads" ? "leads" : metric || "",
+                          category: row.category ?? "other",
+                        });
+                      }}
+                      className={inputClass}
+                    >
+                      <option value="">{lang === "ar" ? "بدون هدف" : "No goal"}</option>
+                      {[
+                        "leads",
+                        "views",
+                        "visits",
+                        "submissions",
+                        "campaigns",
+                        "creatives",
+                        "videos",
+                        "posts",
+                        "registrations",
+                        "custom",
+                      ].map((metric) => (
+                        <option key={metric} value={metric}>
+                          {metric}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={lang === "ar" ? "تصنيف النشاط" : "Activity category"}>
+                    <select
+                      value={row.category ?? "other"}
+                      onChange={(event) =>
+                        patchActivity(row.key, {
+                          category: event.target.value as MediaPlanActivityBudget["category"],
+                        })
+                      }
+                      className={inputClass}
+                    >
+                      {[
+                        "website",
+                        "paid_media",
+                        "landing_page",
+                        "webinar",
+                        "creative",
+                        "organic",
+                        "other",
+                      ].map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={lang === "ar" ? "التارجت" : "Target"}>
+                    <input
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={row.target ?? ""}
+                      onChange={(event) =>
+                        patchActivity(row.key, {
+                          target:
+                            event.target.value === ""
+                              ? undefined
+                              : Math.max(0, Number(event.target.value) || 0),
+                        })
+                      }
+                      placeholder={lang === "ar" ? "اختياري" : "Optional"}
+                      className={`${inputClass} num`}
+                    />
+                  </Field>
+                  <Field label={lang === "ar" ? "مصدر الفعلي" : "Actual source"}>
+                    <select
+                      value={row.actualSource ?? ""}
+                      onChange={(event) =>
+                        patchActivity(row.key, { actualSource: event.target.value || undefined })
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">{lang === "ar" ? "غير متصل" : "Not connected"}</option>
+                      <option value="website_crm_leads">Website · Odoo CRM</option>
+                      <option value="webinar_crm_leads">Webinar · Odoo CRM</option>
+                      <option value="paid_media_platform_leads">Paid media · platform</option>
+                      <option value="creative_catalog">Creative catalog</option>
+                      <option value="manual_reported">
+                        {lang === "ar" ? "إدخال يدوي" : "Manually reported"}
+                      </option>
+                    </select>
+                  </Field>
+                  {row.actualSource === "manual_reported" && (
+                    <Field label={lang === "ar" ? "المحقق يدويًا" : "Reported actual"}>
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={row.reportedActual ?? ""}
+                        onChange={(event) =>
+                          patchActivity(row.key, {
+                            reportedActual:
+                              event.target.value === ""
+                                ? undefined
+                                : Math.max(0, Number(event.target.value) || 0),
+                          })
+                        }
+                        placeholder={
+                          lang === "ar" ? "اتركه فارغًا حتى يصلك التقرير" : "Blank until reported"
+                        }
+                        className={`${inputClass} num`}
+                      />
+                    </Field>
+                  )}
                   <NumberField
                     label={lang === "ar" ? "Budget $" : "Budget $"}
                     value={row.budgetUsd}
                     onChange={(value) => patchActivity(row.key, { budgetUsd: value })}
-                    className="w-32"
                   />
                   <button
                     type="button"

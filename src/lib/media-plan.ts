@@ -47,6 +47,8 @@ export interface MediaPlanActivityBudget {
   target?: number;
   unit?: string;
   actualSource?: string;
+  /** A month-to-date figure entered by an authorized editor when no API exists. */
+  reportedActual?: number;
   matchTerms?: string[];
 }
 
@@ -58,6 +60,8 @@ export interface MonthlyMediaPlan {
   paidLeadTarget: number;
   organicWebinarLeadTarget: number;
   leadGenerationBudgetUsd: number;
+  /** Source-wide envelope when the split between lead-gen and other work is unknown. */
+  overallMarketingBudgetUsd?: number;
   salesTargetUsd: number;
   courses: MediaPlanCourseTarget[];
   additionalActivities: MediaPlanActivityBudget[];
@@ -155,7 +159,84 @@ const basePlan = (
 export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
   "2026-08": basePlan("2026-08", "approved"),
   "2026-09": basePlan("2026-09", "draft", "2026-08"),
+  // Imported from the supplied October image as a DRAFT. The image says
+  // 24,700 total leads, but its six course rows sum to 4,104 and the website
+  // goal is 3,000. YouTube (300) and branding (500) have no stated unit, so
+  // they remain separate custom goals, not inferred leads in KPI denominators.
+  "2026-10": {
+    month: "2026-10",
+    status: "draft",
+    paidLeadTarget: 4_104,
+    organicWebinarLeadTarget: 0,
+    leadTarget: 4_104,
+    leadGenerationBudgetUsd: 0,
+    overallMarketingBudgetUsd: 27_500,
+    salesTargetUsd: 156_000,
+    courses: [
+      { key: "cfm", label: "CFM", targetLeads: 648, targetCpl: 0, owners: ["Sayed"] },
+      { key: "pmp", label: "PMP", targetLeads: 792, targetCpl: 0, owners: ["Sayed"] },
+      { key: "cmrp", label: "CMRP", targetLeads: 360, targetCpl: 0, owners: ["Shazly"] },
+      {
+        key: "interior",
+        label: "Décor / Interior",
+        targetLeads: 792,
+        targetCpl: 0,
+        owners: ["Sayed"],
+      },
+      { key: "bim", label: "BIM", targetLeads: 504, targetCpl: 0, owners: ["Shazly"] },
+      { key: "automotive", label: "Auto", targetLeads: 1_008, targetCpl: 0, owners: ["Shazly"] },
+    ],
+    additionalActivities: [
+      {
+        key: "website",
+        label: "Website leads",
+        budgetUsd: 0,
+        category: "website",
+        metric: "leads",
+        target: 3_000,
+        unit: "leads",
+        actualSource: "website_crm_leads",
+        matchTerms: ["website"],
+      },
+      {
+        key: "youtube",
+        label: "YouTube",
+        budgetUsd: 0,
+        category: "organic",
+        metric: "custom",
+        target: 300,
+        unit: "units",
+        actualSource: "manual_reported",
+        matchTerms: ["youtube"],
+      },
+      {
+        key: "branding",
+        label: "Social media branding",
+        budgetUsd: 0,
+        category: "creative",
+        metric: "custom",
+        target: 500,
+        unit: "units",
+        actualSource: "manual_reported",
+        matchTerms: ["branding", "awareness"],
+      },
+    ],
+  },
 };
+
+export const OCTOBER_2026_SOURCE = {
+  image: "/media-plan/october-2026-source.png",
+  statedTotalLeads: 24_700,
+  courseLeads: 4_104,
+  websiteLeads: 3_000,
+  youtubeGoal: 300,
+  brandingGoal: 500,
+  marketingBudgetUsd: 27_500,
+  salesTargetUsd: 156_000,
+  staffTotal: 16,
+  dailyCourseLeads: 171,
+  workingDays: 24,
+} as const;
 
 export const mediaPlanMonths = (): string[] =>
   Object.keys(MEDIA_PLANS).sort((a, b) => b.localeCompare(a));
@@ -369,6 +450,17 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
               actualSource: shortText(row.actualSource, `Activity ${index + 1} actual source`, 120),
             }
           : {}),
+        ...(row.reportedActual !== undefined &&
+        row.reportedActual !== null &&
+        row.reportedActual !== ""
+          ? {
+              reportedActual: boundedNumber(
+                row.reportedActual,
+                `Activity ${index + 1} manually reported actual`,
+                10_000_000,
+              ),
+            }
+          : {}),
         matchTerms: Array.isArray(row.matchTerms)
           ? stringList(row.matchTerms, `Activity ${index + 1} match terms`, 20)
           : [],
@@ -395,6 +487,15 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
       "leadGenerationBudgetUsd",
       100_000_000,
     ),
+    ...(raw.overallMarketingBudgetUsd !== undefined && raw.overallMarketingBudgetUsd !== null
+      ? {
+          overallMarketingBudgetUsd: boundedNumber(
+            raw.overallMarketingBudgetUsd,
+            "overallMarketingBudgetUsd",
+            100_000_000,
+          ),
+        }
+      : {}),
     salesTargetUsd: boundedNumber(raw.salesTargetUsd, "salesTargetUsd", 1_000_000_000),
     courses,
     additionalActivities,

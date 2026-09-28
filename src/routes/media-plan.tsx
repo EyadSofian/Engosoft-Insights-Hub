@@ -6,6 +6,7 @@ import {
   CalendarRange,
   CopyPlus,
   Gauge,
+  Image as ImageIcon,
   Info,
   Landmark,
   Pencil,
@@ -29,9 +30,8 @@ import {
 import { DashboardPageHeader, DashboardPanel, KpiRow } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
-import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
-import type { MonthlyMediaPlan } from "@/lib/media-plan";
+import { mediaPlanMonths, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
 import { useApi } from "@/lib/use-api";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
@@ -209,13 +209,25 @@ function mediaPlanMetrics(
   return {
     leadTarget: {
       id: "media_plan.leadTarget",
-      title: A ? "تارجت الشهر" : "Monthly lead target",
+      title:
+        P.month === "2026-10"
+          ? A
+            ? "تارجت ليدز الدورات"
+            : "Course lead target"
+          : A
+            ? "تارجت الشهر"
+            : "Monthly lead target",
       value: fmtNum(P.leadTarget),
       tone: "sky",
       icon: <Target size={16} />,
-      definition: A
-        ? "عدد العملاء المحتملين الذي تلتزم به الخطة هذا الشهر، من المدفوع ومن الأورجانيك والويبينار معًا."
-        : "The number of leads the plan commits to this month, paid and organic/webinar together.",
+      definition:
+        P.month === "2026-10"
+          ? A
+            ? "مجموع أهداف الدورات الست فقط. أهداف الموقع ويوتيوب والبراندينج تظهر مستقلة أسفلها؛ لا نجمعها هنا لأن مصادرها قد تتداخل."
+            : "Only the six course goals. Website, YouTube and branding are separate below; channels may overlap."
+          : A
+            ? "عدد العملاء المحتملين الذي تلتزم به الخطة هذا الشهر، من المدفوع ومن الأورجانيك والويبينار معًا."
+            : "The number of leads the plan commits to this month, paid and organic/webinar together.",
       formula: A
         ? `${fmtNum(P.paidLeadTarget)} مدفوع + ${fmtNum(P.organicWebinarLeadTarget)} أورجانيك/ويبينار = ${fmtNum(P.leadTarget)}.`
         : `${fmtNum(P.paidLeadTarget)} paid + ${fmtNum(P.organicWebinarLeadTarget)} organic/webinar = ${fmtNum(P.leadTarget)}.`,
@@ -281,15 +293,24 @@ function mediaPlanMetrics(
     budget: {
       id: "media_plan.budget",
       title: A ? "ميزانية الليدز" : "Lead-gen budget",
-      value: fmtUSDFull(P.leadGenerationBudgetUsd),
+      value:
+        P.overallMarketingBudgetUsd !== undefined && P.leadGenerationBudgetUsd === 0
+          ? A
+            ? "غير موزعة"
+            : "Unallocated"
+          : fmtUSDFull(P.leadGenerationBudgetUsd),
       tone: "amber",
       icon: <WalletCards size={16} />,
       definition: A
         ? "الميزانية المخصصة لجلب العملاء هذا الشهر. الأنشطة الأخرى لها ميزانيتها المنفصلة."
         : "The budget set aside to bring in leads this month. Other activities carry their own budget.",
       formula: A
-        ? `${fmtUSDFull(V.targetedSpend)} مصروف من ${fmtUSDFull(P.leadGenerationBudgetUsd)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
-        : `${fmtUSDFull(V.targetedSpend)} spent of ${fmtUSDFull(P.leadGenerationBudgetUsd)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
+        ? P.overallMarketingBudgetUsd !== undefined && P.leadGenerationBudgetUsd === 0
+          ? `الصورة تحدد ${fmtUSDFull(P.overallMarketingBudgetUsd)} كإجمالي تسويق، لكنها لا توزع ميزانية جلب الليدز على الدورات أو الأنشطة.`
+          : `${fmtUSDFull(V.targetedSpend)} مصروف من ${fmtUSDFull(P.leadGenerationBudgetUsd)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
+        : P.overallMarketingBudgetUsd !== undefined && P.leadGenerationBudgetUsd === 0
+          ? `The image sets ${fmtUSDFull(P.overallMarketingBudgetUsd)} for all marketing, without a lead-gen or activity split.`
+          : `${fmtUSDFull(V.targetedSpend)} spent of ${fmtUSDFull(P.leadGenerationBudgetUsd)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
       caveat:
         V.unattributedOrUnplannedSpend > 0
           ? A
@@ -301,7 +322,10 @@ function mediaPlanMetrics(
         {
           key: "remaining",
           label: A ? "المتبقي" : "Remaining",
-          value: fmtUSDFull(Math.max(0, P.leadGenerationBudgetUsd - V.targetedSpend)),
+          value:
+            P.overallMarketingBudgetUsd !== undefined && P.leadGenerationBudgetUsd === 0
+              ? "—"
+              : fmtUSDFull(Math.max(0, P.leadGenerationBudgetUsd - V.targetedSpend)),
         },
         { key: "allSpend", label: A ? "كل الإنفاق" : "All spend", value: fmtUSDFull(V.allSpend) },
         paceFact,
@@ -392,11 +416,19 @@ function mediaPlanMetrics(
       tone: "slate",
       icon: <BadgeDollarSign size={16} />,
       definition: A
-        ? "كل ما خُصص للتسويق هذا الشهر: ميزانية جلب العملاء، بالإضافة إلى الأنشطة الأخرى."
-        : "Everything set aside for marketing this month: the lead-generation budget plus the other activities.",
+        ? P.overallMarketingBudgetUsd !== undefined
+          ? "إجمالي الميزانية المذكور في مصدر الخطة، حتى لو توزيعها التفصيلي لم يُحدد بعد."
+          : "كل ما خُصص للتسويق هذا الشهر: ميزانية جلب العملاء، بالإضافة إلى الأنشطة الأخرى."
+        : P.overallMarketingBudgetUsd !== undefined
+          ? "The source plan's overall budget, even if the detailed allocation is not yet specified."
+          : "Everything set aside for marketing this month: lead generation plus other activities.",
       formula: A
-        ? `${fmtUSDFull(P.leadGenerationBudgetUsd)} ليدز + ${fmtUSDFull(P.additionalBudgetUsd)} أنشطة إضافية = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`
-        : `${fmtUSDFull(P.leadGenerationBudgetUsd)} lead-gen + ${fmtUSDFull(P.additionalBudgetUsd)} extra activities = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`,
+        ? P.overallMarketingBudgetUsd !== undefined
+          ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} إجمالي من المصدر؛ الموزع حاليًا ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)}، والباقي غير موزع.`
+          : `${fmtUSDFull(P.leadGenerationBudgetUsd)} ليدز + ${fmtUSDFull(P.additionalBudgetUsd)} أنشطة إضافية = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`
+        : P.overallMarketingBudgetUsd !== undefined
+          ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} source total; ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)} allocated so far, the rest unallocated.`
+          : `${fmtUSDFull(P.leadGenerationBudgetUsd)} lead-gen + ${fmtUSDFull(P.additionalBudgetUsd)} extra activities = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`,
       supporting: [
         {
           key: "leadGen",
@@ -410,8 +442,22 @@ function mediaPlanMetrics(
         },
         {
           key: "reserve",
-          label: A ? "الاحتياطي" : "Reserve",
-          value: fmtUSDFull(P.reserveBudgetUsd),
+          label:
+            P.overallMarketingBudgetUsd !== undefined
+              ? A
+                ? "غير موزع"
+                : "Unallocated"
+              : A
+                ? "الاحتياطي"
+                : "Reserve",
+          value: fmtUSDFull(
+            P.overallMarketingBudgetUsd !== undefined
+              ? Math.max(
+                  0,
+                  P.overallMarketingBudgetUsd - P.leadGenerationBudgetUsd - P.additionalBudgetUsd,
+                )
+              : P.reserveBudgetUsd,
+          ),
         },
         {
           key: "spent",
@@ -440,10 +486,110 @@ function mediaPlanMetrics(
   };
 }
 
+function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
+  const A = lang === "ar";
+  const source = OCTOBER_2026_SOURCE;
+  const confirmedLeadGoals = source.courseLeads + source.websiteLeads;
+  const numericListed = confirmedLeadGoals + source.youtubeGoal + source.brandingGoal;
+  const leadGap = source.statedTotalLeads - confirmedLeadGoals;
+  const budgetPercent = (source.marketingBudgetUsd / source.salesTargetUsd) * 100;
+
+  return (
+    <Card className="overflow-hidden border-sky-border/70 bg-sky-surface/20">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,17rem)_1fr]">
+        <a
+          href={source.image}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group block overflow-hidden rounded-xl border border-border bg-surface"
+          aria-label={A ? "فتح صورة خطة أكتوبر بالحجم الكامل" : "Open the October plan image"}
+        >
+          <img
+            src={source.image}
+            alt={
+              A
+                ? "صورة خطة ميديا أكتوبر 2026 الأصلية: أهداف الدورات والموقع ويوتيوب والبراندينج"
+                : "Original October 2026 media plan with course, website, YouTube and branding goals"
+            }
+            loading="lazy"
+            className="aspect-[3/2] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+          <span className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-[11px] font-semibold text-brand">
+            <ImageIcon size={13} />
+            {A ? "افتح الصورة الأصلية" : "Open original image"}
+          </span>
+        </a>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-bold text-text">
+              {A ? "مرجع خطة أكتوبر من الصورة" : "October plan image reference"}
+            </h2>
+            <Pill tone="warning">{A ? "مسودة للمراجعة" : "Draft for review"}</Pill>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            {A
+              ? "أهداف الدورات والموقع متصلة بمصادرها في الداشبورد. يوتيوب والبراندينج يظهران كهدفين منفصلين بوحدة غير محددة في الصورة؛ والمحقق يُدخل يدويًا لحين تعريف المؤشر وتوصيل مصدر موثوق."
+              : "Course and website goals use dashboard sources. YouTube and branding remain separate goals with units unspecified in the image; actuals are manually reported until their metrics and trustworthy sources are defined."}
+          </p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[10px] text-text-muted">
+                {A ? "ليدز الدورات · 171 يوميًا × 24 يوم" : "Course leads · 171 daily × 24 days"}
+              </div>
+              <div className="num mt-1 text-lg font-bold text-text">
+                {fmtNum(source.courseLeads)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[10px] text-text-muted">
+                {A ? "ليدز الموقع" : "Website leads"}
+              </div>
+              <div className="num mt-1 text-lg font-bold text-text">
+                {fmtNum(source.websiteLeads)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[10px] text-text-muted">
+                {A ? "يوتيوب · الوحدة غير مذكورة" : "YouTube · unit unspecified"}
+              </div>
+              <div className="num mt-1 text-lg font-bold text-text">
+                {fmtNum(source.youtubeGoal)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[10px] text-text-muted">
+                {A ? "براندينج · الوحدة غير مذكورة" : "Branding · unit unspecified"}
+              </div>
+              <div className="num mt-1 text-lg font-bold text-text">
+                {fmtNum(source.brandingGoal)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[10px] text-text-muted">
+                {A ? "إجمالي الصورة المعلن" : "Total stated in image"}
+              </div>
+              <div className="num mt-1 text-lg font-bold text-text">
+                {fmtNum(source.statedTotalLeads)}
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-3 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-warning">
+            {A
+              ? `ليدز الدورات والموقع = ${fmtNum(confirmedLeadGoals)}. جمع كل الأرقام الظاهرة حسابيًا = ${fmtNum(numericListed)}، لكن لا يصح اعتباره «إجمالي ليدز» لأن وحدة يوتيوب والبراندينج غير مذكورة وقد تتداخل القنوات. لذلك يبقى الفرق ${fmtNum(leadGap)} عن إجمالي ${fmtNum(source.statedTotalLeads)} ليد غير مفسّر. أيضًا ${fmtUSDFull(source.marketingBudgetUsd)} = ${fmtPct(budgetPercent, 1)} من هدف ${fmtUSDFull(source.salesTargetUsd)}، لا 17% بالضبط.`
+              : `Course and website lead goals total ${fmtNum(confirmedLeadGoals)}. All visible numbers sum arithmetically to ${fmtNum(numericListed)}, but that is not a valid lead total: YouTube and branding units are unspecified and channels may overlap. The ${fmtNum(leadGap)} gap to the stated ${fmtNum(source.statedTotalLeads)} leads is unresolved. Also ${fmtUSDFull(source.marketingBudgetUsd)} is ${fmtPct(budgetPercent, 1)} of the ${fmtUSDFull(source.salesTargetUsd)} revenue goal, not exactly 17%.`}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function MediaPlanPage() {
-  const reportingPeriod = useReportingPeriod();
   const { lang } = useI18n();
-  const [month, setMonth] = useState("2026-09");
+  const [month, setMonth] = useState(() => mediaPlanMonths()[0]);
   // Month is local page state, so declare it explicitly. Nexus then reads the
   // same plan the manager has selected instead of silently defaulting to now.
   useRegisterNexusView("media_plan", { parameters: { month } });
@@ -470,7 +616,7 @@ function MediaPlanPage() {
               ? "لوحة واحدة تربط التارجت بالصرف والليدز الفعلية لكل دورة ومسؤول."
               : "One planning board linking every course target and owner to actual spend and leads."
           }
-          period={reportingPeriod}
+          period={data ? `${data.window.from} → ${data.window.to}` : undefined}
         />
         <div className="flex flex-wrap gap-2">
           {!!data && (
@@ -517,9 +663,13 @@ function MediaPlanPage() {
                 ? lang === "ar"
                   ? `الأرقام منسوخة بوضوح من خطة ${monthName(data.plan.basisMonth, lang)} كخط أساس، مع CPL Benchmarks من خطة يوليو، لحين اعتماد أرقام الشهر النهائية.`
                   : `Targets are visibly copied from ${monthName(data.plan.basisMonth, lang)} as a baseline, with July CPL benchmarks, until this month is approved.`
-                : lang === "ar"
-                  ? "الخطة المعتمدة للشهر مع مقارنة التنفيذ الفعلي."
-                  : "Approved monthly targets compared with actual delivery."
+                : data.plan.status === "draft"
+                  ? lang === "ar"
+                    ? "أهداف مسودة للشهر مع مقارنة التنفيذ الفعلي؛ تحتاج مراجعة واعتماد."
+                    : "Draft monthly targets against actual delivery; review and approval needed."
+                  : lang === "ar"
+                    ? "الخطة المعتمدة للشهر مع مقارنة التنفيذ الفعلي."
+                    : "Approved monthly targets compared with actual delivery."
             }
             action={
               <label className="block min-w-44 text-[11px] font-semibold text-text-muted">
@@ -559,15 +709,27 @@ function MediaPlanPage() {
             </div>
           </DashboardPanel>
 
+          {data.plan.month === "2026-10" && <OctoberSourcePanel lang={lang} />}
+
           <KpiRow>
             <MetricDetailTrigger
               detail={figures.leadTarget}
-              card={{ index: 0, sub: "Paid + Organic/Webinar" }}
+              card={{
+                index: 0,
+                sub:
+                  data.plan.month === "2026-10"
+                    ? lang === "ar"
+                      ? "الدورات الست فقط"
+                      : "Six courses only"
+                    : "Paid + Organic/Webinar",
+              }}
             />
-            <MetricDetailTrigger
-              detail={figures.paidTarget}
-              card={{ index: 1, sub: ratioPct(data.actual.paidLeadAchievement) }}
-            />
+            {data.plan.month !== "2026-10" && (
+              <MetricDetailTrigger
+                detail={figures.paidTarget}
+                card={{ index: 1, sub: ratioPct(data.actual.paidLeadAchievement) }}
+              />
+            )}
             <MetricDetailTrigger
               detail={figures.budget}
               card={{
@@ -590,7 +752,12 @@ function MediaPlanPage() {
               detail={figures.totalBudget}
               card={{
                 index: 5,
-                sub: `+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`,
+                sub:
+                  data.plan.overallMarketingBudgetUsd !== undefined
+                    ? lang === "ar"
+                      ? "إجمالي الصورة · التوزيع لم يُحدد"
+                      : "Image total · allocation pending"
+                    : `+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`,
               }}
             />
           </KpiRow>
@@ -610,12 +777,14 @@ function MediaPlanPage() {
             elapsed={data.window.elapsed}
             phase={data.window.phase}
             lang={lang}
+            onEditManual={data.editable ? () => setEditor("edit") : undefined}
           />
 
           <NeedsAttention
             deliverables={data.deliverables}
             elapsed={data.window.elapsed}
             lang={lang}
+            onEditManual={data.editable ? () => setEditor("edit") : undefined}
           />
 
           <Card className="border-dashed border-brand/25 bg-brand-soft/20">
@@ -703,9 +872,13 @@ function MediaPlanPage() {
             <Card>
               <SectionTitle
                 hint={
-                  lang === "ar"
-                    ? `دي ليست ضمن ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} الخاصة بتوليد الليدز.`
-                    : `These activities sit outside the ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} lead-generation budget.`
+                  data.plan.overallMarketingBudgetUsd !== undefined
+                    ? lang === "ar"
+                      ? `الصورة تحدد ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} للتسويق كله، لكنها لا تفصل ميزانية كل نشاط.`
+                      : `The image specifies ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} overall, without activity allocations.`
+                    : lang === "ar"
+                      ? `دي ليست ضمن ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} الخاصة بتوليد الليدز.`
+                      : `These activities sit outside the ${fmtUSDFull(data.plan.leadGenerationBudgetUsd)} lead-generation budget.`
                 }
               >
                 {lang === "ar" ? "الميزانية الإضافية" : "Additional activity budget"}
@@ -718,7 +891,11 @@ function MediaPlanPage() {
                   >
                     <div className="text-[11px] leading-snug text-text-muted">{activity.label}</div>
                     <div className="num mt-2 text-lg font-bold text-text">
-                      {fmtUSDFull(activity.budgetUsd)}
+                      {data.plan.overallMarketingBudgetUsd !== undefined && activity.budgetUsd === 0
+                        ? lang === "ar"
+                          ? "غير محددة"
+                          : "Unallocated"
+                        : fmtUSDFull(activity.budgetUsd)}
                     </div>
                   </div>
                 ))}
@@ -729,8 +906,24 @@ function MediaPlanPage() {
                   {fmtUSDFull(data.plan.plannedCourseBudgetUsd)}
                 </span>
                 <span>
-                  {lang === "ar" ? "احتياطي من ميزانية الليدز" : "Lead budget reserve"}:{" "}
-                  {fmtUSDFull(data.plan.reserveBudgetUsd)}
+                  {data.plan.overallMarketingBudgetUsd !== undefined
+                    ? lang === "ar"
+                      ? "غير موزع من الإجمالي"
+                      : "Unallocated from total"
+                    : lang === "ar"
+                      ? "احتياطي من ميزانية الليدز"
+                      : "Lead budget reserve"}
+                  :{" "}
+                  {fmtUSDFull(
+                    data.plan.overallMarketingBudgetUsd !== undefined
+                      ? Math.max(
+                          0,
+                          data.plan.overallMarketingBudgetUsd -
+                            data.plan.leadGenerationBudgetUsd -
+                            data.plan.additionalBudgetUsd,
+                        )
+                      : data.plan.reserveBudgetUsd,
+                  )}
                 </span>
               </div>
             </Card>
@@ -743,9 +936,13 @@ function MediaPlanPage() {
                 <div className="flex gap-2">
                   <Info size={15} className="mt-0.5 shrink-0 text-brand" />
                   <p>
-                    {lang === "ar"
-                      ? `تارجت الدورات = ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} Paid Leads. وتارجت Organic وWebinar منفصل حتى لا يتحسب مرتين.`
-                      : `Course rows total ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} paid leads. Organic and Webinar remain separate so they are not double-counted.`}
+                    {data.plan.month === "2026-10"
+                      ? lang === "ar"
+                        ? `تارجت الدورات = ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} ليد، وأهداف الموقع ويوتيوب والبراندينج مستقلة. إجمالي 24,700 في الصورة غير قابل للمطابقة مع هذه البنود حتى تتضح تعريفاته.`
+                        : `Course rows target ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} leads; website, YouTube and branding remain separate. The image's 24,700 total cannot be reconciled until its scope is clarified.`
+                      : lang === "ar"
+                        ? `تارجت الدورات = ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} Paid Leads. وتارجت Organic وWebinar منفصل حتى لا يتحسب مرتين.`
+                        : `Course rows total ${fmtNum(data.courses.reduce((sum, row) => sum + row.targetLeads, 0))} paid leads. Organic and Webinar remain separate so they are not double-counted.`}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -851,11 +1048,13 @@ function PlanDeliverySection({
   elapsed,
   phase,
   lang,
+  onEditManual,
 }: {
   deliverables: DeliverableRow[];
   elapsed: number;
   phase: PlanPhase;
   lang: "ar" | "en";
+  onEditManual?: () => void;
 }) {
   return (
     <Card className="overflow-hidden border-brand/15">
@@ -879,7 +1078,14 @@ function PlanDeliverySection({
       </SectionTitle>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {deliverables.map((row, index) => (
-          <DeliverableCard key={row.key} row={row} elapsed={elapsed} lang={lang} index={index} />
+          <DeliverableCard
+            key={row.key}
+            row={row}
+            elapsed={elapsed}
+            lang={lang}
+            index={index}
+            onEditManual={onEditManual}
+          />
         ))}
       </div>
     </Card>
@@ -890,10 +1096,12 @@ function NeedsAttention({
   deliverables,
   elapsed,
   lang,
+  onEditManual,
 }: {
   deliverables: DeliverableRow[];
   elapsed: number;
   lang: "ar" | "en";
+  onEditManual?: () => void;
 }) {
   const priority = { not_connected: 0, not_started: 1, behind: 2 } as const;
   const rows = deliverables
@@ -928,27 +1136,47 @@ function NeedsAttention({
         </p>
       ) : (
         <div className="grid gap-2 md:grid-cols-3">
-          {rows.map(({ row, status }) => (
-            <Link
-              key={row.key}
-              to={row.reportTo as never}
-              className="rounded-xl border border-amber-border/60 bg-surface px-3 py-2.5 transition-colors hover:border-brand/40"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-bold text-text">{row.label}</span>
-                <span className="shrink-0 text-[10px] font-bold text-amber-ink">
-                  {deliverableStatusLabel(status, lang)}
-                </span>
-              </div>
-              <div className="mt-1 text-[11px] text-text-muted">
-                {row.actual === null || !row.connected
-                  ? lang === "ar"
-                    ? "المصدر غير متصل"
-                    : "Source not connected"
-                  : `${fmtNum(row.actual)} / ${fmtNum(row.target)} ${row.unit}`}
-              </div>
-            </Link>
-          ))}
+          {rows.map(({ row, status }) => {
+            const isManual = row.actualSource === "Manual month-to-date report";
+            const contents = (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-bold text-text">{row.label}</span>
+                  <span className="shrink-0 text-[10px] font-bold text-amber-ink">
+                    {deliverableStatusLabel(status, lang)}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-text-muted">
+                  {row.actual === null || !row.connected
+                    ? lang === "ar"
+                      ? isManual
+                        ? "لم يُدخل المحقق بعد"
+                        : "المصدر غير متصل"
+                      : isManual
+                        ? "Actual not reported yet"
+                        : "Source not connected"
+                    : `${fmtNum(row.actual)} / ${fmtNum(row.target)} ${row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit}`}
+                </div>
+              </>
+            );
+            const className =
+              "rounded-xl border border-amber-border/60 bg-surface px-3 py-2.5 text-start transition-colors hover:border-brand/40";
+            return isManual ? (
+              <button
+                key={row.key}
+                type="button"
+                onClick={onEditManual}
+                disabled={!onEditManual}
+                className={className}
+              >
+                {contents}
+              </button>
+            ) : (
+              <Link key={row.key} to={row.reportTo as never} className={className}>
+                {contents}
+              </Link>
+            );
+          })}
         </div>
       )}
     </Card>
@@ -995,26 +1223,31 @@ function DeliverableCard({
   elapsed,
   lang,
   index,
+  onEditManual,
 }: {
   row: DeliverableRow;
   elapsed: number;
   lang: "ar" | "en";
   index: number;
+  onEditManual?: () => void;
 }) {
   const tone = DELIVERABLE_TONES[index % DELIVERABLE_TONES.length];
   const actual = row.actual;
-  const achievement = actual !== null && row.target > 0 ? actual / row.target : null;
+  const achievement =
+    actual !== null && row.connected && row.target > 0 ? actual / row.target : null;
   const status = deliverableStatus(actual, row.target, elapsed, row.connected);
-  const remaining = actual === null ? null : Math.max(0, row.target - actual);
+  const remaining = actual === null || !row.connected ? null : Math.max(0, row.target - actual);
   const label =
     row.key === "website" ? (lang === "ar" ? "ليدز الموقع" : "Website leads") : row.label;
+  const isManual = row.actualSource === "Manual month-to-date report";
+  const unit =
+    row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit;
 
   return (
-    <Link
-      to={row.reportTo as never}
+    <div
       className="group rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md"
       style={{ borderTopColor: tone.strong, borderTopWidth: 3 }}
-      title={`${row.actualSource} · ${row.dateScope}`}
+      title={`${row.actualSource} · ${row.dateScope} · ${row.matchingRule}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -1027,7 +1260,7 @@ function DeliverableCard({
           <div className="mt-2 text-xs text-text-muted">{lang === "ar" ? "التارجت" : "Target"}</div>
           <div className="num mt-0.5 text-2xl font-black tracking-tight text-text">
             {fmtNum(row.target)}{" "}
-            <span className="text-xs font-semibold text-text-muted">{row.unit}</span>
+            <span className="text-xs font-semibold text-text-muted">{unit}</span>
           </div>
         </div>
         <span
@@ -1063,15 +1296,38 @@ function DeliverableCard({
         <span>
           {remaining === null
             ? lang === "ar"
-              ? "لا يوجد مصدر موصل"
-              : "No source connected"
+              ? isManual
+                ? "لم يُدخل المحقق بعد"
+                : "لا يوجد مصدر موصل"
+              : isManual
+                ? "Actual not reported yet"
+                : "No source connected"
             : `${fmtNum(remaining)} ${lang === "ar" ? "متبقي" : "remaining"}`}
         </span>
-        <span className="font-semibold group-hover:text-brand">
-          {lang === "ar" ? "فتح التقرير ↗" : "View report ↗"}
-        </span>
+        {isManual ? (
+          onEditManual ? (
+            <button type="button" onClick={onEditManual} className="font-semibold text-brand">
+              {lang === "ar" ? "سجّل المحقق" : "Enter actual"}
+            </button>
+          ) : (
+            <span>{lang === "ar" ? "يتطلب صلاحية تعديل" : "Editor access required"}</span>
+          )
+        ) : (
+          <Link to={row.reportTo as never} className="font-semibold group-hover:text-brand">
+            {lang === "ar" ? "فتح التقرير ↗" : "View report ↗"}
+          </Link>
+        )}
       </div>
-    </Link>
+      <p className="mt-2 border-t border-border/70 pt-2 text-[10px] text-text-muted">
+        {isManual
+          ? lang === "ar"
+            ? "المصدر: إدخال يدوي غير متحقق آليًا"
+            : "Source: manually reported, not API-verified"
+          : lang === "ar"
+            ? `المصدر: ${row.actualSource}`
+            : `Source: ${row.actualSource}`}
+      </p>
+    </div>
   );
 }
 
@@ -1092,8 +1348,10 @@ function CourseTableRow({
         <OwnerList owners={row.owners} />
       </td>
       <td className="num px-3 py-3.5 font-semibold text-text">{fmtNum(row.targetLeads)}</td>
-      <td className="num px-3 py-3.5">{fmtUSDFull(row.targetBudgetUsd)}</td>
-      <td className="num px-3 py-3.5">{fmtUSDFull(row.targetCpl)}</td>
+      <td className="num px-3 py-3.5">
+        {row.targetCpl > 0 ? fmtUSDFull(row.targetBudgetUsd) : "—"}
+      </td>
+      <td className="num px-3 py-3.5">{row.targetCpl > 0 ? fmtUSDFull(row.targetCpl) : "—"}</td>
       <td className="px-3 py-3.5">
         <div className="num font-semibold text-text">{fmtNum(row.actual.actualLeads)}</div>
         <div className="mt-0.5 text-[10px] text-text-subtle">
@@ -1148,10 +1406,13 @@ function CourseMobileCard({
           label={lang === "ar" ? "التارجت" : "Target"}
           value={fmtNum(row.targetLeads)}
         />
-        <CompactMetric label="Target CPL" value={fmtUSDFull(row.targetCpl)} />
+        <CompactMetric
+          label="Target CPL"
+          value={row.targetCpl > 0 ? fmtUSDFull(row.targetCpl) : "—"}
+        />
         <CompactMetric
           label={lang === "ar" ? "الميزانية" : "Budget"}
-          value={fmtUSDFull(row.targetBudgetUsd)}
+          value={row.targetCpl > 0 ? fmtUSDFull(row.targetBudgetUsd) : "—"}
         />
         <CompactMetric
           label={lang === "ar" ? "ليدز فعلية" : "Actual leads"}

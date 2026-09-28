@@ -205,8 +205,18 @@ export const Route = createFileRoute("/api/media-plan")({
         const sourceForDeliverable = (deliverable: {
           actualSource?: string;
           metric?: MediaPlanDeliverable["metric"];
+          reportedActual?: number;
         }) => {
           switch (deliverable.actualSource) {
+            case "manual_reported":
+              return {
+                actual: deliverable.reportedActual ?? null,
+                connected: deliverable.reportedActual !== undefined,
+                actualSource: "Manual month-to-date report",
+                matchingRule:
+                  "Entered by a plan editor; not independently verified or inferred from campaign or creative counts.",
+                reportTo: "/media-plan",
+              };
             case "website_crm_leads":
               return {
                 actual: websiteLeads,
@@ -251,21 +261,25 @@ export const Route = createFileRoute("/api/media-plan")({
           }
         };
         const deliverables: DeliverableDelivery[] = [
-          {
-            key: "paid-media-leads",
-            label: "Paid media leads",
-            category: "paid_media",
-            metric: "leads",
-            target: plan.paidLeadTarget,
-            unit: "leads",
-            actual: targetedLeads,
-            connected: data.ads.some((row) => row.platformLeads !== null),
-            actualSource: "Course-attributed paid delivery",
-            dateScope,
-            matchingRule:
-              "Course/campaign matching from the selected plan; platform leads preferred, CRM fallback labelled below.",
-            reportTo: "/ads",
-          },
+          ...(plan.month === "2026-10"
+            ? []
+            : [
+                {
+                  key: "paid-media-leads",
+                  label: "Paid media leads",
+                  category: "paid_media" as const,
+                  metric: "leads" as const,
+                  target: plan.paidLeadTarget,
+                  unit: "leads",
+                  actual: targetedLeads,
+                  connected: data.ads.some((row) => row.platformLeads !== null),
+                  actualSource: "Course-attributed paid delivery",
+                  dateScope,
+                  matchingRule:
+                    "Course/campaign matching from the selected plan; platform leads preferred, CRM fallback labelled below.",
+                  reportTo: "/ads",
+                },
+              ]),
           ...plan.courses.map((target) => {
             const row = courseRows.find((candidate) => candidate.key === target.key);
             return {
@@ -312,11 +326,15 @@ export const Route = createFileRoute("/api/media-plan")({
         return json({
           plan: {
             ...plan,
-            targetCpl: divide(plan.leadGenerationBudgetUsd, plan.paidLeadTarget),
+            targetCpl:
+              plan.leadGenerationBudgetUsd > 0
+                ? divide(plan.leadGenerationBudgetUsd, plan.paidLeadTarget)
+                : null,
             plannedCourseBudgetUsd,
             reserveBudgetUsd: plan.leadGenerationBudgetUsd - plannedCourseBudgetUsd,
             additionalBudgetUsd,
-            totalMarketingBudgetUsd: plan.leadGenerationBudgetUsd + additionalBudgetUsd,
+            totalMarketingBudgetUsd:
+              plan.overallMarketingBudgetUsd ?? plan.leadGenerationBudgetUsd + additionalBudgetUsd,
           },
           window: {
             ...window,
@@ -354,6 +372,11 @@ export const Route = createFileRoute("/api/media-plan")({
           sources: [
             "ENGOSOFT Marketing Plan Aug 2026: lead, budget, sales and ownership targets",
             "July Media Plan and Media Buyers Plan: course CPL benchmarks",
+            ...(plan.month === "2026-10"
+              ? [
+                  "October 2026 Media Plan image supplied by management; conflicting totals remain a draft note",
+                ]
+              : []),
           ],
           health: data.snapshot.health,
         });

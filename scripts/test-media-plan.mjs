@@ -6,6 +6,7 @@ import {
   mediaPlanForMonth,
   nextMediaPlanMonth,
   normalizeMonthlyMediaPlan,
+  OCTOBER_2026_SOURCE,
   plannedCourseBudget,
 } from "../src/lib/media-plan.ts";
 
@@ -32,6 +33,46 @@ assert.deepEqual(september.courses.find((row) => row.key === "interior")?.owners
   "Shazly",
   "Sayed",
 ]);
+
+const october = mediaPlanForMonth("2026-10");
+assert.equal(october.status, "draft");
+assert.equal(october.salesTargetUsd, 156_000);
+assert.equal(october.overallMarketingBudgetUsd, 27_500);
+assert.equal(october.leadGenerationBudgetUsd, 0, "source does not allocate the budget");
+assert.equal(october.paidLeadTarget, 4_104);
+assert.equal(
+  october.courses.reduce((sum, row) => sum + row.targetLeads, 0),
+  4_104,
+);
+assert.deepEqual(
+  october.courses.map((row) => row.targetLeads),
+  [648, 792, 360, 792, 504, 1_008],
+);
+assert.equal(
+  october.courses.reduce((sum, row) => sum + plannedCourseBudget(row), 0),
+  0,
+  "source does not specify per-course CPL",
+);
+assert.equal(october.additionalActivities.find((row) => row.key === "website")?.target, 3_000);
+assert.equal(october.additionalActivities.find((row) => row.key === "youtube")?.target, 300);
+assert.equal(october.additionalActivities.find((row) => row.key === "branding")?.target, 500);
+assert.equal(october.additionalActivities.find((row) => row.key === "youtube")?.metric, "custom");
+assert.equal(october.additionalActivities.find((row) => row.key === "branding")?.metric, "custom");
+assert.equal(
+  OCTOBER_2026_SOURCE.statedTotalLeads - october.paidLeadTarget - 3_000,
+  17_596,
+  "unspecified YouTube and branding units must not be counted as leads",
+);
+assert.equal(
+  normalizeMonthlyMediaPlan({
+    ...october,
+    additionalActivities: october.additionalActivities.map((row) =>
+      row.key === "youtube" ? { ...row, reportedActual: 23 } : row,
+    ),
+  }).additionalActivities.find((row) => row.key === "youtube")?.reportedActual,
+  23,
+  "manually reported goal progress survives plan normalization",
+);
 
 for (const [raw, expected] of [
   ["CFM", "cfm"],
