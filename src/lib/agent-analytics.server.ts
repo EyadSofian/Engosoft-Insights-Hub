@@ -1482,9 +1482,9 @@ function buildTargetCoverage(
     : null;
   const targetedPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
   // Company achievement compares the published team quota with all employee
-  // collections. Excluding sellers with no individual quota understated the
-  // total (95.7% vs 97.7% in the live September example); keep their share
-  // separately so the denominator and every employee-level target stay clear.
+  // collections. Excluding sellers with no individual quota understates the
+  // company total; keep their share separately so the denominator and every
+  // employee-level target stay clear.
   const totalPaidRevenue = agents.reduce((sum, row) => sum + row.paidRevenue, 0);
 
   return {
