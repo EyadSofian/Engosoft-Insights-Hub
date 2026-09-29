@@ -41,6 +41,12 @@ import { summarizeLeadQa, type LeadQaSummary } from "./lead-qa";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
+export interface AgentPeriodLostCourse {
+  key: string;
+  label: string;
+  count: number;
+}
+
 export interface AgentAnalyticsRow {
   key: string;
   /**
@@ -115,6 +121,8 @@ export interface AgentAnalyticsRow {
    * the cohort figure; rankings of closures read `closedLostInPeriod` only.
    */
   cohortLost: number;
+  /** Canonical Lost records closed in the selected window, by Odoo course. */
+  periodClosedLostByCourse: AgentPeriodLostCourse[];
   closedLostInPeriod: number;
   createdAndLostInPeriod: number;
   olderCohortClosedLostInPeriod: number;
@@ -325,6 +333,7 @@ export interface AgentAnalyticsResult {
     periodClosedWon: number;
     /** Closed Lost in the window (= periodClosedLost), split canonically below. */
     periodClosedLost: number;
+    periodClosedLostByCourse: AgentPeriodLostCourse[];
     createdAndLostInPeriod: number;
     olderCohortClosedLostInPeriod: number;
     undatedCohortClosedLostInPeriod: number;
@@ -618,6 +627,7 @@ const blank = (key: string, name: string): MutableAgent => ({
   slaWon: 0,
   slaLost: 0,
   cohortLost: 0,
+  periodClosedLostByCourse: [],
   closedLostInPeriod: 0,
   createdAndLostInPeriod: 0,
   olderCohortClosedLostInPeriod: 0,
@@ -1386,6 +1396,11 @@ function mergeOperationalClosures(
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
     row.slaLost += 1;
     row.closedLostInPeriod += 1;
+    const courseLabel = cleanDimensionLabel(lead.course);
+    const courseKey = normalizeDimension(courseLabel) || "uncategorized";
+    const courseLoss = row.periodClosedLostByCourse.find((item) => item.key === courseKey);
+    if (courseLoss) courseLoss.count += 1;
+    else row.periodClosedLostByCourse.push({ key: courseKey, label: courseLabel, count: 1 });
     const { closedSplit } = classifyLostRow(lead, window);
     if (closedSplit === "created_in_period") row.createdAndLostInPeriod += 1;
     else if (closedSplit === "older_cohort") row.olderCohortClosedLostInPeriod += 1;
@@ -1897,6 +1912,7 @@ export async function buildAgentAnalytics(
       lost: 0,
       periodClosedWon: 0,
       periodClosedLost: 0,
+      periodClosedLostByCourse: [] as AgentPeriodLostCourse[],
       createdAndLostInPeriod: 0,
       olderCohortClosedLostInPeriod: 0,
       undatedCohortClosedLostInPeriod: 0,
@@ -1937,6 +1953,17 @@ export async function buildAgentAnalytics(
       chatAwaitingReply: chatwootStatus.ok ? 0 : (null as number | null),
       chatAverageFirstResponseSeconds: null as number | null,
     },
+  );
+  const periodLostCourses = new Map<string, AgentPeriodLostCourse>();
+  for (const agent of agents) {
+    for (const item of agent.periodClosedLostByCourse) {
+      const current = periodLostCourses.get(item.key);
+      if (current) current.count += item.count;
+      else periodLostCourses.set(item.key, { ...item });
+    }
+  }
+  summary.periodClosedLostByCourse = [...periodLostCourses.values()].sort(
+    (left, right) => right.count - left.count || left.label.localeCompare(right.label),
   );
   summary.conversionRate = summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
   summary.decidedConversionRate =

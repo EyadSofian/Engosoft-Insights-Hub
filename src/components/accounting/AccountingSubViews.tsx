@@ -1309,6 +1309,10 @@ export function AccountingAgentsView() {
           agents={visibleAgents}
           summary={data.summary}
           targetAchievement={data.targets.totalAchievementPaid}
+          lostDataAvailable={
+            data.agents.length > 0 &&
+            data.agents.every((agent) => agent.courseProfile.lostDataAvailable)
+          }
           from={data.selected.from}
           to={data.selected.to}
           lang={lang}
@@ -1636,6 +1640,7 @@ function TeamSalesOverview({
   agents,
   summary,
   targetAchievement,
+  lostDataAvailable,
   from,
   to,
   lang,
@@ -1644,6 +1649,7 @@ function TeamSalesOverview({
   agents: AgentRow[];
   summary: AgentsResponse["summary"];
   targetAchievement: number | null;
+  lostDataAvailable: boolean;
   from?: string;
   to?: string;
   lang: Lang;
@@ -1687,7 +1693,7 @@ function TeamSalesOverview({
         >
           {lang === "ar" ? "ملخص أداء فريق المبيعات" : "Sales team performance overview"}
         </SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <OverviewMetric
             label={lang === "ar" ? "تحويل كوهورت الليدز" : "Lead-cohort conversion"}
             value={fmtPct(summary.conversionRate, 1)}
@@ -1720,6 +1726,21 @@ function TeamSalesOverview({
             tone="amber"
           />
           <OverviewMetric
+            label={lang === "ar" ? "Lost اتقفل في الفترة" : "Lost closed this period"}
+            value={lostDataAvailable ? fmtNum(summary.periodClosedLost) : "—"}
+            sub={
+              lostDataAvailable
+                ? lang === "ar"
+                  ? "حسب تاريخ قفل Lost في Odoo، من كل تواريخ إنشاء الليدز"
+                  : "By Odoo Lost close date, regardless of lead creation date"
+                : lang === "ar"
+                  ? "بيانات Lost غير متاحة حاليًا"
+                  : "Lost data is currently unavailable"
+            }
+            icon={<TrendingDown size={17} />}
+            tone="rose"
+          />
+          <OverviewMetric
             label={lang === "ar" ? "أفضل كورس في التحويل" : "Top course by conversion"}
             value={bestCourse?.label ?? "—"}
             sub={
@@ -1740,6 +1761,85 @@ function TeamSalesOverview({
         </p>
       </Card>
 
+      {lostDataAvailable ? (
+        <Card padded={false} className="overflow-hidden">
+          <div className="border-b border-border px-4 py-4 sm:px-5">
+            <SectionTitle className="mb-0">
+              {lang === "ar"
+                ? "Lost اللي اتقفل خلال الفترة حسب الكورس"
+                : "Lost closed this period by course"}
+            </SectionTitle>
+            <p className="mt-1 text-xs text-text-muted">
+              {lang === "ar"
+                ? `الإجمالي ${fmtNum(summary.periodClosedLost)} صفقة Lost، محسوبة بتاريخ القفل لا بتاريخ إنشاء الليد.`
+                : `${fmtNum(summary.periodClosedLost)} closed Lost deals, grouped by close date rather than lead creation date.`}
+            </p>
+          </div>
+          <div className="table-wrap scroll-hint-x">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead className="bg-surface-2 text-xs text-text-muted">
+                <tr>
+                  <th className="px-4 py-3 text-start">{lang === "ar" ? "الكورس" : "Course"}</th>
+                  <th className="px-4 py-3 text-end">
+                    {lang === "ar" ? "Lost مقفول" : "Closed Lost"}
+                  </th>
+                  <th className="px-4 py-3 text-end">
+                    {lang === "ar" ? "النسبة من الإجمالي" : "Share of total"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {summary.periodClosedLostByCourse.map((course) => (
+                  <tr key={course.key} className="hover:bg-surface-muted/50">
+                    <td className="px-4 py-3 font-medium text-text">
+                      {displayDimension(course.label, lang)}
+                    </td>
+                    <td className="num px-4 py-3 text-end font-semibold text-danger">
+                      {fmtNum(course.count)}
+                    </td>
+                    <td className="num px-4 py-3 text-end text-text-muted">
+                      {fmtPct(
+                        summary.periodClosedLost > 0
+                          ? (course.count / summary.periodClosedLost) * 100
+                          : null,
+                        1,
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {summary.periodClosedLostByCourse.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-xs text-text-muted">
+                      {lang === "ar"
+                        ? "لا توجد صفقات Lost اتقفلت في الفترة"
+                        : "No Lost deals closed in this period"}
+                    </td>
+                  </tr>
+                )}
+                <tr className="border-t-2 border-border bg-surface-2 font-bold">
+                  <td className="px-4 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
+                  <td className="num px-4 py-3 text-end text-danger">
+                    {fmtNum(summary.periodClosedLost)}
+                  </td>
+                  <td className="num px-4 py-3 text-end">
+                    {summary.periodClosedLost > 0 ? "100%" : "—"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
+        <Notice
+          tone="warning"
+          title={lang === "ar" ? "تفصيل Lost غير متاح" : "Lost breakdown unavailable"}
+        >
+          {lang === "ar"
+            ? "مصدر بيانات Lost من Odoo غير متاح حاليًا؛ لن نظهر أصفارًا مضللة."
+            : "Odoo's Lost source is unavailable, so the dashboard is not showing misleading zeros."}
+        </Notice>
+      )}
+
       <Card padded={false} className="overflow-hidden">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
           <div>
@@ -1757,7 +1857,7 @@ function TeamSalesOverview({
           </Pill>
         </div>
         <div className="table-wrap scroll-hint-x">
-          <table className="w-full min-w-[850px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead className="bg-surface-2 text-xs text-text-muted">
               <tr>
                 <th className="px-4 py-3 text-start">{lang === "ar" ? "الموظف" : "Employee"}</th>
@@ -1765,6 +1865,9 @@ function TeamSalesOverview({
                   {lang === "ar" ? "ليدز الكوهورت" : "Cohort leads"}
                 </th>
                 <th className="px-4 py-3 text-end">{lang === "ar" ? "التحويل" : "Conversion"}</th>
+                <th className="px-4 py-3 text-end">
+                  {lang === "ar" ? "Lost اتقفل في الفترة" : "Lost closed in period"}
+                </th>
                 <th className="px-4 py-3 text-end">
                   {lang === "ar" ? "التواصل المثبت" : "Verified contact"}
                 </th>
@@ -1793,6 +1896,9 @@ function TeamSalesOverview({
                   <td className="num px-4 py-3 text-end">{fmtNum(agent.cleanLeads)}</td>
                   <td className="num px-4 py-3 text-end font-semibold">
                     {fmtPct(agent.conversionRate, 1)}
+                  </td>
+                  <td className="num px-4 py-3 text-end font-semibold text-danger">
+                    {agent.courseProfile.lostDataAvailable ? fmtNum(agent.closedLostInPeriod) : "—"}
                   </td>
                   <td className="num px-4 py-3 text-end">
                     {fmtPct(agent.leadOwnerCallCoverageRate, 1)}
@@ -1840,7 +1946,7 @@ function TeamSalesOverview({
               ))}
               {sortedAgents.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-text-muted">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-text-muted">
                     {lang === "ar"
                       ? "لا يوجد موظفون يطابقون البحث"
                       : "No employees match this search"}
@@ -1866,13 +1972,14 @@ function OverviewMetric({
   value: string;
   sub: string;
   icon: ReactNode;
-  tone: "brand" | "sky" | "amber" | "mint";
+  tone: "brand" | "sky" | "amber" | "mint" | "rose";
 }) {
   const toneClasses = {
     brand: "bg-brand-soft text-brand",
     sky: "bg-sky-500/10 text-sky-700",
     amber: "bg-amber-500/10 text-amber-700",
     mint: "bg-emerald-500/10 text-emerald-700",
+    rose: "bg-rose-500/10 text-rose-700",
   };
   return (
     <div className="min-w-0 rounded-2xl border border-border bg-surface px-4 py-4">
@@ -4363,6 +4470,7 @@ function AgentPerformanceSheet({
             </section>
 
             <CourseLeadTotals profile={courseProfile} />
+            <AgentPeriodLostByCourse row={row} />
             <UnsoldCoursesNotice profile={courseProfile} />
 
             <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_.8fr]">
@@ -5278,6 +5386,86 @@ function CourseLeadTotals({ profile }: { profile: AgentRow["courseProfile"] }) {
           }
           icon={<Layers3 size={17} />}
         />
+      </div>
+    </Card>
+  );
+}
+
+function AgentPeriodLostByCourse({ row }: { row: AgentRow }) {
+  const { lang } = useI18n();
+  if (!row.courseProfile.lostDataAvailable)
+    return (
+      <Notice
+        tone="warning"
+        title={lang === "ar" ? "تفصيل Lost حسب الكورس غير متاح" : "Course Lost detail unavailable"}
+      >
+        {lang === "ar"
+          ? "مصدر بيانات Lost من Odoo غير متاح حاليًا؛ لن نعرض أرقامًا صفرية مضللة."
+          : "Odoo's Lost source is currently unavailable, so no misleading zero counts are shown."}
+      </Notice>
+    );
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <div className="border-b border-border px-4 py-4 sm:px-5">
+        <SectionTitle className="mb-0">
+          {lang === "ar"
+            ? "Lost اللي اتقفل خلال الفترة حسب الكورس"
+            : "Lost closed this period by course"}
+        </SectionTitle>
+        <p className="mt-1 text-xs text-text-muted">
+          {lang === "ar"
+            ? `إجمالي الموظف ${fmtNum(row.closedLostInPeriod)}؛ التجميع بتاريخ القفل وليس تاريخ إنشاء الليد.`
+            : `${fmtNum(row.closedLostInPeriod)} total for this employee, grouped by close date rather than lead creation date.`}
+        </p>
+      </div>
+      <div className="table-wrap scroll-hint-x">
+        <table className="w-full min-w-[480px] text-sm">
+          <thead className="bg-surface-2 text-xs text-text-muted">
+            <tr>
+              <th className="px-4 py-3 text-start">{lang === "ar" ? "الكورس" : "Course"}</th>
+              <th className="px-4 py-3 text-end">{lang === "ar" ? "Lost مقفول" : "Closed Lost"}</th>
+              <th className="px-4 py-3 text-end">{lang === "ar" ? "النسبة" : "Share"}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {row.periodClosedLostByCourse.map((course) => (
+              <tr key={course.key}>
+                <td className="px-4 py-3 font-medium text-text">
+                  {displayDimension(course.label, lang)}
+                </td>
+                <td className="num px-4 py-3 text-end font-semibold text-danger">
+                  {fmtNum(course.count)}
+                </td>
+                <td className="num px-4 py-3 text-end text-text-muted">
+                  {fmtPct(
+                    row.closedLostInPeriod > 0
+                      ? (course.count / row.closedLostInPeriod) * 100
+                      : null,
+                    1,
+                  )}
+                </td>
+              </tr>
+            ))}
+            {row.periodClosedLostByCourse.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-xs text-text-muted">
+                  {lang === "ar"
+                    ? "لا توجد صفقات Lost اتقفلت في الفترة"
+                    : "No Lost deals closed in this period"}
+                </td>
+              </tr>
+            )}
+            <tr className="border-t-2 border-border bg-surface-2 font-bold">
+              <td className="px-4 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
+              <td className="num px-4 py-3 text-end text-danger">
+                {fmtNum(row.closedLostInPeriod)}
+              </td>
+              <td className="num px-4 py-3 text-end">
+                {row.closedLostInPeriod > 0 ? "100%" : "—"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </Card>
   );
