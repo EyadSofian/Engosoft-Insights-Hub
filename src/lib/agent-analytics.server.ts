@@ -186,7 +186,10 @@ export interface TargetCoverage {
   matched: number;
   /** Whole published quota across every matched employee. */
   totalTarget: number | null;
+  /** All employee collections in the selection, including sellers without a published quota. */
   totalPaidRevenue: number;
+  /** Portion of collections from employees who have a published quota. */
+  targetedPaidRevenue: number;
   /** Collections ÷ the whole quota, %. */
   totalAchievementPaid: number | null;
   /** False when the window spans a month with no published quota. */
@@ -1477,13 +1480,19 @@ function buildTargetCoverage(
   const totalTarget = targeted.length
     ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
     : null;
-  const totalPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
+  const targetedPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
+  // Company achievement compares the published team quota with all employee
+  // collections. Excluding sellers with no individual quota understated the
+  // total (95.7% vs 97.7% in the live September example); keep their share
+  // separately so the denominator and every employee-level target stay clear.
+  const totalPaidRevenue = agents.reduce((sum, row) => sum + row.paidRevenue, 0);
 
   return {
     publishedMonths,
     matched: matchedEmployeeIds.size,
     totalTarget,
     totalPaidRevenue,
+    targetedPaidRevenue,
     totalAchievementPaid:
       totalTarget !== null && totalTarget > 0 ? (totalPaidRevenue / totalTarget) * 100 : null,
     complete: targeted.every((row) => row.target?.complete ?? false),
