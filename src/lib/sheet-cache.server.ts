@@ -2457,6 +2457,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           invoiceDate,
           orderRef,
           product,
+          odooProductId: str(r["__odoo_product_id"]),
           productCategory,
           mainCategory: canonicalMainCategory(str(r["Main Category"]), course, productCategory),
           productCode:

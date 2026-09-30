@@ -439,9 +439,14 @@ async function loadSaleOrders(): Promise<{ orders: SaleOrderLink[] | null; error
  */
 async function loadPaidInvoiceLines(errors: string[] = []): Promise<PaidInvoiceLine[]> {
   try {
-    const [{ loadAllData }, { accountingUsdPaid, DEFAULT_FX_RATES }] = await Promise.all([
+    const [
+      { loadAllData },
+      { accountingUsdPaid, DEFAULT_FX_RATES },
+      { isExcludedFromSalesRevenue },
+    ] = await Promise.all([
       import("./sheet-cache.server"),
       import("./fx-rates"),
+      import("./sales-revenue-policy"),
     ]);
     const snapshot = await loadAllData();
     if (snapshot.accounting.length) {
@@ -450,7 +455,7 @@ async function loadPaidInvoiceLines(errors: string[] = []): Promise<PaidInvoiceL
         .map((row) => ({
           orderName: row.orderRef,
           movement: row.movement,
-          usdPaid: accountingUsdPaid(row, DEFAULT_FX_RATES),
+          usdPaid: isExcludedFromSalesRevenue(row) ? 0 : accountingUsdPaid(row, DEFAULT_FX_RATES),
           paymentDate: (row.isCreditNote
             ? row.invoiceDate || row.paymentDate
             : row.paymentDate
@@ -1270,12 +1275,17 @@ async function loadRevenueAuthority(
   range: { from: string; to: string },
   fxFilters: { fxEgp?: string; fxSar?: string },
 ): Promise<RevenueAuthority> {
-  const [{ loadAllData }, { accountingUsdPaid, fxRatesFromFilters }, { accountingReportingDate }] =
-    await Promise.all([
-      import("./sheet-cache.server"),
-      import("./fx-rates"),
-      import("./accounting-policy"),
-    ]);
+  const [
+    { loadAllData },
+    { accountingUsdPaid, fxRatesFromFilters },
+    { accountingReportingDate },
+    { isExcludedFromSalesRevenue },
+  ] = await Promise.all([
+    import("./sheet-cache.server"),
+    import("./fx-rates"),
+    import("./accounting-policy"),
+    import("./sales-revenue-policy"),
+  ]);
   const [snapshot, links] = await Promise.all([
     loadAllData(),
     getPool().query<Row>(`SELECT sale_order_name, opportunity_id FROM crm_sale_order_links`),
@@ -1297,7 +1307,7 @@ async function loadRevenueAuthority(
   const byLead: RevenueAuthority["byLead"] = new Map();
   const paymentWindow: RevenueAuthority["paymentWindow"] = [];
   for (const row of snapshot.accounting) {
-    const usd = accountingUsdPaid(row, fx);
+    const usd = isExcludedFromSalesRevenue(row) ? 0 : accountingUsdPaid(row, fx);
     const crmLeadId = row.orderRef ? (opportunityByOrder.get(row.orderRef.trim()) ?? "") : "";
     if (crmLeadId) {
       const entry = byLead.get(crmLeadId) ?? {

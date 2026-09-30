@@ -17,6 +17,7 @@ export const Route = createFileRoute("/api/revenue-cohorts")({
         const { parseFilters, json } = await import("@/lib/api.server");
         const { loadAllData } = await import("@/lib/sheet-cache.server");
         const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
         const { buildEntryMonthCohorts } = await import("@/lib/revenue-cohort");
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
         const { acquisitionDatabaseConfigured, getPool, BUSINESS_TIME_ZONE } =
@@ -73,7 +74,11 @@ export const Route = createFileRoute("/api/revenue-cohorts")({
           ...snapshot.lost.map((row) => ({ id: row.id, createdAt: row.createdAt, won: false })),
         ];
         const lines = snapshot.accounting
-          .filter((row) => !filters.company || row.company === filters.company)
+          .filter(
+            (row) =>
+              !isExcludedFromSalesRevenue(row) &&
+              (!filters.company || row.company === filters.company),
+          )
           .map((row) => ({
             orderRef: row.orderRef,
             movement: row.movement,

@@ -15,6 +15,7 @@ import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel"
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
+import { excludeSalesRevenue, isExcludedFromSalesRevenue } from "./sales-revenue-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
@@ -534,7 +535,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     })
     .map((row) => {
       const usdPaid = accountingUsdPaid(row, fxRates);
-      return { ...row, usdPaid, usdSales: usdPaid };
+      return excludeSalesRevenue({ ...row, usdPaid, usdSales: usdPaid });
     });
 
   const lost = all.lost.filter((r) => {
@@ -2420,6 +2421,7 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const revenueOf = (y: number, m?: string) =>
     sum(
       all.accounting.filter((row) => {
+        if (isExcludedFromSalesRevenue(row)) return false;
         const d = accountingReportingDate(row, "payment");
         return inYear(d, y) && (!m || d.slice(5, 7) === m);
       }),
@@ -2443,8 +2445,10 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
     crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
-    accounting: all.accounting.filter((row) =>
-      inYear(accountingReportingDate(row, "payment"), prevYear),
+    accounting: all.accounting.filter(
+      (row) =>
+        !isExcludedFromSalesRevenue(row) &&
+        inYear(accountingReportingDate(row, "payment"), prevYear),
     ).length,
   };
   const metricAvailability = {
@@ -2492,6 +2496,7 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const ytdRevenue = (y: number) =>
     sum(
       all.accounting.filter((row) => {
+        if (isExcludedFromSalesRevenue(row)) return false;
         const d = accountingReportingDate(row, "payment");
         return inYear(d, y) && d.slice(5) <= ytdCut;
       }),
@@ -2507,17 +2512,18 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
     all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
       .length;
 
-  const courseKeys = new Set(all.accounting.map((row) => row.course).filter(Boolean));
+  const eligibleRevenue = all.accounting.filter((row) => !isExcludedFromSalesRevenue(row));
+  const courseKeys = new Set(eligibleRevenue.map((row) => row.course).filter(Boolean));
   const byCourse = [...courseKeys]
     .map((course) => {
       const current = sum(
-        all.accounting.filter(
+        eligibleRevenue.filter(
           (row) => row.course === course && inYear(accountingReportingDate(row, "payment"), year),
         ),
         (row) => row.usdPaid,
       );
       const previous = sum(
-        all.accounting.filter(
+        eligibleRevenue.filter(
           (row) =>
             row.course === course && inYear(accountingReportingDate(row, "payment"), prevYear),
         ),

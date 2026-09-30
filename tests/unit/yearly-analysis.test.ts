@@ -16,6 +16,14 @@ function fixture(): AnnualSource {
       { paymentDate: "2026-09-29", usdPaid: 300, course: "PMP", isCreditNote: false },
       { paymentDate: "2025-09-28", usdPaid: 80, course: "PMP", isCreditNote: false },
       { paymentDate: "2025-09-29", usdPaid: 90, course: "PMP", isCreditNote: false },
+      {
+        paymentDate: "2026-09-28",
+        usdPaid: 900,
+        course: "Certificate",
+        product: "Professional certificate registration",
+        odooProductId: "246",
+        isCreditNote: false,
+      },
     ] as AnnualSource["accounting"],
     crm: [
       { createdAt: "2026-09-27", course: "PMP", isWon: true },
@@ -31,6 +39,19 @@ function fixture(): AnnualSource {
 }
 
 describe("annual comparison", () => {
+  it("excludes Professional certificate registration from revenue and course totals", () => {
+    const result = buildAnnualComparison(
+      fixture(),
+      2026,
+      9,
+      "2026-09-28",
+      (ad) => ad.courseHint ?? "",
+    );
+
+    expect(result.current.revenue).toBe(300);
+    expect(result.courses.some((row) => row.name === "Certificate")).toBe(false);
+  });
+
   it("cuts current and previous years at the same day of the selected month", () => {
     const result = buildAnnualComparison(
       fixture(),

@@ -1,4 +1,5 @@
 import { accountingReportingDate } from "./accounting-policy";
+import { isExcludedFromSalesRevenue } from "./sales-revenue-policy";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import type { AccountingRow, AdRow, CrmLeadRow, LostRow, YoyPoint, YoyResult } from "./types";
 import type { HistoricalCrmDay } from "./crm-odoo.server";
@@ -119,6 +120,7 @@ function collect(
     bucket(courses, courseOfAd(row)).spend += row.spend;
   }
   for (const row of source.accounting) {
+    if (isExcludedFromSalesRevenue(row)) continue;
     const date = accountingReportingDate(row, "payment");
     if (!inWindow(date)) continue;
     coverage.accounting++;

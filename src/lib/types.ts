@@ -293,6 +293,8 @@ export interface AccountingRow {
   invoiceDate: string;
   orderRef: string;
   product: string;
+  /** Stable Odoo product record ID when available. */
+  odooProductId?: string;
   productCategory: string;
   mainCategory: string;
   productCode: string;

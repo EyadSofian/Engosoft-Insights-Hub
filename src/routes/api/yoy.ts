@@ -9,6 +9,7 @@ export const Route = createFileRoute("/api/yoy")({
         const { annualAsYoyResult, buildAnnualComparison } = await import("@/lib/yearly-analysis");
         const { json } = await import("@/lib/api.server");
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
         const { historicalCrm } = await import("@/lib/yearly-crm-history.server");
 
         const query = new URL(request.url).searchParams;
@@ -82,8 +83,10 @@ export const Route = createFileRoute("/api/yoy")({
                   .flatMap((source) => source.rows)
                   .reduce((total, row) => total + row.leads, 0)
               : all.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
-            accounting: all.accounting.filter((row) =>
-              accountingReportingDate(row, "payment").startsWith(String(y)),
+            accounting: all.accounting.filter(
+              (row) =>
+                !isExcludedFromSalesRevenue(row) &&
+                accountingReportingDate(row, "payment").startsWith(String(y)),
             ).length,
           })),
           health: all.health,
