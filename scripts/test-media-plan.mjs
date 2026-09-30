@@ -36,18 +36,25 @@ assert.deepEqual(september.courses.find((row) => row.key === "interior")?.owners
 
 const october = mediaPlanForMonth("2026-10");
 assert.equal(october.status, "draft");
-assert.equal(october.salesTargetUsd, 156_000);
-assert.equal(october.overallMarketingBudgetUsd, 27_500);
+assert.equal(october.salesTargetUsd, 157_500);
+assert.equal(october.overallMarketingBudgetUsd, 27_575);
+assert.equal(october.leadTarget, 4_176);
 assert.equal(october.leadGenerationBudgetUsd, 0, "source does not allocate the budget");
-assert.equal(october.paidLeadTarget, 4_104);
+assert.equal(october.paidLeadTarget, 4_176);
 assert.equal(
   october.courses.reduce((sum, row) => sum + row.targetLeads, 0),
-  4_104,
+  4_176,
 );
 assert.deepEqual(
   october.courses.map((row) => row.targetLeads),
-  [648, 792, 360, 792, 504, 1_008],
+  [648, 864, 288, 864, 504, 1_008],
 );
+assert.equal(OCTOBER_2026_SOURCE.staffTotal, 51);
+assert.equal(OCTOBER_2026_SOURCE.dailyCourseLeads, 174);
+assert.equal(OCTOBER_2026_SOURCE.courseLeads, 4_176);
+assert.equal(OCTOBER_2026_SOURCE.marketingBudgetUsd, 26_775);
+assert.equal(OCTOBER_2026_SOURCE.overallMarketingBudgetUsd, 27_575);
+assert.equal(OCTOBER_2026_SOURCE.marketingBudgetUsd / OCTOBER_2026_SOURCE.salesTargetUsd, 0.17);
 assert.equal(
   october.courses.reduce((sum, row) => sum + plannedCourseBudget(row), 0),
   0,
@@ -60,7 +67,7 @@ assert.equal(october.additionalActivities.find((row) => row.key === "youtube")?.
 assert.equal(october.additionalActivities.find((row) => row.key === "branding")?.metric, "custom");
 assert.equal(
   OCTOBER_2026_SOURCE.statedTotalLeads - october.paidLeadTarget - 3_000,
-  17_596,
+  17_524,
   "unspecified YouTube and branding units must not be counted as leads",
 );
 assert.equal(

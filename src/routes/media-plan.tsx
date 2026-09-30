@@ -536,7 +536,9 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-xl border border-border bg-surface p-3">
               <div className="text-[10px] text-text-muted">
-                {A ? "ليدز الدورات · 171 يوميًا × 24 يوم" : "Course leads · 171 daily × 24 days"}
+                {A
+                  ? `ليدز الدورات · ${fmtNum(source.dailyCourseLeads)} يوميًا × ${fmtNum(source.workingDays)} يوم`
+                  : `Course leads · ${fmtNum(source.dailyCourseLeads)} daily × ${fmtNum(source.workingDays)} days`}
               </div>
               <div className="num mt-1 text-lg font-bold text-text">
                 {fmtNum(source.courseLeads)}

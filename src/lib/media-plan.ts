@@ -160,26 +160,26 @@ export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
   "2026-08": basePlan("2026-08", "approved"),
   "2026-09": basePlan("2026-09", "draft", "2026-08"),
   // Imported from the supplied October image as a DRAFT. The image says
-  // 24,700 total leads, but its six course rows sum to 4,104 and the website
+  // 24,700 total leads, but its six course rows sum to 4,176 and the website
   // goal is 3,000. YouTube (300) and branding (500) have no stated unit, so
   // they remain separate custom goals, not inferred leads in KPI denominators.
   "2026-10": {
     month: "2026-10",
     status: "draft",
-    paidLeadTarget: 4_104,
+    paidLeadTarget: 4_176,
     organicWebinarLeadTarget: 0,
-    leadTarget: 4_104,
+    leadTarget: 4_176,
     leadGenerationBudgetUsd: 0,
-    overallMarketingBudgetUsd: 27_500,
-    salesTargetUsd: 156_000,
+    overallMarketingBudgetUsd: 27_575,
+    salesTargetUsd: 157_500,
     courses: [
       { key: "cfm", label: "CFM", targetLeads: 648, targetCpl: 0, owners: ["Sayed"] },
-      { key: "pmp", label: "PMP", targetLeads: 792, targetCpl: 0, owners: ["Sayed"] },
-      { key: "cmrp", label: "CMRP", targetLeads: 360, targetCpl: 0, owners: ["Shazly"] },
+      { key: "pmp", label: "PMP", targetLeads: 864, targetCpl: 0, owners: ["Sayed"] },
+      { key: "cmrp", label: "CMRP", targetLeads: 288, targetCpl: 0, owners: ["Shazly"] },
       {
         key: "interior",
         label: "Décor / Interior",
-        targetLeads: 792,
+        targetLeads: 864,
         targetCpl: 0,
         owners: ["Sayed"],
       },
@@ -227,14 +227,15 @@ export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
 export const OCTOBER_2026_SOURCE = {
   image: "/media-plan/october-2026-source.png",
   statedTotalLeads: 24_700,
-  courseLeads: 4_104,
+  courseLeads: 4_176,
   websiteLeads: 3_000,
   youtubeGoal: 300,
   brandingGoal: 500,
-  marketingBudgetUsd: 27_500,
-  salesTargetUsd: 156_000,
-  staffTotal: 16,
-  dailyCourseLeads: 171,
+  marketingBudgetUsd: 26_775,
+  overallMarketingBudgetUsd: 27_575,
+  salesTargetUsd: 157_500,
+  staffTotal: 51,
+  dailyCourseLeads: 174,
   workingDays: 24,
 } as const;
 
