@@ -219,6 +219,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         icon: UserRoundSearch,
         tabLabel: { ar: "الميديا بايرز", en: "Media buyers" },
       },
+      {
+        to: "/lead-distribution",
+        key: "teams",
+        icon: UsersRound,
+        tabLabel: { ar: "توزيع الليدز", en: "Lead distribution" },
+      },
     ],
   },
   {

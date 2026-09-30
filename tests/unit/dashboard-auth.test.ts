@@ -48,6 +48,8 @@ describe("isPublicPath", () => {
     for (const path of [
       "/api/ads",
       "/api/leads",
+      "/api/lead-ranking",
+      "/lead-distribution",
       "/api/attribution/summary",
       "/api/attribution/conversations",
       "/api/landing-attribution/summary",
