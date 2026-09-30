@@ -18,6 +18,8 @@ export interface FreshLostPipelineRecord {
   salesTeam: string;
   company: string;
   course: string;
+  /** Exact product labels, retained for course-level allocation analysis. */
+  courses?: string;
   lossReason: string;
   lostCategory: string;
   odooUrl: string;
@@ -114,6 +116,7 @@ async function readFreshLostPipeline(
         salesTeam: row["Sales Team"] || "",
         company: row.Company || "",
         course: row.Course || "",
+        courses: row.Courses || "",
         lossReason: row["سبب الضياع"] || "",
         lostCategory: row["فئة الضياع"] || row["Lost Category"] || "",
         odooUrl: `${cfg.url}/web#id=${encodeURIComponent(id)}&model=crm.lead&view_type=form`,

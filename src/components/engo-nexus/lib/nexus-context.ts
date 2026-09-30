@@ -28,6 +28,7 @@ export type NexusPageType =
   | "courses"
   | "sales"
   | "teams"
+  | "lead_distribution"
   | "leads"
   | "lost"
   | "accounting"
@@ -89,6 +90,7 @@ export function pageTypeFor(path: string): NexusPageType {
     courses: "courses",
     sales: "sales",
     teams: "teams",
+    "lead-distribution": "lead_distribution",
     leads: "leads",
     lost: "lost",
     accounting: "accounting",

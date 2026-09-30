@@ -188,6 +188,58 @@ const COLLECTION_BASIS_CAVEAT = t(
 
 export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   {
+    id: "lead_distribution",
+    routes: ["/lead-distribution"],
+    section: "team",
+    title: t("توزيع الليدز", "Lead distribution"),
+    status: "CONNECTED",
+    sensitivity: "personal",
+    views: [],
+    operations: ["summary", "list"],
+    filters: ["month"],
+    entities: [],
+    sources: [
+      {
+        endpoint: "/api/lead-ranking",
+        as: "root",
+        required: true,
+        requiredArgs: ["month"],
+        auditArgs: { month: "2026-10" },
+        summaryPaths: ["window", "weights", "diagnostics", "coverage", "health"],
+        why: "Monthly six-month employee specialty/course ranks from the same calculation the distribution page renders.",
+      },
+    ],
+    rows: [
+      {
+        collection: "rankingRows",
+        kind: "employee_specialty_course_rank",
+        fields: [
+          "key",
+          "name",
+          "specialization",
+          "course",
+          "rank",
+          "score",
+          "revenue",
+          "invoices",
+          "leads",
+          "won",
+          "conversionRate",
+          "undatedWon",
+          "missingInvoiceIds",
+          "components",
+        ],
+        limit: 500,
+      },
+    ],
+    caveats: [
+      t(
+        "الأوزان 50% للمبيعات و25% للفواتير و25% للتحويل داخل نفس التخصص أو الكورس. شهر التوزيع يحدد الستة أشهر السابقة مستقلًا عن الفلاتر العامة. الإسناد الحالي لا يعيد بناء تاريخ نقل الموظفين؛ السجلات الناقصة لا تحصل على ترتيب مكتمل. لا ينفذ هذا التقرير إسناد الليدز.",
+        "Weights are 50% revenue, 25% invoices and 25% conversion within a specialty or course. Distribution month determines the previous six months independently of global filters. Current ownership cannot reconstruct historical reassignment; incomplete evidence has no full rank. This report does not assign leads.",
+      ),
+    ],
+  },
+  {
     id: "overview",
     routes: ["/"],
     section: "business",

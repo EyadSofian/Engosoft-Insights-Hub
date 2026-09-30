@@ -228,6 +228,42 @@ const commonElements = (capability: string): NexusElement[] => [
 
 export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
   {
+    id: "lead_distribution",
+    route: "/lead-distribution",
+    title: q("توزيع الليدز", "Lead distribution"),
+    description: q(
+      "ترتيب كل موظف داخل التخصص والكورس من مبيعاته وفواتيره ونسبة التحويل خلال الستة أشهر السابقة لشهر التوزيع.",
+      "Employee ranks within each specialty and course from revenue, invoices and conversion over the six months before distribution.",
+    ),
+    tabs: [],
+    sections: [
+      {
+        id: "ranking",
+        title: q("ترتيب الموظفين", "Employee ranking"),
+        elements: ["lead_distribution.ranking"],
+      },
+    ],
+    elements: [
+      {
+        id: "lead_distribution.ranking",
+        type: "table",
+        title: q("ترتيب الموظفين", "Employee ranking"),
+        meaning: q(
+          "درجة من 100 داخل نفس التخصص أو الكورس؛ المبيعات 50% والفواتير 25% والتحويل 25%، مع إظهار البيانات الناقصة.",
+          "A score out of 100 within the same specialty or course: 50% revenue, 25% invoices and 25% conversion, with incomplete evidence visible.",
+        ),
+        sourceCapability: "lead_distribution",
+        periodSensitive: true,
+        filterSensitive: false,
+        questions: [q("اشرح طريقة حساب الترتيب", "Explain how ranks are calculated")],
+      },
+    ],
+    suggestedQuestions: [
+      q("اشرح طريقة حساب الترتيب", "Explain how ranks are calculated"),
+      q("ما البيانات الناقصة في الترتيب؟", "What evidence is missing from this ranking?"),
+    ],
+  },
+  {
     id: "overview",
     route: "/",
     title: q("تحليلات البيزنس", "Business analytics"),
