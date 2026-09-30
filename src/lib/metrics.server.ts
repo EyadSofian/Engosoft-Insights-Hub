@@ -15,7 +15,7 @@ import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel"
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
-import { excludeSalesRevenue, isExcludedFromSalesRevenue } from "./sales-revenue-policy";
+import { isExcludedFromSalesRevenue } from "./sales-revenue-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
@@ -493,6 +493,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   });
 
   const invoiced = all.invoiced.filter((r) => {
+    if (isExcludedFromSalesRevenue(r)) return false;
     if (!inRange(r.revenueDate, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
@@ -515,6 +516,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   // with a legacy order bridge only for older workbooks.
   const accounting = all.accounting
     .filter((r) => {
+      if (isExcludedFromSalesRevenue(r)) return false;
       if (!inRange(accountingDate(r), from, to)) return false;
       if (company && r.company !== company) return false;
       if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
@@ -535,7 +537,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     })
     .map((row) => {
       const usdPaid = accountingUsdPaid(row, fxRates);
-      return excludeSalesRevenue({ ...row, usdPaid, usdSales: usdPaid });
+      return { ...row, usdPaid, usdSales: usdPaid };
     });
 
   const lost = all.lost.filter((r) => {
