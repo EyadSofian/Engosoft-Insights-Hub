@@ -621,6 +621,13 @@ function MediaPlanPage() {
           period={data ? `${data.window.from} → ${data.window.to}` : undefined}
         />
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/management-review"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/5 px-3 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
+          >
+            <Gauge size={14} />{" "}
+            {lang === "ar" ? "مراجعة الخطة والـSales Funnel" : "Plan & sales funnel review"}
+          </Link>
           {!!data && (
             <>
               <button

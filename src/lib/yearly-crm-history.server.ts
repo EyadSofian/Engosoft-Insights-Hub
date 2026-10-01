@@ -7,7 +7,7 @@ import {
 } from "./dashboard-db.server";
 import { odooConfigured } from "./odoo.server";
 
-const REVISION = "annual-all-crm-cairo-cohort-v2";
+const REVISION = "annual-all-crm-funnel-v3";
 const REFRESH_MS = 24 * 60 * 60 * 1000;
 const retries = new Map<number, number>();
 const pending = new Map<number, Promise<void>>();
@@ -19,6 +19,7 @@ export interface HistoricalCrmResult {
   status: "ready" | "refreshing" | "unavailable";
   syncedAt: string;
   error: string;
+  funnelReady: boolean;
 }
 
 function dataset(year: 2024 | 2025): DashboardDataset {
@@ -35,6 +36,21 @@ function parseRows(rows: Record<string, string>[]): HistoricalCrmDay[] {
       won: Number(row.won) || 0,
       lost: Number(row.lost) || 0,
       inventoryLeads: Number(row.inventoryLeads) || 0,
+      noAnswer: Number(row.noAnswer) || 0,
+      replyKnown: Number(row.replyKnown) || 0,
+      freshLeads: Number(row.freshLeads) || 0,
+      freshWon: Number(row.freshWon) || 0,
+      oldLeads: Number(row.oldLeads) || 0,
+      oldWon: Number(row.oldWon) || 0,
+      turnaroundDaysSum: Number(row.turnaroundDaysSum) || 0,
+      turnaroundSamples: Number(row.turnaroundSamples) || 0,
+      lostReasons: (() => {
+        try {
+          return JSON.parse(row.lostReasons || "{}");
+        } catch {
+          return {};
+        }
+      })(),
     }));
 }
 
@@ -75,16 +91,25 @@ export async function historicalCrm(year: 2024 | 2025): Promise<HistoricalCrmRes
     cached.metadata.revision === REVISION &&
     cached.metadata.complete === true;
   const local = memory.get(year);
-  const rows = storedReady ? parseRows(cached.rows) : (local?.rows ?? []);
-  const syncedAt = storedReady ? cached.syncedAt : (local?.syncedAt ?? "");
-  const ready = storedReady || Boolean(local);
-  const stale = !ready || Date.now() - Date.parse(syncedAt) > REFRESH_MS;
+  const storedBase = cached?.status === "success" && cached.metadata.complete === true;
+  const rows = storedBase ? parseRows(cached.rows) : (local?.rows ?? []);
+  const syncedAt = storedBase ? cached.syncedAt : (local?.syncedAt ?? "");
+  const ready = storedBase || Boolean(local);
+  const stale = !storedReady || Date.now() - Date.parse(syncedAt) > REFRESH_MS;
   if (stale) refresh(year);
   return {
     year,
     rows,
-    status: ready ? "ready" : pending.has(year) ? "refreshing" : "unavailable",
+    status:
+      pending.has(year) && !storedReady
+        ? "refreshing"
+        : ready
+          ? "ready"
+          : pending.has(year)
+            ? "refreshing"
+            : "unavailable",
     syncedAt,
+    funnelReady: storedReady || Boolean(local),
     error:
       ready || pending.has(year)
         ? ""

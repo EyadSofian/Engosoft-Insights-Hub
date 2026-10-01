@@ -723,6 +723,23 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
   },
   {
+    id: "management_review",
+    route: "/management-review",
+    title: q("مراجعة الأداء والخطة", "Performance and plan review"),
+    description: q(
+      "جدول شهري من 2025 يربط مسار ليدز Odoo وأسباب فقدها بالخطة القديمة والتنفيذ الفعلي.",
+      "Monthly view since 2025 linking Odoo lead cohorts and loss reasons to saved media-plan targets and actual delivery.",
+    ),
+    tabs: [],
+    sections: [],
+    elements: [],
+    suggestedQuestions: [
+      q("ليه الليدز بتضيع الشهر ده؟", "Why are leads being lost this month?"),
+      q("قد إيه حققنا من تارجت الخطة؟", "How much of the plan target did we achieve?"),
+      q("أنهي كورس عنده أفضل تحويل Fresh؟", "Which course has the strongest Fresh conversion?"),
+    ],
+  },
+  {
     id: "social_media",
     route: "/social-media",
     title: q("السوشيال ميديا", "Social media"),

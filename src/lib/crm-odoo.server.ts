@@ -29,6 +29,7 @@ import {
   type CrmStageKey,
 } from "./crm-contract";
 import { canonicalCourseValue } from "./course-taxonomy";
+import { canonicalLossReason } from "./loss-reason-taxonomy";
 
 export type CrmRawRow = Record<string, string>;
 
@@ -129,6 +130,15 @@ export interface HistoricalCrmDay {
   won: number;
   lost: number;
   inventoryLeads: number;
+  noAnswer: number;
+  replyKnown: number;
+  freshLeads: number;
+  freshWon: number;
+  oldLeads: number;
+  oldWon: number;
+  turnaroundDaysSum: number;
+  turnaroundSamples: number;
+  lostReasons: Record<string, number>;
 }
 
 export function historicalCrmYearDomain(year: 2024 | 2025): Domain {
@@ -149,7 +159,8 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     context: companyContext({ active_test: false }),
   });
   if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
-  const courseField = customFieldPlan(metadata).courseCategories;
+  const customFields = customFieldPlan(metadata);
+  const courseField = customFields.courseCategories;
   const fields = [
     "id",
     "create_date",
@@ -160,6 +171,11 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     "stage_is_lost",
     "stage_is_won",
     "lost_reason_id",
+    "lead_segment_id",
+    "date_closed",
+    "won_date",
+    "lost_verification_date",
+    customFields.callingReply,
     courseField,
   ].filter((field) => Boolean(field && metadata[field]));
   const [leads, stageKeys] = await Promise.all([
@@ -181,12 +197,44 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
       won: 0,
       lost: 0,
       inventoryLeads: 0,
+      noAnswer: 0,
+      replyKnown: 0,
+      freshLeads: 0,
+      freshWon: 0,
+      oldLeads: 0,
+      oldWon: 0,
+      turnaroundDaysSum: 0,
+      turnaroundSamples: 0,
+      lostReasons: {},
     };
     const status = crmBusinessStatus(contractRecord(lead, stageKeys));
     day.leads++;
     if (status === "won") day.won++;
     if (status === "lost") day.lost++;
     if (display(lead.inventory_bucket)) day.inventoryLeads++;
+    const reply = normalize(custom(lead, customFields.callingReply));
+    if (reply) day.replyKnown++;
+    const reason = m2oName(lead.lost_reason_id);
+    const reasonKey = status === "lost" ? canonicalLossReason(reason).canonicalReasonKey : "";
+    if (reasonKey) day.lostReasons[reasonKey] = (day.lostReasons[reasonKey] ?? 0) + 1;
+    if (reply === "not answer" || reply === "no answer" || reasonKey === "not_reached")
+      day.noAnswer++;
+    const segment = normalize(m2oName(lead.lead_segment_id as M2O));
+    if (segment === "fresh") {
+      day.freshLeads++;
+      if (status === "won") day.freshWon++;
+    } else if (segment === "old data") {
+      day.oldLeads++;
+      if (status === "won") day.oldWon++;
+    }
+    if (status === "won" || status === "lost") {
+      const closed = date(lead.date_closed || lead.won_date || lead.lost_verification_date);
+      const days = (Date.parse(closed) - Date.parse(createdAt)) / 86_400_000;
+      if (Number.isFinite(days) && days >= 0) {
+        day.turnaroundDaysSum += days;
+        day.turnaroundSamples++;
+      }
+    }
     days.set(key, day);
   }
   const archived = [...days.values()].reduce((sum, row) => sum + row.inventoryLeads, 0);

@@ -22,6 +22,7 @@ import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LandingPagesRouteImport } from './routes/landing-pages'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
+import { Route as ManagementReviewRouteImport } from './routes/management-review'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
 import { Route as MediaPlanRouteImport } from './routes/media-plan'
 import { Route as OrganicRouteImport } from './routes/organic'
@@ -56,6 +57,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
+import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
@@ -186,6 +188,11 @@ const LeadsRoute = LeadsRouteImport.update({
 const LostRoute = LostRouteImport.update({
   id: '/lost',
   path: '/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManagementReviewRoute = ManagementReviewRouteImport.update({
+  id: '/management-review',
+  path: '/management-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaBuyersRoute = MediaBuyersRouteImport.update({
@@ -358,6 +365,11 @@ const ApiLeadsRoute = ApiLeadsRouteImport.update({
 const ApiLostRoute = ApiLostRouteImport.update({
   id: '/api/lost',
   path: '/api/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagementReviewRoute = ApiManagementReviewRouteImport.update({
+  id: '/api/management-review',
+  path: '/api/management-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaBuyersRoute = ApiMediaBuyersRouteImport.update({
@@ -722,6 +734,7 @@ export interface FileRoutesByFullPath {
   '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -756,6 +769,7 @@ export interface FileRoutesByFullPath {
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -837,6 +851,7 @@ export interface FileRoutesByTo {
   '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -871,6 +886,7 @@ export interface FileRoutesByTo {
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -953,6 +969,7 @@ export interface FileRoutesById {
   '/landing-pages': typeof LandingPagesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -987,6 +1004,7 @@ export interface FileRoutesById {
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1070,6 +1088,7 @@ export interface FileRouteTypes {
     | '/landing-pages'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -1104,6 +1123,7 @@ export interface FileRouteTypes {
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1185,6 +1205,7 @@ export interface FileRouteTypes {
     | '/landing-pages'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -1219,6 +1240,7 @@ export interface FileRouteTypes {
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1300,6 +1322,7 @@ export interface FileRouteTypes {
     | '/landing-pages'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -1334,6 +1357,7 @@ export interface FileRouteTypes {
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1416,6 +1440,7 @@ export interface RootRouteChildren {
   LandingPagesRoute: typeof LandingPagesRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
+  ManagementReviewRoute: typeof ManagementReviewRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
   MediaPlanRoute: typeof MediaPlanRoute
   OrganicRoute: typeof OrganicRoute
@@ -1450,6 +1475,7 @@ export interface RootRouteChildren {
   ApiLeadQaRoute: typeof ApiLeadQaRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
+  ApiManagementReviewRoute: typeof ApiManagementReviewRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
@@ -1609,6 +1635,13 @@ declare module '@tanstack/react-router' {
       path: '/lost'
       fullPath: '/lost'
       preLoaderRoute: typeof LostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/management-review': {
+      id: '/management-review'
+      path: '/management-review'
+      fullPath: '/management-review'
+      preLoaderRoute: typeof ManagementReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media-buyers': {
@@ -1847,6 +1880,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lost'
       fullPath: '/api/lost'
       preLoaderRoute: typeof ApiLostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/management-review': {
+      id: '/api/management-review'
+      path: '/api/management-review'
+      fullPath: '/api/management-review'
+      preLoaderRoute: typeof ApiManagementReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media-buyers': {
@@ -2328,6 +2368,7 @@ const rootRouteChildren: RootRouteChildren = {
   LandingPagesRoute: LandingPagesRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
+  ManagementReviewRoute: ManagementReviewRoute,
   MediaBuyersRoute: MediaBuyersRoute,
   MediaPlanRoute: MediaPlanRoute,
   OrganicRoute: OrganicRoute,
@@ -2362,6 +2403,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadQaRoute: ApiLeadQaRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
+  ApiManagementReviewRoute: ApiManagementReviewRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
