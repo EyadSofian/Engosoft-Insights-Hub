@@ -136,13 +136,31 @@ export const Route = createFileRoute("/api/media-plan")({
           data.crm.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
           data.lost.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
         )).leads;
-        const certificateRevenueUsd = allData.accounting
+        const certificateRows = allData.accounting
           .filter((row) =>
             accountingReportingDate(row, "payment") >= window.from &&
             accountingReportingDate(row, "payment") <= window.to &&
             isExcludedFromSalesRevenue(row),
-          )
-          .reduce((sum, row) => sum + accountingUsdPaid(row, fxRatesFromFilters({})), 0);
+          );
+        const rates = fxRatesFromFilters({});
+        const certificateRevenueUsd = certificateRows
+          .reduce((sum, row) => sum + accountingUsdPaid(row, rates), 0);
+        const companyRevenueMap = new Map<string, { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }>();
+        const companyRow = (company: string) => {
+          const key = company.trim() || "غير محدد";
+          const current = companyRevenueMap.get(key) ?? { company: key, salesUsd: 0, certificateUsd: 0, certificateLines: 0 };
+          companyRevenueMap.set(key, current);
+          return current;
+        };
+        for (const row of data.accounting) companyRow(row.company).salesUsd += row.usdPaid;
+        for (const row of certificateRows) {
+          const current = companyRow(row.company);
+          current.certificateUsd += accountingUsdPaid(row, rates);
+          current.certificateLines++;
+        }
+        const revenueByCompany = [...companyRevenueMap.values()].sort(
+          (a, b) => b.salesUsd + b.certificateUsd - a.salesUsd - a.certificateUsd,
+        );
         const courses = computeCourses(data);
         const totals = computeTotals(data);
         const organicTotals = computeTotals(organicData);
@@ -372,6 +390,8 @@ export const Route = createFileRoute("/api/media-plan")({
             unattributedOrUnplannedSpend: Math.max(0, totals.spend - targetedSpend),
             revenueUsd: totals.revenue,
             certificateRevenueUsd,
+            certificateLines: certificateRows.length,
+            revenueByCompany,
             revenueIncludingCertificatesUsd: totals.revenue + certificateRevenueUsd,
             actualSalesBudgetAllowanceUsd: plan.month === "2026-09" ? totals.revenue * 0.17 : null,
             actualGrossBudgetAllowanceUsd: plan.month === "2026-09" ? (totals.revenue + certificateRevenueUsd) * 0.17 : null,

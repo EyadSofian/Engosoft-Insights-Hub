@@ -94,6 +94,8 @@ interface MediaPlanResponse {
     unattributedOrUnplannedSpend: number;
     revenueUsd: number;
     certificateRevenueUsd: number;
+    certificateLines: number;
+    revenueByCompany: { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }[];
     revenueIncludingCertificatesUsd: number;
     actualSalesBudgetAllowanceUsd: number | null;
     actualGrossBudgetAllowanceUsd: number | null;
@@ -758,6 +760,38 @@ function MediaPlanPage() {
                   ? `التحصيل المؤهل لتارجت السيلز ${fmtUSDFull(data.actual.revenueUsd)}؛ شهادات المنتج 246 خارج التارجت ${fmtUSDFull(data.actual.certificateRevenueUsd)}؛ الإجمالي معها ${fmtUSDFull(data.actual.revenueIncludingCertificatesUsd)}. سقف 17% من الإجمالي مع الشهادات ${fmtUSDFull(data.actual.actualGrossBudgetAllowanceUsd)}، وهو منفصل عن الميزانية الثابتة 22,950$. توزيع الدورات والأنشطة المنسوخ من أغسطس ما زال مسودة.`
                   : `Sales-eligible collections ${fmtUSDFull(data.actual.revenueUsd)}; excluded product 246 certificates ${fmtUSDFull(data.actual.certificateRevenueUsd)}; combined ${fmtUSDFull(data.actual.revenueIncludingCertificatesUsd)}. A 17% allowance on the inclusive total is ${fmtUSDFull(data.actual.actualGrossBudgetAllowanceUsd)}, distinct from the fixed $22,950 budget. Course/activity allocations copied from August remain draft.`}
               </p>
+              <details className="mt-3 rounded-xl border border-border bg-surface p-3 text-xs">
+                <summary className="cursor-pointer font-semibold text-brand">
+                  {lang === "ar" ? "تفصيل التحصيل حسب الشركة ومصدر فرق الشهادات" : "Revenue by company and certificate difference"}
+                </summary>
+                <p className="mt-2 text-text-muted">
+                  {lang === "ar"
+                    ? `${fmtNum(data.actual.certificateLines)} سطر محاسبي للمنتج 246 أو أسمائه المطابقة؛ جميع المبالغ بتاريخ الدفع من Odoo وبالدولار حسب سعر الصرف المعتمد.`
+                    : `${fmtNum(data.actual.certificateLines)} paid accounting lines for product 246 or matching names; Odoo payment-date USD using the configured FX rates.`}
+                </p>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[430px] text-xs">
+                    <thead className="border-b border-border text-text-muted">
+                      <tr>
+                        <th className="p-2 text-start">{lang === "ar" ? "الشركة" : "Company"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "مبيعات مؤهلة" : "Sales eligible"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "شهادات 246" : "Certificates 246"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "الإجمالي" : "Combined"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.actual.revenueByCompany.map((item) => (
+                        <tr key={item.company} className="border-b border-border/70 last:border-0">
+                          <td className="p-2 font-medium text-text">{item.company}</td>
+                          <td className="num p-2 text-end">{fmtUSDFull(item.salesUsd)}</td>
+                          <td className="num p-2 text-end">{fmtUSDFull(item.certificateUsd)}</td>
+                          <td className="num p-2 text-end font-semibold">{fmtUSDFull(item.salesUsd + item.certificateUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             </Card>
           )}
 
