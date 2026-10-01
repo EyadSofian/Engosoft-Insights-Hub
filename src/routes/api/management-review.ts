@@ -32,17 +32,24 @@ export const Route = createFileRoute("/api/management-review")({
         const { computeCourses, getFiltered } = await import("@/lib/metrics.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
         const { historicalCrm } = await import("@/lib/yearly-crm-history.server");
+        const { loadAllData } = await import("@/lib/sheet-cache.server");
+        const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
+        const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { lostPopulationCounts, lostPopulations } = await import("@/lib/lost-classification");
         const { json } = await import("@/lib/api.server");
         const today = cairoToday();
         const months = monthsThrough(today);
         const previousMonth = months.at(-2) ?? months[0];
         const requested = new URL(request.url).searchParams.get("month") ?? "";
         const selectedMonth = months.includes(requested) ? requested : previousMonth;
-        const [data, source, historical] = await Promise.all([
+        const [data, closedData, allData, source, historical] = await Promise.all([
           getFiltered({ from: "2025-01-01", to: today }),
+          getFiltered({ from: "2025-01-01", to: today, lostDateBasis: "closed" }),
+          loadAllData(),
           loadMediaPlanSource(),
           historicalCrm(2025),
         ]);
+        const fxRates = fxRatesFromFilters({});
 
         const monthRows = months.map((month) => {
           const historicalMonth = month.startsWith("2025");
@@ -72,6 +79,13 @@ export const Route = createFileRoute("/api/management-review")({
           const revenueSum = data.accounting
             .filter((row) => accountingReportingDate(row, "payment").startsWith(month))
             .reduce((sum, row) => sum + row.usdPaid, 0);
+          const certificateRevenue = allData.accounting
+            .filter(
+              (row) =>
+                accountingReportingDate(row, "payment").startsWith(month) &&
+                isExcludedFromSalesRevenue(row),
+            )
+            .reduce((sum, row) => sum + accountingUsdPaid(row, fxRates), 0);
           const spend = adsCovered ? spendSum : null;
           const revenue = revenueCovered ? revenueSum : null;
           const salesTarget = plan?.salesTargetUsd ?? null;
@@ -99,12 +113,24 @@ export const Route = createFileRoute("/api/management-review")({
             ? "mixed_platform_crm"
             : "platform";
           const adBudget = plan
-            ? plan.leadGenerationBudgetUsd > 0
-              ? plan.leadGenerationBudgetUsd
+            ? plan.overallMarketingBudgetUsd !== undefined
+              ? plan.overallMarketingBudgetUsd
+              : plan.leadGenerationBudgetUsd > 0
+                ? plan.leadGenerationBudgetUsd + plan.additionalActivities.reduce((sum, activity) => sum + activity.budgetUsd, 0)
               : month === "2026-10" && !source.editedMonths.includes(month)
                 ? OCTOBER_2026_SOURCE.marketingBudgetUsd
                 : null
             : null;
+          const lostCounts = historicalMonth || !crmCovered ? null : lostPopulationCounts(
+            lostPopulations({
+              cohortRows: data.lost,
+              closedRows: closedData.lost,
+              window: {
+                from: `${month}-01`,
+                to: `${month}-${String(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`,
+              },
+            }),
+          );
           return {
             month,
             historicalStatus: historicalMonth ? historical.status : "ready",
@@ -124,8 +150,11 @@ export const Route = createFileRoute("/api/management-review")({
             },
             actual: {
               revenue,
+              certificateRevenue: revenueCovered ? certificateRevenue : null,
+              revenueIncludingCertificates: revenueCovered && revenue !== null ? revenue + certificateRevenue : null,
               spend,
               leads: planLeadsActual,
+              crmLeads: crmCovered ? funnel.leads : null,
               conversion: crmCovered ? funnel.conversion : null,
               freshConversion: enriched ? funnel.freshConversion : null,
               oldConversion: enriched ? funnel.oldConversion : null,
@@ -137,6 +166,18 @@ export const Route = createFileRoute("/api/management-review")({
                 leadTarget === null || planLeadsActual === null
                   ? null
                   : rate(planLeadsActual, leadTarget),
+            },
+            budget: {
+              actualRevenueAllowance: revenue === null || month !== "2026-09" ? null : revenue * 0.17,
+              actualRevenueUtilization: revenue === null || spend === null || month !== "2026-09" ? null : rate(spend, revenue * 0.17),
+              actualGrossAllowance: revenue === null || month !== "2026-09" ? null : (revenue + certificateRevenue) * 0.17,
+              targetRate: month === "2026-09" ? 0.17 : null,
+            },
+            lostMovement: {
+              closedInMonth: lostCounts?.closedLostInPeriod ?? null,
+              createdAndClosedInMonth: lostCounts?.createdAndLostInPeriod ?? null,
+              olderCreatedClosedInMonth: lostCounts?.olderCohortClosedLostInPeriod ?? null,
+              undatedCreatedClosedInMonth: lostCounts?.undatedCohortClosedLostInPeriod ?? null,
             },
             funnel: {
               ...funnel,
@@ -197,7 +238,9 @@ export const Route = createFileRoute("/api/management-review")({
             revenue:
               "Paid Accounting USD by payment date, with product 246 excluded by the sales revenue policy.",
             spend:
-              "All connected ad-account spend by platform date. A missing plan target is not inferred.",
+              "All connected ad-account spend by platform date. September 2026 fixed marketing budget is 17% of the $135,000 target; a separate floating 17%-of-sales allowance is shown, not substituted for the fixed plan.",
+            lostMovement:
+              "Creation-cohort Lost means leads created in the selected month that are now Lost. Closed-in-month Lost means all leads closed Lost in that month, including older creation cohorts.",
             leadTarget:
               "Paid course-lead target compared with course-matched platform leads, with labelled CRM fallback where a platform does not report leads.",
           },

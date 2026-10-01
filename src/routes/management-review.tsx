@@ -45,10 +45,12 @@ interface ReviewRow {
     number | null
   >;
   actual: Record<
-    "revenue" | "spend" | "leads" | "conversion" | "freshConversion" | "oldConversion",
+    "revenue" | "spend" | "leads" | "conversion" | "freshConversion" | "oldConversion" | "certificateRevenue" | "revenueIncludingCertificates" | "crmLeads",
     number | null
   >;
   achievement: Record<"revenue" | "spend" | "leads", number | null>;
+  budget: { actualRevenueAllowance: number | null; actualRevenueUtilization: number | null; actualGrossAllowance: number | null; targetRate: number | null };
+  lostMovement: { closedInMonth: number | null; createdAndClosedInMonth: number | null; olderCreatedClosedInMonth: number | null; undatedCreatedClosedInMonth: number | null };
   funnel: {
     leads: number;
     won: number;
@@ -219,21 +221,43 @@ function ManagementReviewPage() {
             tone="green"
           />
           <SummaryMetric
-            label={ar ? "المستخدم من ميزانية الإعلانات" : "Ad budget utilization"}
+            label={ar ? "المستخدم من الميزانية الثابتة" : "Fixed-budget utilization"}
             value={percent(row.achievement.spend)}
             detail={`${money(row.actual.spend)} / ${money(row.target.spend)}`}
             tone="amber"
           />
           <SummaryMetric
-            label={ar ? "تحقيق تارجت الليدز" : "Lead target achievement"}
+            label={ar ? "ليدز Odoo المنشأة في الشهر" : "CRM leads created this month"}
+            value={number(row.actual.crmLeads)}
+            detail={ar ? "كل الدورات والمصادر، غير عدد منصة الإعلانات" : "All CRM sources; distinct from platform leads"}
+          />
+          <SummaryMetric
+            label={ar ? "تحقيق تارجت ليدز الإعلانات" : "Paid-lead target achievement"}
             value={percent(row.achievement.leads)}
             detail={`${number(row.actual.leads)} / ${number(row.target.leads)}`}
           />
+          {row.budget.targetRate !== null && (
+            <SummaryMetric
+              label={ar ? "الصرف مقابل 17% من التحصيل" : "Spend vs 17% of actual sales"}
+              value={percent(row.budget.actualRevenueUtilization)}
+              detail={`${money(row.actual.spend)} / ${money(row.budget.actualRevenueAllowance)} ${ar ? "بدون شهادات" : "excl. certificates"} · ${money(row.budget.actualGrossAllowance)} ${ar ? "معها" : "incl."}`}
+              tone="green"
+            />
+          )}
+          {row.actual.certificateRevenue !== null && (
+            <SummaryMetric
+              label={ar ? "الشهادات خارج تارجت السيلز" : "Certificates outside sales target"}
+              value={money(row.actual.certificateRevenue)}
+              detail={`${ar ? "الإجمالي مع الشهادات" : "Total with certificates"}: ${money(row.actual.revenueIncludingCertificates)}`}
+            />
+          )}
         </div>
         {row.planStatus === "draft" && (
           <p className="mt-3 text-xs leading-relaxed text-amber-800">
             {ar
-              ? `تنبيه: تارجت ${monthName(row.month, lang)} مسودة${row.planBasisMonth ? ` منسوخة من ${monthName(row.planBasisMonth, lang)}` : ""}، فلا تعتبر نسبة التحقيق حكمًا نهائيًا حتى اعتماد الخطة.`
+              ? row.month === "2026-09"
+                ? "تارجت المبيعات 135,000$ وميزانية التسويق 22,950$ (17%) بتصحيح الإدارة. توزيع الليدز والدورات والأنشطة من أغسطس ما زال مسودة، فلا تعتبر تحقيق تارجت الليدز نهائيًا."
+                : `تنبيه: تارجت ${monthName(row.month, lang)} مسودة${row.planBasisMonth ? ` منسوخة من ${monthName(row.planBasisMonth, lang)}` : ""}، فلا تعتبر نسبة التحقيق حكمًا نهائيًا حتى اعتماد الخطة.`
               : "Draft targets are provisional and must be approved before treating achievement as final."}
           </p>
         )}
@@ -279,7 +303,7 @@ function ManagementReviewPage() {
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
             {ar
-              ? `لا نختلق تارجت لمعدل التحويل أو لأشهر بلا خطة. التحصيل من Odoo بتاريخ الدفع، والصرف من كل الحسابات المتصلة. ليدز التارجت من الدورات المطابقة للخطة (${row.leadBasis === "mixed_platform_crm" ? "منصات + بديل CRM عند غياب بيانات المنصة" : "بيانات المنصات"})؛ مسار الـCRM الكامل معروض منفصلًا.`
+              ? `لا نختلق تارجت لمعدل التحويل أو لأشهر بلا خطة. التحصيل من Odoo بتاريخ الدفع، والصرف من كل الحسابات المتصلة. تارجت الليدز للمنصات فقط (${row.leadBasis === "mixed_platform_crm" ? "منصات + بديل CRM عند غياب بيانات المنصة" : "بيانات المنصات"})؛ جميع ليدز Odoo معروضة منفصلة. ميزانية سبتمبر الثابتة = 135,000 × 17%، وسقف 17% من التحصيل الفعلي مقارنة مستقلة.`
               : "No inferred targets. Paid accounting and connected ad accounts. Paid course leads match plan courses; CRM funnel is separate."}
           </p>
         </Card>
@@ -292,9 +316,17 @@ function ManagementReviewPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <SummaryMetric
-              label="Lost Rate"
+              label={ar ? "Lost ليدز الشهر (حالتها الآن)" : "Created this month, now Lost"}
               value={row.funnelAvailable ? percent(f.lostRate) : "—"}
               detail={`${row.funnelAvailable ? number(f.lost) : "—"} / ${row.funnelAvailable ? number(f.leads) : "—"}`}
+              tone="red"
+            />
+            <SummaryMetric
+              label={ar ? "Lost اتقفلت خلال الشهر · كل الليدز" : "All leads closed Lost this month"}
+              value={number(row.lostMovement.closedInMonth)}
+              detail={ar
+                ? `${number(row.lostMovement.createdAndClosedInMonth)} من ليدز الشهر + ${number(row.lostMovement.olderCreatedClosedInMonth)} أقدم + ${number(row.lostMovement.undatedCreatedClosedInMonth)} تاريخها غير صالح`
+                : `${number(row.lostMovement.createdAndClosedInMonth)} new + ${number(row.lostMovement.olderCreatedClosedInMonth)} older + ${number(row.lostMovement.undatedCreatedClosedInMonth)} undated`}
               tone="red"
             />
             <SummaryMetric
@@ -502,7 +534,7 @@ function ManagementReviewPage() {
         <div className="mt-3 space-y-2">
           <p>
             {ar
-              ? "الليدز مجموعات حسب تاريخ الإنشاء في Odoo؛ بيانات 2025 التاريخية تشمل Inventory، بينما بيانات التشغيل 2026 لا تشملها. Won وLost هي الحالة الحالية وقت آخر مزامنة وليست لقطة محفوظة بنهاية كل شهر."
+              ? "الليدز مجموعات حسب تاريخ الإنشاء في Odoo؛ بيانات 2025 التاريخية تشمل Inventory، بينما بيانات التشغيل 2026 لا تشملها. Lost ليدز الشهر = ليدز أُنشئت خلاله وحالتها الآن Lost. Lost المقفولة خلال الشهر = كل الحالات التي تاريخ إغلاقها Lost في الشهر، بما فيها الليدز الأقدم. المجموعتان لا تُجمعان."
               : "Leads use Odoo creation date. Historical 2025 includes Inventory, while operational 2026 excludes it. Won/Lost reflect current state, not saved month-end state."}
           </p>
           <p>

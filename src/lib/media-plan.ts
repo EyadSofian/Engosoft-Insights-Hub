@@ -152,13 +152,17 @@ const basePlan = (
 });
 
 /**
- * August is the approved source plan. September intentionally starts as a
- * visible draft copied from that baseline until management publishes revised
- * targets; the UI never presents copied numbers as approved September facts.
+ * August is the approved source plan. September's sales target and 17% overall
+ * marketing ceiling were confirmed by management on 2026-10-01. Its course
+ * lead targets and activity allocations are still copied August draft values.
  */
 export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
   "2026-08": basePlan("2026-08", "approved"),
-  "2026-09": basePlan("2026-09", "draft", "2026-08"),
+  "2026-09": {
+    ...basePlan("2026-09", "draft", "2026-08"),
+    salesTargetUsd: 135_000,
+    overallMarketingBudgetUsd: 22_950,
+  },
   // Imported from the supplied October image as a DRAFT. The image says
   // 24,700 total leads, but its six course rows sum to 4,176 and the website
   // goal is 3,000. YouTube (300) and branding (500) have no stated unit, so

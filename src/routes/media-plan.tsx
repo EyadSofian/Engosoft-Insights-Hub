@@ -85,6 +85,7 @@ interface MediaPlanResponse {
     targetedSpend: number;
     targetedLeads: number;
     targetedCrmLeads: number;
+    allCrmLeads: number;
     targetedCpl: number | null;
     paidLeadAchievement: number | null;
     organicWebinarLeads: number;
@@ -92,6 +93,10 @@ interface MediaPlanResponse {
     allSpend: number;
     unattributedOrUnplannedSpend: number;
     revenueUsd: number;
+    certificateRevenueUsd: number;
+    revenueIncludingCertificatesUsd: number;
+    actualSalesBudgetAllowanceUsd: number | null;
+    actualGrossBudgetAllowanceUsd: number | null;
     salesAchievement: number | null;
   };
   courses: CourseRow[];
@@ -424,10 +429,14 @@ function mediaPlanMetrics(
           : "Everything set aside for marketing this month: lead generation plus other activities.",
       formula: A
         ? P.overallMarketingBudgetUsd !== undefined
-          ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} إجمالي من المصدر؛ الموزع حاليًا ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)}، والباقي غير موزع.`
+          ? P.leadGenerationBudgetUsd + P.additionalBudgetUsd > P.overallMarketingBudgetUsd
+            ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} الإجمالي المؤكد؛ توزيع المسودة ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)} أعلى منه بـ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd - P.overallMarketingBudgetUsd)} ويحتاج إعادة اعتماد.`
+            : `${fmtUSDFull(P.totalMarketingBudgetUsd)} إجمالي من المصدر؛ الموزع حاليًا ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)}، والباقي غير موزع.`
           : `${fmtUSDFull(P.leadGenerationBudgetUsd)} ليدز + ${fmtUSDFull(P.additionalBudgetUsd)} أنشطة إضافية = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`
         : P.overallMarketingBudgetUsd !== undefined
-          ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} source total; ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)} allocated so far, the rest unallocated.`
+          ? P.leadGenerationBudgetUsd + P.additionalBudgetUsd > P.overallMarketingBudgetUsd
+            ? `${fmtUSDFull(P.totalMarketingBudgetUsd)} confirmed total; draft allocations of ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)} exceed it by ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd - P.overallMarketingBudgetUsd)} and need approval.`
+            : `${fmtUSDFull(P.totalMarketingBudgetUsd)} source total; ${fmtUSDFull(P.leadGenerationBudgetUsd + P.additionalBudgetUsd)} allocated so far, the rest unallocated.`
           : `${fmtUSDFull(P.leadGenerationBudgetUsd)} lead-gen + ${fmtUSDFull(P.additionalBudgetUsd)} extra activities = ${fmtUSDFull(P.totalMarketingBudgetUsd)}.`,
       supporting: [
         {
@@ -445,17 +454,18 @@ function mediaPlanMetrics(
           label:
             P.overallMarketingBudgetUsd !== undefined
               ? A
-                ? "غير موزع"
-                : "Unallocated"
+                ? P.leadGenerationBudgetUsd + P.additionalBudgetUsd > P.overallMarketingBudgetUsd
+                  ? "زيادة توزيع المسودة"
+                  : "غير موزع"
+                : P.leadGenerationBudgetUsd + P.additionalBudgetUsd > P.overallMarketingBudgetUsd
+                  ? "Draft over-allocation"
+                  : "Unallocated"
               : A
                 ? "الاحتياطي"
                 : "Reserve",
           value: fmtUSDFull(
             P.overallMarketingBudgetUsd !== undefined
-              ? Math.max(
-                  0,
-                  P.overallMarketingBudgetUsd - P.leadGenerationBudgetUsd - P.additionalBudgetUsd,
-                )
+              ? Math.abs(P.overallMarketingBudgetUsd - P.leadGenerationBudgetUsd - P.additionalBudgetUsd)
               : P.reserveBudgetUsd,
           ),
         },
@@ -719,6 +729,37 @@ function MediaPlanPage() {
           </DashboardPanel>
 
           {data.plan.month === "2026-10" && <OctoberSourcePanel lang={lang} />}
+
+          {data.plan.month === "2026-09" && (
+            <Card className="border-brand/20 bg-brand-soft/20 p-5">
+              <h2 className="text-sm font-bold text-text">
+                {lang === "ar" ? "تصحيح سبتمبر · الهدف والصرف والليدز" : "September correction · target, spend and leads"}
+              </h2>
+              <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="text-text-muted">{lang === "ar" ? "تارجت المبيعات" : "Sales target"}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.plan.salesTargetUsd)}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="text-text-muted">{lang === "ar" ? "ميزانية ثابتة: 17% من التارجت" : "Fixed budget: 17% of target"}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.plan.totalMarketingBudgetUsd)}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="text-text-muted">{lang === "ar" ? "صرف فعلي / 17% من التحصيل" : "Spend / 17% of actual sales"}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.actual.allSpend)} / {fmtUSDFull(data.actual.actualSalesBudgetAllowanceUsd)}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="text-text-muted">{lang === "ar" ? "ليدز Odoo المنشأة / ليدز المنصات" : "Created CRM / platform leads"}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{fmtNum(data.actual.allCrmLeads)} / {fmtNum(data.actual.targetedLeads)}</div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-text-muted">
+                {lang === "ar"
+                  ? `التحصيل المؤهل لتارجت السيلز ${fmtUSDFull(data.actual.revenueUsd)}؛ شهادات المنتج 246 خارج التارجت ${fmtUSDFull(data.actual.certificateRevenueUsd)}؛ الإجمالي معها ${fmtUSDFull(data.actual.revenueIncludingCertificatesUsd)}. سقف 17% من الإجمالي مع الشهادات ${fmtUSDFull(data.actual.actualGrossBudgetAllowanceUsd)}، وهو منفصل عن الميزانية الثابتة 22,950$. توزيع الدورات والأنشطة المنسوخ من أغسطس ما زال مسودة.`
+                  : `Sales-eligible collections ${fmtUSDFull(data.actual.revenueUsd)}; excluded product 246 certificates ${fmtUSDFull(data.actual.certificateRevenueUsd)}; combined ${fmtUSDFull(data.actual.revenueIncludingCertificatesUsd)}. A 17% allowance on the inclusive total is ${fmtUSDFull(data.actual.actualGrossBudgetAllowanceUsd)}, distinct from the fixed $22,950 budget. Course/activity allocations copied from August remain draft.`}
+              </p>
+            </Card>
+          )}
 
           <KpiRow>
             <MetricDetailTrigger

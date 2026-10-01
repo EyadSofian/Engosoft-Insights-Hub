@@ -20,7 +20,8 @@ assert.equal(
 assert.equal(september.paidLeadTarget, 4_000);
 assert.equal(september.organicWebinarLeadTarget, 1_000);
 assert.equal(september.leadTarget, 5_000);
-assert.equal(september.salesTargetUsd, 150_000);
+assert.equal(september.salesTargetUsd, 135_000);
+assert.equal(september.overallMarketingBudgetUsd, 22_950);
 assert.equal(
   september.courses.reduce((sum, row) => sum + plannedCourseBudget(row), 0),
   19_500,

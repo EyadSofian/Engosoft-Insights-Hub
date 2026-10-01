@@ -85,6 +85,11 @@ export const Route = createFileRoute("/api/media-plan")({
         const { computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
+        const { loadAllData } = await import("@/lib/sheet-cache.server");
+        const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
+        const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { funnelFromLive, summarizeFunnel } = await import("@/lib/management-review");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
@@ -120,12 +125,24 @@ export const Route = createFileRoute("/api/media-plan")({
           salesperson: undefined,
         } as const;
 
-        const [data, organicData, websiteData, webinarData] = await Promise.all([
+        const [data, organicData, websiteData, webinarData, allData] = await Promise.all([
           getFiltered(scopedFilters),
           getFiltered({ ...scopedFilters, channel: "organic" }),
           getFiltered({ ...scopedFilters, source: "Website" }),
           getFiltered({ ...scopedFilters, source: "Webinar" }),
+          loadAllData(),
         ]);
+        const allCrmLeads = summarizeFunnel(funnelFromLive(
+          data.crm.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+          data.lost.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+        )).leads;
+        const certificateRevenueUsd = allData.accounting
+          .filter((row) =>
+            accountingReportingDate(row, "payment") >= window.from &&
+            accountingReportingDate(row, "payment") <= window.to &&
+            isExcludedFromSalesRevenue(row),
+          )
+          .reduce((sum, row) => sum + accountingUsdPaid(row, fxRatesFromFilters({})), 0);
         const courses = computeCourses(data);
         const totals = computeTotals(data);
         const organicTotals = computeTotals(organicData);
@@ -346,6 +363,7 @@ export const Route = createFileRoute("/api/media-plan")({
             targetedSpend,
             targetedLeads,
             targetedCrmLeads,
+            allCrmLeads,
             targetedCpl: divide(targetedSpend, targetedLeads),
             paidLeadAchievement: divide(targetedLeads, plan.paidLeadTarget),
             organicWebinarLeads: organicTotals.totalLeads,
@@ -353,6 +371,10 @@ export const Route = createFileRoute("/api/media-plan")({
             allSpend: totals.spend,
             unattributedOrUnplannedSpend: Math.max(0, totals.spend - targetedSpend),
             revenueUsd: totals.revenue,
+            certificateRevenueUsd,
+            revenueIncludingCertificatesUsd: totals.revenue + certificateRevenueUsd,
+            actualSalesBudgetAllowanceUsd: plan.month === "2026-09" ? totals.revenue * 0.17 : null,
+            actualGrossBudgetAllowanceUsd: plan.month === "2026-09" ? (totals.revenue + certificateRevenueUsd) * 0.17 : null,
             salesAchievement: divide(totals.revenue, plan.salesTargetUsd),
           },
           courses: courseRows,
@@ -376,6 +398,9 @@ export const Route = createFileRoute("/api/media-plan")({
               ? [
                   "October 2026 Media Plan image supplied by management; conflicting totals remain a draft note",
                 ]
+              : []),
+            ...(plan.month === "2026-09"
+              ? ["Management correction, 2026-10-01: September sales target $135,000; marketing budget 17% of target ($22,950). August course/activity allocations remain a draft."]
               : []),
           ],
           health: data.snapshot.health,
