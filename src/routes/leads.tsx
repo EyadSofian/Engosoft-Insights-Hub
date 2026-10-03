@@ -139,6 +139,7 @@ interface Resp {
     currentLostOpportunities: number;
     historicalLostOpportunities: number;
     unmappedOperationalStages: number;
+    longFollowUpStages: number;
     readyToConvert: number;
     unsourced: number;
   };
@@ -885,12 +886,12 @@ function CrmWorkspace() {
               >
                 <strong>
                   {A
-                    ? `${fmtNum(summary.unmappedOperationalStages)} سجلًا مفتوحًا خارج توزيع المراحل.`
-                    : `${fmtNum(summary.unmappedOperationalStages)} open records are outside the stage distribution.`}
+                    ? `${fmtNum(summary.unmappedOperationalStages)} سجلًا مفتوحًا خارج شريط المراحل القياسية، منها ${fmtNum(summary.longFollowUpStages)} في متابعة طويلة.`
+                    : `${fmtNum(summary.unmappedOperationalStages)} open records are outside the standard stage rail, including ${fmtNum(summary.longFollowUpStages)} in Long Follow Up.`}
                 </strong>{" "}
                 {A
-                  ? "مرحلتها ليست من مراحل الـCRM المعرّفة بـXMLID في هذه النسخة؛ لا نخمّن المرحلة من اسمها."
-                  : "Their stage does not resolve to a lifecycle XMLID in this snapshot, so the dashboard does not guess from a stage name."}
+                  ? "متابعة طويلة محسوبة في جدول الـSLA أعلاه باسمها الفعلي في Odoo؛ ولا نضم المراحل الأخرى إلى شريط XMLID بالتخمين."
+                  : "Long Follow Up is counted in the SLA table above using its actual Odoo label; other stages are not guessed into the XMLID rail."}
               </div>
             )}
           </Card>

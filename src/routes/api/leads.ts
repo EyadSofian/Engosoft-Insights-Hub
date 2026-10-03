@@ -220,6 +220,12 @@ export const Route = createFileRoute("/api/leads")({
             unmappedOperationalStages: activeRows.filter(
               (row) => (row.status === "lead" || row.status === "open") && row.stageKey === "other",
             ).length,
+            longFollowUpStages: activeRows.filter(
+              (row) =>
+                (row.status === "lead" || row.status === "open") &&
+                row.stageKey === "other" &&
+                row.stage.trim().toLowerCase() === "long follow up",
+            ).length,
             readyToConvert: activeRows.filter(
               (row) => row.recordType === "lead" && row.readyToConvert,
             ).length,
