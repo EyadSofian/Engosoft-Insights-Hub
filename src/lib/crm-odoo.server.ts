@@ -498,6 +498,7 @@ function commonRaw(
   return {
     __odoo_id: String(lead.id),
     __odoo_create_date_utc: display(lead.create_date),
+    __odoo_last_stage_update_utc: display(lead.date_last_stage_update),
     __odoo_write_date: dateTime(lead.write_date),
     "Record Type": contract.type,
     "Record Active": String(contract.active),

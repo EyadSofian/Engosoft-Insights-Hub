@@ -34,6 +34,39 @@ export interface SalesTarget {
   note: string;
 }
 
+// Plan October - Mahfouz.xlsx, Sheet1 H2:K31 (received 2026-10-03).
+// The spreadsheet has two *units* (Bahaa 82,500; Asmaa 75,000) and four
+// subordinate teams (Bahaa, Ahmed Saeed, Nader, Asmaa). Preserve the August
+// Odoo identities/aliases, but never carry an August quota into October.
+const AUGUST_BY_ID = new Map<string, SalesTarget>();
+function octoberRow(
+  employeeId: string,
+  workbookName: string,
+  target: number | null,
+  teamLeader: string,
+  supervisor: string,
+  extraAliases: string[] = [],
+  note = "",
+): SalesTarget {
+  const previous = AUGUST_BY_ID.get(employeeId);
+  return {
+    employeeId,
+    name: previous?.name ?? workbookName,
+    aliases: [
+      ...new Set([
+        ...(previous?.aliases ?? []),
+        ...(previous && previous.name !== workbookName ? [workbookName] : []),
+        ...extraAliases,
+      ]),
+    ],
+    teamLeader,
+    supervisor,
+    branch: "Egypt",
+    target,
+    note,
+  };
+}
+
 /**
  * Targets by month (`YYYY-MM`). Add the next month as a new key; never edit a
  * past month, because achievement for a closed month has already been reported.
@@ -368,6 +401,95 @@ export const SALES_TARGETS: Record<string, SalesTarget[]> = {
   ],
 };
 
+for (const row of SALES_TARGETS["2026-08"]) AUGUST_BY_ID.set(row.employeeId, row);
+const OCTOBER_PUBLISHED: SalesTarget[] = [
+  // Bahaa's unit: 63,000 direct + 19,500 under Ahmed Saeed = 82,500.
+  octoberRow("338", "Basma kamal ali Ibrahim alroby", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("346", "Sherif Waleed Ahmed Mohamed", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("606", "Eslam Khaled Abdelmonem", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("503", "Menna Tullah Mustafa Ali Mustafa", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("319", "Hady Mahmnoud Fahmy Elhenawy", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("482", "Mr.Mohamad Abdullah Mohamad Mohsen", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("238", "Sabrin Ebrahim Ali", 9000, "Bahaa Ramadan", "Bahaa Ramadan"),
+  octoberRow("630", "Yasmin Gaber Farghaly", 9000, "Ahmed Saeed", "Bahaa Ramadan"),
+  octoberRow("602", "Hessein Mohamed Abdullah", 7500, "Ahmed Saeed", "Bahaa Ramadan"),
+  octoberRow("635", "Mustafa Reda Abdelglel", 3000, "Ahmed Saeed", "Bahaa Ramadan"),
+  // Asmaa's unit: 51,000 under Nader + 24,000 direct = 75,000.
+  octoberRow("558", "Dalia Mohamed Abdelfattah Ibrahim", 9000, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow(
+    "632",
+    "mahmoud hassan elsayed amer - Website",
+    9000,
+    "Nader Aziz",
+    "Asmaa Fathy",
+    ["mahmoud hassan elsayed amer (website)"],
+    "مبيعات الموقع",
+  ),
+  octoberRow("619", "Hazem talaat", 7500, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow("631", "Ahmed Ehab hosny ahmed", 7500, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow("597", "Mohamed Ehab Fathy", 6000, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow("292", "Ahmed Shaaban Ali Muhammad", 6000, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow("457", "Mennatallah walid Mohamed Fathy", 6000, "Nader Aziz", "Asmaa Fathy"),
+  octoberRow("378", "Ahmed Farouk Mohamed Mohamed", 6000, "Asmaa Fathy", "Asmaa Fathy"),
+  octoberRow("235", "Mohamed Sami Mahmoud", 3000, "Asmaa Fathy", "Asmaa Fathy"),
+  octoberRow(
+    "sara.abdullah@engosoft.com",
+    "Sara Abdullah Ahmed",
+    3000,
+    "Asmaa Fathy",
+    "Asmaa Fathy",
+  ),
+  octoberRow(
+    "workbook:mazen-ahmed-mahmoud",
+    "Mazen Ahmed Mahmoud",
+    3000,
+    "Asmaa Fathy",
+    "Asmaa Fathy",
+    ["Mazen Ahmed"],
+    "Odoo employee ID not published in workbook",
+  ),
+  octoberRow(
+    "335",
+    "Abdullah Mohsen Abdul Hamid - Website",
+    9000,
+    "Asmaa Fathy",
+    "Asmaa Fathy",
+    ["Abdullah Mohsen Abdul Hamid"],
+    "مبيعات الموقع",
+  ),
+  // Explicit zeros in the workbook are not missing targets.
+  octoberRow(
+    "workbook:ahmed-salah-aboyazed",
+    "Ahmed Salah Aboyazed Hassan",
+    0,
+    "Asmaa Fathy",
+    "Asmaa Fathy",
+  ),
+  octoberRow(
+    "workbook:abdelrahman-abdelhamid",
+    "Abdelrahman Abdelhamid Nasreldin",
+    0,
+    "Asmaa Fathy",
+    "Asmaa Fathy",
+  ),
+  octoberRow("workbook:solaf-ali", "Solaf Ali Mostafa Kamal", 0, "Asmaa Fathy", "Asmaa Fathy"),
+  octoberRow("workbook:radwa-samah", "Radwa Samah Salem", 0, "Asmaa Fathy", "Asmaa Fathy"),
+];
+// Previously known staff absent from October's published plan remain visible
+// to sales analysis, but cannot inherit an old target.
+const octoberIds = new Set(OCTOBER_PUBLISHED.map((row) => row.employeeId));
+SALES_TARGETS["2026-10"] = [
+  ...OCTOBER_PUBLISHED,
+  ...SALES_TARGETS["2026-08"]
+    .filter((row) => !octoberIds.has(row.employeeId))
+    .map((row) => ({
+      ...row,
+      aliases: [...row.aliases],
+      target: null,
+      note: "غير مدرج بتارجت في خطة أكتوبر",
+    })),
+];
+
 /**
  * A month-keyed set of quotas. The seed below is the default; the server merges
  * PostgreSQL overrides on top and passes the result in, so every function here
@@ -426,7 +548,7 @@ export function targetRosterForMonth(
 
 /** Every spelling that must resolve to this person. */
 export function targetNameKeys(entry: SalesTarget): string[] {
-  return [entry.name, ...entry.aliases].map(normalizePersonName).filter(Boolean);
+  return [...new Set([entry.name, ...entry.aliases].map(normalizePersonName).filter(Boolean))];
 }
 
 /**

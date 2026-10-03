@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyOverrides } from "../src/lib/target-overrides.ts";
+import { applyOverrides, isCurrentTargetOverride } from "../src/lib/target-overrides.ts";
 import { SALES_TARGETS, targetsByPerson } from "../src/lib/sales-targets.ts";
 import { normalizePersonName } from "../src/lib/person-name.ts";
 
@@ -13,6 +13,16 @@ const override = (employeeId, target, month = "2026-08") => ({
 });
 
 const totalFor = (source, month) => source[month].reduce((sum, row) => sum + (row.target ?? 0), 0);
+
+assert.equal(isCurrentTargetOverride(override("335", 10000, "2026-10")), false);
+assert.equal(
+  isCurrentTargetOverride({
+    ...override("335", 10000, "2026-10"),
+    updatedAt: "2026-10-04T00:00:00Z",
+  }),
+  true,
+);
+assert.equal(isCurrentTargetOverride(override("335", 10000, "2026-08")), true);
 
 /* --- an edit is a delta, not a replacement --------------------------------- */
 // A save that mentions one person must not disturb the rest of the roster. This

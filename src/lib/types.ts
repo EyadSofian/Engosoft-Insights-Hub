@@ -200,6 +200,8 @@ export interface CrmLeadRow {
   cleanedStage: string;
   /** Last time the lead moved stage in Odoo; used as a conservative contact-age proxy. */
   lastStageUpdate: string;
+  /** Original Odoo UTC datetime; the day-only display field cannot support a 7pm SLA. */
+  lastStageUpdateUtc: string;
   /** Raw Odoo "Calling reply?" value when that custom field is available. */
   callingReply: string;
   isWon: boolean;

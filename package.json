@@ -58,6 +58,7 @@
     "test:dataset-freshness": "node --experimental-strip-types scripts/test-dataset-freshness.mjs",
     "test:lost-authority": "node --experimental-strip-types scripts/test-lost-authority.mjs",
     "test:crm-contract": "node --experimental-strip-types scripts/test-crm-contract.mjs",
+    "test:crm-stage-sla": "node --experimental-strip-types scripts/test-crm-stage-sla.mjs",
     "test:weekend-analysis": "node --experimental-strip-types scripts/test-weekend-analysis.mjs",
     "test:campaign-purpose": "node --experimental-strip-types scripts/test-campaign-purpose.mjs",
     "test:campaign-return-band": "node --experimental-strip-types scripts/test-campaign-return-band.mjs",

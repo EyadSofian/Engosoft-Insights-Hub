@@ -107,13 +107,60 @@ assert.equal(people.byName.size >= august.length, true);
 
 const website = people.byName.get(normalizePersonName("mahmoud hassan elsayed amer"));
 assert.equal(website.entry.employeeId, "632");
-assert.deepEqual(website.monthly, [{ month: "2026-08", target: 12000 }]);
+assert.deepEqual(website.monthly, [
+  { month: "2026-08", target: 12000 },
+  { month: "2026-10", target: 9000 },
+]);
 assert.equal(website.entry.teamLeader, "Nader Aziz");
 
 const leaveMonthly = people.byName.get(
   normalizePersonName("Mennatallah walid Mohamed Fathy"),
 ).monthly;
-assert.deepEqual(leaveMonthly, [{ month: "2026-08", target: null }]);
+assert.deepEqual(leaveMonthly, [
+  { month: "2026-08", target: null },
+  { month: "2026-10", target: 6000 },
+]);
+
+/* --- October plan supplied on 2026-10-03 ------------------------------- */
+const october = SALES_TARGETS["2026-10"];
+assert.equal(sum(october), 157_500, "October individual targets reconcile to the plan");
+assert.equal(
+  sum(october.filter((row) => row.supervisor === "Bahaa Ramadan" && row.target !== null)),
+  82_500,
+);
+assert.equal(
+  sum(october.filter((row) => row.supervisor === "Asmaa Fathy" && row.target !== null)),
+  75_000,
+);
+assert.equal(
+  sum(october.filter((row) => row.teamLeader === "Ahmed Saeed" && row.target !== null)),
+  19_500,
+);
+assert.equal(
+  sum(october.filter((row) => row.teamLeader === "Nader Aziz" && row.target !== null)),
+  51_000,
+);
+assert.equal(
+  sum(october.filter((row) => row.teamLeader === "Asmaa Fathy" && row.target !== null)),
+  24_000,
+);
+assert.equal(
+  october.filter((row) => row.target !== null).length,
+  26,
+  "22 quotas and four explicit zeros",
+);
+assert.equal(
+  october.find((row) => row.employeeId === "335")?.target,
+  9000,
+  "website quota belongs to Asmaa",
+);
+assert.equal(october.find((row) => row.employeeId === "sara.abdullah@engosoft.com")?.target, 3000);
+assert.equal(
+  october.find((row) => row.employeeId === "workbook:mazen-ahmed-mahmoud")?.target,
+  3000,
+);
+assert.equal(october.find((row) => row.employeeId === "workbook:solaf-ali")?.target, 0);
+assert.deepEqual(targetIndexForMonth("2026-10").duplicates, []);
 
 /* --- preparing the next monthly roster ------------------------------------ */
 

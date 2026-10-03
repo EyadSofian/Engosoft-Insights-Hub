@@ -2192,6 +2192,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           stage: str(r["Stage"]),
           cleanedStage,
           lastStageUpdate: parseDate(r["آخر تحديث للمرحلة"]),
+          lastStageUpdateUtc: str(r["__odoo_last_stage_update_utc"]),
           callingReply: str(r["Calling reply?"]),
           // Not `=== "won"`: that relies on the `Cleaned Stage` helper column
           // being present, and the raw Odoo stage is `Won / ربح`. A workbook

@@ -16,7 +16,7 @@ export const CRM_CONTRACT_VERSION = "17.0.1.26.0";
  * this value whenever the persisted raw-row shape, date semantics, or source
  * scope changes so a deploy cannot keep serving a stale snapshot.
  */
-export const CRM_SNAPSHOT_SCHEMA_REVISION = "normal-crm-inventory-scope-v3";
+export const CRM_SNAPSHOT_SCHEMA_REVISION = "normal-crm-inventory-scope-v4-stage-sla-utc";
 
 /**
  * Stable business scope for every normal CRM dashboard population.

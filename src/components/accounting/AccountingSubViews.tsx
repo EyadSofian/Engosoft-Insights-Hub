@@ -670,8 +670,8 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
       tone: "amber",
       icon: <Target size={16} />,
       definition: A
-        ? "مجموع الحصص المنشورة للموظفين الظاهرين في هذه الفترة، محسوبة بالتناسب: نصف شهر يعني نصف الحصة."
-        : "The published quotas of the employees present in this window, prorated: half a month means half the quota.",
+        ? "تارجت الشركة يجمع حصص كل موظفي الخطة المنشورة للشهر، حتى إن لم يظهر لهم نشاط بعد. التارجت الشهري لا ينخفض عند اختيار جزء من الشهر."
+        : "The company target includes every employee quota in the published monthly plan, even with no activity yet. A partial-month selection does not shrink the monthly quota.",
       formula:
         targets.totalTarget === null
           ? A

@@ -192,7 +192,7 @@ export interface TargetCoverage {
   publishedMonths: string[];
   /** Employees in the current selection matched to a published quota. */
   matched: number;
-  /** Whole published quota across every matched employee. */
+  /** Full published roster at company scope; matched employees under detail filters. */
   totalTarget: number | null;
   /** All employee collections in the selection, including sellers without a published quota. */
   totalPaidRevenue: number;
@@ -1433,11 +1433,23 @@ function buildTargetCoverage(
 ): TargetCoverage {
   const { byName, duplicates } = targetsByPerson(source);
   const publishedMonths = targetMonths(source);
+  // Team moves in a new workbook must not rewrite a closed month's hierarchy.
+  // For a multi-month window, use the latest published roster inside it.
+  const selectedRosterMonth = publishedMonths
+    .filter(
+      (month) =>
+        (!filters.from || month >= filters.from.slice(0, 7)) &&
+        (!filters.to || month <= filters.to.slice(0, 7)),
+    )
+    .at(-1);
+  const entryForWindow = (employeeId: string) =>
+    source[selectedRosterMonth ?? ""]?.find((entry) => entry.employeeId === employeeId);
 
   const matchedEmployeeIds = new Set<string>();
   for (const row of agents) {
     const person = byName.get(normalizePersonName(row.name));
     if (!person) continue;
+    const rosterEntry = entryForWindow(person.entry.employeeId) ?? person.entry;
     const resolved = windowTarget(person.monthly, filters.from, filters.to);
     const { target } = resolved;
     // Achievement always divides by the whole published quota, never by a
@@ -1453,11 +1465,11 @@ function buildTargetCoverage(
     if (target !== null) matchedEmployeeIds.add(person.entry.employeeId);
     row.target = {
       employeeId: person.entry.employeeId,
-      name: person.entry.name,
-      teamLeader: person.entry.teamLeader,
-      supervisor: person.entry.supervisor,
-      branch: person.entry.branch,
-      note: person.entry.note,
+      name: rosterEntry.name,
+      teamLeader: rosterEntry.teamLeader,
+      supervisor: rosterEntry.supervisor,
+      branch: rosterEntry.branch,
+      note: rosterEntry.note,
       target,
       monthsCovered: resolved.monthsCovered,
       monthsMissing: resolved.monthsMissing,
@@ -1492,9 +1504,37 @@ function buildTargetCoverage(
   }
 
   const targeted = agents.filter((row) => row.target?.target !== null && row.target !== null);
-  const totalTarget = targeted.length
-    ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
-    : null;
+  const companyScope = !(
+    filters.salesTeam ||
+    filters.salesperson ||
+    filters.course ||
+    filters.mainCategory ||
+    filters.source ||
+    filters.platform ||
+    filters.account ||
+    filters.campaign ||
+    filters.adset ||
+    filters.ad
+  );
+  const windowMonths = publishedMonths.filter(
+    (month) =>
+      (!filters.from || month >= filters.from.slice(0, 7)) &&
+      (!filters.to || month <= filters.to.slice(0, 7)),
+  );
+  // The company target is the *published roster*, including a salesperson
+  // with zero leads/collections so far. Summing only active agent rows made a
+  // month-to-date dashboard quietly shrink the October $157,500 plan.
+  const totalTarget =
+    companyScope && windowMonths.length
+      ? windowMonths.reduce(
+          (sum, month) =>
+            sum +
+            (source[month] ?? []).reduce((subtotal, entry) => subtotal + (entry.target ?? 0), 0),
+          0,
+        )
+      : targeted.length
+        ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
+        : null;
   const targetedPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
   // Company achievement compares the published team quota with all employee
   // collections. Excluding sellers with no individual quota understates the

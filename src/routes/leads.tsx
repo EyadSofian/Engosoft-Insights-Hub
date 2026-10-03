@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   ChevronLeft,
   CircleDot,
+  Clock3,
   FileText,
   Filter,
   Layers3,
@@ -43,6 +44,7 @@ import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import type { FreshLostPipelineRecord, FreshLostPipelineResult } from "@/lib/crm-fresh-lost.server";
+import { SLA_POLICY, SLA_STAGES, type SlaStage, type SlaSummary } from "@/lib/crm-stage-sla";
 
 export const Route = createFileRoute("/leads")({ component: CrmWorkspace });
 
@@ -125,6 +127,7 @@ interface CrmWorkspaceRow {
 
 interface Resp {
   contractVersion: string;
+  sla: SlaSummary;
   summary: {
     total: number;
     activeLeads: number;
@@ -796,6 +799,19 @@ function CrmWorkspace() {
 
         <PageSection
           level="primary"
+          title={A ? "توزيع المراحل ووقت الاستجابة لكل موظف" : "Stage workload and SLA by employee"}
+          hint={
+            A
+              ? "ليدز أُنشئت في الفترة المختارة، وحالتها الحالية ومدة بقائها في المرحلة الآن."
+              : "Leads created in the selected period, grouped by current stage and time in that stage."
+          }
+          icon={<Clock3 size={17} />}
+        >
+          <CrmStageSla summary={data.sla} lang={lang} />
+        </PageSection>
+
+        <PageSection
+          level="primary"
           title={A ? "مسار الـCRM" : "CRM flow"}
           hint={
             A
@@ -1039,6 +1055,206 @@ function CrmWorkspace() {
         </div>
       </PageSections>
     </div>
+  );
+}
+
+function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en" }) {
+  const A = lang === "ar";
+  const [selected, setSelected] = useState<{ employee: string; stage: SlaStage } | null>(null);
+  const stageLabels: Record<SlaStage, string> = A
+    ? { new: "جديد", open: "مفتوح", long_follow_up: "متابعة طويلة", quotation: "إرسال عرض سعر" }
+    : { new: "New", open: "Open", long_follow_up: "Long Follow Up", quotation: "Quotation Sent" };
+  const shown = selected
+    ? summary.records.rows.filter(
+        (row) => row.salesperson === selected.employee && row.stage === selected.stage,
+      )
+    : [];
+  const selectedCell = selected
+    ? summary.employees.find((row) => row.name === selected.employee)?.stages[selected.stage]
+    : null;
+  const time = (value: string) => {
+    if (!value) return A ? "وقت دخول المرحلة غير متاح" : "Stage entry time unavailable";
+    if (value.endsWith("Cairo")) return value;
+    return new Intl.DateTimeFormat(A ? "ar-EG" : "en-GB", {
+      timeZone: "Africa/Cairo",
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  };
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <div className="grid gap-2 border-b border-border bg-surface-2/70 p-3 sm:grid-cols-3 sm:p-4">
+        <div className="rounded-xl bg-surface px-3 py-2.5">
+          <div className="text-[11px] text-text-muted">
+            {A ? "في مراحل الـSLA" : "In SLA stages"}
+          </div>
+          <div className="num text-xl font-bold text-text">{fmtNum(summary.total)}</div>
+        </div>
+        <div className="rounded-xl border border-danger/20 bg-danger/5 px-3 py-2.5">
+          <div className="text-[11px] text-danger">{A ? "متجاوزة للـSLA" : "Over SLA"}</div>
+          <div className="num text-xl font-bold text-danger">{fmtNum(summary.overdue)}</div>
+        </div>
+        <div className="rounded-xl bg-surface px-3 py-2.5">
+          <div className="text-[11px] text-text-muted">
+            {A ? "وقت المرحلة غير متاح" : "Stage time unavailable"}
+          </div>
+          <div className="num text-xl font-bold text-text">{fmtNum(summary.unknown)}</div>
+        </div>
+      </div>
+      <p className="border-b border-border px-4 py-2.5 text-[11px] leading-5 text-text-muted">
+        {A
+          ? "العدد حسب تاريخ إنشاء الليد في الفترة المختارة؛ الـSLA تُحسب من آخر دخول للمرحلة الحالية حتى الآن بتوقيت القاهرة. جديد: الساعة 7 مساءً في نفس يوم الدخول؛ مفتوح وعرض سعر: 30 يومًا؛ متابعة طويلة: 60 يومًا. اضغط أي خانة للتفاصيل."
+          : "Counts use lead creation date in the selected period. SLA starts when the current stage was entered and is checked now (Cairo): New by 7pm that day; Open and Quotation Sent 30 days; Long Follow Up 60 days. Select a cell for records."}
+        {summary.unassigned > 0 &&
+          ` · ${fmtNum(summary.unassigned)} ${A ? "بدون موظف" : "unassigned"}`}
+      </p>
+      <div className="hscroll overflow-x-auto">
+        <table className="w-full min-w-[850px] table-fixed text-start text-[12px]">
+          <thead className="bg-surface-2 text-text-muted">
+            <tr>
+              <th scope="col" className="w-[24%] px-4 py-3 text-start font-bold">
+                {A ? "الموظف" : "Employee"}
+              </th>
+              {SLA_STAGES.map((stage) => (
+                <th key={stage} scope="col" className="w-[16%] px-2 py-3 text-center font-bold">
+                  <span className="block">{stageLabels[stage]}</span>
+                  <span className="block text-[10px] font-normal text-text-subtle">
+                    {stage === "new"
+                      ? A
+                        ? "نفس اليوم 7م"
+                        : "same day 7pm"
+                      : `${SLA_POLICY[stage].days} ${A ? "يوم" : "days"}`}
+                  </span>
+                </th>
+              ))}
+              <th scope="col" className="w-[12%] px-3 py-3 text-center font-bold">
+                {A ? "الإجمالي / المتجاوز" : "Total / overdue"}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.employees.map((employee) => (
+              <tr key={employee.name} className="border-t border-border hover:bg-surface-2/60">
+                <th
+                  scope="row"
+                  className="truncate px-4 py-3 text-start font-semibold text-text"
+                  title={employee.name}
+                >
+                  {employee.name === "—" ? (A ? "بدون موظف" : "Unassigned") : employee.name}
+                </th>
+                {SLA_STAGES.map((stage) => {
+                  const cell = employee.stages[stage];
+                  const active = selected?.employee === employee.name && selected.stage === stage;
+                  return (
+                    <td key={stage} className="px-2 py-2 text-center">
+                      {cell.count ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelected(active ? null : { employee: employee.name, stage })
+                          }
+                          aria-pressed={active}
+                          className={`inline-flex min-w-20 flex-col rounded-xl border px-2 py-1.5 transition ${active ? "border-brand bg-brand/10" : "border-transparent hover:border-border hover:bg-surface-2"}`}
+                        >
+                          <span className="num font-bold text-text">{fmtNum(cell.count)}</span>
+                          <span
+                            className={`num text-[10px] ${cell.overdue ? "font-bold text-danger" : "text-text-muted"}`}
+                          >
+                            {fmtNum(cell.overdue)} {A ? "متجاوز" : "overdue"}
+                          </span>
+                          {cell.unknown > 0 && (
+                            <span className="num text-[10px] text-amber-strong">
+                              {fmtNum(cell.unknown)} {A ? "غير معروف" : "unknown"}
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-text-subtle">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="num px-3 py-3 text-center font-bold text-text">
+                  {fmtNum(employee.total)} /{" "}
+                  <span className={employee.overdue ? "text-danger" : "text-text-muted"}>
+                    {fmtNum(employee.overdue)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {summary.employees.length === 0 && (
+        <p className="p-6 text-center text-sm text-text-muted">
+          {A
+            ? "لا توجد ليدز نشطة في هذه المراحل للفترة المختارة."
+            : "No active leads in these stages for the selected period."}
+        </p>
+      )}
+      {selected && selectedCell && (
+        <div className="border-t border-border bg-surface-2/50 p-3 sm:p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-text">
+              {selected.employee} · {stageLabels[selected.stage]} · {fmtNum(selectedCell.count)}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="text-xs font-semibold text-brand hover:underline"
+            >
+              {A ? "إغلاق" : "Close"}
+            </button>
+          </div>
+          {summary.records.truncated && (
+            <p className="mb-2 text-xs text-amber-strong">
+              {A
+                ? "التفاصيل محدودة بأول 5000 سجل؛ العدادات تشمل الكل."
+                : "Details are capped at 5,000 records; counts cover all."}
+            </p>
+          )}
+          <div className="max-h-80 space-y-1.5 overflow-y-auto">
+            {shown.slice(0, 100).map((row) => (
+              <a
+                key={row.id}
+                href={row.odooUrl || undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-xs hover:border-brand/40"
+              >
+                <span className="min-w-0 truncate font-semibold text-text">
+                  {row.contact || `#${row.id}`}{" "}
+                  <span className="num text-text-subtle">#{row.id}</span>
+                </span>
+                <span className="shrink-0 text-text-muted">
+                  {A ? "الموعد" : "Due"}: {time(row.dueAt)}
+                </span>
+                <span
+                  className={`shrink-0 font-bold ${row.overdue === true ? "text-danger" : row.overdue === null ? "text-amber-strong" : "text-mint-strong"}`}
+                >
+                  {row.overdue === true
+                    ? A
+                      ? "متجاوز"
+                      : "Overdue"
+                    : row.overdue === null
+                      ? A
+                        ? "غير معروف"
+                        : "Unknown"
+                      : A
+                        ? "ضمن المهلة"
+                        : "On time"}
+                </span>
+              </a>
+            ))}
+          </div>
+          {shown.length > 100 && (
+            <p className="mt-2 text-xs text-text-muted">
+              {A ? "معروض أول 100 سجل." : "Showing first 100 records."}
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

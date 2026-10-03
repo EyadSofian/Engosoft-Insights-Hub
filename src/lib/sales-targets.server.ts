@@ -11,6 +11,7 @@
 import { SALES_TARGETS, type TargetSource } from "./sales-targets.ts";
 import {
   applyOverrides,
+  isCurrentTargetOverride,
   overrideKey,
   toOverride,
   type TargetOverride,
@@ -60,7 +61,9 @@ export async function loadTargetSource(force = false): Promise<TargetSourceSnaps
   let error = "";
   try {
     const snapshot = await readDashboardDataset(DATASET);
-    overrides = snapshot.rows.map(toOverride).filter((row): row is TargetOverride => row !== null);
+    overrides = snapshot.rows
+      .map(toOverride)
+      .filter((row): row is TargetOverride => row !== null && isCurrentTargetOverride(row));
   } catch {
     // A store that cannot be read must not blank the quotas. Serve the seed and
     // say so, rather than reporting every employee as untargeted.
