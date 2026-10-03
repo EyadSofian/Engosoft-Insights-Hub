@@ -6,7 +6,7 @@ export const Route = createFileRoute("/api/accounting-net-sales")({
       GET: async ({ request }) => {
         const { parseFilters, json } = await import("@/lib/api.server");
         const { fxRatesFromFilters } = await import("@/lib/fx-rates");
-        const { buildNetSalesMonths } = await import("@/lib/net-sales");
+        const { buildNetSalesMonths, usdCents } = await import("@/lib/net-sales");
         const { loadNetSalesLedger } = await import("@/lib/net-sales-odoo.server");
         const filters = await parseFilters(request);
         const scope = new URL(request.url).searchParams.get("scope") === "all" ? "all" : "report";
@@ -38,6 +38,17 @@ export const Route = createFileRoute("/api/accounting-net-sales")({
               netSalesUsd: 0,
             },
           );
+          for (const key of [
+            "salesUsd",
+            "certificateUsd",
+            "otherIncomeUsd",
+            "gatewayFeesUsd",
+            "outputVatUsd",
+            "roundingUsd",
+          ] as const) {
+            total[key] = usdCents(total[key]);
+          }
+          total.netSalesUsd = usdCents(total.salesUsd - total.gatewayFeesUsd);
           return json({
             period: { from, to },
             months,

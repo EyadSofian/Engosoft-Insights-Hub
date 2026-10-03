@@ -46,6 +46,11 @@ export function companyAmountUsd(balance: number, currency: string, rates: FxRat
   throw new Error(`Unsupported Odoo company currency: ${currency || "(blank)"}`);
 }
 
+/** Displayed accounting totals reconcile to the cent, including negative refunds. */
+export function usdCents(amount: number): number {
+  return (Math.sign(amount) * Math.round((Math.abs(amount) + Number.EPSILON) * 100)) / 100;
+}
+
 /** A posted income credit is positive revenue; expense and VAT balances retain their signs. */
 export function ledgerAmountUsd(group: NetSalesLedgerGroup, rates: FxRates): number {
   const amount = companyAmountUsd(group.balance, group.currency, rates);
@@ -83,7 +88,9 @@ export function buildNetSalesMonths(
       };
       months.set(group.month, month);
     }
-    const amount = ledgerAmountUsd(group, rates);
+    // Round each account/company/month ledger bucket once. Every drill-down
+    // and headline is then summed from the same displayed cents.
+    const amount = usdCents(ledgerAmountUsd(group, rates));
     if (group.kind === "sales") month.salesUsd += amount;
     if (group.kind === "certificate") month.certificateUsd += amount;
     if (group.kind === "otherIncome") month.otherIncomeUsd += amount;
@@ -116,10 +123,28 @@ export function buildNetSalesMonths(
 
   return [...months.values()]
     .sort((a, b) => a.month.localeCompare(b.month))
-    .map((month) => ({
-      ...month,
-      netSalesUsd: month.salesUsd - month.gatewayFeesUsd,
-      accounts: month.accounts.sort((a, b) => Math.abs(b.amountUsd) - Math.abs(a.amountUsd)),
-      companies: month.companies.sort((a, b) => b.salesUsd - a.salesUsd),
-    }));
+    .map((month) => {
+      const salesUsd = usdCents(month.salesUsd);
+      const gatewayFeesUsd = usdCents(month.gatewayFeesUsd);
+      return {
+        ...month,
+        salesUsd,
+        certificateUsd: usdCents(month.certificateUsd),
+        otherIncomeUsd: usdCents(month.otherIncomeUsd),
+        gatewayFeesUsd,
+        outputVatUsd: usdCents(month.outputVatUsd),
+        roundingUsd: usdCents(month.roundingUsd),
+        netSalesUsd: usdCents(salesUsd - gatewayFeesUsd),
+        accounts: month.accounts
+          .map((account) => ({ ...account, amountUsd: usdCents(account.amountUsd) }))
+          .sort((a, b) => Math.abs(b.amountUsd) - Math.abs(a.amountUsd)),
+        companies: month.companies
+          .map((company) => ({
+            ...company,
+            salesUsd: usdCents(company.salesUsd),
+            gatewayFeesUsd: usdCents(company.gatewayFeesUsd),
+          }))
+          .sort((a, b) => b.salesUsd - a.salesUsd),
+      };
+    });
 }

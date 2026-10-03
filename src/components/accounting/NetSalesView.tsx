@@ -9,9 +9,12 @@ import {
 } from "lucide-react";
 import { monthLabel } from "./accounting-format";
 import { ErrorState, Skeleton } from "@/components/ui-bits";
-import { fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtPct, useI18n } from "@/lib/i18n";
 import type { NetSalesMonth } from "@/lib/net-sales";
 import { useApi } from "@/lib/use-api";
+
+const fmtUSDFull = (value: number) =>
+  `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface NetSalesResponse {
   period: { from: string; to: string };
