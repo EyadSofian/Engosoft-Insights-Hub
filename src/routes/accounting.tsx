@@ -61,13 +61,16 @@ import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-c
 import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
 import { SalesPerformance } from "@/components/acquisition/SalesPerformance";
 import { EntryCohortView } from "@/components/accounting/EntryCohortView";
+import { NetSalesView } from "@/components/accounting/NetSalesView";
 
-type AccountingView = "summary" | "months" | "cohorts" | "profitability" | "marketing";
+type AccountingView =
+  "summary" | "months" | "cohorts" | "profitability" | "net-sales" | "marketing";
 const ACCOUNTING_VIEWS: readonly AccountingView[] = [
   "summary",
   "months",
   "cohorts",
   "profitability",
+  "net-sales",
   "marketing",
 ];
 
@@ -163,7 +166,9 @@ function Accounting() {
   const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
-  const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
+  const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting", {
+    enabled: view !== "net-sales",
+  });
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
   // Built once per response, not once per card: the five summary figures share
@@ -197,7 +202,8 @@ function Accounting() {
     filterStore.setFxRates(DEFAULT_FX_RATES.EGP, DEFAULT_FX_RATES.SAR);
   };
 
-  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error && view !== "net-sales")
+    return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const cols: Col<AccountingDetail>[] = [
     {
@@ -360,16 +366,24 @@ function Accounting() {
         flush
         icon={<Receipt size={20} />}
         title={
-          view === "marketing"
+          view === "net-sales"
             ? lang === "ar"
-              ? "من التسويق للإيراد"
-              : "Marketing → revenue"
-            : t("accounting")
+              ? "صافي مبيعات الشركة"
+              : "Net company sales"
+            : view === "marketing"
+              ? lang === "ar"
+                ? "من التسويق للإيراد"
+                : "Marketing → revenue"
+              : t("accounting")
         }
         subtitle={
-          lang === "ar"
-            ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
-            : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
+          view === "net-sales"
+            ? lang === "ar"
+              ? "المبيعات من القيود المحاسبية المرحّلة، بدون ضريبة القيمة المضافة وبعد رسوم التحصيل"
+              : "Posted accounting sales excluding VAT and collection fees"
+            : lang === "ar"
+              ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
+              : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
         }
         period={reportingPeriod}
       />
@@ -385,13 +399,17 @@ function Accounting() {
             {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
           </span>
           <span className="text-[11.5px] text-text-muted">
-            {dateBasis === "invoice"
+            {view === "net-sales"
               ? lang === "ar"
-                ? "تاريخ الفاتورة"
-                : "Invoice Date"
-              : lang === "ar"
-                ? "تاريخ الدفع"
-                : "Payment Date"}
+                ? "تاريخ القيد المرحّل"
+                : "Posted journal date"
+              : dateBasis === "invoice"
+                ? lang === "ar"
+                  ? "تاريخ الفاتورة"
+                  : "Invoice Date"
+                : lang === "ar"
+                  ? "تاريخ الدفع"
+                  : "Payment Date"}
             {" · "}
             {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
           </span>
@@ -401,31 +419,33 @@ function Accounting() {
           />
         </summary>
         <div className="grid gap-4 border-t border-border p-3.5 sm:p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
-              <CalendarDays size={15} className="text-brand" />
-              {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+          {view !== "net-sales" && (
+            <div>
+              <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+                <CalendarDays size={15} className="text-brand" />
+                {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+              </div>
+              <Segmented
+                value={dateBasis}
+                onChange={(value) =>
+                  filterStore.set({
+                    dateBasis: value === "invoice" ? "invoice" : undefined,
+                  })
+                }
+                size="md"
+                options={[
+                  {
+                    value: "payment",
+                    label: lang === "ar" ? "تاريخ الدفع — الافتراضي" : "Payment Date — default",
+                  },
+                  {
+                    value: "invoice",
+                    label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+                  },
+                ]}
+              />
             </div>
-            <Segmented
-              value={dateBasis}
-              onChange={(value) =>
-                filterStore.set({
-                  dateBasis: value === "invoice" ? "invoice" : undefined,
-                })
-              }
-              size="md"
-              options={[
-                {
-                  value: "payment",
-                  label: lang === "ar" ? "تاريخ الدفع — الافتراضي" : "Payment Date — default",
-                },
-                {
-                  value: "invoice",
-                  label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
-                },
-              ]}
-            />
-          </div>
+          )}
 
           <label className="block">
             <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
@@ -451,13 +471,17 @@ function Accounting() {
               {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
             </div>
             <div className="mt-1">
-              {dateBasis === "invoice"
+              {view === "net-sales"
                 ? lang === "ar"
-                  ? "الفترة تُطبّق على تاريخ الفاتورة"
-                  : "Range applies to Invoice Date"
-                : lang === "ar"
-                  ? "الفترة على تاريخ الدفع الفعلي، مش Due Date"
-                  : "Range uses the actual Payment Date, never Due Date"}
+                  ? "الفترة تُطبّق على تاريخ القيد في Odoo"
+                  : "Range applies to Odoo journal entry date"
+                : dateBasis === "invoice"
+                  ? lang === "ar"
+                    ? "الفترة تُطبّق على تاريخ الفاتورة"
+                    : "Range applies to Invoice Date"
+                  : lang === "ar"
+                    ? "الفترة على تاريخ الدفع الفعلي، مش Due Date"
+                    : "Range uses the actual Payment Date, never Due Date"}
             </div>
           </div>
         </div>
@@ -479,12 +503,18 @@ function Accounting() {
               label: lang === "ar" ? "كوهورت دخول العملاء" : "Customer entry cohorts",
             },
             { value: "profitability", label: lang === "ar" ? "الربحية" : "Profitability" },
+            {
+              value: "net-sales",
+              label: lang === "ar" ? "صافي مبيعات الشركة" : "Net company sales",
+            },
           ]}
         />
       )}
 
       {view === "marketing" ? (
         <SalesPerformance />
+      ) : view === "net-sales" ? (
+        <NetSalesView />
       ) : view === "cohorts" ? (
         <EntryCohortView />
       ) : isLoading || !data ? (

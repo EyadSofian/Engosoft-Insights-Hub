@@ -36,6 +36,7 @@ import { Route as WeekendRouteImport } from './routes/weekend'
 import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
+import { Route as ApiAccountingNetSalesRouteImport } from './routes/api/accounting-net-sales'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiAdsCreativesRouteImport } from './routes/api/ads-creatives'
 import { Route as ApiAgentCourseIntelligenceRouteImport } from './routes/api/agent-course-intelligence'
@@ -258,6 +259,11 @@ const ApiAccountingRoute = ApiAccountingRouteImport.update({
 const ApiAccountingExportRoute = ApiAccountingExportRouteImport.update({
   id: '/api/accounting-export',
   path: '/api/accounting-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountingNetSalesRoute = ApiAccountingNetSalesRouteImport.update({
+  id: '/api/accounting-net-sales',
+  path: '/api/accounting-net-sales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdsRoute = ApiAdsRouteImport.update({
@@ -748,6 +754,7 @@ export interface FileRoutesByFullPath {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -865,6 +872,7 @@ export interface FileRoutesByTo {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -983,6 +991,7 @@ export interface FileRoutesById {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -1102,6 +1111,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -1219,6 +1229,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -1336,6 +1347,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -1454,6 +1466,7 @@ export interface RootRouteChildren {
   YoyRoute: typeof YoyRoute
   ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
+  ApiAccountingNetSalesRoute: typeof ApiAccountingNetSalesRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiAdsCreativesRoute: typeof ApiAdsCreativesRoute
   ApiAgentCourseIntelligenceRoute: typeof ApiAgentCourseIntelligenceRoute
@@ -1733,6 +1746,13 @@ declare module '@tanstack/react-router' {
       path: '/api/accounting-export'
       fullPath: '/api/accounting-export'
       preLoaderRoute: typeof ApiAccountingExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/accounting-net-sales': {
+      id: '/api/accounting-net-sales'
+      path: '/api/accounting-net-sales'
+      fullPath: '/api/accounting-net-sales'
+      preLoaderRoute: typeof ApiAccountingNetSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ads': {
@@ -2382,6 +2402,7 @@ const rootRouteChildren: RootRouteChildren = {
   YoyRoute: YoyRoute,
   ApiAccountingRoute: ApiAccountingRoute,
   ApiAccountingExportRoute: ApiAccountingExportRoute,
+  ApiAccountingNetSalesRoute: ApiAccountingNetSalesRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiAdsCreativesRoute: ApiAdsCreativesRoute,
   ApiAgentCourseIntelligenceRoute: ApiAgentCourseIntelligenceRoute,
