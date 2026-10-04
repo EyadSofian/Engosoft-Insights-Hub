@@ -63,7 +63,7 @@ export const Route = createFileRoute("/api/profitability")({
             companies:
               profitability.snapshot?.companies ??
               (filters.company ? [{ id: null, name: filters.company }] : []),
-            selection: filters.company || "Engosoft - KSA",
+            selection: filters.company || "all configured Profit and Loss companies",
           },
         });
       },

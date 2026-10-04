@@ -4,6 +4,7 @@ import {
   m2oName,
   odooAccessibleCompanies,
   odooCallWithPolicy,
+  odooConfig,
   odooConfigured,
   type M2O,
 } from "./odoo.server";
@@ -65,12 +66,20 @@ export async function getProfitabilityLedger(
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   const accessible = await odooAccessibleCompanies();
+  const configuredReportIds = odooConfig().pnlCompanyIds;
   const selected = companyName
     ? accessible.filter(
         (item) => item.name.trim().toLowerCase() === companyName.trim().toLowerCase(),
       )
-    : accessible;
+    : accessible.filter((item) => configuredReportIds.includes(item.id));
   if (!selected.length) throw new Error("Odoo accounting company was not found.");
+  if (!companyName && selected.length !== configuredReportIds.length) {
+    const selectedIds = new Set(selected.map((item) => item.id));
+    const missingIds = configuredReportIds.filter((id) => !selectedIds.has(id));
+    throw new Error(
+      `Odoo account ledger is missing configured companies: ${missingIds.join(", ") || "unknown"}.`,
+    );
+  }
   const companyIds = selected.map((item) => item.id);
   const byCompanyId = new Map(selected.map((item) => [item.id, item]));
   const context = companyContext({ allowed_company_ids: companyIds, lang: "en_US" });

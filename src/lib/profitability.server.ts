@@ -238,11 +238,19 @@ async function fetchProfitability(
   );
   const availableCompanies =
     initialOptions.companies ?? accessibleCompanies.map(({ id, name }) => ({ id, name }));
+  const configuredReportIds = odooConfig().pnlCompanyIds;
   const selectedCompanies = company
     ? availableCompanies.filter((item) => clean(item.name) === clean(company))
-    : availableCompanies;
+    : availableCompanies.filter((item) => configuredReportIds.includes(Number(item.id)));
   if (company && !selectedCompanies.length) {
     throw new Error(`Odoo Profit and Loss company was not found: ${company}`);
+  }
+  if (!company && selectedCompanies.length !== configuredReportIds.length) {
+    const availableIds = new Set(availableCompanies.map((item) => Number(item.id)));
+    const missingIds = configuredReportIds.filter((id) => !availableIds.has(id));
+    throw new Error(
+      `Odoo Profit and Loss is missing configured companies: ${missingIds.join(", ") || "unknown"}. The report was stopped to avoid showing partial totals.`,
+    );
   }
   const selectedCompanyIds = selectedCompanies.map((item) => Number(item.id));
   const reportContext = companyContext({
@@ -358,21 +366,6 @@ function startRefresh(
   return job;
 }
 
-async function resolveReportCompany(company?: string): Promise<string> {
-  if (company) return company;
-  // Odoo's P&L follows the report company, not every company the API user can
-  // access. The configured company list is Egypt/KSA/UAE; KSA is the default
-  // report company used by the dashboard and by the Odoo screen in production.
-  const config = odooConfig();
-  const companies = await odooAccessibleCompanies();
-  const preferredId = config.companyIds[1] ?? config.companyIds[0];
-  const currentCompany =
-    companies.find((item) => item.name.trim().toLowerCase() === "engosoft - ksa") ||
-    companies.find((item) => item.id === preferredId);
-  if (!currentCompany) throw new Error("Odoo default report company is not available.");
-  return currentCompany.name;
-}
-
 /** One expanded month, without launching the full-range monthly background job. */
 export async function getProfitabilitySnapshot(
   from: string,
@@ -380,11 +373,10 @@ export async function getProfitabilitySnapshot(
   company?: string,
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilitySnapshotResult> {
-  const effectiveCompany = await resolveReportCompany(company);
-  const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;
+  const key = `${from}|${to}|${company || "all-configured-companies"}|${fxSar}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return { status: "ready", snapshot: cached.value };
-  const refresh = startRefresh(key, from, to, effectiveCompany, fxSar);
+  const refresh = startRefresh(key, from, to, company, fxSar);
   if (cached) return { status: "refreshing", snapshot: cached.value };
   try {
     const snapshot = await Promise.race([
@@ -407,19 +399,18 @@ export async function getProfitability(
   company?: string,
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilityResult> {
-  const effectiveCompany = await resolveReportCompany(company);
-  const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;
-  void startMonthlyRefresh(key, from, to, effectiveCompany, fxSar);
-  const months = monthlyState(from, to, effectiveCompany, fxSar);
+  const key = `${from}|${to}|${company || "all-configured-companies"}|${fxSar}`;
+  void startMonthlyRefresh(key, from, to, company, fxSar);
+  const months = monthlyState(from, to, company, fxSar);
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now())
     return {
       status: "ready",
       snapshot: cached.value,
-      ...monthlyState(from, to, effectiveCompany, fxSar),
+      ...monthlyState(from, to, company, fxSar),
     };
 
-  const refresh = startRefresh(key, from, to, effectiveCompany, fxSar);
+  const refresh = startRefresh(key, from, to, company, fxSar);
   if (cached) return { status: "refreshing", snapshot: cached.value, ...months };
 
   try {
@@ -429,18 +420,17 @@ export async function getProfitability(
       refresh,
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000)),
     ]);
-    if (snapshot)
-      return { status: "ready", snapshot, ...monthlyState(from, to, effectiveCompany, fxSar) };
+    if (snapshot) return { status: "ready", snapshot, ...monthlyState(from, to, company, fxSar) };
     return {
       status: "loading",
       snapshot: null,
-      ...monthlyState(from, to, effectiveCompany, fxSar),
+      ...monthlyState(from, to, company, fxSar),
     };
   } catch (error) {
     return {
       status: "error",
       snapshot: null,
-      ...monthlyState(from, to, effectiveCompany, fxSar),
+      ...monthlyState(from, to, company, fxSar),
       error: error instanceof Error ? error.message : String(error),
     };
   }

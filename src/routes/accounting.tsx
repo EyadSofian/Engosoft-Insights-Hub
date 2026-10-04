@@ -171,14 +171,7 @@ function Accounting() {
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
   const companyScopeLabel =
-    filters.company ||
-    (view === "profitability"
-      ? lang === "ar"
-        ? "شركة التقرير الافتراضية في Odoo"
-        : "Default Odoo report company"
-      : lang === "ar"
-        ? "كل الشركات"
-        : "All companies");
+    filters.company || (lang === "ar" ? "كل شركات تقرير الأرباح والخسائر" : "All P&L companies");
   // Built once per response, not once per card: the five summary figures share
   // the same distributions and the same day series.
   const metrics = useMemo(() => (data ? accountingMetrics(data, lang) : null), [data, lang]);
@@ -511,13 +504,7 @@ function Accounting() {
               className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15"
             >
               <option value="">
-                {view === "profitability"
-                  ? lang === "ar"
-                    ? "شركة التقرير الافتراضية في Odoo"
-                    : "Default Odoo report company"
-                  : lang === "ar"
-                    ? "كل الشركات"
-                    : "All companies"}
+                {lang === "ar" ? "كل شركات تقرير الأرباح والخسائر" : "All P&L companies"}
               </option>
               {(filterOptions?.companies ?? []).map((company) => (
                 <option key={company} value={company}>
