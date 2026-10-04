@@ -1390,12 +1390,12 @@ export function ProfitAndLossView() {
 
       <Notice
         tone="info"
-        title={lang === "ar" ? "مصدر الأرقام وطريقة عرض الدولار" : "Source and USD conversion"}
+        title={lang === "ar" ? "مصدر الأرقام وعملة التقرير" : "Source and report currency"}
         icon={<FileText size={16} />}
       >
         {lang === "ar"
-          ? `الأرقام مأخوذة من قائمة الأرباح والخسائر في Odoo للشركات: ${report.companies.map((item) => item.name).join("، ")}. القيود المرحلة فقط. ${activeTab === "report" ? `الفترة من ${report.from} إلى ${report.to}. ` : "تاريخ كل شهر ظاهر داخل المقارنة. "}عملة التقرير الأصلية ${report.sourceCurrency}، والتحويل إلى الدولار بسعر ${report.fxRate.toLocaleString("en-US")} ${report.sourceCurrency} لكل دولار.`
-          : `Figures come from Odoo Profit and Loss for ${report.companies.map((item) => item.name).join(", ")}, posted entries only. ${activeTab === "report" ? `Period ${report.from} to ${report.to}. ` : "Each compared month shows its exact dates. "}Converted from ${report.sourceCurrency} to USD at ${report.fxRate.toLocaleString("en-US")} ${report.sourceCurrency} per USD.`}
+          ? `الأرقام مأخوذة من قائمة الأرباح والخسائر في Odoo للشركات: ${report.companies.map((item) => item.name).join("، ")}. القيود المرحلة فقط. ${activeTab === "report" ? `الفترة من ${report.from} إلى ${report.to}. ` : "تاريخ كل شهر ظاهر داخل المقارنة. "}التقرير محسوب بالدولار داخل Odoo باستخدام تحويل العملات الخاص به، بدون قسمة إضافية في الداشبورد.`
+          : `Figures come from Odoo Profit and Loss for ${report.companies.map((item) => item.name).join(", ")}, posted entries only. ${activeTab === "report" ? `Period ${report.from} to ${report.to}. ` : "Each compared month shows its exact dates. "}Odoo calculates this report in USD using its own currency conversion; the dashboard does not convert it again.`}
       </Notice>
 
       {account && (

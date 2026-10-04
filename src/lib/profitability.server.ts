@@ -71,7 +71,7 @@ interface OdooReportLine {
   id?: string;
   name?: string;
   level?: number;
-  columns?: { name?: string; no_format?: number | string | null }[];
+  columns?: { name?: string; no_format?: number | string | null; currency_symbol?: string | null }[];
 }
 
 interface OdooReportInformation {
@@ -94,6 +94,7 @@ const clean = (value: string): string =>
 
 const valueOf = (line: OdooReportLine): number | null => {
   for (const column of [...(line.columns ?? [])].reverse()) {
+    if (column.no_format === null || column.no_format === undefined) continue;
     const value = Number(column.no_format);
     if (Number.isFinite(value)) return value;
   }
@@ -216,12 +217,21 @@ async function fetchProfitability(
   from: string,
   to: string,
   company?: string,
-  sarPerUsd: number = DEFAULT_FX_RATES.SAR,
+  _sarPerUsd: number = DEFAULT_FX_RATES.SAR,
   includeDetails = true,
 ): Promise<ProfitabilitySnapshot> {
   if (!odooConfigured()) throw new Error("Odoo credentials are not configured.");
   const accessibleCompanies = await odooAccessibleCompanies();
-  const accessibleCompanyIds = accessibleCompanies.map((company) => company.id);
+  // Odoo renders a multi-company P&L in the first company's currency. The
+  // configured companies used to start with EGP, while the dashboard divided
+  // that EGP figure by a SAR/USD rate. Put Odoo's USD company first instead;
+  // Odoo then performs its own dated conversion, matching the exported report.
+  const usdCompany = accessibleCompanies.find((item) => item.currency.toUpperCase() === "USD");
+  if (!usdCompany) throw new Error("Odoo Profit and Loss needs an accessible USD company.");
+  const accessibleCompanyIds = [
+    usdCompany.id,
+    ...accessibleCompanies.filter((item) => item.id !== usdCompany.id).map((item) => item.id),
+  ];
   const baseContext = companyContext({
     lang: "en_US",
     tz: "Africa/Cairo",
@@ -239,84 +249,107 @@ async function fetchProfitability(
   const availableCompanies =
     initialOptions.companies ?? accessibleCompanies.map(({ id, name }) => ({ id, name }));
   const configuredReportIds = odooConfig().pnlCompanyIds;
-  const selectedCompanies = company
+  const filteredCompanies = company
     ? availableCompanies.filter((item) => clean(item.name) === clean(company))
     : availableCompanies.filter((item) => configuredReportIds.includes(Number(item.id)));
-  if (company && !selectedCompanies.length) {
+  if (company && !filteredCompanies.length) {
     throw new Error(`Odoo Profit and Loss company was not found: ${company}`);
   }
-  if (!company && selectedCompanies.length !== configuredReportIds.length) {
+  if (!company && filteredCompanies.length !== configuredReportIds.length) {
     const availableIds = new Set(availableCompanies.map((item) => Number(item.id)));
     const missingIds = configuredReportIds.filter((id) => !availableIds.has(id));
     throw new Error(
       `Odoo Profit and Loss is missing configured companies: ${missingIds.join(", ") || "unknown"}. The report was stopped to avoid showing partial totals.`,
     );
   }
-  const selectedCompanyIds = selectedCompanies.map((item) => Number(item.id));
-  const reportContext = companyContext({
-    lang: "en_US",
-    tz: "Africa/Cairo",
-    report_id: REPORT_ID,
-    allowed_company_ids: selectedCompanyIds,
-  });
+  const selectedCompanies = [
+    ...filteredCompanies.filter((item) => Number(item.id) === usdCompany.id),
+    ...filteredCompanies.filter((item) => Number(item.id) !== usdCompany.id),
+  ];
+  if (!company && !selectedCompanies.some((item) => Number(item.id) === usdCompany.id)) {
+    throw new Error("The configured Profit and Loss companies must include the USD company.");
+  }
   // `get_options()` builds the report's column groups. Mutating only
   // `options.date` afterwards leaves each column's `forced_options.date` on
   // Odoo's default fiscal year, so the UI says "custom range" while the
   // figures are actually year-to-date. Feed the desired range back through
   // Odoo once so it rebuilds the columns and computes the exact P&L itself.
-  const previousOptions: OdooReportOptions = {
-    ...initialOptions,
-    companies: selectedCompanies,
-    date: {
-      ...(initialOptions.date ?? {}),
-      string: `${from} - ${to}`,
-      period_type: "custom",
-      mode: "range",
-      date_from: from,
-      date_to: to,
-      filter: "custom",
-    },
-    comparison: {
-      ...(initialOptions.comparison ?? {}),
-      filter: "no_comparison",
-      date_from: from,
-      date_to: to,
-      periods: [],
-    },
-    all_entries: false,
-    unfold_all: includeDetails,
-    unfolded_lines: [],
+  const getReport = async (companies: { id: number; name: string }[]) => {
+    const reportContext = companyContext({
+      lang: "en_US",
+      tz: "Africa/Cairo",
+      report_id: REPORT_ID,
+      allowed_company_ids: companies.map((item) => Number(item.id)),
+    });
+    const previousOptions: OdooReportOptions = {
+      ...initialOptions,
+      companies,
+      date: {
+        ...(initialOptions.date ?? {}),
+        string: `${from} - ${to}`,
+        period_type: "custom",
+        mode: "range",
+        date_from: from,
+        date_to: to,
+        filter: "custom",
+      },
+      comparison: {
+        ...(initialOptions.comparison ?? {}),
+        filter: "no_comparison",
+        date_from: from,
+        date_to: to,
+        periods: [],
+      },
+      all_entries: false,
+      unfold_all: includeDetails,
+      unfolded_lines: [],
+    };
+    const options = await odooCallWithPolicy<OdooReportOptions>(
+      "account.report",
+      "get_options",
+      [REPORT_ID, previousOptions],
+      { context: reportContext },
+      { attempts: 1, timeoutMs: 45_000 },
+    );
+    // get_options may rebuild its own fold state. Expand the final options too.
+    const expandedOptions = { ...options, unfold_all: includeDetails, unfolded_lines: [] };
+    return odooCallWithPolicy<OdooReportInformation>(
+      "account.report",
+      "get_report_information",
+      [REPORT_ID, expandedOptions],
+      { context: reportContext },
+      { attempts: 1, timeoutMs: 240_000 },
+    );
   };
-  const options = await odooCallWithPolicy<OdooReportOptions>(
-    "account.report",
-    "get_options",
-    [REPORT_ID, previousOptions],
-    { context: reportContext },
-    { attempts: 1, timeoutMs: 45_000 },
-  );
 
-  // get_options may rebuild its own fold state. Expand the final options too,
-  // otherwise account rows such as office rent disappear below Expenses.
-  const expandedOptions = { ...options, unfold_all: includeDetails, unfolded_lines: [] };
-  const report = await odooCallWithPolicy<OdooReportInformation>(
-    "account.report",
-    "get_report_information",
-    [REPORT_ID, expandedOptions],
-    { context: reportContext },
-    // The P&L engine can be slow on this database. It runs in the background;
-    // callers time out quickly and then receive the cached result.
-    { attempts: 1, timeoutMs: 240_000 },
+  // A company filter still needs USD output. Odoo insists on all context
+  // companies being selected, so compute that company's exact contribution as
+  // (USD + company) minus (USD alone), both converted by Odoo itself.
+  const needsCompanyDifference = company && Number(selectedCompanies[0].id) !== usdCompany.id;
+  const usdSelection = availableCompanies.filter((item) => Number(item.id) === usdCompany.id);
+  const reportSelection = needsCompanyDifference
+    ? [...usdSelection, ...selectedCompanies]
+    : selectedCompanies;
+  const [report, usdOnlyReport] = await Promise.all([
+    getReport(reportSelection),
+    needsCompanyDifference ? getReport(usdSelection) : Promise.resolve(null),
+  ]);
+  const usdBase = new Map(
+    (usdOnlyReport?.lines ?? []).map((line) => [String(line.id || line.name || ""), valueOf(line) ?? 0]),
   );
-
   const lines = (report.lines ?? [])
     .map((line): ProfitabilityLine | null => {
       const value = valueOf(line);
       if (value === null) return null;
+      const symbol = line.columns?.find((column) => column.no_format != null)?.currency_symbol;
+      if (symbol && symbol !== "$") {
+        throw new Error(`Odoo Profit and Loss returned ${symbol} instead of USD; report stopped to prevent incorrect figures.`);
+      }
+      const id = String(line.id || line.name || "");
       return {
-        id: String(line.id || line.name || ""),
+        id,
         label: String(line.name || "—"),
-        // Odoo's consolidated report is shown in SR; management asked for USD.
-        value: value / sarPerUsd,
+        value: value - (usdOnlyReport ? (usdBase.get(id) ?? 0) : 0),
         level: Number(line.level || 0),
       };
     })
@@ -326,8 +359,8 @@ async function fetchProfitability(
     from,
     to,
     currency: "USD",
-    sourceCurrency: "SR",
-    fxRate: sarPerUsd,
+    sourceCurrency: "USD",
+    fxRate: 1,
     reportId: REPORT_ID,
     postedOnly: true,
     companies: selectedCompanies.map((company) => ({
