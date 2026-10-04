@@ -62,6 +62,8 @@ const usd = (value: number | null | undefined) =>
         maximumFractionDigits: 2,
       }).format(value);
 
+const roundedUsd = (value: number) => Number(value.toFixed(2));
+
 const nativeMoney = (value: number, currency: string) =>
   `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value)} ${currency || ""}`.trim();
 
@@ -449,6 +451,10 @@ function ProfitabilityComparison({
     {
       key: "gross",
       label: lang === "ar" ? "مجمل الربح" : "Gross profit",
+      help:
+        lang === "ar"
+          ? "نتيجة النشاط قبل الإيرادات الأخرى والمصروفات"
+          : "Operating result before other income and expenses",
       color: "#3675ab",
       betterUp: true,
       value: (item: ProfitabilitySnapshot) => item.grossProfit,
@@ -456,6 +462,10 @@ function ProfitabilityComparison({
     {
       key: "net",
       label: lang === "ar" ? "صافي الربح / الخسارة" : "Net profit / loss",
+      help:
+        lang === "ar"
+          ? "يشمل الإيرادات الأخرى بعد خصم المصروفات"
+          : "Includes other income after expenses",
       color: "#173d69",
       betterUp: true,
       value: (item: ProfitabilitySnapshot) => item.netProfit,
@@ -627,9 +637,11 @@ function ProfitabilityComparison({
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {metrics.map((metric) => {
-                const current = metric.value(base);
-                const past = metric.value(comparison);
-                const delta = current !== null && past !== null ? current - past : null;
+                const rawCurrent = metric.value(base);
+                const rawPast = metric.value(comparison);
+                const current = rawCurrent === null ? null : roundedUsd(rawCurrent);
+                const past = rawPast === null ? null : roundedUsd(rawPast);
+                const delta = current !== null && past !== null ? roundedUsd(current - past) : null;
                 const improvement =
                   delta === null ? null : metric.betterUp ? delta >= 0 : delta <= 0;
                 const percent =
@@ -643,6 +655,11 @@ function ProfitabilityComparison({
                     style={{ borderTop: `3px solid ${metric.color}` }}
                   >
                     <div className="text-xs font-semibold text-text-muted">{metric.label}</div>
+                    {"help" in metric && (
+                      <div className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                        {metric.help}
+                      </div>
+                    )}
                     <div className="num mt-2 text-xl font-extrabold text-text">{usd(current)}</div>
                     <div className="mt-1 text-[11px] text-text-muted">
                       {lang === "ar" ? "مقابل" : "vs"} <span className="num">{usd(past)}</span>
@@ -803,8 +820,8 @@ function ProfitabilityComparison({
                           {row.name}
                         </div>
                         <div className="num mt-1 text-[11px] text-text-muted" dir="ltr">
-                          {row.current - row.past > 0 ? "+" : ""}
-                          {usd(row.current - row.past)}
+                          {roundedUsd(row.current - row.past) > 0 ? "+" : ""}
+                          {usd(roundedUsd(row.current - row.past))}
                         </div>
                       </div>
                       <div className="space-y-1.5">
