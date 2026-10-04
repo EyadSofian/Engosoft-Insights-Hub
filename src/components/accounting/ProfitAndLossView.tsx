@@ -398,6 +398,13 @@ export function ProfitAndLossView() {
         <Skeleton className="mt-4 h-96" />
       </>
     );
+  if (data.status === "error" && !data.snapshot)
+    return (
+      <ErrorState
+        message={data.error || "Odoo Profit and Loss is unavailable"}
+        onRetry={() => refetch()}
+      />
+    );
   if (!data.snapshot) {
     return (
       <Card className="py-12 text-center">
