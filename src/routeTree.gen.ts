@@ -118,6 +118,7 @@ import { Route as ApiPricingItemsRouteImport } from './routes/api/pricing.items'
 import { Route as ApiPricingMappingsRouteImport } from './routes/api/pricing.mappings'
 import { Route as ApiPricingPublishRouteImport } from './routes/api/pricing.publish'
 import { Route as ApiPricingRecalculateRouteImport } from './routes/api/pricing.recalculate'
+import { Route as ApiRevenueAccessLoginRouteImport } from './routes/api/revenue-access.login'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/telegram.send-course-alerts'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
@@ -688,6 +689,11 @@ const ApiPricingRecalculateRoute = ApiPricingRecalculateRouteImport.update({
   path: '/api/pricing/recalculate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRevenueAccessLoginRoute = ApiRevenueAccessLoginRouteImport.update({
+  id: '/api/revenue-access/login',
+  path: '/api/revenue-access/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTelegramPreviewRoute = ApiTelegramPreviewRouteImport.update({
   id: '/api/telegram/preview',
   path: '/api/telegram/preview',
@@ -842,6 +848,7 @@ export interface FileRoutesByFullPath {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -961,6 +968,7 @@ export interface FileRoutesByTo {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -1081,6 +1089,7 @@ export interface FileRoutesById {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
@@ -1202,6 +1211,7 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
@@ -1321,6 +1331,7 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
@@ -1440,6 +1451,7 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
@@ -1560,6 +1572,7 @@ export interface RootRouteChildren {
   ApiPricingMappingsRoute: typeof ApiPricingMappingsRoute
   ApiPricingPublishRoute: typeof ApiPricingPublishRoute
   ApiPricingRecalculateRoute: typeof ApiPricingRecalculateRoute
+  ApiRevenueAccessLoginRoute: typeof ApiRevenueAccessLoginRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendCourseAlertsRoute: typeof ApiTelegramSendCourseAlertsRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
@@ -2335,6 +2348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPricingRecalculateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/revenue-access/login': {
+      id: '/api/revenue-access/login'
+      path: '/api/revenue-access/login'
+      fullPath: '/api/revenue-access/login'
+      preLoaderRoute: typeof ApiRevenueAccessLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram/preview': {
       id: '/api/telegram/preview'
       path: '/api/telegram/preview'
@@ -2506,6 +2526,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPricingMappingsRoute: ApiPricingMappingsRoute,
   ApiPricingPublishRoute: ApiPricingPublishRoute,
   ApiPricingRecalculateRoute: ApiPricingRecalculateRoute,
+  ApiRevenueAccessLoginRoute: ApiRevenueAccessLoginRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendCourseAlertsRoute: ApiTelegramSendCourseAlertsRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
