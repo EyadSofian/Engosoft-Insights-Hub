@@ -365,10 +365,11 @@ export async function getProfitability(
   let effectiveCompany = company;
   if (!effectiveCompany) {
     const config = odooConfig();
+    const companies = await odooAccessibleCompanies();
     const preferredId = config.companyIds[1] ?? config.companyIds[0];
-    const currentCompany = (await odooAccessibleCompanies()).find(
-      (item) => item.id === preferredId,
-    );
+    const currentCompany =
+      companies.find((item) => item.name.trim().toLowerCase() === "engosoft - ksa") ||
+      companies.find((item) => item.id === preferredId);
     if (!currentCompany) throw new Error("Odoo default report company is not available.");
     effectiveCompany = currentCompany.name;
   }
