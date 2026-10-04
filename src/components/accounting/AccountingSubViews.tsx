@@ -194,11 +194,38 @@ export interface AccountingMonth {
 
 interface ProfitabilityResponse {
   status: "ready" | "refreshing" | "loading" | "error";
+  monthlyStatus: "ready" | "loading" | "error";
+  monthly: Array<{
+    month: string;
+    from: string;
+    to: string;
+    status: "ready" | "loading" | "error";
+    error?: string;
+    snapshot: {
+      from: string;
+      to: string;
+      currency: string;
+      sourceCurrency: string;
+      fxRate: number;
+      netProfit: number | null;
+      income: number | null;
+      grossProfit: number | null;
+      operatingIncome: number | null;
+      otherIncome: number | null;
+      costOfRevenue: number | null;
+      expenses: number | null;
+      depreciation: number | null;
+      lines: { id: string; label: string; value: number; level: number }[];
+      fetchedAt: string;
+    } | null;
+  }>;
   error?: string;
   snapshot: {
     from: string;
     to: string;
     currency: string;
+    sourceCurrency: string;
+    fxRate: number;
     postedOnly: true;
     companies: { id: number; name: string }[];
     netProfit: number | null;
@@ -6160,13 +6187,24 @@ function profitabilityMetrics(
 
 export function AccountingProfitabilityView() {
   const { lang } = useI18n();
+  const [selectedMonth, setSelectedMonth] = useState("");
   const { data, isLoading, error, refetch } = useApi<ProfitabilityResponse>("/api/profitability");
 
   useEffect(() => {
-    if (data?.status !== "loading") return;
+    if (data?.status !== "loading" && data?.monthlyStatus !== "loading") return;
     const timer = window.setTimeout(() => refetch(), 15_000);
     return () => window.clearTimeout(timer);
-  }, [data?.status, refetch]);
+  }, [data?.status, data?.monthlyStatus, refetch]);
+
+  useEffect(() => {
+    if (!data?.monthly.length) return;
+    const current = data.monthly.find((item) => item.month === selectedMonth);
+    if (!current) {
+      const latestReady = [...data.monthly].reverse().find((item) => item.snapshot);
+      const firstAvailable = data.monthly[0];
+      if (latestReady || firstAvailable) setSelectedMonth((latestReady || firstAvailable)!.month);
+    }
+  }, [data?.monthly, selectedMonth]);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
   if (isLoading || !data)
@@ -6211,6 +6249,8 @@ export function AccountingProfitabilityView() {
   }
 
   const p = data.snapshot;
+  const selectedMonthData =
+    data.monthly.find((item) => item.month === selectedMonth)?.snapshot ?? null;
   const companyNames = p.companies.map((company) => company.name).join("، ");
   const companyScope =
     p.companies.length === 1
@@ -6231,8 +6271,8 @@ export function AccountingProfitabilityView() {
         icon={<Calculator size={16} />}
       >
         {lang === "ar"
-          ? `تقرير Profit and Loss مباشر من Odoo 17 ${companyScope}، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. الربح = الدخل − المصروفات.`
-          : `Direct Odoo 17 Profit and Loss ${companyScope}, posted entries only, ${p.from} → ${p.to}. Profit = income − expenses.`}
+          ? `تقرير Profit and Loss مباشر من Odoo 17 ${companyScope}، قيود مرحلة فقط، للفترة ${p.from} → ${p.to}. القيم معروضة بالدولار بعد التحويل من ${p.sourceCurrency} على أساس ${p.fxRate.toLocaleString("en-US")} ${p.sourceCurrency} لكل 1 USD.`
+          : `Direct Odoo 17 Profit and Loss ${companyScope}, posted entries only, ${p.from} → ${p.to}. Values are shown in USD, converted from ${p.sourceCurrency} at ${p.fxRate.toLocaleString("en-US")} ${p.sourceCurrency} per USD.`}
       </Notice>
       <KpiRow>
         <MetricDetailTrigger
@@ -6249,6 +6289,159 @@ export function AccountingProfitabilityView() {
       <Card>
         <SectionTitle
           action={
+            <div className="flex items-center gap-2">
+              <Pill
+                tone={
+                  data.monthlyStatus === "ready"
+                    ? "success"
+                    : data.monthlyStatus === "error"
+                      ? "warning"
+                      : "neutral"
+                }
+              >
+                {data.monthlyStatus === "ready"
+                  ? lang === "ar"
+                    ? "اكتمل التحميل"
+                    : "Complete"
+                  : data.monthlyStatus === "error"
+                    ? lang === "ar"
+                      ? "بعض الشهور تعذّر تحميلها"
+                      : "Some months unavailable"
+                    : `${data.monthly.filter((item) => item.snapshot).length}/${data.monthly.length} ${lang === "ar" ? "شهر" : "months"}`}
+              </Pill>
+              {data.monthlyStatus === "error" && (
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="min-h-9 rounded-lg border border-border px-3 text-xs font-semibold text-brand hover:bg-surface-2"
+                >
+                  {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+                </button>
+              )}
+            </div>
+          }
+        >
+          {lang === "ar" ? "الأداء المالي شهرًا بشهر" : "Monthly financial performance"}
+        </SectionTitle>
+        <p className="mb-3 text-xs leading-relaxed text-text-muted">
+          {lang === "ar"
+            ? "اختر شهرًا لعرض بنود الدخل والمصروفات التي كوّنت أرقامه. القيم من تقرير Odoo نفسه، مع القيود المرحلة فقط."
+            : "Select a month to inspect the income and expense lines behind its figures. Values come from Odoo's report, with posted entries only."}
+        </p>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full min-w-[760px] border-collapse text-sm">
+            <thead className="bg-surface-2 text-[11px] text-text-muted">
+              <tr>
+                {[
+                  lang === "ar" ? "الشهر" : "Month",
+                  lang === "ar" ? "الدخل" : "Income",
+                  lang === "ar" ? "تكلفة الإيراد" : "Cost of revenue",
+                  lang === "ar" ? "إجمالي الربح" : "Gross profit",
+                  lang === "ar" ? "المصروفات" : "Expenses",
+                  lang === "ar" ? "صافي الربح" : "Net profit",
+                  lang === "ar" ? "الهامش" : "Margin",
+                ].map((label) => (
+                  <th
+                    key={label}
+                    className="whitespace-nowrap px-3 py-2.5 text-end font-semibold first:text-start"
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data.monthly.map((item) => {
+                const monthSnapshot = item.snapshot;
+                const monthLabel = new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
+                  month: "long",
+                  year: "numeric",
+                  timeZone: "UTC",
+                }).format(new Date(`${item.month}-01T00:00:00Z`));
+                const marginValue =
+                  monthSnapshot?.income && monthSnapshot.netProfit !== null
+                    ? (monthSnapshot.netProfit / monthSnapshot.income) * 100
+                    : null;
+                return (
+                  <tr
+                    key={item.month}
+                    className={
+                      selectedMonth === item.month ? "bg-brand/5" : "hover:bg-surface-2/70"
+                    }
+                  >
+                    <td className="whitespace-nowrap px-3 py-2.5 text-start">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMonth(item.month)}
+                        className="font-semibold text-brand hover:underline"
+                      >
+                        {monthLabel}
+                      </button>
+                      {item.status === "loading" && (
+                        <span className="ms-2 text-[10px] text-text-muted">
+                          {lang === "ar" ? "جارٍ التحميل" : "Loading"}
+                        </span>
+                      )}
+                      {item.status === "error" && (
+                        <span className="ms-2 text-[10px] text-danger" title={item.error}>
+                          {lang === "ar" ? "تعذّر" : "Unavailable"}
+                        </span>
+                      )}
+                    </td>
+                    {[
+                      monthSnapshot?.income,
+                      monthSnapshot?.costOfRevenue,
+                      monthSnapshot?.grossProfit,
+                      monthSnapshot?.expenses,
+                      monthSnapshot?.netProfit,
+                    ].map((value, index) => (
+                      <td
+                        key={index}
+                        className="num whitespace-nowrap px-3 py-2.5 text-end font-medium text-text"
+                      >
+                        {monthSnapshot ? localMoney(value ?? null, monthSnapshot.currency) : "—"}
+                      </td>
+                    ))}
+                    <td className="num whitespace-nowrap px-3 py-2.5 text-end text-text-muted">
+                      {fmtPct(marginValue, 1)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      {selectedMonthData && (
+        <Card>
+          <SectionTitle action={<Pill tone="brand">{selectedMonth}</Pill>}>
+            {lang === "ar" ? "تفاصيل حسابات الشهر المختار" : "Selected month account detail"}
+          </SectionTitle>
+          <div className="divide-y divide-border">
+            {selectedMonthData.lines.map((line) => (
+              <div
+                key={line.id}
+                className="flex items-center justify-between gap-4 py-2.5"
+                style={{ paddingInlineStart: `${Math.min(line.level, 4) * 12}px` }}
+              >
+                <span
+                  className={
+                    line.level <= 1 ? "font-semibold text-text" : "text-sm text-text-muted"
+                  }
+                >
+                  {line.label}
+                </span>
+                <span className="num whitespace-nowrap font-semibold text-text">
+                  {localMoney(line.value, selectedMonthData.currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+      <Card>
+        <SectionTitle
+          action={
             <Pill tone={data.status === "refreshing" ? "warning" : "success"}>
               {data.status === "refreshing"
                 ? lang === "ar"
@@ -6260,7 +6453,7 @@ export function AccountingProfitabilityView() {
             </Pill>
           }
         >
-          {lang === "ar" ? "تفاصيل الربح والخسارة" : "Profit and Loss details"}
+          {lang === "ar" ? "إجمالي الفترة المحددة — من Odoo" : "Selected-period total — from Odoo"}
         </SectionTitle>
         <div className="divide-y divide-border">
           {p.lines.map((line) => (

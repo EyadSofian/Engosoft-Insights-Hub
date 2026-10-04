@@ -502,7 +502,10 @@ function Accounting() {
               value: "cohorts",
               label: lang === "ar" ? "كوهورت دخول العملاء" : "Customer entry cohorts",
             },
-            { value: "profitability", label: lang === "ar" ? "الربحية" : "Profitability" },
+            {
+              value: "profitability",
+              label: lang === "ar" ? "الأرباح والخسائر" : "Profit and Loss",
+            },
             {
               value: "net-sales",
               label: lang === "ar" ? "صافي مبيعات الشركة" : "Net company sales",

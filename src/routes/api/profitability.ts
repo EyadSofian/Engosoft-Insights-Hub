@@ -9,7 +9,12 @@ export const Route = createFileRoute("/api/profitability")({
         const filters = await parseFilters(request);
         const from = filters.from || "2026-01-01";
         const to = filters.to || new Date().toISOString().slice(0, 10);
-        const profitability = await getProfitability(from, to, filters.company);
+        const profitability = await getProfitability(
+          from,
+          to,
+          filters.company,
+          Number(filters.fxSar),
+        );
         return json({
           ...profitability,
           appliedFilters: filters,
