@@ -25,9 +25,9 @@ import {
 } from "@/components/accounting/CourseRevenueExplorer";
 import {
   AccountingMonthlyView,
-  AccountingProfitabilityView,
   type AccountingMonth,
 } from "@/components/accounting/AccountingSubViews";
+import { ProfitAndLossView } from "@/components/accounting/ProfitAndLossView";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
   BarList,
@@ -45,7 +45,6 @@ import {
   KpiRow,
   PageSection,
   PageSections,
-  ViewSelect,
 } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
@@ -167,7 +166,7 @@ function Accounting() {
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting", {
-    enabled: view !== "net-sales",
+    enabled: view !== "net-sales" && view !== "profitability",
   });
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
@@ -202,7 +201,7 @@ function Accounting() {
     filterStore.setFxRates(DEFAULT_FX_RATES.EGP, DEFAULT_FX_RATES.SAR);
   };
 
-  if (error && view !== "net-sales")
+  if (error && view !== "net-sales" && view !== "profitability")
     return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const cols: Col<AccountingDetail>[] = [
@@ -370,23 +369,62 @@ function Accounting() {
             ? lang === "ar"
               ? "صافي مبيعات الشركة"
               : "Net company sales"
-            : view === "marketing"
+            : view === "profitability"
               ? lang === "ar"
-                ? "من التسويق للإيراد"
-                : "Marketing → revenue"
-              : t("accounting")
+                ? "الأرباح والخسائر"
+                : "Profit and Loss"
+              : view === "marketing"
+                ? lang === "ar"
+                  ? "من التسويق للإيراد"
+                  : "Marketing → revenue"
+                : t("accounting")
         }
         subtitle={
           view === "net-sales"
             ? lang === "ar"
               ? "المبيعات من القيود المحاسبية المرحّلة، بدون ضريبة القيمة المضافة وبعد رسوم التحصيل"
               : "Posted accounting sales excluding VAT and collection fees"
-            : lang === "ar"
-              ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
-              : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
+            : view === "profitability"
+              ? lang === "ar"
+                ? "الدخل والمصروفات وصافي الربح من القيود المحاسبية المرحّلة في Odoo"
+                : "Income, expenses and net profit from posted Odoo journal entries"
+              : lang === "ar"
+                ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
+                : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
         }
         period={reportingPeriod}
       />
+
+      {view !== "marketing" && (
+        <nav
+          aria-label={lang === "ar" ? "تقارير المحاسبة" : "Accounting reports"}
+          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
+        >
+          {(
+            [
+              ["summary", lang === "ar" ? "ملخص التحصيل" : "Collection summary"],
+              ["months", lang === "ar" ? "مقارنة الشهور" : "Monthly comparison"],
+              ["cohorts", lang === "ar" ? "مصدر العملاء" : "Customer cohorts"],
+              ["profitability", lang === "ar" ? "الأرباح والخسائر" : "Profit and Loss"],
+              ["net-sales", lang === "ar" ? "صافي المبيعات" : "Net sales"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-current={view === value ? "page" : undefined}
+              className={`min-h-11 shrink-0 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+                view === value
+                  ? "border-brand bg-brand text-white shadow-sm"
+                  : "border-border bg-surface text-text-muted hover:border-brand/40 hover:text-text"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {/* The reporting basis and the company scope are settings, not findings.
           They belong to the report and must stay reachable, but they were
@@ -399,7 +437,7 @@ function Accounting() {
             {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
           </span>
           <span className="text-[11.5px] text-text-muted">
-            {view === "net-sales"
+            {view === "net-sales" || view === "profitability"
               ? lang === "ar"
                 ? "تاريخ القيد المرحّل"
                 : "Posted journal date"
@@ -419,7 +457,7 @@ function Accounting() {
           />
         </summary>
         <div className="grid gap-4 border-t border-border p-3.5 sm:p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
-          {view !== "net-sales" && (
+          {view !== "net-sales" && view !== "profitability" && (
             <div>
               <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
                 <CalendarDays size={15} className="text-brand" />
@@ -450,7 +488,13 @@ function Accounting() {
           <label className="block">
             <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
               <Building2 size={15} className="text-brand" />
-              {lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
+              {view === "profitability"
+                ? lang === "ar"
+                  ? "شركة التقرير"
+                  : "Report company"
+                : lang === "ar"
+                  ? "شركة الفاتورة"
+                  : "Invoice company"}
             </span>
             <select
               value={filters.company ?? ""}
@@ -471,7 +515,7 @@ function Accounting() {
               {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
             </div>
             <div className="mt-1">
-              {view === "net-sales"
+              {view === "net-sales" || view === "profitability"
                 ? lang === "ar"
                   ? "الفترة تُطبّق على تاريخ القيد في Odoo"
                   : "Range applies to Odoo journal entry date"
@@ -487,37 +531,12 @@ function Accounting() {
         </div>
       </details>
 
-      {/* Collection and Marketing → revenue are the Revenue workspace's own
-          tabs; the two analyst views of the collection report are a choice
-          inside it, not a second tab strip. */}
-      {view !== "marketing" && (
-        <ViewSelect
-          label={lang === "ar" ? "التقرير" : "Report"}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "summary", label: lang === "ar" ? "ملخص التحصيل" : "Collection summary" },
-            { value: "months", label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison" },
-            {
-              value: "cohorts",
-              label: lang === "ar" ? "كوهورت دخول العملاء" : "Customer entry cohorts",
-            },
-            {
-              value: "profitability",
-              label: lang === "ar" ? "الأرباح والخسائر" : "Profit and Loss",
-            },
-            {
-              value: "net-sales",
-              label: lang === "ar" ? "صافي مبيعات الشركة" : "Net company sales",
-            },
-          ]}
-        />
-      )}
-
       {view === "marketing" ? (
         <SalesPerformance />
       ) : view === "net-sales" ? (
         <NetSalesView />
+      ) : view === "profitability" ? (
+        <ProfitAndLossView />
       ) : view === "cohorts" ? (
         <EntryCohortView />
       ) : isLoading || !data ? (
@@ -732,7 +751,6 @@ function Accounting() {
           )}
 
           {view === "months" && <AccountingMonthlyView monthly={data.monthly} />}
-          {view === "profitability" && <AccountingProfitabilityView />}
         </>
       )}
     </div>

@@ -68,6 +68,7 @@ import { Route as ApiOverviewRouteImport } from './routes/api/overview'
 import { Route as ApiOverviewRevenueSourceRouteImport } from './routes/api/overview-revenue-source'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
+import { Route as ApiProfitabilityLedgerRouteImport } from './routes/api/profitability-ledger'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiRevenueCohortsRouteImport } from './routes/api/revenue-cohorts'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
@@ -422,6 +423,11 @@ const ApiProductsRoute = ApiProductsRouteImport.update({
 const ApiProfitabilityRoute = ApiProfitabilityRouteImport.update({
   id: '/api/profitability',
   path: '/api/profitability',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfitabilityLedgerRoute = ApiProfitabilityLedgerRouteImport.update({
+  id: '/api/profitability-ledger',
+  path: '/api/profitability-ledger',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
@@ -786,6 +792,7 @@ export interface FileRoutesByFullPath {
   '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -904,6 +911,7 @@ export interface FileRoutesByTo {
   '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -1023,6 +1031,7 @@ export interface FileRoutesById {
   '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -1143,6 +1152,7 @@ export interface FileRouteTypes {
     | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1261,6 +1271,7 @@ export interface FileRouteTypes {
     | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1379,6 +1390,7 @@ export interface FileRouteTypes {
     | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1498,6 +1510,7 @@ export interface RootRouteChildren {
   ApiOverviewRevenueSourceRoute: typeof ApiOverviewRevenueSourceRoute
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
+  ApiProfitabilityLedgerRoute: typeof ApiProfitabilityLedgerRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiRevenueCohortsRoute: typeof ApiRevenueCohortsRoute
   ApiSalesRoute: typeof ApiSalesRoute
@@ -1972,6 +1985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProfitabilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profitability-ledger': {
+      id: '/api/profitability-ledger'
+      path: '/api/profitability-ledger'
+      fullPath: '/api/profitability-ledger'
+      preLoaderRoute: typeof ApiProfitabilityLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/refresh': {
       id: '/api/refresh'
       path: '/api/refresh'
@@ -2434,6 +2454,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOverviewRevenueSourceRoute: ApiOverviewRevenueSourceRoute,
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
+  ApiProfitabilityLedgerRoute: ApiProfitabilityLedgerRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiRevenueCohortsRoute: ApiRevenueCohortsRoute,
   ApiSalesRoute: ApiSalesRoute,

@@ -149,7 +149,15 @@ function startMonthlyRefresh(
           const cachedMonth = monthlyCache.get(window.key);
           if (cachedMonth && cachedMonth.expiresAt > Date.now()) return;
           try {
-            const snapshot = await fetchProfitability(window.from, window.to, company, fxRate);
+            // Monthly trend cards only need report totals. The selected month
+            // requests its account rows separately when opened.
+            const snapshot = await fetchProfitability(
+              window.from,
+              window.to,
+              company,
+              fxRate,
+              false,
+            );
             monthlyCache.set(window.key, { value: snapshot, expiresAt: Date.now() + TTL });
             monthlyErrors.delete(window.key);
           } catch (error) {
@@ -203,6 +211,7 @@ async function fetchProfitability(
   to: string,
   company?: string,
   sarPerUsd: number = DEFAULT_FX_RATES.SAR,
+  includeDetails = true,
 ): Promise<ProfitabilitySnapshot> {
   if (!odooConfigured()) throw new Error("Odoo credentials are not configured.");
   const accessibleCompanies = await odooAccessibleCompanies();
@@ -261,7 +270,7 @@ async function fetchProfitability(
       periods: [],
     },
     all_entries: false,
-    unfold_all: false,
+    unfold_all: includeDetails,
     unfolded_lines: [],
   };
   const options = await odooCallWithPolicy<OdooReportOptions>(
@@ -272,10 +281,13 @@ async function fetchProfitability(
     { attempts: 1, timeoutMs: 45_000 },
   );
 
+  // get_options may rebuild its own fold state. Expand the final options too,
+  // otherwise account rows such as office rent disappear below Expenses.
+  const expandedOptions = { ...options, unfold_all: includeDetails, unfolded_lines: [] };
   const report = await odooCallWithPolicy<OdooReportInformation>(
     "account.report",
     "get_report_information",
-    [REPORT_ID, options],
+    [REPORT_ID, expandedOptions],
     { context: reportContext },
     // The P&L engine can be slow on this database. It runs in the background;
     // callers time out quickly and then receive the cached result.
