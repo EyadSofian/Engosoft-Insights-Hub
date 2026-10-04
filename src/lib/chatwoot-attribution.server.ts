@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import {
   getChatwootConversationLabels,
   replaceChatwootConversationLabels,
@@ -140,7 +141,6 @@ export function verifyChatwootWebhookSignature(input: {
   return received.length === calculated.length && timingSafeEqual(received, calculated);
 }
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 let importedDataCache: {
   expiresAt: number;
@@ -154,22 +154,7 @@ let importedDataCache: {
 } | null = null;
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 async function ensureSchema(): Promise<void> {

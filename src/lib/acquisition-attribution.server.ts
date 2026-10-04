@@ -1,4 +1,5 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import {
   chatwootChannelSql,
   sourcePlatformSql,
@@ -15,8 +16,6 @@ import {
  * Nothing here reads CRM to decide attribution and nothing calls Meta Graph;
  * CRM status and revenue appear only where an existing downstream join exists.
  */
-
-let pool: Pool | null = null;
 
 type Row = Record<string, unknown>;
 
@@ -37,22 +36,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[\w.:-]{1,64}$/;
 
 export function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 4,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 export function acquisitionDatabaseConfigured(): boolean {

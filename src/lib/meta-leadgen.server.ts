@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import { metaLeadSourceType } from "./acquisition-attribution";
 import {
   META_LEAD_FIELDS,
@@ -35,7 +36,6 @@ const FORM_REFRESH_MS = 24 * 60 * 60 * 1000;
 const RETRYABLE_CODES = new Set([1, 2, 4, 17, 32, 341, 613, 80000, 80001, 80004]);
 const ACCESS_CODES = new Set([10, 100, 190, 200, 294]);
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 let workerTimer: ReturnType<typeof setInterval> | null = null;
 let workerStarted = false;
@@ -97,22 +97,7 @@ function hash(value: string): string {
 }
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 export async function ensureMetaLeadAdsSchema(): Promise<void> {

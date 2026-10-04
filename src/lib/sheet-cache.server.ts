@@ -2811,7 +2811,8 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     // a dataset that had failed twenty-six times in a row looking identical to
     // one that had simply not been touched since lunchtime.
     for (const alert of datasetFreshnessAlerts(storedStates, Date.now())) {
-      fetchErrors.push(alert.message);
+      if (alert.kind === "failed") fetchErrors.push(alert.message);
+      else staleTabs.push(alert.message);
     }
 
     const tabSyncs: SourceFreshness[] = [

@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import {
   getChatwootConversationLabels,
   replaceChatwootConversationLabels,
@@ -71,7 +72,6 @@ export function isSelfTestMessageId(providerMessageId: string): boolean {
 const MAX_PROCESS_ATTEMPTS = 8;
 const MANAGED_LABEL_PREFIXES = ["src:", "channel:", "campaign:", "branch:"];
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 let workerStarted = false;
 let workerTimer: ReturnType<typeof setInterval> | null = null;
@@ -282,22 +282,7 @@ export function verifyMetaWebhookChallenge(input: {
 }
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 async function ensureSchema(): Promise<void> {
