@@ -24,6 +24,7 @@ export const Route = createFileRoute("/api/revenue-access/login")({
           allowRevenuePasswordAttempt,
           issueRevenueSessionCookie,
           renderRevenueSignInPage,
+          revenueRequestOriginMatches,
           revenuePasswordConfigured,
           revenuePasswordMatches,
           safeRevenueReturnPath,
@@ -40,8 +41,7 @@ export const Route = createFileRoute("/api/revenue-access/login")({
             },
           });
 
-        const origin = request.headers.get("origin");
-        if (origin && origin !== new URL(request.url).origin)
+        if (!revenueRequestOriginMatches(request))
           return page("تعذر التحقق من مصدر الطلب. أعد المحاولة من لوحة المعلومات.", 403);
         if (!allowRevenuePasswordAttempt(request))
           return page("محاولات كثيرة. انتظر 15 دقيقة ثم أعد المحاولة.", 429);

@@ -7,6 +7,7 @@ import {
   revenueSessionValid,
   safeRevenueReturnPath,
   revenueGuardApplies,
+  revenueRequestOriginMatches,
 } from "../src/lib/revenue-access.server.ts";
 
 const password = "testing-only-revenue-password";
@@ -42,5 +43,28 @@ assert.equal(revenueGuardApplies(new Request("https://example.test/api/teams")),
 assert.equal(revenueGuardApplies(new Request("https://example.test/accounting?view=months")), true);
 assert.equal(revenueGuardApplies(new Request("https://example.test/courses?view=sales")), true);
 assert.equal(revenueGuardApplies(new Request("https://example.test/api/courses")), true);
+assert.equal(
+  revenueRequestOriginMatches(
+    new Request("http://internal-service/api/revenue-access/login", {
+      method: "POST",
+      headers: {
+        origin: "https://insights.example.test",
+        host: "internal-service",
+        "x-forwarded-host": "insights.example.test",
+      },
+    }),
+  ),
+  true,
+  "a reverse proxy must compare the browser host with the forwarded public host",
+);
+assert.equal(
+  revenueRequestOriginMatches(
+    new Request("https://example.test/api/revenue-access/login", {
+      method: "POST",
+      headers: { origin: "https://attacker.test", host: "example.test" },
+    }),
+  ),
+  false,
+);
 
 console.log("Revenue password gate: hash verification, signed session, expiry and scope passed.");

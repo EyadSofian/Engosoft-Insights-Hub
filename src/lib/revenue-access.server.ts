@@ -130,6 +130,19 @@ export function allowRevenuePasswordAttempt(request: Request, now = Date.now()):
   return state.count <= 8;
 }
 
+/** Reverse proxies may change the scheme/host visible to the app runtime. */
+export function revenueRequestOriginMatches(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const publicHost = forwardedHost || request.headers.get("host") || new URL(request.url).host;
+  try {
+    return new URL(origin).host.toLowerCase() === publicHost.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 export function revenueGuardApplies(request: Request): boolean {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/u, "") || "/";
