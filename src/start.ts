@@ -17,7 +17,10 @@ const revenueAccessMiddleware = createMiddleware().server(async ({ next, request
 
   if (url.pathname.startsWith("/api/")) {
     return Response.json(
-      { error: "Revenue access requires a password." },
+      {
+        code: "REVENUE_PASSWORD_REQUIRED",
+        error: "Revenue access requires a password.",
+      },
       { status: 401, headers: { "cache-control": "no-store" } },
     );
   }

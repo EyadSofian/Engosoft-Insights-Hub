@@ -28,6 +28,18 @@ export function useApi<T>(
     queryFn: async () => {
       const res = await fetch(url);
       if (res.status === 401) {
+        const authError = await res
+          .clone()
+          .json()
+          .then((body: { code?: string }) => body?.code)
+          .catch(() => undefined);
+        if (authError === "REVENUE_PASSWORD_REQUIRED") {
+          // A client-side route transition can skip the document request that
+          // the server middleware uses to render the password screen. Reload
+          // once so the same protected URL is handled as a document request.
+          if (typeof window !== "undefined") window.location.assign(window.location.href);
+          throw new Error("Revenue access requires a password.");
+        }
         throw new Error("Your sign-in session has ended. Reload the page to sign in again.");
       }
       if (!res.ok) {
