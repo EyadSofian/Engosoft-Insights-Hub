@@ -340,7 +340,8 @@ export async function odooCurrentCompanyId(): Promise<number> {
   );
   const companyId = m2oId(users[0]?.company_id);
   if (!companyId) throw new OdooError("Odoo user has no active company.", "access");
-  currentCompanyCache = { uid: userId, value: companyId, expiresAt: Date.now() + 30 * 60 * 1000 };
+  // This can change from the Odoo company switcher, so keep the cache short.
+  currentCompanyCache = { uid: userId, value: companyId, expiresAt: Date.now() + 30_000 };
   return companyId;
 }
 
