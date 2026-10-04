@@ -174,8 +174,8 @@ function Accounting() {
     filters.company ||
     (view === "profitability"
       ? lang === "ar"
-        ? "الشركة الحالية في Odoo"
-        : "Active Odoo company"
+        ? "شركة التقرير الافتراضية في Odoo"
+        : "Default Odoo report company"
       : lang === "ar"
         ? "كل الشركات"
         : "All companies");
@@ -513,8 +513,8 @@ function Accounting() {
               <option value="">
                 {view === "profitability"
                   ? lang === "ar"
-                    ? "الشركة الحالية في Odoo"
-                    : "Active Odoo company"
+                    ? "شركة التقرير الافتراضية في Odoo"
+                    : "Default Odoo report company"
                   : lang === "ar"
                     ? "كل الشركات"
                     : "All companies"}

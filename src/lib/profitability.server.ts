@@ -2,7 +2,7 @@ import {
   companyContext,
   odooAccessibleCompanies,
   odooCallWithPolicy,
-  odooCurrentCompanyId,
+  odooConfig,
   odooConfigured,
 } from "./odoo.server";
 import { DEFAULT_FX_RATES } from "./fx-rates";
@@ -359,16 +359,17 @@ export async function getProfitability(
   company?: string,
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilityResult> {
-  // Odoo's P&L follows the active company shown in the company switcher. Do
-  // not silently consolidate every company the user can access; that produces
-  // a number that cannot be reconciled with the report open in Odoo.
+  // Odoo's P&L follows the report company, not every company the API user can
+  // access. The configured company list is Egypt/KSA/UAE; KSA is the default
+  // report company used by the dashboard and by the Odoo screen in production.
   let effectiveCompany = company;
   if (!effectiveCompany) {
-    const currentCompanyId = await odooCurrentCompanyId();
+    const config = odooConfig();
+    const preferredId = config.companyIds[1] ?? config.companyIds[0];
     const currentCompany = (await odooAccessibleCompanies()).find(
-      (item) => item.id === currentCompanyId,
+      (item) => item.id === preferredId,
     );
-    if (!currentCompany) throw new Error("Odoo active company is not available to the report.");
+    if (!currentCompany) throw new Error("Odoo default report company is not available.");
     effectiveCompany = currentCompany.name;
   }
   const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;

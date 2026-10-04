@@ -78,7 +78,6 @@ let accessibleCompaniesCache: {
   value: OdooAccessibleCompany[];
   expiresAt: number;
 } | null = null;
-let currentCompanyCache: { uid: number; value: number; expiresAt: number } | null = null;
 
 async function rpc(
   service: string,
@@ -318,31 +317,6 @@ export async function odooAccessibleCompanies(): Promise<OdooAccessibleCompany[]
   }));
   accessibleCompaniesCache = { uid: userId, value, expiresAt: Date.now() + 30 * 60 * 1000 };
   return value;
-}
-
-/**
- * The Odoo report follows the user's active company, not every company that
- * appears in the switcher. Keep the dashboard's default P&L scope aligned with
- * that active company; the explicit company filter can still select another one.
- */
-export async function odooCurrentCompanyId(): Promise<number> {
-  const userId = await uid();
-  if (currentCompanyCache?.uid === userId && currentCompanyCache.expiresAt > Date.now()) {
-    return currentCompanyCache.value;
-  }
-  const users = await odooCall<{ id: number; company_id?: M2O }[]>(
-    "res.users",
-    "read",
-    [[userId], ["company_id"]],
-    {
-      context: { active_test: false },
-    },
-  );
-  const companyId = m2oId(users[0]?.company_id);
-  if (!companyId) throw new OdooError("Odoo user has no active company.", "access");
-  // This can change from the Odoo company switcher, so keep the cache short.
-  currentCompanyCache = { uid: userId, value: companyId, expiresAt: Date.now() + 30_000 };
-  return companyId;
 }
 
 /* --- small shared helpers ------------------------------------------------ */
