@@ -43,6 +43,11 @@ export interface ProfitabilityResult {
   error?: string;
 }
 
+export type ProfitabilitySnapshotResult = Pick<
+  ProfitabilityResult,
+  "status" | "snapshot" | "error"
+>;
+
 export interface ProfitabilityMonth {
   month: string;
   from: string;
@@ -353,26 +358,56 @@ function startRefresh(
   return job;
 }
 
+async function resolveReportCompany(company?: string): Promise<string> {
+  if (company) return company;
+  // Odoo's P&L follows the report company, not every company the API user can
+  // access. The configured company list is Egypt/KSA/UAE; KSA is the default
+  // report company used by the dashboard and by the Odoo screen in production.
+  const config = odooConfig();
+  const companies = await odooAccessibleCompanies();
+  const preferredId = config.companyIds[1] ?? config.companyIds[0];
+  const currentCompany =
+    companies.find((item) => item.name.trim().toLowerCase() === "engosoft - ksa") ||
+    companies.find((item) => item.id === preferredId);
+  if (!currentCompany) throw new Error("Odoo default report company is not available.");
+  return currentCompany.name;
+}
+
+/** One expanded month, without launching the full-range monthly background job. */
+export async function getProfitabilitySnapshot(
+  from: string,
+  to: string,
+  company?: string,
+  fxSar: number = DEFAULT_FX_RATES.SAR,
+): Promise<ProfitabilitySnapshotResult> {
+  const effectiveCompany = await resolveReportCompany(company);
+  const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return { status: "ready", snapshot: cached.value };
+  const refresh = startRefresh(key, from, to, effectiveCompany, fxSar);
+  if (cached) return { status: "refreshing", snapshot: cached.value };
+  try {
+    const snapshot = await Promise.race([
+      refresh,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000)),
+    ]);
+    return snapshot ? { status: "ready", snapshot } : { status: "loading", snapshot: null };
+  } catch (error) {
+    return {
+      status: "error",
+      snapshot: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function getProfitability(
   from: string,
   to: string,
   company?: string,
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilityResult> {
-  // Odoo's P&L follows the report company, not every company the API user can
-  // access. The configured company list is Egypt/KSA/UAE; KSA is the default
-  // report company used by the dashboard and by the Odoo screen in production.
-  let effectiveCompany = company;
-  if (!effectiveCompany) {
-    const config = odooConfig();
-    const companies = await odooAccessibleCompanies();
-    const preferredId = config.companyIds[1] ?? config.companyIds[0];
-    const currentCompany =
-      companies.find((item) => item.name.trim().toLowerCase() === "engosoft - ksa") ||
-      companies.find((item) => item.id === preferredId);
-    if (!currentCompany) throw new Error("Odoo default report company is not available.");
-    effectiveCompany = currentCompany.name;
-  }
+  const effectiveCompany = await resolveReportCompany(company);
   const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;
   void startMonthlyRefresh(key, from, to, effectiveCompany, fxSar);
   const months = monthlyState(from, to, effectiveCompany, fxSar);
