@@ -622,74 +622,82 @@ export function ProfitAndLossView() {
         />
       </Card>
 
-      <Card>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-base font-bold text-text">
-              {lang === "ar" ? "حركة الإيرادات والمصروفات بالشهور" : "Monthly income and expenses"}
-            </h3>
-            <p className="mt-0.5 text-xs text-text-muted">
-              {lang === "ar"
-                ? "اضغط على شهر لعرض حساباته بالتفصيل"
-                : "Select a month to view its accounts"}
-            </p>
+      {data.monthly.length > 1 && (
+        <Card>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-text">
+                {lang === "ar"
+                  ? "حركة الإيرادات والمصروفات بالشهور"
+                  : "Monthly income and expenses"}
+              </h3>
+              <p className="mt-0.5 text-xs text-text-muted">
+                {lang === "ar"
+                  ? "اضغط على شهر لعرض حساباته بالتفصيل"
+                  : "Select a month to view its accounts"}
+              </p>
+            </div>
+            <span className="text-xs text-text-muted">
+              {monthlyReady.length}/{data.monthly.length}{" "}
+              {lang === "ar" ? "شهر جاهز" : "months ready"}
+            </span>
           </div>
-          <span className="text-xs text-text-muted">
-            {monthlyReady.length}/{data.monthly.length}{" "}
-            {lang === "ar" ? "شهر جاهز" : "months ready"}
-          </span>
-        </div>
-        {chartData.length > 0 && (
-          <MultiLineChart
-            data={chartData}
-            series={[
-              { key: "income", name: lang === "ar" ? "الإيرادات" : "Income", color: "#19947d" },
-              { key: "expenses", name: lang === "ar" ? "المصروفات" : "Expenses", color: "#d58d45" },
-              {
-                key: "profit",
-                name: lang === "ar" ? "صافي الربح" : "Net profit",
-                color: "#265b91",
-              },
-            ]}
-            height={270}
-            format={(value) => usd(value)}
-          />
-        )}
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {data.monthly.map((item) => (
+          {chartData.length > 0 && (
+            <MultiLineChart
+              data={chartData}
+              series={[
+                { key: "income", name: lang === "ar" ? "الإيرادات" : "Income", color: "#19947d" },
+                {
+                  key: "expenses",
+                  name: lang === "ar" ? "المصروفات" : "Expenses",
+                  color: "#d58d45",
+                },
+                {
+                  key: "profit",
+                  name: lang === "ar" ? "صافي الربح" : "Net profit",
+                  color: "#265b91",
+                },
+              ]}
+              height={270}
+              format={(value) => usd(value)}
+            />
+          )}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            {data.monthly.map((item) => (
+              <button
+                key={item.month}
+                type="button"
+                onClick={() => setSelectedMonth(item.month)}
+                className={`min-w-28 shrink-0 rounded-xl border px-3 py-2 text-start transition-colors ${selectedMonth === item.month ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}
+              >
+                <span className="block text-xs font-semibold text-text">
+                  {monthName(item.month, lang)}
+                </span>
+                <span className="num mt-1 block text-sm font-bold text-text">
+                  {item.snapshot
+                    ? usd(item.snapshot.netProfit)
+                    : item.status === "error"
+                      ? lang === "ar"
+                        ? "تعذّر التحميل"
+                        : "Unavailable"
+                      : "…"}
+                </span>
+              </button>
+            ))}
+          </div>
+          {data.monthlyStatus === "error" && (
             <button
-              key={item.month}
               type="button"
-              onClick={() => setSelectedMonth(item.month)}
-              className={`min-w-28 shrink-0 rounded-xl border px-3 py-2 text-start transition-colors ${selectedMonth === item.month ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}
+              onClick={() => refetch()}
+              className="mt-3 text-xs font-semibold text-brand hover:underline"
             >
-              <span className="block text-xs font-semibold text-text">
-                {monthName(item.month, lang)}
-              </span>
-              <span className="num mt-1 block text-sm font-bold text-text">
-                {item.snapshot
-                  ? usd(item.snapshot.netProfit)
-                  : item.status === "error"
-                    ? lang === "ar"
-                      ? "تعذّر التحميل"
-                      : "Unavailable"
-                    : "…"}
-              </span>
+              {lang === "ar" ? "إعادة تحميل الشهور غير المتاحة" : "Retry unavailable months"}
             </button>
-          ))}
-        </div>
-        {data.monthlyStatus === "error" && (
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="mt-3 text-xs font-semibold text-brand hover:underline"
-          >
-            {lang === "ar" ? "إعادة تحميل الشهور غير المتاحة" : "Retry unavailable months"}
-          </button>
-        )}
-      </Card>
+          )}
+        </Card>
+      )}
 
-      {monthSummary && (
+      {data.monthly.length > 1 && monthSummary && (
         <Card className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>

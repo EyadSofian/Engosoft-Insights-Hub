@@ -2,6 +2,7 @@ import {
   companyContext,
   odooAccessibleCompanies,
   odooCallWithPolicy,
+  odooCurrentCompanyId,
   odooConfigured,
 } from "./odoo.server";
 import { DEFAULT_FX_RATES } from "./fx-rates";
@@ -358,14 +359,30 @@ export async function getProfitability(
   company?: string,
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilityResult> {
-  const key = `${from}|${to}|${company || "all-accessible-odoo-companies"}|${fxSar}`;
-  void startMonthlyRefresh(key, from, to, company, fxSar);
-  const months = monthlyState(from, to, company, fxSar);
+  // Odoo's P&L follows the active company shown in the company switcher. Do
+  // not silently consolidate every company the user can access; that produces
+  // a number that cannot be reconciled with the report open in Odoo.
+  let effectiveCompany = company;
+  if (!effectiveCompany) {
+    const currentCompanyId = await odooCurrentCompanyId();
+    const currentCompany = (await odooAccessibleCompanies()).find(
+      (item) => item.id === currentCompanyId,
+    );
+    if (!currentCompany) throw new Error("Odoo active company is not available to the report.");
+    effectiveCompany = currentCompany.name;
+  }
+  const key = `${from}|${to}|${effectiveCompany}|${fxSar}`;
+  void startMonthlyRefresh(key, from, to, effectiveCompany, fxSar);
+  const months = monthlyState(from, to, effectiveCompany, fxSar);
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now())
-    return { status: "ready", snapshot: cached.value, ...monthlyState(from, to, company, fxSar) };
+    return {
+      status: "ready",
+      snapshot: cached.value,
+      ...monthlyState(from, to, effectiveCompany, fxSar),
+    };
 
-  const refresh = startRefresh(key, from, to, company, fxSar);
+  const refresh = startRefresh(key, from, to, effectiveCompany, fxSar);
   if (cached) return { status: "refreshing", snapshot: cached.value, ...months };
 
   try {
@@ -375,13 +392,18 @@ export async function getProfitability(
       refresh,
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000)),
     ]);
-    if (snapshot) return { status: "ready", snapshot, ...monthlyState(from, to, company, fxSar) };
-    return { status: "loading", snapshot: null, ...monthlyState(from, to, company, fxSar) };
+    if (snapshot)
+      return { status: "ready", snapshot, ...monthlyState(from, to, effectiveCompany, fxSar) };
+    return {
+      status: "loading",
+      snapshot: null,
+      ...monthlyState(from, to, effectiveCompany, fxSar),
+    };
   } catch (error) {
     return {
       status: "error",
       snapshot: null,
-      ...monthlyState(from, to, company, fxSar),
+      ...monthlyState(from, to, effectiveCompany, fxSar),
       error: error instanceof Error ? error.message : String(error),
     };
   }

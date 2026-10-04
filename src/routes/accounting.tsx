@@ -170,6 +170,15 @@ function Accounting() {
   });
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+  const companyScopeLabel =
+    filters.company ||
+    (view === "profitability"
+      ? lang === "ar"
+        ? "الشركة الحالية في Odoo"
+        : "Active Odoo company"
+      : lang === "ar"
+        ? "كل الشركات"
+        : "All companies");
   // Built once per response, not once per card: the five summary figures share
   // the same distributions and the same day series.
   const metrics = useMemo(() => (data ? accountingMetrics(data, lang) : null), [data, lang]);
@@ -449,7 +458,7 @@ function Accounting() {
                   ? "تاريخ الدفع"
                   : "Payment Date"}
             {" · "}
-            {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
+            {companyScopeLabel}
           </span>
           <ChevronDown
             size={16}
@@ -501,7 +510,15 @@ function Accounting() {
               onChange={(event) => filterStore.set({ company: event.target.value || undefined })}
               className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15"
             >
-              <option value="">{lang === "ar" ? "كل الشركات" : "All companies"}</option>
+              <option value="">
+                {view === "profitability"
+                  ? lang === "ar"
+                    ? "الشركة الحالية في Odoo"
+                    : "Active Odoo company"
+                  : lang === "ar"
+                    ? "كل الشركات"
+                    : "All companies"}
+              </option>
               {(filterOptions?.companies ?? []).map((company) => (
                 <option key={company} value={company}>
                   {company}
@@ -511,9 +528,7 @@ function Accounting() {
           </label>
 
           <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-xs text-text-muted">
-            <div className="font-semibold text-text">
-              {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
-            </div>
+            <div className="font-semibold text-text">{companyScopeLabel}</div>
             <div className="mt-1">
               {view === "net-sales" || view === "profitability"
                 ? lang === "ar"
