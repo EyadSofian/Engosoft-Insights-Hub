@@ -108,8 +108,7 @@ export function safeRevenueReturnPath(value: unknown): string {
   const url = new URL(value, "https://revenue.invalid");
   if (url.origin !== "https://revenue.invalid") return "/accounting";
   if (url.pathname === "/accounting") return `${url.pathname}${url.search}`;
-  if (url.pathname === "/courses" && url.searchParams.get("view") === "sales")
-    return `${url.pathname}${url.search}`;
+  if (url.pathname === "/courses") return `${url.pathname}${url.search}`;
   return "/accounting";
 }
 
@@ -134,8 +133,7 @@ export function allowRevenuePasswordAttempt(request: Request, now = Date.now()):
 export function revenueGuardApplies(request: Request): boolean {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/u, "") || "/";
-  if (path === "/accounting") return true;
-  if (path === "/courses") return url.searchParams.get("view") === "sales";
+  if (path === "/accounting" || path === "/courses") return true;
   if (
     path === "/api/accounting" ||
     path === "/api/accounting-export" ||
@@ -144,7 +142,7 @@ export function revenueGuardApplies(request: Request): boolean {
     path === "/api/profitability-ledger"
   )
     return true;
-  return path === "/api/courses" && url.searchParams.get("view") === "sales";
+  return path === "/api/courses" || path === "/api/course-lead-alerts";
 }
 
 export function renderRevenueSignInPage(input: { next: string; error?: string }): string {

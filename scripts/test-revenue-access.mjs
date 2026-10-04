@@ -40,5 +40,7 @@ assert.equal(safeRevenueReturnPath("https://attacker.test/"), "/accounting");
 assert.equal(revenueGuardApplies(new Request("https://example.test/api/profitability")), true);
 assert.equal(revenueGuardApplies(new Request("https://example.test/api/teams")), false);
 assert.equal(revenueGuardApplies(new Request("https://example.test/accounting?view=months")), true);
+assert.equal(revenueGuardApplies(new Request("https://example.test/courses?view=sales")), true);
+assert.equal(revenueGuardApplies(new Request("https://example.test/api/courses")), true);
 
 console.log("Revenue password gate: hash verification, signed session, expiry and scope passed.");
