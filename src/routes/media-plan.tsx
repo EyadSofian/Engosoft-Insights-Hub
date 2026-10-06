@@ -5,6 +5,7 @@ import {
   BadgeDollarSign,
   CalendarRange,
   CopyPlus,
+  ExternalLink,
   Gauge,
   Image as ImageIcon,
   Info,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { MediaPlanActivityPanel } from "@/components/media-plan/MediaPlanActivityPanel";
 import { MediaPlanEditor } from "@/components/media-plan/MediaPlanEditor";
+import { DetailPanel } from "@/components/DetailPanel";
 import {
   Card,
   ErrorState,
@@ -32,6 +34,7 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { mediaPlanMonths, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
+import type { MediaPlanLeadDetailResponse } from "@/lib/media-plan-lead-link";
 import { useApi } from "@/lib/use-api";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
@@ -609,6 +612,7 @@ function MediaPlanPage() {
   useRegisterNexusView("media_plan", { parameters: { month } });
   const [editor, setEditor] = useState<"edit" | "create" | null>(null);
   const [showCampaignDelivery, setShowCampaignDelivery] = useState(false);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliverableRow | null>(null);
   const { data, isLoading, error, refetch } = useApi<MediaPlanResponse>(
     `/api/media-plan?month=${month}`,
   );
@@ -697,7 +701,7 @@ function MediaPlanPage() {
                 {lang === "ar" ? "شهر الخطة" : "Plan month"}
                 <select
                   value={month}
-                  onChange={(event) => setMonth(event.target.value)}
+                  onChange={(event) => { setMonth(event.target.value); setSelectedDelivery(null); }}
                   className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   {data.availableMonths.map((value) => (
@@ -862,13 +866,14 @@ function MediaPlanPage() {
             phase={data.window.phase}
             lang={lang}
             onEditManual={data.editable ? () => setEditor("edit") : undefined}
+            onOpen={setSelectedDelivery}
           />
 
           <NeedsAttention
             deliverables={data.deliverables}
             elapsed={data.window.elapsed}
             lang={lang}
-            onEditManual={data.editable ? () => setEditor("edit") : undefined}
+            onOpen={setSelectedDelivery}
           />
 
           <Card className="border-dashed border-brand/25 bg-brand-soft/20">
@@ -1072,6 +1077,15 @@ function MediaPlanPage() {
               void refetch();
             }}
           />
+          {selectedDelivery && (
+            <MediaPlanLeadsPanel
+              key={`${data.plan.month}:${selectedDelivery.key}`}
+              row={selectedDelivery}
+              month={data.plan.month}
+              lang={lang}
+              onClose={() => setSelectedDelivery(null)}
+            />
+          )}
         </>
       )}
     </div>
@@ -1133,12 +1147,14 @@ function PlanDeliverySection({
   phase,
   lang,
   onEditManual,
+  onOpen,
 }: {
   deliverables: DeliverableRow[];
   elapsed: number;
   phase: PlanPhase;
   lang: "ar" | "en";
   onEditManual?: () => void;
+  onOpen: (row: DeliverableRow) => void;
 }) {
   return (
     <Card className="overflow-hidden border-brand/15">
@@ -1169,6 +1185,7 @@ function PlanDeliverySection({
             lang={lang}
             index={index}
             onEditManual={onEditManual}
+            onOpen={() => onOpen(row)}
           />
         ))}
       </div>
@@ -1180,12 +1197,12 @@ function NeedsAttention({
   deliverables,
   elapsed,
   lang,
-  onEditManual,
+  onOpen,
 }: {
   deliverables: DeliverableRow[];
   elapsed: number;
   lang: "ar" | "en";
-  onEditManual?: () => void;
+  onOpen: (row: DeliverableRow) => void;
 }) {
   const priority = { not_connected: 0, not_started: 1, behind: 2 } as const;
   const rows = deliverables
@@ -1245,25 +1262,127 @@ function NeedsAttention({
             );
             const className =
               "rounded-xl border border-amber-border/60 bg-surface px-3 py-2.5 text-start transition-colors hover:border-brand/40";
-            return isManual ? (
-              <button
-                key={row.key}
-                type="button"
-                onClick={onEditManual}
-                disabled={!onEditManual}
-                className={className}
-              >
+            return (
+              <button key={row.key} type="button" onClick={() => onOpen(row)} className={className}>
                 {contents}
               </button>
-            ) : (
-              <Link key={row.key} to={row.reportTo as never} className={className}>
-                {contents}
-              </Link>
             );
           })}
         </div>
       )}
     </Card>
+  );
+}
+
+function MediaPlanLeadsPanel({
+  row,
+  month,
+  lang,
+  onClose,
+}: {
+  row: DeliverableRow;
+  month: string;
+  lang: "ar" | "en";
+  onClose: () => void;
+}) {
+  const [stage, setStage] = useState("");
+  const [page, setPage] = useState(1);
+  const query = new URLSearchParams({ month, key: row.key, page: String(page) });
+  if (stage) query.set("stage", stage);
+  const detail = useApi<MediaPlanLeadDetailResponse>(`/api/media-plan-leads?${query}`);
+  const ar = lang === "ar";
+  const match = detail.data?.match;
+  const sourceLabel = row.actualSource === "Platform campaign delivery"
+    ? ar ? "تسليم منصات الإعلانات" : "Ad-platform delivery"
+    : row.actualSource === "CRM fallback"
+      ? "Odoo CRM fallback"
+      : row.actualSource === "Manual month-to-date report"
+        ? ar ? "إدخال يدوي" : "Manual entry"
+        : row.actualSource;
+  const note = match === "course_category" || match === "plan_courses"
+    ? ar
+      ? "رقم المنصة محسوب من الحملات؛ السجلات أدناه من حقل كورس الليد في Odoo حسب تاريخ إنشائه. اختلاف الرقمين طبيعي ولا يعني أن هذه هي نفس ليدز المنصة واحدًا بواحد."
+      : "Platform delivery is campaign-reported. Records below are Odoo leads by their recorded course and creation date; the two populations are not a one-to-one match."
+    : match === "source"
+      ? ar
+        ? "القائمة من سجلات Odoo التي يطابق حقل Source فيها المصدر المحدد، خلال نفس شهر الخطة."
+        : "This list uses Odoo records whose Source field exactly matches this activity in the plan month."
+      : ar
+        ? "النشاط ده ليس له ربط موثوق بسجلات Leads فردية في Odoo؛ لن نعرض سجلات غير مرتبطة به على أنها نتيجته."
+        : "This activity has no reliable individual Odoo lead linkage, so unrelated records are not shown as its result.";
+
+  return (
+    <DetailPanel
+      open
+      onClose={onClose}
+      title={row.label}
+      subtitle={`${month} · ${ar ? "المطلوب" : "Target"} ${fmtNum(row.target)} · ${ar ? "الفعلي" : "Actual"} ${row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}`}
+      eyebrow={<span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold text-brand">{ar ? "تفاصيل تنفيذ خطة الميديا" : "Media plan delivery details"}</span>}
+      width="min(720px, 100vw)"
+    >
+      {detail.isLoading || !detail.data ? (
+        detail.error ? <ErrorState message={(detail.error as Error).message} onRetry={() => detail.refetch()} /> : <Skeleton className="h-80" />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-border bg-surface-2/60 p-3">
+              <div className="text-[11px] text-text-muted">{ar ? "المطلوب" : "Target"}</div>
+              <div className="num mt-1 text-xl font-bold text-text">{fmtNum(row.target)}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface-2/60 p-3">
+              <div className="text-[11px] text-text-muted">{sourceLabel}</div>
+              <div className="num mt-1 text-xl font-bold text-text">{row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}</div>
+            </div>
+            <div className="rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
+              <div className="text-[11px] text-text-muted">{ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"}</div>
+              <div className="num mt-1 text-xl font-bold text-brand">{match === "unavailable" ? "—" : fmtNum(detail.data.total)}</div>
+            </div>
+          </div>
+          <p className="rounded-xl border border-amber-border/60 bg-amber-surface/40 p-3 text-xs leading-relaxed text-text-muted">{note}</p>
+          {match !== "unavailable" && (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => { setStage(""); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
+                  {ar ? "كل المراحل" : "All stages"} · {fmtNum(detail.data.total)}
+                </button>
+                {Object.entries(detail.data.stages).map(([name, count]) => (
+                  <button key={name} type="button" onClick={() => { setStage(name); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
+                    {name} · {fmtNum(count)}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs font-semibold text-text">{ar ? "السجلات المطابقة" : "Matching records"} · {fmtNum(detail.data.filteredTotal)}</div>
+              <div className="space-y-2">
+                {detail.data.rows.map((lead) => (
+                  <div key={lead.id} className="rounded-xl border border-border bg-surface-2/35 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-text">{lead.contact} <span className="num text-xs font-normal text-text-muted">#{lead.id}</span></div>
+                        <div className="mt-1 text-xs text-text-muted">{lead.recordType === "lead" ? "Lead" : "Opportunity"} · {lead.stage} · {lead.createdAt.slice(0, 10)}</div>
+                      </div>
+                      <a href={lead.odooUrl} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"><ExternalLink size={13} />{ar ? "فتح في أودو" : "Open in Odoo"}</a>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-text-muted">
+                      <span className="rounded-md bg-surface-3 px-2 py-1">{lead.course} · {lead.specialty}</span>
+                      {lead.salesperson && <span className="rounded-md bg-surface-3 px-2 py-1">{lead.salesperson}</span>}
+                      {match === "source" && <span className="rounded-md bg-surface-3 px-2 py-1">Source: {lead.source}</span>}
+                    </div>
+                  </div>
+                ))}
+                {!detail.data.rows.length && <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-text-muted">{ar ? "لا توجد سجلات مطابقة في هذه الفترة" : "No matching records in this period"}</div>}
+              </div>
+              {detail.data.filteredTotal > detail.data.pageSize && (
+                <div className="flex items-center justify-between gap-3 py-2 text-xs text-text-muted">
+                  <button type="button" disabled={page === 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-border px-3 py-2 disabled:opacity-40">{ar ? "السابق" : "Previous"}</button>
+                  <span>{fmtNum(page)} / {fmtNum(Math.ceil(detail.data.filteredTotal / detail.data.pageSize))}</span>
+                  <button type="button" disabled={page * detail.data.pageSize >= detail.data.filteredTotal} onClick={() => setPage(page + 1)} className="rounded-lg border border-border px-3 py-2 disabled:opacity-40">{ar ? "التالي" : "Next"}</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </DetailPanel>
   );
 }
 
@@ -1308,12 +1427,14 @@ function DeliverableCard({
   lang,
   index,
   onEditManual,
+  onOpen,
 }: {
   row: DeliverableRow;
   elapsed: number;
   lang: "ar" | "en";
   index: number;
   onEditManual?: () => void;
+  onOpen: () => void;
 }) {
   const tone = DELIVERABLE_TONES[index % DELIVERABLE_TONES.length];
   const actual = row.actual;
@@ -1326,14 +1447,20 @@ function DeliverableCard({
   const isManual = row.actualSource === "Manual month-to-date report";
   const unit =
     row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit;
+  const actualLabel = row.actualSource === "Platform campaign delivery"
+    ? lang === "ar" ? "الفعلي من المنصة" : "Platform actual"
+    : row.actualSource === "CRM fallback"
+      ? lang === "ar" ? "الفعلي من CRM" : "CRM actual"
+      : lang === "ar" ? "الفعلي" : "Actual";
 
   return (
     <div
-      className="group rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md"
+      className="group relative rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/35"
       style={{ borderTopColor: tone.strong, borderTopWidth: 3 }}
       title={`${row.actualSource} · ${row.dateScope} · ${row.matchingRule}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <button type="button" onClick={onOpen} className="absolute inset-0 z-0 rounded-2xl" aria-label={`${lang === "ar" ? "عرض تفاصيل" : "View details"} ${label}`} />
+      <div className="pointer-events-none relative flex items-start justify-between gap-3">
         <div>
           <div
             className="text-[11px] font-bold uppercase tracking-[0.08em]"
@@ -1355,9 +1482,9 @@ function DeliverableCard({
         </span>
       </div>
 
-      <div className="mt-4 flex items-end justify-between gap-3">
+      <div className="pointer-events-none relative mt-4 flex items-end justify-between gap-3">
         <div>
-          <div className="text-xs text-text-muted">{lang === "ar" ? "الفعلي" : "Actual"}</div>
+          <div className="text-xs text-text-muted">{actualLabel}</div>
           <div className="num mt-0.5 text-xl font-bold text-text">
             {actual === null || !row.connected ? "—" : fmtNum(actual)}
           </div>
@@ -1370,13 +1497,13 @@ function DeliverableCard({
         </div>
       </div>
 
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
+      <div className="pointer-events-none relative mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
         <div
           className="h-full rounded-full transition-[width] duration-700"
           style={{ width: barWidth(achievement), background: tone.strong }}
         />
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-text-subtle">
+      <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-2 text-[10px] text-text-subtle">
         <span>
           {remaining === null
             ? lang === "ar"
@@ -1390,25 +1517,27 @@ function DeliverableCard({
         </span>
         {isManual ? (
           onEditManual ? (
-            <button type="button" onClick={onEditManual} className="font-semibold text-brand">
+            <button type="button" onClick={onEditManual} className="pointer-events-auto relative z-10 font-semibold text-brand">
               {lang === "ar" ? "سجّل المحقق" : "Enter actual"}
             </button>
           ) : (
             <span>{lang === "ar" ? "يتطلب صلاحية تعديل" : "Editor access required"}</span>
           )
         ) : (
-          <Link to={row.reportTo as never} className="font-semibold group-hover:text-brand">
-            {lang === "ar" ? "فتح التقرير ↗" : "View report ↗"}
-          </Link>
+          <span className="font-semibold text-brand">
+            {row.metric === "leads"
+              ? lang === "ar" ? "عرض الليدز ↗" : "View leads ↗"
+              : lang === "ar" ? "تفاصيل الربط ↗" : "Link details ↗"}
+          </span>
         )}
       </div>
-      <p className="mt-2 border-t border-border/70 pt-2 text-[10px] text-text-muted">
+      <p className="pointer-events-none relative mt-2 border-t border-border/70 pt-2 text-[10px] text-text-muted">
         {isManual
           ? lang === "ar"
             ? "المصدر: إدخال يدوي غير متحقق آليًا"
             : "Source: manually reported, not API-verified"
           : lang === "ar"
-            ? `المصدر: ${row.actualSource}`
+            ? `المصدر: ${row.actualSource === "Platform campaign delivery" ? "تسليم منصات الإعلانات" : row.actualSource === "CRM fallback" ? "سجلات CRM بديل المنصة" : row.actualSource}`
             : `Source: ${row.actualSource}`}
       </p>
     </div>

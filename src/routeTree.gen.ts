@@ -64,6 +64,7 @@ import { Route as ApiManagementReviewRouteImport } from './routes/api/management
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
+import { Route as ApiMediaPlanLeadsRouteImport } from './routes/api/media-plan-leads'
 import { Route as ApiMetaDestinationMixRouteImport } from './routes/api/meta-destination-mix'
 import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
@@ -406,6 +407,11 @@ const ApiMediaPlanRoute = ApiMediaPlanRouteImport.update({
 const ApiMediaPlanActivityRoute = ApiMediaPlanActivityRouteImport.update({
   id: '/api/media-plan-activity',
   path: '/api/media-plan-activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMediaPlanLeadsRoute = ApiMediaPlanLeadsRouteImport.update({
+  id: '/api/media-plan-leads',
+  path: '/api/media-plan-leads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMetaDestinationMixRoute = ApiMetaDestinationMixRouteImport.update({
@@ -807,6 +813,7 @@ export interface FileRoutesByFullPath {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -929,6 +936,7 @@ export interface FileRoutesByTo {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -1052,6 +1060,7 @@ export interface FileRoutesById {
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
   '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
@@ -1176,6 +1185,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
@@ -1298,6 +1308,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
@@ -1420,6 +1431,7 @@ export interface FileRouteTypes {
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
     | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
@@ -1543,6 +1555,7 @@ export interface RootRouteChildren {
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
+  ApiMediaPlanLeadsRoute: typeof ApiMediaPlanLeadsRoute
   ApiMetaDestinationMixRoute: typeof ApiMetaDestinationMixRoute
   ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
@@ -1995,6 +2008,13 @@ declare module '@tanstack/react-router' {
       path: '/api/media-plan-activity'
       fullPath: '/api/media-plan-activity'
       preLoaderRoute: typeof ApiMediaPlanActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media-plan-leads': {
+      id: '/api/media-plan-leads'
+      path: '/api/media-plan-leads'
+      fullPath: '/api/media-plan-leads'
+      preLoaderRoute: typeof ApiMediaPlanLeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta-destination-mix': {
@@ -2511,6 +2531,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
+  ApiMediaPlanLeadsRoute: ApiMediaPlanLeadsRoute,
   ApiMetaDestinationMixRoute: ApiMetaDestinationMixRoute,
   ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,

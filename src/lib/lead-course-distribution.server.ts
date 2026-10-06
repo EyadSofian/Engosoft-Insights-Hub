@@ -104,12 +104,9 @@ function grouped(records: CourseLeadRecord[], key: "course" | "specialty") {
   return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export async function leadCourseDistribution(
-  filters: GlobalFilters,
-  detail?: { dimension: "course" | "specialty"; label: string; stage?: string; page: number },
-): Promise<CourseLeadDistribution> {
+export async function loadLeadCourseRecords(filters: GlobalFilters): Promise<CourseLeadRecord[]> {
   const raw = await dateRows(filters);
-  const rows = raw
+  return raw
     .filter((row) => row.__odoo_id && ["lead", "opportunity"].includes(row["Record Type"]))
     .map(toRecord)
     .filter((row) => {
@@ -118,20 +115,31 @@ export async function leadCourseDistribution(
       if (filters.to && day > filters.to) return false;
       if (filters.company && row.company !== filters.company) return false;
       if (filters.course && row.course !== filters.course) return false;
-      if (filters.mainCategory && mainCategoryForCourse(row.course) !== filters.mainCategory) return false;
+      if (filters.mainCategory && mainCategoryForCourse(row.course) !== filters.mainCategory)
+        return false;
       if (filters.salesTeam && row.salesTeam !== filters.salesTeam) return false;
       if (filters.salesperson && row.salesperson !== filters.salesperson) return false;
       if (filters.source && row.source !== filters.source) return false;
       return true;
     });
+}
+
+export async function leadCourseDistribution(
+  filters: GlobalFilters,
+  detail?: { dimension: "course" | "specialty"; label: string; stage?: string; page: number },
+): Promise<CourseLeadDistribution> {
+  const rows = await loadLeadCourseRecords(filters);
   const stages = [...new Set(rows.map((row) => row.stage))].sort((a, b) => {
-    const rank = (value: string) => value === "Lost" ? 98 : value === "Archived" ? 99 : 0;
+    const rank = (value: string) => (value === "Lost" ? 98 : value === "Archived" ? 99 : 0);
     return rank(a) - rank(b) || a.localeCompare(b);
   });
   const pageSize = 50;
   const detailRows = detail
     ? rows
-        .filter((row) => row[detail.dimension] === detail.label && (!detail.stage || row.stage === detail.stage))
+        .filter(
+          (row) =>
+            row[detail.dimension] === detail.label && (!detail.stage || row.stage === detail.stage),
+        )
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     : null;
   return {
