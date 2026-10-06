@@ -155,13 +155,14 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
   },
   {
     id: "sales-crm",
-    label: { ar: "إدارة العملاء والـ CRM", en: "CRM & Customer Management" },
-    shortLabel: { ar: "إدارة العملاء", en: "CRM" },
+    label: { ar: "Leads", en: "Leads" },
+    shortLabel: { ar: "Leads", en: "Leads" },
     icon: Users,
-    defaultTo: "/leads",
+    defaultTo: "/lead-distribution",
     contextual: "tabs",
     items: [
-      { to: "/leads", key: "leads", icon: Users, tabLabel: { ar: "العملاء", en: "Leads" } },
+      { to: "/lead-distribution", key: "crm_leads", icon: Layers, tabLabel: { ar: "حسب الدورة والتخصص", en: "Course & specialty" } },
+      { to: "/leads", key: "leads", icon: Users, tabLabel: { ar: "سجلات CRM", en: "CRM records" } },
       { to: "/lost", key: "lost", icon: TrendingDown, tabLabel: { ar: "المفقودة", en: "Lost" } },
     ],
   },

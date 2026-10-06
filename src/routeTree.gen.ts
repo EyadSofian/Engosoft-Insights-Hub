@@ -20,6 +20,7 @@ import { Route as CreativesRouteImport } from './routes/creatives'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LandingPagesRouteImport } from './routes/landing-pages'
+import { Route as LeadDistributionRouteImport } from './routes/lead-distribution'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as ManagementReviewRouteImport } from './routes/management-review'
@@ -55,6 +56,7 @@ import { Route as ApiEmployeeEvidenceRouteImport } from './routes/api/employee-e
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiLeadCourseDistributionRouteImport } from './routes/api/lead-course-distribution'
 import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
@@ -181,6 +183,11 @@ const GuideRoute = GuideRouteImport.update({
 const LandingPagesRoute = LandingPagesRouteImport.update({
   id: '/landing-pages',
   path: '/landing-pages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadDistributionRoute = LeadDistributionRouteImport.update({
+  id: '/lead-distribution',
+  path: '/lead-distribution',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -360,6 +367,12 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeadCourseDistributionRoute =
+  ApiLeadCourseDistributionRouteImport.update({
+    id: '/api/lead-course-distribution',
+    path: '/api/lead-course-distribution',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
   id: '/api/lead-qa',
   path: '/api/lead-qa',
@@ -750,6 +763,7 @@ export interface FileRoutesByFullPath {
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -785,6 +799,7 @@ export interface FileRoutesByFullPath {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -870,6 +885,7 @@ export interface FileRoutesByTo {
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -905,6 +921,7 @@ export interface FileRoutesByTo {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -991,6 +1008,7 @@ export interface FileRoutesById {
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -1026,6 +1044,7 @@ export interface FileRoutesById {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -1113,6 +1132,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
+    | '/lead-distribution'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1148,6 +1168,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1233,6 +1254,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
+    | '/lead-distribution'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1268,6 +1290,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1353,6 +1376,7 @@ export interface FileRouteTypes {
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
+    | '/lead-distribution'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1388,6 +1412,7 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1474,6 +1499,7 @@ export interface RootRouteChildren {
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
   LandingPagesRoute: typeof LandingPagesRoute
+  LeadDistributionRoute: typeof LeadDistributionRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   ManagementReviewRoute: typeof ManagementReviewRoute
@@ -1509,6 +1535,7 @@ export interface RootRouteChildren {
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiLeadCourseDistributionRoute: typeof ApiLeadCourseDistributionRoute
   ApiLeadQaRoute: typeof ApiLeadQaRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
@@ -1660,6 +1687,13 @@ declare module '@tanstack/react-router' {
       path: '/landing-pages'
       fullPath: '/landing-pages'
       preLoaderRoute: typeof LandingPagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lead-distribution': {
+      id: '/lead-distribution'
+      path: '/lead-distribution'
+      fullPath: '/lead-distribution'
+      preLoaderRoute: typeof LeadDistributionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -1905,6 +1939,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-course-distribution': {
+      id: '/api/lead-course-distribution'
+      path: '/api/lead-course-distribution'
+      fullPath: '/api/lead-course-distribution'
+      preLoaderRoute: typeof ApiLeadCourseDistributionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/lead-qa': {
@@ -2426,6 +2467,7 @@ const rootRouteChildren: RootRouteChildren = {
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
   LandingPagesRoute: LandingPagesRoute,
+  LeadDistributionRoute: LeadDistributionRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   ManagementReviewRoute: ManagementReviewRoute,
@@ -2461,6 +2503,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiLeadCourseDistributionRoute: ApiLeadCourseDistributionRoute,
   ApiLeadQaRoute: ApiLeadQaRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,

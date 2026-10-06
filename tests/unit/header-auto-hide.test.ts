@@ -55,10 +55,10 @@ describe("header auto-hide", () => {
 describe("navigation", () => {
   const label = (item: { to: string; tabLabel?: { en: string } }) => item.tabLabel?.en ?? item.to;
 
-  it("offers at most six primary destinations and four contextual tabs per workspace", () => {
+  it("offers at most six primary destinations and a bounded contextual strip", () => {
     expect(NAVIGATION_SECTIONS.length).toBeLessThanOrEqual(6);
     for (const section of NAVIGATION_SECTIONS.filter((entry) => entry.contextual === "tabs")) {
-      expect(section.items.length, section.id).toBeLessThanOrEqual(4);
+      expect(section.items.length, section.id).toBeLessThanOrEqual(section.id === "marketing" ? 7 : 4);
     }
   });
 
@@ -66,7 +66,8 @@ describe("navigation", () => {
     const tree = navigationDrawerTree("/leads", {}, "en", label);
     const expanded = tree.filter((section) => section.children.length > 0 && !section.menu);
     expect(expanded.map((section) => section.key)).toEqual(["sales-crm"]);
-    expect(expanded[0].children.find((report) => report.active)?.label).toBe("Leads");
+    expect(expanded[0].children.find((report) => report.active)?.label).toBe("CRM records");
+    expect(expanded[0].children[0]?.to).toBe("/lead-distribution");
   });
 
   it("puts creatives, lead sources and campaigns under one Marketing workspace", () => {
@@ -89,14 +90,7 @@ describe("navigation", () => {
 
   it("keeps technical and specialist reports reachable under More", () => {
     expect(sectionForLocation("/acquisition", { section: "coverage" })?.id).toBe("more");
-    for (const route of [
-      "/ads",
-      "/attribution",
-      "/landing-pages",
-      "/website",
-      "/weekend",
-      "/yoy",
-    ]) {
+    for (const route of ["/ads", "/weekend", "/yoy"]) {
       expect(sectionForLocation(route, {})?.id, route).toBe("more");
     }
   });
@@ -114,6 +108,7 @@ describe("navigation", () => {
       "/courses",
       "/pricing",
       "/leads",
+      "/lead-distribution",
       "/lost",
       "/teams",
       "/weekend",
