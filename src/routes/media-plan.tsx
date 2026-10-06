@@ -58,7 +58,7 @@ interface CourseRow {
     revenueUsd: number;
     invoices: number;
     actualLeads: number;
-    leadBasis: "platform" | "crm_fallback";
+    leadBasis: "crm";
     actualCpl: number | null;
     achievement: number | null;
     expectedLeads: number;
@@ -88,6 +88,7 @@ interface MediaPlanResponse {
     targetedSpend: number;
     targetedLeads: number;
     targetedCrmLeads: number;
+    targetedPlatformLeads: number | null;
     allCrmLeads: number;
     targetedCpl: number | null;
     paidLeadAchievement: number | null;
@@ -146,6 +147,7 @@ interface DeliverableRow {
   actual: number | null;
   connected: boolean;
   actualSource: string;
+  platformActual?: number | null;
   dateScope: string;
   matchingRule: string;
   reportTo: string;
@@ -756,7 +758,7 @@ function MediaPlanPage() {
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-3">
                   <div className="text-text-muted">{lang === "ar" ? "ليدز Odoo المنشأة / ليدز المنصات" : "Created CRM / platform leads"}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{fmtNum(data.actual.allCrmLeads)} / {fmtNum(data.actual.targetedLeads)}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{fmtNum(data.actual.allCrmLeads)} / {data.actual.targetedPlatformLeads === null ? "—" : fmtNum(data.actual.targetedPlatformLeads)}</div>
                 </div>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-text-muted">
@@ -912,8 +914,8 @@ function MediaPlanPage() {
               <SectionTitle
                 hint={
                   lang === "ar"
-                    ? "Actual Leads من المنصة عند توفرها؛ وإذا المنصة لا ترسلها يظهر CRM fallback بوضوح."
-                    : "Actual leads use platform reporting when available; CRM fallback is labelled explicitly."
+                    ? "الرقم الأساسي والإنجاز من ليدز Odoo؛ رقم المنصة يظهر أسفله للمقارنة فقط."
+                    : "Primary lead counts and achievement use Odoo CRM; platform delivery is shown underneath for comparison only."
                 }
               >
                 {lang === "ar" ? "خطة كل دورة والمسؤول عنها" : "Course targets and ownership"}
@@ -930,7 +932,7 @@ function MediaPlanPage() {
                       lang === "ar" ? "تارجت الليدز" : "Lead target",
                       lang === "ar" ? "Budget" : "Budget",
                       lang === "ar" ? "Target CPL" : "Target CPL",
-                      lang === "ar" ? "ليدز فعلية" : "Actual leads",
+                      lang === "ar" ? "ليدز أودو" : "Odoo leads",
                       lang === "ar" ? "Actual CPL" : "Actual CPL",
                       lang === "ar" ? "الصرف" : "Spend",
                       lang === "ar" ? "الإنجاز" : "Progress",
@@ -1292,17 +1294,15 @@ function MediaPlanLeadsPanel({
   const detail = useApi<MediaPlanLeadDetailResponse>(`/api/media-plan-leads?${query}`);
   const ar = lang === "ar";
   const match = detail.data?.match;
-  const sourceLabel = row.actualSource === "Platform campaign delivery"
-    ? ar ? "تسليم منصات الإعلانات" : "Ad-platform delivery"
-    : row.actualSource === "CRM fallback"
-      ? "Odoo CRM fallback"
-      : row.actualSource === "Manual month-to-date report"
+  const sourceLabel = row.actualSource === "Odoo CRM · Course Categories"
+    ? ar ? "ليدز Odoo" : "Odoo leads"
+    : row.actualSource === "Manual month-to-date report"
         ? ar ? "إدخال يدوي" : "Manual entry"
         : row.actualSource;
   const note = match === "course_category" || match === "plan_courses"
     ? ar
-      ? "رقم المنصة محسوب من الحملات؛ السجلات أدناه من حقل كورس الليد في Odoo حسب تاريخ إنشائه. اختلاف الرقمين طبيعي ولا يعني أن هذه هي نفس ليدز المنصة واحدًا بواحد."
-      : "Platform delivery is campaign-reported. Records below are Odoo leads by their recorded course and creation date; the two populations are not a one-to-one match."
+      ? "الرقم الأساسي ونسبة الإنجاز من ليدز Odoo المنشأة هذا الشهر والمصنفة على الكورس. رقم المنصة للمقارنة فقط؛ قد يختلف لأن قياس الحملات ليس سجلًا مقابل سجل في Odoo."
+      : "The main figure and achievement use Odoo leads created this month and assigned to this course. Platform delivery is comparison-only, not a one-to-one list of Odoo records."
     : match === "source"
       ? ar
         ? "القائمة من سجلات Odoo التي يطابق حقل Source فيها المصدر المحدد، خلال نفس شهر الخطة."
@@ -1329,13 +1329,13 @@ function MediaPlanLeadsPanel({
               <div className="text-[11px] text-text-muted">{ar ? "المطلوب" : "Target"}</div>
               <div className="num mt-1 text-xl font-bold text-text">{fmtNum(row.target)}</div>
             </div>
-            <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <div className="text-[11px] text-text-muted">{sourceLabel}</div>
-              <div className="num mt-1 text-xl font-bold text-text">{row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}</div>
-            </div>
             <div className="rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
-              <div className="text-[11px] text-text-muted">{ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"}</div>
-              <div className="num mt-1 text-xl font-bold text-brand">{match === "unavailable" ? "—" : fmtNum(detail.data.total)}</div>
+              <div className="text-[11px] text-text-muted">{sourceLabel}</div>
+              <div className="num mt-1 text-xl font-bold text-brand">{row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface-2/60 p-3">
+              <div className="text-[11px] text-text-muted">{row.platformActual !== undefined ? (ar ? "رقم المنصة للمقارنة" : "Platform comparison") : (ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records")}</div>
+              <div className="num mt-1 text-xl font-bold text-text">{row.platformActual !== undefined ? (row.platformActual === null ? "—" : fmtNum(row.platformActual)) : match === "unavailable" ? "—" : fmtNum(detail.data.total)}</div>
             </div>
           </div>
           <p className="rounded-xl border border-amber-border/60 bg-amber-surface/40 p-3 text-xs leading-relaxed text-text-muted">{note}</p>
@@ -1351,7 +1351,7 @@ function MediaPlanLeadsPanel({
                   </button>
                 ))}
               </div>
-              <div className="text-xs font-semibold text-text">{ar ? "السجلات المطابقة" : "Matching records"} · {fmtNum(detail.data.filteredTotal)}</div>
+              <div className="text-xs font-semibold text-text">{ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"} · {fmtNum(detail.data.filteredTotal)}</div>
               <div className="space-y-2">
                 {detail.data.rows.map((lead) => (
                   <div key={lead.id} className="rounded-xl border border-border bg-surface-2/35 p-3">
@@ -1447,10 +1447,8 @@ function DeliverableCard({
   const isManual = row.actualSource === "Manual month-to-date report";
   const unit =
     row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit;
-  const actualLabel = row.actualSource === "Platform campaign delivery"
-    ? lang === "ar" ? "الفعلي من المنصة" : "Platform actual"
-    : row.actualSource === "CRM fallback"
-      ? lang === "ar" ? "الفعلي من CRM" : "CRM actual"
+  const actualLabel = row.actualSource === "Odoo CRM · Course Categories"
+    ? lang === "ar" ? "ليدز أودو الفعلية" : "Actual Odoo leads"
       : lang === "ar" ? "الفعلي" : "Actual";
 
   return (
@@ -1497,6 +1495,13 @@ function DeliverableCard({
         </div>
       </div>
 
+      {row.platformActual !== undefined && (
+        <p className="pointer-events-none relative mt-1.5 text-[11px] text-text-muted">
+          {lang === "ar" ? "رقم المنصة للمقارنة فقط:" : "Platform comparison only:"}{" "}
+          <span className="num font-semibold">{row.platformActual === null ? "—" : fmtNum(row.platformActual)}</span>
+        </p>
+      )}
+
       <div className="pointer-events-none relative mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
         <div
           className="h-full rounded-full transition-[width] duration-700"
@@ -1537,7 +1542,7 @@ function DeliverableCard({
             ? "المصدر: إدخال يدوي غير متحقق آليًا"
             : "Source: manually reported, not API-verified"
           : lang === "ar"
-            ? `المصدر: ${row.actualSource === "Platform campaign delivery" ? "تسليم منصات الإعلانات" : row.actualSource === "CRM fallback" ? "سجلات CRM بديل المنصة" : row.actualSource}`
+            ? `المصدر: ${row.actualSource === "Odoo CRM · Course Categories" ? "سجلات أودو حسب تاريخ إنشاء الليد والكورس" : row.actualSource}`
             : `Source: ${row.actualSource}`}
       </p>
     </div>
@@ -1568,8 +1573,8 @@ function CourseTableRow({
       <td className="px-3 py-3.5">
         <div className="num font-semibold text-text">{fmtNum(row.actual.actualLeads)}</div>
         <div className="mt-0.5 text-[10px] text-text-subtle">
-          {row.actual.leadBasis === "platform" ? "Platform" : "CRM fallback"} · CRM{" "}
-          {fmtNum(row.actual.crmLeads)}
+          {lang === "ar" ? "المنصة للمقارنة" : "Platform comparison"}{" "}
+          {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
         </div>
       </td>
       <td className="num px-3 py-3.5">{fmtUSDFull(row.actual.actualCpl)}</td>
@@ -1628,7 +1633,7 @@ function CourseMobileCard({
           value={row.targetCpl > 0 ? fmtUSDFull(row.targetBudgetUsd) : "—"}
         />
         <CompactMetric
-          label={lang === "ar" ? "ليدز فعلية" : "Actual leads"}
+          label={lang === "ar" ? "ليدز أودو" : "Odoo leads"}
           value={fmtNum(row.actual.actualLeads)}
         />
         <CompactMetric label="Actual CPL" value={fmtUSDFull(row.actual.actualCpl)} />
@@ -1637,6 +1642,9 @@ function CourseMobileCard({
           value={fmtUSDFull(row.actual.spend)}
         />
       </div>
+      <p className="mt-2 text-[11px] text-text-muted">
+        {lang === "ar" ? "المنصة للمقارنة فقط" : "Platform comparison only"}: {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
+      </p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div
           className="h-full rounded-full bg-brand"

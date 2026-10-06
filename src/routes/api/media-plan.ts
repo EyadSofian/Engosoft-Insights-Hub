@@ -24,6 +24,7 @@ interface DeliverableDelivery {
   target: number;
   unit: string;
   actual: number | null;
+  platformActual?: number | null;
   connected: boolean;
   actualSource: string;
   dateScope: string;
@@ -194,7 +195,9 @@ export const Route = createFileRoute("/api/media-plan")({
         const elapsed = elapsedShare(window.from, window.to, window.days, today);
         const courseRows = plan.courses.map((target) => {
           const actual = actualByKey.get(target.key) ?? emptyActual();
-          const actualLeads = actual.platformLeads ?? actual.crmLeads;
+          // The actionable number is the Odoo lead population users can open.
+          // Platform-reported delivery remains separate for reconciliation.
+          const actualLeads = actual.crmLeads;
           const targetBudgetUsd = plannedCourseBudget(target);
           const achievement = divide(actualLeads, target.targetLeads);
           const expectedLeads = target.targetLeads * elapsed;
@@ -208,7 +211,7 @@ export const Route = createFileRoute("/api/media-plan")({
             actual: {
               ...actual,
               actualLeads,
-              leadBasis: actual.platformLeads === null ? "crm_fallback" : "platform",
+              leadBasis: "crm",
               actualCpl,
               achievement,
               expectedLeads,
@@ -222,6 +225,9 @@ export const Route = createFileRoute("/api/media-plan")({
         const targetedSpend = courseRows.reduce((sum, row) => sum + row.actual.spend, 0);
         const targetedLeads = courseRows.reduce((sum, row) => sum + row.actual.actualLeads, 0);
         const targetedCrmLeads = courseRows.reduce((sum, row) => sum + row.actual.crmLeads, 0);
+        const targetedPlatformLeads = courseRows.some((row) => row.actual.platformLeads !== null)
+          ? courseRows.reduce((sum, row) => sum + (row.actual.platformLeads ?? 0), 0)
+          : null;
         const plannedCourseBudgetUsd = courseRows.reduce(
           (sum, row) => sum + row.targetBudgetUsd,
           0,
@@ -307,11 +313,12 @@ export const Route = createFileRoute("/api/media-plan")({
                   target: plan.paidLeadTarget,
                   unit: "leads",
                   actual: targetedLeads,
-                  connected: data.ads.some((row) => row.platformLeads !== null),
-                  actualSource: "Course-attributed paid delivery",
+                  connected: true,
+                  actualSource: "Odoo CRM · Course Categories",
+                  platformActual: targetedPlatformLeads,
                   dateScope,
                   matchingRule:
-                    "Course/campaign matching from the selected plan; platform leads preferred, CRM fallback labelled below.",
+                    "Odoo CRM Course Categories for the primary number; platform delivery shown separately.",
                   reportTo: "/ads",
                 },
               ]),
@@ -324,14 +331,12 @@ export const Route = createFileRoute("/api/media-plan")({
               metric: "leads" as const,
               target: target.targetLeads,
               unit: "leads",
-              actual: row?.actual.actualLeads ?? null,
+              actual: row?.actual.crmLeads ?? null,
               connected: !!row,
-              actualSource:
-                row?.actual.leadBasis === "platform"
-                  ? "Platform campaign delivery"
-                  : "CRM fallback",
+              actualSource: "Odoo CRM · Course Categories",
+              platformActual: row?.actual.platformLeads ?? null,
               dateScope,
-              matchingRule: "Campaign name/course aliases from the selected monthly plan.",
+              matchingRule: "Odoo lead Course Categories and creation month; platform campaign delivery is a separate comparison.",
               reportTo: "/campaigns",
             };
           }),
@@ -381,6 +386,7 @@ export const Route = createFileRoute("/api/media-plan")({
             targetedSpend,
             targetedLeads,
             targetedCrmLeads,
+            targetedPlatformLeads,
             allCrmLeads,
             targetedCpl: divide(targetedSpend, targetedLeads),
             paidLeadAchievement: divide(targetedLeads, plan.paidLeadTarget),
