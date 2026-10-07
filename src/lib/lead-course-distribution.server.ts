@@ -7,7 +7,7 @@ import {
   type LeadLifecycleBucket,
 } from "./lead-course-distribution";
 import { mainCategoryForCourse } from "./course-taxonomy";
-import { odooConfig } from "./odoo.server";
+import { odooConfig, searchRead } from "./odoo.server";
 import type { GlobalFilters } from "./types";
 
 export interface CourseLeadRecord {
@@ -57,6 +57,57 @@ export interface CourseLeadDistribution {
 }
 
 const cache = new Map<string, { expiresAt: number; promise: Promise<CrmRawRow[]> }>();
+
+type OdooStage = { id: number; name: string; sequence: number };
+let stageCache: { expiresAt: number; promise: Promise<OdooStage[]> } | null = null;
+
+async function odooStages(): Promise<OdooStage[]> {
+  if (stageCache && stageCache.expiresAt > Date.now()) return stageCache.promise;
+  const promise = searchRead<OdooStage>("crm.stage", [], ["name", "sequence"], {
+    order: "sequence,id",
+    context: { active_test: false, lang: "en_US" },
+    policy: { attempts: 2, timeoutMs: 30_000 },
+  });
+  stageCache = { expiresAt: Date.now() + 5 * 60_000, promise };
+  void promise.catch(() => {
+    if (stageCache?.promise === promise) stageCache = null;
+  });
+  return promise;
+}
+
+const fallbackStageOrder = [
+  "preparation",
+  "new",
+  "open",
+  "long follow up",
+  "quotation sent",
+  "won",
+  "lost",
+  "archived",
+];
+
+function stageName(value: string): string {
+  return value.split(" / ")[0].trim().toLocaleLowerCase("en");
+}
+
+/** Odoo's crm.stage sequence controls the opportunity rail, including custom stages. */
+export function sortOpportunityStages(stages: string[], odooOrder: OdooStage[]): string[] {
+  const ranks = new Map<string, number>();
+  odooOrder.forEach((stage, index) => {
+    const name = stageName(stage.name);
+    if (!ranks.has(name)) ranks.set(name, index);
+  });
+  return [...stages].sort((a, b) => {
+    const rank = (value: string) => {
+      const fallback = fallbackStageOrder.indexOf(stageName(value));
+      return (
+        ranks.get(stageName(value)) ??
+        odooOrder.length + (fallback < 0 ? fallbackStageOrder.length : fallback) + 1
+      );
+    };
+    return rank(a) - rank(b) || a.localeCompare(b);
+  });
+}
 
 function dateRows(filters: GlobalFilters): Promise<CrmRawRow[]> {
   const bounds = lostEventWindow(filters.from, filters.to);
@@ -161,13 +212,15 @@ export async function leadCourseDistribution(
     page: number;
   },
 ): Promise<CourseLeadDistribution> {
-  const rows = await loadLeadCourseRecords(filters);
-  const stages = [
-    ...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage)),
-  ].sort((a, b) => {
-    const rank = (value: string) => (value === "Lost" ? 98 : value === "Archived" ? 99 : 0);
-    return rank(a) - rank(b) || a.localeCompare(b);
-  });
+  const [rows, stageDefinitions] = await Promise.all([
+    loadLeadCourseRecords(filters),
+    // Keep the page available if Odoo temporarily refuses the stage metadata read.
+    odooStages().catch(() => []),
+  ]);
+  const stages = sortOpportunityStages(
+    [...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage))],
+    stageDefinitions,
+  );
   const pageSize = 50;
   const detailRows = detail
     ? rows

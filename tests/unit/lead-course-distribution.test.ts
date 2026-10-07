@@ -5,8 +5,48 @@ import {
   leadStage,
   UNCLASSIFIED_SPECIALTY,
 } from "@/lib/lead-course-distribution";
+import { sortOpportunityStages } from "@/lib/lead-course-distribution.server";
 
 describe("CRM Course Categories attribution", () => {
+  it("uses Odoo's stage sequence for opportunity breakdowns", () => {
+    const actual = sortOpportunityStages(
+      [
+        "Lost",
+        "Open",
+        "New",
+        "Quotation Sent",
+        "Preparation",
+        "Sales Review",
+        "Long Follow Up",
+        "Won",
+      ],
+      [
+        { id: 1, name: "Preparation", sequence: 1 },
+        { id: 2, name: "New", sequence: 2 },
+        { id: 3, name: "Sales Review", sequence: 3 },
+        { id: 4, name: "Open", sequence: 4 },
+        { id: 5, name: "Long Follow Up", sequence: 5 },
+        { id: 6, name: "Quotation Sent", sequence: 6 },
+        { id: 7, name: "Won", sequence: 7 },
+        { id: 8, name: "Lost", sequence: 8 },
+      ],
+    );
+    expect(actual).toEqual([
+      "Preparation",
+      "New",
+      "Sales Review",
+      "Open",
+      "Long Follow Up",
+      "Quotation Sent",
+      "Won",
+      "Lost",
+    ]);
+    expect(sortOpportunityStages(["Lost / خسارة", "New", "Preparation"], [])).toEqual([
+      "Preparation",
+      "New",
+      "Lost / خسارة",
+    ]);
+  });
   it("maps verified Odoo categories to the intended course and specialty", () => {
     expect(classifyLeadCourse("Facility Management")).toMatchObject({
       course: "CFM",

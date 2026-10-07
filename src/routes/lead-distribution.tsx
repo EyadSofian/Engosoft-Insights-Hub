@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useMemo, useState } from "react";
-import { BookOpen, ExternalLink, Flame, Layers3, Search, Users } from "lucide-react";
+import { BookOpen, Download, ExternalLink, Flame, Layers3, Search, Users } from "lucide-react";
 import { DashboardPageHeader, PageSections } from "@/components/dashboard-bits";
 import { DetailPanel } from "@/components/DetailPanel";
 import { Card, ErrorState, Skeleton } from "@/components/ui-bits";
 import { useApi } from "@/lib/use-api";
+import { useFilters } from "@/lib/filter-store";
 import { fmtNum, useI18n } from "@/lib/i18n";
 import type {
   CourseLeadDistribution,
@@ -48,6 +49,7 @@ function lifecycleExplanation(leadOther: number, arabic: boolean): string {
 function LeadDistributionPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const filters = useFilters();
   const [dimension, setDimension] = useState<Dimension>("specialty");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -72,12 +74,16 @@ function LeadDistributionPage() {
     const needle = search.trim().toLocaleLowerCase();
     return needle
       ? source.filter((group) =>
-          `${group.label} ${groupDisplayName(group.label, dimension, ar)}`
+          `${group.label} ${groupDisplayName(group.label, dimension, false)}`
             .toLocaleLowerCase()
             .includes(needle),
         )
       : source;
-  }, [data, dimension, search, ar]);
+  }, [data, dimension, search]);
+  const exportParams = new URLSearchParams({ dimension, search: search.trim(), lang });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) exportParams.set(key, String(value));
+  }
 
   const open = (group: CourseLeadGroup, bucket?: LeadLifecycleBucket, stage?: string) => {
     setPage(1);
@@ -185,15 +191,24 @@ function LeadDistributionPage() {
                   </button>
                 ))}
               </div>
-              <label className="relative block min-w-[210px] flex-1 sm:max-w-72">
-                <Search size={16} className="absolute inset-y-0 my-auto ms-3 text-text-muted" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={ar ? "ابحث عن تخصص أو دورة" : "Find a specialty or course"}
-                  className="w-full rounded-xl border border-border bg-surface px-3 py-2 ps-10 text-sm text-text outline-none focus:border-brand"
-                />
-              </label>
+              <div className="flex min-w-[210px] flex-1 flex-wrap items-center justify-end gap-2">
+                <label className="relative block min-w-[210px] flex-1 sm:max-w-72">
+                  <Search size={16} className="absolute inset-y-0 my-auto ms-3 text-text-muted" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={ar ? "ابحث عن تخصص أو دورة" : "Find a specialty or course"}
+                    className="w-full rounded-xl border border-border bg-surface px-3 py-2 ps-10 text-sm text-text outline-none focus:border-brand"
+                  />
+                </label>
+                <a
+                  href={`/api/lead-course-export?${exportParams.toString()}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-3.5 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  <Download size={16} aria-hidden="true" />
+                  {ar ? "تصدير Excel" : "Export Excel"}
+                </a>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-start text-sm">
@@ -237,7 +252,7 @@ function LeadDistributionPage() {
                             onClick={() => open(group)}
                             className="text-start text-brand hover:underline"
                           >
-                            {groupDisplayName(group.label, dimension, ar)}
+                            <span dir="ltr">{groupDisplayName(group.label, dimension, false)}</span>
                           </button>
                           {(group.hot > 0 || group.unverified > 0) && (
                             <span className="mt-1 block text-[11px] font-normal text-text-muted">
@@ -356,7 +371,7 @@ function LeadDistributionPage() {
       <DetailPanel
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
-        title={selected ? groupDisplayName(selected.label, selected.dimension, ar) : ""}
+        title={selected ? groupDisplayName(selected.label, selected.dimension, false) : ""}
         subtitle={
           selected
             ? `${selected.bucket ? `${lifecycleDisplayName(selected.bucket, ar)} · ` : ""}${selected.stage ? `${stageDisplayName(selected.stage, ar)} · ` : ""}${fmtNum(detail.data?.detail?.total ?? 0)} ${ar ? "سجل" : "records"}`
@@ -398,12 +413,13 @@ function LeadDistributionPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
                   <span className="rounded-md bg-surface-3 px-2 py-1">
-                    {ar ? "الدورة" : "Course"}: {courseDisplayName(row.course, ar)}
-                    {courseDisplayName(row.course, ar) !==
-                      specialtyDisplayName(row.specialty, ar) && (
+                    {ar ? "الدورة" : "Course"}: <bdi>{courseDisplayName(row.course, false)}</bdi>
+                    {courseDisplayName(row.course, false) !==
+                      specialtyDisplayName(row.specialty, false) && (
                       <>
                         {" "}
-                        · {ar ? "التخصص" : "Specialty"}: {specialtyDisplayName(row.specialty, ar)}
+                        · {ar ? "التخصص" : "Specialty"}:{" "}
+                        <bdi>{specialtyDisplayName(row.specialty, false)}</bdi>
                       </>
                     )}
                   </span>

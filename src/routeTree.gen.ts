@@ -57,6 +57,7 @@ import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadCourseDistributionRouteImport } from './routes/api/lead-course-distribution'
+import { Route as ApiLeadCourseExportRouteImport } from './routes/api/lead-course-export'
 import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
@@ -374,6 +375,11 @@ const ApiLeadCourseDistributionRoute =
     path: '/api/lead-course-distribution',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiLeadCourseExportRoute = ApiLeadCourseExportRouteImport.update({
+  id: '/api/lead-course-export',
+  path: '/api/lead-course-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
   id: '/api/lead-qa',
   path: '/api/lead-qa',
@@ -806,6 +812,7 @@ export interface FileRoutesByFullPath {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -929,6 +936,7 @@ export interface FileRoutesByTo {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -1053,6 +1061,7 @@ export interface FileRoutesById {
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
@@ -1178,6 +1187,7 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/health'
     | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1301,6 +1311,7 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/health'
     | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1424,6 +1435,7 @@ export interface FileRouteTypes {
     | '/api/full-invoiced'
     | '/api/health'
     | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
     | '/api/lead-qa'
     | '/api/leads'
     | '/api/lost'
@@ -1548,6 +1560,7 @@ export interface RootRouteChildren {
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiLeadCourseDistributionRoute: typeof ApiLeadCourseDistributionRoute
+  ApiLeadCourseExportRoute: typeof ApiLeadCourseExportRoute
   ApiLeadQaRoute: typeof ApiLeadQaRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
@@ -1959,6 +1972,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lead-course-distribution'
       fullPath: '/api/lead-course-distribution'
       preLoaderRoute: typeof ApiLeadCourseDistributionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-course-export': {
+      id: '/api/lead-course-export'
+      path: '/api/lead-course-export'
+      fullPath: '/api/lead-course-export'
+      preLoaderRoute: typeof ApiLeadCourseExportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/lead-qa': {
@@ -2524,6 +2544,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiLeadCourseDistributionRoute: ApiLeadCourseDistributionRoute,
+  ApiLeadCourseExportRoute: ApiLeadCourseExportRoute,
   ApiLeadQaRoute: ApiLeadQaRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
