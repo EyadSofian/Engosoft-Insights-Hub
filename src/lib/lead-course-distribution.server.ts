@@ -1,6 +1,11 @@
 import { loadCrmRawByDomain, type CrmRawRow } from "./crm-odoo.server";
 import { lostEventWindow } from "./crm-lost-events";
-import { classifyLeadCourse, leadStage } from "./lead-course-distribution";
+import {
+  classifyLeadCourse,
+  leadLifecycleBucket,
+  leadStage,
+  type LeadLifecycleBucket,
+} from "./lead-course-distribution";
 import { mainCategoryForCourse } from "./course-taxonomy";
 import { odooConfig } from "./odoo.server";
 import type { GlobalFilters } from "./types";
@@ -31,12 +36,17 @@ export interface CourseLeadGroup {
   count: number;
   hot: number;
   unverified: number;
-  stages: Record<string, number>;
+  leadActive: number;
+  leadLost: number;
+  leadOther: number;
+  opportunities: number;
+  opportunityStages: Record<string, number>;
 }
 
 export interface CourseLeadDistribution {
   total: number;
   unverified: number;
+  lifecycle: { leadActive: number; leadLost: number; leadOther: number; opportunities: number };
   stages: string[];
   byCourse: CourseLeadGroup[];
   bySpecialty: CourseLeadGroup[];
@@ -94,11 +104,28 @@ function grouped(records: CourseLeadRecord[], key: "course" | "specialty") {
   const groups = new Map<string, CourseLeadGroup>();
   for (const record of records) {
     const label = record[key];
-    const group = groups.get(label) ?? { label, count: 0, hot: 0, unverified: 0, stages: {} };
+    const group: CourseLeadGroup = groups.get(label) ?? {
+      label,
+      count: 0,
+      hot: 0,
+      unverified: 0,
+      leadActive: 0,
+      leadLost: 0,
+      leadOther: 0,
+      opportunities: 0,
+      opportunityStages: {},
+    };
     group.count++;
     if (record.priority === "Hot") group.hot++;
     if (!record.verified) group.unverified++;
-    group.stages[record.stage] = (group.stages[record.stage] ?? 0) + 1;
+    const bucket = leadLifecycleBucket(record.recordType, record.stage);
+    if (bucket === "lead_active") group.leadActive++;
+    else if (bucket === "lead_lost") group.leadLost++;
+    else if (bucket === "lead_other") group.leadOther++;
+    else {
+      group.opportunities++;
+      group.opportunityStages[record.stage] = (group.opportunityStages[record.stage] ?? 0) + 1;
+    }
     groups.set(label, group);
   }
   return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
@@ -126,10 +153,18 @@ export async function loadLeadCourseRecords(filters: GlobalFilters): Promise<Cou
 
 export async function leadCourseDistribution(
   filters: GlobalFilters,
-  detail?: { dimension: "course" | "specialty"; label: string; stage?: string; page: number },
+  detail?: {
+    dimension: "course" | "specialty";
+    label: string;
+    bucket?: LeadLifecycleBucket;
+    stage?: string;
+    page: number;
+  },
 ): Promise<CourseLeadDistribution> {
   const rows = await loadLeadCourseRecords(filters);
-  const stages = [...new Set(rows.map((row) => row.stage))].sort((a, b) => {
+  const stages = [
+    ...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage)),
+  ].sort((a, b) => {
     const rank = (value: string) => (value === "Lost" ? 98 : value === "Archived" ? 99 : 0);
     return rank(a) - rank(b) || a.localeCompare(b);
   });
@@ -138,13 +173,26 @@ export async function leadCourseDistribution(
     ? rows
         .filter(
           (row) =>
-            row[detail.dimension] === detail.label && (!detail.stage || row.stage === detail.stage),
+            row[detail.dimension] === detail.label &&
+            (!detail.bucket || leadLifecycleBucket(row.recordType, row.stage) === detail.bucket) &&
+            (!detail.stage || (row.recordType === "opportunity" && row.stage === detail.stage)),
         )
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     : null;
   return {
     total: rows.length,
     unverified: rows.filter((row) => !row.verified).length,
+    lifecycle: {
+      leadActive: rows.filter(
+        (row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_active",
+      ).length,
+      leadLost: rows.filter((row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_lost")
+        .length,
+      leadOther: rows.filter(
+        (row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_other",
+      ).length,
+      opportunities: rows.filter((row) => row.recordType === "opportunity").length,
+    },
     stages,
     byCourse: grouped(rows, "course"),
     bySpecialty: grouped(rows, "specialty"),

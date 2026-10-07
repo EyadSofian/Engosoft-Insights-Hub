@@ -26,7 +26,7 @@ export function classifyLeadCourse(rawCategory: string) {
   const course = verified ? canonicalCourseValue(raw) : raw || UNCLASSIFIED_COURSE;
   return {
     course,
-    specialty: verified ? SPECIALTY_BY_COURSE[course] ?? course : UNCLASSIFIED_SPECIALTY,
+    specialty: verified ? (SPECIALTY_BY_COURSE[course] ?? course) : UNCLASSIFIED_SPECIALTY,
     verified,
   };
 }
@@ -35,4 +35,14 @@ export function leadStage(status: string, actualStage: string) {
   if (status === "lost") return "Lost";
   if (status === "archived") return "Archived";
   return actualStage.trim() || "Unspecified stage";
+}
+
+export type LeadLifecycleBucket = "lead_active" | "lead_lost" | "lead_other" | "opportunity";
+
+/** Mutually exclusive current CRM states. Opportunity stages are a breakdown, not extra leads. */
+export function leadLifecycleBucket(recordType: string, stage: string): LeadLifecycleBucket {
+  if (recordType === "opportunity") return "opportunity";
+  if (stage === "Lost") return "lead_lost";
+  if (stage === "Archived") return "lead_other";
+  return "lead_active";
 }
