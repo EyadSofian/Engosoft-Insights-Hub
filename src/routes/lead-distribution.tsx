@@ -142,7 +142,7 @@ function LeadDistributionPage() {
                 + {fmtNum(data.lifecycle.leadOther)} {bucketLabel("lead_other", ar)}
               </>
             )}
-            .{" "}
+            {". "}
             {ar
               ? "مراحل الـOpportunity تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في Odoo، وليس سجل حدث التحويل التاريخي."
               : "Opportunity stages break down that count; they are not additional records. This uses the current Odoo record type, not historical conversion events."}
@@ -239,14 +239,17 @@ function LeadDistributionPage() {
                           >
                             {group.label}
                           </button>
-                          <span className="mt-1 block text-[11px] font-normal text-text-muted">
-                            {group.hot > 0 && <>Hot: {fmtNum(group.hot)} · </>}
-                            {group.unverified > 0 && (
-                              <>
-                                {fmtNum(group.unverified)} {ar ? "بحاجة مراجعة" : "needs review"}
-                              </>
-                            )}
-                          </span>
+                          {(group.hot > 0 || group.unverified > 0) && (
+                            <span className="mt-1 block text-[11px] font-normal text-text-muted">
+                              {group.hot > 0 && <>Hot: {fmtNum(group.hot)}</>}
+                              {group.hot > 0 && group.unverified > 0 && " · "}
+                              {group.unverified > 0 && (
+                                <>
+                                  {fmtNum(group.unverified)} {ar ? "بحاجة مراجعة" : "needs review"}
+                                </>
+                              )}
+                            </span>
+                          )}
                         </th>
                         <td className="num px-3 pt-4 pb-2 text-center font-bold">
                           <button
@@ -296,36 +299,37 @@ function LeadDistributionPage() {
                           </td>
                         )}
                       </tr>
-                      <tr className="bg-surface-2/40">
-                        <td
-                          colSpan={data.lifecycle.leadOther > 0 ? 6 : 5}
-                          className="px-4 pb-4 pt-1"
-                        >
-                          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs">
-                            <span className="font-semibold text-violet-800">
-                              {ar
-                                ? `تفصيل ${fmtNum(group.opportunities)} Opportunity حسب المرحلة:`
-                                : `${fmtNum(group.opportunities)} opportunities by stage:`}
-                            </span>
-                            {data.stages.map((stage) =>
-                              group.opportunityStages[stage] ? (
-                                <button
-                                  key={stage}
-                                  type="button"
-                                  onClick={() => open(group, "opportunity", stage)}
-                                  className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-violet-900 transition-colors hover:border-violet-500 hover:bg-violet-100"
-                                >
-                                  {stageLabel(stage, ar)}{" "}
-                                  <strong className="num ms-1">
-                                    {fmtNum(group.opportunityStages[stage])}
-                                  </strong>
-                                </button>
-                              ) : null,
-                            )}
-                            {!group.opportunities && <span className="text-text-muted">—</span>}
-                          </div>
-                        </td>
-                      </tr>
+                      {group.opportunities > 0 && (
+                        <tr className="bg-surface-2/40">
+                          <td
+                            colSpan={data.lifecycle.leadOther > 0 ? 6 : 5}
+                            className="px-4 pb-4 pt-1"
+                          >
+                            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs">
+                              <span className="font-semibold text-violet-800">
+                                {ar
+                                  ? `تفصيل ${fmtNum(group.opportunities)} Opportunity حسب المرحلة:`
+                                  : `${fmtNum(group.opportunities)} opportunities by stage:`}
+                              </span>
+                              {data.stages.map((stage) =>
+                                group.opportunityStages[stage] ? (
+                                  <button
+                                    key={stage}
+                                    type="button"
+                                    onClick={() => open(group, "opportunity", stage)}
+                                    className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-violet-900 transition-colors hover:border-violet-500 hover:bg-violet-100"
+                                  >
+                                    {stageLabel(stage, ar)}{" "}
+                                    <strong className="num ms-1">
+                                      {fmtNum(group.opportunityStages[stage])}
+                                    </strong>
+                                  </button>
+                                ) : null,
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </Fragment>
                   ))}
                 </tbody>
