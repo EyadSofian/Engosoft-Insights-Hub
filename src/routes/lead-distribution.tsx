@@ -36,6 +36,15 @@ function pageError(error: Error, arabic: boolean): string {
     : error.message;
 }
 
+function lifecycleExplanation(leadOther: number, arabic: boolean): string {
+  if (arabic) {
+    const extra = leadOther ? ` + ${fmtNum(leadOther)} عملاء محتملون مؤرشفون` : "";
+    return `المعادلة: الإجمالي = العملاء المحتملون النشطون + العملاء المحتملون المفقودون + الفرص البيعية${extra}. مراحل الفرص البيعية تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في أودو، وليس سجل حدث التحويل التاريخي.`;
+  }
+  const extra = leadOther ? ` + ${fmtNum(leadOther)} archived leads` : "";
+  return `Total = active leads + lost leads + opportunities${extra}. Opportunity stages break down that count; they are not additional records. This uses the current Odoo record type, not historical conversion events.`;
+}
+
 function LeadDistributionPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
@@ -130,23 +139,17 @@ function LeadDistributionPage() {
           </div>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
-            {ar
-              ? "المعادلة: الإجمالي = العملاء المحتملون النشطون + العملاء المحتملون المفقودون + الفرص البيعية"
-              : "Total = active leads + lost leads + opportunities"}
-            {data.lifecycle.leadOther > 0 && (
-              <>
-                {" "}
-                + {fmtNum(data.lifecycle.leadOther)} {lifecycleDisplayName("lead_other", ar)}
-              </>
-            )}
-            {". "}
-            {ar
-              ? "مراحل الفرص البيعية تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في أودو، وليس سجل حدث التحويل التاريخي."
-              : "Opportunity stages break down that count; they are not additional records. This uses the current Odoo record type, not historical conversion events."}
+            {lifecycleExplanation(data.lifecycle.leadOther, ar)}
             {data.unverified > 0 && (
               <span className="ms-2 text-amber-800">
                 {fmtNum(data.unverified)}{" "}
-                {ar ? "سجل يحتاج مراجعة الكورس." : "course assignments need review."}
+                {ar
+                  ? data.unverified === 1
+                    ? "سجل يحتاج مراجعة الدورة."
+                    : "سجلات تحتاج مراجعة الدورة."
+                  : data.unverified === 1
+                    ? "course assignment needs review."
+                    : "course assignments need review."}
               </span>
             )}
           </div>
@@ -395,7 +398,14 @@ function LeadDistributionPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
                   <span className="rounded-md bg-surface-3 px-2 py-1">
-                    {courseDisplayName(row.course, ar)} · {specialtyDisplayName(row.specialty, ar)}
+                    {ar ? "الدورة" : "Course"}: {courseDisplayName(row.course, ar)}
+                    {courseDisplayName(row.course, ar) !==
+                      specialtyDisplayName(row.specialty, ar) && (
+                      <>
+                        {" "}
+                        · {ar ? "التخصص" : "Specialty"}: {specialtyDisplayName(row.specialty, ar)}
+                      </>
+                    )}
                   </span>
                   {row.priority === "Hot" && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-800">

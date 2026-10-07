@@ -74,7 +74,13 @@ export function SectionTabs() {
     <nav
       ref={ref}
       data-app-chrome=""
-      aria-label={lang === "ar" ? `تقارير ${label}` : `${label} reports`}
+      aria-label={
+        lang === "ar"
+          ? section.id === "sales-crm"
+            ? "تقارير العملاء المحتملين"
+            : `تقارير ${label}`
+          : `${label} reports`
+      }
       // Shown at every width, not only below `lg`. The rail auto-hides on the
       // first downward scroll, and it was taking the section's sub-navigation
       // with it — on a long report a desktop reader had no way back to a
