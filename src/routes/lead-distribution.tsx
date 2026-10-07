@@ -11,6 +11,14 @@ import type {
   CourseLeadGroup,
 } from "@/lib/lead-course-distribution.server";
 import type { LeadLifecycleBucket } from "@/lib/lead-course-distribution";
+import {
+  courseDisplayName,
+  groupDisplayName,
+  lifecycleDisplayName,
+  recordTypeDisplayName,
+  specialtyDisplayName,
+  stageDisplayName,
+} from "@/lib/lead-distribution-labels";
 
 export const Route = createFileRoute("/lead-distribution")({ component: LeadDistributionPage });
 
@@ -22,30 +30,10 @@ type Selection = {
   stage?: string;
 };
 
-function bucketLabel(bucket: LeadLifecycleBucket, ar: boolean) {
-  const labels = {
-    lead_active: ar ? "Lead نشط" : "Active leads",
-    lead_lost: ar ? "Lead مفقود" : "Lost leads",
-    lead_other: ar ? "Lead مؤرشف" : "Archived leads",
-    opportunity: "Opportunity",
-  };
-  return labels[bucket];
-}
-
-function stageLabel(stage: string, arabic: boolean) {
-  if (!arabic) return stage;
-  const names: Record<string, string> = {
-    Lost: "Lost / مفقود",
-    Archived: "مؤرشف",
-    "Unspecified stage": "مرحلة غير محددة",
-    "Long Follow Up": "متابعة طويلة",
-    Open: "Open / مفتوح",
-    New: "New / جديد",
-    "Quotation Sent": "عرض سعر",
-    Won: "Won / مكتمل",
-    Preparation: "تجهيز",
-  };
-  return names[stage] ?? stage;
+function pageError(error: Error, arabic: boolean): string {
+  return arabic
+    ? "تعذّر جلب سجلات العملاء من أودو. تحقّق من الاتصال ثم أعد المحاولة."
+    : error.message;
 }
 
 function LeadDistributionPage() {
@@ -74,24 +62,29 @@ function LeadDistributionPage() {
     const source = dimension === "course" ? (data?.byCourse ?? []) : (data?.bySpecialty ?? []);
     const needle = search.trim().toLocaleLowerCase();
     return needle
-      ? source.filter((group) => group.label.toLocaleLowerCase().includes(needle))
+      ? source.filter((group) =>
+          `${group.label} ${groupDisplayName(group.label, dimension, ar)}`
+            .toLocaleLowerCase()
+            .includes(needle),
+        )
       : source;
-  }, [data, dimension, search]);
+  }, [data, dimension, search, ar]);
 
   const open = (group: CourseLeadGroup, bucket?: LeadLifecycleBucket, stage?: string) => {
     setPage(1);
     setSelected({ dimension, label: group.label, bucket, stage });
   };
 
-  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error)
+    return <ErrorState message={pageError(error as Error, ar)} onRetry={() => refetch()} />;
   return (
     <PageSections>
       <DashboardPageHeader
         icon={<Layers3 size={22} />}
-        title={ar ? "Leads حسب التخصص والكورس" : "Leads by specialty and course"}
+        title={ar ? "العملاء المحتملون حسب التخصص والدورة" : "Leads by specialty and course"}
         subtitle={
           ar
-            ? "مسار كل سجل حسب تاريخ إنشائه في Odoo: Lead نشط أو مفقود، ثم Opportunity بمراحلها الحالية."
+            ? "مسار كل سجل حسب تاريخ إنشائه في أودو: عميل محتمل نشط أو مفقود، أو فرصة بيعية بمرحلتها الحالية."
             : "Each Odoo record by creation date: active or lost lead, or opportunity with its current stage."
         }
         tone="sky"
@@ -113,19 +106,23 @@ function LeadDistributionPage() {
               <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(data.total)}</div>
             </Card>
             <Card className="border-s-4 border-s-emerald-600">
-              <div className="text-xs text-text-muted">{bucketLabel("lead_active", ar)}</div>
+              <div className="text-xs text-text-muted">
+                {lifecycleDisplayName("lead_active", ar)}
+              </div>
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadActive)}
               </div>
             </Card>
             <Card className="border-s-4 border-s-rose-500">
-              <div className="text-xs text-text-muted">{bucketLabel("lead_lost", ar)}</div>
+              <div className="text-xs text-text-muted">{lifecycleDisplayName("lead_lost", ar)}</div>
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadLost)}
               </div>
             </Card>
             <Card className="border-s-4 border-s-violet-600">
-              <div className="text-xs text-text-muted">{bucketLabel("opportunity", ar)}</div>
+              <div className="text-xs text-text-muted">
+                {lifecycleDisplayName("opportunity", ar)}
+              </div>
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.opportunities)}
               </div>
@@ -134,17 +131,17 @@ function LeadDistributionPage() {
 
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
             {ar
-              ? "المعادلة: الإجمالي = Lead نشط + Lead مفقود + Opportunity"
+              ? "المعادلة: الإجمالي = العملاء المحتملون النشطون + العملاء المحتملون المفقودون + الفرص البيعية"
               : "Total = active leads + lost leads + opportunities"}
             {data.lifecycle.leadOther > 0 && (
               <>
                 {" "}
-                + {fmtNum(data.lifecycle.leadOther)} {bucketLabel("lead_other", ar)}
+                + {fmtNum(data.lifecycle.leadOther)} {lifecycleDisplayName("lead_other", ar)}
               </>
             )}
             {". "}
             {ar
-              ? "مراحل الـOpportunity تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في Odoo، وليس سجل حدث التحويل التاريخي."
+              ? "مراحل الفرص البيعية تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في أودو، وليس سجل حدث التحويل التاريخي."
               : "Opportunity stages break down that count; they are not additional records. This uses the current Odoo record type, not historical conversion events."}
             {data.unverified > 0 && (
               <span className="ms-2 text-amber-800">
@@ -180,7 +177,7 @@ function LeadDistributionPage() {
                         ? "حسب التخصص"
                         : "By specialty"
                       : ar
-                        ? "حسب الكورس"
+                        ? "حسب الدورة"
                         : "By course"}
                   </button>
                 ))}
@@ -190,7 +187,7 @@ function LeadDistributionPage() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder={ar ? "ابحث عن تخصص أو كورس" : "Find a specialty or course"}
+                  placeholder={ar ? "ابحث عن تخصص أو دورة" : "Find a specialty or course"}
                   className="w-full rounded-xl border border-border bg-surface px-3 py-2 ps-10 text-sm text-text outline-none focus:border-brand"
                 />
               </label>
@@ -202,7 +199,7 @@ function LeadDistributionPage() {
                     <th className="min-w-[175px] px-4 py-3 text-start font-semibold">
                       {dimension === "course"
                         ? ar
-                          ? "الكورس"
+                          ? "الدورة"
                           : "Course"
                         : ar
                           ? "التخصص"
@@ -212,17 +209,17 @@ function LeadDistributionPage() {
                       {ar ? "الإجمالي" : "Total"}
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      {bucketLabel("lead_active", ar)}
+                      {lifecycleDisplayName("lead_active", ar)}
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      {bucketLabel("lead_lost", ar)}
+                      {lifecycleDisplayName("lead_lost", ar)}
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      {bucketLabel("opportunity", ar)}
+                      {lifecycleDisplayName("opportunity", ar)}
                     </th>
                     {data.lifecycle.leadOther > 0 && (
                       <th className="px-3 py-3 text-center font-semibold">
-                        {bucketLabel("lead_other", ar)}
+                        {lifecycleDisplayName("lead_other", ar)}
                       </th>
                     )}
                   </tr>
@@ -237,11 +234,15 @@ function LeadDistributionPage() {
                             onClick={() => open(group)}
                             className="text-start text-brand hover:underline"
                           >
-                            {group.label}
+                            {groupDisplayName(group.label, dimension, ar)}
                           </button>
                           {(group.hot > 0 || group.unverified > 0) && (
                             <span className="mt-1 block text-[11px] font-normal text-text-muted">
-                              {group.hot > 0 && <>Hot: {fmtNum(group.hot)}</>}
+                              {group.hot > 0 && (
+                                <>
+                                  {ar ? "عالي الأولوية" : "High priority"}: {fmtNum(group.hot)}
+                                </>
+                              )}
                               {group.hot > 0 && group.unverified > 0 && " · "}
                               {group.unverified > 0 && (
                                 <>
@@ -308,7 +309,7 @@ function LeadDistributionPage() {
                             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs">
                               <span className="font-semibold text-violet-800">
                                 {ar
-                                  ? `تفصيل ${fmtNum(group.opportunities)} Opportunity حسب المرحلة:`
+                                  ? `تفصيل ${fmtNum(group.opportunities)} فرصة بيعية حسب المرحلة:`
                                   : `${fmtNum(group.opportunities)} opportunities by stage:`}
                               </span>
                               {data.stages.map((stage) =>
@@ -319,7 +320,7 @@ function LeadDistributionPage() {
                                     onClick={() => open(group, "opportunity", stage)}
                                     className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-violet-900 transition-colors hover:border-violet-500 hover:bg-violet-100"
                                   >
-                                    {stageLabel(stage, ar)}{" "}
+                                    {stageDisplayName(stage, ar)}{" "}
                                     <strong className="num ms-1">
                                       {fmtNum(group.opportunityStages[stage])}
                                     </strong>
@@ -342,8 +343,8 @@ function LeadDistributionPage() {
             </div>
             <div className="border-t border-border px-4 py-3 text-[11px] text-text-muted sm:px-5">
               {ar
-                ? "كل رقم قابل للضغط لعرض السجلات وفتحها في Odoo. Hot أولوية متداخلة وليست جزءًا جديدًا من الإجمالي."
-                : "Select any count to inspect records in Odoo. Hot is an overlapping priority, not an extra part of the total."}
+                ? "كل رقم قابل للضغط لعرض السجلات وفتحها في أودو. عالي الأولوية وصف متداخل وليس جزءًا جديدًا من الإجمالي."
+                : "Select any count to inspect records in Odoo. High priority is an overlapping label, not an extra part of the total."}
             </div>
           </Card>
         </>
@@ -352,10 +353,10 @@ function LeadDistributionPage() {
       <DetailPanel
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
-        title={selected?.label ?? ""}
+        title={selected ? groupDisplayName(selected.label, selected.dimension, ar) : ""}
         subtitle={
           selected
-            ? `${selected.bucket ? `${bucketLabel(selected.bucket, ar)} · ` : ""}${selected.stage ? `${stageLabel(selected.stage, ar)} · ` : ""}${fmtNum(detail.data?.detail?.total ?? 0)} ${ar ? "سجل" : "records"}`
+            ? `${selected.bucket ? `${lifecycleDisplayName(selected.bucket, ar)} · ` : ""}${selected.stage ? `${stageDisplayName(selected.stage, ar)} · ` : ""}${fmtNum(detail.data?.detail?.total ?? 0)} ${ar ? "سجل" : "records"}`
             : undefined
         }
         width="min(670px, 100vw)"
@@ -363,7 +364,10 @@ function LeadDistributionPage() {
         {detail.isLoading ? (
           <Skeleton className="h-80" />
         ) : detail.error ? (
-          <ErrorState message={(detail.error as Error).message} onRetry={() => detail.refetch()} />
+          <ErrorState
+            message={pageError(detail.error as Error, ar)}
+            onRetry={() => detail.refetch()}
+          />
         ) : (
           <div className="space-y-2">
             {detail.data?.detail?.rows.map((row) => (
@@ -375,8 +379,8 @@ function LeadDistributionPage() {
                       <span className="num text-xs font-normal text-text-muted">#{row.id}</span>
                     </div>
                     <div className="mt-1 text-xs text-text-muted">
-                      {row.recordType === "lead" ? "Lead" : "Opportunity"} ·{" "}
-                      {stageLabel(row.stage, ar)} · {row.createdAt.slice(0, 10)}
+                      {recordTypeDisplayName(row.recordType, ar)} ·{" "}
+                      {stageDisplayName(row.stage, ar)} · {row.createdAt.slice(0, 10)}
                     </div>
                   </div>
                   <a
@@ -391,16 +395,16 @@ function LeadDistributionPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
                   <span className="rounded-md bg-surface-3 px-2 py-1">
-                    {row.course} · {row.specialty}
+                    {courseDisplayName(row.course, ar)} · {specialtyDisplayName(row.specialty, ar)}
                   </span>
                   {row.priority === "Hot" && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-amber-800">
-                      <Flame size={12} /> Hot
+                      <Flame size={12} /> {ar ? "عالي الأولوية" : "High priority"}
                     </span>
                   )}
                   {!row.verified && (
                     <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800">
-                      {ar ? "حقل الكورس يحتاج مراجعة" : "Course field needs review"}:{" "}
+                      {ar ? "تصنيف الدورة يحتاج مراجعة" : "Course category needs review"}:{" "}
                       {row.rawCategory || "—"}
                     </span>
                   )}
@@ -411,7 +415,8 @@ function LeadDistributionPage() {
                   )}
                   {row.actualStage && row.stage !== row.actualStage && (
                     <span className="rounded-md bg-surface-3 px-2 py-1">
-                      Odoo: {row.actualStage}
+                      {ar ? "المرحلة المحفوظة في أودو" : "Stored Odoo stage"}:{" "}
+                      {stageDisplayName(row.actualStage, ar)}
                     </span>
                   )}
                 </div>

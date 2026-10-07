@@ -155,14 +155,24 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
   },
   {
     id: "sales-crm",
-    label: { ar: "Leads", en: "Leads" },
-    shortLabel: { ar: "Leads", en: "Leads" },
+    label: { ar: "العملاء المحتملون", en: "Leads" },
+    shortLabel: { ar: "العملاء المحتملون", en: "Leads" },
     icon: Users,
     defaultTo: "/lead-distribution",
     contextual: "tabs",
     items: [
-      { to: "/lead-distribution", key: "crm_leads", icon: Layers, tabLabel: { ar: "حسب الدورة والتخصص", en: "Course & specialty" } },
-      { to: "/leads", key: "leads", icon: Users, tabLabel: { ar: "سجلات CRM", en: "CRM records" } },
+      {
+        to: "/lead-distribution",
+        key: "crm_leads",
+        icon: Layers,
+        tabLabel: { ar: "حسب التخصص والدورة", en: "Specialty & course" },
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Users,
+        tabLabel: { ar: "سجلات العملاء", en: "CRM records" },
+      },
       { to: "/lost", key: "lost", icon: TrendingDown, tabLabel: { ar: "المفقودة", en: "Lost" } },
     ],
   },
