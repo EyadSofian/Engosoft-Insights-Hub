@@ -30,6 +30,11 @@ export const Route = createFileRoute("/api/lead-course-distribution")({
           return json({ error: "Invalid lifecycle bucket." }, 400);
         if (params.has("stage") && bucket !== "opportunity")
           return json({ error: "A stage must belong to an opportunity." }, 400);
+        if (
+          params.has("opportunityLost") &&
+          (params.get("opportunityLost") !== "1" || bucket !== "opportunity" || params.has("stage"))
+        )
+          return json({ error: "Invalid lost opportunity selection." }, 400);
         const filters = await parseFilters(request);
         try {
           return json(
@@ -41,6 +46,7 @@ export const Route = createFileRoute("/api/lead-course-distribution")({
                     label,
                     bucket: (bucket as LeadLifecycleBucket) || undefined,
                     stage: params.get("stage") || undefined,
+                    opportunityLost: params.get("opportunityLost") === "1",
                     page,
                   }
                 : undefined,

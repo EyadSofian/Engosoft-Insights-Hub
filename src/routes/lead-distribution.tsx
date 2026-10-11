@@ -29,6 +29,7 @@ type Selection = {
   label: string;
   bucket?: LeadLifecycleBucket;
   stage?: string;
+  opportunityLost?: boolean;
 };
 
 function pageError(error: Error, arabic: boolean): string {
@@ -40,10 +41,10 @@ function pageError(error: Error, arabic: boolean): string {
 function lifecycleExplanation(leadOther: number, arabic: boolean): string {
   if (arabic) {
     const extra = leadOther ? ` + ${fmtNum(leadOther)} عملاء محتملون مؤرشفون` : "";
-    return `المعادلة: الإجمالي = العملاء المحتملون النشطون + العملاء المحتملون المفقودون + الفرص البيعية${extra}. مراحل الفرص البيعية تفصيل داخل عددها وليست سجلات إضافية. التصنيف يعكس نوع السجل الحالي في أودو، وليس سجل حدث التحويل التاريخي.`;
+    return `المعادلة: الإجمالي = العملاء المحتملون النشطون + العملاء المحتملون المفقودون + جميع الفرص البيعية${extra}. الفرص المفقودة جزء من جميع الفرص، وليست إضافة إلى الإجمالي. مراحل الفرص تفصيل داخل عددها. التصنيف يعكس نوع السجل الحالي في أودو، وليس سجل حدث التحويل التاريخي.`;
   }
   const extra = leadOther ? ` + ${fmtNum(leadOther)} archived leads` : "";
-  return `Total = active leads + lost leads + opportunities${extra}. Opportunity stages break down that count; they are not additional records. This uses the current Odoo record type, not historical conversion events.`;
+  return `Total = active leads + lost leads + all opportunities${extra}. Lost opportunities are a subset of all opportunities, not an extra part of the total. Stages break down opportunity counts. This uses the current Odoo record type, not historical conversion events.`;
 }
 
 function LeadDistributionPage() {
@@ -63,6 +64,7 @@ function LeadDistributionPage() {
         label: selected.label,
         ...(selected.bucket ? { bucket: selected.bucket } : {}),
         ...(selected.stage ? { stage: selected.stage } : {}),
+        ...(selected.opportunityLost ? { opportunityLost: "1" } : {}),
         page: String(page),
       }).toString()
     : "";
@@ -85,9 +87,14 @@ function LeadDistributionPage() {
     if (value) exportParams.set(key, String(value));
   }
 
-  const open = (group: CourseLeadGroup, bucket?: LeadLifecycleBucket, stage?: string) => {
+  const open = (
+    group: CourseLeadGroup,
+    bucket?: LeadLifecycleBucket,
+    stage?: string,
+    opportunityLost?: boolean,
+  ) => {
     setPage(1);
-    setSelected({ dimension, label: group.label, bucket, stage });
+    setSelected({ dimension, label: group.label, bucket, stage, opportunityLost });
   };
 
   if (error)
@@ -113,7 +120,7 @@ function LeadDistributionPage() {
         </>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Card className="border-s-4 border-s-blue-600">
               <div className="text-xs text-text-muted">
                 {ar ? "إجمالي السجلات التي دخلت" : "All records created"}
@@ -136,10 +143,21 @@ function LeadDistributionPage() {
             </Card>
             <Card className="border-s-4 border-s-violet-600">
               <div className="text-xs text-text-muted">
-                {lifecycleDisplayName("opportunity", ar)}
+                {ar ? "جميع الفرص البيعية" : "All opportunities"}
               </div>
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.opportunities)}
+              </div>
+            </Card>
+            <Card className="border-s-4 border-s-fuchsia-600">
+              <div className="text-xs text-text-muted">
+                {ar ? "فرص بيعية مفقودة" : "Lost opportunities"}
+              </div>
+              <div className="num mt-2 text-2xl font-bold text-fuchsia-800">
+                {fmtNum(data.lifecycle.opportunityLost)}
+              </div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {ar ? "جزء من جميع الفرص" : "Included in all opportunities"}
               </div>
             </Card>
           </div>
@@ -233,7 +251,10 @@ function LeadDistributionPage() {
                       {lifecycleDisplayName("lead_lost", ar)}
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      {lifecycleDisplayName("opportunity", ar)}
+                      {ar ? "جميع الفرص البيعية" : "All opportunities"}
+                    </th>
+                    <th className="min-w-[125px] bg-fuchsia-50/70 px-3 py-3 text-center font-semibold text-fuchsia-800">
+                      {ar ? "فرص مفقودة (من الفرص)" : "Lost opportunities (subset)"}
                     </th>
                     {data.lifecycle.leadOther > 0 && (
                       <th className="px-3 py-3 text-center font-semibold">
@@ -302,6 +323,19 @@ function LeadDistributionPage() {
                             </td>
                           );
                         })}
+                        <td className="num bg-fuchsia-50/35 px-3 pt-4 pb-2 text-center">
+                          {group.opportunityLost > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => open(group, "opportunity", undefined, true)}
+                              className="rounded-lg px-3 py-1 font-semibold text-fuchsia-800 hover:bg-fuchsia-100"
+                            >
+                              {fmtNum(group.opportunityLost)}
+                            </button>
+                          ) : (
+                            <span className="text-text-subtle">—</span>
+                          )}
+                        </td>
                         {data.lifecycle.leadOther > 0 && (
                           <td className="num px-3 pt-4 pb-2 text-center">
                             {group.leadOther > 0 ? (
@@ -321,7 +355,7 @@ function LeadDistributionPage() {
                       {group.opportunities > 0 && (
                         <tr className="bg-surface-2/40">
                           <td
-                            colSpan={data.lifecycle.leadOther > 0 ? 6 : 5}
+                            colSpan={data.lifecycle.leadOther > 0 ? 7 : 6}
                             className="px-4 pb-4 pt-1"
                           >
                             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-xs">
@@ -338,7 +372,11 @@ function LeadDistributionPage() {
                                     onClick={() => open(group, "opportunity", stage)}
                                     className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-violet-900 transition-colors hover:border-violet-500 hover:bg-violet-100"
                                   >
-                                    {stageDisplayName(stage, ar)}{" "}
+                                    {stage.split(" / ")[0].trim().toLowerCase() === "lost"
+                                      ? ar
+                                        ? "مفقود من الفرص"
+                                        : "Lost opportunities"
+                                      : stageDisplayName(stage, ar)}{" "}
                                     <strong className="num ms-1">
                                       {fmtNum(group.opportunityStages[stage])}
                                     </strong>
@@ -361,8 +399,8 @@ function LeadDistributionPage() {
             </div>
             <div className="border-t border-border px-4 py-3 text-[11px] text-text-muted sm:px-5">
               {ar
-                ? "كل رقم قابل للضغط لعرض السجلات وفتحها في أودو. عالي الأولوية وصف متداخل وليس جزءًا جديدًا من الإجمالي."
-                : "Select any count to inspect records in Odoo. High priority is an overlapping label, not an extra part of the total."}
+                ? "كل رقم قابل للضغط لعرض سجلاته. عمود الفرص المفقودة داخل إجمالي الفرص البيعية، ولا يُضاف مرة ثانية إلى الإجمالي."
+                : "Select any count to inspect records. Lost opportunities are included in all opportunities and must not be added again."}
             </div>
           </Card>
         </>
@@ -374,7 +412,7 @@ function LeadDistributionPage() {
         title={selected ? groupDisplayName(selected.label, selected.dimension, false) : ""}
         subtitle={
           selected
-            ? `${selected.bucket ? `${lifecycleDisplayName(selected.bucket, ar)} · ` : ""}${selected.stage ? `${stageDisplayName(selected.stage, ar)} · ` : ""}${fmtNum(detail.data?.detail?.total ?? 0)} ${ar ? "سجل" : "records"}`
+            ? `${selected.opportunityLost ? (ar ? "فرص بيعية مفقودة · " : "Lost opportunities · ") : selected.bucket ? `${lifecycleDisplayName(selected.bucket, ar)} · ` : ""}${selected.stage ? `${stageDisplayName(selected.stage, ar)} · ` : ""}${fmtNum(detail.data?.detail?.total ?? 0)} ${ar ? "سجل" : "records"}`
             : undefined
         }
         width="min(670px, 100vw)"

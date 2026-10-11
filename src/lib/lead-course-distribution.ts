@@ -39,6 +39,11 @@ export function leadStage(status: string, actualStage: string) {
 
 export type LeadLifecycleBucket = "lead_active" | "lead_lost" | "lead_other" | "opportunity";
 
+/** Lost opportunities remain opportunities; this is a subset, not another lifecycle bucket. */
+export function isLostOpportunity(recordType: string, stage: string): boolean {
+  return recordType === "opportunity" && stage.split(" / ")[0].trim().toLowerCase() === "lost";
+}
+
 /** Mutually exclusive current CRM states. Opportunity stages are a breakdown, not extra leads. */
 export function leadLifecycleBucket(recordType: string, stage: string): LeadLifecycleBucket {
   if (recordType === "opportunity") return "opportunity";
