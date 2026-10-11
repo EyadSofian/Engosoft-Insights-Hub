@@ -33,5 +33,7 @@ describe("lead source by course matrix", () => {
     expect(matrixSource("WhatsApp")).toBe("WhatsApp");
     expect(matrixSource("WhatsApp Broadcast")).toBe("WhatsApp Broadcast");
     expect(matrixSource("referral")).toBe("referral");
+    expect(matrixSource("Recommended From Customer")).toBe("Recommendation");
+    expect(matrixSource("Recommendation Sales")).toBe("Recommendation");
   });
 });

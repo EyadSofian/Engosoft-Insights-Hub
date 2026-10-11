@@ -313,8 +313,8 @@ function LeadSourcesPage() {
             </div>
             <p className="mt-1">
               {ar
-                ? "الصف = Source المحفوظ على سجل CRM في أودو؛ العمود = الدورة المصنّفة من Course Categories. السجلات ذات المصدر أو الدورة غير المحددة لا تُحذف، بل تظهر مستقلة. الأحمر يبرز المصادر المحددة في المرجع، وليس حكمًا على جودتها."
-                : "Rows use the CRM Source in Odoo; columns use the course classified from Course Categories. Missing assignments remain visible. Red marks sources highlighted in the reference, not their quality."}
+                ? "الصف = Source المحفوظ على سجل CRM في أودو؛ نوعا Recommended From Customer وRecommendation Sales مجتمعان تحت Recommendation، ويظهر الاسم الأصلي في تفاصيل الليد. العمود = الدورة من Course Categories. السجلات غير المحددة تظهر مستقلة. الأحمر للإبراز فقط."
+                : "Rows use the CRM Source in Odoo. Recommended From Customer and Recommendation Sales roll up to Recommendation; the original name remains in each lead's details. Columns use Course Categories. Unassigned records stay visible. Red is only a visual highlight."}
             </p>
           </div>
         </>

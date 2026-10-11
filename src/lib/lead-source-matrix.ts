@@ -59,6 +59,8 @@ export function matrixSource(value: string): string {
     instagram: "Instagram",
     phonecall: "Phone Call",
     recommendation: "Recommendation",
+    recommendedfromcustomer: "Recommendation",
+    recommendationsales: "Recommendation",
     snapchat: "Snapchat",
     tiktok: "TikTok",
     webinar: "Webinar",
