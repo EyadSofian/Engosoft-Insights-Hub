@@ -14,6 +14,7 @@ import {
   MessagesSquare,
   MoreHorizontal,
   Receipt,
+  Table2,
   ShieldCheck,
   TrendingDown,
   TrendingUp,
@@ -166,6 +167,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: "crm_leads",
         icon: Layers,
         tabLabel: { ar: "حسب التخصص والدورة", en: "Specialty & course" },
+      },
+      {
+        to: "/lead-sources",
+        key: "lead_source_matrix",
+        icon: Table2,
+        tabLabel: { ar: "المصادر حسب الدورة", en: "Sources by course" },
       },
       {
         to: "/leads",

@@ -21,6 +21,7 @@ import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LandingPagesRouteImport } from './routes/landing-pages'
 import { Route as LeadDistributionRouteImport } from './routes/lead-distribution'
+import { Route as LeadSourcesRouteImport } from './routes/lead-sources'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
 import { Route as ManagementReviewRouteImport } from './routes/management-review'
@@ -59,6 +60,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadCourseDistributionRouteImport } from './routes/api/lead-course-distribution'
 import { Route as ApiLeadCourseExportRouteImport } from './routes/api/lead-course-export'
 import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
+import { Route as ApiLeadSourceMatrixRouteImport } from './routes/api/lead-source-matrix'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
@@ -190,6 +192,11 @@ const LandingPagesRoute = LandingPagesRouteImport.update({
 const LeadDistributionRoute = LeadDistributionRouteImport.update({
   id: '/lead-distribution',
   path: '/lead-distribution',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadSourcesRoute = LeadSourcesRouteImport.update({
+  id: '/lead-sources',
+  path: '/lead-sources',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -383,6 +390,11 @@ const ApiLeadCourseExportRoute = ApiLeadCourseExportRouteImport.update({
 const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
   id: '/api/lead-qa',
   path: '/api/lead-qa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadSourceMatrixRoute = ApiLeadSourceMatrixRouteImport.update({
+  id: '/api/lead-source-matrix',
+  path: '/api/lead-source-matrix',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLeadsRoute = ApiLeadsRouteImport.update({
@@ -776,6 +788,7 @@ export interface FileRoutesByFullPath {
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
   '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -814,6 +827,7 @@ export interface FileRoutesByFullPath {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/management-review': typeof ApiManagementReviewRoute
@@ -900,6 +914,7 @@ export interface FileRoutesByTo {
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
   '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -938,6 +953,7 @@ export interface FileRoutesByTo {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/management-review': typeof ApiManagementReviewRoute
@@ -1025,6 +1041,7 @@ export interface FileRoutesById {
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
   '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
   '/management-review': typeof ManagementReviewRoute
@@ -1063,6 +1080,7 @@ export interface FileRoutesById {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
   '/api/management-review': typeof ApiManagementReviewRoute
@@ -1151,6 +1169,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/landing-pages'
     | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1189,6 +1208,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
     | '/api/management-review'
@@ -1275,6 +1295,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/landing-pages'
     | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1313,6 +1334,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
     | '/api/management-review'
@@ -1399,6 +1421,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/landing-pages'
     | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
     | '/management-review'
@@ -1437,6 +1460,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
     | '/api/management-review'
@@ -1524,6 +1548,7 @@ export interface RootRouteChildren {
   GuideRoute: typeof GuideRoute
   LandingPagesRoute: typeof LandingPagesRoute
   LeadDistributionRoute: typeof LeadDistributionRoute
+  LeadSourcesRoute: typeof LeadSourcesRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
   ManagementReviewRoute: typeof ManagementReviewRoute
@@ -1562,6 +1587,7 @@ export interface RootRouteChildren {
   ApiLeadCourseDistributionRoute: typeof ApiLeadCourseDistributionRoute
   ApiLeadCourseExportRoute: typeof ApiLeadCourseExportRoute
   ApiLeadQaRoute: typeof ApiLeadQaRoute
+  ApiLeadSourceMatrixRoute: typeof ApiLeadSourceMatrixRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
   ApiManagementReviewRoute: typeof ApiManagementReviewRoute
@@ -1720,6 +1746,13 @@ declare module '@tanstack/react-router' {
       path: '/lead-distribution'
       fullPath: '/lead-distribution'
       preLoaderRoute: typeof LeadDistributionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lead-sources': {
+      id: '/lead-sources'
+      path: '/lead-sources'
+      fullPath: '/lead-sources'
+      preLoaderRoute: typeof LeadSourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -1986,6 +2019,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lead-qa'
       fullPath: '/api/lead-qa'
       preLoaderRoute: typeof ApiLeadQaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-source-matrix': {
+      id: '/api/lead-source-matrix'
+      path: '/api/lead-source-matrix'
+      fullPath: '/api/lead-source-matrix'
+      preLoaderRoute: typeof ApiLeadSourceMatrixRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/leads': {
@@ -2508,6 +2548,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuideRoute: GuideRoute,
   LandingPagesRoute: LandingPagesRoute,
   LeadDistributionRoute: LeadDistributionRoute,
+  LeadSourcesRoute: LeadSourcesRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
   ManagementReviewRoute: ManagementReviewRoute,
@@ -2546,6 +2587,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadCourseDistributionRoute: ApiLeadCourseDistributionRoute,
   ApiLeadCourseExportRoute: ApiLeadCourseExportRoute,
   ApiLeadQaRoute: ApiLeadQaRoute,
+  ApiLeadSourceMatrixRoute: ApiLeadSourceMatrixRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
   ApiManagementReviewRoute: ApiManagementReviewRoute,

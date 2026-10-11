@@ -192,6 +192,7 @@ export const DICT = {
   cpa_invoices: { ar: "عدد الفواتير", en: "Invoices" },
   acos: { ar: "نسبة الإنفاق للإيراد", en: "ACOS" },
   crm_leads: { ar: "عملاء محتملون", en: "CRM Leads" },
+  lead_source_matrix: { ar: "مصادر العملاء حسب الدورة", en: "Lead sources by course" },
   platform_leads: { ar: "عملاء حسب المنصة", en: "Platform leads" },
   won: { ar: "صفقات مغلقة", en: "Won" },
   lost_count: { ar: "صفقات ضائعة", en: "Lost" },
