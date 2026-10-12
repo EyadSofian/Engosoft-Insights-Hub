@@ -9,18 +9,6 @@ interface AccountRow {
   to_date: string | null;
 }
 
-interface SyncRow {
-  dataset: string;
-  status: string;
-  synced_at: Date;
-  metadata: {
-    since?: string;
-    until?: string;
-    workflowId?: string;
-    completed?: boolean;
-  } | null;
-}
-
 export interface SpendCoverageGap {
   platform: "meta" | "snapchat" | "tiktok" | "google";
   account: string;
@@ -30,16 +18,12 @@ export interface SpendCoverageGap {
 
 export interface SpendCoverage {
   complete: boolean;
+  provisionalToday: boolean;
   checkedFrom: string;
   checkedTo: string;
   gaps: SpendCoverageGap[];
 }
 
-const LIVE_WORKFLOWS: Record<"meta_ads" | "snap_ads", string> = {
-  meta_ads: "imS2VrWslYHhnFNn",
-  snap_ads: "x9iHWEw7cE3ELqOp",
-};
-const MAX_LIVE_SYNC_AGE_MS = 6 * 60 * 60 * 1000;
 const MILLIS_PER_DAY = 86_400_000;
 const day = (value: string) => Math.floor(Date.parse(`${value}T00:00:00Z`) / MILLIS_PER_DAY);
 const iso = (value: number) => new Date(value * MILLIS_PER_DAY).toISOString().slice(0, 10);
@@ -66,9 +50,11 @@ export async function getAdSpendCoverage(input: {
   account?: string;
 }): Promise<SpendCoverage> {
   const checkedFrom = input.from || "2026-01-01";
-  const checkedTo = [input.to || cairoToday(), cairoToday()].sort()[0];
+  const today = cairoToday();
+  const checkedTo = [input.to || today, today].sort()[0];
+  const provisionalToday = checkedTo === today && checkedFrom <= today;
   if (checkedFrom > checkedTo) {
-    return { complete: true, checkedFrom, checkedTo, gaps: [] };
+    return { complete: true, provisionalToday: false, checkedFrom, checkedTo, gaps: [] };
   }
 
   const gaps: SpendCoverageGap[] = [];
@@ -85,10 +71,8 @@ export async function getAdSpendCoverage(input: {
 
   if (selected("meta") || selected("snapchat")) {
     try {
-      const pool = getSharedDatabasePool();
-      const [result, syncResult] = await Promise.all([
-        pool.query<AccountRow>(
-          `
+      const result = await getSharedDatabasePool().query<AccountRow>(
+        `
         SELECT a.dataset, a.account_id, a.account_name,
           c.from_date::text, c.to_date::text
         FROM ad_delivery_accounts a
@@ -97,29 +81,8 @@ export async function getAdSpendCoverage(input: {
           AND c.to_date >= $1::date AND c.from_date <= $2::date
         WHERE a.dataset IN ('meta_ads', 'snap_ads')
         ORDER BY a.dataset, a.account_id, c.from_date`,
-          [checkedFrom, checkedTo],
-        ),
-        pool.query<SyncRow>(
-          `SELECT dataset, status, synced_at, metadata FROM dashboard_sync_state
-           WHERE dataset IN ('meta_ads', 'snap_ads')`,
-        ),
-      ]);
-      const liveWindows = new Map<"meta" | "snapchat", [number, number]>();
-      for (const state of syncResult.rows) {
-        if (state.dataset !== "meta_ads" && state.dataset !== "snap_ads") continue;
-        const metadata = state.metadata;
-        if (
-          state.status !== "success" ||
-          metadata?.workflowId !== LIVE_WORKFLOWS[state.dataset] ||
-          !metadata.since ||
-          !metadata.until ||
-          metadata.completed === false ||
-          Date.now() - new Date(state.synced_at).getTime() > MAX_LIVE_SYNC_AGE_MS
-        )
-          continue;
-        const platform = state.dataset === "meta_ads" ? "meta" : "snapchat";
-        liveWindows.set(platform, [day(metadata.since), day(metadata.until)]);
-      }
+        [checkedFrom, checkedTo],
+      );
       const byAccount = new Map<
         string,
         { platform: "meta" | "snapchat"; name: string; windows: [number, number][] }
@@ -148,11 +111,10 @@ export async function getAdSpendCoverage(input: {
         }
         for (const account of accounts) {
           let cursor = day(checkedFrom);
-          const end = day(checkedTo);
-          const windows = [...account.windows];
-          const live = liveWindows.get(platform);
-          if (live) windows.push(live);
-          for (const [start, stop] of windows.sort(([a], [b]) => a - b)) {
+          // Today's platform totals are a live snapshot, not a full-day result.
+          // Never call the sync heartbeat proof that all ad rows were fetched.
+          const end = day(checkedTo) - (provisionalToday ? 1 : 0);
+          for (const [start, stop] of account.windows.sort(([a], [b]) => a - b)) {
             if (start > cursor && cursor <= end) {
               gaps.push({
                 platform,
@@ -182,5 +144,5 @@ export async function getAdSpendCoverage(input: {
       console.error("Ad spend coverage check failed", error);
     }
   }
-  return { complete: gaps.length === 0, checkedFrom, checkedTo, gaps };
+  return { complete: gaps.length === 0, provisionalToday, checkedFrom, checkedTo, gaps };
 }

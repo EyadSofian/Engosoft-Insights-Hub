@@ -452,6 +452,15 @@ function Overview() {
           </AlertBar>
         </div>
       )}
+      {data.spendCoverage?.complete && data.spendCoverage.provisionalToday && (
+        <div className="mt-3">
+          <AlertBar title={lang === "ar" ? "إنفاق اليوم أولي" : "Today's spend is provisional"}>
+            {lang === "ar"
+              ? "الفترة تشمل اليوم الجاري؛ أرقامه حتى آخر مزامنة وليست إجمالي يوم مكتمل. الأيام السابقة خضعت لفحص التغطية."
+              : "This range includes today. Its figures are current through the latest sync, not a completed-day total. Earlier days passed the coverage check."}
+          </AlertBar>
+        </div>
+      )}
 
       <PageSections className="gap-after-header">
         {/* LEVEL 1 — is the company doing well? Six figures, one row. */}

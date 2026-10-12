@@ -142,12 +142,14 @@ export interface OverviewResp {
   staleTabs: string[];
   spendCoverage?: {
     complete: boolean;
+    provisionalToday: boolean;
     checkedFrom: string;
     checkedTo: string;
     gaps: { platform: string; account: string; from: string; to: string }[];
   };
   prevSpendCoverage?: {
     complete: boolean;
+    provisionalToday: boolean;
     checkedFrom: string;
     checkedTo: string;
     gaps: { platform: string; account: string; from: string; to: string }[];
@@ -770,6 +772,16 @@ export function overviewMetrics({
     report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
   };
 
+  if (data.spendCoverage?.provisionalToday && data.spendCoverage.complete) {
+    spend.caveat = [
+      spend.caveat,
+      A
+        ? "جزء اليوم الحالي رقم أولي حتى آخر مزامنة، وليس إجمالي يوم مغلق."
+        : "The current day is a live snapshot, not a closed-day total.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
   if (data.spendCoverage?.complete === false) {
     const caveat = A
       ? "هناك حسابات أو أيام لم تُسترجع بعد؛ تفاصيل الإنفاق والعائد مخفية حتى تكتمل الفترة المختارة."

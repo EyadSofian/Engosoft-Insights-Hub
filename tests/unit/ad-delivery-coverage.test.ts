@@ -2,14 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
   accounts: [] as Array<Record<string, unknown>>,
-  sync: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/lib/database-pool.server", () => ({
   getSharedDatabasePool: () => ({
-    query: async (sql: string) => ({
-      rows: sql.includes("FROM dashboard_sync_state") ? fixture.sync : fixture.accounts,
-    }),
+    query: async () => ({ rows: fixture.accounts }),
   }),
 }));
 
@@ -28,7 +25,6 @@ describe("advertising spend coverage", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-12T12:00:00Z"));
     fixture.accounts = [];
-    fixture.sync = [];
   });
 
   afterEach(() => vi.useRealTimers());
@@ -60,43 +56,27 @@ describe("advertising spend coverage", () => {
     });
   });
 
-  it("uses a fresh successful production sync only for its actual rolling window", async () => {
+  it("calls today's number provisional, not an audited full-day total", async () => {
     fixture.accounts = [account("2026-09-01", "2026-10-11")];
-    fixture.sync = [
-      {
-        dataset: "meta_ads",
-        status: "success",
-        synced_at: new Date("2026-10-12T11:00:00Z"),
-        metadata: {
-          since: "2026-10-05",
-          until: "2026-10-12",
-          workflowId: "imS2VrWslYHhnFNn",
-          completed: true,
-        },
-      },
-    ];
     const result = await getAdSpendCoverage({
       from: "2026-10-01",
       to: "2026-10-12",
       platform: "meta",
     });
     expect(result.complete).toBe(true);
+    expect(result.provisionalToday).toBe(true);
 
-    fixture.sync[0]!.metadata = {
-      since: "2026-10-05",
-      until: "2026-10-12",
-      workflowId: "temporary-backfill",
-    };
-    const untrusted = await getAdSpendCoverage({
+    fixture.accounts = [account("2026-09-01", "2026-10-10")];
+    const missingYesterday = await getAdSpendCoverage({
       from: "2026-10-01",
       to: "2026-10-12",
       platform: "meta",
     });
-    expect(untrusted.gaps).toContainEqual({
+    expect(missingYesterday.gaps).toContainEqual({
       platform: "meta",
       account: "Example Meta Account",
-      from: "2026-10-12",
-      to: "2026-10-12",
+      from: "2026-10-11",
+      to: "2026-10-11",
     });
   });
 

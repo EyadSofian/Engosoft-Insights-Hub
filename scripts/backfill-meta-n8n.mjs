@@ -2,7 +2,7 @@
 const API = "https://n8n.engosoft.com/api/v1";
 const SOURCE = "imS2VrWslYHhnFNn";
 const key = process.env.N8N_API_KEY;
-const [command, from, to, chunkDaysArg] = process.argv.slice(2);
+const [command, from, to, chunkDaysArg, accountId, accountName] = process.argv.slice(2);
 if (!key) throw new Error("N8N_API_KEY is required.");
 
 async function api(path, method = "GET", body) {
@@ -25,9 +25,10 @@ if (command === "start") {
     !/^\d{4}-\d{2}-\d{2}$/.test(from || "") ||
     !/^\d{4}-\d{2}-\d{2}$/.test(to || "") ||
     from > to ||
-    !/^[1-7]$/.test(chunkDaysArg || "3")
+    !/^[1-7]$/.test(chunkDaysArg || "3") ||
+    (accountId && !/^act_\d+$/.test(accountId))
   ) {
-    throw new Error("Use start YYYY-MM-DD YYYY-MM-DD [chunkDays 1-7].");
+    throw new Error("Use start YYYY-MM-DD YYYY-MM-DD [chunkDays 1-7] [act_accountId].");
   }
   const chunkDays = Number(chunkDaysArg || 3);
   const source = await api(`/workflows/${SOURCE}`);
@@ -56,6 +57,16 @@ if (command === "start") {
   );
   if (!chunk) throw new Error("Meta work chunk configuration missing.");
   chunk.value = chunkDays;
+  if (accountId) {
+    const assignments = config.parameters.assignments.assignments;
+    const discover = assignments.find((item) => item.name === "DISCOVER_ALL_META_ACCOUNTS");
+    const configured = assignments.find((item) => item.name === "META_ACCOUNTS_JSON");
+    if (!discover || !configured) throw new Error("Meta account selector configuration missing.");
+    discover.value = false;
+    configured.value = JSON.stringify([
+      { id: accountId, name: accountName || accountId, currency: "USD" },
+    ]);
+  }
   const created = await api("/workflows", "POST", {
     name: `TEMP verified Meta backfill ${from} to ${to}`,
     nodes,
@@ -63,27 +74,37 @@ if (command === "start") {
     settings: source.settings,
   });
   await api(`/workflows/${created.id}/activate`, "POST");
-  console.log(JSON.stringify({ id: created.id, from, to, active: true, chunkDays }));
+  console.log(JSON.stringify({ id: created.id, from, to, accountId, active: true, chunkDays }));
   // Schedule triggers recur each minute. Deactivate immediately after the first
   // execution begins so a historical load cannot launch overlapping copies.
-  let started = false;
-  for (let attempt = 0; attempt < 45; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    const [running, finished] = await Promise.all([
-      api(`/executions?workflowId=${created.id}&status=running&limit=1`),
-      api(`/executions?workflowId=${created.id}&limit=1`),
-    ]);
-    const execution = running.data?.[0] || finished.data?.[0];
-    if (!execution) continue;
-    await api(`/workflows/${created.id}/deactivate`, "POST");
-    console.log(JSON.stringify({ id: created.id, active: false, executionId: execution.id }));
-    started = true;
-    break;
+  let executionId = "";
+  try {
+    for (let attempt = 0; attempt < 45; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const [running, finished] = await Promise.all([
+        api(`/executions?workflowId=${created.id}&status=running&limit=1`),
+        api(`/executions?workflowId=${created.id}&limit=1`),
+      ]);
+      const execution = running.data?.[0] || finished.data?.[0];
+      if (execution) {
+        executionId = execution.id;
+        break;
+      }
+    }
+  } finally {
+    // A polling timeout must never leave the every-minute trigger active.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await api(`/workflows/${created.id}/deactivate`, "POST");
+        break;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
   }
-  if (!started) {
-    await api(`/workflows/${created.id}/deactivate`, "POST");
-    throw new Error(`Historical workflow ${created.id} never started.`);
-  }
+  console.log(JSON.stringify({ id: created.id, active: false, executionId }));
+  if (!executionId) throw new Error(`Historical workflow ${created.id} never started.`);
 } else if (command === "status") {
   const executions = await api(`/executions?workflowId=${encodeURIComponent(from)}&limit=5`);
   console.log(

@@ -535,6 +535,95 @@ export async function readDashboardDataset(dataset: DashboardDataset): Promise<D
   return (await readDashboardDatasets([dataset]))[0];
 }
 
+/** Ignore ordinary batches and any completion claim from the wrong workflow. */
+export function completedAdCoverageClaim(
+  dataset: DashboardDataset,
+  metadata: Record<string, unknown>,
+): { from: string; to: string; accounts: { id: string; name: string }[] } | null {
+  const workflows: Partial<Record<DashboardDataset, string>> = {
+    meta_ads: "imS2VrWslYHhnFNn",
+    snap_ads: "x9iHWEw7cE3ELqOp",
+  };
+  const expectedWorkflow = workflows[dataset];
+  if (!expectedWorkflow || metadata.workflowId !== expectedWorkflow || metadata.completed !== true)
+    return null;
+  const from = metadata.since;
+  const to = metadata.until;
+  const accounts = metadata.accounts;
+  if (
+    typeof from !== "string" ||
+    typeof to !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(to) ||
+    from > to ||
+    !Array.isArray(accounts) ||
+    accounts.length < 1 ||
+    accounts.length > 100 ||
+    Number(metadata.accountCount) !== accounts.length
+  )
+    return null;
+  const parsed = accounts.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const account = value as Record<string, unknown>;
+    const id = typeof account.id === "string" ? account.id.trim() : "";
+    const name = typeof account.name === "string" ? account.name.trim() : id;
+    const validId = dataset === "meta_ads" ? /^act_\d+$/.test(id) : /^[0-9a-f-]{36}$/i.test(id);
+    return validId && name && account.currency === "USD" ? { id, name } : null;
+  });
+  if (
+    parsed.some((account) => !account) ||
+    new Set(parsed.map((account) => account!.id)).size !== parsed.length
+  )
+    return null;
+  return {
+    from,
+    to,
+    accounts: parsed.filter((account): account is { id: string; name: string } => !!account),
+  };
+}
+
+/** Persist the exact account/date window only after the source workflow finishes. */
+async function recordCompletedAdCoverage(
+  client: PoolClient,
+  dataset: DashboardDataset,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  const claim = completedAdCoverageClaim(dataset, metadata);
+  if (!claim) return;
+  const { from, to } = claim;
+  for (const account of claim.accounts) {
+    await client.query(
+      `INSERT INTO ad_delivery_accounts (dataset, account_id, account_name, currency)
+       VALUES ($1, $2, $3, 'USD')
+       ON CONFLICT (dataset, account_id) DO UPDATE SET
+         account_name = CASE
+           WHEN EXCLUDED.account_name = EXCLUDED.account_id
+             THEN ad_delivery_accounts.account_name
+           ELSE EXCLUDED.account_name END,
+         discovered_at = now()`,
+      [dataset, account.id, account.name],
+    );
+    const {
+      rows: [totals],
+    } = await client.query<{ row_count: number; spend: string }>(
+      `SELECT count(*)::integer AS row_count,
+         coalesce(sum(nullif(row_data->>'Spend (Cost)', '')::numeric), 0)::text AS spend
+       FROM dashboard_rows WHERE dataset = $1 AND row_data->>'__account_id' = $2
+         AND record_date BETWEEN $3::date AND $4::date`,
+      [dataset, account.id, from, to],
+    );
+    await client.query(
+      `INSERT INTO ad_delivery_coverage
+         (dataset, account_id, from_date, to_date, expected_spend, row_count)
+       VALUES ($1, $2, $3::date, $4::date, $5::numeric, $6)
+       ON CONFLICT (dataset, account_id, from_date, to_date) DO UPDATE SET
+         expected_spend = EXCLUDED.expected_spend,
+         row_count = EXCLUDED.row_count, verified_at = now()`,
+      [dataset, account.id, from, to, totals?.spend ?? "0", totals?.row_count ?? 0],
+    );
+  }
+}
+
 export async function writeDashboardDataset(
   dataset: DashboardDataset,
   inputRows: Record<string, unknown>[],
@@ -615,6 +704,7 @@ export async function writeDashboardDataset(
          metadata = EXCLUDED.metadata`,
         [dataset, rowCount, syncedAt, JSON.stringify(metadata)],
       );
+      await recordCompletedAdCoverage(client, dataset, metadata);
       await client.query("COMMIT");
       return {
         dataset,
