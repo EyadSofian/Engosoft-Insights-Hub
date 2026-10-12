@@ -83,6 +83,7 @@ describe("course lead intelligence", () => {
     expect(result.lifecycle.averageDays).toBe(5.5);
     expect(result.totals.won).toBe(1);
     expect(result.totals.lost).toBe(1);
+    expect(result.campaigns[0].course).toBe("SFM");
   });
 
   it("does not assign ad spend or course targets to a salesperson", () => {

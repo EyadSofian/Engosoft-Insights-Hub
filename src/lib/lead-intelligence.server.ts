@@ -63,6 +63,7 @@ export interface LeadIntelligenceResponse {
   daily: Array<{ day: string; leads: number; target: number | null }>;
   campaigns: Array<{
     name: string;
+    course: string;
     leads: number;
     won: number;
     lost: number;
@@ -242,12 +243,20 @@ export function buildLeadIntelligence(
     (row.campaign || row.campaignName ? `name:${key(row.campaign || row.campaignName || "")}` : "");
   const campaignMap = new Map<
     string,
-    { name: string; leads: number; won: number; lost: number; spend: number; revenue: number }
+    {
+      name: string;
+      course: string;
+      leads: number;
+      won: number;
+      lost: number;
+      spend: number;
+      revenue: number;
+    }
   >();
   const campaign = (id: string, name: string) => {
     let entry = campaignMap.get(id);
     if (!entry) {
-      entry = { name: name || "—", leads: 0, won: 0, lost: 0, spend: 0, revenue: 0 };
+      entry = { name: name || "—", course: "", leads: 0, won: 0, lost: 0, spend: 0, revenue: 0 };
       campaignMap.set(id, entry);
     }
     return entry;
@@ -256,17 +265,28 @@ export function buildLeadIntelligence(
     const id = campaignKey(row);
     if (!id) continue;
     const entry = campaign(id, row.campaign);
+    if (!entry.course) entry.course = row.course;
+    else if (entry.course !== row.course) entry.course = "Multiple";
     entry.leads++;
     if (row.status === "won") entry.won++;
     if (row.status === "lost") entry.lost++;
   }
   for (const row of ads) {
     const id = campaignKey({ campaignKey: row.campaignKey, campaign: row.campaign });
-    if (id) campaign(id, row.campaign).spend += row.spend;
+    if (id) {
+      const entry = campaign(id, row.campaign);
+      entry.spend += row.spend;
+      if (!entry.course)
+        entry.course = canonicalCourse(attributedAdCourse(row, data.snapshot).course);
+    }
   }
   for (const row of paid) {
     const id = campaignKey({ campaignKey: row.campaignKey, campaignName: row.campaignName });
-    if (id) campaign(id, row.campaignName).revenue += row.usdPaid;
+    if (id) {
+      const entry = campaign(id, row.campaignName);
+      entry.revenue += row.usdPaid;
+      if (!entry.course) entry.course = canonicalCourse(row.course);
+    }
   }
 
   const courseNames = focusCourse ? [focusCourse] : courses;
@@ -445,6 +465,7 @@ export function buildLeadIntelligence(
     campaigns: [...campaignMap.values()]
       .map((row) => ({
         name: row.name,
+        course: row.course,
         leads: row.leads,
         won: row.won,
         lost: row.lost,

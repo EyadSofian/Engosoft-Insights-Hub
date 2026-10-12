@@ -365,7 +365,16 @@ export function LeadIntelligence() {
               className="rounded-2xl border border-border bg-surface p-4"
             >
               <div className="flex items-start justify-between gap-3">
-                <p className="min-w-0 break-words text-sm font-bold text-text">{row.name || "—"}</p>
+                <div className="min-w-0">
+                  <span className="mb-2 inline-block rounded-full bg-violet-surface px-2 py-0.5 text-[10px] font-bold text-violet-strong">
+                    {row.course === "Multiple"
+                      ? A
+                        ? "أكثر من كورس"
+                        : "Multiple courses"
+                      : row.course || (A ? "كورس غير محدد" : "Unassigned course")}
+                  </span>
+                  <p className="break-words text-sm font-bold text-text">{row.name || "—"}</p>
+                </div>
                 <span className="num shrink-0 rounded-xl bg-sky-surface px-2 py-1 text-base font-black text-sky-strong">
                   {fmtNum(row.leads)}
                 </span>
