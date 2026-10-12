@@ -45,8 +45,62 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import type { FreshLostPipelineRecord, FreshLostPipelineResult } from "@/lib/crm-fresh-lost.server";
 import { SLA_POLICY, SLA_STAGES, type SlaStage, type SlaSummary } from "@/lib/crm-stage-sla";
+import { LeadIntelligence } from "@/components/leads/LeadIntelligence";
 
-export const Route = createFileRoute("/leads")({ component: CrmWorkspace });
+export const Route = createFileRoute("/leads")({
+  validateSearch: (search: Record<string, unknown>): { view?: "crm" | "intelligence" } =>
+    search.view === "intelligence" ? { view: "intelligence" } : {},
+  component: LeadsPage,
+});
+
+function LeadsPage() {
+  const { lang } = useI18n();
+  const period = useReportingPeriod();
+  const workspace = Route.useSearch().view ?? "crm";
+  return (
+    <div>
+      <nav
+        aria-label={lang === "ar" ? "عرض العملاء المحتملين" : "Leads view"}
+        className="hscroll mb-4 flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface-2 p-1.5"
+      >
+        <Link
+          to="/leads"
+          search={{}}
+          aria-current={workspace === "crm" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "crm" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "سجل العملاء والـCRM" : "Leads and CRM"}
+        </Link>
+        <Link
+          to="/leads"
+          search={{ view: "intelligence" }}
+          aria-current={workspace === "intelligence" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "intelligence" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "تحليل الليدز حسب الكورس" : "Course lead intelligence"}
+        </Link>
+      </nav>
+      {workspace === "crm" ? (
+        <CrmWorkspace />
+      ) : (
+        <>
+          <DashboardPageHeader
+            flush
+            icon={<Target size={21} />}
+            title={lang === "ar" ? "تحليل العملاء المحتملين" : "Lead intelligence"}
+            subtitle={
+              lang === "ar"
+                ? "الأهداف، الحملات، دورة الإغلاق، الجودة، أداء المسؤولين، واقتصاديات الليد."
+                : "Targets, campaigns, close lifecycle, quality, salespeople and unit economics."
+            }
+            period={period}
+          />
+          <LeadIntelligence />
+        </>
+      )}
+    </div>
+  );
+}
 
 type WorkspaceView = "all" | "leads" | "pipeline" | "won" | "lost";
 type FacetKey =
