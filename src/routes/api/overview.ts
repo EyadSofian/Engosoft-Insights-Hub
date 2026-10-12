@@ -25,6 +25,7 @@ export const Route = createFileRoute("/api/overview")({
         } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { getAdSpendCoverage } = await import("@/lib/ad-delivery-coverage.server");
+        const { aggregateAdAccounts } = await import("@/lib/ad-account-aggregation");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -125,7 +126,7 @@ export const Route = createFileRoute("/api/overview")({
           topCourses: courses.slice(0, 6),
           courseSales,
           revenueLeadAttribution: computeRevenueLeadAttribution(data, prevData),
-          accounts: data.snapshot.accounts,
+          accounts: aggregateAdAccounts(data.ads),
           summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,
           spendCoverage,

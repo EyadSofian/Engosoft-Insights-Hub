@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/ads")({
         const { parseFilters, json } = await import("@/lib/api.server");
         const { ACQUISITION_CHANNELS, PLATFORMS } = await import("@/lib/constants");
         const { paidCampaignPurpose } = await import("@/lib/campaign-purpose");
+        const { aggregateAdAccounts } = await import("@/lib/ad-account-aggregation");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
@@ -227,7 +228,7 @@ export const Route = createFileRoute("/api/ads")({
           ...(grain
             ? { grain, rows: computePerf(data, grain) }
             : { byAd: computePerf(data, "ad"), byAdset: computePerf(data, "adset") }),
-          accounts: data.snapshot.accounts,
+          accounts: aggregateAdAccounts(data.ads),
           unknownAdsetKey: UNKNOWN_ADSET_KEY,
           health: data.snapshot.health,
           appliedFilters: filters,
