@@ -207,35 +207,38 @@ export function LeadIntelligence() {
         title={A ? "تارجت كل كورس" : "Course lead target"}
         description={
           A
-            ? "أهداف الكورسات من خطة الميديا الشهرية، والوصول الفعلي من تصنيف الكورس في Odoo."
-            : "Monthly media-plan targets versus course-coded Odoo leads."
+            ? "الليدز الفعلية من كورس الليد في Odoo، والأهداف من خطة الميديا."
+            : "Actual leads use the Odoo lead course; targets come from the media plan."
         }
       >
+        <div className="rounded-2xl border border-sky-strong/20 bg-sky-surface/60 px-4 py-3 text-xs leading-relaxed text-text sm:text-sm">
+          <b>{A ? "اقرأ الكارت كده:" : "How to read each card:"}</b>{" "}
+          {A
+            ? `وصل فعلًا مقابل المطلوب حتى ${data.period.to || "نهاية الفترة"}. لكل شهر: المطلوب = هدف الشهر × أيام الفترة داخل الشهر ÷ أيام الشهر. هدف الشهر الكامل معروض منفصلًا.`
+            : `Actual leads are compared with the pace through ${data.period.to || "the period end"}. For each month, period pace = full-month target × selected days in that month ÷ days in the month.`}{" "}
+          <a href="/media-plan" className="font-bold text-sky-strong underline underline-offset-2">
+            {A ? "افتح خطة الميديا" : "Open media plan"}
+          </a>
+        </div>
         {targetCourses.some((row) => row.targetCoverage.startsWith("draft")) && (
           <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-semibold text-amber-strong">
             {A
-              ? "الأهداف المعروضة من خطة ميديا مسودة. المقارنة استرشادية حتى اعتماد الخطة."
-              : "Displayed targets come from a draft media plan. Comparisons are provisional until approval."}
+              ? "«مسودة» تعني أن أهداف خطة الميديا لم تُعتمد بعد. أعداد الليدز الفعلية مأخوذة من Odoo، والمقارنة مع الهدف استرشادية."
+              : "Draft means the media-plan targets are not yet approved. Actual lead counts come from Odoo; target comparisons are provisional."}
           </div>
         )}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {displayCourses.map((row, i) => {
-            const progress = row.expectedLeads
-              ? Math.min(100, (row.leads / row.expectedLeads) * 100)
-              : 0;
+          {displayCourses.map((row) => {
+            const expected = row.expectedLeads === null ? null : Math.ceil(row.expectedLeads);
+            const difference = expected === null ? null : row.leads - expected;
+            const progress = expected ? Math.min(100, (row.leads / expected) * 100) : 0;
             return (
               <div
                 key={row.course}
-                className="rounded-2xl border border-border bg-surface p-4 shadow-sm"
+                className={`rounded-2xl border bg-surface p-4 shadow-sm ${difference === null ? "border-border" : difference >= 0 ? "border-mint-strong/30" : "border-amber-strong/30"}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-black text-text">{row.course}</p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      {A ? "الهدف الشهري" : "Monthly target"}{" "}
-                      <b className="num text-text">{num(row.target)}</b>
-                    </p>
-                  </div>
+                  <p className="text-base font-black text-text">{row.course}</p>
                   <span
                     className={`rounded-full px-2 py-1 text-[10px] font-bold ${row.target === null ? "bg-surface-3 text-text-muted" : row.targetCoverage.startsWith("draft") ? "bg-amber-surface text-amber-strong" : "bg-sky-surface text-sky-strong"}`}
                   >
@@ -252,41 +255,58 @@ export function LeadIntelligence() {
                           : "Approved"}
                   </span>
                 </div>
-                <div className="mt-4 flex items-end justify-between">
-                  <p className="num text-3xl font-black text-text">
-                    {fmtNum(row.leads)}{" "}
-                    <span className="text-sm font-semibold text-text-muted">
-                      / {row.expectedLeads === null ? "—" : Math.round(row.expectedLeads)}
-                    </span>
-                  </p>
-                  <div className="text-end">
-                    <p className="num text-sm font-black text-sky-strong">{pct(row.achievement)}</p>
-                    {row.expectedLeads !== null && (
-                      <p
-                        className={`mt-1 text-[10px] font-bold ${row.leads >= row.expectedLeads ? "text-mint-strong" : "text-amber-strong"}`}
-                      >
-                        {row.leads >= row.expectedLeads
-                          ? A
-                            ? "وصل لمسار الفترة"
-                            : "On pace"
-                          : A
-                            ? "أقل من مسار الفترة"
-                            : "Behind pace"}
-                      </p>
-                    )}
+                <div className="mt-4 flex items-baseline justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-xs text-text-muted">
+                  <span>{A ? "هدف الشهر كاملًا" : "Full-month target"}</span>
+                  <b className="num text-base font-black text-text">
+                    {num(row.target)} {A ? "ليد" : "leads"}
+                  </b>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-sky-surface px-3 py-3">
+                    <p className="text-[11px] font-bold text-sky-strong">
+                      {A ? "وصل فعلًا" : "Actually received"}
+                    </p>
+                    <p className="num mt-1 text-2xl font-black text-text">{fmtNum(row.leads)}</p>
+                  </div>
+                  <div className="rounded-xl bg-surface-2 px-3 py-3">
+                    <p className="text-[11px] font-bold text-text-muted">
+                      {A
+                        ? `المطلوب حتى ${data.period.to || "اليوم"}`
+                        : `Needed by ${data.period.to || "today"}`}
+                    </p>
+                    <p className="num mt-1 text-2xl font-black text-text">{num(expected)}</p>
                   </div>
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
+                <p
+                  className={`mt-3 text-xs font-bold ${difference === null ? "text-text-muted" : difference >= 0 ? "text-mint-strong" : "text-amber-strong"}`}
+                >
+                  {difference === null
+                    ? A
+                      ? "لا يوجد هدف للمقارنة"
+                      : "No target to compare"
+                    : difference >= 0
+                      ? A
+                        ? `أعلى من المطلوب حتى الآن بـ ${fmtNum(difference)} ليد`
+                        : `${fmtNum(difference)} leads ahead of pace`
+                      : A
+                        ? `ناقص ${fmtNum(-difference)} ليد للوصول لمسار الفترة`
+                        : `${fmtNum(-difference)} more leads needed to reach pace`}
+                </p>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
                   <div
-                    className={`h-full rounded-full ${tone[i % tone.length]}`}
+                    className={`h-full rounded-full ${difference === null ? "bg-sky-strong" : difference >= 0 ? "bg-mint-strong" : "bg-amber-strong"}`}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="mt-3 flex justify-between text-[11px] text-text-muted">
-                  <span>{A ? "المتوقع حتى الآن" : "Expected by now"}</span>
+                <div className="mt-3 flex flex-wrap justify-between gap-1 text-[11px] text-text-muted">
                   <span>
-                    {A ? "المطلوب يوميًا" : "Daily pace"}{" "}
-                    <b className="num">{row.dailyTarget?.toFixed(1) ?? "—"}</b>
+                    {A ? "تحقيق المطلوب حتى اليوم" : "Period pace achieved"}{" "}
+                    <b className="num text-text">{pct(expected ? row.leads / expected : null)}</b>
+                  </span>
+                  <span>
+                    {A ? "متوسط الخطة اليومي" : "Daily plan average"}{" "}
+                    <b className="num">{row.dailyTarget?.toFixed(1) ?? "—"}</b>{" "}
+                    {A ? "ليد" : "leads"}
                   </span>
                 </div>
               </div>
