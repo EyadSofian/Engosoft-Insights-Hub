@@ -36,6 +36,7 @@ export interface LeadIntelligenceResponse {
     open: number;
     spend: number | null;
     revenue: number;
+    attributedRevenue: number;
     cpl: number | null;
     cac: number | null;
     roas: number | null;
@@ -114,6 +115,7 @@ function targetForCourse(
   let expected = 0;
   let days = 0;
   let missing = false;
+  let draft = false;
   let safety = 0;
   while (cursor <= endMonth && safety++ < 120) {
     const [year, month] = cursor.split("-").map(Number);
@@ -126,10 +128,11 @@ function targetForCourse(
     if (overlap !== null) {
       const plan = plans[cursor];
       const match = plan ? matchMediaPlanCourse(plan.courses, course) : null;
-      if (match && plan?.status === "approved") {
+      if (match && plan) {
         total += match.targetLeads;
         expected += (match.targetLeads * (overlap + 1)) / monthDays;
         days += overlap + 1;
+        if (plan.status === "draft") draft = true;
       } else missing = true;
     }
     cursor = `${year + (month === 12 ? 1 : 0)}-${String(month === 12 ? 1 : month + 1).padStart(2, "0")}`;
@@ -139,8 +142,10 @@ function targetForCourse(
     expected: days && !missing ? expected : null,
     daily: days && !missing ? expected / days : null,
     coverage: missing
-      ? "no_approved_plan_for_entire_period"
-      : "approved_plan_prorated_by_calendar_day",
+      ? "no_plan_for_entire_period"
+      : draft
+        ? "draft_plan_prorated_by_calendar_day"
+        : "approved_plan_prorated_by_calendar_day",
   };
 }
 
@@ -193,7 +198,7 @@ export function buildLeadIntelligence(
       (plan) =>
         (!data.applied.from || `${plan.month}-31` >= data.applied.from) &&
         (!data.applied.to || `${plan.month}-01` <= data.applied.to) &&
-        plan.status === "approved",
+        Boolean(plan.courses.length),
     )
     .flatMap((plan) => plan.courses.map((row) => row.label));
   const courses = [
@@ -221,8 +226,13 @@ export function buildLeadIntelligence(
   const ads = data.ads.filter((row) =>
     matchesCourse(canonicalCourse(attributedAdCourse(row, data.snapshot).course)),
   );
+  const adCampaignKeys = new Set(ads.map((row) => row.campaignKey).filter(Boolean));
+  const attributedPaid = paid.filter(
+    (row) => row.campaignKey && adCampaignKeys.has(row.campaignKey),
+  );
   const spend = focusOwner ? null : ads.reduce((sum, row) => sum + row.spend, 0);
   const revenue = paid.reduce((sum, row) => sum + row.usdPaid, 0);
+  const attributedRevenue = attributedPaid.reduce((sum, row) => sum + row.usdPaid, 0);
   const won = leads.filter((row) => row.status === "won").length;
   const lostCount = leads.filter((row) => row.status === "lost").length;
   const customers = new Set(lifetimePaid.map((row) => key(row.partner)).filter(Boolean));
@@ -273,6 +283,9 @@ export function buildLeadIntelligence(
             )
             .reduce((sum, row) => sum + row.spend, 0);
       const courseRevenue = coursePaid.reduce((sum, row) => sum + row.usdPaid, 0);
+      const courseAttributedRevenue = attributedPaid
+        .filter((row) => key(canonicalCourse(row.course)) === key(course))
+        .reduce((sum, row) => sum + row.usdPaid, 0);
       const target = targetForCourse(course, plans, data.applied.from || "", data.applied.to || "");
       const courseWon = cohort.filter((row) => row.status === "won").length;
       const courseLost = cohort.filter((row) => row.status === "lost").length;
@@ -288,8 +301,8 @@ export function buildLeadIntelligence(
         open: cohort.length - courseWon - courseLost,
         spend: courseSpend,
         revenue: courseRevenue,
-        roas: courseSpend === null ? null : ratio(courseRevenue, courseSpend),
-        achievement: focusOwner ? null : ratio(cohort.length, target.target ?? 0),
+        roas: courseSpend === null ? null : ratio(courseAttributedRevenue, courseSpend),
+        achievement: focusOwner ? null : ratio(cohort.length, target.expected ?? 0),
       };
     })
     .filter((row) => row.leads || row.spend || row.revenue || row.target !== null)
@@ -313,13 +326,16 @@ export function buildLeadIntelligence(
   const daily = dates.map((day) => ({
     day,
     leads: dailyMap.get(day) ?? 0,
-    target: focusOwner
-      ? null
-      : courseRows.reduce<number | null>((sum, row) => {
-          const dayTarget = targetForCourse(row.course, plans, day, day).expected;
-          if (dayTarget === null) return null;
-          return sum === null ? null : sum + dayTarget;
-        }, 0),
+    target:
+      focusOwner || !courseRows.some((row) => row.target !== null)
+        ? null
+        : courseRows
+            .filter((row) => row.target !== null)
+            .reduce<number | null>((sum, row) => {
+              const dayTarget = targetForCourse(row.course, plans, day, day).expected;
+              if (dayTarget === null) return null;
+              return sum === null ? null : sum + dayTarget;
+            }, 0),
   }));
 
   const closed = leads
@@ -415,10 +431,11 @@ export function buildLeadIntelligence(
       open: leads.length - won - lostCount,
       spend,
       revenue,
+      attributedRevenue,
       cpl: spend === null ? null : ratio(spend, leads.length),
       cac: spend === null ? null : ratio(spend, won),
-      roas: spend === null ? null : ratio(revenue, spend),
-      roi: spend && spend > 0 ? (revenue - spend) / spend : null,
+      roas: spend === null ? null : ratio(attributedRevenue, spend),
+      roi: spend && spend > 0 ? (attributedRevenue - spend) / spend : null,
       observedLtv: ratio(lifetimeRevenue, customers.size),
       payingCustomers: customers.size,
       attributedLeads: leads.filter((row) => Boolean(row.campaignKey || row.campaign)).length,
@@ -456,7 +473,7 @@ export function buildLeadIntelligence(
     salespeople,
     notes: [
       "Lead cohort uses Odoo creation date; Won/Lost are the current outcomes of that cohort.",
-      "Revenue uses paid invoice date, so it is period revenue rather than revenue from the same lead cohort.",
+      "Revenue uses paid invoice date, so it is period revenue rather than revenue from the same lead cohort. ROAS and ad-cost ROI use only paid revenue linked to a campaign with spend.",
       "Observed LTV is all-time paid revenue divided by distinct named paying partners; it is a proxy, not predicted lifetime value.",
       ...(focusOwner
         ? [

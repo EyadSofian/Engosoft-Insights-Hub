@@ -113,4 +113,37 @@ describe("course lead intelligence", () => {
     expect(result.courses[0].target).toBeNull();
     expect(result.daily[0].target).toBeNull();
   });
+
+  it("shows draft plan targets as provisional and compares progress with elapsed days", () => {
+    const draft = { ...plan, status: "draft" as const };
+    const result = buildLeadIntelligence(data, { "2026-10": draft });
+    expect(result.courses[0].target).toBe(100);
+    expect(result.courses[0].targetCoverage).toBe("draft_plan_prorated_by_calendar_day");
+    expect(result.courses[0].achievement).toBeCloseTo(3 / (1000 / 31));
+    expect(result.daily[0].target).toBeCloseTo(100 / 31);
+  });
+
+  it("uses only campaign-linked collections for ad ROAS", () => {
+    const withAds = {
+      ...data,
+      ads: [{ campaign: "SFM Q4", campaignKey: "id:1", courseHint: "SFM", spend: 100 }],
+      accounting: [
+        ...data.accounting,
+        {
+          course: "SFM",
+          salesperson: "Ali",
+          partner: "Customer B",
+          usdPaid: 900,
+          campaignKey: "",
+          campaignName: "",
+        },
+      ],
+      snapshot: { campaigns: new Map() },
+    } as unknown as FilteredData;
+    const result = buildLeadIntelligence(withAds, { "2026-10": plan });
+    expect(result.totals.revenue).toBe(1100);
+    expect(result.totals.attributedRevenue).toBe(200);
+    expect(result.totals.roas).toBe(2);
+    expect(result.totals.roi).toBe(1);
+  });
 });
