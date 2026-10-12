@@ -264,6 +264,36 @@ function Overview() {
       technical: data.staleTabs.join(" · "),
     });
   }
+  if (data.spendCoverage?.complete === false) {
+    healthIssues.push({
+      tone: "danger",
+      message:
+        lang === "ar"
+          ? "صرف الإعلانات غير مكتمل للفترة المختارة."
+          : "Ad spend is incomplete for the selected period.",
+      impact:
+        lang === "ar"
+          ? "أُخفيت أرقام الصرف ومؤشرات التكلفة والعائد حتى يكتمل استرجاع الحسابات."
+          : "Spend and cost/return KPIs are hidden until the missing account history is restored.",
+      technical: data.spendCoverage.gaps
+        .slice(0, 12)
+        .map((gap) => `${gap.platform} · ${gap.account} · ${gap.from} → ${gap.to}`)
+        .join(" | "),
+    });
+  }
+  if (data.prevSpendCoverage?.complete === false) {
+    healthIssues.push({
+      tone: "warning",
+      message:
+        lang === "ar"
+          ? "مقارنة صرف الشهر السابق غير مكتملة."
+          : "Prior-period spend comparison is incomplete.",
+      impact:
+        lang === "ar"
+          ? "أُخفي تغيّر الصرف ومؤشرات الكفاءة لحين اكتمال الفترة المقارنة."
+          : "Spend and efficiency deltas are hidden until the comparison period is complete.",
+    });
+  }
   // Held onto so the data-health section does not restate it: this exact
   // problem already interrupts the top of the page in its own alert bar, and
   // reading the same warning twice in one screen makes a reader trust neither.
@@ -408,6 +438,20 @@ function Overview() {
           </AlertBar>
         </div>
       )}
+      {data.spendCoverage?.complete === false && (
+        <div className="mt-3">
+          <AlertBar title={lang === "ar" ? "صرف الإعلانات غير مكتمل" : "Incomplete ad spend"}>
+            {lang === "ar"
+              ? "الفترة المختارة تتضمن أيامًا لم يُتحقق من كل حساباتها بعد؛ لذلك الصرف ومؤشرات التكلفة والعائد مخفية."
+              : "Some accounts have unverified days in this period; spend and cost/return KPIs are hidden."}{" "}
+            {data.spendCoverage.gaps
+              .slice(0, 3)
+              .map((gap) => `${gap.platform} / ${gap.account}: ${gap.from} → ${gap.to}`)
+              .join(" · ")}
+            {data.spendCoverage.gaps.length > 3 ? ` · +${data.spendCoverage.gaps.length - 3}` : ""}
+          </AlertBar>
+        </div>
+      )}
 
       <PageSections className="gap-after-header">
         {/* LEVEL 1 — is the company doing well? Six figures, one row. */}
@@ -433,15 +477,21 @@ function Overview() {
               card={{
                 index: 1,
                 spark: seriesOf("spend"),
-                sub: PLATFORMS.map((platform) => ({
-                  platform,
-                  spend: spendByPlatform[platform],
-                }))
-                  .filter(({ spend }) => spend > 0)
-                  .map(
-                    ({ platform, spend }) => `${PLATFORM_LABEL[platform][lang]} ${fmtUSD(spend)}`,
-                  )
-                  .join(" · "),
+                sub:
+                  data.spendCoverage?.complete === false
+                    ? lang === "ar"
+                      ? "جاري استرجاع بيانات الحسابات الناقصة"
+                      : "Restoring missing account history"
+                    : PLATFORMS.map((platform) => ({
+                        platform,
+                        spend: spendByPlatform[platform],
+                      }))
+                        .filter(({ spend }) => spend > 0)
+                        .map(
+                          ({ platform, spend }) =>
+                            `${PLATFORM_LABEL[platform][lang]} ${fmtUSD(spend)}`,
+                        )
+                        .join(" · "),
               }}
             />
             <MetricDetailTrigger

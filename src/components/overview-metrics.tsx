@@ -140,6 +140,18 @@ export interface OverviewResp {
   syncedAt: string;
   fetchErrors: string[];
   staleTabs: string[];
+  spendCoverage?: {
+    complete: boolean;
+    checkedFrom: string;
+    checkedTo: string;
+    gaps: { platform: string; account: string; from: string; to: string }[];
+  };
+  prevSpendCoverage?: {
+    complete: boolean;
+    checkedFrom: string;
+    checkedTo: string;
+    gaps: { platform: string; account: string; from: string; to: string }[];
+  } | null;
 }
 
 const ar = (lang: Lang) => lang === "ar";
@@ -351,10 +363,10 @@ export function overviewMetrics({
   const spend: MetricDetail = {
     id: "overview.spend",
     title: A ? "الإنفاق الإعلاني" : "Ad spend",
-    value: fmtUSD(T.spend),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSD(T.spend),
     tone: "rose",
     icon: <DollarSign size={16} />,
-    delta: D.spend,
+    delta: data.spendCoverage?.complete === false ? undefined : D.spend,
     deltaInvert: true,
     definition: A
       ? "ما أُنفق فعليًا على الإعلانات خلال الفترة، بتاريخ ظهور الإعلان، من كل المنصات المتصلة."
@@ -684,13 +696,13 @@ export function overviewMetrics({
   const roas: MetricDetail = {
     id: "overview.roas",
     title: A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS",
-    value: fmtRoas(T.attributedRoas),
+    value: data.spendCoverage?.complete === false ? "—" : fmtRoas(T.attributedRoas),
     tone:
       T.attributedRoas !== null && isFinite(T.attributedRoas) && T.attributedRoas < 1
         ? "rose"
         : "amber",
     icon: <Target size={16} />,
-    delta: D.attributedRoas,
+    delta: data.spendCoverage?.complete === false ? undefined : D.attributedRoas,
     definition: A
       ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
       : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
@@ -757,6 +769,20 @@ export function overviewMetrics({
     ],
     report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
   };
+
+  if (data.spendCoverage?.complete === false) {
+    const caveat = A
+      ? "هناك حسابات أو أيام لم تُسترجع بعد؛ تفاصيل الإنفاق والعائد مخفية حتى تكتمل الفترة المختارة."
+      : "Some accounts or days have not been retrieved; spend and return detail is hidden until the selected period is complete.";
+    for (const metric of [spend, roas]) {
+      metric.caveat = caveat;
+      metric.formula = undefined;
+      metric.trend = undefined;
+      metric.breakdowns = [];
+      metric.supporting = [];
+      metric.records = undefined;
+    }
+  }
 
   return { revenue, spend, leads, won, roas };
 }
@@ -913,7 +939,7 @@ export function overviewEfficiencyMetrics({
   const cpl: MetricDetail = {
     id: "overview.cpl",
     title: A ? "تكلفة العميل المحتمل" : "Cost per lead",
-    value: fmtUSDFull(T.cpl),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSDFull(T.cpl),
     // A cost is read against the thing it bought, so cost-per-lead takes the
     // lead family and cost-per-won takes the won family. Painting all three
     // cost figures amber gave the second row three identical cards and told a
@@ -1022,7 +1048,7 @@ export function overviewEfficiencyMetrics({
   const acos: MetricDetail = {
     id: "overview.acos",
     title: "ACOS",
-    value: fmtPct(T.acos, 1),
+    value: data.spendCoverage?.complete === false ? "—" : fmtPct(T.acos, 1),
     tone: "amber",
     icon: <Percent size={14} />,
     delta: D.acos,
@@ -1084,7 +1110,7 @@ export function overviewEfficiencyMetrics({
   const cpa: MetricDetail = {
     id: "overview.cpa",
     title: A ? "تكلفة الصفقة" : "Cost per won deal",
-    value: fmtUSDFull(T.cpa),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSDFull(T.cpa),
     tone: "violet",
     icon: <Target size={14} />,
     definition: A
@@ -1106,6 +1132,20 @@ export function overviewEfficiencyMetrics({
     ],
     report: { to: "/sales", label: A ? "فتح تقرير المبيعات" : "Open the sales report" },
   };
+
+  if (data.spendCoverage?.complete === false) {
+    const caveat = A
+      ? "بيانات الإنفاق غير مكتملة؛ أُخفيت تفاصيل التكلفة والكفاءة حتى تكتمل الفترة."
+      : "Spend data is incomplete; cost and efficiency details are hidden until the period is complete.";
+    for (const metric of [acos, cpl, cpa]) {
+      metric.caveat = caveat;
+      metric.formula = undefined;
+      metric.trend = undefined;
+      metric.breakdowns = [];
+      metric.supporting = [];
+      metric.records = undefined;
+    }
+  }
 
   return { lost, conversion, lostRate, closeTime, acos, cpl, cpa };
 }

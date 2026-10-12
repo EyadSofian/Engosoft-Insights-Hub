@@ -126,6 +126,25 @@ async function ensureSchema(): Promise<void> {
           error text NOT NULL DEFAULT '',
           metadata jsonb NOT NULL DEFAULT '{}'::jsonb
         );
+
+        CREATE TABLE IF NOT EXISTS ad_delivery_accounts (
+          dataset text NOT NULL,
+          account_id text NOT NULL,
+          account_name text NOT NULL,
+          currency text NOT NULL,
+          discovered_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (dataset, account_id)
+        );
+        CREATE TABLE IF NOT EXISTS ad_delivery_coverage (
+          dataset text NOT NULL,
+          account_id text NOT NULL,
+          from_date date NOT NULL,
+          to_date date NOT NULL,
+          expected_spend numeric NOT NULL,
+          row_count integer NOT NULL,
+          verified_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (dataset, account_id, from_date, to_date)
+        );
       `,
       )
       .then(() => undefined)

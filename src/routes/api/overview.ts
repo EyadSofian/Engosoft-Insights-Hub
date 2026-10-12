@@ -24,9 +24,16 @@ export const Route = createFileRoute("/api/overview")({
           computeRevenueLeadAttribution,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
+        const { getAdSpendCoverage } = await import("@/lib/ad-delivery-coverage.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const spendCoverage = await getAdSpendCoverage({
+          from: filters.from ?? data.snapshot.adsDateMin,
+          to: filters.to ?? data.snapshot.adsDateMax,
+          platform: filters.platform,
+          account: filters.account,
+        });
         const totals = computeTotals(data);
         const campaigns = computePerf(data, "campaign");
         const activity = await computeRecentCampaignActivity(filters, data);
@@ -37,7 +44,29 @@ export const Route = createFileRoute("/api/overview")({
         const prevComparable = await isPreviousComparable(prevRange);
         const prevData =
           prevComparable && prevRange ? await getFiltered({ ...filters, ...prevRange }) : null;
+        const prevSpendCoverage =
+          prevComparable && prevRange
+            ? await getAdSpendCoverage({
+                ...prevRange,
+                platform: filters.platform,
+                account: filters.account,
+              })
+            : null;
         const deltas = prevData ? computeDeltas(totals, computeTotals(prevData)) : {};
+        if (!spendCoverage.complete || prevSpendCoverage?.complete === false) {
+          for (const key of [
+            "spend",
+            "cpl",
+            "cpa",
+            "cpaInvoices",
+            "acos",
+            "attributedAcos",
+            "roas",
+            "attributedRoas",
+          ] as const) {
+            delete deltas[key];
+          }
+        }
         const courses = computeCourses(data, prevData ?? undefined);
         const soldCourses = courses
           .filter(
@@ -99,6 +128,8 @@ export const Route = createFileRoute("/api/overview")({
           accounts: data.snapshot.accounts,
           summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,
+          spendCoverage,
+          prevSpendCoverage,
           coverage: {
             adsDateMin: data.snapshot.adsDateMin,
             adsDateMax: data.snapshot.adsDateMax,
