@@ -76,6 +76,9 @@ export interface LeadIntelligenceResponse {
     buckets: Array<{ label: string; count: number }>;
     averageDays: number | null;
     medianDays: number | null;
+    observedMaxDays: number | null;
+    won: { count: number; averageDays: number | null };
+    lost: { count: number; averageDays: number | null };
     sample: number;
     missingCloseDate: number;
     records: Array<
@@ -371,13 +374,46 @@ export function buildLeadIntelligence(
   const median = sorted.length
     ? (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2
     : null;
-  const bucketSpecs: Array<[string, number, number]> = [
-    ["0–30", 0, 30],
-    ["31–60", 31, 60],
-    ["61–90", 61, 90],
-    ["91–180", 91, 180],
-    ["180+", 181, Infinity],
-  ];
+  const observedMaxDays = sorted.length ? sorted[sorted.length - 1] : null;
+  // A creation-date cohort from the current month cannot have 31+ day closures.
+  // Use useful short-interval bands instead of putting every record in 0–30.
+  const bucketSpecs: Array<[string, number, number]> =
+    observedMaxDays !== null && observedMaxDays <= 14
+      ? [
+          ["0", 0, 0],
+          ["1", 1, 1],
+          ["2–3", 2, 3],
+          ["4–7", 4, 7],
+          ["8–14", 8, 14],
+        ]
+      : observedMaxDays !== null && observedMaxDays <= 30
+        ? [
+            ["0", 0, 0],
+            ["1", 1, 1],
+            ["2–3", 2, 3],
+            ["4–7", 4, 7],
+            ["8–14", 8, 14],
+            ["15–30", 15, 30],
+          ]
+        : [
+            ["0–7", 0, 7],
+            ["8–30", 8, 30],
+            ["31–60", 31, 60],
+            ["61–90", 61, 90],
+            ["91–180", 91, 180],
+            ["181+", 181, Infinity],
+          ];
+  const statusDuration = (status: "won" | "lost") => {
+    const values = closed
+      .filter((row) => row.status === status && row.closeDays !== null)
+      .map((row) => row.closeDays as number);
+    return {
+      count: values.length,
+      averageDays: values.length
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : null,
+    };
+  };
   const pageSize = 50;
   const totalPages = Math.max(1, Math.ceil(closed.length / pageSize));
   const safePage = Math.min(Math.max(1, Math.floor(page) || 1), totalPages);
@@ -484,6 +520,9 @@ export function buildLeadIntelligence(
         ? measured.reduce((sum, value) => sum + value, 0) / measured.length
         : null,
       medianDays: median,
+      observedMaxDays,
+      won: statusDuration("won"),
+      lost: statusDuration("lost"),
       sample: measured.length,
       missingCloseDate: closed.length - measured.length,
       records,

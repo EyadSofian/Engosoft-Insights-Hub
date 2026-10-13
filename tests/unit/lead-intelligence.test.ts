@@ -81,6 +81,16 @@ describe("course lead intelligence", () => {
     expect(result.daily[3].target).toBeCloseTo(100 / 31);
     expect(result.lifecycle.sample).toBe(2);
     expect(result.lifecycle.averageDays).toBe(5.5);
+    expect(result.lifecycle.observedMaxDays).toBe(9);
+    expect(result.lifecycle.buckets).toEqual([
+      { label: "0", count: 0 },
+      { label: "1", count: 0 },
+      { label: "2–3", count: 1 },
+      { label: "4–7", count: 0 },
+      { label: "8–14", count: 1 },
+    ]);
+    expect(result.lifecycle.won).toEqual({ count: 1, averageDays: 9 });
+    expect(result.lifecycle.lost).toEqual({ count: 1, averageDays: 2 });
     expect(result.totals.won).toBe(1);
     expect(result.totals.lost).toBe(1);
     expect(result.campaigns[0].course).toBe("SFM");
@@ -146,5 +156,31 @@ describe("course lead intelligence", () => {
     expect(result.totals.attributedRevenue).toBe(200);
     expect(result.totals.roas).toBe(2);
     expect(result.totals.roi).toBe(1);
+  });
+
+  it("uses longer lifecycle bands when the selected creation cohort includes older closures", () => {
+    const older = {
+      ...data,
+      lost: [
+        ...data.lost,
+        {
+          ...data.lost[0],
+          id: "4",
+          createdAt: "2026-08-01",
+          closeDate: "2026-09-15",
+        },
+      ],
+      applied: { from: "2026-08-01", to: "2026-10-10" },
+    } as FilteredData;
+    const result = buildLeadIntelligence(older, { "2026-10": plan });
+    expect(result.lifecycle.observedMaxDays).toBe(45);
+    expect(result.lifecycle.buckets).toEqual([
+      { label: "0–7", count: 1 },
+      { label: "8–30", count: 1 },
+      { label: "31–60", count: 1 },
+      { label: "61–90", count: 0 },
+      { label: "91–180", count: 0 },
+      { label: "181+", count: 0 },
+    ]);
   });
 });

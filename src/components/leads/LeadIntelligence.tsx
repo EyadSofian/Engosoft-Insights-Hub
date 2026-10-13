@@ -442,8 +442,8 @@ export function LeadIntelligence() {
         title={A ? "رحلة الإغلاق" : "Close lifecycle"}
         description={
           A
-            ? "الأيام من إنشاء الليد إلى Won أو Lost. الليد المفتوح خارج المتوسط."
-            : "Days from lead creation to Won or Lost. Open leads are excluded."
+            ? "المدة بالأيام التقويمية من إنشاء الليد إلى إغلاقه. تشمل فقط الليدز المنشأة في الفترة المختارة التي أصبحت ناجحة أو مفقودة؛ الليدز المفتوحة مستبعدة."
+            : "Calendar days from lead creation to closure. Only leads created in the selected period that are now Won or Lost are included; open leads are excluded."
         }
       >
         <div className="grid gap-3 sm:grid-cols-3">
@@ -471,11 +471,64 @@ export function LeadIntelligence() {
             color="mint"
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-5">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-surface-2/50 px-4 py-3 text-xs text-text-muted">
+          <span>
+            {A ? "تاريخ إنشاء الليد" : "Lead creation dates"}:{" "}
+            <b className="num text-text">
+              {data.period.from} → {data.period.to}
+            </b>
+          </span>
+          {data.lifecycle.observedMaxDays !== null && (
+            <span>
+              {A ? "أطول مدة إغلاق مرصودة" : "Longest observed closure"}:{" "}
+              <b className="num text-text">
+                {fmtNum(data.lifecycle.observedMaxDays)} {A ? "يوم" : "days"}
+              </b>
+            </span>
+          )}
+          {data.lifecycle.missingCloseDate > 0 && (
+            <span className="font-semibold text-amber-strong">
+              {A
+                ? `${fmtNum(data.lifecycle.missingCloseDate)} حالة بلا تاريخ إغلاق صالح؛ خارج حساب المدة`
+                : `${fmtNum(data.lifecycle.missingCloseDate)} records have no valid closure date and are excluded from duration metrics`}
+            </span>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              ["won", data.lifecycle.won, A ? "ناجحة" : "Won", "text-mint-strong"],
+              ["lost", data.lifecycle.lost, A ? "مفقودة" : "Lost", "text-amber-strong"],
+            ] as const
+          ).map(([status, summary, label, color]) => (
+            <div
+              key={status}
+              className="flex items-baseline justify-between gap-3 rounded-xl border border-border px-4 py-3"
+            >
+              <span className={`text-sm font-bold ${color}`}>{label}</span>
+              <span className="num text-sm text-text">
+                <b>{fmtNum(summary.count)}</b>
+                <span className="mx-2 text-text-muted">·</span>
+                {A ? "متوسط" : "Average"}{" "}
+                <b>{summary.averageDays === null ? "—" : summary.averageDays.toFixed(1)}</b>{" "}
+                {A ? "يوم" : "days"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
           {data.lifecycle.buckets.map((bucket, i) => (
             <div key={bucket.label} className="rounded-xl bg-surface-2 p-3">
               <p className="num text-xs text-text-muted">
-                {bucket.label} {A ? "يوم" : "days"}
+                {bucket.label === "0"
+                  ? A
+                    ? "نفس اليوم"
+                    : "Same day"
+                  : bucket.label === "1"
+                    ? A
+                      ? "يوم واحد"
+                      : "1 day"
+                    : `${bucket.label} ${A ? "يوم" : "days"}`}
               </p>
               <p className="num my-2 text-xl font-black text-text">{fmtNum(bucket.count)}</p>
               <div className="h-2 rounded-full bg-surface-3">
@@ -509,6 +562,15 @@ export function LeadIntelligence() {
                   #{row.id}
                   <ArrowUpRight size={12} />
                 </a>
+                <span
+                  className={
+                    row.status === "won"
+                      ? "font-bold text-mint-strong"
+                      : "font-bold text-amber-strong"
+                  }
+                >
+                  {row.status === "won" ? (A ? "ناجحة" : "Won") : A ? "مفقودة" : "Lost"}
+                </span>
                 <span>
                   {row.course || "—"} · {row.owner || "—"}
                 </span>
