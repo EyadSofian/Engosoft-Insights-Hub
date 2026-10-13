@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Fragment, useMemo, useState } from "react";
 import { BookOpen, Download, ExternalLink, Flame, Layers3, Search, Users } from "lucide-react";
 import { DashboardPageHeader, PageSections } from "@/components/dashboard-bits";
@@ -164,6 +165,16 @@ function LeadDistributionPage() {
 
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
             {lifecycleExplanation(data.lifecycle.leadOther, ar)}
+            {data.excludedSources.recommendation + data.excludedSources.whatsappBroadcast > 0 && (
+              <span className="ms-2">
+                {ar ? "مستبعد من إجمالي العملاء المحتملين: " : "Excluded from lead totals: "}
+                {fmtNum(data.excludedSources.recommendation)} Recommendation ·{" "}
+                {fmtNum(data.excludedSources.whatsappBroadcast)} WhatsApp Broadcast.{" "}
+                <Link to="/lead-sources" className="font-semibold text-brand underline">
+                  {ar ? "عرض سجلات المصادر" : "View source records"}
+                </Link>
+              </span>
+            )}
             {data.unverified > 0 && (
               <span className="ms-2 text-amber-800">
                 {fmtNum(data.unverified)}{" "}

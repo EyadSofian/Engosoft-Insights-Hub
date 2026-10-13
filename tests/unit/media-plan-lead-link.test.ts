@@ -13,6 +13,9 @@ const rows = [
   lead("4", "Other", "Website"),
   lead("5", "CFM", "Website"),
   lead("6", "CFM", "Meta", false),
+  lead("7", "CFM", "Recommendation"),
+  lead("8", "PMP", "WhatsApp Broadcast"),
+  lead("9", "PMP", "WhatsApp"),
 ];
 
 describe("media plan Odoo lead drilldown", () => {
@@ -20,6 +23,7 @@ describe("media plan Odoo lead drilldown", () => {
     expect(mediaPlanLeadMatch(plan, "cfm")).toBe("course_category");
     expect(linkedMediaPlanLeads(plan, "cfm", rows).map((row) => row.id)).toEqual(["1", "5"]);
     expect(linkedMediaPlanLeads(plan, "interior", rows).map((row) => row.id)).toEqual(["3"]);
+    expect(linkedMediaPlanLeads(plan, "pmp", rows).map((row) => row.id)).toEqual(["2", "9"]);
   });
 
   it("links website activity only through the Odoo Source field", () => {

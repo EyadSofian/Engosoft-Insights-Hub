@@ -38,6 +38,7 @@ import { getEmployeeDirectory } from "./employee-directory.server.ts";
 import { classifyLostRow } from "./lost-classification";
 import { indexCallsByPhone, resolveLeadContactEvidence } from "./lead-contact-evidence";
 import { summarizeLeadQa, type LeadQaSummary } from "./lead-qa";
+import { countsAsPotentialLead } from "./lead-count-policy";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
@@ -1366,7 +1367,7 @@ function mergeOperationalClosures(
     return true;
   };
 
-  for (const lead of data.snapshot.crm) {
+  for (const lead of data.snapshot.crm.filter((row) => countsAsPotentialLead(row.source))) {
     if (!lead.isWon || !dateIncluded(lead.closedAt, filters) || !commonMatch(lead)) continue;
     if (
       filters.salesTeam &&
@@ -1387,7 +1388,7 @@ function mergeOperationalClosures(
   // Closed Lost in the window, split by the canonical classification into
   // created-and-lost, older-cohort and undated-cohort closures.
   const window = { from: filters.from, to: filters.to };
-  for (const lead of data.snapshot.lost) {
+  for (const lead of data.snapshot.lost.filter((row) => countsAsPotentialLead(row.source))) {
     if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
     if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
     const key = normalizePersonName(lead.salesperson);

@@ -8,6 +8,7 @@ import {
   type LeadLifecycleBucket,
 } from "./lead-course-distribution";
 import { mainCategoryForCourse } from "./course-taxonomy";
+import { countsAsPotentialLead, excludedLeadSource } from "./lead-count-policy";
 import { odooConfig, searchRead } from "./odoo.server";
 import type { GlobalFilters } from "./types";
 
@@ -47,6 +48,7 @@ export interface CourseLeadGroup {
 
 export interface CourseLeadDistribution {
   total: number;
+  excludedSources: { recommendation: number; whatsappBroadcast: number };
   unverified: number;
   lifecycle: {
     leadActive: number;
@@ -223,11 +225,19 @@ export async function leadCourseDistribution(
     page: number;
   },
 ): Promise<CourseLeadDistribution> {
-  const [rows, stageDefinitions] = await Promise.all([
+  const [sourceRows, stageDefinitions] = await Promise.all([
     loadLeadCourseRecords(filters),
     // Keep the page available if Odoo temporarily refuses the stage metadata read.
     odooStages().catch(() => []),
   ]);
+  const excludedSources = {
+    recommendation: sourceRows.filter((row) => excludedLeadSource(row.source) === "recommendation")
+      .length,
+    whatsappBroadcast: sourceRows.filter(
+      (row) => excludedLeadSource(row.source) === "whatsapp_broadcast",
+    ).length,
+  };
+  const rows = sourceRows.filter((row) => countsAsPotentialLead(row.source));
   const stages = sortOpportunityStages(
     [...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage))],
     stageDefinitions,
@@ -246,6 +256,7 @@ export async function leadCourseDistribution(
     : null;
   return {
     total: rows.length,
+    excludedSources,
     unverified: rows.filter((row) => !row.verified).length,
     lifecycle: {
       leadActive: rows.filter(

@@ -36,6 +36,7 @@ import {
   businessSignals,
   insightDetails,
   overviewEfficiencyMetrics,
+  overviewLeadTargetMetrics,
   overviewMetrics,
   type BusinessSignals,
   type OverviewResp,
@@ -204,6 +205,10 @@ function Overview() {
     () => (data ? overviewEfficiencyMetrics({ data, workforce: workforce.data, lang }) : null),
     [data, workforce.data, lang],
   );
+  const leadGoals = useMemo(
+    () => (data ? overviewLeadTargetMetrics(data.leadTargets, lang) : null),
+    [data, lang],
+  );
   const insights = useMemo(
     () => (data && business ? insightDetails(data, business, workforce.data, lang) : null),
     [data, business, workforce.data, lang],
@@ -211,7 +216,7 @@ function Overview() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  if (isLoading || !data || !metrics || !efficiency || !insights || !business) {
+  if (isLoading || !data || !metrics || !efficiency || !leadGoals || !insights || !business) {
     return (
       <div className="page-sections">
         <Skeleton className="h-28" />
@@ -463,7 +468,7 @@ function Overview() {
       )}
 
       <PageSections className="gap-after-header">
-        {/* LEVEL 1 — is the company doing well? Six figures, one row. */}
+        {/* LEVEL 1 — headline figures and the two independent lead promises. */}
         <PageSection
           level="headline"
           aria-label={lang === "ar" ? "أهم الأرقام" : "Headline figures"}
@@ -511,9 +516,33 @@ function Overview() {
                 sub: `CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`,
               }}
             />
+            <MetricDetailTrigger
+              detail={leadGoals.courses}
+              card={{
+                index: 3,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.courses.actual ?? 0)} / ${fmtNum(data.leadTargets.courses.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "يتطلب خطة شهرية وفلاتر غير مخصّصة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={leadGoals.website}
+              card={{
+                index: 4,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.website.actual ?? 0)} / ${fmtNum(data.leadTargets.website.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "يتطلب خطة شهرية وفلاتر غير مخصّصة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
             <KpiFigure
               kpi={closedLoop.data?.kpis?.qualified}
-              index={3}
+              index={5}
               icon={<Target size={17} />}
               tone="sky"
               loading={closedLoop.isLoading}
@@ -526,7 +555,7 @@ function Overview() {
             <MetricDetailTrigger
               detail={metrics.won}
               card={{
-                index: 4,
+                index: 6,
                 spark: seriesOf("won"),
                 sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`,
               }}
@@ -534,7 +563,7 @@ function Overview() {
             <MetricDetailTrigger
               detail={metrics.roas}
               card={{
-                index: 5,
+                index: 7,
                 sub:
                   lang === "ar"
                     ? "إجمالي التحصيل ÷ الإنفاق (ليس ROAS إعلانيًا)"

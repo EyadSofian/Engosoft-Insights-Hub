@@ -1,5 +1,6 @@
 import { matchMediaPlanCourse, type MonthlyMediaPlan } from "./media-plan";
 import type { CourseLeadRecord } from "./lead-course-distribution.server";
+import { countsAsPotentialLead } from "./lead-count-policy";
 
 export type MediaPlanLeadMatch = "course_category" | "source" | "plan_courses" | "unavailable";
 
@@ -34,18 +35,19 @@ export function linkedMediaPlanLeads(
   rows: CourseLeadRecord[],
 ): CourseLeadRecord[] {
   const match = mediaPlanLeadMatch(plan, key);
+  const eligible = rows.filter((row) => countsAsPotentialLead(row.source));
   if (match === "course_category")
-    return rows.filter(
+    return eligible.filter(
       (row) => row.verified && matchMediaPlanCourse(plan.courses, row.course)?.key === key,
     );
   if (match === "plan_courses")
-    return rows.filter(
+    return eligible.filter(
       (row) => row.verified && Boolean(matchMediaPlanCourse(plan.courses, row.course)),
     );
   if (match === "source") {
     const activity = plan.additionalActivities.find((row) => row.key === key);
     const source = activity?.actualSource === "website_crm_leads" ? "Website" : "Webinar";
-    return rows.filter((row) => row.source === source);
+    return eligible.filter((row) => row.source.trim().toLowerCase() === source.toLowerCase());
   }
   return [];
 }

@@ -1,4 +1,6 @@
 /** One Odoo CRM record belongs to exactly one source and one course cell. */
+import { countsAsPotentialLead } from "./lead-count-policy";
+
 export interface SourceMatrixRecord {
   source: string;
   course: string;
@@ -12,7 +14,10 @@ export interface SourceMatrixRow {
 }
 
 export interface SourceMatrix {
+  /** Raw source inventory, including sources excluded from lead KPIs. */
   total: number;
+  eligibleTotal: number;
+  excludedTotal: number;
   withoutSnapchat: number;
   unspecifiedSource: number;
   courses: string[];
@@ -61,6 +66,7 @@ export function matrixSource(value: string): string {
     recommendation: "Recommendation",
     recommendedfromcustomer: "Recommendation",
     recommendationsales: "Recommendation",
+    recommendedfromcoordination: "Recommendation",
     snapchat: "Snapchat",
     tiktok: "TikTok",
     webinar: "Webinar",
@@ -74,7 +80,9 @@ export function matrixSource(value: string): string {
 export function buildLeadSourceMatrix(records: SourceMatrixRecord[]): SourceMatrix {
   const bySource = new Map<string, SourceMatrixRow>();
   const courseTotals: Record<string, number> = {};
+  let eligibleTotal = 0;
   for (const record of records) {
+    if (countsAsPotentialLead(record.source)) eligibleTotal++;
     const source = matrixSource(record.source);
     const course = record.course || "غير محدد";
     const row = bySource.get(source) ?? {
@@ -108,6 +116,8 @@ export function buildLeadSourceMatrix(records: SourceMatrixRecord[]): SourceMatr
   );
   return {
     total: records.length,
+    eligibleTotal,
+    excludedTotal: records.length - eligibleTotal,
     withoutSnapchat: records.length - (bySource.get("Snapchat")?.count ?? 0),
     unspecifiedSource: bySource.get(UNSPECIFIED_SOURCE)?.count ?? 0,
     courses,

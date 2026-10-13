@@ -3,6 +3,7 @@ import { crmNormalScopeDomain } from "./crm-contract";
 import { cairoDate, lostEventWindow } from "./crm-lost-events";
 import { matchesLostMovementDimensions } from "./crm-lost-movement.server";
 import { odooConfig } from "./odoo.server";
+import { countsAsPotentialLead } from "./lead-count-policy";
 import type { Snapshot } from "./sheet-cache.server";
 import type { GlobalFilters } from "./types";
 
@@ -94,7 +95,8 @@ async function readFreshLostPipeline(
           : row["Record Type"] !== "lead" ||
             row["Record Active"] !== "false" ||
             !row["سبب الضياع"]) ||
-        !matchesLostMovementDimensions(row, filters, snapshot)
+        !matchesLostMovementDimensions(row, filters, snapshot) ||
+        !countsAsPotentialLead(row.Source || "")
       )
         continue;
       const createdUtc = row.__odoo_create_date_utc || "";

@@ -86,19 +86,34 @@ function LeadSourcesPage() {
         </>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="border-s-4 border-s-blue-600">
               <div className="text-xs font-semibold text-text-muted">
-                {ar ? "إجمالي الليدز في الفترة" : "Total records in period"}
+                {ar ? "العملاء المحتملون المحسوبون" : "Counted potential leads"}
               </div>
-              <div className="num mt-2 text-3xl font-bold text-text">{fmtNum(data.total)}</div>
+              <div className="num mt-2 text-3xl font-bold text-text">
+                {fmtNum(data.eligibleTotal)}
+              </div>
               <p className="mt-2 text-xs text-text-muted">
-                {ar ? "يشمل العملاء المحتملين والفرص البيعية" : "Includes leads and opportunities"}
+                {ar
+                  ? "بدون Recommendation وWhatsApp Broadcast"
+                  : "Excludes Recommendation and WhatsApp Broadcast"}
+              </p>
+            </Card>
+            <Card className="border-s-4 border-s-rose-500">
+              <div className="text-xs font-semibold text-text-muted">
+                {ar ? "مصادر ظاهرة خارج العدّ" : "Visible but excluded sources"}
+              </div>
+              <div className="num mt-2 text-3xl font-bold text-text">
+                {fmtNum(data.excludedTotal)}
+              </div>
+              <p className="mt-2 text-xs text-text-muted">
+                {ar ? "يمكن فتح سجلاتها أدناه" : "Their records remain accessible below"}
               </p>
             </Card>
             <Card className="border-s-4 border-s-emerald-600">
               <div className="text-xs font-semibold text-text-muted">
-                {ar ? "الإجمالي بدون Snapchat" : "Total excluding Snapchat"}
+                {ar ? "السجلات الخام بدون Snapchat" : "Raw records excluding Snapchat"}
               </div>
               <div className="num mt-2 text-3xl font-bold text-text">
                 {fmtNum(data.withoutSnapchat)}
@@ -188,7 +203,7 @@ function LeadSourcesPage() {
                       scope="col"
                       className="sticky end-0 z-20 min-w-24 border-b border-s border-border bg-blue-50 px-3 py-3 text-center text-xs font-bold text-blue-900"
                     >
-                      {ar ? "الإجمالي" : "Total"}
+                      {ar ? "إجمالي السجلات" : "Raw records"}
                     </th>
                   </tr>
                 </thead>
@@ -241,7 +256,7 @@ function LeadSourcesPage() {
                       scope="row"
                       className="sticky start-0 z-10 bg-slate-900 px-4 py-3 text-start"
                     >
-                      {ar ? "الإجمالي" : "Total"}
+                      {ar ? "إجمالي السجلات الخام" : "Raw record total"}
                     </th>
                     {data.courses.map((course) => (
                       <td key={course} className="num px-3 py-3 text-center tabular-nums">
@@ -264,8 +279,8 @@ function LeadSourcesPage() {
               <Info size={16} className="mt-1 shrink-0" />
               <span>
                 {ar
-                  ? "المجموع يُحسب من السجلات المباشرة وليس من إجماليات الصورة. صف «بدون Snapchat» يستبعد Snapchat فقط. الصورة مرجع للشكل؛ هدف 6 أيام فيها لا يُقارن تلقائيًا بفترة مختلفة في الفلتر."
-                  : "Totals are recomputed from live records, not copied from the image. Excluding Snapchat removes that row only. The image is a layout reference; its six-day target is not compared with a different filter period."}
+                  ? `جدول المصادر يعرض كل ${fmtNum(data.total)} سجل خام للرجوع إليها، لكن إجمالي العملاء المحتملين في مؤشرات الأداء هو ${fmtNum(data.eligibleTotal)} فقط. Recommendation وWhatsApp Broadcast ظاهران هنا ولا يدخلان في عدّ العملاء أو تارجتهم. WhatsApp العادي يظل محسوبًا.`
+                  : `The source table keeps all ${fmtNum(data.total)} raw records for inspection, but lead KPIs count only ${fmtNum(data.eligibleTotal)}. Recommendation and WhatsApp Broadcast stay visible here without entering lead totals or targets. Plain WhatsApp remains counted.`}
               </span>
             </div>
           </Card>

@@ -27,6 +27,7 @@ import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
+import type { OverviewLeadTargets } from "@/lib/overview-lead-targets.server";
 
 /* ---------------------------------------------------------------------------
    WHAT EACH FIGURE ON THE OVERVIEW ACTUALLY MEANS
@@ -119,6 +120,8 @@ export interface RevenueLeadAttribution {
 
 export interface OverviewResp {
   totals: Totals;
+  leadTargets: OverviewLeadTargets;
+  excludedLeads: { recommendation: number; whatsappBroadcast: number };
   deltas: Deltas;
   prevRange: { from: string; to: string } | null;
   prevComparable: boolean;
@@ -158,6 +161,89 @@ export interface OverviewResp {
 
 const ar = (lang: Lang) => lang === "ar";
 const EM = "—";
+
+/** Two intentionally separate promises in the monthly media plan. */
+export function overviewLeadTargetMetrics(
+  targets: OverviewLeadTargets,
+  lang: Lang,
+): { courses: MetricDetail; website: MetricDetail } {
+  const A = ar(lang);
+  const unavailable =
+    targets.reason === "narrow_filter"
+      ? A
+        ? "الفلتر الحالي يضيّق الأرقام، بينما التارجت موضوع للشهر كله. امسح فلاتر التخصيص للمقارنة الصحيحة."
+        : "The active dimension filter narrows actuals, but the target covers the entire month. Clear dimension filters to compare fairly."
+      : targets.reason === "no_single_month"
+        ? A
+          ? "اختر فترة داخل شهر واحد لعرض هدف ذلك الشهر."
+          : "Select a date range within one month to show that month's goal."
+        : targets.reason === "plan_unavailable"
+          ? A
+            ? "تعذّر تحميل خطة الميديا حاليًا."
+            : "The media plan is currently unavailable."
+          : A
+            ? "لا توجد خطة ميديا محفوظة لهذا الشهر."
+            : "There is no saved media plan for this month.";
+  const build = (kind: "courses" | "website"): MetricDetail => {
+    const goal = targets[kind];
+    const isCourse = kind === "courses";
+    const label = isCourse
+      ? A
+        ? "تحقيق تارجت ليدز الكورسات"
+        : "Course lead target"
+      : A
+        ? "تحقيق تارجت ليدز الموقع"
+        : "Website lead target";
+    const source = isCourse
+      ? A
+        ? "دورات خطة الميديا"
+        : "media-plan courses"
+      : A
+        ? "مصدر الموقع في أودو"
+        : "Odoo Website source";
+    const available = targets.reason === null;
+    return {
+      id: `overview.lead-target-${kind}`,
+      title: label,
+      value: available && goal.achievement !== null ? fmtPct(goal.achievement, 1) : EM,
+      tone: isCourse ? "sky" : "violet",
+      icon: <Target size={16} />,
+      definition: isCourse
+        ? A
+          ? "عدد ليدز كورسات الخطة التي دخلت أودو في الفترة المختارة، مقارنة بهدف الكورسات الشهري الكامل. ليدز الموقع لها كارد منفصل."
+          : "Odoo leads for planned courses created in the selected period against the full monthly course target. Website leads have a separate card."
+        : A
+          ? "عدد الليدز ذات مصدر Website في أودو خلال الفترة المختارة، مقارنة بهدف الموقع الشهري الكامل. لو الليد لها كورس في الخطة، قد تظهر في الكاردين؛ لذلك لا نجمعهما."
+          : "Odoo Website-source leads created in the selected period against the full monthly website target. A lead tagged with a planned course may appear in both cards, so do not sum them.",
+      formula: available
+        ? `${fmtNum(goal.actual ?? 0)} ÷ ${fmtNum(goal.target ?? 0)} × 100 = ${goal.achievement === null ? EM : fmtPct(goal.achievement, 1)}`
+        : undefined,
+      caveat: available
+        ? A
+          ? `المحقق حسب الفترة المختارة، والمطلوب للشهر ${targets.month} كاملًا${targets.status === "draft" ? " (الخطة مسودة)" : ""}. توصية وواتساب برودكاست خارج العد؛ واتساب العادي محسوب.`
+          : `Actual follows the selected dates; target is for all of ${targets.month}${targets.status === "draft" ? " (draft plan)" : ""}. Recommendation and WhatsApp Broadcast are excluded; regular WhatsApp counts.`
+        : unavailable,
+      supporting: available
+        ? [
+            { key: "actual", label: A ? "المحقق" : "Actual", value: fmtNum(goal.actual ?? 0) },
+            {
+              key: "target",
+              label: A ? "هدف الشهر" : "Monthly target",
+              value: fmtNum(goal.target ?? 0),
+            },
+          ]
+        : [],
+      provenance: {
+        system: "Odoo CRM + Media Plan",
+        model: "crm.lead",
+        dateBasis: A ? "تاريخ إنشاء الليد" : "Lead creation date",
+        note: source,
+      },
+      report: { to: "/media-plan", label: A ? "فتح خطة الميديا" : "Open media plan" },
+    };
+  };
+  return { courses: build("courses"), website: build("website") };
+}
 
 /** A series out of the response itself. Never padded, never interpolated. */
 const series = (rows: OverviewResp["trend"], metric: "spend" | "revenue" | "leads" | "won") =>
@@ -473,11 +559,14 @@ export function overviewMetrics({
     icon: <Users size={16} />,
     delta: D.totalLeads,
     definition: A
-      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد."
-      : "Every lead that entered the system in the period: active CRM rows plus the losses from the approved Lost source.",
+      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد، بعد استبعاد مصادر التوصية وواتساب برودكاست."
+      : "Every lead that entered the system in the period: active CRM rows plus approved losses, excluding Recommendation and WhatsApp Broadcast sources.",
     formula: A
       ? `عملاء CRM (${fmtNum(T.crmLeads)}) + الصفقات الضائعة المعتمدة (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`
       : `CRM leads (${fmtNum(T.crmLeads)}) + approved losses (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`,
+    caveat: A
+      ? `مستبعد من الإجمالي: ${fmtNum(data.excludedLeads?.recommendation ?? 0)} توصية و${fmtNum(data.excludedLeads?.whatsappBroadcast ?? 0)} واتساب برودكاست. واتساب العادي محسوب. السجلات المستبعدة ما زالت ظاهرة في تقرير المصادر.`
+      : `Excluded: ${fmtNum(data.excludedLeads?.recommendation ?? 0)} Recommendation and ${fmtNum(data.excludedLeads?.whatsappBroadcast ?? 0)} WhatsApp Broadcast. Regular WhatsApp is counted. Excluded records remain visible in the source report.`,
     trend: {
       points: series(data.trend, "leads"),
       label: A ? "حركة دخول العملاء" : "Leads arriving over the period",

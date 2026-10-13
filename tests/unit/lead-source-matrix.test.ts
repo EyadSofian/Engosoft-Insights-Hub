@@ -16,6 +16,8 @@ describe("lead source by course matrix", () => {
       { source: "", course: "" },
     ]);
     expect(matrix.total).toBe(6);
+    expect(matrix.eligibleTotal).toBe(4);
+    expect(matrix.excludedTotal).toBe(2);
     expect(matrix.withoutSnapchat).toBe(4);
     expect(matrix.unspecifiedSource).toBe(1);
     expect(matrix.rows.reduce((sum, row) => sum + row.count, 0)).toBe(matrix.total);

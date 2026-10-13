@@ -7,7 +7,7 @@ import {
 } from "./dashboard-db.server";
 import { odooConfigured } from "./odoo.server";
 
-const REVISION = "annual-all-crm-funnel-v3";
+const REVISION = "annual-all-crm-funnel-v4-excluded-sources";
 const REFRESH_MS = 24 * 60 * 60 * 1000;
 const retries = new Map<number, number>();
 const pending = new Map<number, Promise<void>>();
@@ -91,7 +91,7 @@ export async function historicalCrm(year: 2024 | 2025): Promise<HistoricalCrmRes
     cached.metadata.revision === REVISION &&
     cached.metadata.complete === true;
   const local = memory.get(year);
-  const storedBase = cached?.status === "success" && cached.metadata.complete === true;
+  const storedBase = storedReady;
   const rows = storedBase ? parseRows(cached.rows) : (local?.rows ?? []);
   const syncedAt = storedBase ? cached.syncedAt : (local?.syncedAt ?? "");
   const ready = storedBase || Boolean(local);

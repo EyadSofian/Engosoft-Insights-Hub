@@ -9,6 +9,7 @@ export const Route = createFileRoute("/api/lead-course-export")({
           await import("@/lib/lead-course-distribution.server");
         const { groupDisplayName, stageDisplayName, recordTypeDisplayName } =
           await import("@/lib/lead-distribution-labels");
+        const { countsAsPotentialLead } = await import("@/lib/lead-count-policy");
         const { default: ExcelJS } = await import("exceljs");
         const params = new URL(request.url).searchParams;
         const dimension = params.get("dimension");
@@ -32,7 +33,9 @@ export const Route = createFileRoute("/api/lead-course-export")({
               .includes(search),
           );
           const visibleLabels = new Set(groups.map((group) => group.label));
-          const visibleRecords = records.filter((row) => visibleLabels.has(row[dimension]));
+          const visibleRecords = records.filter(
+            (row) => countsAsPotentialLead(row.source) && visibleLabels.has(row[dimension]),
+          );
           const workbook = new ExcelJS.Workbook();
           workbook.creator = "Engosoft Insights Hub";
           workbook.created = new Date();

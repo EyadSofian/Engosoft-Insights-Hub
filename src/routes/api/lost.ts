@@ -24,6 +24,7 @@ export const Route = createFileRoute("/api/lost")({
         const { canonicalCourseValue, normalizeCourseKey } = await import("@/lib/course-taxonomy");
         const { loadFreshLostPipeline, loadArchivedLostLeads } =
           await import("@/lib/crm-fresh-lost.server");
+        const { countsAsPotentialLead } = await import("@/lib/lead-count-policy");
 
         const filters = await parseFilters(request);
         const requestParams = new URL(request.url).searchParams;
@@ -321,9 +322,12 @@ export const Route = createFileRoute("/api/lost")({
             ),
             dateFieldAudit: {
               closeDateInPeriod: data.snapshot.lost.filter(
-                (row) => classifyLostRow(row, window).closedLostInPeriod,
+                (row) =>
+                  countsAsPotentialLead(row.source) &&
+                  classifyLostRow(row, window).closedLostInPeriod,
               ).length,
               lostDateInPeriod: data.snapshot.lost.filter((row) => {
+                if (!countsAsPotentialLead(row.source)) return false;
                 const value = String(row.lostDate || "").slice(0, 10);
                 return (
                   Boolean(value) &&

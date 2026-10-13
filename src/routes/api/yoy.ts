@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/yoy")({
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
         const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
         const { historicalCrm } = await import("@/lib/yearly-crm-history.server");
+        const { countsAsPotentialLead } = await import("@/lib/lead-count-policy");
 
         const query = new URL(request.url).searchParams;
         const yearParam = Number(query.get("year"));
@@ -27,6 +28,11 @@ export const Route = createFileRoute("/api/yoy")({
         );
         const today = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
         const all = await loadAllData();
+        const eligible = {
+          ...all,
+          crm: all.crm.filter((row) => countsAsPotentialLead(row.source)),
+          lost: all.lost.filter((row) => countsAsPotentialLead(row.source)),
+        };
         const years = [...new Set([...all.years, 2024, 2025])].sort((a, b) => a - b);
         const latestYear = years.at(-1) ?? Number(todayParts.year);
         const year = years.includes(yearParam) ? yearParam : latestYear;
@@ -44,7 +50,7 @@ export const Route = createFileRoute("/api/yoy")({
         const history = await Promise.all(historicalYears.map(historicalCrm));
         const annual = buildAnnualComparison(
           {
-            ...all,
+            ...eligible,
             historicalCrm: history.flatMap((source) => source.rows),
             historicalReadyYears: history
               .filter((source) => source.status === "ready")
@@ -82,7 +88,7 @@ export const Route = createFileRoute("/api/yoy")({
                   .filter((source) => source.year === y)
                   .flatMap((source) => source.rows)
                   .reduce((total, row) => total + row.leads, 0)
-              : all.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
+              : eligible.crm.filter((c) => c.createdAt.startsWith(String(y))).length,
             accounting: all.accounting.filter(
               (row) =>
                 !isExcludedFromSalesRevenue(row) &&

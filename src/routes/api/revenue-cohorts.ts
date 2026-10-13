@@ -18,6 +18,7 @@ export const Route = createFileRoute("/api/revenue-cohorts")({
         const { loadAllData } = await import("@/lib/sheet-cache.server");
         const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
+        const { countsAsPotentialLead } = await import("@/lib/lead-count-policy");
         const { buildEntryMonthCohorts } = await import("@/lib/revenue-cohort");
         const { METRIC_CONTRACTS } = await import("@/lib/metric-contracts");
         const { acquisitionDatabaseConfigured, getPool, BUSINESS_TIME_ZONE } =
@@ -70,8 +71,12 @@ export const Route = createFileRoute("/api/revenue-cohorts")({
         }
 
         const leads = [
-          ...snapshot.crm.map((row) => ({ id: row.id, createdAt: row.createdAt, won: row.isWon })),
-          ...snapshot.lost.map((row) => ({ id: row.id, createdAt: row.createdAt, won: false })),
+          ...snapshot.crm
+            .filter((row) => countsAsPotentialLead(row.source))
+            .map((row) => ({ id: row.id, createdAt: row.createdAt, won: row.isWon })),
+          ...snapshot.lost
+            .filter((row) => countsAsPotentialLead(row.source))
+            .map((row) => ({ id: row.id, createdAt: row.createdAt, won: false })),
         ];
         const lines = snapshot.accounting
           .filter(

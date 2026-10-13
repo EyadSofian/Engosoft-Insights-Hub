@@ -30,6 +30,7 @@ import {
 } from "./crm-contract";
 import { canonicalCourseValue } from "./course-taxonomy";
 import { canonicalLossReason } from "./loss-reason-taxonomy";
+import { countsAsPotentialLead } from "./lead-count-policy";
 
 export type CrmRawRow = Record<string, string>;
 
@@ -159,6 +160,7 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     context: companyContext({ active_test: false }),
   });
   if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
+  if (!metadata.source_id) throw new Error("CRM lead source field is unavailable");
   const customFields = customFieldPlan(metadata);
   const courseField = customFields.courseCategories;
   const fields = [
@@ -171,6 +173,7 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     "stage_is_lost",
     "stage_is_won",
     "lost_reason_id",
+    "source_id",
     "lead_segment_id",
     "date_closed",
     "won_date",
@@ -187,7 +190,12 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
   const days = new Map<string, HistoricalCrmDay>();
   for (const lead of leads) {
     const createdAt = date(lead.create_date);
-    if (!createdAt.startsWith(`${year}-`) || !isCrmRecordType(normalize(lead.type))) continue;
+    if (
+      !createdAt.startsWith(`${year}-`) ||
+      !isCrmRecordType(normalize(lead.type)) ||
+      !countsAsPotentialLead(m2oName(lead.source_id))
+    )
+      continue;
     const course = canonicalCourseValue(custom(lead, courseField));
     const key = `${createdAt}\u001f${course}`;
     const day = days.get(key) ?? {

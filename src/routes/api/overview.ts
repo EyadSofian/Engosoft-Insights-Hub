@@ -26,9 +26,13 @@ export const Route = createFileRoute("/api/overview")({
         const { parseFilters, json } = await import("@/lib/api.server");
         const { getAdSpendCoverage } = await import("@/lib/ad-delivery-coverage.server");
         const { aggregateAdAccounts } = await import("@/lib/ad-account-aggregation");
+        const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
+        const { overviewLeadTargets } = await import("@/lib/overview-lead-targets.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const mediaPlan = await loadMediaPlanSource();
+        const leadTargets = overviewLeadTargets(data, filters, mediaPlan.plans, mediaPlan.error);
         const spendCoverage = await getAdSpendCoverage({
           from: filters.from ?? data.snapshot.adsDateMin,
           to: filters.to ?? data.snapshot.adsDateMax,
@@ -130,6 +134,8 @@ export const Route = createFileRoute("/api/overview")({
           summary: execSummary(totals, campaigns, deltas, filters, health),
           appliedFilters: filters,
           spendCoverage,
+          leadTargets,
+          excludedLeads: data.excludedLeads,
           prevSpendCoverage,
           coverage: {
             adsDateMin: data.snapshot.adsDateMin,

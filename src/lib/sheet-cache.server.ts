@@ -396,7 +396,6 @@ export function normalizeSource(s: string): string {
   const k = normalizeName(s);
   if (!k) return "";
   if (k === "e-mail") return "email";
-  if (k === "whatsapp") return "whatsapp broadcast";
   return k;
 }
 
@@ -434,6 +433,7 @@ const SOURCES_WITHOUT_SPEND = new Set([
   "tiktok",
   "uchat",
   "whatsapp broadcast",
+  "whatsapp",
   "chatwoot",
   "website",
   "recommended from customer",

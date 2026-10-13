@@ -16,6 +16,7 @@ import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
 import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
 import { isExcludedFromSalesRevenue } from "./sales-revenue-policy";
+import { countsAsPotentialLead, excludedLeadSource } from "./lead-count-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
@@ -317,6 +318,8 @@ export interface FilteredData {
   invoiced: InvoicedRow[];
   accounting: AccountingRow[];
   lost: LostRow[];
+  /** Source inventory is retained separately, not included in lead KPIs. */
+  excludedLeads: { recommendation: number; whatsappBroadcast: number };
   snapshot: Snapshot;
   applied: GlobalFilters;
   /** Ad accounts whose objective is not lead generation. */
@@ -476,7 +479,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
-  const crm = all.crm.filter((r) => {
+  const scopedCrm = all.crm.filter((r) => {
     if (!inRange(r.createdAt, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
@@ -540,7 +543,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
       return { ...row, usdPaid, usdSales: usdPaid };
     });
 
-  const lost = all.lost.filter((r) => {
+  const scopedLost = all.lost.filter((r) => {
     // Marketing analysis follows the lead cohort (creation date). The Lost page
     // can request the operational closure movement separately without mixing
     // old leads closed this month into this month's acquisition quality.
@@ -561,12 +564,23 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
+  const excludedLeads = { recommendation: 0, whatsappBroadcast: 0 };
+  const countedSource = (source: string): boolean => {
+    const exclusion = excludedLeadSource(source);
+    if (exclusion === "recommendation") excludedLeads.recommendation++;
+    if (exclusion === "whatsapp_broadcast") excludedLeads.whatsappBroadcast++;
+    return exclusion === null;
+  };
+  const crm = scopedCrm.filter((row) => countedSource(row.source));
+  const lost = scopedLost.filter((row) => countedSource(row.source));
+
   return {
     ads,
     crm,
     invoiced,
     accounting,
     lost,
+    excludedLeads,
     snapshot: all,
     applied: f,
     nonLeadAccounts: all.accounts.filter((a) => a.objective !== "leads").map((a) => a.name),
@@ -2407,6 +2421,8 @@ export function computeDeltas(now: Totals, prev: Totals): Deltas {
 
 export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const all = await loadAllData();
+  const eligibleCrm = all.crm.filter((row) => countsAsPotentialLead(row.source));
+  const eligibleLost = all.lost.filter((row) => countsAsPotentialLead(row.source));
   const latest =
     [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
   const year = currentYear ?? (latest ? +latest.slice(0, 4) : new Date().getUTCFullYear());
@@ -2430,13 +2446,14 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
       (row) => row.usdPaid,
     );
   const leadsOf = (y: number, m?: string) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length +
-    all.lost.filter((l) => {
+    eligibleCrm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m))
+      .length +
+    eligibleLost.filter((l) => {
       const d = archivedLostReportingDate(l, all);
       return inYear(d, y) && (!m || d.slice(5, 7) === m);
     }).length;
   const wonOf = (y: number, m?: string) =>
-    all.crm.filter(
+    eligibleCrm.filter(
       (c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m),
     ).length;
 
@@ -2446,7 +2463,7 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const MIN_PRIOR_ROWS = 100;
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
-    crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
+    crm: eligibleCrm.filter((c) => inYear(c.createdAt, prevYear)).length,
     accounting: all.accounting.filter(
       (row) =>
         !isExcludedFromSalesRevenue(row) &&
@@ -2505,13 +2522,13 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
       (row) => row.usdPaid,
     );
   const ytdLeads = (y: number) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
-    all.lost.filter((l) => {
+    eligibleCrm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
+    eligibleLost.filter((l) => {
       const d = archivedLostReportingDate(l, all);
       return inYear(d, y) && d.slice(5) <= ytdCut;
     }).length;
   const ytdWon = (y: number) =>
-    all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
+    eligibleCrm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
       .length;
 
   const eligibleRevenue = all.accounting.filter((row) => !isExcludedFromSalesRevenue(row));
