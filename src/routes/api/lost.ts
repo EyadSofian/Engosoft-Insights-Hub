@@ -323,11 +323,11 @@ export const Route = createFileRoute("/api/lost")({
             dateFieldAudit: {
               closeDateInPeriod: data.snapshot.lost.filter(
                 (row) =>
-                  countsAsPotentialLead(row.source) &&
+                  countsAsPotentialLead(row.source, row.leadSegment) &&
                   classifyLostRow(row, window).closedLostInPeriod,
               ).length,
               lostDateInPeriod: data.snapshot.lost.filter((row) => {
-                if (!countsAsPotentialLead(row.source)) return false;
+                if (!countsAsPotentialLead(row.source, row.leadSegment)) return false;
                 const value = String(row.lostDate || "").slice(0, 10);
                 return (
                   Boolean(value) &&

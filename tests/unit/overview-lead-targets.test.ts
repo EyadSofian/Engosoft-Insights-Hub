@@ -17,6 +17,9 @@ describe("potential lead policy and Overview plan goals", () => {
     expect(excludedLeadSource("Recommendation Sales")).toBe("recommendation");
     expect(excludedLeadSource("Recommended From Customer")).toBe("recommendation");
     expect(excludedLeadSource("WhatsApp Broadcast")).toBe("whatsapp_broadcast");
+    expect(excludedLeadSource("Facebook", "WhatsApp Broadcast")).toBe("whatsapp_broadcast");
+    expect(countsAsPotentialLead("Facebook", "WhatsApp Broadcast")).toBe(false);
+    expect(countsAsPotentialLead("Facebook", "Normal Lead")).toBe(true);
     expect(countsAsPotentialLead("WhatsApp")).toBe(true);
     expect(countsAsPotentialLead("Website")).toBe(true);
   });
@@ -29,6 +32,7 @@ describe("potential lead policy and Overview plan goals", () => {
         row("3", "PMP", "WhatsApp"),
         row("4", "PMP", "WhatsApp Broadcast"),
         row("5", "CFM", "Recommendation"),
+        { ...row("7", "BIM", "Facebook"), leadSegment: "WhatsApp Broadcast" },
       ],
       lost: [row("6", "PMP", "Facebook")],
     } as unknown as FilteredData;

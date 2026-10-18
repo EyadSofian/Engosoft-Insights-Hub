@@ -3,6 +3,7 @@ import { countsAsPotentialLead } from "./lead-count-policy";
 
 export interface SourceMatrixRecord {
   source: string;
+  leadSegment?: string;
   course: string;
 }
 
@@ -82,7 +83,7 @@ export function buildLeadSourceMatrix(records: SourceMatrixRecord[]): SourceMatr
   const courseTotals: Record<string, number> = {};
   let eligibleTotal = 0;
   for (const record of records) {
-    if (countsAsPotentialLead(record.source)) eligibleTotal++;
+    if (countsAsPotentialLead(record.source, record.leadSegment)) eligibleTotal++;
     const source = matrixSource(record.source);
     const course = record.course || "غير محدد";
     const row = bySource.get(source) ?? {

@@ -1367,7 +1367,9 @@ function mergeOperationalClosures(
     return true;
   };
 
-  for (const lead of data.snapshot.crm.filter((row) => countsAsPotentialLead(row.source))) {
+  for (const lead of data.snapshot.crm.filter((row) =>
+    countsAsPotentialLead(row.source, row.leadSegment),
+  )) {
     if (!lead.isWon || !dateIncluded(lead.closedAt, filters) || !commonMatch(lead)) continue;
     if (
       filters.salesTeam &&
@@ -1388,7 +1390,9 @@ function mergeOperationalClosures(
   // Closed Lost in the window, split by the canonical classification into
   // created-and-lost, older-cohort and undated-cohort closures.
   const window = { from: filters.from, to: filters.to };
-  for (const lead of data.snapshot.lost.filter((row) => countsAsPotentialLead(row.source))) {
+  for (const lead of data.snapshot.lost.filter((row) =>
+    countsAsPotentialLead(row.source, row.leadSegment),
+  )) {
     if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
     if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
     const key = normalizePersonName(lead.salesperson);

@@ -27,6 +27,7 @@ export interface CourseLeadRecord {
   salesperson: string;
   salesTeam: string;
   source: string;
+  leadSegment: string;
   company: string;
   phone: string;
   email: string;
@@ -154,6 +155,7 @@ function toRecord(row: CrmRawRow): CourseLeadRecord {
     salesperson: row.Salesperson || "",
     salesTeam: row["Sales Team"] || "",
     source: row.Source || "",
+    leadSegment: row["Lead Segment"] || "",
     company: row.Company || "",
     phone: row.Phone || row.Mobile || "",
     email: row.Email || "",
@@ -231,13 +233,14 @@ export async function leadCourseDistribution(
     odooStages().catch(() => []),
   ]);
   const excludedSources = {
-    recommendation: sourceRows.filter((row) => excludedLeadSource(row.source) === "recommendation")
-      .length,
+    recommendation: sourceRows.filter(
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "recommendation",
+    ).length,
     whatsappBroadcast: sourceRows.filter(
-      (row) => excludedLeadSource(row.source) === "whatsapp_broadcast",
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "whatsapp_broadcast",
     ).length,
   };
-  const rows = sourceRows.filter((row) => countsAsPotentialLead(row.source));
+  const rows = sourceRows.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
   const stages = sortOpportunityStages(
     [...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage))],
     stageDefinitions,

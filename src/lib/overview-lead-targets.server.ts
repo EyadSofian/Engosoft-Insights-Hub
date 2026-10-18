@@ -74,7 +74,7 @@ export function overviewLeadTargets(
   let courseActual = 0;
   let websiteActual = 0;
   for (const row of records.values()) {
-    if (!countsAsPotentialLead(row.source)) continue;
+    if (!countsAsPotentialLead(row.source, row.leadSegment)) continue;
     const website = row.sourceKey === "website";
     if (website) websiteActual++;
     if (matchMediaPlanCourse(plan.courses, row.course)) courseActual++;

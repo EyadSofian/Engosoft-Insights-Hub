@@ -72,10 +72,10 @@ export const Route = createFileRoute("/api/revenue-cohorts")({
 
         const leads = [
           ...snapshot.crm
-            .filter((row) => countsAsPotentialLead(row.source))
+            .filter((row) => countsAsPotentialLead(row.source, row.leadSegment))
             .map((row) => ({ id: row.id, createdAt: row.createdAt, won: row.isWon })),
           ...snapshot.lost
-            .filter((row) => countsAsPotentialLead(row.source))
+            .filter((row) => countsAsPotentialLead(row.source, row.leadSegment))
             .map((row) => ({ id: row.id, createdAt: row.createdAt, won: false })),
         ];
         const lines = snapshot.accounting

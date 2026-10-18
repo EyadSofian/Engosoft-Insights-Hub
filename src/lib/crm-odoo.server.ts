@@ -193,7 +193,7 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     if (
       !createdAt.startsWith(`${year}-`) ||
       !isCrmRecordType(normalize(lead.type)) ||
-      !countsAsPotentialLead(m2oName(lead.source_id))
+      !countsAsPotentialLead(m2oName(lead.source_id), m2oName(lead.lead_segment_id as M2O))
     )
       continue;
     const course = canonicalCourseValue(custom(lead, courseField));

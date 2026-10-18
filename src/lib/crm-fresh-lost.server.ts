@@ -96,7 +96,7 @@ async function readFreshLostPipeline(
             row["Record Active"] !== "false" ||
             !row["سبب الضياع"]) ||
         !matchesLostMovementDimensions(row, filters, snapshot) ||
-        !countsAsPotentialLead(row.Source || "")
+        !countsAsPotentialLead(row.Source || "", row["Lead Segment"] || "")
       )
         continue;
       const createdUtc = row.__odoo_create_date_utc || "";

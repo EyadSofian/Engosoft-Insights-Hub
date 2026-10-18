@@ -35,7 +35,7 @@ export function linkedMediaPlanLeads(
   rows: CourseLeadRecord[],
 ): CourseLeadRecord[] {
   const match = mediaPlanLeadMatch(plan, key);
-  const eligible = rows.filter((row) => countsAsPotentialLead(row.source));
+  const eligible = rows.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
   if (match === "course_category")
     return eligible.filter(
       (row) => row.verified && matchMediaPlanCourse(plan.courses, row.course)?.key === key,

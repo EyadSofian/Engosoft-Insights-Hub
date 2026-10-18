@@ -565,14 +565,14 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   });
 
   const excludedLeads = { recommendation: 0, whatsappBroadcast: 0 };
-  const countedSource = (source: string): boolean => {
-    const exclusion = excludedLeadSource(source);
+  const countedSource = (source: string, leadSegment: string): boolean => {
+    const exclusion = excludedLeadSource(source, leadSegment);
     if (exclusion === "recommendation") excludedLeads.recommendation++;
     if (exclusion === "whatsapp_broadcast") excludedLeads.whatsappBroadcast++;
     return exclusion === null;
   };
-  const crm = scopedCrm.filter((row) => countedSource(row.source));
-  const lost = scopedLost.filter((row) => countedSource(row.source));
+  const crm = scopedCrm.filter((row) => countedSource(row.source, row.leadSegment));
+  const lost = scopedLost.filter((row) => countedSource(row.source, row.leadSegment));
 
   return {
     ads,
@@ -2421,8 +2421,8 @@ export function computeDeltas(now: Totals, prev: Totals): Deltas {
 
 export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const all = await loadAllData();
-  const eligibleCrm = all.crm.filter((row) => countsAsPotentialLead(row.source));
-  const eligibleLost = all.lost.filter((row) => countsAsPotentialLead(row.source));
+  const eligibleCrm = all.crm.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
+  const eligibleLost = all.lost.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
   const latest =
     [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
   const year = currentYear ?? (latest ? +latest.slice(0, 4) : new Date().getUTCFullYear());

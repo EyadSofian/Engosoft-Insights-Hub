@@ -30,8 +30,8 @@ export const Route = createFileRoute("/api/yoy")({
         const all = await loadAllData();
         const eligible = {
           ...all,
-          crm: all.crm.filter((row) => countsAsPotentialLead(row.source)),
-          lost: all.lost.filter((row) => countsAsPotentialLead(row.source)),
+          crm: all.crm.filter((row) => countsAsPotentialLead(row.source, row.leadSegment)),
+          lost: all.lost.filter((row) => countsAsPotentialLead(row.source, row.leadSegment)),
         };
         const years = [...new Set([...all.years, 2024, 2025])].sort((a, b) => a - b);
         const latestYear = years.at(-1) ?? Number(todayParts.year);

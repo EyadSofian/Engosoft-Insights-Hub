@@ -13,12 +13,13 @@ describe("lead source by course matrix", () => {
       { source: "Recommendation", course: "CFM" },
       { source: "Recommendation", course: "PMP" },
       { source: "Website", course: "CFM" },
+      { source: "Facebook", leadSegment: "WhatsApp Broadcast", course: "BIM" },
       { source: "", course: "" },
     ]);
-    expect(matrix.total).toBe(6);
+    expect(matrix.total).toBe(7);
     expect(matrix.eligibleTotal).toBe(4);
-    expect(matrix.excludedTotal).toBe(2);
-    expect(matrix.withoutSnapchat).toBe(4);
+    expect(matrix.excludedTotal).toBe(3);
+    expect(matrix.withoutSnapchat).toBe(5);
     expect(matrix.unspecifiedSource).toBe(1);
     expect(matrix.rows.reduce((sum, row) => sum + row.count, 0)).toBe(matrix.total);
     expect(Object.values(matrix.courseTotals).reduce((sum, count) => sum + count, 0)).toBe(

@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/lead-course-export")({
           );
           const visibleLabels = new Set(groups.map((group) => group.label));
           const visibleRecords = records.filter(
-            (row) => countsAsPotentialLead(row.source) && visibleLabels.has(row[dimension]),
+            (row) =>
+              countsAsPotentialLead(row.source, row.leadSegment) &&
+              visibleLabels.has(row[dimension]),
           );
           const workbook = new ExcelJS.Workbook();
           workbook.creator = "Engosoft Insights Hub";
