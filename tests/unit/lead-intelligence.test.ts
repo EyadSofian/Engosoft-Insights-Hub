@@ -134,6 +134,51 @@ describe("course lead intelligence", () => {
     expect(result.daily[0].target).toBeCloseTo(100 / 31);
   });
 
+  it("breaks each course into Odoo sources and then campaigns without changing the card total", () => {
+    const withSources = {
+      ...data,
+      crm: [
+        {
+          ...data.crm[0],
+          source: "Facebook",
+          campaignName: "CFM launch",
+          campaignKey: "id:launch",
+        },
+        {
+          ...data.crm[1],
+          source: "facebook",
+          campaignName: "CFM launch",
+          campaignKey: "id:launch",
+        },
+        { ...data.crm[1], id: "4", source: "Instagram", campaignName: "", campaignKey: "" },
+      ],
+      lost: [
+        {
+          ...data.lost[0],
+          source: "Facebook",
+          campaignName: "CFM retarget",
+          campaignKey: "id:retarget",
+        },
+      ],
+    } as unknown as FilteredData;
+    const result = buildLeadIntelligence(withSources, { "2026-10": plan });
+    const course = result.courses[0];
+    expect(course.leads).toBe(4);
+    expect(course.sources.map(({ source, leads }) => [source, leads])).toEqual([
+      ["Facebook", 3],
+      ["Instagram", 1],
+    ]);
+    expect(course.sources.reduce((sum, source) => sum + source.leads, 0)).toBe(course.leads);
+    expect(course.sources[0].share).toBe(0.75);
+    expect(
+      course.sources[0].campaigns.map(({ name, leads, won, lost }) => [name, leads, won, lost]),
+    ).toEqual([
+      ["CFM launch", 2, 1, 0],
+      ["CFM retarget", 1, 0, 1],
+    ]);
+    expect(course.sources[1].campaigns[0].name).toBe("");
+  });
+
   it("uses only campaign-linked collections for ad ROAS", () => {
     const withAds = {
       ...data,

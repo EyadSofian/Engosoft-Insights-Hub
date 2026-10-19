@@ -1,6 +1,7 @@
 import { matchMediaPlanCourse, type MonthlyMediaPlan } from "./media-plan";
 import { attributedAdCourse, authoritativeLostLeads, type FilteredData } from "./metrics.server";
 import { normalizeName } from "./sheet-cache.server";
+import { matrixSource } from "./lead-source-matrix";
 
 const ratio = (a: number, b: number): number | null => (b > 0 ? a / b : null);
 const key = (value: string): string => normalizeName(value || "");
@@ -19,6 +20,7 @@ type Lead = {
   owner: string;
   campaign: string;
   campaignKey: string;
+  source: string;
   createdAt: string;
   closedAt: string;
   closeDays: number | null;
@@ -59,6 +61,21 @@ export interface LeadIntelligenceResponse {
     revenue: number;
     roas: number | null;
     achievement: number | null;
+    sources: Array<{
+      source: string;
+      leads: number;
+      share: number;
+      won: number;
+      lost: number;
+      open: number;
+      campaigns: Array<{
+        name: string;
+        leads: number;
+        won: number;
+        lost: number;
+        open: number;
+      }>;
+    }>;
   }>;
   daily: Array<{ day: string; leads: number; target: number | null }>;
   campaigns: Array<{
@@ -174,6 +191,7 @@ export function buildLeadIntelligence(
       owner: row.salesperson,
       campaign: row.campaignName,
       campaignKey: row.campaignKey,
+      source: matrixSource(row.source || ""),
       createdAt: row.createdAt,
       closedAt: row.isWon ? row.closedAt || row.wonDate : "",
       closeDays: row.isWon ? row.daysToClose : null,
@@ -188,6 +206,7 @@ export function buildLeadIntelligence(
       owner: row.salesperson,
       campaign: row.campaignName,
       campaignKey: row.campaignKey,
+      source: matrixSource(row.source || ""),
       createdAt: row.createdAt,
       closedAt: row.closeDate || row.lostDate,
       closeDays: daysBetween(row.createdAt, row.closeDate || row.lostDate),
@@ -293,6 +312,57 @@ export function buildLeadIntelligence(
   }
 
   const courseNames = focusCourse ? [focusCourse] : courses;
+  const sourcesForCourse = (cohort: Lead[]) => {
+    const groups = new Map<
+      string,
+      {
+        source: string;
+        leads: number;
+        won: number;
+        lost: number;
+        open: number;
+        campaigns: Map<
+          string,
+          { name: string; leads: number; won: number; lost: number; open: number }
+        >;
+      }
+    >();
+    for (const lead of cohort) {
+      const source = lead.source;
+      const group = groups.get(source) ?? {
+        source,
+        leads: 0,
+        won: 0,
+        lost: 0,
+        open: 0,
+        campaigns: new Map(),
+      };
+      group.leads++;
+      group[lead.status]++;
+      const campaignId =
+        lead.campaignKey || (lead.campaign ? `name:${key(lead.campaign)}` : "unattributed");
+      const campaign = group.campaigns.get(campaignId) ?? {
+        name: lead.campaign || "",
+        leads: 0,
+        won: 0,
+        lost: 0,
+        open: 0,
+      };
+      campaign.leads++;
+      campaign[lead.status]++;
+      group.campaigns.set(campaignId, campaign);
+      groups.set(source, group);
+    }
+    return [...groups.values()]
+      .map(({ campaigns, ...group }) => ({
+        ...group,
+        share: cohort.length ? group.leads / cohort.length : 0,
+        campaigns: [...campaigns.values()].sort(
+          (a, b) => b.leads - a.leads || a.name.localeCompare(b.name),
+        ),
+      }))
+      .sort((a, b) => b.leads - a.leads || a.source.localeCompare(b.source));
+  };
   const courseRows = courseNames
     .map((course) => {
       const cohort = leads.filter((row) => key(row.course) === key(course));
@@ -326,6 +396,7 @@ export function buildLeadIntelligence(
         revenue: courseRevenue,
         roas: courseSpend === null ? null : ratio(courseAttributedRevenue, courseSpend),
         achievement: focusOwner ? null : ratio(cohort.length, target.expected ?? 0),
+        sources: sourcesForCourse(cohort),
       };
     })
     .filter((row) => row.leads || row.spend || row.revenue || row.target !== null)

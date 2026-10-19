@@ -79,6 +79,128 @@ function Expand({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
+function CourseSourceDetails({
+  course,
+  leads,
+  sources,
+  arabic,
+}: {
+  course: string;
+  leads: number;
+  sources: LeadIntelligenceResponse["courses"][number]["sources"];
+  arabic: boolean;
+}) {
+  return (
+    <details className="group mt-4 rounded-xl border border-border bg-surface-2/50 open:bg-surface">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-sky-strong marker:hidden">
+        <span>
+          {arabic ? `مصادر ليدز ${course} والحملات` : `${course} lead sources and campaigns`}
+        </span>
+        <ChevronDown size={16} className="shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t border-border p-3">
+        <p className="text-[11px] leading-relaxed text-text-muted">
+          {arabic
+            ? `توزيع ${fmtNum(leads)} ليد من نفس عدد الكارت حسب المصدر المسجل في Odoo؛ الضغط على المصدر يعرض حملاته وحالة الليدز.`
+            : `Breakdown of the same ${fmtNum(leads)} Odoo leads shown on this card. Open a source for campaigns and lead outcomes.`}
+        </p>
+        {sources.length === 0 ? (
+          <p className="text-xs text-text-muted">
+            {arabic
+              ? "لا توجد ليدز لهذا الكورس في الفترة."
+              : "No leads for this course in the period."}
+          </p>
+        ) : (
+          sources.map((source) => {
+            const bestCampaign = [...source.campaigns]
+              .filter((campaign) => campaign.won > 0)
+              .sort(
+                (a, b) =>
+                  b.won - a.won ||
+                  b.won / b.leads - a.won / a.leads ||
+                  b.leads - a.leads ||
+                  a.name.localeCompare(b.name),
+              )[0];
+            return (
+              <details
+                key={source.source}
+                className="group/source overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
+              >
+                <summary className="cursor-pointer list-none p-3 marker:hidden hover:bg-sky-surface/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-text">
+                      <ChevronDown
+                        size={14}
+                        className="shrink-0 text-sky-strong transition-transform group-open/source:rotate-180"
+                      />
+                      <span className="truncate" title={source.source}>
+                        {arabic && source.source === "Unspecified source"
+                          ? "مصدر غير محدد"
+                          : source.source}
+                      </span>
+                    </span>
+                    <span className="num shrink-0 text-xs font-black text-text">
+                      {fmtNum(source.leads)}{" "}
+                      <span className="text-sky-strong">· {pct(source.share)}</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                    <div
+                      className="h-full rounded-full bg-sky-strong"
+                      style={{ width: `${source.share * 100}%` }}
+                    />
+                  </div>
+                  <p className="num mt-2 text-[10px] text-text-muted">
+                    {arabic ? "نشط" : "Open"} {fmtNum(source.open)} · Won {fmtNum(source.won)} ·
+                    Lost {fmtNum(source.lost)}
+                  </p>
+                </summary>
+                <div className="space-y-2 border-t border-border bg-surface-2/40 p-3">
+                  <p className="text-[11px] font-semibold text-text-muted">
+                    {arabic ? "حملات المصدر" : "Source campaigns"} ·{" "}
+                    {fmtNum(source.campaigns.length)}
+                  </p>
+                  {source.campaigns.map((campaign, index) => (
+                    <div
+                      key={`${campaign.name}-${index}`}
+                      className="rounded-lg border border-border bg-surface px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className="min-w-0 break-words text-xs font-bold text-text"
+                          title={campaign.name || undefined}
+                        >
+                          {campaign.name ||
+                            (arabic ? "حملة غير محددة في Odoo" : "Campaign not recorded in Odoo")}
+                        </span>
+                        {campaign === bestCampaign && (
+                          <span className="rounded-full bg-mint-surface px-2 py-0.5 text-[10px] font-bold text-mint-strong">
+                            {arabic ? "الأعلى في Won" : "Most Won"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="num mt-1.5 text-[11px] text-text-muted">
+                        {fmtNum(campaign.leads)} {arabic ? "ليد" : "leads"} ·{" "}
+                        {arabic ? "نشط" : "Open"} {fmtNum(campaign.open)} · Won{" "}
+                        {fmtNum(campaign.won)} · Lost {fmtNum(campaign.lost)}
+                      </p>
+                    </div>
+                  ))}
+                  <p className="text-[10px] leading-relaxed text-text-muted">
+                    {arabic
+                      ? "الحملات مجمّعة من حقل الحملة في Odoo؛ «الأعلى في Won» حسب عدد العملاء المحوّلين، وليس ROAS."
+                      : "Campaigns use the Odoo campaign field. Most Won ranks conversions by count, not ROAS."}
+                  </p>
+                </div>
+              </details>
+            );
+          })
+        )}
+      </div>
+    </details>
+  );
+}
+
 export function LeadIntelligence() {
   const { lang } = useI18n();
   const A = lang === "ar";
@@ -309,6 +431,12 @@ export function LeadIntelligence() {
                     {A ? "ليد" : "leads"}
                   </span>
                 </div>
+                <CourseSourceDetails
+                  course={row.course}
+                  leads={row.leads}
+                  sources={row.sources}
+                  arabic={A}
+                />
               </div>
             );
           })}
@@ -323,12 +451,17 @@ export function LeadIntelligence() {
           >
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {otherCourses.map((row) => (
-                <div
-                  key={row.course}
-                  className="flex justify-between rounded-xl bg-surface px-3 py-2 text-sm"
-                >
-                  <span>{row.course}</span>
-                  <b className="num">{fmtNum(row.leads)}</b>
+                <div key={row.course} className="rounded-xl bg-surface px-3 py-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span>{row.course}</span>
+                    <b className="num">{fmtNum(row.leads)}</b>
+                  </div>
+                  <CourseSourceDetails
+                    course={row.course}
+                    leads={row.leads}
+                    sources={row.sources}
+                    arabic={A}
+                  />
                 </div>
               ))}
             </div>
