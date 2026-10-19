@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/leads")({
         ]);
         const odooBaseUrl = odooConfig().url;
         const { summarizeStageSla } = await import("@/lib/crm-stage-sla");
+        const { crmSourceDistribution } = await import("@/lib/crm-source-distribution");
 
         // The workspace and the Lost analysis must agree on a single live
         // Odoo population. A snapshot fallback made their totals drift.
@@ -232,6 +233,7 @@ export const Route = createFileRoute("/api/leads")({
             unsourced: workspaceRows.filter((row) => !row.source).length,
           },
           stages,
+          sourceDistribution: crmSourceDistribution(workspaceRows),
           facets: facets(workspaceRows),
           stageFacets: Object.fromEntries(stageKeys.map((key) => [key, facets(inStage(key))])),
           statusFacets: {

@@ -47,6 +47,8 @@ import type { FreshLostPipelineRecord, FreshLostPipelineResult } from "@/lib/crm
 import { SLA_POLICY, SLA_STAGES, type SlaStage, type SlaSummary } from "@/lib/crm-stage-sla";
 import { LeadIntelligence } from "@/components/leads/LeadIntelligence";
 import { WeeklyLeadsReport } from "@/components/leads/WeeklyLeadsReport";
+import { CrmSourceDistribution } from "@/components/leads/CrmSourceDistribution";
+import type { SourceDistributionRow } from "@/lib/crm-source-distribution";
 
 export const Route = createFileRoute("/leads")({
   validateSearch: (search: Record<string, unknown>): { view?: "crm" | "intelligence" | "weekly" } =>
@@ -215,6 +217,7 @@ interface Resp {
     opportunities: number;
     active: number;
   }[];
+  sourceDistribution: SourceDistributionRow[];
   facets: Facets;
   stageFacets: Partial<Record<CrmStageKey, Facets>>;
   statusFacets: Record<WorkspaceView | "activeLeads" | "ready" | "open", Facets>;
@@ -829,6 +832,15 @@ function CrmWorkspace() {
               card={{ index: 3, sub: A ? "من Won stage" : "From the Won stage" }}
             />
           </KpiRow>
+        </PageSection>
+
+        <PageSection
+          level="primary"
+          title={A ? "توزيع الليدز حسب المصدر" : "Lead distribution by source"}
+          hint={A ? "للفترة المختارة: كم جاء من كل مصدر، وكم Won وLost، ونسبة الفقد من إجمالي المصدر." : "For the selected period: source volume, Won, Lost and loss rate within each source."}
+          icon={<CircleDot size={17} />}
+        >
+          <CrmSourceDistribution rows={data.sourceDistribution} total={summary.total} />
         </PageSection>
 
         <PageSection
