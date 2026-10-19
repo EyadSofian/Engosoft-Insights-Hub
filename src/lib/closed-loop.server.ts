@@ -1420,6 +1420,7 @@ async function loadScopeTotals(
   };
   return {
     spend: scopeSpend(scope, platforms),
+    platformLeads: totals.platformLeads,
     uniqueCrmLeads: uniqueIds([...scoped.crm, ...scoped.lost]),
     uniqueWonCustomers: uniqueIds(scoped.crm.filter((row) => row.isWon)),
     collectedRevenue: Math.round(totals.revenue * 100) / 100,

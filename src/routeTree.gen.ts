@@ -85,6 +85,7 @@ import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
+import { Route as ApiWeeklyLeadFollowupRouteImport } from './routes/api/weekly-lead-followup'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
 import { Route as ApiAcquisitionClosedLoopRouteImport } from './routes/api/acquisition.closed-loop'
 import { Route as ApiAcquisitionClosedLoopRefreshRouteImport } from './routes/api/acquisition.closed-loop-refresh'
@@ -519,6 +520,11 @@ const ApiWeekendRoute = ApiWeekendRouteImport.update({
   path: '/api/weekend',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWeeklyLeadFollowupRoute = ApiWeeklyLeadFollowupRouteImport.update({
+  id: '/api/weekly-lead-followup',
+  path: '/api/weekly-lead-followup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiYoyRoute = ApiYoyRouteImport.update({
   id: '/api/yoy',
   path: '/api/yoy',
@@ -858,6 +864,7 @@ export interface FileRoutesByFullPath {
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
@@ -985,6 +992,7 @@ export interface FileRoutesByTo {
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
@@ -1113,6 +1121,7 @@ export interface FileRoutesById {
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
   '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
   '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
@@ -1242,6 +1251,7 @@ export interface FileRouteTypes {
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
     | '/api/acquisition/closed-loop'
     | '/api/acquisition/closed-loop-refresh'
@@ -1369,6 +1379,7 @@ export interface FileRouteTypes {
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
     | '/api/acquisition/closed-loop'
     | '/api/acquisition/closed-loop-refresh'
@@ -1496,6 +1507,7 @@ export interface FileRouteTypes {
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
     | '/api/acquisition/closed-loop'
     | '/api/acquisition/closed-loop-refresh'
@@ -1624,6 +1636,7 @@ export interface RootRouteChildren {
   ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
+  ApiWeeklyLeadFollowupRoute: typeof ApiWeeklyLeadFollowupRoute
   ApiYoyRoute: typeof ApiYoyRoute
   ApiAcquisitionClosedLoopRoute: typeof ApiAcquisitionClosedLoopRoute
   ApiAcquisitionClosedLoopRefreshRoute: typeof ApiAcquisitionClosedLoopRefreshRoute
@@ -2209,6 +2222,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWeekendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/weekly-lead-followup': {
+      id: '/api/weekly-lead-followup'
+      path: '/api/weekly-lead-followup'
+      fullPath: '/api/weekly-lead-followup'
+      preLoaderRoute: typeof ApiWeeklyLeadFollowupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/yoy': {
       id: '/api/yoy'
       path: '/api/yoy'
@@ -2632,6 +2652,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
+  ApiWeeklyLeadFollowupRoute: ApiWeeklyLeadFollowupRoute,
   ApiYoyRoute: ApiYoyRoute,
   ApiAcquisitionClosedLoopRoute: ApiAcquisitionClosedLoopRoute,
   ApiAcquisitionClosedLoopRefreshRoute: ApiAcquisitionClosedLoopRefreshRoute,

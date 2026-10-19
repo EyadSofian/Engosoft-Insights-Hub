@@ -4,8 +4,10 @@
  * Campaign names carry the buyer's token, for example `cfm-13/9/36-sayed-land`
  * or `Automotive - Riyadh - 4/7/26 - CBO - sh`: `SAYED` is Sayed and `SH` is
  * Shazly. A name carrying both tokens is ambiguous and belongs to neither. This
- * is the rule the Media Buyers dashboard uses. Attribution applies it only to a
- * campaign that exact provider evidence already identified, never to a guess.
+ * is the default rule the Media Buyers dashboard uses. Engosoft explicitly
+ * assigned Automotive, BIM and CMRP to Shazly regardless of an old SAYED tag.
+ * Attribution applies only to a campaign already identified by provider
+ * evidence, never to a guessed campaign.
  */
 
 export type MediaBuyerId = "sayed" | "shazly";
@@ -22,6 +24,13 @@ export function mediaBuyerOf(name: string): MediaBuyerId | "ambiguous" | null {
   if (sayed) return "sayed";
   if (shazly) return "shazly";
   return null;
+}
+
+/** Explicit course ownership wins over legacy buyer tokens in campaign names. */
+export function mediaBuyerForCampaign(course: string, campaignName: string): MediaBuyerId | "ambiguous" | null {
+  const normalizedCourse = course.trim().toLocaleLowerCase("en");
+  if (["auto", "automotive", "bim", "cmrp"].includes(normalizedCourse)) return "shazly";
+  return mediaBuyerOf(campaignName);
 }
 
 /** The buyer's display name for an exact campaign name, or "" when none or ambiguous. */

@@ -212,6 +212,7 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
     .filter(Boolean)
     .join(" · ");
   const exact = data?.exactAttributionAvailable !== false;
+  const reportedPlatformLeads = data?.scopeTotals?.platformLeads;
   return (
     <>
       <PageSection
@@ -240,8 +241,8 @@ export function OverviewKpis({ data, loading }: { data?: ClosedLoopResponse; loa
             loading={loading}
             sub={
               A
-                ? `${shown("leads")} حدث استحواذ · ${shown("costPerCrmLead")} لكل ليد`
-                : `${shown("leads")} acquisition events · ${shown("costPerCrmLead")} per lead`
+                ? `${reportedPlatformLeads === null || reportedPlatformLeads === undefined ? "—" : fmtNum(reportedPlatformLeads)} ليدز أبلغت بها المنصة · ${shown("leads")} أحداث تتبّع وليست ليدز إضافية`
+                : `${reportedPlatformLeads === null || reportedPlatformLeads === undefined ? "—" : fmtNum(reportedPlatformLeads)} platform-reported leads · ${shown("leads")} tracking events, not extra leads`
             }
           />
           <KpiFigure

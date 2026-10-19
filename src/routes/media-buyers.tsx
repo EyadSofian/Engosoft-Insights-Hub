@@ -1025,8 +1025,8 @@ function MediaBuyers() {
                 : undefined,
             technical:
               lang === "ar"
-                ? `SAYED = سيد، وSH ككلمة مستقلة = شاذلي. أسماء ملتبسة: ${fmtNum(data.coverage.ambiguousCampaigns)} · إنفاق ملتبس: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`
-                : `SAYED maps to Sayed and standalone SH maps to Shazly. Ambiguous names: ${fmtNum(data.coverage.ambiguousCampaigns)} · ambiguous spend: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`,
+                ? `Auto/Automotive وBIM وCMRP للشاذلي حتى لو اسم الحملة فيه SAYED. باقي الحملات: SAYED = سيد، وSH ككلمة مستقلة = شاذلي. أسماء ملتبسة: ${fmtNum(data.coverage.ambiguousCampaigns)} · إنفاق ملتبس: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`
+                : `Auto/Automotive, BIM and CMRP belong to Shazly even when a campaign says SAYED. Otherwise SAYED maps to Sayed and standalone SH to Shazly. Ambiguous names: ${fmtNum(data.coverage.ambiguousCampaigns)} · ambiguous spend: ${fmtUSDFull(data.coverage.ambiguousSpend)}.`,
           },
         ]}
       />

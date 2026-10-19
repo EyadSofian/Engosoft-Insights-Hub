@@ -116,6 +116,7 @@ export interface ClosedLoopResponse {
   exactAttributionAvailable?: boolean;
   scopeTotals?: {
     spend: ScopeSpend;
+    platformLeads: number | null;
     uniqueCrmLeads: number | null;
     uniqueWonCustomers: number | null;
     collectedRevenue: number | null;

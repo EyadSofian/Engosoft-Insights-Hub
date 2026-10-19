@@ -46,10 +46,11 @@ import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-c
 import type { FreshLostPipelineRecord, FreshLostPipelineResult } from "@/lib/crm-fresh-lost.server";
 import { SLA_POLICY, SLA_STAGES, type SlaStage, type SlaSummary } from "@/lib/crm-stage-sla";
 import { LeadIntelligence } from "@/components/leads/LeadIntelligence";
+import { WeeklyLeadsReport } from "@/components/leads/WeeklyLeadsReport";
 
 export const Route = createFileRoute("/leads")({
-  validateSearch: (search: Record<string, unknown>): { view?: "crm" | "intelligence" } =>
-    search.view === "intelligence" ? { view: "intelligence" } : {},
+  validateSearch: (search: Record<string, unknown>): { view?: "crm" | "intelligence" | "weekly" } =>
+    search.view === "intelligence" || search.view === "weekly" ? { view: search.view } : {},
   component: LeadsPage,
 });
 
@@ -79,9 +80,19 @@ function LeadsPage() {
         >
           {lang === "ar" ? "تحليل الليدز حسب الكورس" : "Course lead intelligence"}
         </Link>
+        <Link
+          to="/leads"
+          search={{ view: "weekly" }}
+          aria-current={workspace === "weekly" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "weekly" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "متابعة ليدز الأسبوع" : "Weekly lead follow-up"}
+        </Link>
       </nav>
       {workspace === "crm" ? (
         <CrmWorkspace />
+      ) : workspace === "weekly" ? (
+        <WeeklyLeadsReport />
       ) : (
         <>
           <DashboardPageHeader

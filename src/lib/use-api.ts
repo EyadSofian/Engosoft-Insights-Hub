@@ -56,6 +56,9 @@ export function useApi<T>(
       return res.json();
     },
     staleTime: 30_000,
+    // Revisit a tab with a fresh network read even during the 30-second
+    // freshness window. The server still controls upstream sync and throttling.
+    refetchOnMount: "always",
     refetchInterval: options.refetchInterval,
   });
 }

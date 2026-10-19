@@ -16,6 +16,7 @@ import {
 } from "@/components/acquisition/ClosedLoop";
 import { CreativeGallery } from "@/components/acquisition/CreativeGallery";
 import { AdSetComparison } from "@/components/acquisition/AdSetComparison";
+import { SnapchatLiveStatus } from "@/components/acquisition/SnapchatLiveStatus";
 import { MessagingReadinessPanel } from "@/components/acquisition/MessagingReadiness";
 import { TelegramPanel } from "@/components/TelegramPanel";
 import {
@@ -299,6 +300,7 @@ function Acquisition() {
       {section === "overview" ? (
         <>
           <OverviewKpis data={data} loading={loading} />
+          <SnapchatLiveStatus />
           <SimpleFunnel data={data} loading={loading} />
           <BestPerformers data={data} loading={loading} onOpenCreative={setCreativeId} />
           <MoreDetails

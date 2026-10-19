@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -106,6 +106,8 @@ export function useFiltersData() {
       return res.json();
     },
     staleTime: 5 * 60_000,
+    refetchOnWindowFocus: "always",
+    refetchInterval: 60_000,
   });
 }
 
@@ -230,6 +232,8 @@ export function TopBar({ title }: { title?: string }) {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const qc = useQueryClient();
+  const routeHref = useLocation({ select: (location) => location.href });
+  const previousRoute = useRef(routeHref);
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   // The bar hides on the way down and returns on the way up (see
@@ -249,6 +253,14 @@ export function TopBar({ title }: { title?: string }) {
   }, [barRef]);
 
   const { data } = useFiltersData();
+  // The shell stays mounted when switching pages or in-page views. Revalidate
+  // active reports on navigation, including the global source-health badge;
+  // otherwise yesterday's cached result can follow the user between tabs.
+  useEffect(() => {
+    if (previousRoute.current === routeHref) return;
+    previousRoute.current = routeHref;
+    void qc.invalidateQueries({ type: "active" });
+  }, [routeHref, qc]);
   const activeCount = activeDimensionCount(filters);
   const latest = latestDate(data);
 
@@ -573,6 +585,8 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
 
   const danger = failed.length > 0;
   const count = danger ? failed.length : stale.length;
+  const firstSourceKey = (danger ? failed[0] : stale[0])?.split(":")[0]?.trim();
+  const firstSourceLabel = data?.tabSyncs.find((tab) => tab.key === firstSourceKey)?.label || firstSourceKey;
 
   // What the reader can act on: how many sources are affected, and what that
   // does to the figures. The source names themselves are internal worksheet
@@ -585,6 +599,11 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
     : lang === "ar"
       ? `يتم عرض آخر نسخة ناجحة لـ ${count} من المصادر — قد تنقص أحدث الصفوف.`
       : `Showing the last good copy for ${count} source${count === 1 ? "" : "s"} — the newest rows may be missing.`;
+  const namedText = count === 1 && firstSourceLabel
+    ? lang === "ar"
+      ? `${firstSourceLabel}: ${text}`
+      : `${firstSourceLabel}: ${text}`
+    : text;
 
   const detail = (danger ? failed : stale).join(" · ");
 
@@ -600,8 +619,8 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
       role="status"
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "currentColor" }} />
-      <span className="truncate" title={`${text}\n\n${detail}`}>
-        {text}
+      <span className="truncate" title={`${namedText}\n\n${detail}`}>
+        {namedText}
       </span>
     </div>
   );
@@ -682,7 +701,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
       </span>
       {level !== "ok" && lagging && (
         <span className="num shrink-0" style={{ color }} title={tooltip}>
-          · {lang === "ar" ? "أقدم مصدر" : "oldest source"} {fmtAge(ageH(lagging.syncedAt))}
+          · {lagging.label} {fmtAge(ageH(lagging.syncedAt))}
         </span>
       )}
     </span>

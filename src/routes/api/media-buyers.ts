@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import {
   MEDIA_BUYERS as BUYERS,
-  mediaBuyerOf as ownerOf,
+  mediaBuyerForCampaign as ownerOf,
   type MediaBuyerId as Owner,
 } from "@/lib/media-buyers";
 
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/media-buyers")({
         const ambiguous: typeof campaigns = [];
 
         for (const row of campaigns) {
-          const owner = ownerOf(row.campaignName || row.name);
+          const owner = ownerOf(row.course, row.campaignName || row.name);
           if (owner === "ambiguous") ambiguous.push(row);
           else if (owner) groups.get(owner)!.push(row);
           else unassigned.push(row);
@@ -75,8 +75,8 @@ export const Route = createFileRoute("/api/media-buyers")({
         return json({
           buyers,
           mapping: {
-            sayed: "Campaign name contains the standalone token SAYED",
-            shazly: "Campaign name contains the standalone token SH",
+            sayed: "Standalone SAYED campaign token, except Auto/Automotive, BIM and CMRP",
+            shazly: "Auto/Automotive, BIM and CMRP course ownership overrides campaign tokens; otherwise standalone SH",
           },
           coverage: {
             assignedCampaigns: buyers.reduce((sum, buyer) => sum + buyer.campaigns, 0),
