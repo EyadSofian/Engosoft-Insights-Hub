@@ -16,6 +16,7 @@ const rows = [
   lead("7", "CFM", "Recommendation"),
   lead("8", "PMP", "WhatsApp Broadcast"),
   lead("9", "PMP", "WhatsApp"),
+  { ...lead("10", "CFM", "Facebook"), leadSegment: "WhatsApp Broadcast" },
 ];
 
 describe("media plan Odoo lead drilldown", () => {

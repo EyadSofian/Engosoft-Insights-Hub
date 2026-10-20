@@ -88,6 +88,7 @@ interface MediaPlanResponse {
     targetedSpend: number;
     targetedLeads: number;
     targetedCrmLeads: number;
+    excludedLeads: { recommendation: number; whatsappBroadcast: number };
     targetedPlatformLeads: number | null;
     allCrmLeads: number;
     targetedCpl: number | null;
@@ -864,6 +865,7 @@ function MediaPlanPage() {
 
           <PlanDeliverySection
             deliverables={data.deliverables}
+            excludedLeads={data.actual.excludedLeads}
             elapsed={data.window.elapsed}
             phase={data.window.phase}
             lang={lang}
@@ -1145,6 +1147,7 @@ function ProgressRail({
 
 function PlanDeliverySection({
   deliverables,
+  excludedLeads,
   elapsed,
   phase,
   lang,
@@ -1152,6 +1155,7 @@ function PlanDeliverySection({
   onOpen,
 }: {
   deliverables: DeliverableRow[];
+  excludedLeads: { recommendation: number; whatsappBroadcast: number };
   elapsed: number;
   phase: PlanPhase;
   lang: "ar" | "en";
@@ -1178,6 +1182,11 @@ function PlanDeliverySection({
       >
         {lang === "ar" ? "تنفيذ خطة الشهر" : "Monthly Plan Delivery"}
       </SectionTitle>
+      <p className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/30 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
+        {lang === "ar"
+          ? `الأرقام الفعلية ونِسَب الإنجاز لا تشمل ليدز Recommendation (${fmtNum(excludedLeads.recommendation)}) ولا WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) خلال شهر الخطة. تظل هذه السجلات متاحة للمراجعة في Odoo، ورقم المنصة معروض للمقارنة فقط.`
+          : `Actual Odoo leads and achievement exclude Recommendation (${fmtNum(excludedLeads.recommendation)}) and WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) in this plan month. These records remain available in Odoo; platform figures are comparison-only.`}
+      </p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {deliverables.map((row, index) => (
           <DeliverableCard

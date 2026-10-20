@@ -386,6 +386,7 @@ export const Route = createFileRoute("/api/media-plan")({
             targetedSpend,
             targetedLeads,
             targetedCrmLeads,
+            excludedLeads: data.excludedLeads,
             targetedPlatformLeads,
             allCrmLeads,
             targetedCpl: divide(targetedSpend, targetedLeads),
