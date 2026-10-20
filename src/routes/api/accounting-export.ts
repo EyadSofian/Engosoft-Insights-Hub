@@ -24,13 +24,15 @@ function filename(view: ExportView, from?: string, to?: string): string {
   return `engosoft-accounting-${view}-${range}.csv`;
 }
 
-function download(csv: string, name: string): Response {
+function download(csv: string, name: string, invoiceBasis: boolean): Response {
   return new Response(csv, {
     headers: {
       "cache-control": "no-store",
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-      "x-accounting-authority": "paid-invoices-only",
+      "x-accounting-authority": invoiceBasis
+        ? "paid-invoices-and-posted-credit-notes"
+        : "paid-invoices-only",
     },
   });
 }
@@ -44,6 +46,7 @@ export const Route = createFileRoute("/api/accounting-export")({
         const { buildAccountingCourses } = await import("@/lib/accounting-courses");
         const { fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { accountingCreditNotes } = await import("@/lib/accounting-credit-notes.server");
 
         const url = new URL(request.url);
         const requested = url.searchParams.get("view");
@@ -55,8 +58,42 @@ export const Route = createFileRoute("/api/accounting-export")({
         const filters = await parseFilters(request);
         const fxRates = fxRatesFromFilters(filters);
         const data = await getFiltered(filters);
-        const rows = data.accounting;
         const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+        let rows =
+          dateBasis === "invoice"
+            ? data.accounting
+            : data.accounting.filter((row) => !row.isCreditNote);
+        const hasAttributionFilter = Boolean(
+          filters.platform ||
+          filters.channel ||
+          filters.account ||
+          filters.campaign ||
+          filters.campaignKey ||
+          filters.adset ||
+          filters.adsetKey ||
+          filters.ad ||
+          filters.adKey ||
+          filters.source ||
+          filters.course ||
+          filters.mainCategory ||
+          filters.salesTeam ||
+          filters.salesperson,
+        );
+        if (dateBasis === "invoice" && !hasAttributionFilter) {
+          try {
+            rows = (
+              await accountingCreditNotes(
+                rows,
+                filters.from || data.applied.from || "",
+                filters.to || data.applied.to || "",
+                fxRates,
+                filters.company || "",
+              )
+            ).rows;
+          } catch {
+            // Preserve the last synced export when Odoo is temporarily unreachable.
+          }
+        }
         const accountingDate = (row: {
           invoiceDate: string;
           paymentDate: string;
@@ -64,6 +101,13 @@ export const Route = createFileRoute("/api/accounting-export")({
         }) => accountingReportingDate(row, dateBasis);
         const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
         const name = filename(view, filters.from, filters.to);
+        const accountingRule = ar
+          ? dateBasis === "invoice"
+            ? "فواتير مدفوعة وإشعارات خصم منشورة"
+            : "فواتير مدفوعة فقط"
+          : dateBasis === "invoice"
+            ? "Paid invoices and posted credit notes"
+            : "Paid invoices only";
 
         if (view === "summary") {
           const revenue = rows.reduce((sum, row) => sum + row.usdPaid, 0);
@@ -86,7 +130,7 @@ export const Route = createFileRoute("/api/accounting-export")({
           const header = ar
             ? ["المؤشر", "القيمة", "طريقة الحساب", "المصدر المعتمد"]
             : ["Metric", "Value", "Calculation", "Accounting authority"];
-          const source = ar ? "الفواتير المدفوعة فقط" : "Paid invoices only";
+          const source = accountingRule;
           const output: CsvCell[][] = [
             header,
             [
@@ -172,7 +216,7 @@ export const Route = createFileRoute("/api/accounting-export")({
               source,
             ],
           ];
-          return download(toCsv(output), name);
+          return download(toCsv(output), name, dateBasis === "invoice");
         }
 
         if (view === "invoices") {
@@ -306,10 +350,10 @@ export const Route = createFileRoute("/api/accounting-export")({
                 [...row.events].join(" | "),
                 [...row.eventStages].join(" | "),
                 [...row.sources].join(" | "),
-                ar ? "فاتورة مدفوعة فقط" : "Paid invoice only",
+                accountingRule,
               ]),
           ];
-          return download(toCsv(output), name);
+          return download(toCsv(output), name, dateBasis === "invoice");
         }
 
         if (view === "courses") {
@@ -372,11 +416,11 @@ export const Route = createFileRoute("/api/accounting-export")({
                 product.sources.map((source) => source.label).join(" | "),
                 product.events.map((event) => event.label).join(" | "),
                 product.eventStages.map((stage) => stage.label).join(" | "),
-                ar ? "فاتورة مدفوعة فقط" : "Paid invoice only",
+                accountingRule,
               ]);
             }
           }
-          return download(toCsv(output), name);
+          return download(toCsv(output), name, dateBasis === "invoice");
         }
 
         const header = ar
@@ -475,10 +519,10 @@ export const Route = createFileRoute("/api/accounting-export")({
               row.event,
               row.eventStage,
               row.source,
-              ar ? "فاتورة مدفوعة فقط" : "Paid invoice only",
+              accountingRule,
             ]),
         ];
-        return download(toCsv(output), name);
+        return download(toCsv(output), name, dateBasis === "invoice");
       },
     },
   },

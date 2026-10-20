@@ -123,6 +123,23 @@ interface AccountingResponse {
     productLines: number;
     averageInvoice: number | null;
   };
+  creditNoteReconciliation: {
+    status: "live" | "unavailable" | "not_applicable";
+    documents: Array<{
+      id: number;
+      movement: string;
+      invoiceDate: string;
+      company: string;
+      partner: string;
+      currency: string;
+      amount: number;
+      odooUrl: string;
+      inAccountingSnapshot: boolean;
+    }>;
+    addedDocuments: number;
+    addedUsd: number;
+    unsupportedCurrencies: string[];
+  };
   byProduct: Grouped[];
   byProductCategory: Grouped[];
   byMainCategory: Grouped[];
@@ -557,7 +574,14 @@ function Accounting() {
                     index: 0,
                     hero: true,
                     valueWrap: true,
-                    sub: lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date",
+                    sub:
+                      dateBasis === "invoice"
+                        ? lang === "ar"
+                          ? "فواتير وإشعارات خصم حسب تاريخ الفاتورة"
+                          : "Invoices and credit notes by Invoice Date"
+                        : lang === "ar"
+                          ? "الفواتير المدفوعة حسب تاريخ الدفع"
+                          : "Paid invoices by Payment Date",
                   }}
                 />
                 <MetricDetailTrigger
@@ -572,11 +596,93 @@ function Accounting() {
                   detail={{ ...metrics!.lines, title: t("product_lines") }}
                   card={{ index: 3 }}
                 />
-                <MetricDetailTrigger
-                  detail={metrics!.credits}
-                  card={{ index: 4, valueWrap: true }}
-                />
+                {dateBasis === "invoice" && (
+                  <MetricDetailTrigger
+                    detail={metrics!.credits}
+                    card={{ index: 4, valueWrap: true }}
+                  />
+                )}
               </KpiRow>
+
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.status === "unavailable" && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? "تعذر التحقق المباشر من إشعارات الخصم في Odoo. المعروض حاليًا من آخر نسخة متزامنة وقد لا يشمل أحدث الإشعارات."
+                      : "Live Odoo credit-note verification is unavailable. The last synced copy may omit recent notes."}
+                  </Notice>
+                )}
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.unsupportedCurrencies.length > 0 && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? `بعض الإشعارات بعملة لا يوجد لها تحويل دولار معتمد (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")})؛ ظهرت في التفاصيل ولم تُخصم من رقم الدولار.`
+                      : `Some credit notes use currencies without an approved USD conversion (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")}); they are listed but not deducted from USD revenue.`}
+                  </Notice>
+                )}
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.status === "not_applicable" && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? "عند تصفية الإيرادات بمصدر أو كورس أو موظف، لا يمكن إسناد كل إشعارات الخصم لهذا البُعد بدقة. أزل هذه التصفية لعرض كل الإشعارات المنشورة."
+                      : "Credit notes cannot all be attributed reliably to a marketing, course or employee filter. Clear that filter to see every posted note."}
+                  </Notice>
+                )}
+
+              {dateBasis === "invoice" && data.creditNoteReconciliation.documents.length > 0 && (
+                <details className="group card overflow-hidden">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden sm:px-5">
+                    <RotateCcw size={17} className="shrink-0 text-amber-600" aria-hidden="true" />
+                    <span className="text-[13px] font-semibold text-text">
+                      {lang === "ar"
+                        ? "إشعارات الخصم المنشورة في Odoo"
+                        : "Posted Odoo credit notes"}
+                    </span>
+                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                      {fmtNum(data.creditNoteReconciliation.documents.length)}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className="ms-auto text-text-muted transition-transform group-open:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="border-t border-border px-4 pb-4 sm:px-5">
+                    <p className="py-3 text-[11.5px] text-text-muted">
+                      {lang === "ar"
+                        ? "الإشعارات الملغاة مستبعدة. كل مبلغ معروض بعملة المستند ويُخصم من الإيراد في تاريخ إشعار الخصم."
+                        : "Cancelled notes are excluded. Amounts use each document's currency and reduce revenue on the credit-note date."}
+                    </p>
+                    <div className="max-h-72 overflow-auto rounded-xl border border-border">
+                      {data.creditNoteReconciliation.documents.map((document) => (
+                        <a
+                          key={document.id}
+                          href={document.odooUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-3 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-surface-2"
+                        >
+                          <span className="min-w-0">
+                            <span className="num font-semibold text-brand">
+                              {document.movement}
+                            </span>
+                            <span className="ms-2 text-text-muted">{document.company}</span>
+                          </span>
+                          <span className="flex items-center gap-4">
+                            <span className="num text-text-muted">{document.invoiceDate}</span>
+                            <span className="num font-semibold text-amber-700">
+                              {Math.abs(document.amount).toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              {document.currency}
+                            </span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              )}
 
               <ClosedLoopSalesBridge />
 
@@ -799,6 +905,7 @@ function accountingMetrics(
 ): Record<string, MetricDetail> {
   const A = lang === "ar";
   const S = data.summary;
+  const invoiceBasis = data.source.dateBasis === "Invoice Date";
   const collectionTrend = data.byDay
     .filter((row) => Number.isFinite(row.revenue))
     .map((row) => ({ date: row.date, value: row.revenue }));
@@ -809,12 +916,20 @@ function accountingMetrics(
     value: fmtUSDFull(S.paidUsd),
     tone: "mint",
     icon: <BadgeDollarSign size={16} />,
-    definition: A
-      ? "المبالغ المدفوعة فعليًا خلال الفترة، محسوبة بتاريخ الدفع من عمود USD Paid. الفاتورة التي صدرت ولم تُدفع بعد لا تدخل هنا."
-      : "Money actually collected in the period, counted on payment date from the USD Paid column. An invoice raised but not yet paid is not in this figure.",
-    formula: A
-      ? "مجموع USD Paid لكل فاتورة يقع تاريخ دفعها داخل الفترة المحددة، بعد خصم إشعارات الخصم."
-      : "Sum of USD Paid for every invoice whose payment date falls inside the window, credit notes deducted.",
+    definition: invoiceBasis
+      ? A
+        ? "قيمة الفواتير المدفوعة بتاريخ الفاتورة، بعد خصم إشعارات الخصم المنشورة في نفس تاريخ فاتورتها."
+        : "Paid invoice value by Invoice Date, net of posted credit notes on their own Invoice Date."
+      : A
+        ? "المبالغ المدفوعة فعليًا خلال الفترة حسب تاريخ الدفع. إشعارات الخصم تظهر في عرض تاريخ الفاتورة فقط."
+        : "Paid invoices by Payment Date. Credit notes appear only in the Invoice Date view.",
+    formula: invoiceBasis
+      ? A
+        ? "مجموع USD Paid للفواتير بتاريخ الفاتورة ناقص إشعارات الخصم المنشورة بتاريخ فاتورتها."
+        : "Invoice-date USD Paid less posted credit notes on their own invoice dates."
+      : A
+        ? "مجموع USD Paid للفواتير المدفوعة حسب تاريخ الدفع؛ دون إشعارات الخصم."
+        : "Paid invoice USD Paid by payment date; credit notes excluded.",
     trend:
       collectionTrend.length > 1
         ? {
@@ -1003,16 +1118,16 @@ function accountingMetrics(
     tone: S.creditNotes > 0 ? "rose" : "amber",
     icon: <RotateCcw size={16} />,
     definition: A
-      ? "الفواتير التي أُلغيت أو صدر لها إشعار خصم داخل الفترة. قيمتها مخصومة بالفعل من الإيراد المعروض."
-      : "Invoices cancelled or credited inside the period. Their value is already deducted from the revenue shown.",
+      ? "إشعارات الخصم المنشورة في Odoo (Posted) بتاريخ فاتورتها خلال الفترة؛ الإشعارات الملغاة غير محسوبة. كل مستند يُعد مرة واحدة حتى لو له أكثر من بند."
+      : "Posted Odoo credit notes dated by their own Invoice Date. Cancelled notes are excluded, and each document counts once regardless of line count.",
     formula: A
-      ? `${fmtNum(S.creditNotes)} إشعار بقيمة ${fmtUSDExact(S.creditNoteUsd)}، مخصومة من ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} إجمالي محصّل قبل الخصم.`
-      : `${fmtNum(S.creditNotes)} notes worth ${fmtUSDExact(S.creditNoteUsd)}, deducted from ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} collected before the deduction.`,
+      ? `${fmtNum(S.creditNotes)} إشعار بقيمة ${fmtUSDExact(Math.abs(S.creditNoteUsd))}، مخصومة من ${fmtUSDExact(S.paidUsd - S.creditNoteUsd)} قبل الخصم.`
+      : `${fmtNum(S.creditNotes)} notes worth ${fmtUSDExact(Math.abs(S.creditNoteUsd))}, deducted from ${fmtUSDExact(S.paidUsd - S.creditNoteUsd)} before credits.`,
     supporting: [
       {
         key: "value",
         label: A ? "قيمة الإشعارات" : "Credit value",
-        value: fmtUSDExact(S.creditNoteUsd),
+        value: fmtUSDExact(Math.abs(S.creditNoteUsd)),
       },
       {
         key: "net",
@@ -1023,9 +1138,32 @@ function accountingMetrics(
       {
         key: "share",
         label: A ? "نسبتها من التحصيل" : "Share of collection",
-        value: S.paidUsd > 0 ? fmtPct((S.creditNoteUsd / S.paidUsd) * 100, 1) : "—",
+        value: S.paidUsd > 0 ? fmtPct((Math.abs(S.creditNoteUsd) / S.paidUsd) * 100, 1) : "—",
       },
     ],
+    records: {
+      title: A ? "مستندات Credit Note في Odoo" : "Odoo credit-note documents",
+      hint: A
+        ? "اضغط على المستند لفتحه في Odoo. القيمة بعملة الفاتورة؛ المجموع أعلى الكارد بالدولار."
+        : "Open any document in Odoo. Row values use the invoice currency; the card total is USD.",
+      rows: data.creditNoteReconciliation.documents.slice(0, 5).map((document) => ({
+        key: String(document.id),
+        title: document.movement,
+        subtitle: `${document.invoiceDate} · ${document.company}${document.partner ? ` · ${document.partner}` : ""}`,
+        value: `${Math.abs(document.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${document.currency}`,
+        meta: document.inAccountingSnapshot
+          ? A
+            ? "متزامن"
+            : "Synced"
+          : A
+            ? "أُضيف مباشرة من Odoo"
+            : "Added directly from Odoo",
+        href: document.odooUrl,
+      })),
+      emptyLabel: A
+        ? "لا توجد إشعارات خصم منشورة في الفترة"
+        : "No posted credit notes in this period",
+    },
   };
 
   return { revenue, invoices, average, lines, credits };
