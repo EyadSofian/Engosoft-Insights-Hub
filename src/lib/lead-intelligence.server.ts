@@ -2,6 +2,7 @@ import { matchMediaPlanCourse, type MonthlyMediaPlan } from "./media-plan";
 import { attributedAdCourse, authoritativeLostLeads, type FilteredData } from "./metrics.server";
 import { normalizeName } from "./sheet-cache.server";
 import { matrixSource } from "./lead-source-matrix";
+import { groupByCanonicalReason, type CanonicalReasonGroup } from "./loss-reason-taxonomy";
 
 const ratio = (a: number, b: number): number | null => (b > 0 ? a / b : null);
 const key = (value: string): string => normalizeName(value || "");
@@ -25,10 +26,102 @@ type Lead = {
   closedAt: string;
   closeDays: number | null;
   status: "won" | "lost" | "open";
+  lossReason: string;
   odooUrl: string;
 };
 
+export interface CohortWindow {
+  eligible: number;
+  won: number;
+  lost: number;
+  open: number;
+  undated: number;
+  additionalWon: number;
+  additionalLost: number;
+  observedWon: number;
+  observedLost: number;
+  wonRate: number | null;
+  lostRate: number | null;
+}
+
+export interface CourseCohort {
+  course: string;
+  total: number;
+  current: {
+    won: number;
+    lost: number;
+    open: number;
+    wonRate: number | null;
+    lostRate: number | null;
+  };
+  month1: CohortWindow;
+  month2: CohortWindow;
+  history: Array<{
+    month: string;
+    leads: number;
+    mature30: number;
+    mature60: number;
+    lost30: number;
+    lost60: number;
+    lostRate30: number | null;
+    lostRate60: number | null;
+  }>;
+  benchmark60: { lost: number; eligible: number; rate: number | null };
+  reasons: CanonicalReasonGroup[];
+}
+
+function cohortWindow(leads: Lead[], asOf: string, days: 30 | 60): CohortWindow {
+  const eligible = leads.filter((lead) => (daysBetween(lead.createdAt, asOf) ?? -1) >= days);
+  let won = 0,
+    lost = 0,
+    undated = 0,
+    additionalWon = 0,
+    additionalLost = 0;
+  let observedWon = 0,
+    observedLost = 0;
+  for (const lead of leads) {
+    if (lead.status === "open") continue;
+    const age = daysBetween(lead.createdAt, lead.closedAt);
+    const observedAge = daysBetween(lead.createdAt, asOf);
+    if (age === null || observedAge === null || age > observedAge) continue;
+    if (age < days && (days === 30 || age >= 30)) {
+      if (lead.status === "won") observedWon++;
+      else observedLost++;
+    }
+  }
+  for (const lead of eligible) {
+    if (lead.status === "open") continue;
+    const age = daysBetween(lead.createdAt, lead.closedAt);
+    if (age === null) {
+      undated++;
+      continue;
+    }
+    if (age >= days) continue;
+    if (lead.status === "won") {
+      won++;
+      if (age >= 30) additionalWon++;
+    } else {
+      lost++;
+      if (age >= 30) additionalLost++;
+    }
+  }
+  return {
+    eligible: eligible.length,
+    won,
+    lost,
+    undated,
+    open: eligible.length - won - lost - undated,
+    additionalWon,
+    additionalLost,
+    observedWon,
+    observedLost,
+    wonRate: ratio(won, eligible.length),
+    lostRate: ratio(lost, eligible.length),
+  };
+}
+
 export interface LeadIntelligenceResponse {
+  lostAvailable: boolean;
   filters: { courses: string[]; owners: string[]; course: string; owner: string };
   period: { from: string; to: string };
   totals: {
@@ -77,6 +170,7 @@ export interface LeadIntelligenceResponse {
       }>;
     }>;
   }>;
+  cohorts: { asOf: string; courses: CourseCohort[] };
   daily: Array<{ day: string; leads: number; target: number | null }>;
   campaigns: Array<{
     name: string;
@@ -178,7 +272,9 @@ export function buildLeadIntelligence(
   page = 1,
   odooBaseUrl = "",
   lifetimeData?: FilteredData,
+  asOf = new Date().toISOString().slice(0, 10),
 ): LeadIntelligenceResponse {
+  const lostAvailable = data.snapshot.health?.lostAuthority !== "unavailable";
   const lost = authoritativeLostLeads(data);
   const odooOrigin = odooBaseUrl.replace(/\/$/, "");
   const planCourses = Object.values(plans).flatMap((plan) => plan.courses);
@@ -196,6 +292,7 @@ export function buildLeadIntelligence(
       closedAt: row.isWon ? row.closedAt || row.wonDate : "",
       closeDays: row.isWon ? row.daysToClose : null,
       status: row.isWon ? "won" : "open",
+      lossReason: "",
       odooUrl: odooOrigin
         ? `${odooOrigin}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
         : "",
@@ -211,11 +308,44 @@ export function buildLeadIntelligence(
       closedAt: row.closeDate || row.lostDate,
       closeDays: daysBetween(row.createdAt, row.closeDate || row.lostDate),
       status: "lost",
+      lossReason: row.lossReason || "",
       odooUrl: odooOrigin
         ? `${odooOrigin}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
         : "",
     })),
   ];
+  const historicalLeads: Lead[] = lifetimeData
+    ? [
+        ...lifetimeData.crm.map((row): Lead => ({
+          id: row.id,
+          course: canonicalCourse(row.course),
+          owner: row.salesperson,
+          campaign: row.campaignName,
+          campaignKey: row.campaignKey,
+          source: matrixSource(row.source || ""),
+          createdAt: row.createdAt,
+          closedAt: row.isWon ? row.closedAt || row.wonDate : "",
+          closeDays: row.isWon ? row.daysToClose : null,
+          status: row.isWon ? "won" : "open",
+          lossReason: "",
+          odooUrl: "",
+        })),
+        ...authoritativeLostLeads(lifetimeData).map((row): Lead => ({
+          id: row.id,
+          course: canonicalCourse(row.course),
+          owner: row.salesperson,
+          campaign: row.campaignName,
+          campaignKey: row.campaignKey,
+          source: matrixSource(row.source || ""),
+          createdAt: row.createdAt,
+          closedAt: row.closeDate || row.lostDate,
+          closeDays: daysBetween(row.createdAt, row.closeDate || row.lostDate),
+          status: "lost",
+          lossReason: row.lossReason || "",
+          odooUrl: "",
+        })),
+      ]
+    : allLeads;
   const plannedCourses = Object.values(plans)
     .filter(
       (plan) =>
@@ -402,6 +532,67 @@ export function buildLeadIntelligence(
     .filter((row) => row.leads || row.spend || row.revenue || row.target !== null)
     .sort((a, b) => b.leads - a.leads || a.course.localeCompare(b.course));
 
+  const historyEnd = (data.applied.to && data.applied.to < asOf ? data.applied.to : asOf).slice(
+    0,
+    7,
+  );
+  const [endYear, endMonth] = historyEnd.split("-").map(Number);
+  const months = Array.from({ length: 12 }, (_, index) =>
+    new Date(Date.UTC(endYear, endMonth - 12 + index, 1)).toISOString().slice(0, 7),
+  );
+  const cohorts: CourseCohort[] = courseRows
+    .filter((row) => row.leads > 0)
+    .map((row) => {
+      const selected = leads.filter((lead) => key(lead.course) === key(row.course));
+      const history = historicalLeads.filter(
+        (lead) => key(lead.course) === key(row.course) && matchesOwner(lead.owner),
+      );
+      const current = {
+        won: row.won,
+        lost: row.lost,
+        open: row.open,
+        wonRate: ratio(row.won, row.leads),
+        lostRate: ratio(row.lost, row.leads),
+      };
+      const month1 = cohortWindow(selected, asOf, 30);
+      const month2 = cohortWindow(selected, asOf, 60);
+      const monthly = months.map((month) => {
+        const rows = history.filter((lead) => dateOnly(lead.createdAt).slice(0, 7) === month);
+        const first = cohortWindow(rows, asOf, 30);
+        const second = cohortWindow(rows, asOf, 60);
+        return {
+          month,
+          leads: rows.length,
+          mature30: first.eligible,
+          mature60: second.eligible,
+          lost30: first.lost,
+          lost60: second.lost,
+          lostRate30: first.lostRate,
+          lostRate60: second.lostRate,
+        };
+      });
+      const prior = monthly.slice(0, -1);
+      const benchmarkLost = prior.reduce((sum, month) => sum + month.lost60, 0);
+      const benchmarkEligible = prior.reduce((sum, month) => sum + month.mature60, 0);
+      return {
+        course: row.course,
+        total: row.leads,
+        current,
+        month1,
+        month2,
+        history: monthly,
+        benchmark60: {
+          lost: benchmarkLost,
+          eligible: benchmarkEligible,
+          rate: ratio(benchmarkLost, benchmarkEligible),
+        },
+        reasons: groupByCanonicalReason(
+          selected.filter((lead) => lead.status === "lost"),
+          (lead) => lead.lossReason,
+        ),
+      };
+    });
+
   const dailyMap = new Map<string, number>();
   for (const row of leads) {
     const day = dateOnly(row.createdAt);
@@ -549,6 +740,7 @@ export function buildLeadIntelligence(
     .sort((a, b) => b.leads - a.leads || b.won - a.won);
 
   return {
+    lostAvailable,
     filters: { courses, owners, course: focusCourse, owner: focusOwner },
     period: { from: data.applied.from || "", to: data.applied.to || "" },
     totals: {
@@ -568,6 +760,7 @@ export function buildLeadIntelligence(
       attributedLeads: leads.filter((row) => Boolean(row.campaignKey || row.campaign)).length,
     },
     courses: courseRows,
+    cohorts: { asOf, courses: cohorts },
     daily,
     campaigns: [...campaignMap.values()]
       .map((row) => ({

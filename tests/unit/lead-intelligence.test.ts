@@ -228,4 +228,102 @@ describe("course lead intelligence", () => {
       { label: "181+", count: 0 },
     ]);
   });
+
+  it("tracks first and second 30-day outcomes from the same creation cohort", () => {
+    const cohort = {
+      ...data,
+      crm: [
+        { ...data.crm[0], createdAt: "2026-01-01", closedAt: "2026-01-10" },
+        { ...data.crm[1], createdAt: "2026-01-01" },
+      ],
+      lost: [
+        {
+          ...data.lost[0],
+          createdAt: "2026-01-01",
+          closeDate: "2026-02-10",
+          lossReason: "Not Interested",
+        },
+        {
+          ...data.lost[0],
+          id: "4",
+          createdAt: "2026-01-01",
+          closeDate: "2026-03-10",
+          lossReason: "غير مهتم",
+        },
+      ],
+      applied: { from: "2026-01-01", to: "2026-01-31" },
+    } as FilteredData;
+    const result = buildLeadIntelligence(cohort, {}, "SFM", "", 1, "", cohort, "2026-04-01");
+    const entry = result.cohorts.courses[0];
+    expect(entry.total).toBe(4);
+    expect(entry.current).toMatchObject({ won: 1, lost: 2, open: 1, wonRate: 0.25, lostRate: 0.5 });
+    expect(entry.month1).toMatchObject({
+      eligible: 4,
+      won: 1,
+      lost: 0,
+      open: 3,
+      additionalWon: 0,
+      additionalLost: 0,
+    });
+    expect(entry.month2).toMatchObject({
+      eligible: 4,
+      won: 1,
+      lost: 1,
+      open: 2,
+      additionalWon: 0,
+      additionalLost: 1,
+      lostRate: 0.25,
+    });
+    expect(entry.history.find((row) => row.month === "2026-01")).toMatchObject({
+      leads: 4,
+      mature60: 4,
+      lost60: 1,
+      lostRate60: 0.25,
+    });
+    expect(entry.reasons).toHaveLength(1);
+    expect(entry.reasons[0]).toMatchObject({
+      canonicalReasonKey: "not_interested",
+      count: 2,
+      share: 100,
+    });
+  });
+
+  it("marks immature cohorts and undated closures instead of inventing a final rate", () => {
+    const incomplete = {
+      ...data,
+      crm: [{ ...data.crm[0], createdAt: "2026-10-01", closedAt: "2026-10-10" }],
+      lost: [{ ...data.lost[0], createdAt: "2026-10-01", closeDate: "", lostDate: "" }],
+      applied: { from: "2026-10-01", to: "2026-10-20" },
+    } as FilteredData;
+    const result = buildLeadIntelligence(
+      incomplete,
+      {},
+      "SFM",
+      "",
+      1,
+      "",
+      incomplete,
+      "2026-10-20",
+    );
+    const entry = result.cohorts.courses[0];
+    expect(entry.month1).toMatchObject({
+      eligible: 0,
+      wonRate: null,
+      lostRate: null,
+      observedWon: 1,
+    });
+    expect(entry.month2).toMatchObject({ eligible: 0, wonRate: null, lostRate: null });
+    expect(entry.history.at(-1)).toMatchObject({ leads: 2, mature60: 0, lostRate60: null });
+  });
+
+  it("marks Lost metrics unavailable when the canonical Odoo Lost source is down", () => {
+    const unavailable = {
+      ...data,
+      lost: [],
+      snapshot: { health: { lostAuthority: "unavailable" } },
+    } as unknown as FilteredData;
+    const result = buildLeadIntelligence(unavailable, { "2026-10": plan });
+    expect(result.lostAvailable).toBe(false);
+    expect(result.cohorts.courses[0].current.lost).toBe(0);
+  });
 });

@@ -201,6 +201,352 @@ function CourseSourceDetails({
   );
 }
 
+function OutcomeStrip({
+  won,
+  lost,
+  open,
+  total,
+  arabic,
+  lostAvailable,
+}: {
+  won: number;
+  lost: number;
+  open: number;
+  total: number;
+  arabic: boolean;
+  lostAvailable: boolean;
+}) {
+  return (
+    <div className="mt-4 border-t border-border pt-3">
+      <p className="mb-2 text-[11px] font-semibold text-text-muted">
+        {arabic ? "مصير نفس الليدز الواردة" : "Outcome of these same leads"}
+      </p>
+      <div className="grid grid-cols-3 gap-1.5 text-center">
+        {[
+          { label: arabic ? "ناجح" : "Won", count: won, style: "bg-mint-surface text-mint-strong" },
+          {
+            label: arabic ? "مفقود" : "Lost",
+            count: lost,
+            style: "bg-amber-surface text-amber-strong",
+          },
+          { label: arabic ? "مفتوح" : "Open", count: open, style: "bg-surface-2 text-text-muted" },
+        ].map((item) => (
+          <div key={item.label} className={`rounded-xl px-1.5 py-2 ${item.style}`}>
+            <p className="text-[10px] font-bold">{item.label}</p>
+            <p className="num mt-0.5 text-sm font-black">
+              {!lostAvailable && item.label !== (arabic ? "ناجح" : "Won")
+                ? "—"
+                : fmtNum(item.count)}
+            </p>
+            <p className="num text-[10px] font-bold">
+              {!lostAvailable && item.label !== (arabic ? "ناجح" : "Won")
+                ? "—"
+                : pct(total ? item.count / total : null)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CohortAnalysis({
+  data,
+  arabic,
+  course,
+  onCourseChange,
+  lostAvailable,
+}: {
+  data: LeadIntelligenceResponse["cohorts"];
+  arabic: boolean;
+  course: string;
+  onCourseChange: (course: string) => void;
+  lostAvailable: boolean;
+}) {
+  const selected =
+    data.courses.find((row) => row.course === course) ??
+    data.courses.find((row) => row.course.toUpperCase() === "CFM") ??
+    data.courses[0];
+  if (!selected)
+    return (
+      <p className="text-sm text-text-muted">
+        {arabic ? "لا توجد ليدز في الفترة." : "No leads in this period."}
+      </p>
+    );
+  const maxHistory = Math.max(1, ...selected.history.map((row) => row.lostRate60 ?? 0));
+  return (
+    <div className="space-y-5">
+      {!lostAvailable && (
+        <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-bold text-amber-strong">
+          {arabic
+            ? "مصدر المفقود في Odoo غير متاح حاليًا. أعداد ونِسَب الخسارة والمعيار التاريخي غير قابلة للاعتماد حتى تكتمل المزامنة."
+            : "Odoo Lost source is unavailable. Loss counts, rates and the historical benchmark are not reliable until sync recovers."}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-strong/20 bg-sky-surface/50 p-4">
+        <div>
+          <p className="text-sm font-black text-text">
+            {arabic
+              ? "تابع نفس مجموعة الليدز من يوم دخولها"
+              : "Follow the same lead cohort from creation"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            {arabic
+              ? "الشهر الأول = الأيام 0–29؛ الثاني = الأيام 30–59. النِسَب المكتملة تُحسب فقط لليدز التي مرّت عليها الفترة كاملة، والنتائج حتى الآن منفصلة عنها."
+              : "Month 1 = days 0–29; Month 2 = days 30–59. Final rates include only leads that completed the full window; observed-to-date counts are separate."}
+          </p>
+        </div>
+        <label className="text-xs font-bold text-text-muted">
+          {arabic ? "الدورة" : "Course"}
+          <select
+            className="ms-2 min-h-10 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-text"
+            value={selected.course}
+            onChange={(event) => onCourseChange(event.target.value)}
+          >
+            {data.courses.map((row) => (
+              <option key={row.course} value={row.course}>
+                {row.course}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Metric
+          label={arabic ? "عدد الليدز الأصلية" : "Original leads"}
+          value={fmtNum(selected.total)}
+          detail={`${selected.course} · ${arabic ? "تاريخ الإنشاء داخل الفترة المختارة" : "created in the selected period"}`}
+        />
+        <Metric
+          label={arabic ? "ناجح حتى الآن" : "Won so far"}
+          value={`${fmtNum(selected.current.won)} · ${pct(selected.current.wonRate)}`}
+          color="mint"
+        />
+        <Metric
+          label={arabic ? "مفقود حتى الآن" : "Lost so far"}
+          value={
+            lostAvailable
+              ? `${fmtNum(selected.current.lost)} · ${pct(selected.current.lostRate)}`
+              : "—"
+          }
+          color="amber"
+        />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {[selected.month1, selected.month2].map((window, index) => {
+          const complete = window.eligible === selected.total;
+          return (
+            <div
+              key={index}
+              className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-2/60 px-4 py-3">
+                <div>
+                  <p className="text-sm font-black text-text">
+                    {arabic
+                      ? `الشهر ${index + 1 === 1 ? "الأول" : "الثاني"}`
+                      : `Month ${index + 1}`}
+                  </p>
+                  <p className="num text-[11px] text-text-muted">
+                    {index ? "30–59" : "0–29"}{" "}
+                    {arabic ? "يومًا من إنشاء الليد" : "days from creation"}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-1 text-[10px] font-bold ${complete ? "bg-mint-surface text-mint-strong" : "bg-amber-surface text-amber-strong"}`}
+                >
+                  {complete ? (arabic ? "مكتمل" : "Complete") : arabic ? "جزئي" : "Partial"}
+                </span>
+              </div>
+              <div className="space-y-3 p-4">
+                <p className="text-xs text-text-muted">
+                  {arabic ? "اكتملت مدة المتابعة لـ" : "Fully observed"}{" "}
+                  <b className="num text-text">
+                    {fmtNum(window.eligible)} / {fmtNum(selected.total)}
+                  </b>
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    {
+                      label: arabic ? "ناجح تراكمي" : "Cumulative won",
+                      count: window.won,
+                      rate: window.wonRate,
+                      color: "text-mint-strong",
+                    },
+                    {
+                      label: arabic ? "مفقود تراكمي" : "Cumulative lost",
+                      count: window.lost,
+                      rate: window.lostRate,
+                      color: "text-amber-strong",
+                    },
+                    {
+                      label: arabic ? "ظل مفتوحًا" : "Still open",
+                      count: window.open,
+                      rate: window.eligible ? window.open / window.eligible : null,
+                      color: "text-text",
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-xl bg-surface-2 px-2 py-3">
+                      <p className="text-[10px] text-text-muted">{item.label}</p>
+                      <p className={`num mt-1 text-xl font-black ${item.color}`}>
+                        {!lostAvailable &&
+                        item.label !== (arabic ? "ناجح تراكمي" : "Cumulative won")
+                          ? "—"
+                          : fmtNum(item.count)}
+                      </p>
+                      <p className="num text-[11px] font-bold text-text-muted">
+                        {!lostAvailable &&
+                        item.label !== (arabic ? "ناجح تراكمي" : "Cumulative won")
+                          ? "—"
+                          : pct(item.rate)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] leading-relaxed text-text-muted">
+                  {lostAvailable && index
+                    ? arabic
+                      ? `إضافي خلال الشهر الثاني: ${fmtNum(window.additionalWon)} ناجح، ${fmtNum(window.additionalLost)} مفقود.`
+                      : `Additional in month 2: ${fmtNum(window.additionalWon)} won, ${fmtNum(window.additionalLost)} lost.`
+                    : null}
+                  {lostAvailable && !complete
+                    ? ` ${arabic ? "المُسجَّل حتى الآن داخل هذه النافذة" : "Observed so far within this window"}: ${fmtNum(window.observedWon)} ${arabic ? "ناجح" : "won"} · ${fmtNum(window.observedLost)} ${arabic ? "مفقود" : "lost"}.`
+                    : ""}
+                  {lostAvailable && window.undated
+                    ? ` ${fmtNum(window.undated)} ${arabic ? "حالة محسومة بلا تاريخ إغلاق، غير موزعة زمنيًا" : "settled records without a close date; timing unknown"}.`
+                    : ""}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="rounded-2xl border border-border p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-black text-text">
+              {arabic
+                ? "مقارنة الخسارة عبر آخر 12 شهر إنشاء"
+                : "Lost rate by creation month · last 12 months"}
+            </h4>
+            <p className="mt-1 text-xs text-text-muted">
+              {arabic
+                ? "كل عمود: نسبة المفقود خلال 60 يومًا من الليدز التي أكملت 60 يومًا؛ لا تُستنتج نتيجة للشهور غير المكتملة."
+                : "Each bar: lost within 60 days ÷ leads observed for 60 days. Immature months have no final rate."}
+            </p>
+          </div>
+          <div className="text-xs text-text-muted">
+            {arabic ? "معيار الشهور السابقة" : "Prior-month benchmark"}{" "}
+            <b className="num text-amber-strong">
+              {lostAvailable ? pct(selected.benchmark60.rate) : "—"}
+            </b>{" "}
+            <span className="num">
+              {lostAvailable
+                ? `(${fmtNum(selected.benchmark60.lost)}/${fmtNum(selected.benchmark60.eligible)})`
+                : ""}
+            </span>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-6 gap-2 md:grid-cols-12" dir="ltr">
+          {selected.history.map((month) => (
+            <div
+              key={month.month}
+              className="min-w-0 text-center"
+              title={
+                lostAvailable
+                  ? `${month.month}: ${month.lost60}/${month.mature60} lost in 60 days; ${month.leads} leads`
+                  : `${month.month}: Lost source unavailable`
+              }
+            >
+              <div className="flex h-28 items-end rounded-lg bg-surface-2 p-1">
+                <div
+                  className={`w-full rounded-md ${!lostAvailable || month.lostRate60 === null ? "bg-surface-3" : "bg-amber-strong"}`}
+                  style={{
+                    height:
+                      !lostAvailable || month.lostRate60 === null
+                        ? "4px"
+                        : `${Math.max(4, (month.lostRate60 / maxHistory) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="num mt-1 text-[10px] font-bold text-text">{month.month.slice(5)}</p>
+              <p className="num text-[10px] text-text-muted">
+                {lostAvailable ? pct(month.lostRate60) : "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+        <details className="mt-4 rounded-xl border border-border">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-sky-strong">
+            {arabic ? "اعرض أعداد كل شهر بالتفصيل" : "Show each month's counts"}
+          </summary>
+          <div className="overflow-x-auto border-t border-border p-3">
+            <table className="w-full min-w-[620px] text-start text-xs">
+              <thead>
+                <tr className="text-text-muted">
+                  <th className="p-2 text-start">{arabic ? "شهر الإنشاء" : "Creation month"}</th>
+                  <th className="p-2 text-start">{arabic ? "ليدز" : "Leads"}</th>
+                  <th className="p-2 text-start">{arabic ? "مكتمل 30 يوم" : "30d mature"}</th>
+                  <th className="p-2 text-start">{arabic ? "مفقود 30 يوم" : "30d lost"}</th>
+                  <th className="p-2 text-start">{arabic ? "مكتمل 60 يوم" : "60d mature"}</th>
+                  <th className="p-2 text-start">{arabic ? "مفقود 60 يوم" : "60d lost"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selected.history.map((row) => (
+                  <tr key={row.month} className="border-t border-border">
+                    <td className="num p-2">{row.month}</td>
+                    <td className="num p-2">{fmtNum(row.leads)}</td>
+                    <td className="num p-2">{fmtNum(row.mature30)}</td>
+                    <td className="num p-2">
+                      {lostAvailable ? `${fmtNum(row.lost30)} · ${pct(row.lostRate30)}` : "—"}
+                    </td>
+                    <td className="num p-2">{fmtNum(row.mature60)}</td>
+                    <td className="num p-2">
+                      {lostAvailable ? `${fmtNum(row.lost60)} · ${pct(row.lostRate60)}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+      <div className="rounded-2xl border border-border p-4 sm:p-5">
+        <h4 className="text-sm font-black text-text">
+          {arabic ? "أسباب المفقود من نفس الليدز" : "Lost reasons in this cohort"}
+        </h4>
+        <p className="mt-1 text-xs text-text-muted">
+          {arabic
+            ? "النسبة من إجمالي المفقود، بتصنيف الأسباب المسجلة في Odoo."
+            : "Share of all lost leads, grouped from Odoo's recorded reasons."}
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {lostAvailable &&
+            selected.reasons.map((reason) => (
+              <div
+                key={reason.canonicalReasonKey}
+                className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-xs"
+              >
+                <span>
+                  {arabic ? reason.canonicalReasonLabelAr : reason.canonicalReasonLabelEn}
+                </span>
+                <b className="num text-text">
+                  {fmtNum(reason.count)} · {fmtPct(reason.share, 1)}
+                </b>
+              </div>
+            ))}
+          {lostAvailable && !selected.reasons.length && (
+            <p className="text-xs text-text-muted">
+              {arabic ? "لا توجد حالات مفقودة في الفترة." : "No lost leads in the period."}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LeadIntelligence() {
   const { lang } = useI18n();
   const A = lang === "ar";
@@ -208,6 +554,7 @@ export function LeadIntelligence() {
   const [owner, setOwner] = useState("");
   const [page, setPage] = useState(1);
   const [moreCampaigns, setMoreCampaigns] = useState(false);
+  const [cohortCourse, setCohortCourse] = useState("CFM");
   const path = `/api/lead-intelligence?focusCourse=${encodeURIComponent(course)}&focusOwner=${encodeURIComponent(owner)}&page=${page}`;
   const { data, isLoading, error, refetch } = useApi<LeadIntelligenceResponse>(path);
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
@@ -260,8 +607,8 @@ export function LeadIntelligence() {
               </h2>
               <p className="mt-2 text-sm text-slate-200">
                 {A
-                  ? "ست قراءات مترابطة للكورسات والحملات والإغلاق والمبيعات."
-                  : "Six connected views of courses, campaigns, closing and sales."}
+                  ? "سبع قراءات مترابطة للكورسات ومجموعات الليدز والحملات والإغلاق والمبيعات."
+                  : "Seven connected views of courses, cohorts, campaigns, closing and sales."}
               </p>
               <p className="num mt-3 text-xs text-sky-200">
                 {data.period.from} → {data.period.to}
@@ -322,6 +669,14 @@ export function LeadIntelligence() {
           </div>
         </div>
       </header>
+
+      {!data.lostAvailable && (
+        <div className="rounded-2xl border border-amber-strong/30 bg-amber-surface px-5 py-4 text-sm font-semibold text-amber-strong">
+          {A
+            ? "تنبيه جودة البيانات: مصدر Lost في Odoo غير متاح الآن. لا تعتبر الصفر الظاهر في أي تفاصيل قديمة نسبة خسارة حقيقية؛ مؤشرات الخسارة الجديدة معروضة كغير متاحة حتى تعود المزامنة."
+            : "Data quality alert: the Odoo Lost source is unavailable. Zero in older breakdowns is not a real loss rate; the new loss metrics show as unavailable until sync recovers."}
+        </div>
+      )}
 
       <Section
         id="lead-target"
@@ -431,6 +786,14 @@ export function LeadIntelligence() {
                     {A ? "ليد" : "leads"}
                   </span>
                 </div>
+                <OutcomeStrip
+                  won={row.won}
+                  lost={row.lost}
+                  open={row.open}
+                  total={row.leads}
+                  arabic={A}
+                  lostAvailable={data.lostAvailable}
+                />
                 <CourseSourceDetails
                   course={row.course}
                   leads={row.leads}
@@ -456,6 +819,14 @@ export function LeadIntelligence() {
                     <span>{row.course}</span>
                     <b className="num">{fmtNum(row.leads)}</b>
                   </div>
+                  <OutcomeStrip
+                    won={row.won}
+                    lost={row.lost}
+                    open={row.open}
+                    total={row.leads}
+                    arabic={A}
+                    lostAvailable={data.lostAvailable}
+                  />
                   <CourseSourceDetails
                     course={row.course}
                     leads={row.leads}
@@ -502,8 +873,27 @@ export function LeadIntelligence() {
       </Section>
 
       <Section
-        id="lead-campaigns"
+        id="lead-cohorts"
         index="02"
+        title={A ? "مصير الليدز خلال شهر وشهرين" : "Lead cohort · month 1 and 2"}
+        description={
+          A
+            ? "نفس الليدز حسب تاريخ إنشائها: ناجح ومفقود ومفتوح بعد أول 30 يوم ثم 60 يوم، مع معيار الخسارة التاريخي."
+            : "The same creation-date cohort through day 30 and day 60, with a historical loss benchmark."
+        }
+      >
+        <CohortAnalysis
+          data={data.cohorts}
+          arabic={A}
+          course={course || cohortCourse}
+          onCourseChange={setCohortCourse}
+          lostAvailable={data.lostAvailable}
+        />
+      </Section>
+
+      <Section
+        id="lead-campaigns"
+        index="03"
         title={A ? "الحملات التي جابت الليدز" : "Campaign lead delivery"}
         description={
           A
@@ -571,7 +961,7 @@ export function LeadIntelligence() {
 
       <Section
         id="lead-lifecycle"
-        index="03"
+        index="04"
         title={A ? "رحلة الإغلاق" : "Close lifecycle"}
         description={
           A
@@ -740,7 +1130,7 @@ export function LeadIntelligence() {
 
       <Section
         id="lead-quality"
-        index="04"
+        index="05"
         title={A ? "الجودة والنتيجة حسب الكورس" : "Course quality and outcome"}
         description={
           A
@@ -807,7 +1197,7 @@ export function LeadIntelligence() {
 
       <Section
         id="lead-sales"
-        index="05"
+        index="06"
         title={A ? "الكورس × مسؤول المبيعات" : "Course × salesperson"}
         description={
           A
@@ -878,7 +1268,7 @@ export function LeadIntelligence() {
 
       <Section
         id="lead-economics"
-        index="06"
+        index="07"
         title={A ? "اقتصاديات الليد" : "Lead economics"}
         description={
           A
