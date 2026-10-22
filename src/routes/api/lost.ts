@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/lost")({
         const { buildCourseLeadLossReport, buildCourseLostMovementReport } =
           await import("@/lib/course-lead-loss");
         const { canonicalCourseValue, normalizeCourseKey } = await import("@/lib/course-taxonomy");
-        const { loadFreshLostPipeline, loadArchivedLostLeads } =
+        const { loadFreshLostPipeline, loadArchivedLostLeads, loadDirectLeadCohort } =
           await import("@/lib/crm-fresh-lost.server");
         const { countsAsPotentialLead } = await import("@/lib/lead-count-policy");
 
@@ -42,6 +42,14 @@ export const Route = createFileRoute("/api/lost")({
           200,
           Math.max(1, Number(requestParams.get("detailLimit")) || 50),
         );
+        const selectedDays =
+          filters.from && filters.to
+            ? (Date.parse(filters.to) - Date.parse(filters.from)) / 86_400_000 + 1
+            : Infinity;
+        // A direct Odoo scan of an unbounded history could exceed the upstream
+        // gateway timeout. Keep that older view available, but label its saved
+        // denominator explicitly rather than claiming it is live.
+        const directDenominatorEnabled = selectedDays > 0 && selectedDays <= 93;
         const prevRange = previousPeriod(filters.from, filters.to);
         const [data, closedData, prevData] = await Promise.all([
           getFiltered(filters),
@@ -50,12 +58,20 @@ export const Route = createFileRoute("/api/lost")({
         ]);
         const labels = data.snapshot.sourceLabels;
         const window = { from: filters.from, to: filters.to };
-        const [freshPipeline, archivedLeads] = await Promise.all([
+        const [freshPipeline, archivedLeads, directCohortResult] = await Promise.all([
           loadFreshLostPipeline(filters, data.snapshot),
           loadArchivedLostLeads(filters, data.snapshot),
+          directDenominatorEnabled
+            ? loadDirectLeadCohort(filters, data.snapshot).catch((error: unknown) => ({
+                error: error instanceof Error ? error.message : "Direct Odoo cohort read failed",
+              }))
+            : Promise.resolve({ error: "WINDOW_TOO_LARGE" }),
         ]);
+        const directCohort = "error" in directCohortResult ? null : directCohortResult;
         const liveCohortAvailable =
-          freshPipeline.availability === "available" && archivedLeads.availability === "available";
+          freshPipeline.availability === "available" &&
+          archivedLeads.availability === "available" &&
+          (!directDenominatorEnabled || directCohort !== null);
         const liveCohortRows = liveCohortAvailable
           ? [...freshPipeline.records, ...archivedLeads.records]
           : [];
@@ -66,7 +82,8 @@ export const Route = createFileRoute("/api/lost")({
         if (!liveCohortAvailable) {
           return json(
             {
-              error: "Live Odoo Lost cohort is unavailable; no snapshot fallback was used.",
+              error:
+                "Live Odoo Lost or non-Lost cohort is unavailable; no snapshot fallback was used.",
               code: "ODOO_LIVE_UNAVAILABLE",
               cohortAuthority: {
                 source: "odoo_unavailable",
@@ -80,6 +97,7 @@ export const Route = createFileRoute("/api/lost")({
               details: {
                 pipeline: freshPipeline.error ?? null,
                 archivedLeads: archivedLeads.error ?? null,
+                nonLostCohort: "error" in directCohortResult ? directCohortResult.error : null,
               },
             },
             503,
@@ -245,14 +263,16 @@ export const Route = createFileRoute("/api/lost")({
         const detailRows = liveCourseDetailRows ?? snapshotDetailRows;
         const snapshotTotals = computeTotals(data);
         const authoritativeLost = liveCohortRows.length;
+        const liveNonLost = directCohort?.nonLost ?? data.crm.length;
         const totals = {
           ...snapshotTotals,
           lost: authoritativeLost,
           archivedLeads: authoritativeLost,
-          totalLeads: data.crm.length + authoritativeLost,
+          crmLeads: liveNonLost,
+          totalLeads: liveNonLost + authoritativeLost,
           lostRate:
-            data.crm.length + authoritativeLost > 0
-              ? (authoritativeLost / (data.crm.length + authoritativeLost)) * 100
+            liveNonLost + authoritativeLost > 0
+              ? (authoritativeLost / (liveNonLost + authoritativeLost)) * 100
               : null,
         };
         const detail =
@@ -292,6 +312,15 @@ export const Route = createFileRoute("/api/lost")({
             snapshotTotal: snapshotTotals.lost,
             snapshotDelta: authoritativeLost - snapshotTotals.lost,
             fetchedAt: [freshPipeline.fetchedAt, archivedLeads.fetchedAt].sort().at(-1),
+          },
+          denominatorAuthority: {
+            source: directCohort ? "odoo_live" : "snapshot_long_range",
+            nonLost: liveNonLost,
+            snapshotNonLost: data.crm.length,
+            nonLostDelta: liveNonLost - data.crm.length,
+            directLostCrossCheck: directCohort?.lost ?? null,
+            lostCrossCheckDelta: directCohort ? directCohort.lost - authoritativeLost : null,
+            fetchedAt: directCohort?.fetchedAt ?? null,
           },
           /**
            * The three canonical Lost populations. `closedLostInPeriod` always

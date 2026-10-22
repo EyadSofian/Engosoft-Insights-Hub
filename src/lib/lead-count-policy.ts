@@ -17,14 +17,16 @@ function normalized(value: string): string {
 
 export function excludedLeadSource(source: string, leadSegment = ""): ExcludedLeadSource | null {
   const key = normalized(source);
-  if (key === "whatsappbroadcast") return "whatsapp_broadcast";
-  if (
-    key === "recommendation" ||
-    key === "recommendationsales" ||
-    key.startsWith("recommendedfrom")
-  )
-    return "recommendation";
-  if (normalized(leadSegment) === "whatsappbroadcast") return "whatsapp_broadcast";
+  const segment = normalized(leadSegment);
+  if (key === "whatsappbroadcast" || segment === "whatsappbroadcast") return "whatsapp_broadcast";
+  const isRecommendation = (value: string) =>
+    value === "recommendation" ||
+    value === "recommendationsales" ||
+    value === "whatsapprecommendation" ||
+    value === "whatsapprecommendations" ||
+    value === "recommendationwhatsapp" ||
+    value.startsWith("recommendedfrom");
+  if (isRecommendation(key) || isRecommendation(segment)) return "recommendation";
   return null;
 }
 

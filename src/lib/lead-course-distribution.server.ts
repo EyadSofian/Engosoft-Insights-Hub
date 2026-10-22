@@ -120,7 +120,7 @@ export function sortOpportunityStages(stages: string[], odooOrder: OdooStage[]):
   });
 }
 
-function dateRows(filters: GlobalFilters): Promise<CrmRawRow[]> {
+export function loadCrmDateRows(filters: GlobalFilters): Promise<CrmRawRow[]> {
   const bounds = lostEventWindow(filters.from, filters.to);
   const domain: unknown[] = [];
   if (bounds.start) domain.push(["create_date", ">=", bounds.start]);
@@ -197,7 +197,7 @@ function grouped(records: CourseLeadRecord[], key: "course" | "specialty") {
 }
 
 export async function loadLeadCourseRecords(filters: GlobalFilters): Promise<CourseLeadRecord[]> {
-  const raw = await dateRows(filters);
+  const raw = await loadCrmDateRows(filters);
   return raw
     .filter((row) => row.__odoo_id && ["lead", "opportunity"].includes(row["Record Type"]))
     .map(toRecord)

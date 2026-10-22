@@ -4,6 +4,7 @@ import { cairoDate, lostEventWindow } from "./crm-lost-events";
 import { matchesLostMovementDimensions } from "./crm-lost-movement.server";
 import { odooConfig } from "./odoo.server";
 import { countsAsPotentialLead } from "./lead-count-policy";
+import { loadCrmDateRows } from "./lead-course-distribution.server";
 import type { Snapshot } from "./sheet-cache.server";
 import type { GlobalFilters } from "./types";
 
@@ -33,6 +34,31 @@ export interface FreshLostPipelineResult {
   domain: unknown[];
   fetchedAt: string;
   records: FreshLostPipelineRecord[];
+}
+
+/** Same creation cohort and dimension filters for both sides of the Lost rate.
+ * A saved non-Lost snapshot must never be paired with a live Odoo Lost count.
+ */
+export async function loadDirectLeadCohort(filters: GlobalFilters, snapshot: Snapshot) {
+  const bounds = lostEventWindow(filters.from, filters.to);
+  const raw = await loadCrmDateRows(filters);
+  const eligible = raw.filter((row) => {
+    const created = row.__odoo_create_date_utc || "";
+    return (
+      (!bounds.start || created >= bounds.start) &&
+      (!bounds.end || created < bounds.end) &&
+      ["lead", "opportunity"].includes(row["Record Type"]) &&
+      ["lead", "open", "won", "lost"].includes(row["Business Status"]) &&
+      matchesLostMovementDimensions(row, filters, snapshot) &&
+      countsAsPotentialLead(row.Source || "", row["Lead Segment"] || "")
+    );
+  });
+  return {
+    total: eligible.length,
+    nonLost: eligible.filter((row) => row["Business Status"] !== "lost").length,
+    lost: eligible.filter((row) => row["Business Status"] === "lost").length,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 /** Matches Odoo Pipeline: Creation Date + Stage Is Lost, not event timing.
