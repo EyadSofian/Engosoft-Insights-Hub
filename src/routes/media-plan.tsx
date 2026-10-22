@@ -34,6 +34,7 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { mediaPlanMonths, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
+import { deliverableStatus } from "@/lib/media-plan-delivery";
 import type { MediaPlanLeadDetailResponse } from "@/lib/media-plan-lead-link";
 import type { MediaPlanLifecycle, MediaPlanLifecycleBucket } from "@/lib/media-plan-lifecycle";
 import { recordTypeDisplayName, stageDisplayName } from "@/lib/lead-distribution-labels";
@@ -61,7 +62,7 @@ interface CourseRow {
     revenueUsd: number;
     invoices: number;
     actualLeads: number;
-    leadBasis: "crm";
+    leadBasis: "crm_opportunity";
     actualCpl: number | null;
     achievement: number | null;
     expectedLeads: number;
@@ -257,7 +258,7 @@ function mediaPlanMetrics(
         },
         {
           key: "actual",
-          label: A ? "المحقق من Paid" : "Paid so far",
+          label: A ? "الفرص البيعية المحققة" : "Opportunities so far",
           value: fmtNum(V.targetedLeads),
         },
         paceFact,
@@ -278,13 +279,13 @@ function mediaPlanMetrics(
       tone: "violet",
       icon: <Users size={16} />,
       definition: A
-        ? "الجزء من تارجت الشهر الذي يُفترض أن تأتي به الحملات المدفوعة."
-        : "The part of the month's target the paid campaigns are expected to deliver.",
+        ? "هدف الليدز المدفوعة كما ورد في الخطة. نسبة الإنجاز هنا تقارن الفرص البيعية الحالية بهذا الهدف؛ ليست معدل تحويل الليدز."
+        : "The paid-lead target from the plan. Achievement compares current opportunities with that target; it is not a lead conversion rate.",
       formula: A
         ? `${fmtNum(V.targetedLeads)} من ${fmtNum(P.paidLeadTarget)} = ${ratioPct(V.paidLeadAchievement)} بعد ${fmtNum(W.elapsed)} من ${fmtNum(W.days)} يوم.`
         : `${fmtNum(V.targetedLeads)} of ${fmtNum(P.paidLeadTarget)} = ${ratioPct(V.paidLeadAchievement)} after ${fmtNum(W.elapsed)} of ${fmtNum(W.days)} days.`,
       supporting: [
-        { key: "actual", label: A ? "المحقق" : "Achieved", value: fmtNum(V.targetedLeads) },
+        { key: "actual", label: A ? "فرص بيعية" : "Opportunities", value: fmtNum(V.targetedLeads) },
         {
           key: "remaining",
           label: A ? "المتبقي" : "Remaining",
@@ -300,8 +301,8 @@ function mediaPlanMetrics(
       breakdowns: [
         {
           id: "courses",
-          title: A ? "الليدز الفعلية حسب الدورة" : "Actual leads by course",
-          rows: byCourse((row) => row.actual.crmLeads, fmtNum, "violet"),
+          title: A ? "الفرص البيعية حسب الدورة" : "Opportunities by course",
+          rows: byCourse((row) => row.actual.lifecycle.opportunities, fmtNum, "violet"),
           emptyLabel: A ? "لا توجد دورات في الخطة" : "No courses in the plan",
         },
       ],
@@ -372,7 +373,7 @@ function mediaPlanMetrics(
       supporting: [
         { key: "actual", label: A ? "الفعلي" : "Actual", value: fmtUSDFull(V.targetedCpl) },
         { key: "spent", label: A ? "المصروف" : "Spent", value: fmtUSDFull(V.targetedSpend) },
-        { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(V.targetedLeads) },
+        { key: "leads", label: A ? "ليدز أودو" : "Odoo leads", value: fmtNum(V.targetedCrmLeads) },
         paceFact,
       ],
       breakdowns: [
@@ -920,8 +921,8 @@ function MediaPlanPage() {
               <SectionTitle
                 hint={
                   lang === "ar"
-                    ? "الرقم الأساسي والإنجاز من ليدز Odoo؛ رقم المنصة يظهر أسفله للمقارنة فقط."
-                    : "Primary lead counts and achievement use Odoo CRM; platform delivery is shown underneath for comparison only."
+                    ? "الرقم الأساسي ونسبة الإنجاز وحالة الدورة من الفرص البيعية في أودو فقط؛ تارجت الخطة ما زال تارجت ليدز. رقم المنصة للمقارنة فقط."
+                    : "The main figure, achievement and course status use Odoo opportunities only; the plan target remains a lead target. Platform delivery is comparison-only."
                 }
               >
                 {lang === "ar" ? "خطة كل دورة والمسؤول عنها" : "Course targets and ownership"}
@@ -938,7 +939,7 @@ function MediaPlanPage() {
                       lang === "ar" ? "تارجت الليدز" : "Lead target",
                       lang === "ar" ? "Budget" : "Budget",
                       lang === "ar" ? "Target CPL" : "Target CPL",
-                      lang === "ar" ? "ليدز أودو" : "Odoo leads",
+                      lang === "ar" ? "فرص أودو" : "Odoo opportunities",
                       lang === "ar" ? "Actual CPL" : "Actual CPL",
                       lang === "ar" ? "الصرف" : "Spend",
                       lang === "ar" ? "الإنجاز" : "Progress",
@@ -1188,8 +1189,8 @@ function PlanDeliverySection({
       </SectionTitle>
       <p className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/30 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
         {lang === "ar"
-          ? `الرقم الفعلي = ليد نشط + ليد مفقود + فرصة بيعية حسب نوع السجل الحالي في أودو. الفرص المفقودة ضمن الفرص ولا تُضاف مرة ثانية. لا تشمل الأرقام Recommendation (${fmtNum(excludedLeads.recommendation)}) ولا WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) خلال شهر الخطة. رقم المنصة للمقارنة فقط.`
-          : `Actual Odoo records = active leads + lost leads + opportunities by current record type. Lost opportunities are included in opportunities, not added again. Recommendation (${fmtNum(excludedLeads.recommendation)}) and WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) are excluded. Platform figures are comparison-only.`}
+          ? `الرقم الفعلي ونسبة الإنجاز وحالة «متأخر/على المسار/متقدم» تُحسب من الفرص البيعية في أودو فقط مقارنةً بتارجت الليدز في الخطة، وليست معدل تحويل. الليد النشط والمفقود يظهران منفصلين ولا يدخلان في الإنجاز. الفرص المفقودة ضمن الفرص. مستبعد Recommendation (${fmtNum(excludedLeads.recommendation)}) وWhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}). رقم المنصة للمقارنة فقط.`
+          : `The main figure, achievement and Behind/On track/Ahead status use current Odoo opportunities only against the plan's lead target; this is not a conversion rate. Active and Lost leads are shown separately and excluded from attainment. Lost opportunities remain within opportunities. Recommendation (${fmtNum(excludedLeads.recommendation)}) and WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) are excluded. Platform figures are comparison-only.`}
       </p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {deliverables.map((row, index) => (
@@ -1301,7 +1302,9 @@ function MediaPlanLeadsPanel({
   onClose: () => void;
 }) {
   const [stage, setStage] = useState("");
-  const [bucket, setBucket] = useState<MediaPlanLifecycleBucket | "">("");
+  const [bucket, setBucket] = useState<MediaPlanLifecycleBucket | "">(
+    row.actualSource === "Odoo CRM · Course Categories" ? "opportunity" : "",
+  );
   const [opportunityLost, setOpportunityLost] = useState(false);
   const [page, setPage] = useState(1);
   const query = new URLSearchParams({ month, key: row.key, page: String(page) });
@@ -1312,14 +1315,14 @@ function MediaPlanLeadsPanel({
   const ar = lang === "ar";
   const match = detail.data?.match;
   const sourceLabel = row.actualSource === "Odoo CRM · Course Categories"
-    ? ar ? "ليدز Odoo" : "Odoo leads"
+    ? ar ? "فرص أودو" : "Odoo opportunities"
     : row.actualSource === "Manual month-to-date report"
         ? ar ? "إدخال يدوي" : "Manual entry"
         : row.actualSource;
   const note = match === "course_category" || match === "plan_courses"
     ? ar
-      ? "الرقم الأساسي ونسبة الإنجاز من ليدز Odoo المنشأة هذا الشهر والمصنفة على الكورس. رقم المنصة للمقارنة فقط؛ قد يختلف لأن قياس الحملات ليس سجلًا مقابل سجل في Odoo."
-      : "The main figure and achievement use Odoo leads created this month and assigned to this course. Platform delivery is comparison-only, not a one-to-one list of Odoo records."
+      ? "الرقم الأساسي ونسبة الإنجاز من الفرص البيعية الحالية في أودو، بتاريخ إنشاء السجل والكورس. الليدز النشطة والمفقودة منفصلة ولا تدخل في الحساب. تارجت الخطة ليدز، لذلك هذه المقارنة ليست معدل تحويل."
+      : "The main figure and achievement use current Odoo opportunities by record creation date and course. Active and Lost leads are separate and excluded. The plan target is leads, so this comparison is not a conversion rate."
     : match === "source"
       ? ar
         ? "القائمة من سجلات Odoo التي يطابق حقل Source فيها المصدر المحدد، خلال نفس شهر الخطة."
@@ -1391,8 +1394,8 @@ function MediaPlanLeadsPanel({
                 })}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => { setStage(""); setBucket(""); setOpportunityLost(false); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage && !bucket ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
-                  {ar ? "كل السجلات" : "All records"} · {fmtNum(detail.data.total)}
+                <button type="button" onClick={() => { setStage(""); setBucket(row.actualSource === "Odoo CRM · Course Categories" ? "opportunity" : ""); setOpportunityLost(false); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage && (row.actualSource === "Odoo CRM · Course Categories" ? bucket === "opportunity" : !bucket) && !opportunityLost ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
+                  {row.actualSource === "Odoo CRM · Course Categories" ? (ar ? "كل الفرص" : "All opportunities") : (ar ? "كل السجلات" : "All records")} · {fmtNum(row.actualSource === "Odoo CRM · Course Categories" ? detail.data.lifecycle.opportunities : detail.data.total)}
                 </button>
                 {Object.entries(detail.data.stages).map(([name, count]) => (
                   <button key={name} type="button" onClick={() => { setStage(name); setBucket("opportunity"); setOpportunityLost(false); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
@@ -1443,21 +1446,6 @@ const DELIVERABLE_TONES = [
   { strong: "var(--rose-strong)", surface: "var(--rose-surface)", ink: "var(--rose-ink)" },
 ];
 
-function deliverableStatus(
-  actual: number | null,
-  target: number,
-  elapsed: number,
-  connected: boolean,
-) {
-  if (!connected || actual === null) return "not_connected";
-  if (actual >= target && target > 0) return "complete";
-  if (actual <= 0) return "not_started";
-  const achievement = target > 0 ? actual / target : 0;
-  if (achievement >= elapsed + 0.05) return "ahead";
-  if (achievement + 0.05 < elapsed) return "behind";
-  return "on_track";
-}
-
 function deliverableStatusLabel(status: string, lang: "ar" | "en") {
   const labels: Record<string, { ar: string; en: string }> = {
     ahead: { ar: "متقدم", en: "Ahead" },
@@ -1497,7 +1485,7 @@ function DeliverableCard({
   const unit =
     row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit;
   const actualLabel = row.actualSource === "Odoo CRM · Course Categories"
-    ? lang === "ar" ? "إجمالي ليدز وفرص أودو" : "Odoo leads and opportunities"
+    ? lang === "ar" ? "فرص أودو البيعية" : "Odoo opportunities"
       : lang === "ar" ? "الفعلي" : "Actual";
 
   return (
@@ -1595,7 +1583,9 @@ function DeliverableCard({
         ) : (
           <span className="font-semibold text-brand">
             {row.metric === "leads"
-              ? lang === "ar" ? "عرض الليدز ↗" : "View leads ↗"
+              ? row.actualSource === "Odoo CRM · Course Categories"
+                ? lang === "ar" ? "عرض الفرص ↗" : "View opportunities ↗"
+                : lang === "ar" ? "عرض الليدز ↗" : "View leads ↗"
               : lang === "ar" ? "تفاصيل الربط ↗" : "Link details ↗"}
           </span>
         )}
@@ -1697,7 +1687,7 @@ function CourseMobileCard({
           value={row.targetCpl > 0 ? fmtUSDFull(row.targetBudgetUsd) : "—"}
         />
         <CompactMetric
-          label={lang === "ar" ? "ليدز أودو" : "Odoo leads"}
+          label={lang === "ar" ? "فرص أودو" : "Odoo opportunities"}
           value={fmtNum(row.actual.actualLeads)}
         />
         <CompactMetric label="Actual CPL" value={fmtUSDFull(row.actual.actualCpl)} />

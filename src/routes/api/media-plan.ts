@@ -92,7 +92,7 @@ export const Route = createFileRoute("/api/media-plan")({
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
         const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { funnelFromLive, summarizeFunnel } = await import("@/lib/management-review");
-        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle } = await import("@/lib/media-plan-lifecycle");
+        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle, mediaPlanOpportunityActual } = await import("@/lib/media-plan-lifecycle");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
@@ -205,13 +205,16 @@ export const Route = createFileRoute("/api/media-plan")({
         const elapsed = elapsedShare(window.from, window.to, window.days, today);
         const courseRows = plan.courses.map((target) => {
           const actual = actualByKey.get(target.key) ?? emptyActual();
-          // The actionable number is the Odoo lead population users can open.
-          // Platform-reported delivery remains separate for reconciliation.
-          const actualLeads = actual.crmLeads;
+          const lifecycle = lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle();
+          // Plan attainment is based on current Odoo opportunities only. Fresh
+          // and Lost leads remain visible in the lifecycle breakdown, but do
+          // not inflate the headline, achievement, or pace status.
+          const actualLeads = mediaPlanOpportunityActual(lifecycle);
           const targetBudgetUsd = plannedCourseBudget(target);
           const achievement = divide(actualLeads, target.targetLeads);
           const expectedLeads = target.targetLeads * elapsed;
-          const actualCpl = divide(actual.spend, actualLeads);
+          // CPL still means cost per CRM lead, not cost per opportunity.
+          const actualCpl = divide(actual.spend, actual.crmLeads);
           const cplVariance =
             actualCpl === null ? null : divide(actualCpl - target.targetCpl, target.targetCpl);
 
@@ -220,9 +223,9 @@ export const Route = createFileRoute("/api/media-plan")({
             targetBudgetUsd,
             actual: {
               ...actual,
-              lifecycle: lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle(),
+              lifecycle,
               actualLeads,
-              leadBasis: "crm",
+              leadBasis: "crm_opportunity",
               actualCpl,
               achievement,
               expectedLeads,
@@ -350,13 +353,13 @@ export const Route = createFileRoute("/api/media-plan")({
               metric: "leads" as const,
               target: target.targetLeads,
               unit: "leads",
-              actual: row?.actual.crmLeads ?? null,
+              actual: row?.actual.actualLeads ?? null,
               lifecycle: row?.actual.lifecycle ?? emptyMediaPlanLifecycle(),
               connected: !!row,
               actualSource: "Odoo CRM · Course Categories",
               platformActual: row?.actual.platformLeads ?? null,
               dateScope,
-              matchingRule: "Odoo lead Course Categories and creation month; platform campaign delivery is a separate comparison.",
+              matchingRule: "Current Odoo opportunities by lead Course Categories and creation month; fresh and Lost leads are separate, and platform delivery is comparison-only.",
               reportTo: "/campaigns",
             };
           }),
@@ -409,7 +412,7 @@ export const Route = createFileRoute("/api/media-plan")({
             excludedLeads: data.excludedLeads,
             targetedPlatformLeads,
             allCrmLeads,
-            targetedCpl: divide(targetedSpend, targetedLeads),
+            targetedCpl: divide(targetedSpend, targetedCrmLeads),
             paidLeadAchievement: divide(targetedLeads, plan.paidLeadTarget),
             organicWebinarLeads: organicTotals.totalLeads,
             organicAchievement: divide(organicTotals.totalLeads, plan.organicWebinarLeadTarget),

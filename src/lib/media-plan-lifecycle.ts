@@ -32,3 +32,8 @@ export function addMediaPlanLifecycle(
 export function mediaPlanLifecycleTotal(value: MediaPlanLifecycle): number {
   return value.leadActive + value.leadLost + value.leadOther + value.opportunities;
 }
+
+/** Only current opportunities count toward opportunity-based media-plan attainment. */
+export function mediaPlanOpportunityActual(value: MediaPlanLifecycle): number {
+  return value.opportunities;
+}
