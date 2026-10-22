@@ -1,6 +1,8 @@
 import { matchMediaPlanCourse, type MonthlyMediaPlan } from "./media-plan";
 import type { CourseLeadRecord } from "./lead-course-distribution.server";
 import { countsAsPotentialLead } from "./lead-count-policy";
+import { leadLifecycleBucket, isLostOpportunity } from "./lead-course-distribution";
+import type { MediaPlanLifecycle, MediaPlanLifecycleBucket } from "./media-plan-lifecycle";
 
 export type MediaPlanLeadMatch = "course_category" | "source" | "plan_courses" | "unavailable";
 
@@ -9,10 +11,25 @@ export interface MediaPlanLeadDetailResponse {
   total: number;
   filteredTotal: number;
   stages: Record<string, number>;
+  lifecycle: MediaPlanLifecycle;
   rows: CourseLeadRecord[];
   page: number;
   pageSize: number;
   period: { from: string; to: string };
+}
+
+export function mediaPlanRecordBucket(row: CourseLeadRecord): MediaPlanLifecycleBucket {
+  const bucket = leadLifecycleBucket(row.recordType, row.stage);
+  return bucket;
+}
+
+export function mediaPlanRecordMatches(
+  row: CourseLeadRecord,
+  bucket?: MediaPlanLifecycleBucket,
+  opportunityLost = false,
+): boolean {
+  return (!bucket || mediaPlanRecordBucket(row) === bucket) &&
+    (!opportunityLost || isLostOpportunity(row.recordType, row.stage));
 }
 
 /** Keep platform delivery and Odoo records distinct: only Odoo fields link a record. */

@@ -24,6 +24,7 @@ interface DeliverableDelivery {
   target: number;
   unit: string;
   actual: number | null;
+  lifecycle?: import("@/lib/media-plan-lifecycle").MediaPlanLifecycle;
   platformActual?: number | null;
   connected: boolean;
   actualSource: string;
@@ -83,7 +84,7 @@ export const Route = createFileRoute("/api/media-plan")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
+        const { authoritativeLostLeads, computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
         const { loadAllData } = await import("@/lib/sheet-cache.server");
@@ -91,6 +92,7 @@ export const Route = createFileRoute("/api/media-plan")({
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
         const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { funnelFromLive, summarizeFunnel } = await import("@/lib/management-review");
+        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle } = await import("@/lib/media-plan-lifecycle");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
@@ -166,6 +168,14 @@ export const Route = createFileRoute("/api/media-plan")({
         const totals = computeTotals(data);
         const organicTotals = computeTotals(organicData);
         const actualByKey = new Map<string, ActualCourse>();
+        const lifecycleByKey = new Map<string, ReturnType<typeof emptyMediaPlanLifecycle>>();
+        for (const row of [...data.crm, ...authoritativeLostLeads(data)]) {
+          const target = matchMediaPlanCourse(plan.courses, row.course);
+          if (!target) continue;
+          const lifecycle = lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle();
+          addMediaPlanLifecycle(lifecycle, row);
+          lifecycleByKey.set(target.key, lifecycle);
+        }
         const unplanned: Array<{
           course: string;
           spend: number;
@@ -210,6 +220,7 @@ export const Route = createFileRoute("/api/media-plan")({
             targetBudgetUsd,
             actual: {
               ...actual,
+              lifecycle: lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle(),
               actualLeads,
               leadBasis: "crm",
               actualCpl,
@@ -313,6 +324,14 @@ export const Route = createFileRoute("/api/media-plan")({
                   target: plan.paidLeadTarget,
                   unit: "leads",
                   actual: targetedLeads,
+                  lifecycle: courseRows.reduce((sum, row) => {
+                    sum.leadActive += row.actual.lifecycle.leadActive;
+                    sum.leadLost += row.actual.lifecycle.leadLost;
+                    sum.leadOther += row.actual.lifecycle.leadOther;
+                    sum.opportunities += row.actual.lifecycle.opportunities;
+                    sum.opportunityLost += row.actual.lifecycle.opportunityLost;
+                    return sum;
+                  }, emptyMediaPlanLifecycle()),
                   connected: true,
                   actualSource: "Odoo CRM · Course Categories",
                   platformActual: targetedPlatformLeads,
@@ -332,6 +351,7 @@ export const Route = createFileRoute("/api/media-plan")({
               target: target.targetLeads,
               unit: "leads",
               actual: row?.actual.crmLeads ?? null,
+              lifecycle: row?.actual.lifecycle ?? emptyMediaPlanLifecycle(),
               connected: !!row,
               actualSource: "Odoo CRM · Course Categories",
               platformActual: row?.actual.platformLeads ?? null,

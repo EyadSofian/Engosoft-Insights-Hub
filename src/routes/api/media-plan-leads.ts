@@ -7,12 +7,16 @@ export const Route = createFileRoute("/api/media-plan-leads")({
         const { json } = await import("@/lib/api.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
         const { loadLeadCourseRecords } = await import("@/lib/lead-course-distribution.server");
-        const { mediaPlanLeadMatch, linkedMediaPlanLeads } =
+        const { mediaPlanLeadMatch, linkedMediaPlanLeads, mediaPlanRecordMatches } =
           await import("@/lib/media-plan-lead-link");
+        const { isLostOpportunity } = await import("@/lib/lead-course-distribution");
+        const { emptyMediaPlanLifecycle } = await import("@/lib/media-plan-lifecycle");
         const params = new URL(request.url).searchParams;
         const month = params.get("month") || "";
         const key = params.get("key") || "";
         const stage = params.get("stage") || "";
+        const bucket = params.get("bucket") || "";
+        const opportunityLost = params.get("opportunityLost") === "1";
         const page = Number(params.get("page") || "1");
         if (
           !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ||
@@ -21,7 +25,11 @@ export const Route = createFileRoute("/api/media-plan-leads")({
           !Number.isInteger(page) ||
           page < 1 ||
           page > 10000 ||
-          stage.length > 100
+          stage.length > 100 ||
+          (stage !== "" && bucket !== "opportunity") ||
+          (bucket !== "" && bucket !== "lead_active" && bucket !== "lead_lost" && bucket !== "lead_other" && bucket !== "opportunity") ||
+          (opportunityLost && bucket !== "opportunity") ||
+          (params.has("opportunityLost") && params.get("opportunityLost") !== "1")
         )
           return json({ error: "Invalid media plan lead request." }, 400);
 
@@ -48,6 +56,7 @@ export const Route = createFileRoute("/api/media-plan-leads")({
             total: 0,
             filteredTotal: 0,
             stages: {},
+            lifecycle: emptyMediaPlanLifecycle(),
             rows: [],
             page,
             pageSize: 50,
@@ -62,8 +71,22 @@ export const Route = createFileRoute("/api/media-plan-leads")({
           });
           const linked = linkedMediaPlanLeads(plan, key, records);
           const stages: Record<string, number> = {};
-          for (const row of linked) stages[row.stage] = (stages[row.stage] ?? 0) + 1;
-          const filtered = (stage ? linked.filter((row) => row.stage === stage) : linked).sort(
+          for (const row of linked) {
+            if (row.recordType === "opportunity") stages[row.stage] = (stages[row.stage] ?? 0) + 1;
+          }
+          const lifecycle = emptyMediaPlanLifecycle();
+          for (const row of linked) {
+            if (row.recordType === "opportunity") {
+              lifecycle.opportunities++;
+              if (isLostOpportunity(row.recordType, row.stage)) lifecycle.opportunityLost++;
+            } else if (row.stage === "Lost") lifecycle.leadLost++;
+            else if (row.stage === "Archived") lifecycle.leadOther++;
+            else lifecycle.leadActive++;
+          }
+          const filtered = linked.filter((row) =>
+            (!stage || row.stage === stage) &&
+            mediaPlanRecordMatches(row, bucket || undefined, opportunityLost),
+          ).sort(
             (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
           );
           const pageSize = 50;
@@ -72,6 +95,7 @@ export const Route = createFileRoute("/api/media-plan-leads")({
             total: linked.length,
             filteredTotal: filtered.length,
             stages,
+            lifecycle,
             rows: filtered.slice((page - 1) * pageSize, page * pageSize),
             page,
             pageSize,

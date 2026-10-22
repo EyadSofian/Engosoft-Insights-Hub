@@ -122,11 +122,14 @@ function LeadDistributionPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Card className="border-s-4 border-s-blue-600">
+            <Card className="border-s-4 border-s-violet-600 bg-violet-50/30">
               <div className="text-xs text-text-muted">
-                {ar ? "إجمالي السجلات التي دخلت" : "All records created"}
+                {ar ? "إجمالي الفرص البيعية" : "Total opportunities"}
               </div>
-              <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(data.total)}</div>
+              <div className="num mt-2 text-2xl font-bold text-violet-800">{fmtNum(data.lifecycle.opportunities)}</div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {ar ? "يشمل الفرص المفقودة؛ لا يشمل الليد المفقود" : "Includes lost opportunities, excludes lost leads"}
+              </div>
             </Card>
             <Card className="border-s-4 border-s-emerald-600">
               <div className="text-xs text-text-muted">
@@ -141,13 +144,19 @@ function LeadDistributionPage() {
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadLost)}
               </div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {ar ? "نوعها ليد في أودو؛ ليست فرصًا بيعية" : "Odoo type Lead, not Opportunity"}
+              </div>
             </Card>
-            <Card className="border-s-4 border-s-violet-600">
+            <Card className="border-s-4 border-s-blue-600">
               <div className="text-xs text-text-muted">
-                {ar ? "جميع الفرص البيعية" : "All opportunities"}
+                {ar ? "إجمالي سجلات الليد والفرص" : "All lead and opportunity records"}
               </div>
               <div className="num mt-2 text-2xl font-bold text-text">
-                {fmtNum(data.lifecycle.opportunities)}
+                {fmtNum(data.total)}
+              </div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {ar ? "ليس عدد الفرص وحدها" : "Not the opportunity count alone"}
               </div>
             </Card>
             <Card className="border-s-4 border-s-fuchsia-600">
