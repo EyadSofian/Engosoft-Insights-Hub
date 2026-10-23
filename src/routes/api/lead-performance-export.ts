@@ -222,8 +222,26 @@ export const Route = createFileRoute("/api/lead-performance-export")({
             `${result.coverage.qaReviewed} / ${result.selected.leads}`,
           ],
           [
-            ar ? "بنود مالية غير مربوطة" : "Unlinked accounting lines",
+            ar ? "بنود غير مربوطة في فترة التقرير" : "Unlinked lines in report window",
             String(result.coverage.unlinkedAccountingLines),
+          ],
+          [
+            ar ? "فواتير بها ربط مؤكد" : "Invoices with an exact link",
+            String(result.coverage.linkedAccountingInvoices),
+          ],
+          [
+            ar ? "فواتير بلا ربط مؤكد" : "Invoices without an exact link",
+            String(result.coverage.unlinkedAccountingInvoices),
+          ],
+          [
+            ar ? "بنود غير مربوطة وبها اسم سيلز" : "Unlinked lines with a salesperson",
+            String(result.coverage.unlinkedWithSellerLines),
+          ],
+          [
+            ar ? "معيار ربط الفاتورة" : "Invoice link rule",
+            ar
+              ? "الفاتورة مربوطة إذا كان أحد بنودها على الأقل مرتبطًا بأمر بيع له Opportunity محددة في أودو. اسم السيلز وحده لا يثبت مصدر الليد."
+              : "An invoice is linked if at least one line belongs to a sale order with an exact Odoo Opportunity link. Salesperson name alone cannot identify the lead.",
           ],
           [
             ar ? "مستبعد: توصية" : "Excluded: recommendation",

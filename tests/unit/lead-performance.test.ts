@@ -84,6 +84,42 @@ describe("six-month lead performance", () => {
     expect(result.bySalesCloser[0]?.name).toBe("Closer A");
   });
 
+  it("audits invoice linkage only inside the six-month report window, not the 2025 archive", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      invoices: [
+        ...base().invoices,
+        { movement: "OLD", orderRef: "", date: "2025-10-01", usdPaid: 50, salesperson: "" },
+        {
+          movement: "INV-1",
+          orderRef: "S1",
+          date: "2026-06-03",
+          usdPaid: 20,
+          salesperson: "Closer A",
+        },
+        {
+          movement: "INV-1",
+          orderRef: "S1",
+          date: "2026-06-03",
+          usdPaid: 10,
+          salesperson: "Closer A",
+        },
+        {
+          movement: "INV-2",
+          orderRef: "",
+          date: "2026-06-04",
+          usdPaid: 10,
+          salesperson: "Closer C",
+        },
+      ],
+    });
+    expect(result.coverage.linkedAccountingLines).toBe(6);
+    expect(result.coverage.unlinkedAccountingLines).toBe(2);
+    expect(result.coverage.linkedAccountingInvoices).toBe(5);
+    expect(result.coverage.unlinkedAccountingInvoices).toBe(2);
+    expect(result.coverage.unlinkedWithSellerLines).toBe(2);
+  });
+
   it("does not misallocate PBX calls across leads sharing a phone and keeps loss reasons within Lost", () => {
     const result = buildLeadPerformance({ ...base(), selectedMonth: "2026-10" });
     expect(result.selected.contact2).toBe(1);

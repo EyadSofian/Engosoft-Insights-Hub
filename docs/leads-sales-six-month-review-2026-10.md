@@ -156,9 +156,20 @@ Read from Railway (`Engosoft-Insights-Hub`, production) — variable names only:
    is its own piece of work.
 2. **Link coverage bounds the conversion rate.** Conversion is a *verified
    lower bound*: only accounting lines carrying an exactly linked sale order
-   count. The page warns below 90% coverage. Raising real coverage is an Odoo
-   data-entry matter, not a dashboard one, and the figure should not be used
-   alone to judge staff until it improves.
+   count. The page warns below 90% coverage in its own six-month window. An
+   audit on 24 October found that the earlier all-history denominator mixed
+   2025 archive lines with 2026 report lines and falsely suggested roughly
+   50% coverage. In the raw `accounting` snapshot, May–October had 6,359
+   linked lines of 6,733 (94.4%), while 1,740 of 1,949 invoice numbers had
+   at least one linked line. These are raw snapshot figures, not a claim that
+   every invoice in the canonical live report is now attributed. Of 251
+   distinct invoice-referenced order names absent from the link table across
+   2026, Odoo confirmed 240 have no `opportunity_id`; 10 are confirmed sale
+   orders from 2025 with an Opportunity and are now looked up explicitly; one
+   more has an Opportunity but is cancelled and remains excluded. Seller names
+   are present on most unlinked lines, but they do not uniquely identify a
+   CRM lead. Those 240 need Odoo record-level reconciliation, not a guessed
+   dashboard join, before a verified conversion rate can be called complete.
 3. **Dead revenue-password code.** `src/lib/revenue-access.server.ts` (~200
    lines) and the `REVENUE_PASSWORD_REQUIRED` branch in `src/lib/use-api.ts`
    are unreachable: the middleware that called them was removed on purpose in

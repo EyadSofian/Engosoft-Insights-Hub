@@ -998,6 +998,39 @@ export function SixMonthPerformance() {
       </PageSection>
 
       <PageSection
+        title={lang === "ar" ? "تدقيق ربط الفواتير بالليدز" : "Invoice-to-lead linkage audit"}
+        hint={`${data.months[0]}-01 → ${data.asOf}`}
+        icon={<ReceiptText size={16} />}
+        tone="sky"
+      >
+        <Card>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SmallStat
+              label={lang === "ar" ? "فواتير بها ربط مؤكّد" : "Invoices with an exact link"}
+              value={n(data.coverage.linkedAccountingInvoices)}
+            />
+            <SmallStat
+              label={lang === "ar" ? "فواتير بلا ربط مؤكّد" : "Invoices without an exact link"}
+              value={n(data.coverage.unlinkedAccountingInvoices)}
+            />
+            <SmallStat
+              label={
+                lang === "ar"
+                  ? "بنود غير مربوطة وبها اسم سيلز"
+                  : "Unlinked lines with a salesperson"
+              }
+              value={n(data.coverage.unlinkedWithSellerLines)}
+            />
+          </div>
+          <p className="mt-3 text-[12px] leading-6 text-text-muted">
+            {lang === "ar"
+              ? `تغطية بنود الفواتير في فترة التقرير: ${linkCoverage === null ? "—" : pct(linkCoverage)} (${n(linkedLines)} من ${n(totalLines)} بند). اسم السيلز على الفاتورة يحدد بائعها، لكنه لا يثبت أي ليد أو حملة جابتها؛ الربط المؤكد يحتاج أمر بيع مرتبطًا بالـOpportunity في أودو. الفاتورة تُعد مربوطة إذا وُجد لها بند واحد مربوط على الأقل. فواتير الدفع الشهري تشمل أيضًا مبيعات ليدز قديمة، ولا تساوي تسجيلات مجموعة الدخول.`
+              : `Invoice-line coverage in this report window: ${linkCoverage === null ? "—" : pct(linkCoverage)} (${n(linkedLines)} of ${n(totalLines)} lines). The salesperson on an invoice identifies its seller, not the lead or campaign that generated it. Exact attribution requires an Odoo sale order linked to an Opportunity. An invoice is counted as linked if at least one line is linked. Payment-month invoices also include older lead cohorts.`}
+          </p>
+        </Card>
+      </PageSection>
+
+      <PageSection
         title={t.funnel}
         hint={t.trendSub}
         icon={<Filter size={16} />}
@@ -1283,7 +1316,9 @@ export function SixMonthPerformance() {
               value={`${t.campaign} ${n(data.coverage.unknownCampaign)} · ${t.buyer} ${n(data.coverage.unknownMediaBuyer)}`}
             />
             <Fact
-              label={lang === "ar" ? "بنود مالية غير مربوطة" : "Unlinked accounting lines"}
+              label={
+                lang === "ar" ? "بنود غير مربوطة في آخر ٦ أشهر" : "Unlinked lines in six months"
+              }
               value={`${n(data.coverage.unlinkedAccountingLines)}${linkCoverage !== null ? ` · ${pct(linkCoverage)} ${lang === "ar" ? "مربوط" : "linked"}` : ""}`}
             />
             <Fact

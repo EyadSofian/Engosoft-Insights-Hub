@@ -21,6 +21,8 @@ export interface PerformanceLead {
 }
 
 export interface PerformanceInvoice {
+  movement?: string;
+  company?: string;
   orderRef: string;
   date: string;
   usdPaid: number;
@@ -124,6 +126,9 @@ export interface PerformanceResult {
     ambiguousOrders: number;
     unlinkedAccountingLines: number;
     linkedAccountingLines: number;
+    linkedAccountingInvoices: number;
+    unlinkedAccountingInvoices: number;
+    unlinkedWithSellerLines: number;
     callsAvailable: boolean;
     qaAvailable: boolean;
     linksAvailable: boolean;
@@ -325,6 +330,9 @@ export function buildLeadPerformance(input: {
     ambiguousOrders: 0,
     unlinkedAccountingLines: 0,
     linkedAccountingLines: 0,
+    linkedAccountingInvoices: 0,
+    unlinkedAccountingInvoices: 0,
+    unlinkedWithSellerLines: 0,
     callsAvailable: input.calls !== null,
     qaAvailable: input.qa !== null,
     linksAvailable: input.linksAvailable,
@@ -410,19 +418,40 @@ export function buildLeadPerformance(input: {
   for (const order of ambiguous) orderToLead.delete(order);
   coverage.ambiguousOrders = ambiguous.size;
   const orderLines = new Map<string, PerformanceInvoice[]>();
-  for (const line of input.invoices) {
+  const linkedInvoices = new Set<string>();
+  const unlinkedInvoices = new Set<string>();
+  const coverageStart = `${months[0]}-01`;
+  for (const [index, line] of input.invoices.entries()) {
     if (!line.date || line.date > input.asOf) continue;
     const order = line.orderRef.trim();
+    const inCoverageWindow = line.date >= coverageStart;
+    const invoiceKey = line.movement ? `${line.company ?? ""}\0${line.movement}` : `line:${index}`;
     if (!order) {
-      coverage.unlinkedAccountingLines++;
+      if (inCoverageWindow) {
+        coverage.unlinkedAccountingLines++;
+        unlinkedInvoices.add(invoiceKey);
+        if (line.salesperson.trim()) coverage.unlinkedWithSellerLines++;
+      }
       continue;
     }
-    if (orderToLead.has(order)) coverage.linkedAccountingLines++;
-    else coverage.unlinkedAccountingLines++;
+    if (inCoverageWindow) {
+      if (orderToLead.has(order)) {
+        coverage.linkedAccountingLines++;
+        linkedInvoices.add(invoiceKey);
+      } else {
+        coverage.unlinkedAccountingLines++;
+        unlinkedInvoices.add(invoiceKey);
+        if (line.salesperson.trim()) coverage.unlinkedWithSellerLines++;
+      }
+    }
     const list = orderLines.get(order) ?? [];
     list.push(line);
     orderLines.set(order, list);
   }
+  coverage.linkedAccountingInvoices = linkedInvoices.size;
+  coverage.unlinkedAccountingInvoices = [...unlinkedInvoices].filter(
+    (invoice) => !linkedInvoices.has(invoice),
+  ).length;
   for (const [order, lines] of orderLines) {
     const lead = enriched.get(orderToLead.get(order) ?? "");
     if (!lead) continue;

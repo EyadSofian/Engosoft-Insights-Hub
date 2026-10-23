@@ -413,18 +413,65 @@ async function loadSaleOrders(): Promise<{ orders: SaleOrderLink[] | null; error
       ["name", "opportunity_id", "state", "date_order"],
       { context: { active_test: false } },
     );
-    return {
-      orders: rows
-        .filter((row) => Array.isArray(row.opportunity_id))
-        .map((row) => ({
-          orderId: String(row.id),
-          orderName: s(row.name),
-          opportunityId: String((row.opportunity_id as [number, string])[0]),
-          state: s(row.state),
-          dateOrder: s(row.date_order),
-        })) as (SaleOrderLink & { dateOrder: string })[],
-      error: "",
-    };
+    const orders = rows
+      .filter((row) => Array.isArray(row.opportunity_id))
+      .map((row) => ({
+        orderId: String(row.id),
+        orderName: s(row.name),
+        opportunityId: String((row.opportunity_id as [number, string])[0]),
+        state: s(row.state),
+        dateOrder: s(row.date_order),
+      })) as (SaleOrderLink & { dateOrder: string })[];
+    // A 2026 paid invoice can belong to a 2025 sale order. The normal order
+    // sync starts in 2026, so look up only invoice-referenced orders it missed.
+    // Never use salesperson or customer name as a substitute for opportunity_id.
+    try {
+      const invoiceOrders = await getPool().query<{ order_name: string }>(
+        `SELECT DISTINCT row_data->>'Sales Order #' AS order_name
+           FROM dashboard_rows
+          WHERE dataset = 'accounting'
+            AND NULLIF(TRIM(row_data->>'Sales Order #'), '') IS NOT NULL`,
+      );
+      const known = new Set(orders.map((order) => order.orderName));
+      const missingNames = invoiceOrders.rows
+        .map((row) => s(row.order_name))
+        .filter((name) => name && !known.has(name));
+      if (missingNames.length) {
+        const historic = await searchRead<{
+          id: number;
+          name?: string;
+          opportunity_id?: [number, string] | false;
+          state?: string;
+          date_order?: string;
+        }>(
+          "sale.order",
+          [
+            ["name", "in", missingNames],
+            ["opportunity_id", "!=", false],
+            ["state", "in", ["sale", "done"]],
+          ],
+          ["name", "opportunity_id", "state", "date_order"],
+          { context: { active_test: false } },
+        );
+        for (const row of historic) {
+          if (!Array.isArray(row.opportunity_id) || known.has(s(row.name))) continue;
+          orders.push({
+            orderId: String(row.id),
+            orderName: s(row.name),
+            opportunityId: String(row.opportunity_id[0]),
+            state: s(row.state),
+            dateOrder: s(row.date_order),
+          });
+          known.add(s(row.name));
+        }
+      }
+    } catch (error) {
+      return {
+        orders,
+        error: `Historic invoice-order lookup: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    return { orders, error: "" };
   } catch (error) {
     return { orders: null, error: error instanceof Error ? error.message : String(error) };
   }

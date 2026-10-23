@@ -186,6 +186,8 @@ export async function loadLeadPerformanceReport(input: {
   const invoices = snapshot.accounting
     .filter((row) => !isExcludedFromSalesRevenue(row))
     .map((row) => ({
+      movement: row.movement,
+      company: row.company,
       orderRef: row.orderRef,
       // Credit-note reversals belong to their invoice date, not the original payment date.
       date: row.isCreditNote ? row.invoiceDate || row.paymentDate : row.paymentDate,
