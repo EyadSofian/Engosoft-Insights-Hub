@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { collapseYeastarCdr } from "../../src/lib/yeastar-cdr.server";
+import { collapseYeastarCdr, parseYeastarCdrPage } from "../../src/lib/yeastar-cdr.server";
 
 describe("Yeastar CDR attempts", () => {
+  it("accepts Yeastar's successful empty-day response without a data field", () => {
+    expect(parseYeastarCdrPage({ errcode: 0, total_number: 0 })).toEqual({
+      total: 0,
+      records: [],
+    });
+    expect(() => parseYeastarCdrPage({ errcode: 0, total_number: 1 })).toThrow(
+      "Yeastar CDR data is missing",
+    );
+  });
+
   it("counts multiple PBX legs as one outbound customer attempt", () => {
     const calls = collapseYeastarCdr("2026-10-22", [
       {

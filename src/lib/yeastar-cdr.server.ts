@@ -13,6 +13,20 @@ type Cdr = {
   disposition?: string;
 };
 
+/** Yeastar omits `data` entirely when a successful search has zero records. */
+export function parseYeastarCdrPage(body: {
+  errcode?: number;
+  total_number?: number;
+  data?: Cdr[] | null;
+}): { total: number; records: Cdr[] } {
+  if (body.errcode !== 0) throw new Error(`Yeastar CDR error ${body.errcode ?? "unknown"}`);
+  const total = Number(body.total_number);
+  if (!Number.isFinite(total) || total < 0) throw new Error("Yeastar CDR total is invalid");
+  if (total === 0 && body.data == null) return { total: 0, records: [] };
+  if (!Array.isArray(body.data)) throw new Error("Yeastar CDR data is missing");
+  return { total, records: body.data };
+}
+
 type DayCall = {
   uid: string;
   day: string;
@@ -158,11 +172,10 @@ async function fetchDay(day: string): Promise<DayCall[]> {
       total_number?: number;
       data?: Cdr[];
     };
-    if (body.errcode !== 0 || !Array.isArray(body.data))
-      throw new Error(`Yeastar CDR error ${body.errcode ?? "unknown"}`);
-    total = Number(body.total_number) || 0;
-    records.push(...body.data);
-    if (body.data.length === 0 && records.length < total)
+    const parsedPage = parseYeastarCdrPage(body);
+    total = parsedPage.total;
+    records.push(...parsedPage.records);
+    if (parsedPage.records.length === 0 && records.length < total)
       throw new Error("Yeastar CDR pagination stopped early");
     page += 1;
   } while (records.length < total && page <= 100);
