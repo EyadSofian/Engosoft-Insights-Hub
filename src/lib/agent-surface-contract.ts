@@ -302,12 +302,22 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   },
   {
     id: "ads",
-    routes: ["/ads"],
+    /**
+     * `/creatives` already declares itself as this surface's `creatives` tab
+     * through `useRegisterNexusView("ads", …)`, but its pathname was not on any
+     * contract — so the page said "you are on ads/creatives" and the router
+     * said the route did not exist. Both now agree.
+     */
+    routes: ["/ads", "/creatives"],
     section: "campaigns",
     title: t("الإعلانات", "Ads"),
     status: "CONNECTED",
     sensitivity: "internal",
-    views: [],
+    views: [
+      { id: "delivery", title: t("التسليم والإنفاق", "Delivery and spend") },
+      { id: "creatives", title: t("المواد الإعلانية", "Creatives") },
+    ],
+    defaultViews: ["delivery"],
     operations: ["summary", "list", "detail"],
     filters: [...PERIOD_FILTERS, "platform", "account", "campaign", "adset", "ad"],
     entities: ["campaign", "adset", "ad"],
@@ -324,6 +334,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
           "health.lostExclusions",
           "platformCoverageAll",
         ],
+      },
+      {
+        endpoint: "/api/ads-creatives",
+        as: "creatives",
+        required: false,
+        views: ["creatives"],
+        why: "Per-creative delivery and spend, which the ad-level table cannot answer because one creative runs under several ads.",
+        summaryPaths: ["totals", "summary"],
       },
     ],
     rows: [
@@ -629,13 +647,46 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   },
   {
     id: "leads",
-    routes: ["/leads"],
+    /**
+     * `/lead-distribution` and `/lead-sources` are separate pathnames rather
+     * than views, but they are the same subject and the same CRM population,
+     * so a lead question asked while standing on either must resolve here.
+     * Both shipped with no contract at all, which is how "كام ليد في كل كورس؟"
+     * could be answered on screen and refused by the assistant on the same page.
+     */
+    routes: ["/leads", "/lead-distribution", "/lead-sources"],
     section: "leads",
     title: t("الليدز", "Leads"),
     status: "CONNECTED",
     // Lead rows carry phone and email.
     sensitivity: "personal",
-    views: [],
+    views: [
+      { id: "crm", title: t("سجل العملاء والـCRM", "Leads and CRM") },
+      { id: "intelligence", title: t("تحليل الليدز حسب الكورس", "Course lead intelligence") },
+      { id: "weekly", title: t("متابعة ليدز الأسبوع", "Weekly lead follow-up") },
+      {
+        id: "performance",
+        title: t("أداء الليدز والمبيعات · ٦ أشهر", "Leads and sales · six months"),
+        caveats: [
+          t(
+            "التحويل هنا حد أدنى مثبت: أمر بيع مرتبط بالفرصة مباشرةً وصافي فواتيره موجب. Won في الـCRM مش محتسب.",
+            "Conversion here is a verified lower bound: an exactly opportunity-linked sale order with a positive net. CRM Won is not counted.",
+          ),
+          t(
+            "المجموعات بشهر دخول الليد، فالبيع المتأخر يرجع لشهر دخوله مش لشهر الدفع.",
+            "Cohorts follow the lead's entry month, so a later sale stays with its entry month rather than its payment month.",
+          ),
+        ],
+      },
+    ],
+    /**
+     * The CRM table is what `/leads` opens on, so it is what "no view" means.
+     * The cohort report is deliberately NOT a default: it is a fixed six-month
+     * window that ignores the global date filter, and folding it into an
+     * unscoped lead question would answer a question about March with figures
+     * from a window the caller never asked for.
+     */
+    defaultViews: ["crm"],
     operations: ["summary", "list", "trend"],
     filters: [...PERIOD_FILTERS, "source", "course", "salesTeam", "salesperson", "campaign"],
     entities: ["source", "course", "salesperson"],
@@ -678,6 +729,50 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: false,
         why: "Leads distributed but never called — the follow-up gap behind a conversion drop.",
         summaryPaths: ["summary", "range", "leads"],
+      },
+      {
+        /**
+         * The six-month entry-cohort report: duplicates, unqualified reasons,
+         * PBX attempt distribution, time to first contact, and conversion to a
+         * verified paid enrollment. Every one of those is a question management
+         * asks in words, and none of them was reachable.
+         */
+        endpoint: "/api/lead-performance",
+        as: "cohorts",
+        required: false,
+        views: ["performance"],
+        why: "Entry-month cohorts: duplicate and unqualified rates, call attempts, first-contact lag, and conversion to a verified paid enrollment.",
+        summaryPaths: ["selected", "coverage", "availability"],
+      },
+      {
+        endpoint: "/api/lead-intelligence",
+        as: "intelligence",
+        required: false,
+        views: ["intelligence"],
+        why: "Per-course lead targets, close lifecycle, lead quality and the unit economics of one lead.",
+        summaryPaths: ["totals", "summary"],
+      },
+      {
+        endpoint: "/api/weekly-lead-followup",
+        as: "weekly",
+        required: false,
+        views: ["weekly"],
+        why: "This week's leads and whether each one has actually been followed up yet.",
+        summaryPaths: ["summary", "totals"],
+      },
+      {
+        endpoint: "/api/lead-course-distribution",
+        as: "distribution",
+        required: false,
+        why: "How the CRM population splits across courses and specialties, by record type and stage.",
+        summaryPaths: ["totals", "summary"],
+      },
+      {
+        endpoint: "/api/lead-source-matrix",
+        as: "sourceMatrix",
+        required: false,
+        why: "Lead source against course as a matrix, which neither breakdown answers on its own.",
+        summaryPaths: ["totals", "summary"],
       },
     ],
     rows: [
@@ -1305,12 +1400,21 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   },
   {
     id: "attribution",
-    routes: ["/attribution"],
+    /**
+     * `/landing-pages` is the same question one step earlier in the journey —
+     * where a visit came from and what it did — so it resolves here rather
+     * than being left without a contract, which is what it shipped with.
+     */
+    routes: ["/attribution", "/landing-pages"],
     section: "campaigns",
     title: t("إسناد محادثات واتساب", "Conversation attribution"),
     status: "CONNECTED",
     sensitivity: "personal",
-    views: [],
+    views: [
+      { id: "conversations", title: t("المحادثات", "Conversations") },
+      { id: "landing", title: t("صفحات الهبوط", "Landing pages") },
+    ],
+    defaultViews: ["conversations"],
     operations: ["summary", "list"],
     filters: [
       ...PERIOD_FILTERS,
@@ -1344,6 +1448,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         operations: ["list"],
         why: "The bounded conversation rows behind attribution totals and CRM outcomes.",
         summaryPaths: ["total"],
+      },
+      {
+        endpoint: "/api/landing-attribution/summary",
+        as: "landing",
+        required: false,
+        views: ["landing"],
+        why: "Landing-page views, form starts, submissions and the step rates between them, by first or latest touch.",
+        summaryPaths: ["totals", "pages"],
       },
     ],
     rows: [

@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   Receipt,
   Table2,
+  Target,
   ShieldCheck,
   TrendingDown,
   TrendingUp,
@@ -72,6 +73,8 @@ const acquisitionSection = (search: LocationSearch) =>
 const accountingView = (search: LocationSearch) =>
   typeof search.view === "string" ? search.view : undefined;
 const courseView = (search: LocationSearch) =>
+  typeof search.view === "string" ? search.view : undefined;
+const leadsView = (search: LocationSearch) =>
   typeof search.view === "string" ? search.view : undefined;
 
 /**
@@ -162,6 +165,28 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
     defaultTo: "/lead-distribution",
     contextual: "tabs",
     items: [
+      /**
+       * The six-month entry-cohort report leads the strip.
+       *
+       * It is the only report here that answers the management question the
+       * others feed — how many leads arrived, how good they were, how fast and
+       * how often sales chased them, and how many became a paid enrollment —
+       * and it shipped reachable only from a fourth in-page tab inside
+       * `/leads`, which no navigation surface named. A report nobody can find
+       * is a report nobody uses.
+       */
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Target,
+        tabLabel: { ar: "أداء الليدز والمبيعات", en: "Leads & sales" },
+        search: { view: "performance" },
+        matches: (search) => leadsView(search) === "performance",
+        description: {
+          ar: "٦ مجموعات شهرية: الجودة والتكرار والمتابعة والتحويل لتسجيل مدفوع",
+          en: "Six monthly cohorts: quality, duplicates, follow-up and paid conversion",
+        },
+      },
       {
         to: "/lead-distribution",
         key: "crm_leads",
@@ -179,6 +204,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         key: "leads",
         icon: Users,
         tabLabel: { ar: "سجلات العملاء", en: "CRM records" },
+        matches: (search) => leadsView(search) === undefined,
       },
       { to: "/lost", key: "lost", icon: TrendingDown, tabLabel: { ar: "المفقودة", en: "Lost" } },
     ],
@@ -255,6 +281,35 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         description: {
           ar: "كل المنصات بكل الأعمدة والفلاتر",
           en: "Every platform, every column and filter",
+        },
+      },
+      /**
+       * Two lead reports that existed only as in-page tabs. Listing them means
+       * every analytical view in the app is named by a navigation surface, so
+       * "where do I see X" has an answer that is not "scroll inside a page".
+       */
+      {
+        to: "/leads",
+        key: "leads",
+        icon: GraduationCap,
+        tabLabel: { ar: "تحليل الليدز حسب الكورس", en: "Course lead intelligence" },
+        search: { view: "intelligence" },
+        matches: (search) => leadsView(search) === "intelligence",
+        description: {
+          ar: "الأهداف ودورة الإغلاق واقتصاديات الليد لكل كورس",
+          en: "Targets, close lifecycle and lead economics per course",
+        },
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: CalendarClock,
+        tabLabel: { ar: "متابعة ليدز الأسبوع", en: "Weekly lead follow-up" },
+        search: { view: "weekly" },
+        matches: (search) => leadsView(search) === "weekly",
+        description: {
+          ar: "ليدز الأسبوع ومين لسه مستني متابعة",
+          en: "This week's leads and who is still waiting",
         },
       },
       {

@@ -57,8 +57,16 @@ describe("navigation", () => {
 
   it("offers at most six primary destinations and a bounded contextual strip", () => {
     expect(NAVIGATION_SECTIONS.length).toBeLessThanOrEqual(6);
+    /**
+     * The cap is per section on purpose: it keeps a strip scannable, and what
+     * counts as scannable depends on how many reports a workspace genuinely
+     * has. Marketing carries seven. Leads carries five because the six-month
+     * lead-to-paid report belongs beside the lead breakdowns rather than
+     * hidden as a fourth in-page tab, which is where it shipped.
+     */
+    const cap: Record<string, number> = { marketing: 7, "sales-crm": 5 };
     for (const section of NAVIGATION_SECTIONS.filter((entry) => entry.contextual === "tabs")) {
-      expect(section.items.length, section.id).toBeLessThanOrEqual(section.id === "marketing" ? 7 : 4);
+      expect(section.items.length, section.id).toBeLessThanOrEqual(cap[section.id] ?? 4);
     }
   });
 
@@ -66,8 +74,14 @@ describe("navigation", () => {
     const tree = navigationDrawerTree("/leads", {}, "en", label);
     const expanded = tree.filter((section) => section.children.length > 0 && !section.menu);
     expect(expanded.map((section) => section.key)).toEqual(["sales-crm"]);
-    expect(expanded[0].children.find((report) => report.active)?.label).toBe("CRM records");
-    expect(expanded[0].children[0]?.to).toBe("/lead-distribution");
+    // `/leads` with no view is the CRM table, not the cohort report that now
+    // leads the strip — two items share the pathname, so only the one whose
+    // `matches` agrees with the search may light up.
+    expect(expanded[0].children.filter((report) => report.active).map((r) => r.label)).toEqual([
+      "CRM records",
+    ]);
+    expect(expanded[0].children[0]?.to).toBe("/leads");
+    expect(expanded[0].children[0]?.search).toEqual({ view: "performance" });
   });
 
   it("puts creatives, lead sources and campaigns under one Marketing workspace", () => {

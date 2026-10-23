@@ -487,16 +487,158 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     route: "/leads",
     title: q("الليدز", "Leads"),
     description: q(
-      "العملاء المحتملين ومصادرهم ومتابعتهم.",
-      "Leads, where they came from and how they are followed up.",
+      "العملاء المحتملين ومصادرهم ومتابعتهم، وتحويلهم لتسجيلات مدفوعة.",
+      "Leads, where they came from, how they are followed up, and what converts to a paid enrollment.",
     ),
-    tabs: [],
-    sections: [{ id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["leads.leads"] }],
-    elements: commonElements("leads"),
+    tabs: [
+      {
+        id: "crm",
+        title: q("سجل العملاء والـCRM", "Leads and CRM"),
+        summary: q(
+          "سجلات الـCRM نفسها: المراحل والمصادر والكورسات والفرق والحملات، مع إمكانية فتح أي سجل.",
+          "The CRM records themselves: stages, sources, courses, teams and campaigns, with every record openable.",
+        ),
+        sections: ["kpis"],
+      },
+      {
+        id: "intelligence",
+        title: q("تحليل الليدز حسب الكورس", "Course lead intelligence"),
+        summary: q(
+          "الأهداف لكل كورس، ودورة الإغلاق، وجودة الليد، واقتصاديات الليد الواحد.",
+          "Per-course targets, the close lifecycle, lead quality and the unit economics of one lead.",
+        ),
+        sections: ["kpis"],
+      },
+      {
+        id: "weekly",
+        title: q("متابعة ليدز الأسبوع", "Weekly lead follow-up"),
+        summary: q(
+          "ليدز الأسبوع الحالي ومين منهم اتعمله متابعة فعلية ومين لسه مستني.",
+          "This week's leads, which have actually been followed up and which are still waiting.",
+        ),
+        sections: ["kpis"],
+      },
+      {
+        id: "performance",
+        title: q("أداء الليدز والمبيعات · ٦ أشهر", "Leads and sales · six months"),
+        summary: q(
+          "ست مجموعات شهرية بشهر دخول الليد: التكرار، عدم التأهل، محاولات الاتصال، زمن أول تواصل، والتحويل لتسجيل مدفوع مثبت. الفترة ثابتة ولا تتبع فلتر التاريخ العام.",
+          "Six monthly entry cohorts: duplicates, unqualified leads, call attempts, time to first contact, and conversion to a verified paid enrollment. The window is fixed and does not follow the global date filter.",
+        ),
+        sections: ["cohort"],
+      },
+    ],
+    sections: [
+      { id: "kpis", title: q("المؤشرات", "KPIs"), elements: ["leads.leads"] },
+      {
+        id: "cohort",
+        title: q("مجموعات الدخول الشهرية", "Monthly entry cohorts"),
+        elements: [
+          "leads.cohortConversion",
+          "leads.duplicateRate",
+          "leads.contactAttempts",
+          "leads.firstContactLag",
+          "leads.unqualified",
+        ],
+      },
+    ],
+    elements: [
+      ...commonElements("leads"),
+      {
+        id: "leads.cohortConversion",
+        type: "kpi",
+        title: q("التحويل المدفوع المثبت", "Verified paid conversion"),
+        meaning: q(
+          "نسبة ليدز شهر الدخول اللي وصلت لأمر بيع مرتبط بالفرصة مباشرةً وصافي فواتيره موجب. حد أدنى مثبت، مش معدل التحويل الحقيقي لكل الليدز، وWon في الـCRM لوحده مش محتسب.",
+          "The share of an entry month's leads that reached an exactly opportunity-linked sale order with a positive net. A verified lower bound rather than the true conversion of every lead; CRM Won alone does not count.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: false,
+        filterSensitive: true,
+        questions: [
+          q("ليه التحويل واطي الشهر ده؟", "Why is conversion low this month?"),
+          q("أنهي مصدر بيحول أحسن؟", "Which source converts best?"),
+        ],
+      },
+      {
+        id: "leads.duplicateRate",
+        type: "kpi",
+        title: q("نسبة التكرار", "Duplicate rate"),
+        meaning: q(
+          "تكرار هوية الهاتف أو البريد داخل نفس الشهر أو من شهر سابق. مؤشر للمراجعة وليس حكمًا؛ المؤكد هو سبب Duplicate المسجل في أودو.",
+          "A repeated phone or email identity, within the same month or carried over from an earlier one. A review signal rather than a verdict; the confirmed figure uses the Odoo duplicate reason.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: false,
+        filterSensitive: true,
+        questions: [
+          q(
+            "التكرار جوه الشهر ولا من شهور قديمة؟",
+            "Is the duplication inside the month or carried over?",
+          ),
+          q("أنهي حملة بتجيب أكتر تكرار؟", "Which campaign produces the most duplicates?"),
+        ],
+      },
+      {
+        id: "leads.contactAttempts",
+        type: "kpi",
+        title: q("محاولات الاتصال", "Call attempts"),
+        meaning: q(
+          "عدد محاولات الاتصال الصادرة الموثقة من سجل Yeastar لكل ليد، وتوزيعها على محاولة واحدة أو اتنين أو ٣ فأكثر. غياب مكالمة لا يثبت عدم التواصل عبر واتساب.",
+          "Verified outbound Yeastar attempts per lead, split into one, two, or three and more. No logged call does not prove there was no WhatsApp contact.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: false,
+        filterSensitive: true,
+        questions: [
+          q("في ليدز محدش كلمها خالص؟", "Are there leads nobody called at all?"),
+          q("متوسط المحاولات لكل سيلز؟", "Average attempts per salesperson?"),
+        ],
+      },
+      {
+        id: "leads.firstContactLag",
+        type: "kpi",
+        title: q("زمن أول تواصل", "Time to first contact"),
+        meaning: q(
+          "الوقت بين إنشاء الليد في أودو وأول محاولة اتصال موثقة، بالساعات حيث توجد ساعة إنشاء دقيقة وبتقريب يومي فيما عدا ذلك.",
+          "The gap between the Odoo record being created and the first verified call attempt — in hours where an exact creation time exists, and day-level otherwise.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: false,
+        filterSensitive: true,
+        questions: [
+          q("بناخد قد إيه لحد أول مكالمة؟", "How long until the first call?"),
+          q("السرعة بتفرق في التحويل؟", "Does speed change conversion?"),
+        ],
+      },
+      {
+        id: "leads.unqualified",
+        type: "kpi",
+        title: q("الليدز غير المؤهلة", "Unqualified leads"),
+        meaning: q(
+          "ليدز بسبب أودو Not Qualified أو حكم مراجعة يدوي غير صالح، مقسّمة بين مشكلة في بيانات العميل ومشكلة في ملاءمة الكورس.",
+          "Leads carrying the Odoo Not Qualified reason or an invalid manual review verdict, split between a customer-data problem and a course-fit problem.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: false,
+        filterSensitive: true,
+        questions: [
+          q(
+            "المشكلة في بيانات العميل ولا في الكورس؟",
+            "Is the problem the customer's data or the course?",
+          ),
+          q("أنهي مصدر بيجيب ليدز غير مؤهلة؟", "Which source brings unqualified leads?"),
+        ],
+      },
+    ],
     suggestedQuestions: [
       q("كام ليد الشهر ده؟", "How many leads this month?"),
       q("مين أحسن مصدر؟", "Which source is best?"),
       q("في ليدز اتوزعت ومحدش كلمها؟", "Are there distributed leads nobody called?"),
+      q(
+        "إيه نسبة التحويل لتسجيل مدفوع آخر ٦ شهور؟",
+        "What is the paid conversion over the last six months?",
+      ),
     ],
   },
   {
@@ -1175,6 +1317,154 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
       ),
       q("كام محادثة لسه مصدرها غير معروف؟", "How many conversations still have an unknown source?"),
       q("إيه المحادثات اللي اتحولت لصفقات؟", "Which conversations became won deals?"),
+    ],
+  },
+  {
+    id: "lead_distribution",
+    route: "/lead-distribution",
+    title: q("توزيع الليدز حسب التخصص والدورة", "Lead distribution by specialty and course"),
+    description: q(
+      "كل سجلات الـCRM مقسّمة على التخصصات والدورات، بنوع السجل ومرحلته، مع تصدير للمراجعة.",
+      "Every CRM record split across specialties and courses, by record type and stage, with an export for review.",
+    ),
+    tabs: [],
+    sections: [
+      {
+        id: "distribution",
+        title: q("التوزيع", "Distribution"),
+        elements: ["lead_distribution.split"],
+      },
+    ],
+    elements: [
+      {
+        id: "lead_distribution.split",
+        type: "table",
+        title: q("التوزيع على الدورات", "Split across courses"),
+        meaning: q(
+          "عدد السجلات في كل دورة أو تخصص، مفصولة بين ليد نشط وليد مفقود وفرصة بيعية وسجل مؤرشف، فالإجمالي لا يُقرأ كعدد عملاء جدد.",
+          "How many records sit under each course or specialty, separated into active leads, lost leads, opportunities and archived records — so the total is not read as a count of new customers.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("أنهي دورة فيها أكبر عدد ليدز؟", "Which course holds the most leads?"),
+          q("أنهي تخصص محتاج مراجعة؟", "Which specialty needs review?"),
+        ],
+      },
+    ],
+    suggestedQuestions: [
+      q("أنهي دورة فيها أكتر ليدز؟", "Which course has the most leads?"),
+      q("قارن التخصصات على عدد الليدز", "Compare specialties on lead volume"),
+      q("كام ليد نشط مقابل مفقود؟", "How many leads are active against lost?"),
+    ],
+  },
+  {
+    id: "lead_sources",
+    route: "/lead-sources",
+    title: q("المصادر حسب الدورة", "Sources by course"),
+    description: q(
+      "مصدر الليد مقابل الدورة كمصفوفة واحدة، وهي السؤال اللي مفيش تقسيم منهم لوحده بيجاوب عليه.",
+      "Lead source against course as a single matrix — the question neither breakdown answers on its own.",
+    ),
+    tabs: [],
+    sections: [{ id: "matrix", title: q("المصفوفة", "Matrix"), elements: ["lead_sources.matrix"] }],
+    elements: [
+      {
+        id: "lead_sources.matrix",
+        type: "table",
+        title: q("المصدر × الدورة", "Source × course"),
+        meaning: q(
+          "عدد الليدز في كل خلية بين مصدر ودورة، فيظهر إن مصدر قوي في الإجمالي قد يكون ضعيفًا في دورة بعينها.",
+          "How many leads sit in each source-and-course cell, which is what shows a source that is strong overall and weak on one course.",
+        ),
+        sourceCapability: "leads",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("أنهي مصدر أحسن للدورة دي؟", "Which source is best for this course?"),
+          q("فين المصادر اللي بتجيب دورة واحدة بس؟", "Which sources bring only one course?"),
+        ],
+      },
+    ],
+    suggestedQuestions: [
+      q("أنهي مصدر أحسن لكل دورة؟", "Which source is best per course?"),
+      q("فين الدورات اللي معتمدة على مصدر واحد؟", "Which courses depend on a single source?"),
+    ],
+  },
+  {
+    id: "landing_pages",
+    route: "/landing-pages",
+    title: q("صفحات الهبوط", "Landing pages"),
+    description: q(
+      "أداء كل صفحة هبوط: المشاهدات والزوار الفريدون وبدء الفورم والإرسالات، ونسب الانتقال بينهم.",
+      "How each landing page performs: views, unique visitors, form starts and submissions, with the step rates between them.",
+    ),
+    tabs: [
+      {
+        id: "first",
+        title: q("أول لمسة", "First touch"),
+        summary: q(
+          "ينسب الزيارة لأول مصدر وصل الزائر للصفحة، وهو ما يقيس الاكتشاف.",
+          "Credits the visit to the first source that brought the visitor, which is what measures discovery.",
+        ),
+        sections: ["funnel"],
+      },
+      {
+        id: "latest",
+        title: q("آخر لمسة", "Latest touch"),
+        summary: q(
+          "ينسب الزيارة لآخر مصدر قبل الإرسال، وهو ما يقيس الإغلاق.",
+          "Credits the visit to the last source before submission, which is what measures closing.",
+        ),
+        sections: ["funnel"],
+      },
+    ],
+    sections: [
+      {
+        id: "funnel",
+        title: q("مسار الصفحة", "Page funnel"),
+        elements: ["landing_pages.views", "landing_pages.submissions"],
+      },
+    ],
+    elements: [
+      {
+        id: "landing_pages.views",
+        type: "kpi",
+        title: q("المشاهدات والزوار", "Views and visitors"),
+        meaning: q(
+          "أحداث مشاهدة الصفحة وعدد المتصفحات الفريدة. المعرّف معرّف متصفح وليس بيانات شخصية، والحقول الناقصة تبقى غير محددة ولا تُخمَّن.",
+          "Recorded page-view events and how many distinct browsers produced them. The identifier is a browser identifier, not personal data, and missing fields stay unset rather than being guessed.",
+        ),
+        sourceCapability: "attribution",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("أنهي صفحة هبوط بتجيب أكتر زيارات؟", "Which landing page draws the most visits?"),
+          q("الزيارات دي جايه منين؟", "Where are these visits coming from?"),
+        ],
+      },
+      {
+        id: "landing_pages.submissions",
+        type: "kpi",
+        title: q("الإرسالات ونسبة التحويل", "Submissions and conversion"),
+        meaning: q(
+          "عدد الفورمات المُرسلة ونسبتها من المشاهدات ومن بدء الفورم، فتظهر هل المشكلة في جذب الزيارة أم في الفورم نفسه.",
+          "How many forms were submitted, as a share of views and of form starts — which separates a traffic problem from a form problem.",
+        ),
+        sourceCapability: "attribution",
+        periodSensitive: true,
+        filterSensitive: true,
+        questions: [
+          q("ليه الفورم بيتفتح ومبيتبعتش؟", "Why is the form started but not submitted?"),
+          q("أنهي صفحة أعلى تحويل؟", "Which page converts best?"),
+        ],
+      },
+    ],
+    suggestedQuestions: [
+      q("أنهي صفحة هبوط أعلى تحويل؟", "Which landing page converts best?"),
+      q("فين بيتوقف الزائر قبل الإرسال؟", "Where does the visitor stop before submitting?"),
+      q("الزيارات جايه من أنهي حملة؟", "Which campaign is sending the visits?"),
     ],
   },
   {

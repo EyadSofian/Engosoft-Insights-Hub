@@ -110,6 +110,40 @@ describe("six-month lead performance", () => {
     expect(result.selected.averageAttempts).toBe(3);
   });
 
+  it("rates each funnel stage against the stage before it, over the base that stage can see", () => {
+    const result = buildLeadPerformance({ ...base(), selectedMonth: "2026-10" });
+    const stage = (key: string) => result.stages.find((row) => row.key === key)!;
+    expect(stage("entered").count).toBe(1);
+    expect(stage("contacted").count).toBe(1);
+    // One of one matchable lead was called: a step rate over entries would be
+    // identical here, but over an unmatchable cohort it would invent a failure.
+    expect(stage("contacted").stepRate).toBe(100);
+    expect(result.selected.contactedWithin24h).toBe(1);
+    // S6 was fully refunded, so the paid stage is honestly zero, not hidden.
+    expect(stage("paid").count).toBe(0);
+    expect(stage("paid").shareOfEntries).toBe(0);
+    // The opportunity step is today's status, never a logged transition.
+    expect(stage("opportunity").evidenced).toBe(false);
+  });
+
+  it("withholds the contacted stage instead of reading missing calls as nobody called", () => {
+    const result = buildLeadPerformance({ ...base(), calls: null, selectedMonth: "2026-10" });
+    const contacted = result.stages.find((row) => row.key === "contacted")!;
+    expect(result.selected.contacted).toBeNull();
+    expect(contacted.count).toBeNull();
+    expect(contacted.stepRate).toBeNull();
+    expect(contacted.evidenced).toBe(false);
+  });
+
+  it("carries contact evidence into every breakdown dimension, not only the month total", () => {
+    const result = buildLeadPerformance({ ...base(), selectedMonth: "2026-10" });
+    const campaign = result.byCampaign.find((row) => row.name === "cfm-shazly")!;
+    expect(campaign.averageAttempts).toBe(2);
+    expect(campaign.contacted).toBe(1);
+    const owner = result.bySalesOwner.find((row) => row.name === "Sales A")!;
+    expect(owner.averageDaysToFirstCall).toBe(1);
+  });
+
   it("reports unavailable evidence as unavailable, not as zero", () => {
     const result = buildLeadPerformance({
       ...base(),

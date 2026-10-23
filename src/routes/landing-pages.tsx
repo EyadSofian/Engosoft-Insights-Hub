@@ -18,8 +18,11 @@ import {
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
-import { Card, KpiCard, Pill, SectionTitle } from "@/components/ui-bits";
+import { Card, Pill, SectionTitle } from "@/components/ui-bits";
 import { FunnelBars } from "@/components/ui-bits";
+import { MetricDetailTrigger } from "@/components/metric-detail";
+import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
+import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/landing-pages")({ component: LandingPages });
@@ -136,6 +139,179 @@ function LandingPages() {
   const data = summary.data;
   const totals = data?.totals;
   const quality = data?.quality;
+  // The page declares which attribution basis it is showing, so "اشرحلي التاب
+  // دي" resolves against first-touch or latest-touch rather than guessing.
+  useRegisterNexusView("landing_pages", { tab: touch });
+
+  /**
+   * The five headline figures, each able to explain itself.
+   *
+   * Every breakdown and the trend come out of the same `summary` response the
+   * cards were rendered from, so opening a figure costs no request and can
+   * never disagree with the number above it.
+   */
+  const figures = useMemo((): Record<string, MetricDetail> => {
+    const pageRows = (metric: (row: LandingPageRow) => number): MetricBreakdownRow[] =>
+      (data?.landingPages ?? []).map((row) => ({
+        key: row.landingPageId,
+        label: row.landingPageName || row.landingPageSlug || row.landingPageId,
+        value: metric(row),
+        display: fmtNum(metric(row)),
+        meta: row.landingPageSlug || undefined,
+      }));
+    const sourceRows = (metric: (row: BreakdownRow) => number): MetricBreakdownRow[] =>
+      (data?.sources ?? []).map((row) => ({
+        key: row.source,
+        label: row.source || (A ? "غير محدد" : "Unset"),
+        value: metric(row),
+        display: fmtNum(metric(row)),
+      }));
+    const byPage = (title: string, metric: (row: LandingPageRow) => number) => ({
+      id: "pages",
+      title,
+      rows: topRows(pageRows(metric)),
+      emptyLabel: A ? "لا توجد صفحات في الفترة." : "No pages in this window.",
+    });
+    const bySource = (title: string, metric: (row: BreakdownRow) => number) => ({
+      id: "sources",
+      title,
+      hint: A
+        ? "المصدر كما وصل في الـUTM؛ الناقص يبقى غير محدد ولا يُخمَّن."
+        : "The source as the UTM delivered it; what is missing stays unset and is never guessed.",
+      rows: topRows(sourceRows(metric)),
+    });
+    const basis = A
+      ? touch === "first"
+        ? "منسوب لأول لمسة وصلت الزائر."
+        : "منسوب لآخر لمسة قبل الإرسال."
+      : touch === "first"
+        ? "Credited to the first touch that brought the visitor."
+        : "Credited to the latest touch before submission.";
+    const trendFor = (key: "views" | "formStarts" | "submissions", label: string) => ({
+      points: (data?.trend ?? []).map((row) => ({ date: row.date, value: row[key] })),
+      label,
+      format: (value: number) => fmtNum(value),
+    });
+    return {
+      views: {
+        id: "landing_pages.views",
+        title: A ? "المشاهدات" : "Views",
+        value: fmtNum(totals?.views),
+        tone: "sky",
+        icon: <MousePointerClick size={17} />,
+        definition: A
+          ? `أحداث مشاهدة صفحة الهبوط المسجلة في الفترة. ${basis}`
+          : `Recorded landing-page view events in the window. ${basis}`,
+        trend: trendFor("views", A ? "مشاهدات" : "Views"),
+        breakdowns: [
+          byPage(A ? "أعلى الصفحات مشاهدة" : "Most viewed pages", (row) => row.views),
+          bySource(A ? "المشاهدات حسب المصدر" : "Views by source", (row) => row.views),
+        ],
+      },
+      visitors: {
+        id: "landing_pages.views",
+        title: A ? "زوار فريدون" : "Unique visitors",
+        value: fmtNum(totals?.uniqueVisitors),
+        tone: "violet",
+        icon: <Globe2 size={17} />,
+        definition: A
+          ? "عدد المتصفحات المختلفة التي شاهدت الصفحة. المعرّف معرّف متصفح وليس بيانات شخصية."
+          : "How many distinct browsers viewed the page. The identifier is a browser identifier, not personal data.",
+        caveat: A
+          ? "متصفح واحد على جهازين يُحسب زائرين، وجهاز مشترك يُحسب زائرًا واحدًا."
+          : "One person on two devices counts twice; a shared device counts once.",
+        supporting: [
+          {
+            key: "sessions",
+            label: A ? "السيشنات" : "Sessions",
+            value: fmtNum(totals?.sessions),
+          },
+          {
+            key: "views",
+            label: A ? "المشاهدات" : "Views",
+            value: fmtNum(totals?.views),
+          },
+        ],
+        breakdowns: [
+          byPage(A ? "الزوار حسب الصفحة" : "Visitors by page", (row) => row.uniqueVisitors),
+        ],
+      },
+      formStarts: {
+        id: "landing_pages.submissions",
+        title: A ? "بدء الفورم" : "Form starts",
+        value: fmtNum(totals?.formStarts),
+        tone: "amber",
+        icon: <FileCheck2 size={17} />,
+        definition: A
+          ? "عدد المرات التي بدأ فيها الزائر تعبئة الفورم دون أن يكون أرسله بالضرورة."
+          : "How many times a visitor began filling the form, whether or not they submitted it.",
+        formula: `${A ? "مشاهدة ← بدء" : "View → start"} = ${fmtNum(totals?.formStarts)} ÷ ${fmtNum(totals?.views)} = ${ratioPct(totals?.viewToStartRate)}`,
+        trend: trendFor("formStarts", A ? "بدء الفورم" : "Form starts"),
+        breakdowns: [
+          byPage(A ? "بدء الفورم حسب الصفحة" : "Form starts by page", (row) => row.formStarts),
+        ],
+      },
+      submissions: {
+        id: "landing_pages.submissions",
+        title: A ? "الإرسالات" : "Submissions",
+        value: fmtNum(totals?.submissions),
+        tone: "mint",
+        icon: <Send size={17} />,
+        definition: A
+          ? `الفورمات المُرسلة فعلًا من صفحات الهبوط. ${basis}`
+          : `Forms actually submitted from the landing pages. ${basis}`,
+        formula: `${A ? "بدء ← إرسال" : "Start → submit"} = ${fmtNum(totals?.submissions)} ÷ ${fmtNum(totals?.formStarts)} = ${ratioPct(totals?.startToSubmissionRate)}`,
+        trend: trendFor("submissions", A ? "إرسالات" : "Submissions"),
+        breakdowns: [
+          byPage(A ? "الإرسالات حسب الصفحة" : "Submissions by page", (row) => row.submissions),
+          bySource(A ? "الإرسالات حسب المصدر" : "Submissions by source", (row) => row.submissions),
+        ],
+      },
+      conversion: {
+        id: "landing_pages.submissions",
+        title: A ? "تحويل المشاهدة" : "View CVR",
+        value: ratioPct(totals?.viewToSubmissionRate),
+        tone: "rose",
+        icon: <BarChart3 size={17} />,
+        definition: A
+          ? "نسبة المشاهدات التي انتهت بإرسال فورم، وهي ما يفصل مشكلة جذب الزيارة عن مشكلة الفورم نفسه."
+          : "The share of views that ended in a submitted form — what separates a traffic problem from a form problem.",
+        formula: `${fmtNum(totals?.submissions)} ÷ ${fmtNum(totals?.views)} = ${ratioPct(totals?.viewToSubmissionRate)}`,
+        supporting: [
+          {
+            key: "viewToStart",
+            label: A ? "مشاهدة ← بدء" : "View → start",
+            value: ratioPct(totals?.viewToStartRate),
+          },
+          {
+            key: "startToSubmit",
+            label: A ? "بدء ← إرسال" : "Start → submit",
+            value: ratioPct(totals?.startToSubmissionRate),
+          },
+        ],
+        breakdowns: [
+          {
+            id: "pageCvr",
+            title: A ? "أعلى الصفحات تحويلًا" : "Best converting pages",
+            hint: A
+              ? "الصفحات التي لها مشاهدات فقط؛ الصفحة بلا مشاهدة ليس لها نسبة."
+              : "Only pages with views; a page with none has no rate.",
+            rows: topRows(
+              (data?.landingPages ?? [])
+                .filter((row) => row.views > 0)
+                .map((row) => ({
+                  key: row.landingPageId,
+                  label: row.landingPageName || row.landingPageId,
+                  value: (row.viewToSubmissionRate ?? 0) * 100,
+                  display: ratioPct(row.viewToSubmissionRate),
+                  meta: `${fmtNum(row.views)} ${A ? "مشاهدة" : "views"}`,
+                })),
+            ),
+          },
+        ],
+      },
+    };
+  }, [A, data, totals, touch]);
   const cols: Col<LandingPageRow>[] = [
     {
       key: "page",
@@ -278,50 +454,45 @@ function LandingPages() {
 
       <PageSection level="headline" aria-label={A ? "مؤشرات صفحات الهبوط" : "Landing page metrics"}>
         <KpiRow>
-          <KpiCard
-            label={A ? "المشاهدات" : "Views"}
-            value={fmtNum(totals?.views)}
-            sub={A ? "أحداث مشاهدة فريدة داخل السيشن" : "Recorded page-view events"}
-            icon={<MousePointerClick size={17} />}
-            tone="sky"
-            loading={summary.isLoading}
-            index={0}
+          <MetricDetailTrigger
+            detail={figures.views!}
+            card={{
+              index: 0,
+              loading: summary.isLoading,
+              sub: A ? "أحداث مشاهدة مسجلة" : "Recorded page-view events",
+            }}
           />
-          <KpiCard
-            label={A ? "زوار فريدون" : "Unique visitors"}
-            value={fmtNum(totals?.uniqueVisitors)}
-            sub={A ? "معرّف المتصفح، وليس بيانات شخصية" : "Browser identifier, not PII"}
-            icon={<Globe2 size={17} />}
-            tone="violet"
-            loading={summary.isLoading}
-            index={1}
+          <MetricDetailTrigger
+            detail={figures.visitors!}
+            card={{
+              index: 1,
+              loading: summary.isLoading,
+              sub: A ? "معرّف المتصفح، وليس بيانات شخصية" : "Browser identifier, not PII",
+            }}
           />
-          <KpiCard
-            label={A ? "بدء الفورم" : "Form starts"}
-            value={fmtNum(totals?.formStarts)}
-            sub={`${A ? "مشاهدة ← بدء" : "View → start"}: ${ratioPct(totals?.viewToStartRate)}`}
-            icon={<FileCheck2 size={17} />}
-            tone="amber"
-            loading={summary.isLoading}
-            index={2}
+          <MetricDetailTrigger
+            detail={figures.formStarts!}
+            card={{
+              index: 2,
+              loading: summary.isLoading,
+              sub: `${A ? "مشاهدة ← بدء" : "View → start"}: ${ratioPct(totals?.viewToStartRate)}`,
+            }}
           />
-          <KpiCard
-            label={A ? "الإرسالات" : "Submissions"}
-            value={fmtNum(totals?.submissions)}
-            sub={`${A ? "بدء ← إرسال" : "Start → submit"}: ${ratioPct(totals?.startToSubmissionRate)}`}
-            icon={<Send size={17} />}
-            tone="mint"
-            loading={summary.isLoading}
-            index={3}
+          <MetricDetailTrigger
+            detail={figures.submissions!}
+            card={{
+              index: 3,
+              loading: summary.isLoading,
+              sub: `${A ? "بدء ← إرسال" : "Start → submit"}: ${ratioPct(totals?.startToSubmissionRate)}`,
+            }}
           />
-          <KpiCard
-            label={A ? "تحويل المشاهدة" : "View CVR"}
-            value={ratioPct(totals?.viewToSubmissionRate)}
-            sub={A ? "الإرسالات ÷ المشاهدات" : "Submissions ÷ views"}
-            icon={<BarChart3 size={17} />}
-            tone="rose"
-            loading={summary.isLoading}
-            index={4}
+          <MetricDetailTrigger
+            detail={figures.conversion!}
+            card={{
+              index: 4,
+              loading: summary.isLoading,
+              sub: A ? "الإرسالات ÷ المشاهدات" : "Submissions ÷ views",
+            }}
           />
         </KpiRow>
       </PageSection>
