@@ -1,11 +1,12 @@
 import { excludedLeadSource } from "./lead-count-policy";
-import { normalizePhone } from "./lead-contact-evidence";
+import { normalizePhone, phoneMatchKey, samePhoneIdentity } from "./lead-contact-evidence";
 import { canonicalLossReason } from "./loss-reason-taxonomy";
 import { mediaBuyerForCampaign, MEDIA_BUYERS } from "./media-buyers";
 
 export interface PerformanceLead {
   id: string;
   createdAt: string;
+  createdAtUtc?: string;
   recordType: "lead" | "opportunity";
   status: "lead" | "open" | "won" | "lost";
   source: string;
@@ -30,6 +31,7 @@ export interface PerformanceCall {
   phone: string;
   day: string;
   totalCalls: number;
+  firstCallAt?: string;
 }
 
 export interface PerformanceQa {
@@ -63,6 +65,8 @@ export interface PerformanceGroup {
   contact3Plus: number | null;
   averageAttempts: number | null;
   averageDaysToFirstCall: number | null;
+  averageHoursToFirstCall: number | null;
+  exactLagSample: number | null;
   callMatchable: number | null;
 }
 
@@ -141,6 +145,7 @@ type Enriched = PerformanceLead & {
   closer: string;
   calls: number | null;
   firstCallLagDays: number | null;
+  firstCallLagHours: number | null;
 };
 
 function aggregate(name: string, records: Enriched[], callsAvailable: boolean): PerformanceGroup {
@@ -148,6 +153,9 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
   const matched = records.filter((row) => row.calls !== null);
   const lags = records
     .map((row) => row.firstCallLagDays)
+    .filter((lag): lag is number => lag !== null);
+  const exactLags = records
+    .map((row) => row.firstCallLagHours)
     .filter((lag): lag is number => lag !== null);
   return {
     name,
@@ -190,6 +198,11 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
       callsAvailable && lags.length
         ? round2(lags.reduce((sum, lag) => sum + lag, 0) / lags.length)
         : null,
+    averageHoursToFirstCall:
+      callsAvailable && exactLags.length
+        ? round2(exactLags.reduce((sum, lag) => sum + lag, 0) / exactLags.length)
+        : null,
+    exactLagSample: callsAvailable ? exactLags.length : null,
     callMatchable: callsAvailable ? matched.length : null,
   };
 }
@@ -280,7 +293,7 @@ export function buildLeadPerformance(input: {
         : "earlier"
       : null;
     for (const key of keys) if (!firstByIdentity.has(key)) firstByIdentity.set(key, lead.createdAt);
-    for (const key of keys.filter((value) => value.startsWith("p:"))) {
+    for (const key of [...new Set([lead.phone, lead.mobile].map(phoneMatchKey).filter(Boolean))]) {
       const owners = phoneOwners.get(key) ?? new Set<string>();
       owners.add(lead.id);
       phoneOwners.set(key, owners);
@@ -301,6 +314,7 @@ export function buildLeadPerformance(input: {
       closer: "",
       calls: null,
       firstCallLagDays: null,
+      firstCallLagHours: null,
     });
   }
 
@@ -357,17 +371,20 @@ export function buildLeadPerformance(input: {
     const callMap = new Map<string, PerformanceCall[]>();
     for (const call of input.calls) {
       const phone = normalizePhone(call.phone);
-      if (!phone.e164 || !call.day || call.day > input.asOf) continue;
-      const key = `p:${phone.e164}`;
+      if (!phone.key || !call.day || call.day > input.asOf) continue;
+      const key = phone.key;
       const list = callMap.get(key) ?? [];
       list.push(call);
       callMap.set(key, list);
     }
     for (const lead of enriched.values()) {
-      const phones = identityKeys(lead).filter((key) => key.startsWith("p:"));
+      const phones = [...new Set([lead.phone, lead.mobile].map(phoneMatchKey).filter(Boolean))];
       if (!phones.length || phones.some((key) => (phoneOwners.get(key)?.size ?? 0) !== 1)) continue;
+      const leadPhones = [lead.phone, lead.mobile].filter(Boolean).map(normalizePhone);
       const calls = [...new Set(phones.flatMap((key) => callMap.get(key) ?? []))].filter(
-        (call) => call.day >= dateOnly(lead.createdAt),
+        (call) =>
+          call.day >= dateOnly(lead.createdAt) &&
+          leadPhones.some((phone) => samePhoneIdentity(phone, normalizePhone(call.phone))),
       );
       lead.calls = calls.reduce((sum, call) => sum + Math.max(0, call.totalCalls), 0);
       const first = calls.map((call) => call.day).sort()[0];
@@ -376,6 +393,22 @@ export function buildLeadPerformance(input: {
           (Date.parse(`${first}T00:00:00Z`) - Date.parse(`${dateOnly(lead.createdAt)}T00:00:00Z`)) /
           DAY_MS;
         if (Number.isFinite(lag) && lag >= 0) lead.firstCallLagDays = lag;
+      }
+      const firstInstant = calls
+        .map((call) => call.firstCallAt ?? "")
+        .filter(Boolean)
+        .sort()[0];
+      const createdInstant = lead.createdAtUtc
+        ? Date.parse(`${lead.createdAtUtc.replace(" ", "T")}Z`)
+        : NaN;
+      const calledInstant = firstInstant
+        ? Date.parse(
+            firstInstant.includes("T") ? firstInstant : `${firstInstant.replace(" ", "T")}Z`,
+          )
+        : NaN;
+      if (Number.isFinite(createdInstant) && Number.isFinite(calledInstant)) {
+        const hours = (calledInstant - createdInstant) / 3_600_000;
+        if (hours >= 0) lead.firstCallLagHours = hours;
       }
     }
   }

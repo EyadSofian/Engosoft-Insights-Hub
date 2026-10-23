@@ -2161,6 +2161,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           businessStatus: crmBusinessStatus(r["Business Status"], recordType, won),
           stageKey: crmStageKey(r["Stage Key"]),
           createdAt,
+          createdAtUtc: str(r["__odoo_create_date_utc"]),
           closedAt,
           daysToClose: closedAt ? daysBetween(createdAt, closedAt) : null,
           campaignName,
@@ -2590,6 +2591,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           sourceKey: normalizeSource(source),
           stage: str(r["Cleaned Stage"]) || str(r["المرحلة"]),
           createdAt: parseDate(r["أنشئ في"]),
+          createdAtUtc: str(r["__odoo_create_date_utc"]),
           closeDate:
             parseDate(r["__canonical_lost_date"]) ||
             parseDate(r["Lost Date"]) ||

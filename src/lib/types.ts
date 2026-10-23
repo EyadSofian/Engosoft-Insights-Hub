@@ -177,6 +177,8 @@ export interface CrmLeadRow {
   /** Stable XMLID-derived stage key. The translated stage label is display-only. */
   stageKey: CrmStageKey;
   createdAt: string;
+  /** Source Odoo create_date in UTC when present. */
+  createdAtUtc?: string;
   closedAt: string;
   /** Days from creation to close. Only meaningful when `closedAt` is set. */
   daysToClose: number | null;
@@ -414,6 +416,8 @@ export interface LostRow {
   sourceKey: string;
   stage: string;
   createdAt: string;
+  /** Source Odoo create_date in UTC when present. */
+  createdAtUtc?: string;
   /** Canonical Lost movement date: Lead `date_closed`; Opportunity verification/stage date. */
   closeDate: string;
   lostDate: string;

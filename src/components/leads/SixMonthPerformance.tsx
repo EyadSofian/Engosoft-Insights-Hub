@@ -16,6 +16,8 @@ import { ErrorState, Skeleton } from "@/components/ui-bits";
 import type { PerformanceGroup, PerformanceResult } from "@/lib/lead-performance";
 
 type Response = PerformanceResult & {
+  collectionsByMonth: { month: string; paidInvoices: number; paidUsd: number }[];
+  callCoverage: { expectedDays: number; coveredDays: number; newestSync: string | null } | null;
   syncedAt: string;
   linksRefreshedAt: string | null;
   availability: {
@@ -37,8 +39,8 @@ const copy = {
       "الفترة ثابتة: آخر ٦ أشهر تقويمية، والشهر الحالي حتى اليوم. فلاتر الكورس العامة فقط تنطبق هنا.",
     leads: "سجلات CRM جديدة",
     lost: "فُقدت حتى الآن",
-    paid: "تسجيلات مدفوعة مثبتة",
-    rate: "تحويل مدفوع مثبت",
+    paid: "ليدز ثبت دفعها وربطها",
+    rate: "تحويل مدفوع مثبت (حد أدنى)",
     later: "دُفعت في شهر لاحق",
     revenue: "صافي تحصيل المجموعة",
     trend: "مقارنة مجموعات الدخول الشهرية",
@@ -59,6 +61,7 @@ const copy = {
     many: "٣ محاولات فأكثر",
     avgAttempts: "متوسط المحاولات",
     avgDays: "أيام لأول محاولة (تقريب يومي)",
+    avgHours: "ساعات لأول محاولة موثّقة",
     coverage: "تغطية الاتصال",
     reasons: "أسباب الفقدان",
     reasonsSub: "تصنيفات السبب ضمن سجلات Lost الحالية لمجموعة الدخول المختارة.",
@@ -84,7 +87,7 @@ const copy = {
       "الجديد = سجل أودو أُنشئ في الشهر، سواء أصبح لاحقًا Opportunity أو Lost. التكرار المحتمل = هوية هاتف/بريد تكررت ولا يعني إلغاء التسجيل تلقائيًا؛ المؤكد هو سبب Duplicate في أودو. غير المؤهل = سبب أودو Not Qualified أو حكم QA يدوي غير صالح. لا يرد/تعذر الوصول/غير مهتم هي أسباب داخل Lost وليست أرقامًا تُضاف فوقه. التحويل = أمر بيع مرتبط بالفرصة ارتباطًا مباشرًا وله صافي فواتير مدفوعة موجب بعد الخصم، وليس مجرد Won في CRM.",
     limits: "حدود الدقة",
     limitsText:
-      "*تصنيف الفرصة وLost هو الوضع الحالي، وليس سجل انتقال تاريخي أو لقطة لنهاية شهر الدخول؛ لذلك مستوى الفرصة مؤشر لا مسارًا تاريخيًا مثبتًا. الكورس والمصدر والحملة ومسؤول الليد هي حقول أودو الحالية، وقد تكون تغيّرت منذ دخوله. إسناد الميديا باير من اسم الحملة وقواعد ملكية الكورسات المعتمدة. بيانات المكالمات PBX فقط؛ عدم ظهور مكالمة لا يثبت عدم التواصل عبر واتساب. التكرار بالهوية مؤشر للمراجعة وليس حكمًا نهائيًا. زمن أول اتصال بالأيام لأن نسخة CRM المجمعة بلا ساعة إنشاء دقيقة. الفواتير غير المربوطة لا تُنسب تخمينًا، والإنفاق الإعلاني لا يظهر هنا لعدم وجود ربط محقق بين كل فاتورة وحملة.",
+      "*تصنيف الفرصة وLost هو الوضع الحالي، وليس سجل انتقال تاريخي أو لقطة لنهاية شهر الدخول؛ لذلك مستوى الفرصة مؤشر لا مسارًا تاريخيًا مثبتًا. الكورس والمصدر والحملة ومسؤول الليد هي حقول أودو الحالية، وقد تكون تغيّرت منذ دخوله. إسناد الميديا باير من اسم الحملة وقواعد ملكية الكورسات المعتمدة. عدد المحاولات من سجل Yeastar المباشر فقط بعد تغطية كل أيام الفترة؛ سجلات أطراف المكالمة المتعددة تُحسب محاولة واحدة. Chatter أودو متاح لفحص السجل منفردًا لكنه ليس مجمّعًا بعد، وغياب مكالمة لا يثبت عدم التواصل عبر واتساب. التكرار بالهوية مؤشر للمراجعة وليس حكمًا نهائيًا. زمن أول اتصال بالساعات حيث توجد ساعة إنشاء أودو الدقيقة، وإلا يظهر تقريب بالأيام. الفواتير غير المربوطة لا تُنسب تخمينًا، والإنفاق الإعلاني لا يظهر هنا لعدم وجود ربط محقق بين كل فاتورة وحملة.",
     missingLinks: "ربط أوامر البيع غير متاح؛ مؤشرات الدفع غير مكتملة.",
     limitedLinks:
       "تغطية ربط بنود الحسابات بأوامر البيع منخفضة؛ التحويل المعروض حد أدنى مُثبت وليس معدل التحويل الحقيقي لكل الليدز، فلا تستخدمه وحده لتقييم الفريق.",
@@ -93,14 +96,21 @@ const copy = {
       "بيانات CRM قديمة؛ أوقفت التقرير حتى لا يظهر الصفر أو نسبة تحويل مضللة. راجع مزامنة أودو.",
     staleLost:
       "بيانات Lost غير متاحة أو قديمة؛ أوقفت التقرير لأن إجمالي الليدز ونسبة الفقدان سيصبحان ناقصين.",
-    missingCalls: "مصدر المكالمات غير متاح؛ لا يمكن الحكم على المحاولات.",
+    missingCalls:
+      "لم تكتمل تغطية سجلات المكالمات المباشرة من Yeastar؛ أوقفت أرقام المحاولات حتى لا تظهر ناقصة.",
     missingQa: "التحقق اليدوي من جودة الليد غير متاح؛ غير المؤهل هنا من سبب أودو فقط.",
+    noQaReviews:
+      "لم تُسجَّل مراجعات جودة يدوية لهذه المجموعة؛ أسباب عدم التأهل الظاهرة لا تمثل تدقيقًا كاملًا لجودة الليدز.",
     excluded: "مستبعد من مؤشرات الاستحواذ",
     unknown: "بيانات غير منسوبة",
     rows: "سجل",
     all: "كل الكورسات",
     noRows: "لا توجد سجلات لهذه المجموعة.",
     wonCaveat: "Won في CRM ظاهر للمراجعة فقط، ولا يدخل في معدل التسجيل المدفوع.",
+    paymentMonth: "فواتير مدفوعة خلال الشهر",
+    cohortVsPayment:
+      "مش نفس المؤشر: الفواتير حسب تاريخ الدفع تشمل ليدز من شهور سابقة وقد تشمل فواتير بلا ربط مؤكد. التسجيلات المثبتة أعلاه تُنسب لشهر دخول الليد، ولا تضم إلا الربط المباشر بأمر البيع. لا يصح اعتبار الفرق ليدز مفقودة أو نسبة تحويل.",
+    paymentRevenue: "تحصيل فواتير الشهر",
   },
   en: {
     title: "From lead to paid enrollment",
@@ -109,8 +119,8 @@ const copy = {
       "Fixed window: six calendar months, current month through today. Only the global course filter applies here.",
     leads: "New CRM records",
     lost: "Lost to date",
-    paid: "Verified paid enrollments",
-    rate: "Verified paid conversion",
+    paid: "Exactly linked paid leads",
+    rate: "Verified paid conversion (lower bound)",
     later: "Paid in a later month",
     revenue: "Net cohort collections",
     trend: "Entry-cohort comparison",
@@ -131,6 +141,7 @@ const copy = {
     many: "Three or more",
     avgAttempts: "Average attempts",
     avgDays: "Days to first attempt (day-level)",
+    avgHours: "Hours to first documented attempt",
     coverage: "Call coverage",
     reasons: "Loss reasons",
     reasonsSub: "Reasons within the current Lost records of the selected entry cohort.",
@@ -156,7 +167,7 @@ const copy = {
       "New means an Odoo CRM record created in the month, including records later converted to Opportunity or Lost. Potential duplicate means matching phone/email identity, not an automatic removal; confirmed duplicate uses the Odoo loss reason. Unqualified means Odoo Not Qualified reason or an invalid manual QA verdict. No answer, unreachable and not interested are reasons within Lost, not extra additive categories. Conversion requires an exact opportunity-linked sale order with positive net paid invoices after credit notes; CRM Won alone never counts.",
     limits: "Accuracy limits",
     limitsText:
-      "*Opportunity/Lost is the current status, not a verified transition history or historical month-end snapshot; the opportunity step is a proxy. Course, source, campaign and lead owner are current Odoo fields and may have changed since entry. Media buyer follows campaign naming and approved course ownership. Calls Hub covers PBX only; missing PBX calls do not prove no WhatsApp contact. Identity duplicates require review. First-contact lag is day-level because consolidated CRM creation lacks a reliable time. Unlinked invoices are not guessed onto leads or buyers; ad spend is omitted here without verified invoice-to-campaign attribution.",
+      "*Opportunity/Lost is the current status, not a verified transition history or historical month-end snapshot; the opportunity step is a proxy. Course, source, campaign and lead owner are current Odoo fields and may have changed since entry. Media buyer follows campaign naming and approved course ownership. Attempts come from direct Yeastar CDRs only after every day in the period is covered; multiple call legs count as one attempt. Odoo Chatter can be inspected per record but is not yet bulk-aggregated, and no PBX call does not prove no WhatsApp contact. Identity duplicates require review. First-contact lag uses exact Odoo creation time when present and day-level approximation otherwise. Unlinked invoices are not guessed onto leads or buyers; ad spend is omitted here without verified invoice-to-campaign attribution.",
     missingLinks: "Sale-order linkage is unavailable; paid metrics are incomplete.",
     limitedLinks:
       "Accounting-line to sale-order coverage is low. Shown conversion is a verified lower bound, not the true conversion of all leads; do not use it alone to judge staff.",
@@ -166,14 +177,21 @@ const copy = {
       "CRM data is stale. This report is paused rather than displaying a misleading zero or conversion rate. Check Odoo sync.",
     staleLost:
       "Lost data is unavailable or stale. This report is paused because entry counts and loss rates would be incomplete.",
-    missingCalls: "Calls Hub is unavailable; attempt metrics cannot be assessed.",
+    missingCalls:
+      "Direct Yeastar CDR coverage is incomplete; attempt metrics are withheld rather than shown too low.",
     missingQa: "Manual lead QA is unavailable; unqualified uses Odoo reason only.",
+    noQaReviews:
+      "No manual quality reviews exist for this cohort; the displayed unqualified reasons are not a complete lead-quality audit.",
     excluded: "Excluded from acquisition KPIs",
     unknown: "Unattributed data",
     rows: "records",
     all: "All courses",
     noRows: "No records for this cohort.",
     wonCaveat: "CRM Won is shown for audit only; it does not enter paid conversion.",
+    paymentMonth: "Paid invoices in payment month",
+    cohortVsPayment:
+      "These are different measures: payment-month invoices can belong to older leads or lack an exact link. Verified enrollments above are credited to the lead entry month only after a direct sale-order link. The difference is not missing leads or a conversion rate.",
+    paymentRevenue: "Payment-month collections",
   },
 } as const;
 
@@ -256,6 +274,9 @@ export function SixMonthPerformance() {
     );
   if (!data) return null;
   const selected = data.selected;
+  const selectedCollections = data.collectionsByMonth.find(
+    (row) => row.month === data.selectedMonth,
+  );
   const paidReady = data.coverage.linksAvailable && data.availability.accounting;
   const linkedLines = data.coverage.linkedAccountingLines;
   const totalLines = linkedLines + data.coverage.unlinkedAccountingLines;
@@ -318,15 +339,23 @@ export function SixMonthPerformance() {
         (linkCoverage !== null && linkCoverage < 90) ||
         !data.availability.accounting ||
         !data.coverage.callsAvailable ||
-        !data.coverage.qaAvailable) && (
+        !data.coverage.qaAvailable ||
+        (data.coverage.qaAvailable && data.coverage.qaReviewed === 0)) && (
         <div className="space-y-2">
           {!data.coverage.linksAvailable && <Notice text={t.missingLinks} />}
           {linkCoverage !== null && linkCoverage < 90 && (
             <Notice text={`${t.limitedLinks} (${pct(linkCoverage)})`} />
           )}
           {!data.availability.accounting && <Notice text={t.missingAccounting} />}
-          {!data.coverage.callsAvailable && <Notice text={t.missingCalls} />}
+          {!data.coverage.callsAvailable && (
+            <Notice
+              text={`${t.missingCalls} ${data.callCoverage ? `(${data.callCoverage.coveredDays}/${data.callCoverage.expectedDays} ${lang === "ar" ? "يوم" : "days"})` : ""}`}
+            />
+          )}
           {!data.coverage.qaAvailable && <Notice text={t.missingQa} />}
+          {data.coverage.qaAvailable && data.coverage.qaReviewed === 0 && (
+            <Notice text={t.noQaReviews} />
+          )}
         </div>
       )}
 
@@ -376,6 +405,24 @@ export function SixMonthPerformance() {
         />
       </div>
 
+      <section className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-900 dark:bg-amber-950/20 md:p-6">
+        <div className="flex items-center gap-2 text-sm font-black text-amber-900 dark:text-amber-200">
+          <ReceiptText size={17} /> {t.paymentMonth} · {data.selectedMonth}
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-2">
+          <div className="text-3xl font-black tabular-nums text-slate-950 dark:text-white">
+            {data.availability.accounting ? n(selectedCollections?.paidInvoices) : "—"}
+          </div>
+          <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            {t.paymentRevenue}:{" "}
+            {data.availability.accounting ? money(selectedCollections?.paidUsd ?? 0) : "—"}
+          </div>
+        </div>
+        <p className="mt-3 max-w-5xl text-xs leading-6 text-amber-950/80 dark:text-amber-100/80">
+          {t.cohortVsPayment}
+        </p>
+      </section>
+
       <section
         id="performance-trend"
         className="scroll-mt-28 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6"
@@ -420,6 +467,7 @@ export function SixMonthPerformance() {
                 <th className="py-2 text-end">{t.unqualified}</th>
                 <th className="py-2 text-end">{t.lost}</th>
                 <th className="py-2 text-end">{t.paid}</th>
+                <th className="py-2 text-end">{t.paymentMonth}</th>
                 <th className="py-2 text-end">{t.rate}</th>
               </tr>
             </thead>
@@ -442,6 +490,14 @@ export function SixMonthPerformance() {
                   </td>
                   <td className="py-2 text-end tabular-nums text-emerald-600">
                     {paidReady ? n(row.paidLeads) : "—"}
+                  </td>
+                  <td className="py-2 text-end tabular-nums text-amber-700">
+                    {data.availability.accounting
+                      ? n(
+                          data.collectionsByMonth.find((item) => item.month === row.name)
+                            ?.paidInvoices,
+                        )
+                      : "—"}
                   </td>
                   <td className="py-2 text-end tabular-nums">
                     {paidReady ? pct(row.conversionRate) : "—"}
@@ -517,7 +573,7 @@ export function SixMonthPerformance() {
           title={t.contact}
           subtitle={
             data.coverage.callsAvailable
-              ? `${t.coverage}: ${n(selected.callMatchable)} / ${n(selected.leads)}`
+              ? `${t.coverage}: ${n(selected.callMatchable)} / ${n(selected.leads)} · ${selected.exactLagSample ? `${n(selected.exactLagSample)} ${lang === "ar" ? "بتوقيت إنشاء دقيق" : "with exact creation time"}` : lang === "ar" ? "تقدير يومي فقط" : "day-level estimate only"}`
               : t.missingCalls
           }
         />
@@ -527,7 +583,10 @@ export function SixMonthPerformance() {
           <SmallStat label={t.two} value={n(selected.contact2)} />
           <SmallStat label={t.many} value={n(selected.contact3Plus)} />
           <SmallStat label={t.avgAttempts} value={n(selected.averageAttempts)} />
-          <SmallStat label={t.avgDays} value={n(selected.averageDaysToFirstCall)} />
+          <SmallStat
+            label={selected.averageHoursToFirstCall !== null ? t.avgHours : t.avgDays}
+            value={n(selected.averageHoursToFirstCall ?? selected.averageDaysToFirstCall)}
+          />
         </div>
       </section>
 

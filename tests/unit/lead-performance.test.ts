@@ -97,6 +97,19 @@ describe("six-month lead performance", () => {
     expect(may.unqualifiedReasons.find((row) => row.category === "customer_data")?.count).toBe(1);
   });
 
+  it("matches PBX trunk-normalized digits to one unique CRM phone without guessing shared owners", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [lead("only", "2026-10-03", { phone: "+966500000006" })],
+      invoices: [],
+      links: [],
+      calls: [{ phone: "6500000006", day: "2026-10-04", totalCalls: 3 }],
+      selectedMonth: "2026-10",
+    });
+    expect(result.selected.contact3Plus).toBe(1);
+    expect(result.selected.averageAttempts).toBe(3);
+  });
+
   it("reports unavailable evidence as unavailable, not as zero", () => {
     const result = buildLeadPerformance({
       ...base(),

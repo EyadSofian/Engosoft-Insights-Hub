@@ -7,7 +7,8 @@ export const Route = createFileRoute("/api/lead-performance")({
       GET: async ({ request }) => {
         const { json } = await import("@/lib/api.server");
         const { loadAllData } = await import("@/lib/sheet-cache.server");
-        const { getCallsHubLeadCalls } = await import("@/lib/calls-hub.server");
+        const { readVerifiedYeastarLeadCalls, refreshRecentYeastarCdr, yeastarCdrCoverage } =
+          await import("@/lib/yeastar-cdr.server");
         const { leadQaConfigured, readLeadQaVerifications } = await import("@/lib/lead-qa.server");
         const { acquisitionDatabaseConfigured, getPool, BUSINESS_TIME_ZONE } =
           await import("@/lib/acquisition-attribution.server");
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/api/lead-performance")({
           ...snapshot.crm.map((row) => ({
             id: row.id,
             createdAt: row.createdAt,
+            createdAtUtc: row.createdAtUtc,
             recordType: row.recordType,
             status: row.businessStatus,
             source: row.source,
@@ -61,6 +63,7 @@ export const Route = createFileRoute("/api/lead-performance")({
           ...snapshot.lost.map((row) => ({
             id: row.id,
             createdAt: row.createdAt,
+            createdAtUtc: row.createdAtUtc,
             recordType: row.recordType,
             status: row.businessStatus,
             source: row.source,
@@ -104,15 +107,18 @@ export const Route = createFileRoute("/api/lead-performance")({
               refreshedAt: null,
               rows: [] as { orderName: string; opportunityId: string }[],
             });
-        const callsPromise = getCallsHubLeadCalls(firstDay, asOf)
+        const callsPromise = refreshRecentYeastarCdr(asOf)
+          .then(() => readVerifiedYeastarLeadCalls(firstDay, asOf))
           .then((rows) =>
             rows.map((row) => ({
               phone: row.phone,
               day: row.callDate,
               totalCalls: row.totalCalls,
+              firstCallAt: row.firstCallAt,
             })),
           )
           .catch(() => null);
+        const callCoveragePromise = yeastarCdrCoverage(firstDay, asOf).catch(() => null);
         const qaPromise = leadQaConfigured()
           ? readLeadQaVerifications(
               leads.filter((row) => row.createdAt >= firstDay).map((row) => row.id),
@@ -126,7 +132,12 @@ export const Route = createFileRoute("/api/lead-performance")({
               )
               .catch(() => null)
           : Promise.resolve(null);
-        const [links, calls, qa] = await Promise.all([linksPromise, callsPromise, qaPromise]);
+        const [links, calls, qa, callCoverage] = await Promise.all([
+          linksPromise,
+          callsPromise,
+          qaPromise,
+          callCoveragePromise,
+        ]);
 
         const invoices = snapshot.accounting
           .filter((row) => !isExcludedFromSalesRevenue(row))
@@ -148,12 +159,36 @@ export const Route = createFileRoute("/api/lead-performance")({
           course: url.searchParams.get("course") ?? undefined,
           linksAvailable: links.available,
         });
+        // This is a separate payment-month view, not an entry-cohort conversion
+        // numerator. A paid invoice can belong to an older lead or lack an
+        // opportunity link altogether; never silently make it disappear.
+        const collectionsByMonth = months.map((month) => {
+          const paidLines = snapshot.accounting.filter(
+            (row) =>
+              !row.isCreditNote &&
+              !isExcludedFromSalesRevenue(row) &&
+              row.paymentDate.slice(0, 7) === month &&
+              row.paymentDate.slice(0, 10) <= asOf,
+          );
+          return {
+            month,
+            paidInvoices: new Set(paidLines.map((row) => row.movement).filter(Boolean)).size,
+            paidUsd:
+              Math.round(
+                paidLines.reduce((sum, row) => sum + accountingUsdPaid(row, DEFAULT_FX_RATES), 0) *
+                  100,
+              ) / 100,
+          };
+        });
         return json({
           ...result,
+          collectionsByMonth,
+          callCoverage,
           source: {
             crm: "Odoo CRM (creation date; current status)",
             payments: "Paid Accounting lines + exact sale.order.opportunity_id link",
-            calls: "Calls Hub / Yeastar PBX (calendar-day precision)",
+            calls:
+              "Yeastar PBX direct CDR API (unique outbound call ID; full-day coverage required)",
             qa: "Manual lead QA + canonical Odoo loss reason",
           },
           availability: {

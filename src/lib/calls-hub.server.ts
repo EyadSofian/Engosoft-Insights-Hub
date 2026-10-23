@@ -114,6 +114,67 @@ async function fetchJson(url: URL): Promise<unknown> {
   return response.json();
 }
 
+/**
+ * The old Calls Hub domain can disappear while the Yeastar ingest remains
+ * healthy in this app's PostgreSQL. Read that same PBX evidence by phone/day;
+ * never turn an unavailable or stale feed into zero calls.
+ */
+async function readStoredLeadCalls(from: string, to: string): Promise<CallsHubLeadCallAggregate[]> {
+  const { getSharedDatabasePool } = await import("./database-pool.server");
+  const pool = getSharedDatabasePool();
+  const state = await pool.query<{ status: string; synced_at: Date | string }>(
+    "SELECT status, synced_at FROM dashboard_sync_state WHERE dataset = 'sla_calls'",
+  );
+  const sync = state.rows[0];
+  const age = Date.now() - Date.parse(String(sync?.synced_at ?? ""));
+  if (sync?.status !== "success" || !Number.isFinite(age) || age < 0 || age > 36 * 3_600_000)
+    throw new Error("Yeastar call feed is unavailable or stale");
+
+  const result = await pool.query<{
+    phone: string;
+    agent_name: string;
+    agent_extension: string;
+    call_day: string;
+    total_calls: number;
+    answered_calls: number;
+    first_call_at: string;
+    latest_call_at: string;
+    latest_call_id: string;
+  }>(
+    `SELECT row_data->>'remote_normalized' AS phone,
+            COALESCE(row_data->>'user_name', '') AS agent_name,
+            COALESCE(row_data->>'extension', '') AS agent_extension,
+            ((row_data->>'started_at')::timestamptz AT TIME ZONE 'Africa/Cairo')::date::text AS call_day,
+            count(*)::int AS total_calls,
+            count(*) FILTER (WHERE COALESCE(NULLIF(row_data->>'talk_sec', '')::numeric, 0) > 0
+                  OR upper(COALESCE(row_data->>'disposition', '')) = 'ANSWERED')::int AS answered_calls,
+            min(row_data->>'started_at') AS first_call_at,
+            max(row_data->>'started_at') AS latest_call_at,
+            (array_agg(row_data->>'call_id' ORDER BY row_data->>'started_at' DESC))[1] AS latest_call_id
+       FROM dashboard_rows
+      WHERE dataset = 'sla_calls'
+        AND record_date >= ($1::date - 1)
+        AND record_date <= ($2::date + 1)
+        AND lower(COALESCE(row_data->>'direction', '')) = 'outbound'
+        AND length(COALESCE(row_data->>'remote_normalized', '')) >= 9
+        AND ((row_data->>'started_at')::timestamptz AT TIME ZONE 'Africa/Cairo')::date
+              BETWEEN $1::date AND $2::date
+      GROUP BY 1, 2, 3, 4`,
+    [from, to],
+  );
+  return result.rows.map((row) => ({
+    phone: row.phone,
+    agentName: row.agent_name,
+    agentExtension: row.agent_extension,
+    callDate: row.call_day,
+    totalCalls: Number(row.total_calls),
+    answeredCalls: Number(row.answered_calls),
+    firstCallAt: row.first_call_at,
+    latestCallAt: row.latest_call_at,
+    latestCallId: row.latest_call_id,
+  }));
+}
+
 function employeeSummary(value: unknown): CallsHubEmployeeSummary | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
@@ -204,7 +265,14 @@ export async function getCallsHubLeadCalls(
     const url = new URL("/api/integrations/insights/lead-calls", `${baseUrl()}/`);
     url.searchParams.set("from", from);
     url.searchParams.set("to", to);
-    const body = (await fetchJson(url)) as Record<string, unknown>;
+    let body: Record<string, unknown>;
+    try {
+      body = (await fetchJson(url)) as Record<string, unknown>;
+    } catch {
+      const value = await readStoredLeadCalls(from, to);
+      leadCallsCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value });
+      return value;
+    }
     const rows = Array.isArray(body.rows) ? body.rows : [];
     const value = rows.flatMap((item) => {
       if (!item || typeof item !== "object") return [];
