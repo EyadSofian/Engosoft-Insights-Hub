@@ -42,7 +42,7 @@ Three things were wrong with it, and all three are now fixed:
 | 7 | Fresh leads → paid registrations per month, and conversion rate | ✅ | Unchanged |
 | 8 | Registrations, count and value, by course/source/campaign/buyer/closer | ✅ including `bySalesCloser` | Unchanged |
 | 9 | Cohort conversion including sales closed in a later month | ✅ `paidLater`; cohorts are entry-month by design | Unchanged |
-| 10 | Sales funnel: count **and conversion %** at every stage | Three stages, counts only, no rates | **Rebuilt**: four stages, each with its step rate and its share of entries |
+| 10 | Sales funnel: count **and conversion %** at every stage | Three stages, counts only, no rates | Four cohort stages with share of entries; only PBX contact has a verified stage rate. Historical transition rates remain unavailable. |
 | 11 | Monthly dashboard comparing volume, quality, conversion, loss reasons, media-buyer and sales performance | Partial | Monthly table now carries all of it; dimension table carries buyer and salesperson |
 | 12 | One agreed definition of Fresh / Duplicate / Unqualified / No interest / Lost | ✅ Excellent definitions panel | Unchanged, and now carried into the export |
 | 13 | Conversion computed on real paid registrations | ✅ Positive net paid invoices on an exactly linked sale order | Unchanged |
@@ -52,17 +52,17 @@ Three things were wrong with it, and all three are now fixed:
 ### Metric layer — `src/lib/lead-performance.ts`
 
 - `contacted` and `contactedWithin24h` per group: leads with at least one
-  verified outbound PBX attempt, and those first reached inside a working day.
+  verified outbound PBX attempt, and those called within 24 hours where exact
+  creation and call timestamps exist.
   Both are `null` when call coverage is incomplete.
-- `performanceStages(group, paidReady)` — the staged funnel the request asks
-  for. Two deliberate decisions:
+- `performanceStages(group, paidReady)` — a cohort-stage overview. Two deliberate decisions:
   - **`contacted` is rated over `callMatchable`, not over entries.** Dividing a
     matched numerator by an unmatched denominator would invent a follow-up
     failure out of a phone-matching limit and blame the sales team for it.
-  - **`paid` is rated against entries, not against the opportunity count.** The
-    opportunity flag is *today's* status; a lead can be paid while its record
-    no longer reads as an open opportunity, and a step rate over that would
-    exceed 100%.
+  - **Opportunity and paid step rates are withheld.** The opportunity flag is
+    *today's* status, not a historical transition. Both stages still show
+    their share of original entries; calling that a previous-stage conversion
+    would mislead readers.
 - Every stage carries `evidenced`, which is `false` for the opportunity step —
   it is a current-status proxy, not a logged transition, and the page says so.
 
@@ -93,7 +93,8 @@ Rebuilt on the project's own system instead of a private palette:
   trend, top breakdowns by course/source/buyer/closer, and a provenance block
   naming the systems joined. All assembled from the response already rendered,
   so opening a figure costs no request.
-- The funnel shows every stage's step rate and share of entries.
+- The funnel shows every stage's share of entries and the verified PBX contact
+  rate over phone-matchable leads. Other transition rates stay unavailable.
 - Both tables are `DataTable`s: sortable, searchable, with a column chooser and
   CSV. One shared column set is used by the monthly table and every dimension,
   which is why the follow-up columns now reach the per-salesperson view.

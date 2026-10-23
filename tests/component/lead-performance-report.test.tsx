@@ -163,15 +163,15 @@ afterEach(() => {
 });
 
 describe("the six-month lead-to-paid report", () => {
-  it("rates every funnel stage against the one before it", async () => {
+  it("shows a verified contact rate but does not invent opportunity or paid transitions", async () => {
     mount(response());
     await waitFor(() => expect(screen.getByText(/Evidence-backed funnel/i)).toBeTruthy());
     const funnel = screen.getByText(/Evidence-backed funnel/i).closest("section")!;
     // 70 contacted of 80 matchable leads — over entries it would read 70%,
     // which would blame follow-up for a phone-matching limit.
-    expect(within(funnel).getByText(/87\.5%\s*of the previous stage/)).toBeTruthy();
-    // The paid step is measured against entries, so it can never exceed 100%.
-    expect(within(funnel).getByText(/12\.0%\s*of the previous stage/)).toBeTruthy();
+    expect(within(funnel).getByText(/87\.5%\s*of phone-matchable leads/)).toBeTruthy();
+    // Paid is shown only as a share of entries, not a made-up transition rate.
+    expect(within(funnel).getByText(/12\.0%\s*of all entries/)).toBeTruthy();
     expect(within(funnel).getByText(/current-status proxy/i)).toBeTruthy();
   });
 

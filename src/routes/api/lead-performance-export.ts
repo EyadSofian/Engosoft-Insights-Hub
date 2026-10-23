@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           ar ? "المرحلة" : "Stage",
           ar ? "العدد" : "Count",
           ar ? "من إجمالي الدخول %" : "Share of entries %",
-          ar ? "من المرحلة السابقة %" : "Step conversion %",
+          ar ? "من الليدز القابلة لمطابقة الهاتف %" : "Rate of phone-matchable leads %",
           ar ? "مثبت بدليل؟" : "Evidence-backed?",
         ]);
         for (const stage of result.stages) {

@@ -110,6 +110,20 @@ describe("six-month lead performance", () => {
     expect(result.selected.averageAttempts).toBe(3);
   });
 
+  it("does not call a next-day contact within 24 hours without exact timestamps", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [lead("only", "2026-10-03", { phone: "+966500000006" })],
+      invoices: [],
+      links: [],
+      calls: [{ phone: "+966500000006", day: "2026-10-04", totalCalls: 1 }],
+      selectedMonth: "2026-10",
+    });
+    expect(result.selected.contacted).toBe(1);
+    expect(result.selected.contactedWithin24h).toBe(0);
+    expect(result.selected.exactLagSample).toBe(0);
+  });
+
   it("rates each funnel stage against the stage before it, over the base that stage can see", () => {
     const result = buildLeadPerformance({ ...base(), selectedMonth: "2026-10" });
     const stage = (key: string) => result.stages.find((row) => row.key === key)!;
@@ -118,12 +132,14 @@ describe("six-month lead performance", () => {
     // One of one matchable lead was called: a step rate over entries would be
     // identical here, but over an unmatchable cohort it would invent a failure.
     expect(stage("contacted").stepRate).toBe(100);
-    expect(result.selected.contactedWithin24h).toBe(1);
+    expect(result.selected.contactedWithin24h).toBe(0);
     // S6 was fully refunded, so the paid stage is honestly zero, not hidden.
     expect(stage("paid").count).toBe(0);
     expect(stage("paid").shareOfEntries).toBe(0);
     // The opportunity step is today's status, never a logged transition.
     expect(stage("opportunity").evidenced).toBe(false);
+    expect(stage("opportunity").stepRate).toBeNull();
+    expect(stage("paid").stepRate).toBeNull();
   });
 
   it("withholds the contacted stage instead of reading missing calls as nobody called", () => {
@@ -131,6 +147,7 @@ describe("six-month lead performance", () => {
     const contacted = result.stages.find((row) => row.key === "contacted")!;
     expect(result.selected.contacted).toBeNull();
     expect(contacted.count).toBeNull();
+    expect(contacted.shareOfEntries).toBeNull();
     expect(contacted.stepRate).toBeNull();
     expect(contacted.evidenced).toBe(false);
   });

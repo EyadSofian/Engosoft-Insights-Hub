@@ -247,12 +247,12 @@ const extra = {
     monthlyTableHint:
       "كل مجموعة دخول في صف واحد: الحجم والتكرار والجودة والمتابعة والتحويل. الأعمدة الإضافية تحت زر الأعمدة.",
     stageShare: "من إجمالي الدخول",
-    stageStep: "من المرحلة السابقة",
+    stageStep: "من الليدز القابلة لمطابقة الهاتف",
     stageProxy: "مؤشر حالة حالية، وليس انتقالًا مسجلًا",
     stageEvidence: "مثبت بدليل",
     stageWithheld: "البيانات غير كافية لعرض هذه المرحلة",
     contactedStage: "تم التواصل معها (PBX)",
-    within24: "أول تواصل خلال ٢٤ ساعة",
+    within24: "أول اتصال خلال ٢٤ ساعة (بتوقيت إنشاء دقيق)",
     groupColumns: {
       duplicates: "تكرار",
       dupSame: "تكرار داخل الشهر",
@@ -286,12 +286,12 @@ const extra = {
     monthlyTableHint:
       "One row per entry cohort: volume, duplicates, quality, follow-up and conversion. Further columns sit behind the Columns button.",
     stageShare: "of all entries",
-    stageStep: "of the previous stage",
+    stageStep: "of phone-matchable leads",
     stageProxy: "A current-status proxy, not a logged transition",
     stageEvidence: "Evidence-backed",
     stageWithheld: "There is not enough evidence to show this stage",
     contactedStage: "Contacted (PBX)",
-    within24: "First contact within 24 hours",
+    within24: "First call within 24 hours (exact creation time)",
     groupColumns: {
       duplicates: "Duplicates",
       dupSame: "Duplicate, same month",

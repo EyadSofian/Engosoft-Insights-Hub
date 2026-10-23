@@ -58,7 +58,7 @@ export interface PerformanceGroup {
    * coverage is incomplete — an un-evidenced lead is not a never-called lead.
    */
   contacted: number | null;
-  /** Of the contacted ones, those first reached inside one working day. */
+  /** Contacts within 24 hours where exact creation and call timestamps exist. */
   contactedWithin24h: number | null;
   paidLeads: number;
   paidOrders: number;
@@ -80,9 +80,11 @@ export interface PerformanceGroup {
 /**
  * One step of the acquisition funnel, with both rates a reader needs.
  *
- * `stepRate` is the share of the PREVIOUS stage that reached this one — the
- * number that localises where the funnel leaks. `shareOfEntries` is the share
- * of the cohort's own entries, so two stages can be compared directly. A rate
+ * `stepRate` is populated only when a verified transition denominator exists.
+ * For PBX contact it is the share of phone-matchable leads that were called.
+ * Current opportunity status and paid enrollment cannot be divided by the
+ * preceding display stage without a historical transition log. `shareOfEntries`
+ * is the share of the cohort's own entries. A rate
  * is `null` rather than `0` whenever the evidence behind the stage is missing,
  * because "nobody was called" and "we cannot see the calls" are different
  * findings and only one of them is somebody's fault.
@@ -102,7 +104,7 @@ export interface PerformanceResult {
   selectedMonth: string;
   rows: PerformanceGroup[];
   selected: PerformanceGroup;
-  /** The selected cohort's funnel, each step with its own conversion rate. */
+  /** Selected cohort stages, with rates only where denominators are evidenced. */
   stages: PerformanceStage[];
   byCourse: PerformanceGroup[];
   bySource: PerformanceGroup[];
@@ -210,11 +212,8 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
     crmWon: records.filter((row) => row.status === "won").length,
     contacted: callsAvailable ? matched.filter((row) => (row.calls ?? 0) >= 1).length : null,
     contactedWithin24h: callsAvailable
-      ? records.filter((row) =>
-          row.firstCallLagHours !== null
-            ? row.firstCallLagHours <= 24
-            : row.firstCallLagDays !== null && row.firstCallLagDays <= 1,
-        ).length
+      ? records.filter((row) => row.firstCallLagHours !== null && row.firstCallLagHours <= 24)
+          .length
       : null,
     paidLeads,
     paidOrders: new Set(records.flatMap((row) => [...row.paidOrders])).size,
@@ -244,15 +243,14 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
 }
 
 /**
- * The four stages, each against the stage before it.
+ * Four cohort views. Only contact has a verified transition denominator.
  *
  * `contacted` is measured over the leads whose calls are actually matchable
  * (`callMatchable`), not over every entry: dividing a matched numerator by an
  * unmatched denominator invents a follow-up failure out of a phone-matching
- * limit. `paid` is deliberately measured against entries rather than against
- * the opportunity count, because the opportunity flag is today's status and a
- * lead can be paid while its record no longer reads as an open opportunity —
- * a step rate over that would exceed 100% and read as nonsense.
+ * limit. Opportunity is today's status, not a logged prior stage; paid leads
+ * can also lack a current opportunity status. Neither has a verified
+ * preceding-stage rate here, so their step rates stay unavailable.
  */
 export function performanceStages(group: PerformanceGroup, paidReady: boolean): PerformanceStage[] {
   const entries = group.leads;
@@ -268,7 +266,7 @@ export function performanceStages(group: PerformanceGroup, paidReady: boolean): 
     {
       key: "contacted",
       count: group.contacted,
-      shareOfEntries: rate(group.contacted ?? 0, entries),
+      shareOfEntries: group.contacted === null ? null : rate(group.contacted, entries),
       stepRate: contactBase ? rate(group.contacted ?? 0, contactBase) : null,
       evidenced: group.contacted !== null,
     },
@@ -276,14 +274,14 @@ export function performanceStages(group: PerformanceGroup, paidReady: boolean): 
       key: "opportunity",
       count: group.opportunities,
       shareOfEntries: rate(group.opportunities, entries),
-      stepRate: rate(group.opportunities, entries),
+      stepRate: null,
       evidenced: false,
     },
     {
       key: "paid",
       count: paidReady ? group.paidLeads : null,
       shareOfEntries: paidReady ? rate(group.paidLeads, entries) : null,
-      stepRate: paidReady ? rate(group.paidLeads, entries) : null,
+      stepRate: null,
       evidenced: paidReady,
     },
   ];
