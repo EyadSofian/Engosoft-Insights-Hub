@@ -39,6 +39,7 @@ assert.equal(
 );
 assert.equal(safeRevenueReturnPath("https://attacker.test/"), "/accounting");
 assert.equal(revenueGuardApplies(new Request("https://example.test/api/profitability")), true);
+assert.equal(revenueGuardApplies(new Request("https://example.test/api/lead-performance")), true);
 assert.equal(revenueGuardApplies(new Request("https://example.test/api/teams")), false);
 assert.equal(revenueGuardApplies(new Request("https://example.test/accounting?view=months")), true);
 assert.equal(revenueGuardApplies(new Request("https://example.test/courses?view=sales")), true);

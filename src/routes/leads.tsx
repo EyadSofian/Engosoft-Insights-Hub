@@ -48,11 +48,16 @@ import { SLA_POLICY, SLA_STAGES, type SlaStage, type SlaSummary } from "@/lib/cr
 import { LeadIntelligence } from "@/components/leads/LeadIntelligence";
 import { WeeklyLeadsReport } from "@/components/leads/WeeklyLeadsReport";
 import { CrmSourceDistribution } from "@/components/leads/CrmSourceDistribution";
+import { SixMonthPerformance } from "@/components/leads/SixMonthPerformance";
 import type { SourceDistributionRow } from "@/lib/crm-source-distribution";
 
 export const Route = createFileRoute("/leads")({
-  validateSearch: (search: Record<string, unknown>): { view?: "crm" | "intelligence" | "weekly" } =>
-    search.view === "intelligence" || search.view === "weekly" ? { view: search.view } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { view?: "crm" | "intelligence" | "weekly" | "performance" } =>
+    search.view === "intelligence" || search.view === "weekly" || search.view === "performance"
+      ? { view: search.view }
+      : {},
   component: LeadsPage,
 });
 
@@ -90,11 +95,21 @@ function LeadsPage() {
         >
           {lang === "ar" ? "متابعة ليدز الأسبوع" : "Weekly lead follow-up"}
         </Link>
+        <Link
+          to="/leads"
+          search={{ view: "performance" }}
+          aria-current={workspace === "performance" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "performance" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "أداء الليدز والمبيعات · ٦ أشهر" : "Leads & sales · 6 months"}
+        </Link>
       </nav>
       {workspace === "crm" ? (
         <CrmWorkspace />
       ) : workspace === "weekly" ? (
         <WeeklyLeadsReport />
+      ) : workspace === "performance" ? (
+        <SixMonthPerformance />
       ) : (
         <>
           <DashboardPageHeader
@@ -837,7 +852,11 @@ function CrmWorkspace() {
         <PageSection
           level="primary"
           title={A ? "توزيع الليدز حسب المصدر" : "Lead distribution by source"}
-          hint={A ? "للفترة المختارة: كم جاء من كل مصدر، وكم Won وLost، ونسبة الفقد من إجمالي المصدر." : "For the selected period: source volume, Won, Lost and loss rate within each source."}
+          hint={
+            A
+              ? "للفترة المختارة: كم جاء من كل مصدر، وكم Won وLost، ونسبة الفقد من إجمالي المصدر."
+              : "For the selected period: source volume, Won, Lost and loss rate within each source."
+          }
           icon={<CircleDot size={17} />}
         >
           <CrmSourceDistribution rows={data.sourceDistribution} total={summary.total} />

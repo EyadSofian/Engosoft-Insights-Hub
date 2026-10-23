@@ -151,6 +151,7 @@ export function revenueGuardApplies(request: Request): boolean {
     path === "/api/accounting" ||
     path === "/api/accounting-export" ||
     path === "/api/accounting-net-sales" ||
+    path === "/api/lead-performance" ||
     path === "/api/profitability" ||
     path === "/api/profitability-ledger"
   )

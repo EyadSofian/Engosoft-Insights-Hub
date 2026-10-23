@@ -60,6 +60,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiLeadCourseDistributionRouteImport } from './routes/api/lead-course-distribution'
 import { Route as ApiLeadCourseExportRouteImport } from './routes/api/lead-course-export'
 import { Route as ApiLeadIntelligenceRouteImport } from './routes/api/lead-intelligence'
+import { Route as ApiLeadPerformanceRouteImport } from './routes/api/lead-performance'
 import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadSourceMatrixRouteImport } from './routes/api/lead-source-matrix'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
@@ -393,6 +394,11 @@ const ApiLeadCourseExportRoute = ApiLeadCourseExportRouteImport.update({
 const ApiLeadIntelligenceRoute = ApiLeadIntelligenceRouteImport.update({
   id: '/api/lead-intelligence',
   path: '/api/lead-intelligence',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadPerformanceRoute = ApiLeadPerformanceRouteImport.update({
+  id: '/api/lead-performance',
+  path: '/api/lead-performance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
@@ -845,6 +851,7 @@ export interface FileRoutesByFullPath {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -974,6 +981,7 @@ export interface FileRoutesByTo {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -1104,6 +1112,7 @@ export interface FileRoutesById {
   '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
   '/api/lead-course-export': typeof ApiLeadCourseExportRoute
   '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
   '/api/lead-qa': typeof ApiLeadQaRoute
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -1235,6 +1244,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-intelligence'
+    | '/api/lead-performance'
     | '/api/lead-qa'
     | '/api/lead-source-matrix'
     | '/api/leads'
@@ -1364,6 +1374,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-intelligence'
+    | '/api/lead-performance'
     | '/api/lead-qa'
     | '/api/lead-source-matrix'
     | '/api/leads'
@@ -1493,6 +1504,7 @@ export interface FileRouteTypes {
     | '/api/lead-course-distribution'
     | '/api/lead-course-export'
     | '/api/lead-intelligence'
+    | '/api/lead-performance'
     | '/api/lead-qa'
     | '/api/lead-source-matrix'
     | '/api/leads'
@@ -1623,6 +1635,7 @@ export interface RootRouteChildren {
   ApiLeadCourseDistributionRoute: typeof ApiLeadCourseDistributionRoute
   ApiLeadCourseExportRoute: typeof ApiLeadCourseExportRoute
   ApiLeadIntelligenceRoute: typeof ApiLeadIntelligenceRoute
+  ApiLeadPerformanceRoute: typeof ApiLeadPerformanceRoute
   ApiLeadQaRoute: typeof ApiLeadQaRoute
   ApiLeadSourceMatrixRoute: typeof ApiLeadSourceMatrixRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
@@ -2058,6 +2071,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lead-intelligence'
       fullPath: '/api/lead-intelligence'
       preLoaderRoute: typeof ApiLeadIntelligenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-performance': {
+      id: '/api/lead-performance'
+      path: '/api/lead-performance'
+      fullPath: '/api/lead-performance'
+      preLoaderRoute: typeof ApiLeadPerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/lead-qa': {
@@ -2647,6 +2667,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadCourseDistributionRoute: ApiLeadCourseDistributionRoute,
   ApiLeadCourseExportRoute: ApiLeadCourseExportRoute,
   ApiLeadIntelligenceRoute: ApiLeadIntelligenceRoute,
+  ApiLeadPerformanceRoute: ApiLeadPerformanceRoute,
   ApiLeadQaRoute: ApiLeadQaRoute,
   ApiLeadSourceMatrixRoute: ApiLeadSourceMatrixRoute,
   ApiLeadsRoute: ApiLeadsRoute,
