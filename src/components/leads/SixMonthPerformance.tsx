@@ -24,6 +24,7 @@ type Response = PerformanceResult & {
     crm: boolean;
     lost: boolean;
     accounting: boolean;
+    callRefreshSucceeded: boolean;
     crmSyncedAt: string;
     lostSyncedAt: string;
     accountingSyncedAt: string;
@@ -87,7 +88,7 @@ const copy = {
       "الجديد = سجل أودو أُنشئ في الشهر، سواء أصبح لاحقًا Opportunity أو Lost. التكرار المحتمل = هوية هاتف/بريد تكررت ولا يعني إلغاء التسجيل تلقائيًا؛ المؤكد هو سبب Duplicate في أودو. غير المؤهل = سبب أودو Not Qualified أو حكم QA يدوي غير صالح. لا يرد/تعذر الوصول/غير مهتم هي أسباب داخل Lost وليست أرقامًا تُضاف فوقه. التحويل = أمر بيع مرتبط بالفرصة ارتباطًا مباشرًا وله صافي فواتير مدفوعة موجب بعد الخصم، وليس مجرد Won في CRM.",
     limits: "حدود الدقة",
     limitsText:
-      "*تصنيف الفرصة وLost هو الوضع الحالي، وليس سجل انتقال تاريخي أو لقطة لنهاية شهر الدخول؛ لذلك مستوى الفرصة مؤشر لا مسارًا تاريخيًا مثبتًا. الكورس والمصدر والحملة ومسؤول الليد هي حقول أودو الحالية، وقد تكون تغيّرت منذ دخوله. إسناد الميديا باير من اسم الحملة وقواعد ملكية الكورسات المعتمدة. عدد المحاولات من سجل Yeastar المباشر فقط بعد تغطية كل أيام الفترة؛ سجلات أطراف المكالمة المتعددة تُحسب محاولة واحدة. Chatter أودو متاح لفحص السجل منفردًا لكنه ليس مجمّعًا بعد، وغياب مكالمة لا يثبت عدم التواصل عبر واتساب. التكرار بالهوية مؤشر للمراجعة وليس حكمًا نهائيًا. زمن أول اتصال بالساعات حيث توجد ساعة إنشاء أودو الدقيقة، وإلا يظهر تقريب بالأيام. الفواتير غير المربوطة لا تُنسب تخمينًا، والإنفاق الإعلاني لا يظهر هنا لعدم وجود ربط محقق بين كل فاتورة وحملة.",
+      "*تصنيف الفرصة وLost هو الوضع الحالي، وليس سجل انتقال تاريخي أو لقطة لنهاية شهر الدخول؛ لذلك مستوى الفرصة مؤشر لا مسارًا تاريخيًا مثبتًا. الكورس والمصدر والحملة ومسؤول الليد هي حقول أودو الحالية، وقد تكون تغيّرت منذ دخوله. إسناد الميديا باير من اسم الحملة وقواعد ملكية الكورسات المعتمدة. عدد المحاولات من سجل Yeastar المباشر فقط بعد تغطية كل أيام الفترة؛ سجلات أطراف المكالمة المتعددة تُحسب محاولة واحدة، واليوم الحالي جزئي حتى آخر تحديث. Chatter أودو متاح لفحص السجل منفردًا لكنه ليس مجمّعًا بعد، وغياب مكالمة لا يثبت عدم التواصل عبر واتساب. التكرار بالهوية مؤشر للمراجعة وليس حكمًا نهائيًا. زمن أول اتصال بالساعات حيث توجد ساعة إنشاء أودو الدقيقة، وإلا يظهر تقريب بالأيام. الفواتير غير المربوطة لا تُنسب تخمينًا، والإنفاق الإعلاني لا يظهر هنا لعدم وجود ربط محقق بين كل فاتورة وحملة.",
     missingLinks: "ربط أوامر البيع غير متاح؛ مؤشرات الدفع غير مكتملة.",
     limitedLinks:
       "تغطية ربط بنود الحسابات بأوامر البيع منخفضة؛ التحويل المعروض حد أدنى مُثبت وليس معدل التحويل الحقيقي لكل الليدز، فلا تستخدمه وحده لتقييم الفريق.",
@@ -98,6 +99,8 @@ const copy = {
       "بيانات Lost غير متاحة أو قديمة؛ أوقفت التقرير لأن إجمالي الليدز ونسبة الفقدان سيصبحان ناقصين.",
     missingCalls:
       "لم تكتمل تغطية سجلات المكالمات المباشرة من Yeastar؛ أوقفت أرقام المحاولات حتى لا تظهر ناقصة.",
+    staleCalls:
+      "تعذّر تحديث Yeastar الآن؛ أرقام المكالمات المعروضة من آخر نسخة محفوظة، وقد لا تشمل أحدث المكالمات.",
     missingQa: "التحقق اليدوي من جودة الليد غير متاح؛ غير المؤهل هنا من سبب أودو فقط.",
     noQaReviews:
       "لم تُسجَّل مراجعات جودة يدوية لهذه المجموعة؛ أسباب عدم التأهل الظاهرة لا تمثل تدقيقًا كاملًا لجودة الليدز.",
@@ -167,7 +170,7 @@ const copy = {
       "New means an Odoo CRM record created in the month, including records later converted to Opportunity or Lost. Potential duplicate means matching phone/email identity, not an automatic removal; confirmed duplicate uses the Odoo loss reason. Unqualified means Odoo Not Qualified reason or an invalid manual QA verdict. No answer, unreachable and not interested are reasons within Lost, not extra additive categories. Conversion requires an exact opportunity-linked sale order with positive net paid invoices after credit notes; CRM Won alone never counts.",
     limits: "Accuracy limits",
     limitsText:
-      "*Opportunity/Lost is the current status, not a verified transition history or historical month-end snapshot; the opportunity step is a proxy. Course, source, campaign and lead owner are current Odoo fields and may have changed since entry. Media buyer follows campaign naming and approved course ownership. Attempts come from direct Yeastar CDRs only after every day in the period is covered; multiple call legs count as one attempt. Odoo Chatter can be inspected per record but is not yet bulk-aggregated, and no PBX call does not prove no WhatsApp contact. Identity duplicates require review. First-contact lag uses exact Odoo creation time when present and day-level approximation otherwise. Unlinked invoices are not guessed onto leads or buyers; ad spend is omitted here without verified invoice-to-campaign attribution.",
+      "*Opportunity/Lost is the current status, not a verified transition history or historical month-end snapshot; the opportunity step is a proxy. Course, source, campaign and lead owner are current Odoo fields and may have changed since entry. Media buyer follows campaign naming and approved course ownership. Attempts come from direct Yeastar CDRs only after every day in the period is covered; multiple call legs count as one attempt, and the current day is partial until the latest refresh. Odoo Chatter can be inspected per record but is not yet bulk-aggregated, and no PBX call does not prove no WhatsApp contact. Identity duplicates require review. First-contact lag uses exact Odoo creation time when present and day-level approximation otherwise. Unlinked invoices are not guessed onto leads or buyers; ad spend is omitted here without verified invoice-to-campaign attribution.",
     missingLinks: "Sale-order linkage is unavailable; paid metrics are incomplete.",
     limitedLinks:
       "Accounting-line to sale-order coverage is low. Shown conversion is a verified lower bound, not the true conversion of all leads; do not use it alone to judge staff.",
@@ -179,6 +182,8 @@ const copy = {
       "Lost data is unavailable or stale. This report is paused because entry counts and loss rates would be incomplete.",
     missingCalls:
       "Direct Yeastar CDR coverage is incomplete; attempt metrics are withheld rather than shown too low.",
+    staleCalls:
+      "Yeastar could not refresh now; call figures use the last stored copy and may miss the latest calls.",
     missingQa: "Manual lead QA is unavailable; unqualified uses Odoo reason only.",
     noQaReviews:
       "No manual quality reviews exist for this cohort; the displayed unqualified reasons are not a complete lead-quality audit.",
@@ -339,6 +344,7 @@ export function SixMonthPerformance() {
         (linkCoverage !== null && linkCoverage < 90) ||
         !data.availability.accounting ||
         !data.coverage.callsAvailable ||
+        (data.coverage.callsAvailable && !data.availability.callRefreshSucceeded) ||
         !data.coverage.qaAvailable ||
         (data.coverage.qaAvailable && data.coverage.qaReviewed === 0)) && (
         <div className="space-y-2">
@@ -351,6 +357,9 @@ export function SixMonthPerformance() {
             <Notice
               text={`${t.missingCalls} ${data.callCoverage ? `(${data.callCoverage.coveredDays}/${data.callCoverage.expectedDays} ${lang === "ar" ? "يوم" : "days"})` : ""}`}
             />
+          )}
+          {data.coverage.callsAvailable && !data.availability.callRefreshSucceeded && (
+            <Notice text={t.staleCalls} />
           )}
           {!data.coverage.qaAvailable && <Notice text={t.missingQa} />}
           {data.coverage.qaAvailable && data.coverage.qaReviewed === 0 && (

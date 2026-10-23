@@ -107,7 +107,10 @@ export const Route = createFileRoute("/api/lead-performance")({
               refreshedAt: null,
               rows: [] as { orderName: string; opportunityId: string }[],
             });
-        const callsPromise = refreshRecentYeastarCdr(asOf)
+        const callRefreshPromise = refreshRecentYeastarCdr(asOf)
+          .then(() => true)
+          .catch(() => false);
+        const callsPromise = callRefreshPromise
           .then(() => readVerifiedYeastarLeadCalls(firstDay, asOf))
           .then((rows) =>
             rows.map((row) => ({
@@ -118,7 +121,9 @@ export const Route = createFileRoute("/api/lead-performance")({
             })),
           )
           .catch(() => null);
-        const callCoveragePromise = yeastarCdrCoverage(firstDay, asOf).catch(() => null);
+        const callCoveragePromise = callRefreshPromise
+          .then(() => yeastarCdrCoverage(firstDay, asOf))
+          .catch(() => null);
         const qaPromise = leadQaConfigured()
           ? readLeadQaVerifications(
               leads.filter((row) => row.createdAt >= firstDay).map((row) => row.id),
@@ -132,11 +137,12 @@ export const Route = createFileRoute("/api/lead-performance")({
               )
               .catch(() => null)
           : Promise.resolve(null);
-        const [links, calls, qa, callCoverage] = await Promise.all([
+        const [links, calls, qa, callCoverage, callRefreshSucceeded] = await Promise.all([
           linksPromise,
           callsPromise,
           qaPromise,
           callCoveragePromise,
+          callRefreshPromise,
         ]);
 
         const invoices = snapshot.accounting
@@ -195,6 +201,7 @@ export const Route = createFileRoute("/api/lead-performance")({
             crm: true,
             lost: lostAvailable,
             accounting: accountingAvailable,
+            callRefreshSucceeded,
             crmSyncedAt,
             lostSyncedAt,
             accountingSyncedAt,
