@@ -44,9 +44,7 @@ function cairoDayBounds(day: string): { start: number; end: number } {
       : 120;
     return Math.floor((midnight - offset * 60_000) / 1000);
   };
-  const nextDay = new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const nextDay = new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
   return { start: startOf(day), end: startOf(nextDay) - 1 };
 }
 
@@ -258,19 +256,27 @@ const recentSyncs = new Map<string, Promise<void>>();
 
 export async function refreshRecentYeastarCdr(day: string): Promise<void> {
   if (!configured()) throw new Error("Yeastar API is not configured");
-  const existing = recentSyncs.get(day);
+  const previous = new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const key = `${previous}:${day}`;
+  const existing = recentSyncs.get(key);
   if (existing) return existing;
   const task = (async () => {
-    const coverage = await yeastarCdrCoverage(day, day);
-    const age = Date.now() - Date.parse(coverage.newestSync ?? "");
-    if (coverage.coveredDays && Number.isFinite(age) && age >= 0 && age < 20 * 60_000) return;
+    const yesterday = await yeastarCdrCoverage(previous, previous);
+    if (
+      !yesterday.coveredDays ||
+      Date.parse(yesterday.newestSync ?? "") < Date.parse(`${day}T00:00:00Z`)
+    )
+      await syncYeastarCdrDay(previous);
+    const today = await yeastarCdrCoverage(day, day);
+    const age = Date.now() - Date.parse(today.newestSync ?? "");
+    if (today.coveredDays && Number.isFinite(age) && age >= 0 && age < 20 * 60_000) return;
     await syncYeastarCdrDay(day);
   })();
-  recentSyncs.set(day, task);
+  recentSyncs.set(key, task);
   try {
     await task;
   } finally {
-    recentSyncs.delete(day);
+    recentSyncs.delete(key);
   }
 }
 
