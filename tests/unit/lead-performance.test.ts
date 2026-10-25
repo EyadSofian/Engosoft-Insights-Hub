@@ -73,6 +73,71 @@ describe("six-month lead performance", () => {
     expect(result.rows[1]?.duplicateEarlierMonth).toBe(1);
   });
 
+  it("excludes misspelled WhatsApp and AutoDialer broadcasts without dropping identity duplicates", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [
+        lead("first", "2026-05-02", { phone: "+966500000001" }),
+        lead("repeat", "2026-05-03", { phone: "+966500000001" }),
+        lead("broadcast-typo", "2026-05-04", { source: "Whtsapp Broadcast" }),
+        lead("autodialer", "2026-05-05", { source: "AutoDailer Broadcast" }),
+      ],
+      invoices: [],
+      links: [],
+      calls: null,
+    });
+    expect(result.selected.leads).toBe(2);
+    expect(result.selected.duplicateSameMonth).toBe(1);
+    expect(result.records.map((row) => row.id)).toEqual(["first", "repeat"]);
+    expect(result.coverage.excludedBroadcast).toBe(1);
+    expect(result.coverage.excludedAutodialerBroadcast).toBe(1);
+  });
+
+  it("separates same-entry-month verified Lost and paid conversion from outcomes that happened later", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [
+        lead("same-lost", "2026-05-02", {
+          status: "lost",
+          lostAt: "2026-05-20",
+          lostAtBasis: "date_closed",
+        }),
+        lead("later-lost", "2026-05-03", {
+          status: "lost",
+          lostAt: "2026-06-02",
+          lostAtBasis: "date_closed",
+        }),
+        lead("fallback-lost", "2026-05-04", {
+          status: "lost",
+          lostAt: "2026-05-19",
+          lostAtBasis: "write_date_fallback",
+        }),
+        lead("paid-now", "2026-05-05", { recordType: "opportunity" }),
+        lead("paid-later", "2026-05-06", { recordType: "opportunity" }),
+      ],
+      links: [
+        { orderName: "S-NOW", opportunityId: "paid-now" },
+        { orderName: "S-LATER", opportunityId: "paid-later" },
+      ],
+      invoices: [
+        { orderRef: "S-NOW", date: "2026-05-12", usdPaid: 100, salesperson: "A" },
+        { orderRef: "S-LATER", date: "2026-06-12", usdPaid: 100, salesperson: "A" },
+      ],
+      calls: null,
+    });
+    expect(result.selected.lost).toBe(3);
+    expect(result.selected.lostSameEntryMonth).toBe(1);
+    expect(result.selected.lostTimingUnverified).toBe(1);
+    expect(result.selected.paidLeads).toBe(2);
+    expect(result.selected.paidSameEntryMonth).toBe(1);
+    expect(result.selected.paidSameEntryMonthRate).toBe(20);
+    expect(result.rows[0]?.calendarLost).toBe(1);
+    expect(result.rows[1]?.calendarLost).toBe(1);
+    expect(result.rows[1]?.calendarLostOlderEntry).toBe(1);
+    expect(result.rows[1]?.calendarPaid).toBe(1);
+    expect(result.rows[1]?.calendarPaidOlderEntry).toBe(1);
+  });
+
   it("keeps the entry cohort distinct from the current Fresh tag and emits auditable records", () => {
     const result = buildLeadPerformance({
       ...base(),

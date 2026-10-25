@@ -126,9 +126,13 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {ar ? "إجمالي الفرص البيعية" : "Total opportunities"}
               </div>
-              <div className="num mt-2 text-2xl font-bold text-violet-800">{fmtNum(data.lifecycle.opportunities)}</div>
+              <div className="num mt-2 text-2xl font-bold text-violet-800">
+                {fmtNum(data.lifecycle.opportunities)}
+              </div>
               <div className="mt-1 text-[11px] text-text-muted">
-                {ar ? "يشمل الفرص المفقودة؛ لا يشمل الليد المفقود" : "Includes lost opportunities, excludes lost leads"}
+                {ar
+                  ? "يشمل الفرص المفقودة؛ لا يشمل الليد المفقود"
+                  : "Includes lost opportunities, excludes lost leads"}
               </div>
             </Card>
             <Card className="border-s-4 border-s-emerald-600">
@@ -152,9 +156,7 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {ar ? "إجمالي سجلات الليد والفرص" : "All lead and opportunity records"}
               </div>
-              <div className="num mt-2 text-2xl font-bold text-text">
-                {fmtNum(data.total)}
-              </div>
+              <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(data.total)}</div>
               <div className="mt-1 text-[11px] text-text-muted">
                 {ar ? "ليس عدد الفرص وحدها" : "Not the opportunity count alone"}
               </div>
@@ -174,11 +176,15 @@ function LeadDistributionPage() {
 
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 text-sm leading-7 text-slate-700">
             {lifecycleExplanation(data.lifecycle.leadOther, ar)}
-            {data.excludedSources.recommendation + data.excludedSources.whatsappBroadcast > 0 && (
+            {data.excludedSources.recommendation +
+              data.excludedSources.whatsappBroadcast +
+              data.excludedSources.autodialerBroadcast >
+              0 && (
               <span className="ms-2">
                 {ar ? "مستبعد من إجمالي العملاء المحتملين: " : "Excluded from lead totals: "}
                 {fmtNum(data.excludedSources.recommendation)} Recommendation ·{" "}
-                {fmtNum(data.excludedSources.whatsappBroadcast)} WhatsApp Broadcast.{" "}
+                {fmtNum(data.excludedSources.whatsappBroadcast)} WhatsApp Broadcast ·{" "}
+                {fmtNum(data.excludedSources.autodialerBroadcast)} AutoDialer Broadcast.{" "}
                 <Link to="/lead-sources" className="font-semibold text-brand underline">
                   {ar ? "عرض سجلات المصادر" : "View source records"}
                 </Link>

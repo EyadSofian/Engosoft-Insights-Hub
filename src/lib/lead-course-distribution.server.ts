@@ -49,7 +49,11 @@ export interface CourseLeadGroup {
 
 export interface CourseLeadDistribution {
   total: number;
-  excludedSources: { recommendation: number; whatsappBroadcast: number };
+  excludedSources: {
+    recommendation: number;
+    whatsappBroadcast: number;
+    autodialerBroadcast: number;
+  };
   unverified: number;
   lifecycle: {
     leadActive: number;
@@ -238,6 +242,9 @@ export async function leadCourseDistribution(
     ).length,
     whatsappBroadcast: sourceRows.filter(
       (row) => excludedLeadSource(row.source, row.leadSegment) === "whatsapp_broadcast",
+    ).length,
+    autodialerBroadcast: sourceRows.filter(
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "autodialer_broadcast",
     ).length,
   };
   const rows = sourceRows.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));

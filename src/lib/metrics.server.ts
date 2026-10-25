@@ -319,7 +319,7 @@ export interface FilteredData {
   accounting: AccountingRow[];
   lost: LostRow[];
   /** Source inventory is retained separately, not included in lead KPIs. */
-  excludedLeads: { recommendation: number; whatsappBroadcast: number };
+  excludedLeads: { recommendation: number; whatsappBroadcast: number; autodialerBroadcast: number };
   snapshot: Snapshot;
   applied: GlobalFilters;
   /** Ad accounts whose objective is not lead generation. */
@@ -564,11 +564,12 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
-  const excludedLeads = { recommendation: 0, whatsappBroadcast: 0 };
+  const excludedLeads = { recommendation: 0, whatsappBroadcast: 0, autodialerBroadcast: 0 };
   const countedSource = (source: string, leadSegment: string): boolean => {
     const exclusion = excludedLeadSource(source, leadSegment);
     if (exclusion === "recommendation") excludedLeads.recommendation++;
     if (exclusion === "whatsapp_broadcast") excludedLeads.whatsappBroadcast++;
+    if (exclusion === "autodialer_broadcast") excludedLeads.autodialerBroadcast++;
     return exclusion === null;
   };
   const crm = scopedCrm.filter((row) => countedSource(row.source, row.leadSegment));

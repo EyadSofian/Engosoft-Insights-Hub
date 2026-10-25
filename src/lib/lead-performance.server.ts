@@ -101,6 +101,8 @@ export async function loadLeadPerformanceReport(input: {
     mobile: string;
     email: string;
     lossReason: string;
+    lostAt?: string;
+    lostAtBasis?: string;
   }): PerformanceLead => ({
     id: row.id,
     createdAt: row.createdAt,
@@ -116,10 +118,14 @@ export async function loadLeadPerformanceReport(input: {
     mobile: row.mobile,
     email: row.email,
     lossReason: row.lossReason,
+    lostAt: row.lostAt,
+    lostAtBasis: row.lostAtBasis,
   });
   const leads: PerformanceLead[] = [
     ...snapshot.crm.map(asPerformanceLead),
-    ...snapshot.lost.map(asPerformanceLead),
+    ...snapshot.lost.map((row) =>
+      asPerformanceLead({ ...row, lostAt: row.lostDate, lostAtBasis: row.lostDateBasis }),
+    ),
   ];
 
   const emptyLinks = {

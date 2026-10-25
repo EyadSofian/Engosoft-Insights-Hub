@@ -1,4 +1,5 @@
 import { excludedLeadSource } from "./lead-count-policy";
+import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { normalizePhone, phoneMatchKey, samePhoneIdentity } from "./lead-contact-evidence";
 import { canonicalLossReason } from "./loss-reason-taxonomy";
 import { mediaBuyerForCampaign, MEDIA_BUYERS } from "./media-buyers";
@@ -18,6 +19,9 @@ export interface PerformanceLead {
   mobile: string;
   email: string;
   lossReason: string;
+  /** Odoo's canonical close date; fallback stage/write dates are not exact Lost events. */
+  lostAt?: string;
+  lostAtBasis?: string;
 }
 
 export interface PerformanceInvoice {
@@ -56,6 +60,8 @@ export interface PerformanceGroup {
   unreachable: number;
   noInterest: number;
   lost: number;
+  lostLeads: number;
+  lostOpportunities: number;
   opportunities: number;
   crmWon: number;
   /**
@@ -69,6 +75,20 @@ export interface PerformanceGroup {
   paidOrders: number;
   paidLater: number;
   paidRevenue: number;
+  /** Verifiable outcomes that happened in the same calendar month as entry. */
+  lostSameEntryMonth: number;
+  lostTimingUnverified: number;
+  /** Current-Lost records with a verified close date in this calendar month, regardless of entry month. */
+  calendarLost: number;
+  calendarLostOlderEntry: number;
+  paidSameEntryMonth: number;
+  paidSameEntryMonthRate: number | null;
+  calendarPaid: number;
+  calendarPaidOlderEntry: number;
+  /** PBX-only evidence for records currently tagged Fresh, never a full worked/unworked verdict. */
+  freshPbxCalled: number | null;
+  freshPbxNoCall: number | null;
+  freshPbxUnmatchable: number | null;
   conversionRate: number | null;
   lostRate: number | null;
   contact0: number | null;
@@ -139,6 +159,7 @@ export interface PerformanceResult {
   stages: PerformanceStage[];
   byCourse: PerformanceGroup[];
   bySource: PerformanceGroup[];
+  byPlatform: PerformanceGroup[];
   byCampaign: PerformanceGroup[];
   byMediaBuyer: PerformanceGroup[];
   bySalesOwner: PerformanceGroup[];
@@ -148,6 +169,7 @@ export interface PerformanceResult {
   coverage: {
     excludedRecommendation: number;
     excludedBroadcast: number;
+    excludedAutodialerBroadcast: number;
     missingIdentity: number;
     unknownCampaign: number;
     unknownMediaBuyer: number;
@@ -206,6 +228,8 @@ type Enriched = PerformanceLead & {
   paidOrders: Set<string>;
   paidRevenue: number;
   paidLater: boolean;
+  paidSameEntryMonth: boolean;
+  firstPaidAt: string;
   closer: string;
   calls: number | null;
   firstCallLagDays: number | null;
@@ -214,6 +238,17 @@ type Enriched = PerformanceLead & {
 
 function aggregate(name: string, records: Enriched[], callsAvailable: boolean): PerformanceGroup {
   const paidLeads = records.filter((row) => row.paidOrders.size > 0).length;
+  const freshRows = records.filter((row) => row.leadSegment.trim().toLowerCase() === "fresh");
+  const lostSameEntryMonth = records.filter(
+    (row) =>
+      row.status === "lost" &&
+      ["date_closed", "lost_verification_date"].includes(row.lostAtBasis ?? "") &&
+      Boolean(row.lostAt) &&
+      monthOf(row.lostAt!) === monthOf(row.createdAt),
+  ).length;
+  const paidSameEntryMonth = records.filter(
+    (row) => row.paidOrders.size > 0 && row.paidSameEntryMonth,
+  ).length;
   const matched = records.filter((row) => row.calls !== null);
   const lags = records
     .map((row) => row.firstCallLagDays)
@@ -224,7 +259,7 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
   return {
     name,
     leads: records.length,
-    freshTagged: records.filter((row) => row.leadSegment.trim().toLowerCase() === "fresh").length,
+    freshTagged: freshRows.length,
     segmentMissing: records.filter((row) => !row.leadSegment.trim()).length,
     duplicateSameMonth: records.filter((row) => row.duplicate === "same").length,
     duplicateEarlierMonth: records.filter((row) => row.duplicate === "earlier").length,
@@ -244,6 +279,10 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
       (row) => row.status === "lost" && row.reason.canonicalReasonKey === "not_interested",
     ).length,
     lost: records.filter((row) => row.status === "lost").length,
+    lostLeads: records.filter((row) => row.status === "lost" && row.recordType === "lead").length,
+    lostOpportunities: records.filter(
+      (row) => row.status === "lost" && row.recordType === "opportunity",
+    ).length,
     opportunities: records.filter((row) => row.recordType === "opportunity").length,
     crmWon: records.filter((row) => row.status === "won").length,
     contacted: callsAvailable ? matched.filter((row) => (row.calls ?? 0) >= 1).length : null,
@@ -255,6 +294,23 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
     paidOrders: new Set(records.flatMap((row) => [...row.paidOrders])).size,
     paidLater: records.filter((row) => row.paidLater).length,
     paidRevenue: round2(records.reduce((sum, row) => sum + row.paidRevenue, 0)),
+    lostSameEntryMonth,
+    lostTimingUnverified: records.filter(
+      (row) =>
+        row.status === "lost" &&
+        !["date_closed", "lost_verification_date"].includes(row.lostAtBasis ?? ""),
+    ).length,
+    calendarLost: 0,
+    calendarLostOlderEntry: 0,
+    paidSameEntryMonth,
+    paidSameEntryMonthRate: rate(paidSameEntryMonth, records.length),
+    calendarPaid: 0,
+    calendarPaidOlderEntry: 0,
+    freshPbxCalled: callsAvailable ? freshRows.filter((row) => (row.calls ?? 0) > 0).length : null,
+    freshPbxNoCall: callsAvailable ? freshRows.filter((row) => row.calls === 0).length : null,
+    freshPbxUnmatchable: callsAvailable
+      ? freshRows.filter((row) => row.calls === null).length
+      : null,
     conversionRate: rate(paidLeads, records.length),
     lostRate: rate(records.filter((row) => row.status === "lost").length, records.length),
     contact0: callsAvailable ? matched.filter((row) => row.calls === 0).length : null,
@@ -354,6 +410,7 @@ export function buildLeadPerformance(input: {
   const coverage = {
     excludedRecommendation: 0,
     excludedBroadcast: 0,
+    excludedAutodialerBroadcast: 0,
     missingIdentity: 0,
     unknownCampaign: 0,
     unknownMediaBuyer: 0,
@@ -385,6 +442,7 @@ export function buildLeadPerformance(input: {
         (!input.course || lead.course === input.course)
       ) {
         if (excluded === "whatsapp_broadcast") coverage.excludedBroadcast++;
+        else if (excluded === "autodialer_broadcast") coverage.excludedAutodialerBroadcast++;
         else coverage.excludedRecommendation++;
       }
       continue;
@@ -430,6 +488,8 @@ export function buildLeadPerformance(input: {
       paidOrders: new Set(),
       paidRevenue: 0,
       paidLater: false,
+      paidSameEntryMonth: false,
+      firstPaidAt: "",
       closer: "",
       calls: null,
       firstCallLagDays: null,
@@ -495,7 +555,10 @@ export function buildLeadPerformance(input: {
       .filter((line) => line.usdPaid > 0)
       .map((line) => line.date)
       .sort()[0];
+    if (firstPaid && (!lead.firstPaidAt || firstPaid < lead.firstPaidAt))
+      lead.firstPaidAt = firstPaid;
     if (firstPaid && monthOf(firstPaid) > monthOf(lead.createdAt)) lead.paidLater = true;
+    if (firstPaid && monthOf(firstPaid) === monthOf(lead.createdAt)) lead.paidSameEntryMonth = true;
     const closers = [
       ...new Set(
         lines
@@ -553,16 +616,39 @@ export function buildLeadPerformance(input: {
     }
   }
 
-  const scoped = [...enriched.values()]
-    .filter((row) => months.includes(monthOf(row.createdAt)))
-    .filter((row) => !input.course || row.course === input.course);
-  const rows = months.map((month) =>
-    aggregate(
+  const allScoped = [...enriched.values()].filter(
+    (row) => !input.course || row.course === input.course,
+  );
+  const scoped = allScoped.filter((row) => months.includes(monthOf(row.createdAt)));
+  const rows = months.map((month) => {
+    const row = aggregate(
       month,
       scoped.filter((row) => monthOf(row.createdAt) === month),
       coverage.callsAvailable,
-    ),
-  );
+    );
+    const closedThisMonth = allScoped.filter(
+      (lead) =>
+        lead.status === "lost" &&
+        ["date_closed", "lost_verification_date"].includes(lead.lostAtBasis ?? "") &&
+        Boolean(lead.lostAt) &&
+        monthOf(lead.lostAt!) === month,
+    );
+    const firstPaidThisMonth = allScoped.filter(
+      (lead) =>
+        lead.paidOrders.size > 0 &&
+        Boolean(lead.firstPaidAt) &&
+        monthOf(lead.firstPaidAt) === month,
+    );
+    return {
+      ...row,
+      calendarLost: closedThisMonth.length,
+      calendarLostOlderEntry: closedThisMonth.filter((lead) => monthOf(lead.createdAt) < month)
+        .length,
+      calendarPaid: firstPaidThisMonth.length,
+      calendarPaidOlderEntry: firstPaidThisMonth.filter((lead) => monthOf(lead.createdAt) < month)
+        .length,
+    };
+  });
   const selectedRecords = scoped.filter((row) => monthOf(row.createdAt) === selectedMonth);
   coverage.qaReviewed = selectedRecords.filter((row) => {
     const verdict = qaById.get(row.id)?.verdict;
@@ -621,6 +707,17 @@ export function buildLeadPerformance(input: {
     stages: performanceStages(selected, coverage.linksAvailable),
     byCourse: groups(selectedRecords, (row) => row.course, coverage.callsAvailable),
     bySource: groups(selectedRecords, (row) => row.source, coverage.callsAvailable),
+    byPlatform: groups(
+      selectedRecords,
+      (row) => {
+        const source = row.source.trim().toLocaleLowerCase("en");
+        const platform = Object.entries(PLATFORM_SOURCE_KEYS).find(([, keys]) =>
+          keys.includes(source),
+        );
+        return platform?.[0] ?? (source ? "organic / other" : "unknown");
+      },
+      coverage.callsAvailable,
+    ),
     byCampaign: groups(selectedRecords, (row) => row.campaign, coverage.callsAvailable),
     byMediaBuyer: groups(
       selectedRecords,

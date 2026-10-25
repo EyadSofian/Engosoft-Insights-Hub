@@ -53,6 +53,12 @@ const group = (name: string, patch: Record<string, unknown> = {}) => ({
   unreachable: 3,
   noInterest: 7,
   lost: 40,
+  lostLeads: 10,
+  lostOpportunities: 30,
+  lostSameEntryMonth: 12,
+  lostTimingUnverified: 5,
+  calendarLost: 18,
+  calendarLostOlderEntry: 6,
   opportunities: 55,
   crmWon: 14,
   contacted: 70,
@@ -61,6 +67,13 @@ const group = (name: string, patch: Record<string, unknown> = {}) => ({
   paidOrders: 13,
   paidLater: 5,
   paidRevenue: 9_400,
+  paidSameEntryMonth: 4,
+  paidSameEntryMonthRate: 4,
+  calendarPaid: 7,
+  calendarPaidOlderEntry: 3,
+  freshPbxCalled: 10,
+  freshPbxNoCall: 9,
+  freshPbxUnmatchable: 5,
   conversionRate: 12,
   lostRate: 40,
   contact0: 10,
@@ -109,6 +122,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
   stages: [],
   byCourse: [group("PMP"), group("CFM", { leads: 40, averageAttempts: 1.1 })],
   bySource: [group("Facebook")],
+  byPlatform: [group("meta")],
   byCampaign: [group("pmp-23-12-25-sayed")],
   byMediaBuyer: [group("Sayed")],
   bySalesOwner: [
@@ -125,6 +139,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
   coverage: {
     excludedRecommendation: 3,
     excludedBroadcast: 2,
+    excludedAutodialerBroadcast: 1,
     missingIdentity: 1,
     unknownCampaign: 4,
     unknownMediaBuyer: 6,
@@ -197,7 +212,8 @@ describe("the six-month lead-to-paid report", () => {
     mount(response());
     await waitFor(() => expect(screen.getByText(/Read this report at a glance/i)).toBeTruthy());
     const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
-    expect(within(summary).getByText(/Tagged Fresh in Odoo now/i)).toBeTruthy();
+    expect(within(summary).getByText(/Lead Segment = Fresh now/i)).toBeTruthy();
+    expect(within(summary).getByText(/Fresh is the current Odoo classification/i)).toBeTruthy();
     expect(within(summary).getByText(/Lead Segment field is blank/i)).toBeTruthy();
     expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
     expect(within(summary).getByText(/not an Odoo sales stage/i)).toBeTruthy();

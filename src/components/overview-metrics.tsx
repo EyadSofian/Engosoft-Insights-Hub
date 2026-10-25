@@ -121,7 +121,7 @@ export interface RevenueLeadAttribution {
 export interface OverviewResp {
   totals: Totals;
   leadTargets: OverviewLeadTargets;
-  excludedLeads: { recommendation: number; whatsappBroadcast: number };
+  excludedLeads: { recommendation: number; whatsappBroadcast: number; autodialerBroadcast: number };
   deltas: Deltas;
   prevRange: { from: string; to: string } | null;
   prevComparable: boolean;

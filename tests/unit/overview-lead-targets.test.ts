@@ -17,6 +17,10 @@ describe("potential lead policy and Overview plan goals", () => {
     expect(excludedLeadSource("Recommendation Sales")).toBe("recommendation");
     expect(excludedLeadSource("Recommended From Customer")).toBe("recommendation");
     expect(excludedLeadSource("WhatsApp Broadcast")).toBe("whatsapp_broadcast");
+    expect(excludedLeadSource("Whtsapp Broadcast")).toBe("whatsapp_broadcast");
+    expect(excludedLeadSource("AutoDailer Broadcast")).toBe("autodialer_broadcast");
+    expect(excludedLeadSource("AutoDialer Broadcast")).toBe("autodialer_broadcast");
+    expect(excludedLeadSource("Facebook", "AutoDialer Broadcast")).toBe("autodialer_broadcast");
     expect(excludedLeadSource("Facebook", "WhatsApp Broadcast")).toBe("whatsapp_broadcast");
     expect(excludedLeadSource("WhatsApp Recommendation")).toBe("recommendation");
     expect(excludedLeadSource("Facebook", "WhatsApp Recommendation")).toBe("recommendation");
@@ -36,6 +40,8 @@ describe("potential lead policy and Overview plan goals", () => {
         row("4", "PMP", "WhatsApp Broadcast"),
         row("5", "CFM", "Recommendation"),
         { ...row("7", "BIM", "Facebook"), leadSegment: "WhatsApp Broadcast" },
+        row("8", "CFM", "Whtsapp Broadcast"),
+        row("9", "CFM", "AutoDailer Broadcast"),
       ],
       lost: [row("6", "PMP", "Facebook")],
     } as unknown as FilteredData;

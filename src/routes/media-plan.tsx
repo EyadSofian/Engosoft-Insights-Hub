@@ -92,7 +92,11 @@ interface MediaPlanResponse {
     targetedSpend: number;
     targetedLeads: number;
     targetedCrmLeads: number;
-    excludedLeads: { recommendation: number; whatsappBroadcast: number };
+    excludedLeads: {
+      recommendation: number;
+      whatsappBroadcast: number;
+      autodialerBroadcast: number;
+    };
     targetedPlatformLeads: number | null;
     allCrmLeads: number;
     targetedCpl: number | null;
@@ -104,7 +108,12 @@ interface MediaPlanResponse {
     revenueUsd: number;
     certificateRevenueUsd: number;
     certificateLines: number;
-    revenueByCompany: { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }[];
+    revenueByCompany: {
+      company: string;
+      salesUsd: number;
+      certificateUsd: number;
+      certificateLines: number;
+    }[];
     revenueIncludingCertificatesUsd: number;
     actualSalesBudgetAllowanceUsd: number | null;
     actualGrossBudgetAllowanceUsd: number | null;
@@ -478,7 +487,9 @@ function mediaPlanMetrics(
                 : "Reserve",
           value: fmtUSDFull(
             P.overallMarketingBudgetUsd !== undefined
-              ? Math.abs(P.overallMarketingBudgetUsd - P.leadGenerationBudgetUsd - P.additionalBudgetUsd)
+              ? Math.abs(
+                  P.overallMarketingBudgetUsd - P.leadGenerationBudgetUsd - P.additionalBudgetUsd,
+                )
               : P.reserveBudgetUsd,
           ),
         },
@@ -709,7 +720,10 @@ function MediaPlanPage() {
                 {lang === "ar" ? "شهر الخطة" : "Plan month"}
                 <select
                   value={month}
-                  onChange={(event) => { setMonth(event.target.value); setSelectedDelivery(null); }}
+                  onChange={(event) => {
+                    setMonth(event.target.value);
+                    setSelectedDelivery(null);
+                  }}
                   className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   {data.availableMonths.map((value) => (
@@ -747,24 +761,50 @@ function MediaPlanPage() {
           {data.plan.month === "2026-09" && (
             <Card className="border-brand/20 bg-brand-soft/20 p-5">
               <h2 className="text-sm font-bold text-text">
-                {lang === "ar" ? "تصحيح سبتمبر · الهدف والصرف والليدز" : "September correction · target, spend and leads"}
+                {lang === "ar"
+                  ? "تصحيح سبتمبر · الهدف والصرف والليدز"
+                  : "September correction · target, spend and leads"}
               </h2>
               <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl border border-border bg-surface p-3">
-                  <div className="text-text-muted">{lang === "ar" ? "تارجت المبيعات" : "Sales target"}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.plan.salesTargetUsd)}</div>
+                  <div className="text-text-muted">
+                    {lang === "ar" ? "تارجت المبيعات" : "Sales target"}
+                  </div>
+                  <div className="num mt-1 text-lg font-bold text-text">
+                    {fmtUSDFull(data.plan.salesTargetUsd)}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-3">
-                  <div className="text-text-muted">{lang === "ar" ? "ميزانية ثابتة: 17% من التارجت" : "Fixed budget: 17% of target"}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.plan.totalMarketingBudgetUsd)}</div>
+                  <div className="text-text-muted">
+                    {lang === "ar"
+                      ? "ميزانية ثابتة: 17% من التارجت"
+                      : "Fixed budget: 17% of target"}
+                  </div>
+                  <div className="num mt-1 text-lg font-bold text-text">
+                    {fmtUSDFull(data.plan.totalMarketingBudgetUsd)}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-3">
-                  <div className="text-text-muted">{lang === "ar" ? "صرف فعلي / 17% من التحصيل" : "Spend / 17% of actual sales"}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{fmtUSDFull(data.actual.allSpend)} / {fmtUSDFull(data.actual.actualSalesBudgetAllowanceUsd)}</div>
+                  <div className="text-text-muted">
+                    {lang === "ar" ? "صرف فعلي / 17% من التحصيل" : "Spend / 17% of actual sales"}
+                  </div>
+                  <div className="num mt-1 text-lg font-bold text-text">
+                    {fmtUSDFull(data.actual.allSpend)} /{" "}
+                    {fmtUSDFull(data.actual.actualSalesBudgetAllowanceUsd)}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-3">
-                  <div className="text-text-muted">{lang === "ar" ? "ليدز Odoo المنشأة / ليدز المنصات" : "Created CRM / platform leads"}</div>
-                  <div className="num mt-1 text-lg font-bold text-text">{fmtNum(data.actual.allCrmLeads)} / {data.actual.targetedPlatformLeads === null ? "—" : fmtNum(data.actual.targetedPlatformLeads)}</div>
+                  <div className="text-text-muted">
+                    {lang === "ar"
+                      ? "ليدز Odoo المنشأة / ليدز المنصات"
+                      : "Created CRM / platform leads"}
+                  </div>
+                  <div className="num mt-1 text-lg font-bold text-text">
+                    {fmtNum(data.actual.allCrmLeads)} /{" "}
+                    {data.actual.targetedPlatformLeads === null
+                      ? "—"
+                      : fmtNum(data.actual.targetedPlatformLeads)}
+                  </div>
                 </div>
               </div>
               <p className="mt-3 text-xs leading-relaxed text-text-muted">
@@ -774,7 +814,9 @@ function MediaPlanPage() {
               </p>
               <details className="mt-3 rounded-xl border border-border bg-surface p-3 text-xs">
                 <summary className="cursor-pointer font-semibold text-brand">
-                  {lang === "ar" ? "تفصيل التحصيل حسب الشركة ومصدر فرق الشهادات" : "Revenue by company and certificate difference"}
+                  {lang === "ar"
+                    ? "تفصيل التحصيل حسب الشركة ومصدر فرق الشهادات"
+                    : "Revenue by company and certificate difference"}
                 </summary>
                 <p className="mt-2 text-text-muted">
                   {lang === "ar"
@@ -786,8 +828,12 @@ function MediaPlanPage() {
                     <thead className="border-b border-border text-text-muted">
                       <tr>
                         <th className="p-2 text-start">{lang === "ar" ? "الشركة" : "Company"}</th>
-                        <th className="p-2 text-end">{lang === "ar" ? "مبيعات مؤهلة" : "Sales eligible"}</th>
-                        <th className="p-2 text-end">{lang === "ar" ? "شهادات 246" : "Certificates 246"}</th>
+                        <th className="p-2 text-end">
+                          {lang === "ar" ? "مبيعات مؤهلة" : "Sales eligible"}
+                        </th>
+                        <th className="p-2 text-end">
+                          {lang === "ar" ? "شهادات 246" : "Certificates 246"}
+                        </th>
                         <th className="p-2 text-end">{lang === "ar" ? "الإجمالي" : "Combined"}</th>
                       </tr>
                     </thead>
@@ -797,7 +843,9 @@ function MediaPlanPage() {
                           <td className="p-2 font-medium text-text">{item.company}</td>
                           <td className="num p-2 text-end">{fmtUSDFull(item.salesUsd)}</td>
                           <td className="num p-2 text-end">{fmtUSDFull(item.certificateUsd)}</td>
-                          <td className="num p-2 text-end font-semibold">{fmtUSDFull(item.salesUsd + item.certificateUsd)}</td>
+                          <td className="num p-2 text-end font-semibold">
+                            {fmtUSDFull(item.salesUsd + item.certificateUsd)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1160,7 +1208,7 @@ function PlanDeliverySection({
   onOpen,
 }: {
   deliverables: DeliverableRow[];
-  excludedLeads: { recommendation: number; whatsappBroadcast: number };
+  excludedLeads: { recommendation: number; whatsappBroadcast: number; autodialerBroadcast: number };
   elapsed: number;
   phase: PlanPhase;
   lang: "ar" | "en";
@@ -1189,8 +1237,8 @@ function PlanDeliverySection({
       </SectionTitle>
       <p className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/30 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
         {lang === "ar"
-          ? `الرقم الفعلي ونسبة الإنجاز وحالة «متأخر/على المسار/متقدم» تُحسب من الفرص البيعية في أودو فقط مقارنةً بتارجت الليدز في الخطة، وليست معدل تحويل. الليد النشط والمفقود يظهران منفصلين ولا يدخلان في الإنجاز. الفرص المفقودة ضمن الفرص. مستبعد Recommendation (${fmtNum(excludedLeads.recommendation)}) وWhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}). رقم المنصة للمقارنة فقط.`
-          : `The main figure, achievement and Behind/On track/Ahead status use current Odoo opportunities only against the plan's lead target; this is not a conversion rate. Active and Lost leads are shown separately and excluded from attainment. Lost opportunities remain within opportunities. Recommendation (${fmtNum(excludedLeads.recommendation)}) and WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) are excluded. Platform figures are comparison-only.`}
+          ? `الرقم الفعلي ونسبة الإنجاز وحالة «متأخر/على المسار/متقدم» تُحسب من الفرص البيعية في أودو فقط مقارنةً بتارجت الليدز في الخطة، وليست معدل تحويل. الليد النشط والمفقود يظهران منفصلين ولا يدخلان في الإنجاز. الفرص المفقودة ضمن الفرص. مستبعد Recommendation (${fmtNum(excludedLeads.recommendation)}) وWhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) وAutoDialer Broadcast (${fmtNum(excludedLeads.autodialerBroadcast)}). رقم المنصة للمقارنة فقط.`
+          : `The main figure, achievement and Behind/On track/Ahead status use current Odoo opportunities only against the plan's lead target; this is not a conversion rate. Active and Lost leads are shown separately and excluded from attainment. Lost opportunities remain within opportunities. Recommendation (${fmtNum(excludedLeads.recommendation)}), WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) and AutoDialer Broadcast (${fmtNum(excludedLeads.autodialerBroadcast)}) are excluded. Platform figures are comparison-only.`}
       </p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {deliverables.map((row, index) => (
@@ -1314,22 +1362,28 @@ function MediaPlanLeadsPanel({
   const detail = useApi<MediaPlanLeadDetailResponse>(`/api/media-plan-leads?${query}`);
   const ar = lang === "ar";
   const match = detail.data?.match;
-  const sourceLabel = row.actualSource === "Odoo CRM · Course Categories"
-    ? ar ? "فرص أودو" : "Odoo opportunities"
-    : row.actualSource === "Manual month-to-date report"
-        ? ar ? "إدخال يدوي" : "Manual entry"
-        : row.actualSource;
-  const note = match === "course_category" || match === "plan_courses"
-    ? ar
-      ? "الرقم الأساسي ونسبة الإنجاز من الفرص البيعية الحالية في أودو، بتاريخ إنشاء السجل والكورس. الليدز النشطة والمفقودة منفصلة ولا تدخل في الحساب. تارجت الخطة ليدز، لذلك هذه المقارنة ليست معدل تحويل."
-      : "The main figure and achievement use current Odoo opportunities by record creation date and course. Active and Lost leads are separate and excluded. The plan target is leads, so this comparison is not a conversion rate."
-    : match === "source"
+  const sourceLabel =
+    row.actualSource === "Odoo CRM · Course Categories"
       ? ar
-        ? "القائمة من سجلات Odoo التي يطابق حقل Source فيها المصدر المحدد، خلال نفس شهر الخطة."
-        : "This list uses Odoo records whose Source field exactly matches this activity in the plan month."
-      : ar
-        ? "النشاط ده ليس له ربط موثوق بسجلات Leads فردية في Odoo؛ لن نعرض سجلات غير مرتبطة به على أنها نتيجته."
-        : "This activity has no reliable individual Odoo lead linkage, so unrelated records are not shown as its result.";
+        ? "فرص أودو"
+        : "Odoo opportunities"
+      : row.actualSource === "Manual month-to-date report"
+        ? ar
+          ? "إدخال يدوي"
+          : "Manual entry"
+        : row.actualSource;
+  const note =
+    match === "course_category" || match === "plan_courses"
+      ? ar
+        ? "الرقم الأساسي ونسبة الإنجاز من الفرص البيعية الحالية في أودو، بتاريخ إنشاء السجل والكورس. الليدز النشطة والمفقودة منفصلة ولا تدخل في الحساب. تارجت الخطة ليدز، لذلك هذه المقارنة ليست معدل تحويل."
+        : "The main figure and achievement use current Odoo opportunities by record creation date and course. Active and Lost leads are separate and excluded. The plan target is leads, so this comparison is not a conversion rate."
+      : match === "source"
+        ? ar
+          ? "القائمة من سجلات Odoo التي يطابق حقل Source فيها المصدر المحدد، خلال نفس شهر الخطة."
+          : "This list uses Odoo records whose Source field exactly matches this activity in the plan month."
+        : ar
+          ? "النشاط ده ليس له ربط موثوق بسجلات Leads فردية في Odoo؛ لن نعرض سجلات غير مرتبطة به على أنها نتيجته."
+          : "This activity has no reliable individual Odoo lead linkage, so unrelated records are not shown as its result.";
 
   return (
     <DetailPanel
@@ -1337,11 +1391,19 @@ function MediaPlanLeadsPanel({
       onClose={onClose}
       title={row.label}
       subtitle={`${month} · ${ar ? "المطلوب" : "Target"} ${fmtNum(row.target)} · ${ar ? "الفعلي" : "Actual"} ${row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}`}
-      eyebrow={<span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold text-brand">{ar ? "تفاصيل تنفيذ خطة الميديا" : "Media plan delivery details"}</span>}
+      eyebrow={
+        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold text-brand">
+          {ar ? "تفاصيل تنفيذ خطة الميديا" : "Media plan delivery details"}
+        </span>
+      }
       width="min(720px, 100vw)"
     >
       {detail.isLoading || !detail.data ? (
-        detail.error ? <ErrorState message={(detail.error as Error).message} onRetry={() => detail.refetch()} /> : <Skeleton className="h-80" />
+        detail.error ? (
+          <ErrorState message={(detail.error as Error).message} onRetry={() => detail.refetch()} />
+        ) : (
+          <Skeleton className="h-80" />
+        )
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
@@ -1351,14 +1413,34 @@ function MediaPlanLeadsPanel({
             </div>
             <div className="rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
               <div className="text-[11px] text-text-muted">{sourceLabel}</div>
-              <div className="num mt-1 text-xl font-bold text-brand">{row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}</div>
+              <div className="num mt-1 text-xl font-bold text-brand">
+                {row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <div className="text-[11px] text-text-muted">{row.platformActual !== undefined ? (ar ? "رقم المنصة للمقارنة" : "Platform comparison") : (ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records")}</div>
-              <div className="num mt-1 text-xl font-bold text-text">{row.platformActual !== undefined ? (row.platformActual === null ? "—" : fmtNum(row.platformActual)) : match === "unavailable" ? "—" : fmtNum(detail.data.total)}</div>
+              <div className="text-[11px] text-text-muted">
+                {row.platformActual !== undefined
+                  ? ar
+                    ? "رقم المنصة للمقارنة"
+                    : "Platform comparison"
+                  : ar
+                    ? "سجلات Odoo القابلة للفتح"
+                    : "Openable Odoo records"}
+              </div>
+              <div className="num mt-1 text-xl font-bold text-text">
+                {row.platformActual !== undefined
+                  ? row.platformActual === null
+                    ? "—"
+                    : fmtNum(row.platformActual)
+                  : match === "unavailable"
+                    ? "—"
+                    : fmtNum(detail.data.total)}
+              </div>
             </div>
           </div>
-          <p className="rounded-xl border border-amber-border/60 bg-amber-surface/40 p-3 text-xs leading-relaxed text-text-muted">{note}</p>
+          <p className="rounded-xl border border-amber-border/60 bg-amber-surface/40 p-3 text-xs leading-relaxed text-text-muted">
+            {note}
+          </p>
           {match !== "unavailable" && (
             <>
               <p className="text-xs leading-relaxed text-text-muted">
@@ -1367,67 +1449,192 @@ function MediaPlanLeadsPanel({
                   : "Current Odoo record types: a lost lead is not an opportunity. Lost opportunities are included within all opportunities."}
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {([
-                  { key: "lead_active", value: detail.data.lifecycle.leadActive, ar: "ليد نشط", en: "Active leads" },
-                  { key: "lead_lost", value: detail.data.lifecycle.leadLost, ar: "ليد مفقود", en: "Lost leads" },
-                  { key: "lead_other", value: detail.data.lifecycle.leadOther, ar: "ليد مؤرشف", en: "Archived leads" },
-                  { key: "opportunity", value: detail.data.lifecycle.opportunities, ar: "كل الفرص", en: "All opportunities" },
-                  { key: "opportunity_lost", value: detail.data.lifecycle.opportunityLost, ar: "فرص مفقودة ضمن الفرص", en: "Lost opportunities (subset)" },
-                ] as const).filter((item) => item.key !== "lead_other" || item.value > 0).map((item) => {
-                  const active = item.key === "opportunity_lost" ? opportunityLost : bucket === item.key && !opportunityLost;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => {
-                        setBucket(item.key === "opportunity_lost" ? "opportunity" : item.key);
-                        setOpportunityLost(item.key === "opportunity_lost");
-                        setStage("");
-                        setPage(1);
-                      }}
-                      className={`rounded-xl border p-3 text-start transition-colors ${active ? "border-brand bg-brand-soft/50" : "border-border bg-surface-2/40 hover:border-brand/40"}`}
-                    >
-                      <span className="block text-[11px] text-text-muted">{ar ? item.ar : item.en}</span>
-                      <strong className="num mt-1 block text-lg text-text">{fmtNum(item.value)}</strong>
-                    </button>
-                  );
-                })}
+                {(
+                  [
+                    {
+                      key: "lead_active",
+                      value: detail.data.lifecycle.leadActive,
+                      ar: "ليد نشط",
+                      en: "Active leads",
+                    },
+                    {
+                      key: "lead_lost",
+                      value: detail.data.lifecycle.leadLost,
+                      ar: "ليد مفقود",
+                      en: "Lost leads",
+                    },
+                    {
+                      key: "lead_other",
+                      value: detail.data.lifecycle.leadOther,
+                      ar: "ليد مؤرشف",
+                      en: "Archived leads",
+                    },
+                    {
+                      key: "opportunity",
+                      value: detail.data.lifecycle.opportunities,
+                      ar: "كل الفرص",
+                      en: "All opportunities",
+                    },
+                    {
+                      key: "opportunity_lost",
+                      value: detail.data.lifecycle.opportunityLost,
+                      ar: "فرص مفقودة ضمن الفرص",
+                      en: "Lost opportunities (subset)",
+                    },
+                  ] as const
+                )
+                  .filter((item) => item.key !== "lead_other" || item.value > 0)
+                  .map((item) => {
+                    const active =
+                      item.key === "opportunity_lost"
+                        ? opportunityLost
+                        : bucket === item.key && !opportunityLost;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => {
+                          setBucket(item.key === "opportunity_lost" ? "opportunity" : item.key);
+                          setOpportunityLost(item.key === "opportunity_lost");
+                          setStage("");
+                          setPage(1);
+                        }}
+                        className={`rounded-xl border p-3 text-start transition-colors ${active ? "border-brand bg-brand-soft/50" : "border-border bg-surface-2/40 hover:border-brand/40"}`}
+                      >
+                        <span className="block text-[11px] text-text-muted">
+                          {ar ? item.ar : item.en}
+                        </span>
+                        <strong className="num mt-1 block text-lg text-text">
+                          {fmtNum(item.value)}
+                        </strong>
+                      </button>
+                    );
+                  })}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => { setStage(""); setBucket(row.actualSource === "Odoo CRM · Course Categories" ? "opportunity" : ""); setOpportunityLost(false); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage && (row.actualSource === "Odoo CRM · Course Categories" ? bucket === "opportunity" : !bucket) && !opportunityLost ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
-                  {row.actualSource === "Odoo CRM · Course Categories" ? (ar ? "كل الفرص" : "All opportunities") : (ar ? "كل السجلات" : "All records")} · {fmtNum(row.actualSource === "Odoo CRM · Course Categories" ? detail.data.lifecycle.opportunities : detail.data.total)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStage("");
+                    setBucket(
+                      row.actualSource === "Odoo CRM · Course Categories" ? "opportunity" : "",
+                    );
+                    setOpportunityLost(false);
+                    setPage(1);
+                  }}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage && (row.actualSource === "Odoo CRM · Course Categories" ? bucket === "opportunity" : !bucket) && !opportunityLost ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
+                >
+                  {row.actualSource === "Odoo CRM · Course Categories"
+                    ? ar
+                      ? "كل الفرص"
+                      : "All opportunities"
+                    : ar
+                      ? "كل السجلات"
+                      : "All records"}{" "}
+                  ·{" "}
+                  {fmtNum(
+                    row.actualSource === "Odoo CRM · Course Categories"
+                      ? detail.data.lifecycle.opportunities
+                      : detail.data.total,
+                  )}
                 </button>
                 {Object.entries(detail.data.stages).map(([name, count]) => (
-                  <button key={name} type="button" onClick={() => { setStage(name); setBucket("opportunity"); setOpportunityLost(false); setPage(1); }} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}>
-                    {ar ? "فرصة · " : "Opportunity · "}{stageDisplayName(name, ar)} · {fmtNum(count)}
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      setStage(name);
+                      setBucket("opportunity");
+                      setOpportunityLost(false);
+                      setPage(1);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
+                  >
+                    {ar ? "فرصة · " : "Opportunity · "}
+                    {stageDisplayName(name, ar)} · {fmtNum(count)}
                   </button>
                 ))}
               </div>
-              <div className="text-xs font-semibold text-text">{ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"} · {fmtNum(detail.data.filteredTotal)}</div>
+              <div className="text-xs font-semibold text-text">
+                {ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"} ·{" "}
+                {fmtNum(detail.data.filteredTotal)}
+              </div>
               <div className="space-y-2">
                 {detail.data.rows.map((lead) => (
-                  <div key={lead.id} className="rounded-xl border border-border bg-surface-2/35 p-3">
+                  <div
+                    key={lead.id}
+                    className="rounded-xl border border-border bg-surface-2/35 p-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-semibold text-text">{lead.contact} <span className="num text-xs font-normal text-text-muted">#{lead.id}</span></div>
-                        <div className="mt-1 text-xs text-text-muted">{recordTypeDisplayName(lead.recordType, ar)} · {stageDisplayName(lead.stage, ar)} · {lead.createdAt.slice(0, 10)}</div>
+                        <div className="font-semibold text-text">
+                          {lead.contact}{" "}
+                          <span className="num text-xs font-normal text-text-muted">
+                            #{lead.id}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-text-muted">
+                          {recordTypeDisplayName(lead.recordType, ar)} ·{" "}
+                          {stageDisplayName(lead.stage, ar)} · {lead.createdAt.slice(0, 10)}
+                        </div>
                       </div>
-                      <a href={lead.odooUrl} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"><ExternalLink size={13} />{ar ? "فتح في أودو" : "Open in Odoo"}</a>
+                      <a
+                        href={lead.odooUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+                      >
+                        <ExternalLink size={13} />
+                        {ar ? "فتح في أودو" : "Open in Odoo"}
+                      </a>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-text-muted">
-                      <span className="rounded-md bg-surface-3 px-2 py-1">{lead.course} · {lead.specialty}</span>
-                      {lead.salesperson && <span className="rounded-md bg-surface-3 px-2 py-1">{lead.salesperson}</span>}
-                      {match === "source" && <span className="rounded-md bg-surface-3 px-2 py-1">Source: {lead.source}</span>}
+                      <span className="rounded-md bg-surface-3 px-2 py-1">
+                        {lead.course} · {lead.specialty}
+                      </span>
+                      {lead.salesperson && (
+                        <span className="rounded-md bg-surface-3 px-2 py-1">
+                          {lead.salesperson}
+                        </span>
+                      )}
+                      {match === "source" && (
+                        <span className="rounded-md bg-surface-3 px-2 py-1">
+                          Source: {lead.source}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
-                {!detail.data.rows.length && <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-text-muted">{ar ? "لا توجد سجلات مطابقة في هذه الفترة" : "No matching records in this period"}</div>}
+                {!detail.data.rows.length && (
+                  <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-text-muted">
+                    {ar
+                      ? "لا توجد سجلات مطابقة في هذه الفترة"
+                      : "No matching records in this period"}
+                  </div>
+                )}
               </div>
               {detail.data.filteredTotal > detail.data.pageSize && (
                 <div className="flex items-center justify-between gap-3 py-2 text-xs text-text-muted">
-                  <button type="button" disabled={page === 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-border px-3 py-2 disabled:opacity-40">{ar ? "السابق" : "Previous"}</button>
-                  <span>{fmtNum(page)} / {fmtNum(Math.ceil(detail.data.filteredTotal / detail.data.pageSize))}</span>
-                  <button type="button" disabled={page * detail.data.pageSize >= detail.data.filteredTotal} onClick={() => setPage(page + 1)} className="rounded-lg border border-border px-3 py-2 disabled:opacity-40">{ar ? "التالي" : "Next"}</button>
+                  <button
+                    type="button"
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                    className="rounded-lg border border-border px-3 py-2 disabled:opacity-40"
+                  >
+                    {ar ? "السابق" : "Previous"}
+                  </button>
+                  <span>
+                    {fmtNum(page)} /{" "}
+                    {fmtNum(Math.ceil(detail.data.filteredTotal / detail.data.pageSize))}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page * detail.data.pageSize >= detail.data.filteredTotal}
+                    onClick={() => setPage(page + 1)}
+                    className="rounded-lg border border-border px-3 py-2 disabled:opacity-40"
+                  >
+                    {ar ? "التالي" : "Next"}
+                  </button>
                 </div>
               )}
             </>
@@ -1484,9 +1691,14 @@ function DeliverableCard({
   const isManual = row.actualSource === "Manual month-to-date report";
   const unit =
     row.unit === "units" ? (lang === "ar" ? "وحدة غير محددة" : "unspecified units") : row.unit;
-  const actualLabel = row.actualSource === "Odoo CRM · Course Categories"
-    ? lang === "ar" ? "فرص أودو البيعية" : "Odoo opportunities"
-      : lang === "ar" ? "الفعلي" : "Actual";
+  const actualLabel =
+    row.actualSource === "Odoo CRM · Course Categories"
+      ? lang === "ar"
+        ? "فرص أودو البيعية"
+        : "Odoo opportunities"
+      : lang === "ar"
+        ? "الفعلي"
+        : "Actual";
 
   return (
     <div
@@ -1494,7 +1706,12 @@ function DeliverableCard({
       style={{ borderTopColor: tone.strong, borderTopWidth: 3 }}
       title={`${row.actualSource} · ${row.dateScope} · ${row.matchingRule}`}
     >
-      <button type="button" onClick={onOpen} className="absolute inset-0 z-0 rounded-2xl" aria-label={`${lang === "ar" ? "عرض تفاصيل" : "View details"} ${label}`} />
+      <button
+        type="button"
+        onClick={onOpen}
+        className="absolute inset-0 z-0 rounded-2xl"
+        aria-label={`${lang === "ar" ? "عرض تفاصيل" : "View details"} ${label}`}
+      />
       <div className="pointer-events-none relative flex items-start justify-between gap-3">
         <div>
           <div
@@ -1535,13 +1752,29 @@ function DeliverableCard({
       {row.actualSource === "Odoo CRM · Course Categories" && row.lifecycle && (
         <div className="pointer-events-none relative mt-3 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[11px] leading-5 text-text-muted">
           <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span>{lang === "ar" ? "ليد نشط" : "Active leads"} <strong className="num text-emerald-700">{fmtNum(row.lifecycle.leadActive)}</strong></span>
-            <span>{lang === "ar" ? "ليد مفقود" : "Lost leads"} <strong className="num text-rose-700">{fmtNum(row.lifecycle.leadLost)}</strong></span>
-            <span>{lang === "ar" ? "فرص بيعية" : "Opportunities"} <strong className="num text-violet-700">{fmtNum(row.lifecycle.opportunities)}</strong></span>
-            {row.lifecycle.leadOther > 0 && <span>{lang === "ar" ? "ليد مؤرشف" : "Archived leads"} <strong className="num">{fmtNum(row.lifecycle.leadOther)}</strong></span>}
+            <span>
+              {lang === "ar" ? "ليد نشط" : "Active leads"}{" "}
+              <strong className="num text-emerald-700">{fmtNum(row.lifecycle.leadActive)}</strong>
+            </span>
+            <span>
+              {lang === "ar" ? "ليد مفقود" : "Lost leads"}{" "}
+              <strong className="num text-rose-700">{fmtNum(row.lifecycle.leadLost)}</strong>
+            </span>
+            <span>
+              {lang === "ar" ? "فرص بيعية" : "Opportunities"}{" "}
+              <strong className="num text-violet-700">{fmtNum(row.lifecycle.opportunities)}</strong>
+            </span>
+            {row.lifecycle.leadOther > 0 && (
+              <span>
+                {lang === "ar" ? "ليد مؤرشف" : "Archived leads"}{" "}
+                <strong className="num">{fmtNum(row.lifecycle.leadOther)}</strong>
+              </span>
+            )}
           </div>
           <div className="mt-1 text-[10px] text-text-subtle">
-            {lang === "ar" ? "الفرص المفقودة ضمن الفرص: " : "Lost opportunities within opportunities: "}
+            {lang === "ar"
+              ? "الفرص المفقودة ضمن الفرص: "
+              : "Lost opportunities within opportunities: "}
             <strong className="num">{fmtNum(row.lifecycle.opportunityLost)}</strong>
           </div>
         </div>
@@ -1550,7 +1783,9 @@ function DeliverableCard({
       {row.platformActual !== undefined && (
         <p className="pointer-events-none relative mt-1.5 text-[11px] text-text-muted">
           {lang === "ar" ? "رقم المنصة للمقارنة فقط:" : "Platform comparison only:"}{" "}
-          <span className="num font-semibold">{row.platformActual === null ? "—" : fmtNum(row.platformActual)}</span>
+          <span className="num font-semibold">
+            {row.platformActual === null ? "—" : fmtNum(row.platformActual)}
+          </span>
         </p>
       )}
 
@@ -1574,7 +1809,11 @@ function DeliverableCard({
         </span>
         {isManual ? (
           onEditManual ? (
-            <button type="button" onClick={onEditManual} className="pointer-events-auto relative z-10 font-semibold text-brand">
+            <button
+              type="button"
+              onClick={onEditManual}
+              className="pointer-events-auto relative z-10 font-semibold text-brand"
+            >
               {lang === "ar" ? "سجّل المحقق" : "Enter actual"}
             </button>
           ) : (
@@ -1584,9 +1823,15 @@ function DeliverableCard({
           <span className="font-semibold text-brand">
             {row.metric === "leads"
               ? row.actualSource === "Odoo CRM · Course Categories"
-                ? lang === "ar" ? "عرض الفرص ↗" : "View opportunities ↗"
-                : lang === "ar" ? "عرض الليدز ↗" : "View leads ↗"
-              : lang === "ar" ? "تفاصيل الربط ↗" : "Link details ↗"}
+                ? lang === "ar"
+                  ? "عرض الفرص ↗"
+                  : "View opportunities ↗"
+                : lang === "ar"
+                  ? "عرض الليدز ↗"
+                  : "View leads ↗"
+              : lang === "ar"
+                ? "تفاصيل الربط ↗"
+                : "Link details ↗"}
           </span>
         )}
       </div>
@@ -1697,7 +1942,8 @@ function CourseMobileCard({
         />
       </div>
       <p className="mt-2 text-[11px] text-text-muted">
-        {lang === "ar" ? "المنصة للمقارنة فقط" : "Platform comparison only"}: {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
+        {lang === "ar" ? "المنصة للمقارنة فقط" : "Platform comparison only"}:{" "}
+        {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
       </p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div

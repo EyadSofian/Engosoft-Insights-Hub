@@ -62,7 +62,8 @@ type Response = PerformanceResult & {
     accountingSyncedAt: string;
   };
 };
-type Dimension = "course" | "source" | "campaign" | "buyer" | "owner" | "closer";
+type Dimension = "course" | "source" | "platform" | "campaign" | "buyer" | "owner" | "closer";
+type LostDimension = "course" | "platform" | "source" | "owner" | "buyer";
 
 const copy = {
   ar: {
@@ -75,11 +76,11 @@ const copy = {
     paid: "ليدز ثبت دفعها وربطها",
     rate: "تحويل مدفوع مثبت (حد أدنى)",
     later: "دُفعت في شهر لاحق",
-    revenue: "صافي تحصيل المجموعة",
+    revenue: "تحصيل مرتبط بمجموعات الدخول",
     trend: "مقارنة مجموعات الدخول الشهرية",
     trendSub: "حالة كل مجموعة حتى اليوم، وليست مبيعات الشهر نفسه.",
     month: "شهر الدخول",
-    duplicates: "تكرار محتمل",
+    duplicates: "تطابق هوية محتمل",
     same: "داخل الشهر",
     previous: "من شهر سابق",
     confirmed: "مؤكد كسبب فقدان في أودو",
@@ -146,7 +147,14 @@ const copy = {
     cohortVsPayment:
       "مش نفس المؤشر: الفواتير حسب تاريخ الدفع تشمل ليدز من شهور سابقة وقد تشمل فواتير بلا ربط مؤكد. التسجيلات المثبتة أعلاه تُنسب لشهر دخول الليد، ولا تضم إلا الربط المباشر بأمر البيع. لا يصح اعتبار الفرق ليدز مفقودة أو نسبة تحويل.",
     paymentRevenue: "تحصيل فواتير الشهر",
-    freshNow: "موسومة Fresh حاليًا في أودو",
+    freshNow: "حقل Lead Segment = Fresh حاليًا",
+    freshMeaning:
+      "Fresh هنا تصنيف حالي في أودو، وليس معناه أن الليد لم يُتصل به، ولا يثبت تصنيفه يوم دخوله.",
+    freshCalled: "لهم مكالمة PBX موثقة",
+    freshNoPbx: "بلا مكالمة PBX ظاهرة",
+    freshUnmatched: "تعذرت مطابقة الهاتف",
+    freshCallCaveat:
+      "غياب مكالمة PBX لا يثبت أن السيلز لم يتعامل مع الليد؛ قد توجد متابعة في Chatter أو واتساب.",
     segmentUnknown: "حقل Lead Segment فارغ",
     segmentExplanation:
       "ده حقل تصنيف منفصل عن مراحل أودو. السجلات دي لها نوع وحالة في CRM، والفرص لها مراحل بيع.",
@@ -196,7 +204,7 @@ const copy = {
     paid: "Exactly linked paid leads",
     rate: "Verified paid conversion (lower bound)",
     later: "Paid in a later month",
-    revenue: "Net cohort collections",
+    revenue: "Collections linked to entry cohorts",
     trend: "Entry-cohort comparison",
     trendSub: "Current outcome of each cohort, not sales booked in that month.",
     month: "Entry month",
@@ -268,7 +276,14 @@ const copy = {
     cohortVsPayment:
       "These are different measures: payment-month invoices can belong to older leads or lack an exact link. Verified enrollments above are credited to the lead entry month only after a direct sale-order link. The difference is not missing leads or a conversion rate.",
     paymentRevenue: "Payment-month collections",
-    freshNow: "Tagged Fresh in Odoo now",
+    freshNow: "Lead Segment = Fresh now",
+    freshMeaning:
+      "Fresh is the current Odoo classification, not proof the lead has never been contacted or that it was Fresh at entry.",
+    freshCalled: "Documented PBX call",
+    freshNoPbx: "No PBX call visible",
+    freshUnmatched: "Phone not safely matchable",
+    freshCallCaveat:
+      "No PBX call does not prove Sales did not work the lead; Chatter or WhatsApp follow-up may exist.",
     segmentUnknown: "Lead Segment field is blank",
     segmentExplanation:
       "This is a separate classification field, not an Odoo sales stage. These records have CRM types and statuses; opportunities have sales stages.",
@@ -326,7 +341,25 @@ const extra = {
     exportHint: "ملف Excel بنفس أرقام الشاشة وتعريفاتها",
     monthlyTable: "مقارنة شهرية كاملة",
     monthlyTableHint:
-      "كل مجموعة دخول في صف واحد: الحجم والتكرار والجودة والمتابعة والتحويل. الأعمدة الإضافية تحت زر الأعمدة.",
+      "الدخول والتحويل محسوبان على مجموعة الليدز التي دخلت الشهر. Lost بتاريخ الإغلاق يشمل ما أُغلق خلاله وما زال Lost الآن، حتى لو دخل قبله؛ السجلات التي أُعيد فتحها غير متاحة هنا. لا نقسمه على عدد الداخلين هذا الشهر.",
+    calendarLost: "أُغلقت Lost في الشهر",
+    calendarLostOlderEntry: "من شهور دخول سابقة",
+    calendarPaid: "أول دفع مثبت في الشهر",
+    sameMonthLost: "دخل وفُقد في الشهر نفسه",
+    sameMonthPaid: "دخل ودفع في الشهر نفسه",
+    lossUnverified: "Lost بلا تاريخ فقدان مؤكّد",
+    duplicateBasis:
+      "مطابقة هاتف/إيميل محتملة ÷ كل سجلات CRM الجديدة المؤهلة. لا تُحذف آليًا؛ سبب Duplicate في أودو رقم مختلف.",
+    declaredDuplicateBasis: "سبب Duplicate من Lost الحالية",
+    duplicateAll: "كل السجلات",
+    duplicateOnly: "تطابق محتمل",
+    nonDuplicate: "بلا تطابق ظاهر",
+    lostBreakdown: "تفصيل الـLost حسب الفلاتر",
+    lostBreakdownHint:
+      "نفس مجموعة شهر الدخول المختارة، حسب الحالة الحالية في أودو. النسبة من سجلات كل صف، لا من إجمالي Lost.",
+    platform: "المنصة / القناة",
+    lostLead: "Lost Leads",
+    lostOpp: "Lost Opportunities",
     stageShare: "من إجمالي الدخول",
     stageStep: "من الليدز القابلة لمطابقة الهاتف",
     stageProxy: "مؤشر حالة حالية، وليس انتقالًا مسجلًا",
@@ -367,7 +400,25 @@ const extra = {
     exportHint: "An Excel file with the same figures and definitions as the screen",
     monthlyTable: "Full monthly comparison",
     monthlyTableHint:
-      "One row per entry cohort: volume, duplicates, quality, follow-up and conversion. Further columns sit behind the Columns button.",
+      "Entries and conversion use that month's entry cohort. Lost by close date counts records closed in the month and still Lost now, even if created earlier; reopened records are unavailable. It is not divided by that month's entries.",
+    calendarLost: "Closed Lost in month",
+    calendarLostOlderEntry: "Entered in earlier months",
+    calendarPaid: "First verified payment in month",
+    sameMonthLost: "Entered and Lost in same month",
+    sameMonthPaid: "Entered and paid in same month",
+    lossUnverified: "Lost without a verified date",
+    duplicateBasis:
+      "Potential phone/email matches ÷ all eligible new CRM records. These are not auto-removed; Odoo's Duplicate loss reason is a separate count.",
+    declaredDuplicateBasis: "Odoo Duplicate reason among current Lost",
+    duplicateAll: "All records",
+    duplicateOnly: "Potential matches",
+    nonDuplicate: "No visible match",
+    lostBreakdown: "Lost by filter",
+    lostBreakdownHint:
+      "Selected entry-month cohort, using current Odoo Lost status. Each rate uses that row's records as denominator.",
+    platform: "Platform / channel",
+    lostLead: "Lost Leads",
+    lostOpp: "Lost Opportunities",
     stageShare: "of all entries",
     stageStep: "of phone-matchable leads",
     stageProxy: "A current-status proxy, not a logged transition",
@@ -453,6 +504,8 @@ export function SixMonthPerformance() {
   const x = extra[lang];
   const [month, setMonth] = useState("");
   const [dimension, setDimension] = useState<Dimension>("course");
+  const [lostDimension, setLostDimension] = useState<LostDimension>("course");
+  const [recordScope, setRecordScope] = useState<"all" | "duplicate" | "nonduplicate">("all");
   const { data, isLoading, error } = useApi<Response>(
     `/api/lead-performance${month ? `?month=${month}` : ""}`,
   );
@@ -682,37 +735,6 @@ export function SixMonthPerformance() {
           : undefined,
         provenance,
       },
-      revenue: {
-        id: "leads.revenue",
-        title: t.revenue,
-        value: paidReady ? money(selected.paidRevenue) : "—",
-        tone: "amber",
-        icon: <ReceiptText size={17} />,
-        definition: t.cohortVsPayment,
-        trend: paidReady
-          ? trend(
-              (row) => row.paidRevenue,
-              t.revenue,
-              (value) => fmtUSD(value),
-            )
-          : undefined,
-        breakdowns: paidReady
-          ? [
-              {
-                id: "campaignRevenue",
-                title: t.campaign,
-                rows: topRows(
-                  dimensionRows(
-                    data.byCampaign,
-                    (row) => row.paidRevenue,
-                    (row) => money(row.paidRevenue),
-                  ),
-                ),
-              },
-            ]
-          : undefined,
-        provenance,
-      },
     };
   }, [data, lang, paidReady, t, x]);
 
@@ -736,7 +758,11 @@ export function SixMonthPerformance() {
    * total, "which salesperson is slow to call?" had no answer on a page whose
    * whole purpose is to answer it fairly.
    */
-  const groupCols = (label: string, isCloser: boolean): Col<PerformanceGroup>[] => [
+  const groupCols = (
+    label: string,
+    isCloser: boolean,
+    monthly = false,
+  ): Col<PerformanceGroup>[] => [
     {
       key: "name",
       header: label,
@@ -889,6 +915,8 @@ export function SixMonthPerformance() {
       header: t.lost,
       group: "outcome",
       align: "right",
+      hideByDefault: monthly,
+      headerTitle: monthly ? t.trendSub : undefined,
       render: (row) =>
         isCloser ? (
           "—"
@@ -904,6 +932,7 @@ export function SixMonthPerformance() {
       header: t.paid,
       group: "outcome",
       align: "right",
+      hideByDefault: monthly,
       render: (row) =>
         paidReady ? <span style={{ color: "var(--mint-ink)" }}>{n(row.paidLeads)}</span> : "—",
       sortValue: (row) => row.paidLeads,
@@ -913,6 +942,7 @@ export function SixMonthPerformance() {
       header: t.rate,
       group: "outcome",
       align: "right",
+      hideByDefault: monthly,
       render: (row) => (paidReady && !isCloser ? pct(row.conversionRate) : "—"),
       sortValue: (row) => row.conversionRate ?? -1,
     },
@@ -981,7 +1011,7 @@ export function SixMonthPerformance() {
     return (
       <div className="page-sections">
         <Skeleton className="h-28" />
-        <KpiSkeletonGrid count={5} />
+        <KpiSkeletonGrid count={4} />
         <Skeleton className="h-72" />
       </div>
     );
@@ -1033,12 +1063,25 @@ export function SixMonthPerformance() {
   const dimensions: { id: Dimension; label: string; rows: PerformanceGroup[] }[] = [
     { id: "course", label: t.course, rows: data.byCourse },
     { id: "source", label: t.source, rows: data.bySource },
+    { id: "platform", label: x.platform, rows: data.byPlatform },
     { id: "campaign", label: t.campaign, rows: data.byCampaign },
     { id: "buyer", label: t.buyer, rows: data.byMediaBuyer },
     { id: "owner", label: t.owner, rows: data.bySalesOwner },
     { id: "closer", label: t.closer, rows: paidReady ? data.bySalesCloser : [] },
   ];
   const activeDimension = dimensions.find((item) => item.id === dimension)!;
+  const lostDimensions = dimensions.filter(
+    (item): item is (typeof dimensions)[number] & { id: LostDimension } =>
+      ["course", "platform", "source", "owner", "buyer"].includes(item.id),
+  );
+  const activeLostDimension = lostDimensions.find((item) => item.id === lostDimension)!;
+  const displayedRecords = data.records.filter((row) =>
+    recordScope === "all"
+      ? true
+      : recordScope === "duplicate"
+        ? row.duplicate !== null
+        : row.duplicate === null,
+  );
   const notices = [
     !data.coverage.linksAvailable && t.missingLinks,
     linkCoverage !== null && linkCoverage < 90 && `${t.limitedLinks} (${pct(linkCoverage)})`,
@@ -1244,6 +1287,22 @@ export function SixMonthPerformance() {
                 <b className="num mt-1 block text-base text-text">{n(selected.segmentMissing)}</b>
               </div>
             </div>
+            <div className="mt-3 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
+              <p>{t.freshMeaning}</p>
+              <div className="mt-2 grid gap-1 sm:grid-cols-3">
+                <span>
+                  {t.freshCalled}: <b className="num text-text">{n(selected.freshPbxCalled)}</b>
+                </span>
+                <span>
+                  {t.freshNoPbx}: <b className="num text-text">{n(selected.freshPbxNoCall)}</b>
+                </span>
+                <span>
+                  {t.freshUnmatched}:{" "}
+                  <b className="num text-text">{n(selected.freshPbxUnmatchable)}</b>
+                </span>
+              </div>
+              <p className="mt-2">{t.freshCallCaveat}</p>
+            </div>
             <div className="mt-4 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
               <p>{t.segmentExplanation}</p>
               <p className="mt-1.5">
@@ -1308,41 +1367,7 @@ export function SixMonthPerformance() {
               sub: paidReady ? `${n(selected.paidLater)} ${t.later}` : undefined,
             }}
           />
-          <MetricDetailTrigger detail={figures.revenue!} card={{ index: 4 }} />
         </KpiRow>
-      </PageSection>
-
-      <PageSection
-        title={lang === "ar" ? "تدقيق ربط الفواتير بالليدز" : "Invoice-to-lead linkage audit"}
-        hint={`${data.months[0]}-01 → ${data.asOf}`}
-        icon={<ReceiptText size={16} />}
-        tone="sky"
-      >
-        <Card>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <SmallStat
-              label={lang === "ar" ? "فواتير بها ربط مؤكّد" : "Invoices with an exact link"}
-              value={n(data.coverage.linkedAccountingInvoices)}
-            />
-            <SmallStat
-              label={lang === "ar" ? "فواتير بلا ربط مؤكّد" : "Invoices without an exact link"}
-              value={n(data.coverage.unlinkedAccountingInvoices)}
-            />
-            <SmallStat
-              label={
-                lang === "ar"
-                  ? "بنود غير مربوطة وبها اسم سيلز"
-                  : "Unlinked lines with a salesperson"
-              }
-              value={n(data.coverage.unlinkedWithSellerLines)}
-            />
-          </div>
-          <p className="mt-3 text-[12px] leading-6 text-text-muted">
-            {lang === "ar"
-              ? `تغطية بنود الفواتير في فترة التقرير: ${linkCoverage === null ? "—" : pct(linkCoverage)} (${n(linkedLines)} من ${n(totalLines)} بند). اسم السيلز على الفاتورة يحدد بائعها، لكنه لا يثبت أي ليد أو حملة جابتها؛ الربط المؤكد يحتاج أمر بيع مرتبطًا بالـOpportunity في أودو. الفاتورة تُعد مربوطة إذا وُجد لها بند واحد مربوط على الأقل. فواتير الدفع الشهري تشمل أيضًا مبيعات ليدز قديمة، ولا تساوي تسجيلات مجموعة الدخول.`
-              : `Invoice-line coverage in this report window: ${linkCoverage === null ? "—" : pct(linkCoverage)} (${n(linkedLines)} of ${n(totalLines)} lines). The salesperson on an invoice identifies its seller, not the lead or campaign that generated it. Exact attribution requires an Odoo sale order linked to an Opportunity. An invoice is counted as linked if at least one line is linked. Payment-month invoices also include older lead cohorts.`}
-          </p>
-        </Card>
       </PageSection>
 
       <PageSection
@@ -1425,18 +1450,23 @@ export function SixMonthPerformance() {
               <span className="text-[11px] text-text-muted">{t.leads}</span>
               <span className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                 <span className="text-rose-strong">
-                  {t.lost}
-                  <b className="num mt-0.5 block text-sm">
-                    {n(row.lost)} · {pct(row.lostRate)}
-                  </b>
+                  {x.calendarLost}
+                  <b className="num mt-0.5 block text-sm">{n(row.calendarLost)}</b>
+                  <span className="block text-text-muted">
+                    {x.calendarLostOlderEntry}: {n(row.calendarLostOlderEntry)}
+                  </span>
                 </span>
                 <span className="text-mint-strong">
-                  {t.paid}
+                  {x.sameMonthPaid}
                   <b className="num mt-0.5 block text-sm">
-                    {paidReady ? n(row.paidLeads) : "—"} ·{" "}
-                    {paidReady ? pct(row.conversionRate) : "—"}
+                    {paidReady ? n(row.paidSameEntryMonth) : "—"} ·{" "}
+                    {paidReady ? pct(row.paidSameEntryMonthRate) : "—"}
                   </b>
                 </span>
+              </span>
+              <span className="mt-2 block text-[11px] text-text-muted">
+                {x.sameMonthLost}: {n(row.lostSameEntryMonth)} · {x.calendarPaid}:{" "}
+                {paidReady ? n(row.calendarPaid) : "—"}
               </span>
             </button>
           ))}
@@ -1445,7 +1475,63 @@ export function SixMonthPerformance() {
           <DataTable<MonthRow>
             rows={monthRows}
             cols={[
-              ...(groupCols(t.month, false) as Col<MonthRow>[]),
+              ...(groupCols(t.month, false, true) as Col<MonthRow>[]),
+              {
+                key: "calendarLost",
+                header: x.calendarLost,
+                group: "outcome",
+                align: "right",
+                always: true,
+                render: (row) => n(row.calendarLost),
+                sortValue: (row) => row.calendarLost,
+              },
+              {
+                key: "calendarLostOlderEntry",
+                header: x.calendarLostOlderEntry,
+                group: "outcome",
+                align: "right",
+                render: (row) => n(row.calendarLostOlderEntry),
+                sortValue: (row) => row.calendarLostOlderEntry,
+              },
+              {
+                key: "lostSameEntryMonth",
+                header: x.sameMonthLost,
+                group: "outcome",
+                align: "right",
+                always: true,
+                render: (row) =>
+                  `${n(row.lostSameEntryMonth)} · ${pct(row.leads ? (row.lostSameEntryMonth / row.leads) * 100 : null)}`,
+                sortValue: (row) => row.lostSameEntryMonth,
+              },
+              {
+                key: "paidSameEntryMonth",
+                header: x.sameMonthPaid,
+                group: "outcome",
+                align: "right",
+                always: true,
+                render: (row) =>
+                  paidReady
+                    ? `${n(row.paidSameEntryMonth)} · ${pct(row.paidSameEntryMonthRate)}`
+                    : "—",
+                sortValue: (row) => row.paidSameEntryMonth,
+              },
+              {
+                key: "calendarPaid",
+                header: x.calendarPaid,
+                group: "payment",
+                align: "right",
+                render: (row) => (paidReady ? n(row.calendarPaid) : "—"),
+                sortValue: (row) => row.calendarPaid,
+              },
+              {
+                key: "lostTimingUnverified",
+                header: x.lossUnverified,
+                group: "outcome",
+                align: "right",
+                hideByDefault: true,
+                render: (row) => n(row.lostTimingUnverified),
+                sortValue: (row) => row.lostTimingUnverified,
+              },
               {
                 key: "paidInvoices",
                 header: x.groupColumns.invoices,
@@ -1534,6 +1620,22 @@ export function SixMonthPerformance() {
                 )}
               />
             </div>
+            <p className="mt-3 text-[11.5px] leading-5 text-text-muted">
+              {x.duplicateBasis} {n(selected.duplicateSameMonth + selected.duplicateEarlierMonth)} ÷{" "}
+              {n(selected.leads)} ={" "}
+              {pct(
+                selected.leads
+                  ? ((selected.duplicateSameMonth + selected.duplicateEarlierMonth) /
+                      selected.leads) *
+                      100
+                  : null,
+              )}
+              .
+            </p>
+            <p className="mt-1 text-[11.5px] leading-5 text-text-muted">
+              {x.declaredDuplicateBasis}: {n(selected.confirmedDuplicate)} ÷ {n(selected.lost)} ={" "}
+              {pct(selected.lost ? (selected.confirmedDuplicate / selected.lost) * 100 : null)}.
+            </p>
             <div className="mt-4">
               <SectionTitle hint={`${t.unqualified}: ${n(selected.unqualified)}`}>
                 {t.quality}
@@ -1610,6 +1712,102 @@ export function SixMonthPerformance() {
       </div>
 
       <PageSection
+        title={x.lostBreakdown}
+        hint={x.lostBreakdownHint}
+        icon={<TrendingDown size={16} />}
+        tone="rose"
+        id="performance-lost-breakdown"
+        action={
+          <Segmented
+            value={lostDimension}
+            onChange={setLostDimension}
+            options={lostDimensions.map((item) => ({ value: item.id, label: item.label }))}
+          />
+        }
+      >
+        <Card padded={false} className="overflow-hidden">
+          <DataTable<PerformanceGroup>
+            rows={activeLostDimension.rows}
+            cols={[
+              {
+                key: "name",
+                header: activeLostDimension.label,
+                always: true,
+                sticky: true,
+                render: (row) =>
+                  row.name === "—" ? (lang === "ar" ? "غير منسوب" : "Unattributed") : row.name,
+                sortValue: (row) => row.name,
+              },
+              {
+                key: "leads",
+                header: t.leads,
+                align: "right",
+                render: (row) => n(row.leads),
+                sortValue: (row) => row.leads,
+              },
+              {
+                key: "lostLeads",
+                header: x.lostLead,
+                align: "right",
+                render: (row) => n(row.lostLeads),
+                sortValue: (row) => row.lostLeads,
+              },
+              {
+                key: "lostOpportunities",
+                header: x.lostOpp,
+                align: "right",
+                render: (row) => n(row.lostOpportunities),
+                sortValue: (row) => row.lostOpportunities,
+              },
+              {
+                key: "lostRate",
+                header: t.lost,
+                align: "right",
+                render: (row) => `${n(row.lost)} · ${pct(row.lostRate)}`,
+                sortValue: (row) => row.lost,
+              },
+              {
+                key: "noAnswer",
+                header: t.noAnswer,
+                align: "right",
+                render: (row) => n(row.noAnswer),
+                sortValue: (row) => row.noAnswer,
+              },
+              {
+                key: "unreachable",
+                header: t.unreachable,
+                align: "right",
+                render: (row) => n(row.unreachable),
+                sortValue: (row) => row.unreachable,
+              },
+              {
+                key: "noInterest",
+                header: t.noInterest,
+                align: "right",
+                render: (row) => n(row.noInterest),
+                sortValue: (row) => row.noInterest,
+              },
+            ]}
+            searchable={(row) => row.name}
+            initialSort={{ key: "lostRate", dir: -1 }}
+            rowKey={(row) => row.name}
+            csvFilename={`engosoft-lost-${lostDimension}-${data.selectedMonth}`}
+            csvRow={(row) => ({
+              name: row.name,
+              leads: row.leads,
+              lostLeads: row.lostLeads,
+              lostOpportunities: row.lostOpportunities,
+              lost: row.lost,
+              lostRate: row.lostRate ?? "",
+              noAnswer: row.noAnswer,
+              unreachable: row.unreachable,
+              noInterest: row.noInterest,
+            })}
+          />
+        </Card>
+      </PageSection>
+
+      <PageSection
         title={t.breakdown}
         hint={t.trendSub}
         icon={<Layers3 size={16} />}
@@ -1644,17 +1842,28 @@ export function SixMonthPerformance() {
 
       <PageSection
         title={t.recordList}
-        hint={`${monthLabel(data.selectedMonth, lang)} · ${n(data.records.length)} ${t.rows}`}
+        hint={`${monthLabel(data.selectedMonth, lang)} · ${n(displayedRecords.length)} / ${n(data.records.length)} ${t.rows}`}
         icon={<Users size={16} />}
         tone="sky"
         id="performance-records"
+        action={
+          <Segmented
+            value={recordScope}
+            onChange={setRecordScope}
+            options={[
+              { value: "all", label: x.duplicateAll },
+              { value: "duplicate", label: x.duplicateOnly },
+              { value: "nonduplicate", label: x.nonDuplicate },
+            ]}
+          />
+        }
       >
         <Card padded={false} className="overflow-hidden">
           <p className="px-4 pt-4 text-xs leading-6 text-text-muted">
-            {t.recordListHint} {t.recordCountHint}
+            {t.recordListHint} {t.recordCountHint} {x.duplicateBasis}
           </p>
           <DataTable<PerformanceRecord>
-            rows={data.records}
+            rows={displayedRecords}
             cols={recordColumns}
             searchable={(row) =>
               [row.id, row.course, row.source, row.campaign, row.mediaBuyer, row.salesperson].join(
@@ -1705,7 +1914,7 @@ export function SixMonthPerformance() {
           <dl className="mt-5 grid gap-3 text-[11.5px] sm:grid-cols-2 lg:grid-cols-3">
             <Fact
               label={t.excluded}
-              value={`Recommendation ${n(data.coverage.excludedRecommendation)} · WhatsApp Broadcast ${n(data.coverage.excludedBroadcast)}`}
+              value={`Recommendation ${n(data.coverage.excludedRecommendation)} · WhatsApp Broadcast ${n(data.coverage.excludedBroadcast)} · AutoDialer Broadcast ${n(data.coverage.excludedAutodialerBroadcast)}`}
             />
             <Fact
               label={t.unknown}

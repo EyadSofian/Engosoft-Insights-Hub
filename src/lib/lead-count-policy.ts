@@ -5,7 +5,7 @@
  * merged plain WhatsApp with WhatsApp Broadcast, while only the latter is
  * excluded. A broadcast-segment lead is excluded even if its source is Facebook.
  */
-export type ExcludedLeadSource = "recommendation" | "whatsapp_broadcast";
+export type ExcludedLeadSource = "recommendation" | "whatsapp_broadcast" | "autodialer_broadcast";
 
 function normalized(value: string): string {
   return value
@@ -18,7 +18,12 @@ function normalized(value: string): string {
 export function excludedLeadSource(source: string, leadSegment = ""): ExcludedLeadSource | null {
   const key = normalized(source);
   const segment = normalized(leadSegment);
-  if (key === "whatsappbroadcast" || segment === "whatsappbroadcast") return "whatsapp_broadcast";
+  const isAutoDialerBroadcast = (value: string) =>
+    value === "autodialerbroadcast" || value === "autodailerbroadcast";
+  if (isAutoDialerBroadcast(key) || isAutoDialerBroadcast(segment)) return "autodialer_broadcast";
+  const isWhatsAppBroadcast = (value: string) =>
+    value === "whatsappbroadcast" || value === "whtsappbroadcast";
+  if (isWhatsAppBroadcast(key) || isWhatsAppBroadcast(segment)) return "whatsapp_broadcast";
   const isRecommendation = (value: string) =>
     value === "recommendation" ||
     value === "recommendationsales" ||
