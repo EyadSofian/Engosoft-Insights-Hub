@@ -161,6 +161,37 @@ function check(
 
 /* -- Odoo ------------------------------------------------------------------ */
 
+/** Minutes Africa/Cairo is ahead of UTC at a given instant (handles DST). */
+function cairoOffsetMinutes(at: Date): number {
+  const name =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Cairo",
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(at)
+      .find((part) => part.type === "timeZoneName")?.value ?? "GMT+00:00";
+  const match = /GMT([+-])(\d{1,2}):?(\d{2})?/.exec(name);
+  if (!match) return 0;
+  return (match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3] ?? 0));
+}
+
+/** The UTC instant of Cairo local midnight on `day`, as Odoo writes datetimes. */
+function cairoStartUtc(day: string): string {
+  const naive = Date.parse(`${day}T00:00:00Z`);
+  // Two passes so a day that begins either side of a DST change settles.
+  let instant = new Date(naive);
+  for (let pass = 0; pass < 2; pass += 1) {
+    instant = new Date(naive - cairoOffsetMinutes(instant) * 60_000);
+  }
+  return instant.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function nextDay(day: string): string {
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 /**
  * How many CRM records Odoo itself counted in the window.
  *
@@ -174,10 +205,13 @@ async function odooCrmRecordsCreated(from: string, to: string): Promise<number> 
   const domain: Domain = [
     ["inventory_bucket", "=", false],
     ["type", "in", ["lead", "opportunity"]],
-    // One extra UTC day each side, then Odoo is asked for the Cairo calendar
-    // window: Cairo runs 2-3 hours ahead of UTC depending on the season.
-    ["create_date", ">=", `${from} 00:00:00`],
-    ["create_date", "<=", `${to} 23:59:59`],
+    // Odoo stores create_date in UTC and the dashboard buckets by Cairo day,
+    // so the window has to be converted or the count is wrong at both edges.
+    // Passing the dates through unconverted counted 10 extra September records
+    // -- leads created in the last Cairo-evening hours of 30 September, which
+    // are 1 October in Cairo -- and reported the dashboard as 10 short.
+    ["create_date", ">=", cairoStartUtc(from)],
+    ["create_date", "<", cairoStartUtc(nextDay(to))],
   ];
   return odooCall<number>("crm.lead", "search_count", [domain], {
     context: { active_test: false },
@@ -350,10 +384,17 @@ async function googleAccessToken(): Promise<string> {
  * asked for by conversion-action category: the unsegmented `metrics.conversions`
  * on this account is overwhelmingly YouTube channel subscriptions.
  */
-async function googleOfficial(
-  from: string,
-  to: string,
-): Promise<{ ok: boolean; spend: number; leads: number; error: string }> {
+interface GoogleOfficial {
+  spendOk: boolean;
+  leadsOk: boolean;
+  spend: number;
+  leads: number;
+  error: string;
+  spendError: string;
+  leadsError: string;
+}
+
+async function googleOfficial(from: string, to: string): Promise<GoogleOfficial> {
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim() ?? "";
   const customerIds = (process.env.GOOGLE_ADS_CUSTOMER_IDS ?? "")
     .split(/[,\s]+/)
@@ -361,17 +402,30 @@ async function googleOfficial(
     .filter(Boolean);
   const loginCustomerId = (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? "").replace(/-/g, "").trim();
   if (!developerToken || customerIds.length === 0) {
-    return { ok: false, spend: 0, leads: 0, error: "Google Ads is not configured." };
+    const reason = "Google Ads is not configured.";
+    return {
+      spendOk: false,
+      leadsOk: false,
+      spend: 0,
+      leads: 0,
+      error: reason,
+      spendError: reason,
+      leadsError: reason,
+    };
   }
   let token: string;
   try {
     token = await googleAccessToken();
   } catch (error) {
+    const reason = error instanceof Error ? error.message.slice(0, 200) : "Google OAuth failed";
     return {
-      ok: false,
+      spendOk: false,
+      leadsOk: false,
       spend: 0,
       leads: 0,
-      error: error instanceof Error ? error.message.slice(0, 160) : "Google OAuth failed",
+      error: reason,
+      spendError: reason,
+      leadsError: reason,
     };
   }
 
@@ -401,7 +455,11 @@ async function googleOfficial(
     "'SUBMIT_LEAD_FORM','PHONE_CALL_LEAD','CONTACT','BOOK_APPOINTMENT','REQUEST_QUOTE','SIGNUP','IMPORTED_LEAD'";
   let spend = 0;
   let leads = 0;
-  const errors: string[] = [];
+  // Cost and leads are two queries, and one failing must not void the other:
+  // reporting a verified spend as unverifiable hides a good check behind a
+  // broken one.
+  const costErrors: string[] = [];
+  const leadErrors: string[] = [];
   for (const customerId of customerIds) {
     try {
       const costRows = await run(
@@ -409,18 +467,34 @@ async function googleOfficial(
         `SELECT metrics.cost_micros FROM customer WHERE segments.date BETWEEN '${from}' AND '${to}'`,
       );
       for (const row of costRows) spend += Number(row.metrics?.costMicros ?? 0) / 1_000_000;
+    } catch (error) {
+      costErrors.push(
+        `${customerId}: ${error instanceof Error ? error.message.slice(0, 300) : "request failed"}`,
+      );
+    }
+    try {
+      // `segments.conversion_action_category` has to appear in SELECT as well
+      // as WHERE, or Google answers EXPECTED_REFERENCED_FIELD_IN_SELECT_CLAUSE.
       const leadRows = await run(
         customerId,
-        `SELECT metrics.conversions FROM customer WHERE segments.date BETWEEN '${from}' AND '${to}' AND segments.conversion_action_category IN (${LEAD_CATEGORIES})`,
+        `SELECT segments.conversion_action_category, metrics.conversions FROM customer WHERE segments.date BETWEEN '${from}' AND '${to}' AND segments.conversion_action_category IN (${LEAD_CATEGORIES})`,
       );
       for (const row of leadRows) leads += Number(row.metrics?.conversions ?? 0);
     } catch (error) {
-      errors.push(
-        `${customerId}: ${error instanceof Error ? error.message.slice(0, 160) : "request failed"}`,
+      leadErrors.push(
+        `${customerId}: ${error instanceof Error ? error.message.slice(0, 300) : "request failed"}`,
       );
     }
   }
-  return { ok: errors.length === 0, spend, leads, error: errors.join(" | ") };
+  return {
+    spendOk: costErrors.length === 0,
+    leadsOk: leadErrors.length === 0,
+    spend,
+    leads,
+    error: [...costErrors, ...leadErrors].join(" | "),
+    spendError: costErrors.join(" | "),
+    leadsError: leadErrors.join(" | "),
+  };
 }
 
 /* -- the report ------------------------------------------------------------ */
@@ -627,10 +701,10 @@ async function build(from: string, to: string): Promise<SourceReconciliation> {
       filters,
       sourceSystem: "Google Ads",
       sourceEntity: "Google Ads v25 GAQL (FROM customer)",
-      sourceValue: google.ok ? google.spend : null,
+      sourceValue: google.spendOk ? google.spend : null,
       dashboardValue: totals.spendGoogle,
       unit: "usd",
-      unavailableReason: google.ok ? "" : google.error.slice(0, 200),
+      unavailableReason: google.spendOk ? "" : google.spendError.slice(0, 300),
       affectedPages: ["/", "/ads", "/campaigns"],
     }),
     check({
@@ -644,13 +718,13 @@ async function build(from: string, to: string): Promise<SourceReconciliation> {
       filters,
       sourceSystem: "Google Ads",
       sourceEntity: "GAQL segments.conversion_action_category (lead categories)",
-      sourceValue: google.ok ? google.leads : null,
+      sourceValue: google.leadsOk ? google.leads : null,
       dashboardValue:
         data.ads
           .filter((row) => row.platform === "google")
           .reduce((total, row) => total + (row.platformLeads ?? 0), 0) || 0,
       unit: "count",
-      unavailableReason: google.ok ? "" : google.error.slice(0, 200),
+      unavailableReason: google.leadsOk ? "" : google.leadsError.slice(0, 300),
       affectedPages: ["/ads", "/campaigns"],
     }),
   ];
@@ -682,7 +756,7 @@ async function build(from: string, to: string): Promise<SourceReconciliation> {
 
   // The all-channel bill is only as verified as its least verified part.
   const verifiedSpend =
-    (meta.ok ? meta.spend : null) !== null && tiktok.ok && google.ok
+    (meta.ok ? meta.spend : null) !== null && tiktok.ok && google.spendOk
       ? meta.spend + tiktok.spend + google.spend + totals.spendSnap
       : null;
   const crossChecks: ReconciliationCheck[] = [
@@ -749,7 +823,7 @@ async function build(from: string, to: string): Promise<SourceReconciliation> {
       checks: googleChecks,
       status: worstStatus(googleChecks.map((item) => item.status)),
       syncedAt: "",
-      unavailableReason: google.ok ? "" : google.error.slice(0, 200),
+      unavailableReason: google.spendOk && google.leadsOk ? "" : google.error.slice(0, 300),
     },
     {
       key: "snapchat",
