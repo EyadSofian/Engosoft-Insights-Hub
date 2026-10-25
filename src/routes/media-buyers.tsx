@@ -54,10 +54,73 @@ interface Buyer {
   ctrAll: number | null;
   cpl: number | null;
   cpa: number | null;
+  /** Revenue that can be paired with spend: `revenue` minus `uncostedRevenue`. */
   roas: number | null;
+  roasRevenue: number;
+  /** Window spend plus the earlier spend of campaigns paid in the window. */
+  roasSpend: number;
+  earlierSpend: number;
+  delayedRevenue: number;
+  delayedCampaigns: number;
+  uncostedRevenue: number;
   conversionRate: number | null;
   lostRate: number | null;
   rows: PerfRow[];
+}
+
+/**
+ * The ROAS sum, spelled out. A campaign paid inside the window but last spent
+ * before it is credited to its buyer, so its earlier spend sits in the
+ * denominator; revenue whose campaign has no recorded spend at all is shown
+ * beside the ratio rather than inside it.
+ */
+function roasFormula(
+  figures: { roasRevenue: number; spend: number; earlierSpend: number; roas: number | null },
+  A: boolean,
+): string {
+  const ratio = figures.roas === null ? "—" : `${figures.roas.toFixed(2)}×`;
+  if (figures.earlierSpend <= 0)
+    return `${fmtUSDFull(figures.roasRevenue)} ÷ ${fmtUSDFull(figures.spend)} = ${ratio}`;
+  return `${fmtUSDFull(figures.roasRevenue)} ÷ (${fmtUSDFull(figures.spend)} + ${fmtUSDFull(figures.earlierSpend)} ${A ? "إنفاق سابق" : "earlier spend"}) = ${ratio}`;
+}
+
+/** Supporting rows that explain the delayed-revenue adjustment, when there is one. */
+function roasSupporting(
+  figures: { earlierSpend: number; delayedRevenue: number; uncostedRevenue: number },
+  A: boolean,
+) {
+  return [
+    ...(figures.delayedRevenue > 0
+      ? [
+          {
+            key: "delayed_revenue",
+            label: A
+              ? "تحصيل متأخر من حملات صرفت قبل الفترة"
+              : "Delayed revenue from earlier campaigns",
+            value: fmtUSDFull(figures.delayedRevenue),
+          },
+          {
+            key: "earlier_spend",
+            label: A ? "إنفاقها السابق (داخل المقام)" : "Their earlier spend (in the denominator)",
+            value: fmtUSDFull(figures.earlierSpend),
+          },
+        ]
+      : []),
+    ...(figures.uncostedRevenue > 0
+      ? [
+          {
+            key: "uncosted_revenue",
+            label: A
+              ? "إيراد بدون إنفاق مسجّل (خارج العائد)"
+              : "Revenue with no recorded spend (outside ROAS)",
+            value: fmtUSDFull(figures.uncostedRevenue),
+            hint: A
+              ? "منسوب للميديا باير لكن مالوش تكلفة"
+              : "Credited, but has no cost to divide by",
+          },
+        ]
+      : []),
+  ];
 }
 
 interface Response {
@@ -218,15 +281,13 @@ function perBuyerMetrics(buyer: Buyer, lang: "ar" | "en"): Record<string, Metric
       definition: A
         ? "التحصيل المنسوب لحملات هذا الميديا باير في الفترة، من الفواتير المدفوعة."
         : "Collection attributed to this buyer's campaigns in the period, from paid invoices.",
-      formula:
-        buyer.spend > 0
-          ? `${fmtUSDFull(buyer.revenue)} ÷ ${fmtUSDFull(buyer.spend)} = ${buyer.roas?.toFixed(2) ?? "—"}×`
-          : undefined,
+      formula: buyer.roasSpend > 0 ? roasFormula(buyer, A) : undefined,
       supporting: [
         { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSDFull(buyer.spend) },
         efficiency[0],
         { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(buyer.invoices) },
         efficiency[2],
+        ...roasSupporting(buyer, A),
       ],
       breakdowns: [campaigns((row) => row.revenue, fmtUSDFull, "mint")],
     },
@@ -280,11 +341,9 @@ function buyerInsights(
       icon: <Trophy size={16} />,
       entity: best ? { type: "media_buyer", id: best.id, name: best.name } : null,
       definition: A
-        ? "الميديا باير صاحب أعلى عائد على الإنفاق في الفترة: الإيراد المنسوب لحملاته ÷ إنفاقه."
-        : "The media buyer with the highest return on spend in the period: revenue attributed to their campaigns ÷ their spend.",
-      formula: best
-        ? `${fmtUSDFull(best.revenue)} ÷ ${fmtUSDFull(best.spend)} = ${best.roas?.toFixed(2) ?? "—"}×`
-        : undefined,
+        ? "الميديا باير صاحب أعلى عائد على الإنفاق في الفترة: الإيراد المنسوب لحملاته ÷ إنفاقه، ومعاه الإنفاق السابق للحملات اللي اتحصّل منها في الفترة."
+        : "The media buyer with the highest return on spend in the period: revenue attributed to their campaigns ÷ their spend, including the earlier spend of campaigns paid in the period.",
+      formula: best ? roasFormula(best, A) : undefined,
       caveat:
         data.coverage.unassignedSpend > 0
           ? A
@@ -297,6 +356,7 @@ function buyerInsights(
             { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSDFull(best.revenue) },
             { key: "leads", label: A ? "ليدز أودو" : "Odoo leads", value: fmtNum(best.crmLeads) },
             { key: "campaigns", label: A ? "الحملات" : "Campaigns", value: fmtNum(best.campaigns) },
+            ...roasSupporting(best, A),
           ]
         : undefined,
       breakdowns: [
@@ -436,6 +496,10 @@ function buyerMetrics(
     won: number;
     invoices: number;
     campaigns: number;
+    roasRevenue: number;
+    earlierSpend: number;
+    delayedRevenue: number;
+    uncostedRevenue: number;
     roas: number | null;
   },
   coveragePct: number | null,
@@ -566,7 +630,7 @@ function buyerMetrics(
     },
     roas: {
       id: "media_buyers.roas",
-      title: A ? "متوسط ROAS" : "Blended ROAS",
+      title: A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS",
       value: totals.roas === null ? "—" : `${totals.roas.toFixed(2)}×`,
       tone:
         totals.roas === null
@@ -578,20 +642,21 @@ function buyerMetrics(
               : "rose",
       icon: <ChartNoAxesCombined size={16} />,
       definition: A
-        ? "الإيراد المرتبط مقسومًا على الإنفاق المُدار. مجموع على مجموع، لا متوسط لنسبتي الميديا بايرز — وإلا لتساوى حساب صغير مع حساب كبير."
-        : "Attributed revenue divided by managed spend. A sum over a sum, not an average of the two buyers' ratios — that would weight a small account like a large one.",
-      formula: `${fmtUSDFull(totals.revenue)} ÷ ${fmtUSDFull(totals.spend)} = ${totals.roas === null ? "—" : `${totals.roas.toFixed(2)}×`}`,
+        ? "الإيراد المرتبط مقسومًا على الإنفاق المُدار. الحملة اللي صرفت قبل الفترة واتحصّل منها فيها بتتحسب للميديا باير، وإنفاقها السابق بيدخل المقام. مجموع على مجموع، لا متوسط لنسبتي الميديا بايرز — وإلا لتساوى حساب صغير مع حساب كبير."
+        : "Attributed revenue divided by managed spend. A campaign that spent before the period and was paid inside it is credited to its buyer, and its earlier spend joins the denominator. A sum over a sum, not an average of the two buyers' ratios — that would weight a small account like a large one.",
+      formula: roasFormula(totals, A),
       supporting: [
         {
           key: "revenue",
           label: A ? "البسط · الإيراد" : "Numerator · revenue",
-          value: fmtUSDFull(totals.revenue),
+          value: fmtUSDFull(totals.roasRevenue),
         },
         {
           key: "spend",
-          label: A ? "المقام · الإنفاق" : "Denominator · spend",
+          label: A ? "المقام · إنفاق الفترة" : "Denominator · period spend",
           value: fmtUSDFull(totals.spend),
         },
+        ...roasSupporting(totals, A),
         { key: "campaigns", label: A ? "الحملات" : "Campaigns", value: fmtNum(totals.campaigns) },
         { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(totals.invoices) },
       ],
@@ -750,8 +815,13 @@ function MediaBuyers() {
     won: sum((b) => b.won),
     invoices: sum((b) => b.invoices),
     campaigns: sum((b) => b.campaigns),
+    roasRevenue: sum((b) => b.roasRevenue),
+    earlierSpend: sum((b) => b.earlierSpend),
+    delayedRevenue: sum((b) => b.delayedRevenue),
+    uncostedRevenue: sum((b) => b.uncostedRevenue),
     get roas() {
-      return this.spend > 0 ? this.revenue / this.spend : null;
+      const denominator = this.spend + this.earlierSpend;
+      return denominator > 0 ? this.roasRevenue / denominator : null;
     },
   };
   const totalCampaigns = data.coverage.assignedCampaigns + data.coverage.unassignedCampaigns;
@@ -807,9 +877,13 @@ function MediaBuyers() {
           card={{
             index: 2,
             sub:
-              lang === "ar"
-                ? "الإيراد المرتبط ÷ الإنفاق المُدار"
-                : "Attributed revenue ÷ managed spend",
+              totals.earlierSpend > 0
+                ? lang === "ar"
+                  ? `يشمل ${fmtUSDFull(totals.earlierSpend)} إنفاق سابق لحملات اتحصّل منها في الفترة`
+                  : `Includes ${fmtUSDFull(totals.earlierSpend)} earlier spend of campaigns paid in the period`
+                : lang === "ar"
+                  ? "الإيراد المرتبط ÷ الإنفاق المُدار"
+                  : "Attributed revenue ÷ managed spend",
           }}
         />
         <MetricDetailTrigger
@@ -847,8 +921,8 @@ function MediaBuyers() {
             value: bestBuyer?.roas != null ? `${bestBuyer.roas.toFixed(2)}×` : undefined,
             detail: bestBuyer
               ? lang === "ar"
-                ? `${fmtUSDFull(bestBuyer.revenue)} إيراد من ${fmtUSDFull(bestBuyer.spend)} إنفاق عبر ${fmtNum(bestBuyer.campaigns)} حملة`
-                : `${fmtUSDFull(bestBuyer.revenue)} from ${fmtUSDFull(bestBuyer.spend)} of spend across ${fmtNum(bestBuyer.campaigns)} campaigns`
+                ? `${fmtUSDFull(bestBuyer.roasRevenue)} إيراد من ${fmtUSDFull(bestBuyer.roasSpend)} إنفاق عبر ${fmtNum(bestBuyer.campaigns)} حملة`
+                : `${fmtUSDFull(bestBuyer.roasRevenue)} from ${fmtUSDFull(bestBuyer.roasSpend)} of spend across ${fmtNum(bestBuyer.campaigns)} campaigns`
               : undefined,
             actionLabel: lang === "ar" ? "لماذا هو الأفضل؟" : "Why them?",
           }}

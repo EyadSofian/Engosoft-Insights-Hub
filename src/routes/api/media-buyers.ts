@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import {
   MEDIA_BUYERS as BUYERS,
+  buyerReturn,
+  isDelayedRevenueRow,
   mediaBuyerForCampaign as ownerOf,
   type MediaBuyerId as Owner,
 } from "@/lib/media-buyers";
@@ -16,6 +18,25 @@ export const Route = createFileRoute("/api/media-buyers")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const campaigns = computePerf(data, "campaign");
+
+        // A campaign paid inside the window may have last spent before it. Its
+        // spend up to the day before the window is read through the same
+        // filters, so `buyerReturn` can put it in the ROAS denominator.
+        const earlierSpendByKey = new Map<string, number>();
+        if (filters.from && campaigns.some(isDelayedRevenueRow)) {
+          const start = new Date(`${filters.from}T00:00:00Z`);
+          start.setUTCDate(start.getUTCDate() - 1);
+          const earlier = await getFiltered({
+            ...filters,
+            from: undefined,
+            to: start.toISOString().slice(0, 10),
+          });
+          for (const row of computePerf(earlier, "campaign")) {
+            if (row.spend > 0) earlierSpendByKey.set(row.key, row.spend);
+          }
+        }
+        const earlierSpendOf = (row: (typeof campaigns)[number]): number =>
+          isDelayedRevenueRow(row) ? (earlierSpendByKey.get(row.key) ?? 0) : 0;
         const groups = new Map<Owner, typeof campaigns>();
         groups.set("sayed", []);
         groups.set("shazly", []);
@@ -45,6 +66,7 @@ export const Route = createFileRoute("/api/media-buyers")({
           const invoices = rows.reduce((sum, row) => sum + row.invoices, 0);
           const salesOrders = rows.reduce((sum, row) => sum + row.salesOrders, 0);
           const platforms = [...new Set(rows.flatMap((row) => row.platforms))];
+          const ret = buyerReturn(rows, earlierSpendByKey);
 
           return {
             id,
@@ -64,10 +86,16 @@ export const Route = createFileRoute("/api/media-buyers")({
             ctrAll: impressions > 0 ? (clicksAll / impressions) * 100 : null,
             cpl: platformLeads === null ? null : div(spend, platformLeads),
             cpa: div(spend, invoices),
-            roas: div(revenue, spend),
+            roas: ret.roas,
+            roasRevenue: ret.roasRevenue,
+            roasSpend: ret.roasSpend,
+            earlierSpend: ret.earlierSpend,
+            delayedRevenue: ret.delayedRevenue,
+            delayedCampaigns: ret.delayedCampaigns,
+            uncostedRevenue: ret.uncostedRevenue,
             conversionRate: crmLeads > 0 ? (won / crmLeads) * 100 : null,
             lostRate: crmLeads > 0 ? (lost / crmLeads) * 100 : null,
-            rows,
+            rows: rows.map((row) => ({ ...row, earlierSpend: earlierSpendOf(row) })),
           };
         });
 
@@ -76,7 +104,8 @@ export const Route = createFileRoute("/api/media-buyers")({
           buyers,
           mapping: {
             sayed: "Standalone SAYED campaign token, except Auto/Automotive, BIM and CMRP",
-            shazly: "Auto/Automotive, BIM and CMRP course ownership overrides campaign tokens; otherwise standalone SH",
+            shazly:
+              "Auto/Automotive, BIM and CMRP course ownership overrides campaign tokens; otherwise standalone SH",
           },
           coverage: {
             assignedCampaigns: buyers.reduce((sum, buyer) => sum + buyer.campaigns, 0),
