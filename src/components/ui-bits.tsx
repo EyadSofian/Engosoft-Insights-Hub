@@ -8,7 +8,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { fmtDelta, fmtRoas, useI18n } from "@/lib/i18n";
-import { calloutStyle, cardToneVars, toneVars, type AnyTone } from "@/lib/dashboard-tone";
+import { calloutStyle, solidCardVars, toneVars, type AnyTone } from "@/lib/dashboard-tone";
 
 /* --- surfaces ------------------------------------------------------------ */
 
@@ -75,7 +75,8 @@ export function DeltaBadge({ value, invert = false }: { value?: number; invert?:
 
   return (
     <span
-      className="inline-flex items-center gap-0.5 text-[12px] font-semibold num"
+      className="delta-badge inline-flex items-center gap-0.5 text-[12px] font-semibold num"
+      data-good={flat ? undefined : String(good)}
       style={{ color }}
       title={t("vs_prev")}
     >
@@ -220,10 +221,10 @@ export function KpiCard({
   if (loading) {
     return (
       <div
-        className={`tone-surface @container pad-card relative h-full overflow-hidden ${
+        className={`tone-surface kpi-solid @container pad-card relative h-full overflow-hidden ${
           compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"
         }`}
-        style={cardToneVars(tone)}
+        style={solidCardVars(tone)}
         aria-busy="true"
       >
         <div className="space-y-3">
@@ -247,14 +248,13 @@ export function KpiCard({
       aria-label={interactive ? ariaLabel : undefined}
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
-      className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+      className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       } ${compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"}`}
       style={
         {
-          ...cardToneVars(tone),
+          ...solidCardVars(tone),
           "--i": index,
-          boxShadow: hero ? "var(--shadow-sm)" : "var(--shadow-xs)",
         } as React.CSSProperties
       }
     >
@@ -272,8 +272,8 @@ export function KpiCard({
       <div className="relative flex items-start justify-between gap-3">
         <span className="inline-flex min-w-0 items-start gap-1.5">
           <span
-            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-1 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
-            style={{ color: "var(--text-muted)" }}
+            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
+            style={{ color: "var(--tone-ink)" }}
           >
             {label}
           </span>
@@ -299,8 +299,8 @@ export function KpiCard({
           compact ? "mt-1.5" : "mt-[11px]"
         } ${
           valueWrap
-            ? "overflow-visible whitespace-normal text-[clamp(1.1rem,15cqi,1.9rem)] leading-[1.15]"
-            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.25rem,20cqi,2.5rem)] leading-none"
+            ? "overflow-visible whitespace-normal text-[clamp(0.8rem,12cqi,1.9rem)] leading-[1.15]"
+            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,13cqi,2.4rem)] leading-none"
         }`}
         style={{ color: "var(--tone-ink)" }}
       >
@@ -317,10 +317,10 @@ export function KpiCard({
           <DeltaBadge value={delta} invert={deltaInvert} />
           {sub != null && (
             <span
-              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-1 text-[12px]" : "text-[12px]"} ${
+              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12px]"} ${
                 subWrap ? "leading-relaxed" : "line-clamp-2"
               }`}
-              style={{ color: "var(--text-muted)" }}
+              style={{ color: "var(--tone-ink)" }}
             >
               {sub}
             </span>
@@ -336,7 +336,7 @@ export function KpiCard({
           {interactive ? (
             <span
               className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
-              style={{ color: "var(--brand)" }}
+              style={{ color: "var(--tone-ink)" }}
             >
               {cue}
               <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
@@ -627,7 +627,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             className={`min-h-11 min-w-11 cursor-pointer whitespace-nowrap rounded-lg font-semibold transition-colors active:scale-[0.97] sm:min-h-0 sm:min-w-0 ${
               size === "md" ? "px-3.5 py-1.5 text-[13px]" : "px-3 py-1.5 text-xs"
-            } ${active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"}`}
+            } ${active ? "bg-brand text-white shadow-sm" : "text-text-muted hover:text-text"}`}
           >
             {o.label}
           </button>

@@ -492,10 +492,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const storedLang = window.localStorage.getItem("engo_lang_v2") as Lang | null;
     if (storedLang === "ar" || storedLang === "en") setLangState(storedLang);
 
-    // Dark is the default: figures read best as the brightest thing on a navy
-    // canvas. A reader who picked the light theme keeps it.
+    // Light is the default; a reader who picked the dark theme keeps it.
     const storedTheme = window.localStorage.getItem("engo_theme") as Theme | null;
-    setThemeState(storedTheme === "light" ? "light" : "dark");
+    setThemeState(storedTheme === "dark" ? "dark" : "light");
   }, []);
 
   useEffect(() => {

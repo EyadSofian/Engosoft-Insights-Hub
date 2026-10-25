@@ -58,13 +58,11 @@ describe("navigation", () => {
   it("offers at most six primary destinations and a bounded contextual strip", () => {
     expect(NAVIGATION_SECTIONS.length).toBeLessThanOrEqual(6);
     /**
-     * The cap is per section on purpose: it keeps a strip scannable, and what
-     * counts as scannable depends on how many reports a workspace genuinely
-     * has. Marketing carries seven. Leads carries five because the six-month
-     * lead-to-paid report belongs beside the lead breakdowns rather than
-     * hidden as a fourth in-page tab, which is where it shipped.
+     * The cap is per section: each strip lists one audience's reports, flat,
+     * with no second strip inside the page. Marketing and CRM carry the most
+     * because their audiences genuinely work across that many reports.
      */
-    const cap: Record<string, number> = { marketing: 7, "sales-crm": 5 };
+    const cap: Record<string, number> = { marketing: 6, leads: 5, crm: 7 };
     for (const section of NAVIGATION_SECTIONS.filter((entry) => entry.contextual === "tabs")) {
       expect(section.items.length, section.id).toBeLessThanOrEqual(cap[section.id] ?? 4);
     }
@@ -73,28 +71,54 @@ describe("navigation", () => {
   it("expands only the active workspace in the drawer", () => {
     const tree = navigationDrawerTree("/leads", {}, "en", label);
     const expanded = tree.filter((section) => section.children.length > 0 && !section.menu);
-    expect(expanded.map((section) => section.key)).toEqual(["sales-crm"]);
-    // `/leads` with no view is the CRM table, not the cohort report that now
-    // leads the strip — two items share the pathname, so only the one whose
-    // `matches` agrees with the search may light up.
+    expect(expanded.map((section) => section.key)).toEqual(["crm"]);
+    // `/leads` with no view is the CRM table; the views that share the
+    // pathname must not light up with it.
     expect(expanded[0].children.filter((report) => report.active).map((r) => r.label)).toEqual([
       "CRM records",
     ]);
     expect(expanded[0].children[0]?.to).toBe("/leads");
-    expect(expanded[0].children[0]?.search).toEqual({ view: "performance" });
+    expect(expanded[0].children[0]?.search).toBeUndefined();
   });
 
-  it("puts creatives, lead sources and campaigns under one Marketing workspace", () => {
-    const creatives = sectionForLocation("/acquisition", { section: "ads", view: "creatives" });
-    const leads = sectionForLocation("/acquisition", { section: "leads" });
-    const campaigns = sectionForLocation("/campaigns", {});
-    const overview = sectionForLocation("/acquisition", {});
-    expect([creatives?.id, leads?.id, campaigns?.id, overview?.id]).toEqual([
-      "marketing",
-      "marketing",
-      "marketing",
-      "marketing",
+  it("groups reports by the audience that reads them", () => {
+    const at = (route: string, search: Record<string, string> = {}) =>
+      sectionForLocation(route, search)?.id;
+    expect([at("/"), at("/management-review"), at("/yoy")]).toEqual([
+      "overview",
+      "overview",
+      "overview",
     ]);
+    expect([
+      at("/acquisition"),
+      at("/campaigns"),
+      at("/acquisition", { section: "ads", view: "creatives" }),
+      at("/media-plan"),
+      at("/media-buyers"),
+      at("/website"),
+    ]).toEqual(["marketing", "marketing", "marketing", "marketing", "marketing", "marketing"]);
+    expect([
+      at("/acquisition", { section: "leads" }),
+      at("/lead-sources"),
+      at("/lead-distribution"),
+      at("/leads", { view: "weekly" }),
+      at("/leads", { view: "intelligence" }),
+    ]).toEqual(["leads", "leads", "leads", "leads", "leads"]);
+    expect([
+      at("/leads"),
+      at("/leads", { view: "performance" }),
+      at("/leads", { view: "channels" }),
+      at("/teams"),
+      at("/lost"),
+      at("/leads", { view: "lost" }),
+      at("/leads", { view: "quality" }),
+    ]).toEqual(["crm", "crm", "crm", "crm", "crm", "crm", "crm"]);
+    expect([
+      at("/accounting"),
+      at("/accounting", { view: "marketing" }),
+      at("/courses", { view: "sales" }),
+      at("/pricing"),
+    ]).toEqual(["revenue", "revenue", "revenue", "revenue"]);
     const marketing = NAVIGATION_SECTIONS.find((section) => section.id === "marketing")!;
     const active = marketing.items.filter((item) =>
       itemIsActive(item, "/acquisition", { section: "ads", view: "adsets" }),
@@ -102,9 +126,14 @@ describe("navigation", () => {
     expect(active.map((item) => item.tabLabel?.en)).toEqual(["Creatives"]);
   });
 
-  it("keeps technical and specialist reports reachable under More", () => {
+  it("keeps technical and specialist reports reachable under advanced tools", () => {
     expect(sectionForLocation("/acquisition", { section: "coverage" })?.id).toBe("more");
-    for (const route of ["/ads", "/weekend", "/yoy"]) {
+    expect(sectionForLocation("/acquisition", { section: "sales" })?.id).toBe("more");
+    expect(sectionForLocation("/acquisition", { section: "ads", view: "adset-compare" })?.id).toBe(
+      "more",
+    );
+    expect(sectionForLocation("/courses", { view: "ads" })?.id).toBe("more");
+    for (const route of ["/ads", "/weekend", "/attribution", "/landing-pages", "/organic"]) {
       expect(sectionForLocation(route, {})?.id, route).toBe("more");
     }
   });
@@ -125,6 +154,9 @@ describe("navigation", () => {
       "/lead-distribution",
       "/lost",
       "/teams",
+      "/management-review",
+      "/lead-sources",
+      "/creatives",
       "/weekend",
       "/yoy",
       "/media-buyers",

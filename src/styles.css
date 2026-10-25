@@ -142,10 +142,9 @@
   --font-sans:
     "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
-  /* Headline figures only. A semi-condensed face lets a six-digit amount sit
-     large in a quarter-width card; Arabic words in the same slot ("غير متوفر")
-     fall through to Plex Arabic. */
-  --font-figure: "Barlow Semi Condensed", var(--font-sans);
+  /* Headline figures stay in the UI sans: one family for every word and
+     number on the page. */
+  --font-figure: var(--font-sans);
 }
 
 :root {
@@ -159,13 +158,13 @@
      (1.17:1, against 1.07:1 before), with hairlines that can actually be seen
      (1.56:1). On the old values a card and the page were the same sheet of
      white, and the eye had no edge to rest on. */
-  --bg: #e9eef5;
-  --bg-subtle: #e2e8f0;
+  --bg: #eef2fb;
+  --bg-subtle: #e6ecf8;
   --surface: #ffffff;
-  --surface-2: #f3f6fa;
-  --surface-3: #e6ecf4;
-  --border: #c4d0de;
-  --border-strong: #a9b8cb;
+  --surface-2: #f5f7fd;
+  --surface-3: #e9eefa;
+  --border: #c9d4ee;
+  --border-strong: #a9b9e0;
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -201,6 +200,16 @@
   --cyan-ink: #056d77;
   --cyan-strong: #0797a4;
 
+  /* Solid card fills. Each carries white text at 4.6:1 or better, and the
+     same fill is used in both themes so a family is one colour everywhere. */
+  --mint-fill: #0a7c5a;
+  --rose-fill: #c2410c;
+  --sky-fill: #1f5bff;
+  --violet-fill: #6d4aff;
+  --amber-fill: #b45309;
+  --cyan-fill: #0e7490;
+  --slate-fill: #334a75;
+
   --slate-surface: #f2f5fa;
   --slate-border: #dde5f0;
   --slate-ink: #3d4d63;
@@ -209,19 +218,22 @@
   /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
      even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
      for body text and is a large part of why the dashboard tired the eyes. */
-  --text: #0b1f3a;
-  --text-muted: #52627a;
-  --text-subtle: #5a6a80;
+  --text: #0b1533;
+  --text-muted: #46557a;
+  --text-subtle: #56658a;
   --text-inverse: #ffffff;
 
-  --brand: #1469e8;
-  --brand-hover: #1059c8;
-  --brand-soft: #edf5ff;
-  --electric: #1469e8;
+  /* Royal blue: the page band, the active tab, links and the collection
+     card. White text on it is 5.25:1. */
+  --brand: #1f5bff;
+  --brand-hover: #1648d6;
+  --brand-soft: #e8eeff;
+  --electric: #1f5bff;
+  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
 
-  --accent: #1469e8;
-  --accent-soft: #edf5ff;
-  --accent-ink: #1a56a8;
+  --accent: #1f5bff;
+  --accent-soft: #e8eeff;
+  --accent-ink: #1440c9;
 
   --success: #159a67;
   --success-soft: #e8f7f0;
@@ -247,8 +259,8 @@
      Light theme keeps the rail on the page's own surface. It used to be a
      navy slab, which made the one persistently darkest region of a light
      dashboard the part carrying no data. */
-  --nav-surface: #ffffff;
-  --nav-border: #c4d0de;
+  --nav-surface: rgba(255, 255, 255, 0.66);
+  --nav-border: rgba(31, 91, 255, 0.16);
   --nav-text: #0b1f38;
   --nav-text-muted: #5a6b81;
   --nav-hover: #f2f5f9;
@@ -260,12 +272,16 @@
      therefore rose, not the danger red it used to sit on top of. --chart-muted
      is reserved for buckets that carry no category of their own (unclassified,
      "other") so a data gap never looks like a real segment. */
-  --chart-1: #2d78df;
-  --chart-2: #e98623;
-  --chart-3: #0797a4;
-  --chart-4: #7659e8;
-  --chart-5: #e04452;
-  --chart-6: #159a67;
+  /* Validated with the data-viz palette checker: every adjacent pair clears
+     the colour-blind (ΔE ≥ 9.2) and normal-vision (ΔE ≥ 19.6) floors. Slots
+     3, 5 and 6 sit under 3:1 on white, so charts carry visible labels and a
+     legend rather than relying on colour alone. */
+  --chart-1: #1f5bff;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #6d4aff;
+  --chart-5: #e87ba4;
+  --chart-6: #eda100;
   --chart-muted: #a3b1c4;
 
   --shadow-xs: 0 1px 2px rgba(11, 31, 58, 0.04);
@@ -274,12 +290,14 @@
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
   --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
 
-  --glass-surface: rgba(255, 255, 255, 0.76);
-  --glass-border: rgba(22, 86, 160, 0.16);
+  --glass-surface: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  --page-glow-primary: transparent;
-  --page-glow-secondary: transparent;
+  /* The colour the glass chrome blurs: royal blue from the top, violet from
+     the trailing corner. Canvas only — every panel is opaque. */
+  --page-glow-primary: rgba(31, 91, 255, 0.16);
+  --page-glow-secondary: rgba(109, 74, 255, 0.12);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -529,10 +547,8 @@
   --ink: #061426;
   --ink-soft: #0c2949;
 
-  /* The default theme: an operations room in Engosoft's own navy. The canvas
-     recedes, panels sit one step forward, and figures are the brightest thing
-     on the screen — white for the number, colour only as a signal. Secondary
-     text is 9:1 and the faintest text 6.6:1 on a panel. */
+  /* Navy canvas, panels one step forward. Secondary text is 9:1 and the
+     faintest text 6.6:1 on a panel. */
   --bg: #050d18;
   --bg-subtle: #08131f;
   --surface: #0d1c30;
@@ -548,6 +564,7 @@
 
   --brand: #5b9bff;
   --brand-hover: #7fb2ff;
+  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
   --brand-soft: #14263f;
   --electric: #4c8dff;
 
@@ -607,7 +624,7 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: #081626;
+  --nav-surface: rgba(8, 22, 38, 0.72);
   --nav-border: #1d3350;
   --nav-text: #e8eef7;
   --nav-text-muted: #94a6bd;
@@ -638,7 +655,7 @@
   /* One cold light from above the header, on the canvas only. Panels are
      opaque, so nothing a figure sits on is tinted. */
   --page-glow-primary: rgba(64, 132, 255, 0.11);
-  --page-glow-secondary: transparent;
+  --page-glow-secondary: rgba(109, 74, 255, 0.1);
 }
 
 @layer base {
@@ -662,7 +679,9 @@
     /* Flat. The two fixed radial washes tinted every white panel on the page
        and made a dense report look permanently slightly out of focus. */
     background:
-      radial-gradient(1100px 520px at 50% -180px, var(--page-glow-primary), transparent 70%)
+      radial-gradient(1100px 560px at 70% -200px, var(--page-glow-primary), transparent 70%)
+        no-repeat,
+      radial-gradient(900px 600px at 0% 100%, var(--page-glow-secondary), transparent 70%) fixed
         no-repeat,
       var(--bg);
     color: var(--text);
@@ -857,9 +876,11 @@
 
 @utility card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow-xs);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 2px rgba(15, 40, 120, 0.04),
+    0 10px 28px -14px rgba(31, 91, 255, 0.18);
 }
 
 /* --- the spatial system, as utilities ------------------------------------
@@ -976,7 +997,7 @@
 @utility tone-surface {
   background: var(--tone-surface, var(--surface));
   border: 1px solid var(--tone-border, var(--border));
-  border-radius: 18px;
+  border-radius: 22px;
   color: var(--tone-ink, var(--text));
 }
 
@@ -1232,9 +1253,9 @@
    dense figures remain legible while the blue page glow can still show
    through at the edges. */
 @utility chrome-bar {
-  background: color-mix(in oklab, var(--surface) 88%, transparent);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 2px rgba(11, 31, 56, 0.04);
 }
@@ -1304,6 +1325,8 @@
    never the strip that carries no data. */
 @utility chrome-sidebar {
   background: var(--nav-surface);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
   border-inline-end: 1px solid var(--nav-border);
   box-shadow: none;
 }
@@ -1538,4 +1561,56 @@
     "tnum" 1,
     "lnum" 1;
   letter-spacing: -0.005em;
+}
+
+/* --- solid KPI cards --------------------------------------------------------
+   A headline card is painted in its family's saturated fill (solidCardVars)
+   and everything on it is white. The few shared pieces that bring their own
+   colour — the period delta, muted helper text, the "not available" dash —
+   are turned white here so nothing grey or red sits on a coloured ground.
+   The delta keeps its meaning by shape: arrow and sign, on a light pill when
+   the move is good and a dark pill when it is not. */
+.kpi-solid {
+  color: #ffffff;
+  border-color: transparent;
+  /* The fill deepens toward the text and lightens only toward the corner
+     the sparkline and cue sit in, so every word stays on the full-strength
+     colour. */
+  background: linear-gradient(
+    to bottom right,
+    var(--tone-fill) 40%,
+    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
+  );
+  box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--tone-fill) 80%, transparent);
+}
+
+[dir="rtl"] .kpi-solid {
+  background: linear-gradient(
+    to bottom left,
+    var(--tone-fill) 40%,
+    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
+  );
+}
+
+.kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
+  color: #ffffff;
+}
+
+.kpi-solid .delta-badge {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.kpi-solid .delta-badge[data-good="false"] {
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.kpi-solid.kpi-card:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.kpi-solid.kpi-card:focus-visible {
+  outline-color: var(--brand);
 }

@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { MetricInfo } from "./MetricInfo";
 import { VERDICT_STYLE, type Verdict } from "./verdict";
-import { cardToneVars, type AnyTone } from "@/lib/dashboard-tone";
+import { solidCardVars, type AnyTone } from "@/lib/dashboard-tone";
 
 const EM = "—";
 
@@ -129,14 +129,13 @@ export function MetricCard({
 
   return (
     <div
-      className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+      className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       }`}
       style={
         {
-          ...cardToneVars(family),
+          ...solidCardVars(family),
           "--i": index,
-          boxShadow: "var(--shadow-xs)",
         } as React.CSSProperties
       }
       onClick={onClick}
@@ -173,7 +172,7 @@ export function MetricCard({
           )}
           <span
             className="line-clamp-2 text-[12.5px] font-semibold leading-snug"
-            style={{ color: "var(--text-muted)" }}
+            style={{ color: "var(--tone-ink)" }}
             title={copy.label}
           >
             {copy.label}
@@ -183,7 +182,7 @@ export function MetricCard({
       </div>
 
       <div
-        className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.2rem,19cqi,2.2rem)] font-bold leading-none"
+        className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-bold leading-none"
         style={{ color: "var(--tone-ink)" }}
       >
         {unavailable ? <Unavailable reason={unavailableReason} /> : value}
@@ -195,7 +194,7 @@ export function MetricCard({
         )}
         <span
           className="line-clamp-2 min-w-0 text-[12px] leading-snug"
-          style={{ color: "var(--text-muted)" }}
+          style={{ color: "var(--tone-ink)" }}
           dir="auto"
         >
           {sub ?? (unavailable ? unavailableReason : copy.formula)}
@@ -206,7 +205,7 @@ export function MetricCard({
         <div className="relative mt-auto pt-2.5">
           <span
             className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
-            style={{ color: "var(--brand)" }}
+            style={{ color: "var(--tone-ink)" }}
           >
             {cue}
             <span className="kpi-cue-arrow inline-flex" aria-hidden="true">

@@ -74,26 +74,32 @@ export function DashboardPageHeader({
   /** Sub-navigation, rendered under the heading rule. */
   children?: ReactNode;
 }) {
-  const t = toneOf(tone);
+  // The page's identity band: royal blue, white type. `tone` stays in the API
+  // for callers, but every page now opens on the same band so the reader
+  // always knows where the page starts and where its figures begin.
+  void tone;
   return (
     <header className={flush ? "" : "mb-4"}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+      <div
+        className="page-band flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[22px] px-4 py-4 sm:px-6 sm:py-5"
+        style={{ background: "var(--brand-band)" }}
+      >
         <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
           {icon && (
             <span
-              className="grid size-11 shrink-0 place-items-center rounded-2xl text-white shadow-sm"
-              style={{ background: t.strong }}
+              className="grid size-11 shrink-0 place-items-center rounded-2xl text-white"
+              style={{ background: "rgba(255, 255, 255, 0.18)" }}
               aria-hidden="true"
             >
               {icon}
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="text-balance text-[21px] font-bold leading-tight tracking-[-0.02em] text-text sm:text-[26px]">
+            <h1 className="text-balance text-[21px] font-bold leading-tight tracking-[-0.02em] text-white sm:text-[26px]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-text-muted sm:text-[13px]">
+              <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-white sm:text-[13.5px]">
                 {subtitle}
               </p>
             )}
@@ -102,7 +108,7 @@ export function DashboardPageHeader({
 
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-text-muted">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-white/35 bg-white/15 px-3 py-1.5 text-[12px] font-semibold text-white">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
               <bdi className="num truncate">{period}</bdi>
             </span>

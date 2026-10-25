@@ -84,67 +84,9 @@ function LeadsPage() {
   const selectedMonth = Route.useSearch().month;
   return (
     <div>
-      <nav
-        aria-label={lang === "ar" ? "عرض العملاء المحتملين" : "Leads view"}
-        className="hscroll mb-4 flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface-2 p-1.5"
-      >
-        <Link
-          to="/leads"
-          search={{}}
-          aria-current={workspace === "crm" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "crm" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "سجل العملاء والـCRM" : "Leads and CRM"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "intelligence" }}
-          aria-current={workspace === "intelligence" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "intelligence" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "تحليل الليدز حسب الكورس" : "Course lead intelligence"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "weekly" }}
-          aria-current={workspace === "weekly" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "weekly" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "متابعة ليدز الأسبوع" : "Weekly lead follow-up"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "performance" }}
-          aria-current={workspace === "performance" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "performance" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "أداء الليدز والمبيعات · ٦ أشهر" : "Leads & sales · 6 months"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "channels" }}
-          aria-current={workspace === "channels" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "channels" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "قنوات إغلاق البيع" : "Sales closing channels"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "lost" }}
-          aria-current={workspace === "lost" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "lost" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "اللوست" : "Lost"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "quality" }}
-          aria-current={workspace === "quality" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "quality" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "جودة الليدز واللوست" : "Lead quality & Lost"}
-        </Link>
-      </nav>
+      {/* Each view is a tab in its own navigation section — the CRM views under
+          CRM and sales, the weekly and course views under Leads — so the page
+          no longer repeats them as a second strip of its own. */}
       {workspace === "crm" ? (
         <CrmWorkspace />
       ) : workspace === "weekly" ? (
