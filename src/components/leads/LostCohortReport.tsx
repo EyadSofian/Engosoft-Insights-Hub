@@ -60,10 +60,10 @@ const wording = {
   },
 } as const;
 
-export function LostCohortReport() {
+export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
   const { lang } = useI18n();
   const t = wording[lang];
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(initialMonth ?? "");
   const [dimension, setDimension] = useState<Dimension>("platform");
   const { data, isLoading, error } = useApi<PerformanceResult>(
     `/api/lead-performance${month ? `?month=${month}` : ""}`,
@@ -209,6 +209,16 @@ export function LostCohortReport() {
           className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
         >
           {t.details}
+          <ExternalLink size={13} />
+        </Link>
+        <Link
+          to="/leads"
+          search={{ view: "quality", month: data.selectedMonth }}
+          className="ms-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+        >
+          {lang === "ar"
+            ? "جودة الليدز واللوست · قرارات المراجعة"
+            : "Lead quality & Lost · audit decisions"}
           <ExternalLink size={13} />
         </Link>
       </PageSection>

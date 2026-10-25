@@ -23,6 +23,8 @@ export type AuditSummary = {
   missingCreatedDate: number;
   missingCampaign: number;
   reasons: AuditGroup[];
+  /** Aggregated sheet labels behind the catch-all, never individual customer rows. */
+  otherReasons: { name: string; count: number }[];
   courses: AuditGroup[];
   salespeople: AuditGroup[];
   campaigns: AuditGroup[];
@@ -103,6 +105,15 @@ export function summarizeArchive(rows: ArchiveRow[]): AuditSummary {
     (row) => archiveMonth(row) && ["yes", "no"].includes(norm(row.Validate)),
   );
   const review = valid.filter((row) => norm(row.Validate) === "no").length;
+  const otherReasonCounts = new Map<string, number>();
+  for (const row of valid) {
+    const raw = clean(row["Lost Reason"]);
+    if (reasonCategory(raw) !== "أسباب أخرى") continue;
+    // Reasons are free text in the sheet. Avoid surfacing a customer phone or
+    // email accidentally entered as a reason in the aggregate API.
+    const safe = raw && !/@|\d{7,}/.test(raw) ? raw.slice(0, 100) : "سبب فردي غير قابل للعرض";
+    otherReasonCounts.set(safe, (otherReasonCounts.get(safe) ?? 0) + 1);
+  }
   return {
     total: valid.length,
     approved: valid.length - review,
@@ -112,6 +123,9 @@ export function summarizeArchive(rows: ArchiveRow[]): AuditSummary {
     missingCreatedDate: valid.filter((row) => !clean(row["Created on"])).length,
     missingCampaign: valid.filter((row) => !clean(row["Campaign Name"])).length,
     reasons: groups(valid, (row) => reasonCategory(row["Lost Reason"])),
+    otherReasons: [...otherReasonCounts]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
     courses: groups(valid, (row) => row["Course Categories"]),
     salespeople: groups(valid, (row) => row.Salesperson),
     campaigns: groups(valid, (row) => row["Campaign Name"]),
@@ -166,6 +180,6 @@ export function buildLostArchiveAudit(
     all: summarizeArchive(primary),
     selected: summarizeArchive(selectedRows),
     caveat:
-      "التبويبات الشهرية هنا مراجعة لسجلات Lost، وليست Cohort لليدز الجديدة ولا معدل Lost من كل الليدز. Validate=No يعني قرار الإغلاق أو سببه يحتاج مراجعة، وليس أن الليد Fresh أو غير مؤهل. الشيت لا يحتوي نوع السجل Lead/Opportunity أو CRM ID، لذلك لا ندمج هذه الأعداد مع مؤشرات أودو.",
+      "التبويبات الشهرية توثق قرار مراجعة Lost، لا حالة السجل الحالية في أودو. Validate=No يعني قرار Lost لم يُعتمد وأُعيد للسيلز للمتابعة؛ لا يعني أن المراجعة ما زالت معلقة. الشيت لا يحتوي CRM ID أو نوع Lead/Opportunity، لذلك لا نضيف صفوفه إلى إجمالي Lost في أودو ولا نستنتج منها حالة السجل الحالية.",
   };
 }

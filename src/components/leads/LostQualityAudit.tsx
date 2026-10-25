@@ -1,9 +1,9 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowUpLeft,
   CheckCircle2,
   CircleAlert,
-  Clock3,
   FileSpreadsheet,
   FilterX,
   ShieldCheck,
@@ -15,7 +15,17 @@ import type { AuditGroup, LostArchiveAuditResult } from "@/lib/lost-archive-audi
 const number = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const percent = (value: number) => `${value.toFixed(1)}%`;
 
-function GroupTable({ rows, title, ar }: { rows: AuditGroup[]; title: string; ar: boolean }) {
+function GroupTable({
+  rows,
+  title,
+  ar,
+  otherReasons,
+}: {
+  rows: AuditGroup[];
+  title: string;
+  ar: boolean;
+  otherReasons?: { name: string; count: number }[];
+}) {
   return (
     <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,.045)]">
       <div className="border-b border-slate-100 px-6 py-5">
@@ -49,7 +59,7 @@ function GroupTable({ rows, title, ar }: { rows: AuditGroup[]; title: string; ar
               </div>
               <div className="min-w-20 text-center">
                 <p className="text-[11px] font-semibold text-rose-600">
-                  {ar ? "تحتاج مراجعة" : "Review"}
+                  {ar ? "أُعيدت للسيلز" : "Returned to sales"}
                 </p>
                 <p className="text-sm font-black tabular-nums text-rose-600">
                   {number(row.review)}{" "}
@@ -66,14 +76,39 @@ function GroupTable({ rows, title, ar }: { rows: AuditGroup[]; title: string; ar
           </p>
         )}
       </div>
+      {otherReasons && otherReasons.length > 0 && (
+        <details className="border-t border-slate-100 px-6 py-4">
+          <summary className="cursor-pointer text-sm font-bold text-[#176f62]">
+            {ar
+              ? "أسباب أخرى: اعرض المسميات المسجلة في الشيت"
+              : "Other reasons: show original sheet labels"}
+          </summary>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            {ar
+              ? "هذه مسميات السبب الأصلية بعد تجميع المتطابق منها، وليست صفوف عملاء إضافية."
+              : "These are grouped original reason labels, not extra customer records."}
+          </p>
+          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto sm:grid-cols-2">
+            {otherReasons.map((reason) => (
+              <div
+                key={reason.name}
+                className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"
+              >
+                <span className="min-w-0 break-words text-slate-700">{reason.name}</span>
+                <b className="shrink-0 tabular-nums text-slate-900">{number(reason.count)}</b>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </section>
   );
 }
 
-export function LostQualityAudit() {
+export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [month, setMonth] = useState("2026-10");
+  const [month, setMonth] = useState(initialMonth ?? "2026-10");
   const [course, setCourse] = useState("");
   const [salesperson, setSalesperson] = useState("");
   const [dimension, setDimension] = useState<"courses" | "salespeople" | "campaigns">("courses");
@@ -138,8 +173,8 @@ export function LostQualityAudit() {
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
               {ar
-                ? "هل قرار الـLost وسببه مُراجع؟ شوف الفجوات بسرعة حسب الشهر والكورس والبياع، من غير خلطها بعدد الليدز الجديدة أو الـOpportunities."
-                : "Audit whether Lost decisions and reasons were reviewed, by month, course and salesperson—separate from new-lead and opportunity counts."}
+                ? "نتيجة مراجعة قرارات Lost في الشيت: ما تم اعتماده وما رجع للسيلز للمتابعة، حسب الشهر والكورس والبياع."
+                : "Sheet audit outcomes: Lost decisions accepted or returned to sales for follow-up, by month, course and salesperson."}
             </p>
           </div>
           <a
@@ -180,6 +215,33 @@ export function LostQualityAudit() {
           </button>
         </div>
       </header>
+
+      <nav
+        aria-label={ar ? "تقارير اللوست المرتبطة" : "Related Lost reports"}
+        className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+      >
+        <span className="font-bold text-text">
+          {ar ? "افتح التقرير المرتبط:" : "Related report:"}
+        </span>
+        <Link
+          to="/leads"
+          search={{ view: "lost", month }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {ar ? "لوست حسب شهر دخول الليد" : "Lost by lead entry month"}
+        </Link>
+        <Link
+          to="/lost"
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {ar ? "لوست الداشبورد وأسباب الفقدان" : "Dashboard Lost and reasons"}
+        </Link>
+        <span className="basis-full text-text-muted">
+          {ar
+            ? "مراجعة الشيت وحالة أودو تقريران مترابطان، لكن لا تُجمع أعدادهم: الشيت لا يحمل CRM ID، وقد يكون السجل عاد للمتابعة بعد المراجعة."
+            : "The sheet audit and Odoo status are linked reports, not additive totals: the sheet has no CRM ID and a record may have returned to follow-up."}
+        </span>
+      </nav>
 
       {!ready ? (
         <section className="rounded-[28px] border border-amber-200 bg-amber-50 px-7 py-8 text-amber-950">
@@ -266,44 +328,44 @@ export function LostQualityAudit() {
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-[26px] border border-slate-200 bg-white p-6">
               <div className="mb-6 flex items-center gap-2 text-xs font-bold text-slate-500">
-                <Clock3 size={16} />{" "}
+                <ShieldCheck size={16} />{" "}
                 {ar
-                  ? `حالات Lost في مراجعة ${selectedLabel}`
-                  : `Lost cases reviewed in ${selectedLabel}`}
+                  ? `قرارات Lost تمت مراجعتها في ${selectedLabel}`
+                  : `Lost decisions audited in ${selectedLabel}`}
               </div>
               <p className="text-5xl font-black tabular-nums tracking-tight text-slate-900">
                 {number(selected.total)}
               </p>
               <p className="mt-3 text-xs leading-6 text-slate-500">
                 {ar
-                  ? "هذا عدد صفوف الشيت، وليس معدل Lost من كل الليدز."
-                  : "Sheet rows—not a Lost rate of all leads."}
+                  ? "صفوف مراجعة الشيت؛ قد تختلف حالتها الحالية في أودو."
+                  : "Sheet audit rows; their current Odoo state may differ."}
               </p>
             </div>
             <div className="rounded-[26px] border border-[#f5c7bd] bg-[#fff4f0] p-6">
               <div className="mb-6 flex items-center gap-2 text-xs font-bold text-[#bb533d]">
                 <CircleAlert size={17} />{" "}
-                {ar ? "قرارات/أسباب تحتاج مراجعة" : "Decisions/reasons needing review"}
+                {ar ? "لم يُعتمد Lost · عادت للسيلز" : "Lost not accepted · returned to sales"}
               </div>
               <p className="text-5xl font-black tabular-nums tracking-tight text-[#a93929]">
                 {number(selected.review)}
               </p>
               <p className="mt-3 text-xs font-bold text-[#bb533d]">
                 {percent(selected.reviewPct)}{" "}
-                {ar ? "من حالات Lost في هذه المراجعة" : "of audited Lost cases"}
+                {ar ? "من قرارات Lost التي تمت مراجعتها" : "of audited Lost decisions"}
               </p>
             </div>
             <div className="rounded-[26px] border border-[#cae8e3] bg-[#edf9f5] p-6">
               <div className="mb-6 flex items-center gap-2 text-xs font-bold text-[#297c70]">
-                <CheckCircle2 size={17} /> {ar ? "حالات اعتمدها المراجع" : "Reviewer accepted"}
+                <CheckCircle2 size={17} /> {ar ? "قرارات Lost المعتمدة" : "Accepted Lost decisions"}
               </div>
               <p className="text-5xl font-black tabular-nums tracking-tight text-[#176f62]">
                 {number(selected.approved)}
               </p>
               <p className="mt-3 text-xs leading-6 text-[#408b80]">
                 {ar
-                  ? "Validate = Yes داخل الشيت، وليس إثبات بيع أو تحويل."
-                  : "Validate = Yes in the sheet, not a paid conversion."}
+                  ? "Validate = Yes في الشيت؛ لا يثبت وحده أن السجل ما زال Lost في أودو."
+                  : "Validate = Yes in the sheet; it does not prove the record is still Lost in Odoo."}
               </p>
             </div>
           </div>
@@ -313,13 +375,14 @@ export function LostQualityAudit() {
               rows={selected.reasons}
               title={ar ? "لماذا سُجّلوا Lost؟" : "Recorded Lost reasons"}
               ar={ar}
+              otherReasons={selected.otherReasons}
             />
             <div className="space-y-5">
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(15,23,42,.045)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-widest text-[#b74d39]">
-                      {ar ? "أين تتركز المراجعة؟" : "REVIEW HOTSPOTS"}
+                      {ar ? "أين تركزت العودة للسيلز؟" : "RETURNED TO SALES"}
                     </p>
                     <h2 className="mt-1 text-xl font-black text-slate-900">
                       {ar ? "افتح زاوية واحدة، وشوف العدد والنسبة" : "One angle at a time"}
@@ -350,50 +413,13 @@ export function LostQualityAudit() {
                 </div>
                 <p className="mt-3 text-xs leading-6 text-slate-500">
                   {ar
-                    ? "العدد الأحمر هو حالات Validate = No فقط؛ النسبة من حالات Lost لنفس الصف."
-                    : "Red count means Validate = No; percentage is within that row's audited Lost cases."}
+                    ? "العدد الأحمر = Validate = No: تمت المراجعة ولم يُعتمد قرار Lost، ورجع السجل للسيلز. النسبة من صفوف المراجعة لنفس المجموعة."
+                    : "Red count = Validate = No: Lost was not accepted after review and the case returned to sales. Rate uses this group's audit rows."}
                 </p>
               </section>
               <GroupTable rows={groups} title={title} ar={ar} />
             </div>
           </div>
-
-          <section className="rounded-[28px] border border-slate-200 bg-[#f6f8fa] px-6 py-6">
-            <p className="mb-4 text-sm font-black text-slate-900">
-              {ar
-                ? "حدود البيانات — لازم تظهر جنب الأرقام"
-                : "Data limits—read alongside the figures"}
-            </p>
-            <div className="grid gap-3 text-xs leading-6 text-slate-600 sm:grid-cols-3">
-              <p>
-                <strong className="block text-lg text-slate-900">
-                  {number(selected.missingClosedDate)}
-                </strong>
-                {ar ? "بلا تاريخ إغلاق في الشيت" : "without a close date"}
-              </p>
-              <p>
-                <strong className="block text-lg text-slate-900">
-                  {number(selected.missingCreatedDate)}
-                </strong>
-                {ar
-                  ? "بلا تاريخ إنشاء؛ لا تصلح لتحليل Cohort"
-                  : "without creation date; not cohort-ready"}
-              </p>
-              <p>
-                <strong className="block text-lg text-slate-900">
-                  {number(selected.missingCampaign)}
-                </strong>
-                {ar
-                  ? "بلا اسم حملة؛ لا تُنسب لميديا باير"
-                  : "without campaign; don't assign a media buyer"}
-              </p>
-            </div>
-            <p className="mt-5 border-t border-slate-200 pt-4 text-xs leading-6 text-slate-500">
-              {ar
-                ? data.caveat
-                : "This sheet audits Lost records, not new-lead cohorts or the overall CRM Lost rate. Validate=No indicates a disputed closure or reason—not Fresh or automatically unqualified. It lacks CRM IDs and Lead/Opportunity type, so it is not merged into Odoo metrics."}
-            </p>
-          </section>
         </>
       )}
     </div>

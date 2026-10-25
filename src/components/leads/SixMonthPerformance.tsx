@@ -1,17 +1,16 @@
 import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowUpRight,
   BadgeCheck,
   CalendarRange,
-  CircleHelp,
   CopyCheck,
   Download,
   Filter,
   Layers3,
   PhoneCall,
   ReceiptText,
-  ShieldCheck,
   TrendingDown,
   Users,
 } from "lucide-react";
@@ -515,11 +514,11 @@ function monthLabel(month: string, lang: "ar" | "en"): string {
 /** A dimension row carrying the payment-month figures its month row also needs. */
 type MonthRow = PerformanceGroup & { paidInvoices: number | null; paidUsd: number | null };
 
-export function SixMonthPerformance() {
+export function SixMonthPerformance({ initialMonth }: { initialMonth?: string }) {
   const { lang } = useI18n();
   const t = copy[lang];
   const x = extra[lang];
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(initialMonth ?? "");
   const [dimension, setDimension] = useState<Dimension>("course");
   const [lostDimension, setLostDimension] = useState<LostDimension>("course");
   const [recordScope, setRecordScope] = useState<"all" | "duplicate" | "nonduplicate">("all");
@@ -1113,9 +1112,6 @@ export function SixMonthPerformance() {
     data.coverage.qaAvailable && data.coverage.qaReviewed === 0 && t.noQaReviews,
   ].filter((value): value is string => Boolean(value));
   const exportParams = new URLSearchParams({ month: data.selectedMonth, lang });
-  const hasFreshGap = selected.segmentMissing > 0;
-  const hasPaidGap = data.coverage.unlinkedAccountingInvoices > 0;
-  const hasQaGap = data.coverage.qaReviewed === 0;
 
   const recordColumns: Col<PerformanceRecord>[] = [
     {
@@ -1289,7 +1285,7 @@ export function SixMonthPerformance() {
         tone="sky"
         id="performance-summary"
       >
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-3 lg:grid-cols-2">
           <Card className="border-sky-strong/20 bg-sky-surface/50">
             <div className="text-xs font-semibold text-text-muted">{t.enteredBasis}</div>
             <div className="num mt-2 text-3xl font-bold text-text">{n(selected.leads)}</div>
@@ -1356,15 +1352,6 @@ export function SixMonthPerformance() {
               {t.rate}:{" "}
               <b className="text-text">{paidReady ? pct(selected.conversionRate) : "—"}</b> ·{" "}
               {t.later}: <b className="text-text">{paidReady ? n(selected.paidLater) : "—"}</b>
-            </div>
-          </Card>
-          <Card className="border-amber-strong/20 bg-amber-surface/50">
-            <div className="text-xs font-semibold text-text-muted">{t.evidenceGap}</div>
-            <div className="mt-3 space-y-2 text-[12px] leading-5 text-text-muted">
-              {hasFreshGap && <p>{t.freshGap}</p>}
-              {hasPaidGap && <p>{t.paidGap}</p>}
-              {hasQaGap && <p>{t.qaGap}</p>}
-              <p>{t.funnelGap}</p>
             </div>
           </Card>
         </div>
@@ -1748,6 +1735,26 @@ export function SixMonthPerformance() {
         </PageSection>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs">
+        <span className="font-bold text-text">
+          {lang === "ar" ? "تقارير اللوست المرتبطة:" : "Related Lost reports:"}
+        </span>
+        <Link
+          to="/leads"
+          search={{ view: "quality", month: data.selectedMonth }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar"
+            ? "جودة الليدز واللوست · مراجعة الشيت"
+            : "Lead quality & Lost · sheet audit"}
+        </Link>
+        <Link
+          to="/lost"
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar" ? "لوست الداشبورد · أودو" : "Dashboard Lost · Odoo"}
+        </Link>
+      </div>
       <LostBreakdown
         cohort={selected}
         rows={activeLostDimension.rows}
@@ -1847,57 +1854,6 @@ export function SixMonthPerformance() {
           />
         </Card>
       </PageSection>
-
-      <PageSection
-        title={t.definitions}
-        icon={<ShieldCheck size={16} />}
-        tone="slate"
-        level="insight"
-      >
-        <Card>
-          <p className="text-[13px] leading-7 text-text-muted">{t.definitionText}</p>
-          <div className="mt-4 flex items-center gap-2 text-[13px] font-semibold text-text">
-            <CircleHelp size={15} style={{ color: "var(--amber-strong)" }} />
-            {t.limits}
-          </div>
-          <p className="mt-2 text-[13px] leading-7 text-text-muted">{t.limitsText}</p>
-          <dl className="mt-5 grid gap-3 text-[11.5px] sm:grid-cols-2 lg:grid-cols-3">
-            <Fact
-              label={t.excluded}
-              value={`Recommendation ${n(data.coverage.excludedRecommendation)} · WhatsApp Broadcast ${n(data.coverage.excludedBroadcast)} · AutoDialer Broadcast ${n(data.coverage.excludedAutodialerBroadcast)}`}
-            />
-            <Fact
-              label={t.unknown}
-              value={`${t.campaign} ${n(data.coverage.unknownCampaign)} · ${t.buyer} ${n(data.coverage.unknownMediaBuyer)}`}
-            />
-            <Fact
-              label={
-                lang === "ar" ? "بنود غير مربوطة في آخر ٦ أشهر" : "Unlinked lines in six months"
-              }
-              value={`${n(data.coverage.unlinkedAccountingLines)}${linkCoverage !== null ? ` · ${pct(linkCoverage)} ${lang === "ar" ? "مربوط" : "linked"}` : ""}`}
-            />
-            <Fact
-              label={
-                lang === "ar" ? "مراجعات الجودة اليدوية" : "Manual quality reviews in this cohort"
-              }
-              value={`${n(data.coverage.qaReviewed)} / ${n(selected.leads)}`}
-            />
-            <Fact
-              label={lang === "ar" ? "هوية ناقصة" : "Records with no identity"}
-              value={n(data.coverage.missingIdentity)}
-            />
-            <Fact
-              label={lang === "ar" ? "آخر مزامنة" : "Last sync"}
-              value={data.syncedAt ? fmtDate(data.syncedAt, lang) : "—"}
-            />
-          </dl>
-          <dl className="mt-4 grid gap-3 border-t border-border pt-4 text-[11.5px] sm:grid-cols-2">
-            {Object.entries(data.source ?? {}).map(([key, value]) => (
-              <Fact key={key} label={key} value={String(value)} />
-            ))}
-          </dl>
-        </Card>
-      </PageSection>
     </PageSections>
   );
 }
@@ -1907,15 +1863,6 @@ function SmallStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-surface-2 p-3">
       <div className="text-[11.5px] leading-snug text-text-muted">{label}</div>
       <div className="num mt-1.5 text-lg font-bold text-text">{value}</div>
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-text-subtle">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-text-muted">{value}</dd>
     </div>
   );
 }

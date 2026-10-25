@@ -277,7 +277,7 @@ describe("the six-month lead-to-paid report", () => {
     expect(within(summary).getByText(/Current record type: Lead/i)).toBeTruthy();
     expect(within(summary).getByText(/Lead tagged Fresh/i)).toBeTruthy();
     expect(within(summary).getByText(/Opportunity tagged Fresh/i)).toBeTruthy();
-    expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
+    expect(within(summary).getByText(/Fresh is a separate tag/i)).toBeTruthy();
     expect(within(summary).getByText(/Before CRM: unavailable/i)).toBeTruthy();
     const classification = screen
       .getByText(/Keep classification, sales state and contact evidence separate/i)

@@ -73,4 +73,17 @@ describe("Lost Archive audit", () => {
     expect(result.selected).toMatchObject({ total: 1, review: 0, approved: 1 });
     expect(result.all.total).toBe(3);
   });
+
+  it("explains Other with aggregated raw reasons without exposing personal contact values", () => {
+    const result = summarizeArchive([
+      row("Oct", "Yes", "Needs a different schedule"),
+      row("Oct", "No", "Needs a different schedule"),
+      row("Oct", "Yes", "Customer phone 01012345678"),
+      row("Oct", "Yes", ""),
+    ]);
+    expect(result.reasons.find((reason) => reason.name === "أسباب أخرى")?.total).toBe(3);
+    expect(result.otherReasons).toContainEqual({ name: "Needs a different schedule", count: 2 });
+    expect(result.otherReasons).toContainEqual({ name: "سبب فردي غير قابل للعرض", count: 1 });
+    expect(result.otherReasons.some((reason) => reason.name.includes("01012345678"))).toBe(false);
+  });
 });

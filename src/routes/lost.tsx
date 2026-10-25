@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   AlertTriangle,
@@ -592,6 +592,36 @@ function Lost() {
         }
         period={reportingPeriod}
       />
+
+      <nav
+        aria-label={lang === "ar" ? "تقارير اللوست المرتبطة" : "Related Lost reports"}
+        className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+      >
+        <span className="font-bold text-text">
+          {lang === "ar" ? "كمّل تحليل اللوست:" : "Continue Lost analysis:"}
+        </span>
+        <Link
+          to="/leads"
+          search={{ view: "quality" }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar"
+            ? "جودة الليدز واللوست · قرارات الشيت"
+            : "Lead quality & Lost · sheet decisions"}
+        </Link>
+        <Link
+          to="/leads"
+          search={{ view: "lost" }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar" ? "لوست حسب شهر دخول الليد" : "Lost by lead entry month"}
+        </Link>
+        <span className="basis-full text-text-muted">
+          {lang === "ar"
+            ? "أرقام هذه الصفحة من أودو؛ قرارات الشيت لا تُضاف إليها لأن الشيت لا يحتوي CRM ID يربط كل صف بسجل أودو."
+            : "This page uses Odoo; sheet decisions are not added because the sheet has no CRM ID to match each row."}
+        </span>
+      </nav>
 
       {isLoading || !data ? (
         <>

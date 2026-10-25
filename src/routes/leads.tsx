@@ -59,6 +59,7 @@ export const Route = createFileRoute("/leads")({
     search: Record<string, unknown>,
   ): {
     view?: "crm" | "intelligence" | "weekly" | "performance" | "channels" | "lost" | "quality";
+    month?: string;
   } =>
     search.view === "intelligence" ||
     search.view === "weekly" ||
@@ -66,7 +67,12 @@ export const Route = createFileRoute("/leads")({
     search.view === "channels" ||
     search.view === "lost" ||
     search.view === "quality"
-      ? { view: search.view }
+      ? {
+          view: search.view,
+          ...(typeof search.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(search.month)
+            ? { month: search.month }
+            : {}),
+        }
       : {},
   component: LeadsPage,
 });
@@ -75,6 +81,7 @@ function LeadsPage() {
   const { lang } = useI18n();
   const period = useReportingPeriod();
   const workspace = Route.useSearch().view ?? "crm";
+  const selectedMonth = Route.useSearch().month;
   return (
     <div>
       <nav
@@ -143,13 +150,13 @@ function LeadsPage() {
       ) : workspace === "weekly" ? (
         <WeeklyLeadsReport />
       ) : workspace === "performance" ? (
-        <SixMonthPerformance />
+        <SixMonthPerformance initialMonth={selectedMonth} />
       ) : workspace === "channels" ? (
         <SalesChannelReport />
       ) : workspace === "lost" ? (
-        <LostCohortReport />
+        <LostCohortReport initialMonth={selectedMonth} />
       ) : workspace === "quality" ? (
-        <LostQualityAudit />
+        <LostQualityAudit initialMonth={selectedMonth} />
       ) : (
         <>
           <DashboardPageHeader
