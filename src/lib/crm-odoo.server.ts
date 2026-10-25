@@ -410,6 +410,30 @@ function custom(lead: OdooCrmLead, fields: string[]): string {
   return "";
 }
 
+/**
+ * The flat field list one `search_read` asks Odoo for.
+ *
+ * Every custom column resolves to a LIST of candidate fields (see
+ * `customFieldPlan`). Spreading those lists without flattening put an array
+ * inside the field list, and Odoo answered every Lost read with the Python
+ * error "unhashable type: 'list'" — from 2026-10-26 01:38 until this fix, the
+ * CRM, Lost and campaign pages that need live Lost all refused to load.
+ */
+export function crmRequestFields(
+  standard: string[],
+  metadata: Record<string, unknown>,
+  plan: Partial<CustomFields>,
+): string[] {
+  return [
+    ...new Set([
+      ...standard.filter((field) => metadata[field]),
+      ...Object.values(plan)
+        .flat()
+        .filter((field): field is string => Boolean(field)),
+    ]),
+  ];
+}
+
 /* Exported for `scripts/test-crm-custom-fields.mjs`, which pins the two
    ad-set pairs this Odoo carries. Nothing else reads them. */
 export { customFieldPlan as crmCustomFieldPlan, custom as crmCustomValue };
@@ -681,9 +705,7 @@ async function loadCrmRawFromDomains(
     "lost_reason_id",
     "lost_category_id",
   ];
-  const fields = [
-    ...new Set([...standard.filter((f) => metadata[f]), ...Object.values(plan).filter(Boolean)]),
-  ];
+  const fields = crmRequestFields(standard, metadata, plan);
   const stages = await loadStageKeys(policy);
   const out: CrmRawRow[] = [];
   for (const domain of domains) {

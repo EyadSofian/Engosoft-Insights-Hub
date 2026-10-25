@@ -70,3 +70,19 @@ describe("CRM custom field resolution", () => {
     expect(crmCustomValue({ id: 3, adset_id: "x" }, bare.adsetId)).toBe("");
   });
 });
+
+describe("the field list sent to Odoo", () => {
+  it("is flat strings only, whatever the candidates per column", async () => {
+    const { crmRequestFields } = await import("@/lib/crm-odoo.server");
+    // The shape customFieldPlan returns since ad-set resolution kept every
+    // candidate: a list per column. A nested list here is what made Odoo
+    // answer "unhashable type: 'list'" on every live Lost read.
+    const fields = crmRequestFields(
+      ["id", "stage_id", "not_on_model"],
+      { id: {}, stage_id: {} },
+      { adsetId: ["adset_id", "ad_set_id"], adsetName: ["adset_name"], courseCategories: [] },
+    );
+    expect(fields).toEqual(["id", "stage_id", "adset_id", "ad_set_id", "adset_name"]);
+    expect(fields.every((field) => typeof field === "string")).toBe(true);
+  });
+});
