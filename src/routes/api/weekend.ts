@@ -6,13 +6,8 @@ export const Route = createFileRoute("/api/weekend")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const {
-          archivedCrmLeads,
-          archivedWinCounter,
-          authoritativeLostLeads,
-          getDefaultRange,
-          getFiltered,
-        } = await import("@/lib/metrics.server");
+        const { authoritativeLostLeads, getDefaultRange, getFiltered } =
+          await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { PLATFORMS } = await import("@/lib/constants");
         const { hasReportableLost } = await import("@/lib/lost-authority");
@@ -55,9 +50,8 @@ export const Route = createFileRoute("/api/weekend")({
 
         interface Facts {
           data: FilteredData;
-          archived: ReturnType<typeof archivedCrmLeads>;
+          archived: ReturnType<typeof authoritativeLostLeads>;
           lost: ReturnType<typeof authoritativeLostLeads>;
-          archivedWon: ReturnType<typeof archivedWinCounter>;
         }
         interface Metrics {
           spend: number;
@@ -86,9 +80,8 @@ export const Route = createFileRoute("/api/weekend")({
         };
         const factsFor = (data: FilteredData): Facts => ({
           data,
-          archived: archivedCrmLeads(data),
+          archived: authoritativeLostLeads(data),
           lost: authoritativeLostLeads(data),
-          archivedWon: archivedWinCounter(data),
         });
         const aggregate = (
           facts: Facts,
@@ -101,9 +94,7 @@ export const Route = createFileRoute("/api/weekend")({
           const lost = facts.lost.filter((row) => row.createdAt && include(row.createdAt));
           const spend = ads.reduce((total, row) => total + row.spend, 0);
           const leads = crm.length + archived.length;
-          const won =
-            crm.filter((row) => row.isWon).length +
-            archived.filter((row) => facts.archivedWon(row)).length;
+          const won = crm.filter((row) => row.isWon).length;
           const reportsPlatformLeads = ads.some((row) => row.platformLeads !== null);
           const reportsSpend = ads.length > 0;
           const platformLeads = reportsPlatformLeads

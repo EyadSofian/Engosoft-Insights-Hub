@@ -122,6 +122,11 @@ export const Route = createFileRoute("/api/ingest/dataset")({
         if (!isDashboardDataset(body.dataset)) {
           return Response.json({ ok: false, error: "Unknown dataset." }, { status: 400 });
         }
+        // These compact annual cohorts are written only by the Odoo reader.
+        // An ingest worker must not replace their provenance or completeness marker.
+        if (body.dataset === "annual_crm_2024" || body.dataset === "annual_crm_2025") {
+          return Response.json({ ok: false, error: "Dataset is Odoo-managed." }, { status: 403 });
+        }
         if (!Array.isArray(body.rows) || body.rows.length > MAX_ROWS_PER_REQUEST) {
           return Response.json(
             { ok: false, error: `rows must contain at most ${MAX_ROWS_PER_REQUEST} items.` },
@@ -163,8 +168,26 @@ export const Route = createFileRoute("/api/ingest/dataset")({
           // warning, nothing to notice. Twenty-six consecutive failures went
           // unseen that way.
           const message = cause instanceof Error ? cause.message : "Dataset write failed.";
+          const code =
+            cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string"
+              ? cause.code
+              : "UNKNOWN";
+          console.error("[dashboard-ingest] dataset write failed", {
+            dataset: body.dataset,
+            code,
+            message: message.slice(0, 300),
+          });
           const { markDashboardDatasetFailed } = await import("@/lib/dashboard-db.server");
-          await markDashboardDatasetFailed(body.dataset, message).catch(() => undefined);
+          await markDashboardDatasetFailed(body.dataset, message).catch((stateError: unknown) => {
+            const stateMessage =
+              stateError instanceof Error
+                ? stateError.message.slice(0, 300)
+                : "Unknown state-write error";
+            console.error("[dashboard-ingest] failed to persist sync failure state", {
+              dataset: body.dataset,
+              message: stateMessage,
+            });
+          });
           return Response.json(
             { ok: false, error: "Dataset write failed." },
             { status: 500, headers: { "cache-control": "no-store" } },

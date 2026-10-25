@@ -340,44 +340,32 @@ export function standardMetrics({
     report: reports.won,
   };
 
-  // Advertising ROAS is campaign-attributed revenue ÷ spend on every surface,
-  // the same figure the executive summary and the Telegram report carry. All
-  // collected revenue ÷ spend stays in the detail as context only: it includes
-  // revenue no campaign produced, so on the Campaigns and Ads pages it read
-  // several times higher than the Overview for the same window.
   const roas: MetricDetail = {
     id: `${surface}.roas`,
-    title: title("roas", A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS"),
-    value: fmtRoas(T.attributedRoas),
-    tone:
-      T.attributedRoas !== null && isFinite(T.attributedRoas) && T.attributedRoas < 1
-        ? "rose"
-        : "amber",
+    // All collections ÷ all spend is not attributed, so it is not called ROAS.
+    title: title("roas", A ? "نسبة التحصيل إلى الصرف" : "Collections-to-spend ratio"),
+    value: fmtRoas(T.roas),
+    tone: T.roas !== null && isFinite(T.roas) && T.roas < 1 ? "rose" : "amber",
     icon: <Target size={16} />,
-    delta: deltas.attributedRoas,
+    delta: deltas.roas,
     definition: A
-      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
-      : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
+      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل قابله في الفترة."
+      : "For every dollar spent on ads, how many dollars of collected revenue came back in the period.",
     formula: A
-      ? `الإيراد المرتبط بحملة ÷ الإنفاق: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`
-      : `Campaign-attributed revenue ÷ spend: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`,
+      ? `الإيراد ÷ الإنفاق: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`
+      : `Revenue ÷ spend: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`,
     caveat:
       caveats.roas ??
       (A
-        ? `إجمالي التحصيل ÷ الإنفاق يساوي ${fmtRoas(T.roas)}، لكنه ليس ROAS إعلانيًا لأنه يشمل إيرادًا غير منسوب إلى حملة.`
-        : `All collected revenue ÷ spend is ${fmtRoas(T.roas)}, but it is not advertising ROAS because it includes revenue not attributed to a campaign.`),
+        ? `هذا هو العائد الإجمالي: كل التحصيل مقابل كل الإنفاق. العائد المرتبط — ${fmtRoas(T.attributedRoas)} — يحسب فقط الإيراد الذي يحمل حملة، وهما رقمان مختلفان لا يصح خلطهما.`
+        : `This is the total return: all collection against all spend. The attributed return — ${fmtRoas(T.attributedRoas)} — counts only revenue that carries a campaign. They must not be mixed.`),
     supporting: [
-      {
-        key: "attributed_revenue",
-        label: A ? "الإيراد المنسوب المستخدم" : "Attributed revenue used",
-        value: fmtUSD(T.attributedRevenue),
-      },
+      { key: "revenue", label: A ? "الإيراد المستخدم" : "Revenue used", value: fmtUSD(T.revenue) },
       { key: "spend", label: A ? "الإنفاق المستخدم" : "Spend used", value: fmtUSD(T.spend) },
       {
-        key: "all_revenue_ratio",
-        label: A ? "إجمالي التحصيل ÷ الإنفاق" : "All revenue ÷ spend",
-        value: fmtRoas(T.roas),
-        hint: A ? "ليس ROAS إعلانيًا" : "Not advertising ROAS",
+        key: "attributed",
+        label: A ? "العائد المرتبط" : "Attributed return",
+        value: fmtRoas(T.attributedRoas),
       },
       { key: "acos", label: "ACOS", value: fmtPct(T.acos, 1) },
     ],
@@ -599,7 +587,7 @@ export function standardMetrics({
     supporting: [
       { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(T.spend) },
       { key: "revenue", label: A ? "الإيراد" : "Revenue", value: fmtUSD(T.revenue) },
-      { key: "roas", label: A ? "العائد" : "Return", value: fmtRoas(T.roas) },
+      { key: "roas", label: A ? "التحصيل ÷ الصرف" : "Collections ÷ spend", value: fmtRoas(T.roas) },
       {
         key: "attributedAcos",
         label: A ? "ACOS المرتبط" : "Attributed ACOS",

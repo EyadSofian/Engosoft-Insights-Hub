@@ -27,6 +27,7 @@ import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
+import type { OverviewLeadTargets } from "@/lib/overview-lead-targets.server";
 
 /* ---------------------------------------------------------------------------
    WHAT EACH FIGURE ON THE OVERVIEW ACTUALLY MEANS
@@ -60,13 +61,71 @@ export interface CourseSaleContribution {
   contribution: number;
   paidInvoices: number;
   averageSalePrice: number | null;
+  leads?: number;
+  won?: number;
+  closureRate?: number | null;
+  avgCloseDays?: number | null;
+  currentLeadRevenue?: number;
+  previousLeadRevenue?: number;
+  otherLeadRevenue?: number;
+  currentLeadRevenueShare?: number | null;
+  previousLeadRevenueShare?: number | null;
+  otherLeadRevenueShare?: number | null;
+  otherBreakdown?: RevenueLeadAttribution["otherBreakdown"];
+  previousPeriodRevenue?: number;
+  revenueDelta?: number | null;
+}
+
+export interface RevenueLeadAttribution {
+  currentLeads: number;
+  previousLeads: number;
+  currentPeriodRevenue: number;
+  previousPeriodRevenue: number;
+  currentLeadRevenue: number;
+  previousLeadRevenue: number;
+  otherLeadRevenue: number;
+  otherBreakdown: {
+    sharedCampaignRevenue: number;
+    outsideSelectedCohortsRevenue: number;
+    campaignNotLinkedRevenue: number;
+    sourceWithoutCampaignRevenue: number;
+    noSourceRevenue: number;
+    sharedCampaignLines: number;
+    outsideSelectedCohortsLines: number;
+    campaignNotLinkedLines: number;
+    sourceWithoutCampaignLines: number;
+    noSourceLines: number;
+  };
+  sourceRows: {
+    sourceKey: string;
+    name: string;
+    campaignId: string;
+    source: string;
+    reason:
+      | "current_period_campaign"
+      | "previous_period_campaign"
+      | "shared_campaign"
+      | "outside_selected_cohorts"
+      | "campaign_not_linked"
+      | "source_without_campaign"
+      | "no_source";
+    revenue: number;
+    lines: number;
+  }[];
+  currentLeadRevenueShare: number | null;
+  previousLeadRevenueShare: number | null;
+  otherLeadRevenueShare: number | null;
+  revenueDelta: number | null;
 }
 
 export interface OverviewResp {
   totals: Totals;
+  leadTargets: OverviewLeadTargets;
+  excludedLeads: { recommendation: number; whatsappBroadcast: number; autodialerBroadcast: number };
   deltas: Deltas;
   prevRange: { from: string; to: string } | null;
   prevComparable: boolean;
+  revenueLeadAttribution?: RevenueLeadAttribution;
   trend: { date: string; spend: number; revenue: number; leads: number; won: number }[];
   courseSales: CourseSaleContribution[];
   funnel: FunnelStep[];
@@ -84,10 +143,107 @@ export interface OverviewResp {
   syncedAt: string;
   fetchErrors: string[];
   staleTabs: string[];
+  spendCoverage?: {
+    complete: boolean;
+    provisionalToday: boolean;
+    checkedFrom: string;
+    checkedTo: string;
+    gaps: { platform: string; account: string; from: string; to: string }[];
+  };
+  prevSpendCoverage?: {
+    complete: boolean;
+    provisionalToday: boolean;
+    checkedFrom: string;
+    checkedTo: string;
+    gaps: { platform: string; account: string; from: string; to: string }[];
+  } | null;
 }
 
 const ar = (lang: Lang) => lang === "ar";
 const EM = "—";
+
+/** Two intentionally separate promises in the monthly media plan. */
+export function overviewLeadTargetMetrics(
+  targets: OverviewLeadTargets,
+  lang: Lang,
+): { courses: MetricDetail; website: MetricDetail } {
+  const A = ar(lang);
+  const unavailable =
+    targets.reason === "narrow_filter"
+      ? A
+        ? "الفلتر الحالي يضيّق الأرقام، بينما التارجت موضوع للشهر كله. امسح فلاتر التخصيص للمقارنة الصحيحة."
+        : "The active dimension filter narrows actuals, but the target covers the entire month. Clear dimension filters to compare fairly."
+      : targets.reason === "no_single_month"
+        ? A
+          ? "اختر فترة داخل شهر واحد لعرض هدف ذلك الشهر."
+          : "Select a date range within one month to show that month's goal."
+        : targets.reason === "plan_unavailable"
+          ? A
+            ? "تعذّر تحميل خطة الميديا حاليًا."
+            : "The media plan is currently unavailable."
+          : A
+            ? "لا توجد خطة ميديا محفوظة لهذا الشهر."
+            : "There is no saved media plan for this month.";
+  const build = (kind: "courses" | "website"): MetricDetail => {
+    const goal = targets[kind];
+    const isCourse = kind === "courses";
+    const label = isCourse
+      ? A
+        ? "تحقيق تارجت ليدز الكورسات"
+        : "Course lead target"
+      : A
+        ? "تحقيق تارجت ليدز الموقع"
+        : "Website lead target";
+    const source = isCourse
+      ? A
+        ? "دورات خطة الميديا"
+        : "media-plan courses"
+      : A
+        ? "مصدر الموقع في أودو"
+        : "Odoo Website source";
+    const available = targets.reason === null;
+    return {
+      id: `overview.lead-target-${kind}`,
+      title: label,
+      value: available && goal.achievement !== null ? fmtPct(goal.achievement, 1) : EM,
+      tone: isCourse ? "sky" : "violet",
+      icon: <Target size={16} />,
+      definition: isCourse
+        ? A
+          ? "عدد ليدز كورسات الخطة التي دخلت أودو في الفترة المختارة، مقارنة بهدف الكورسات الشهري الكامل. ليدز الموقع لها كارد منفصل."
+          : "Odoo leads for planned courses created in the selected period against the full monthly course target. Website leads have a separate card."
+        : A
+          ? "عدد الليدز ذات مصدر Website في أودو خلال الفترة المختارة، مقارنة بهدف الموقع الشهري الكامل. لو الليد لها كورس في الخطة، قد تظهر في الكاردين؛ لذلك لا نجمعهما."
+          : "Odoo Website-source leads created in the selected period against the full monthly website target. A lead tagged with a planned course may appear in both cards, so do not sum them.",
+      formula: available
+        ? `${fmtNum(goal.actual ?? 0)} ÷ ${fmtNum(goal.target ?? 0)} × 100 = ${goal.achievement === null ? EM : fmtPct(goal.achievement, 1)}`
+        : undefined,
+      caveat: available
+        ? A
+          ? `المحقق حسب الفترة المختارة، والمطلوب للشهر ${targets.month} كاملًا${targets.status === "draft" ? " (الخطة مسودة)" : ""}. توصية وواتساب برودكاست خارج العد؛ واتساب العادي محسوب.`
+          : `Actual follows the selected dates; target is for all of ${targets.month}${targets.status === "draft" ? " (draft plan)" : ""}. Recommendation and WhatsApp Broadcast are excluded; regular WhatsApp counts.`
+        : unavailable,
+      supporting: available
+        ? [
+            { key: "actual", label: A ? "المحقق" : "Actual", value: fmtNum(goal.actual ?? 0) },
+            {
+              key: "target",
+              label: A ? "هدف الشهر" : "Monthly target",
+              value: fmtNum(goal.target ?? 0),
+            },
+          ]
+        : [],
+      provenance: {
+        system: "Odoo CRM + Media Plan",
+        model: "crm.lead",
+        dateBasis: A ? "تاريخ إنشاء الليد" : "Lead creation date",
+        note: source,
+      },
+      report: { to: "/media-plan", label: A ? "فتح خطة الميديا" : "Open media plan" },
+    };
+  };
+  return { courses: build("courses"), website: build("website") };
+}
 
 /** A series out of the response itself. Never padded, never interpolated. */
 const series = (rows: OverviewResp["trend"], metric: "spend" | "revenue" | "leads" | "won") =>
@@ -295,10 +451,10 @@ export function overviewMetrics({
   const spend: MetricDetail = {
     id: "overview.spend",
     title: A ? "الإنفاق الإعلاني" : "Ad spend",
-    value: fmtUSD(T.spend),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSD(T.spend),
     tone: "rose",
     icon: <DollarSign size={16} />,
-    delta: D.spend,
+    delta: data.spendCoverage?.complete === false ? undefined : D.spend,
     deltaInvert: true,
     definition: A
       ? "ما أُنفق فعليًا على الإعلانات خلال الفترة، بتاريخ ظهور الإعلان، من كل المنصات المتصلة."
@@ -403,11 +559,14 @@ export function overviewMetrics({
     icon: <Users size={16} />,
     delta: D.totalLeads,
     definition: A
-      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد."
-      : "Every lead that entered the system in the period: active CRM rows plus the losses from the approved Lost source.",
+      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد، بعد استبعاد مصادر التوصية وواتساب برودكاست."
+      : "Every lead that entered the system in the period: active CRM rows plus approved losses, excluding Recommendation and WhatsApp Broadcast sources.",
     formula: A
       ? `عملاء CRM (${fmtNum(T.crmLeads)}) + الصفقات الضائعة المعتمدة (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`
       : `CRM leads (${fmtNum(T.crmLeads)}) + approved losses (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`,
+    caveat: A
+      ? `مستبعد من الإجمالي: ${fmtNum(data.excludedLeads?.recommendation ?? 0)} توصية و${fmtNum(data.excludedLeads?.whatsappBroadcast ?? 0)} واتساب برودكاست. واتساب العادي محسوب. السجلات المستبعدة ما زالت ظاهرة في تقرير المصادر.`
+      : `Excluded: ${fmtNum(data.excludedLeads?.recommendation ?? 0)} Recommendation and ${fmtNum(data.excludedLeads?.whatsappBroadcast ?? 0)} WhatsApp Broadcast. Regular WhatsApp is counted. Excluded records remain visible in the source report.`,
     trend: {
       points: series(data.trend, "leads"),
       label: A ? "حركة دخول العملاء" : "Leads arriving over the period",
@@ -628,13 +787,13 @@ export function overviewMetrics({
   const roas: MetricDetail = {
     id: "overview.roas",
     title: A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS",
-    value: fmtRoas(T.attributedRoas),
+    value: data.spendCoverage?.complete === false ? "—" : fmtRoas(T.attributedRoas),
     tone:
       T.attributedRoas !== null && isFinite(T.attributedRoas) && T.attributedRoas < 1
         ? "rose"
         : "amber",
     icon: <Target size={16} />,
-    delta: D.attributedRoas,
+    delta: data.spendCoverage?.complete === false ? undefined : D.attributedRoas,
     definition: A
       ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
       : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
@@ -701,6 +860,30 @@ export function overviewMetrics({
     ],
     report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
   };
+
+  if (data.spendCoverage?.provisionalToday && data.spendCoverage.complete) {
+    spend.caveat = [
+      spend.caveat,
+      A
+        ? "جزء اليوم الحالي رقم أولي حتى آخر مزامنة، وليس إجمالي يوم مغلق."
+        : "The current day is a live snapshot, not a closed-day total.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (data.spendCoverage?.complete === false) {
+    const caveat = A
+      ? "هناك حسابات أو أيام لم تُسترجع بعد؛ تفاصيل الإنفاق والعائد مخفية حتى تكتمل الفترة المختارة."
+      : "Some accounts or days have not been retrieved; spend and return detail is hidden until the selected period is complete.";
+    for (const metric of [spend, roas]) {
+      metric.caveat = caveat;
+      metric.formula = undefined;
+      metric.trend = undefined;
+      metric.breakdowns = [];
+      metric.supporting = [];
+      metric.records = undefined;
+    }
+  }
 
   return { revenue, spend, leads, won, roas };
 }
@@ -857,7 +1040,7 @@ export function overviewEfficiencyMetrics({
   const cpl: MetricDetail = {
     id: "overview.cpl",
     title: A ? "تكلفة العميل المحتمل" : "Cost per lead",
-    value: fmtUSDFull(T.cpl),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSDFull(T.cpl),
     // A cost is read against the thing it bought, so cost-per-lead takes the
     // lead family and cost-per-won takes the won family. Painting all three
     // cost figures amber gave the second row three identical cards and told a
@@ -966,7 +1149,7 @@ export function overviewEfficiencyMetrics({
   const acos: MetricDetail = {
     id: "overview.acos",
     title: "ACOS",
-    value: fmtPct(T.acos, 1),
+    value: data.spendCoverage?.complete === false ? "—" : fmtPct(T.acos, 1),
     tone: "amber",
     icon: <Percent size={14} />,
     delta: D.acos,
@@ -1028,7 +1211,7 @@ export function overviewEfficiencyMetrics({
   const cpa: MetricDetail = {
     id: "overview.cpa",
     title: A ? "تكلفة الصفقة" : "Cost per won deal",
-    value: fmtUSDFull(T.cpa),
+    value: data.spendCoverage?.complete === false ? "—" : fmtUSDFull(T.cpa),
     tone: "violet",
     icon: <Target size={14} />,
     definition: A
@@ -1050,6 +1233,20 @@ export function overviewEfficiencyMetrics({
     ],
     report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
   };
+
+  if (data.spendCoverage?.complete === false) {
+    const caveat = A
+      ? "بيانات الإنفاق غير مكتملة؛ أُخفيت تفاصيل التكلفة والكفاءة حتى تكتمل الفترة."
+      : "Spend data is incomplete; cost and efficiency details are hidden until the period is complete.";
+    for (const metric of [acos, cpl, cpa]) {
+      metric.caveat = caveat;
+      metric.formula = undefined;
+      metric.trend = undefined;
+      metric.breakdowns = [];
+      metric.supporting = [];
+      metric.records = undefined;
+    }
+  }
 
   return { lost, conversion, lostRate, closeTime, acos, cpl, cpa };
 }
@@ -1094,7 +1291,7 @@ export function businessSignals(
 
   let risk: BusinessSignals["risk"];
   if (data.fetchErrors.length || data.staleTabs.length) {
-    // This card used to print the raw connector errors — "Archived Lost
+    // This card used to print the raw connector errors — "CRM Lost
     // unavailable: direct Odoo is not configured or could not be reached" —
     // into an executive summary. The count and the consequence are what a
     // reader here can act on; the connector names are stated in full in the

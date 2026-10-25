@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { matchMediaPlanCourse, plannedCourseBudget } from "@/lib/media-plan";
+import {
+  matchMediaPlanCourse,
+  plannedCourseBudget,
+  type MediaPlanDeliverable,
+} from "@/lib/media-plan";
 import type { CourseAgg } from "@/lib/types";
 
 interface ActualCourse {
@@ -10,6 +14,23 @@ interface ActualCourse {
   lost: number;
   revenueUsd: number;
   invoices: number;
+}
+
+interface DeliverableDelivery {
+  key: string;
+  label: string;
+  category: MediaPlanDeliverable["category"];
+  metric: MediaPlanDeliverable["metric"];
+  target: number;
+  unit: string;
+  actual: number | null;
+  lifecycle?: import("@/lib/media-plan-lifecycle").MediaPlanLifecycle;
+  platformActual?: number | null;
+  connected: boolean;
+  actualSource: string;
+  dateScope: string;
+  matchingRule: string;
+  reportTo: string;
 }
 
 const emptyActual = (): ActualCourse => ({
@@ -63,9 +84,15 @@ export const Route = createFileRoute("/api/media-plan")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
+        const { authoritativeLostLeads, computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
+        const { loadAllData } = await import("@/lib/sheet-cache.server");
+        const { isExcludedFromSalesRevenue } = await import("@/lib/sales-revenue-policy");
+        const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
+        const { funnelFromLive, summarizeFunnel } = await import("@/lib/management-review");
+        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle, mediaPlanOpportunityActual } = await import("@/lib/media-plan-lifecycle");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
@@ -101,14 +128,54 @@ export const Route = createFileRoute("/api/media-plan")({
           salesperson: undefined,
         } as const;
 
-        const [data, organicData] = await Promise.all([
+        const [data, organicData, websiteData, webinarData, allData] = await Promise.all([
           getFiltered(scopedFilters),
           getFiltered({ ...scopedFilters, channel: "organic" }),
+          getFiltered({ ...scopedFilters, source: "Website" }),
+          getFiltered({ ...scopedFilters, source: "Webinar" }),
+          loadAllData(),
         ]);
+        const allCrmLeads = summarizeFunnel(funnelFromLive(
+          data.crm.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+          data.lost.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+        )).leads;
+        const certificateRows = allData.accounting
+          .filter((row) =>
+            accountingReportingDate(row, "payment") >= window.from &&
+            accountingReportingDate(row, "payment") <= window.to &&
+            isExcludedFromSalesRevenue(row),
+          );
+        const rates = fxRatesFromFilters({});
+        const certificateRevenueUsd = certificateRows
+          .reduce((sum, row) => sum + accountingUsdPaid(row, rates), 0);
+        const companyRevenueMap = new Map<string, { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }>();
+        const companyRow = (company: string) => {
+          const key = company.trim() || "غير محدد";
+          const current = companyRevenueMap.get(key) ?? { company: key, salesUsd: 0, certificateUsd: 0, certificateLines: 0 };
+          companyRevenueMap.set(key, current);
+          return current;
+        };
+        for (const row of data.accounting) companyRow(row.company).salesUsd += row.usdPaid;
+        for (const row of certificateRows) {
+          const current = companyRow(row.company);
+          current.certificateUsd += accountingUsdPaid(row, rates);
+          current.certificateLines++;
+        }
+        const revenueByCompany = [...companyRevenueMap.values()].sort(
+          (a, b) => b.salesUsd + b.certificateUsd - a.salesUsd - a.certificateUsd,
+        );
         const courses = computeCourses(data);
         const totals = computeTotals(data);
         const organicTotals = computeTotals(organicData);
         const actualByKey = new Map<string, ActualCourse>();
+        const lifecycleByKey = new Map<string, ReturnType<typeof emptyMediaPlanLifecycle>>();
+        for (const row of [...data.crm, ...authoritativeLostLeads(data)]) {
+          const target = matchMediaPlanCourse(plan.courses, row.course);
+          if (!target) continue;
+          const lifecycle = lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle();
+          addMediaPlanLifecycle(lifecycle, row);
+          lifecycleByKey.set(target.key, lifecycle);
+        }
         const unplanned: Array<{
           course: string;
           spend: number;
@@ -138,11 +205,16 @@ export const Route = createFileRoute("/api/media-plan")({
         const elapsed = elapsedShare(window.from, window.to, window.days, today);
         const courseRows = plan.courses.map((target) => {
           const actual = actualByKey.get(target.key) ?? emptyActual();
-          const actualLeads = actual.platformLeads ?? actual.crmLeads;
+          const lifecycle = lifecycleByKey.get(target.key) ?? emptyMediaPlanLifecycle();
+          // Plan attainment is based on current Odoo opportunities only. Fresh
+          // and Lost leads remain visible in the lifecycle breakdown, but do
+          // not inflate the headline, achievement, or pace status.
+          const actualLeads = mediaPlanOpportunityActual(lifecycle);
           const targetBudgetUsd = plannedCourseBudget(target);
           const achievement = divide(actualLeads, target.targetLeads);
           const expectedLeads = target.targetLeads * elapsed;
-          const actualCpl = divide(actual.spend, actualLeads);
+          // CPL still means cost per CRM lead, not cost per opportunity.
+          const actualCpl = divide(actual.spend, actual.crmLeads);
           const cplVariance =
             actualCpl === null ? null : divide(actualCpl - target.targetCpl, target.targetCpl);
 
@@ -151,8 +223,9 @@ export const Route = createFileRoute("/api/media-plan")({
             targetBudgetUsd,
             actual: {
               ...actual,
+              lifecycle,
               actualLeads,
-              leadBasis: actual.platformLeads === null ? "crm_fallback" : "platform",
+              leadBasis: "crm_opportunity",
               actualCpl,
               achievement,
               expectedLeads,
@@ -166,6 +239,9 @@ export const Route = createFileRoute("/api/media-plan")({
         const targetedSpend = courseRows.reduce((sum, row) => sum + row.actual.spend, 0);
         const targetedLeads = courseRows.reduce((sum, row) => sum + row.actual.actualLeads, 0);
         const targetedCrmLeads = courseRows.reduce((sum, row) => sum + row.actual.crmLeads, 0);
+        const targetedPlatformLeads = courseRows.some((row) => row.actual.platformLeads !== null)
+          ? courseRows.reduce((sum, row) => sum + (row.actual.platformLeads ?? 0), 0)
+          : null;
         const plannedCourseBudgetUsd = courseRows.reduce(
           (sum, row) => sum + row.targetBudgetUsd,
           0,
@@ -175,14 +251,153 @@ export const Route = createFileRoute("/api/media-plan")({
           0,
         );
 
+        const dateScope = `${window.from} → ${window.to}`;
+        const websiteLeads = computeTotals(websiteData).totalLeads;
+        const webinarLeads = computeTotals(webinarData).totalLeads;
+        const paidPlatformLeads = data.ads
+          .filter((row) => row.objective === "leads")
+          .reduce((sum, row) => sum + (row.platformLeads ?? 0), 0);
+        const sourceForDeliverable = (deliverable: {
+          actualSource?: string;
+          metric?: MediaPlanDeliverable["metric"];
+          reportedActual?: number;
+        }) => {
+          switch (deliverable.actualSource) {
+            case "manual_reported":
+              return {
+                actual: deliverable.reportedActual ?? null,
+                connected: deliverable.reportedActual !== undefined,
+                actualSource: "Manual month-to-date report",
+                matchingRule:
+                  "Entered by a plan editor; not independently verified or inferred from campaign or creative counts.",
+                reportTo: "/media-plan",
+              };
+            case "website_crm_leads":
+              return {
+                actual: websiteLeads,
+                connected: true,
+                actualSource: "Odoo CRM · Source=Website",
+                matchingRule: "Source exactly equals Website; active CRM + canonical Lost rows.",
+                reportTo: "/website",
+              };
+            case "webinar_crm_leads":
+              return {
+                actual: webinarLeads,
+                connected: true,
+                actualSource: "Odoo CRM · Source=Webinar",
+                matchingRule: "Source exactly equals Webinar; active CRM + canonical Lost rows.",
+                reportTo: "/leads",
+              };
+            case "creative_catalog":
+              return {
+                actual: data.snapshot.creatives.length,
+                connected: data.snapshot.creatives.length > 0,
+                actualSource: "Canonical creative catalog",
+                matchingRule: "Creative catalog rows available in the selected plan snapshot.",
+                reportTo: "/creatives",
+              };
+            case "paid_media_platform_leads":
+              return {
+                actual: paidPlatformLeads,
+                connected: data.ads.some((row) => row.platformLeads !== null),
+                actualSource: "Paid-media platform lead fields",
+                matchingRule:
+                  "Objective=leads; sum platform-reported lead fields inside the plan window.",
+                reportTo: "/ads",
+              };
+            default:
+              return {
+                actual: null,
+                connected: false,
+                actualSource: "Not connected",
+                matchingRule: "No authoritative source configured for this deliverable.",
+                reportTo: "/media-plan",
+              };
+          }
+        };
+        const deliverables: DeliverableDelivery[] = [
+          ...(plan.month === "2026-10"
+            ? []
+            : [
+                {
+                  key: "paid-media-leads",
+                  label: "Paid media leads",
+                  category: "paid_media" as const,
+                  metric: "leads" as const,
+                  target: plan.paidLeadTarget,
+                  unit: "leads",
+                  actual: targetedLeads,
+                  lifecycle: courseRows.reduce((sum, row) => {
+                    sum.leadActive += row.actual.lifecycle.leadActive;
+                    sum.leadLost += row.actual.lifecycle.leadLost;
+                    sum.leadOther += row.actual.lifecycle.leadOther;
+                    sum.opportunities += row.actual.lifecycle.opportunities;
+                    sum.opportunityLost += row.actual.lifecycle.opportunityLost;
+                    return sum;
+                  }, emptyMediaPlanLifecycle()),
+                  connected: true,
+                  actualSource: "Odoo CRM · Course Categories",
+                  platformActual: targetedPlatformLeads,
+                  dateScope,
+                  matchingRule:
+                    "Odoo CRM Course Categories for the primary number; platform delivery shown separately.",
+                  reportTo: "/ads",
+                },
+              ]),
+          ...plan.courses.map((target) => {
+            const row = courseRows.find((candidate) => candidate.key === target.key);
+            return {
+              key: target.key,
+              label: target.label,
+              category: "paid_media" as const,
+              metric: "leads" as const,
+              target: target.targetLeads,
+              unit: "leads",
+              actual: row?.actual.actualLeads ?? null,
+              lifecycle: row?.actual.lifecycle ?? emptyMediaPlanLifecycle(),
+              connected: !!row,
+              actualSource: "Odoo CRM · Course Categories",
+              platformActual: row?.actual.platformLeads ?? null,
+              dateScope,
+              matchingRule: "Current Odoo opportunities by lead Course Categories and creation month; fresh and Lost leads are separate, and platform delivery is comparison-only.",
+              reportTo: "/campaigns",
+            };
+          }),
+          ...plan.additionalActivities
+            .filter(
+              (activity) =>
+                activity.target !== undefined &&
+                activity.category &&
+                activity.metric &&
+                activity.unit,
+            )
+            .map((activity) => {
+              const source = sourceForDeliverable(activity);
+              return {
+                key: activity.key,
+                label: activity.label,
+                category: activity.category!,
+                metric: activity.metric!,
+                target: activity.target!,
+                unit: activity.unit!,
+                ...source,
+                dateScope,
+              };
+            }),
+        ];
+
         return json({
           plan: {
             ...plan,
-            targetCpl: divide(plan.leadGenerationBudgetUsd, plan.paidLeadTarget),
+            targetCpl:
+              plan.leadGenerationBudgetUsd > 0
+                ? divide(plan.leadGenerationBudgetUsd, plan.paidLeadTarget)
+                : null,
             plannedCourseBudgetUsd,
             reserveBudgetUsd: plan.leadGenerationBudgetUsd - plannedCourseBudgetUsd,
             additionalBudgetUsd,
-            totalMarketingBudgetUsd: plan.leadGenerationBudgetUsd + additionalBudgetUsd,
+            totalMarketingBudgetUsd:
+              plan.overallMarketingBudgetUsd ?? plan.leadGenerationBudgetUsd + additionalBudgetUsd,
           },
           window: {
             ...window,
@@ -194,16 +409,26 @@ export const Route = createFileRoute("/api/media-plan")({
             targetedSpend,
             targetedLeads,
             targetedCrmLeads,
-            targetedCpl: divide(targetedSpend, targetedLeads),
+            excludedLeads: data.excludedLeads,
+            targetedPlatformLeads,
+            allCrmLeads,
+            targetedCpl: divide(targetedSpend, targetedCrmLeads),
             paidLeadAchievement: divide(targetedLeads, plan.paidLeadTarget),
             organicWebinarLeads: organicTotals.totalLeads,
             organicAchievement: divide(organicTotals.totalLeads, plan.organicWebinarLeadTarget),
             allSpend: totals.spend,
             unattributedOrUnplannedSpend: Math.max(0, totals.spend - targetedSpend),
             revenueUsd: totals.revenue,
+            certificateRevenueUsd,
+            certificateLines: certificateRows.length,
+            revenueByCompany,
+            revenueIncludingCertificatesUsd: totals.revenue + certificateRevenueUsd,
+            actualSalesBudgetAllowanceUsd: plan.month === "2026-09" ? totals.revenue * 0.17 : null,
+            actualGrossBudgetAllowanceUsd: plan.month === "2026-09" ? (totals.revenue + certificateRevenueUsd) * 0.17 : null,
             salesAchievement: divide(totals.revenue, plan.salesTargetUsd),
           },
           courses: courseRows,
+          deliverables,
           unplanned: unplanned.sort((a, b) => b.spend - a.spend),
           availableMonths,
           editable: source.editable && writesEnabled(),
@@ -219,6 +444,14 @@ export const Route = createFileRoute("/api/media-plan")({
           sources: [
             "ENGOSOFT Marketing Plan Aug 2026: lead, budget, sales and ownership targets",
             "July Media Plan and Media Buyers Plan: course CPL benchmarks",
+            ...(plan.month === "2026-10"
+              ? [
+                  "October 2026 Media Plan image supplied by management; conflicting totals remain a draft note",
+                ]
+              : []),
+            ...(plan.month === "2026-09"
+              ? ["Management correction, 2026-10-01: September sales target $135,000; marketing budget 17% of target ($22,950). August course/activity allocations remain a draft."]
+              : []),
           ],
           health: data.snapshot.health,
         });

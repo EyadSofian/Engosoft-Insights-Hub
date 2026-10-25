@@ -114,6 +114,16 @@ export interface MetricReportLink {
   label: string;
 }
 
+/** Verifiable lineage for a figure whose business rule needs to be audited. */
+export interface MetricProvenance {
+  system: string;
+  model?: string;
+  query?: string;
+  fields?: string[];
+  dateBasis?: string;
+  note?: string;
+}
+
 export interface MetricDetail {
   /**
    * The Nexus element id when the registry knows this metric, so "ask Nexus
@@ -133,6 +143,8 @@ export interface MetricDetail {
   formula?: string;
   /** A caveat that changes what the figure means. Rendered, never hidden. */
   caveat?: string;
+  /** Exact source and rule, shown when a plain-language definition is not enough. */
+  provenance?: MetricProvenance;
   trend?: MetricTrend;
   breakdowns?: MetricBreakdownGroup[];
   supporting?: MetricSupportingFact[];
@@ -220,9 +232,12 @@ export function periodLabel(
 }
 
 const PRESET_LABEL: Record<DatePreset, { ar: string; en: string }> = {
+  today: { ar: "اليوم", en: "Today" },
   "7d": { ar: "آخر 7 أيام", en: "Last 7 days" },
   "30d": { ar: "آخر 30 يوماً", en: "Last 30 days" },
   month: { ar: "الشهر الحالي", en: "This month" },
+  prev_month: { ar: "الشهر السابق", en: "Previous month" },
+  same_period_last_month: { ar: "نفس الفترة الشهر الماضي", en: "Same period last month" },
   year: { ar: "السنة الحالية", en: "This year" },
   all: { ar: "كل الفترات", en: "All time" },
 };

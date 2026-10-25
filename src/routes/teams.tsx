@@ -50,11 +50,11 @@ function Teams() {
       <DashboardPageHeader
         flush
         icon={<UsersRound size={20} />}
-        title={lang === "ar" ? "أداء الموظفين وفرق المبيعات" : "Employees and sales teams"}
+        title={lang === "ar" ? "أداء فريق المبيعات" : "Sales team performance"}
         subtitle={
           lang === "ar"
-            ? "التحصيل من الفواتير المدفوعة، والليدز من Odoo، والمكالمات وتقييم الجودة من Yeastar، والمحادثات من Chatwoot."
-            : "Paid invoices supply collections, Odoo supplies leads, Yeastar supplies calls and quality scores, and Chatwoot supplies conversations."
+            ? "من تابع العملاء، كم أغلق، وكم حصّل — لكل فريق وكل موظف."
+            : "Who handled the leads, how many they closed and what they collected — per team and person."
         }
         period={reportingPeriod}
       />

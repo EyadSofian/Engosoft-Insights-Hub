@@ -134,7 +134,7 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
   L.push(`👥 *${esc("العملاء المحتملون")}*`);
   L.push(
     esc(
-      `الإجمالي النظيف: ${int(t.totalLeads)} = CRM بدون Lost ${int(t.crmLeads)} + Lost مؤرشف ${int(t.lost)}${t.archivedWon > 0 ? ` + Won مؤرشف ${int(t.archivedWon)}` : ""}`,
+      `إجمالي CRM القابل للتقرير: ${int(t.totalLeads)} = نشط غير Lost ${int(t.crmLeads)} + Lost حسب عقد 1.26 ${int(t.lost)}`,
     ),
   );
   L.push(esc(`Leads الإعلانات حسب Meta/Snap: ${int(t.platformLeads)}`));
@@ -142,7 +142,7 @@ export async function buildReport(opts: ReportOptions = {}): Promise<string> {
 
   L.push(`🏆 *${esc("الإغلاق")}*`);
   L.push(esc(`صفقات مغلقة: ${int(t.won)} (${pct(t.conversionRate)})  ${change(t.won, p.won)}`));
-  L.push(esc(`ضائعة من Lost Analysis فقط: ${int(t.lost)} (${pct(t.lostRate)})`));
+  L.push(esc(`ضائعة حسب CRM 1.26: ${int(t.lost)} (${pct(t.lostRate)})`));
   L.push(
     esc(
       `إيراد Accounting.USD Paid حسب Payment Date: ${money(t.revenue)}  ${change(t.revenue, p.revenue)}`,

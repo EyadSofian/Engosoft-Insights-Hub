@@ -34,8 +34,8 @@ export function NexusLauncher({ hidden }: { hidden?: boolean }) {
         "transition duration-200 hover:scale-105 active:scale-95",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
         "nexus-float motion-reduce:animate-none",
-        // Clears the mobile bottom nav and the iOS home bar; tighter on desktop.
-        "bottom-[calc(env(safe-area-inset-bottom,0px)+5.25rem)] end-4",
+        // Clears the iOS home bar; a little more room from sm up.
+        "bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] end-4",
         "sm:bottom-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sm:end-6",
       ].join(" ")}
     >

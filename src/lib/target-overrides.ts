@@ -13,6 +13,13 @@ export interface TargetOverride {
   updatedBy: string;
 }
 
+// October's newly supplied workbook supersedes prior ad-hoc October edits.
+// Edits made after its publication must continue to work normally.
+export const OCTOBER_WORKBOOK_PUBLISHED_AT = "2026-10-03T19:23:00Z";
+export function isCurrentTargetOverride(row: TargetOverride): boolean {
+  return row.month !== "2026-10" || row.updatedAt >= OCTOBER_WORKBOOK_PUBLISHED_AT;
+}
+
 const str = (value: unknown): string =>
   value === null || value === undefined ? "" : String(value).trim();
 

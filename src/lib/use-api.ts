@@ -6,7 +6,10 @@ import { useFilters } from "@/lib/filter-store";
  * its own query string (e.g. `?grain=adset`); those params are merged rather
  * than concatenated, which would otherwise produce a second `?` and be dropped.
  */
-export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
+export function useApi<T>(
+  path: string,
+  options: { enabled?: boolean; refetchInterval?: number } = {},
+) {
   const filters = useFilters();
 
   const [base, own = ""] = path.split("?");
@@ -24,6 +27,21 @@ export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
     enabled: options.enabled ?? true,
     queryFn: async () => {
       const res = await fetch(url);
+      if (res.status === 401) {
+        const authError = await res
+          .clone()
+          .json()
+          .then((body: { code?: string }) => body?.code)
+          .catch(() => undefined);
+        if (authError === "REVENUE_PASSWORD_REQUIRED") {
+          // A client-side route transition can skip the document request that
+          // the server middleware uses to render the password screen. Reload
+          // once so the same protected URL is handled as a document request.
+          if (typeof window !== "undefined") window.location.assign(window.location.href);
+          throw new Error("Revenue access requires a password.");
+        }
+        throw new Error("Your sign-in session has ended. Reload the page to sign in again.");
+      }
       if (!res.ok) {
         // Routes that fail on purpose (a missing integration, an upstream that
         // is down) send `{ error }`. Surfacing it beats "Request failed: 503",
@@ -38,5 +56,9 @@ export function useApi<T>(path: string, options: { enabled?: boolean } = {}) {
       return res.json();
     },
     staleTime: 30_000,
+    // Revisit a tab with a fresh network read even during the 30-second
+    // freshness window. The server still controls upstream sync and throttling.
+    refetchOnMount: "always",
+    refetchInterval: options.refetchInterval,
   });
 }

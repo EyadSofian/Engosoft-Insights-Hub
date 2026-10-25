@@ -9,6 +9,7 @@ export const Route = createFileRoute("/api/health")({
         const includeDetails = new URL(request.url).searchParams.get("details") === "1";
         const names = [
           "meta_ads",
+          "meta_ad_creatives",
           "snap_ads",
           "accounting",
           "accounting_legacy",

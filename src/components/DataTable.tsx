@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Search,
   Download,
@@ -45,6 +45,31 @@ export interface Col<T> {
   sortable?: boolean;
 }
 
+/** Columns a table shows before the reader asks for more. */
+export const DEFAULT_VISIBLE_COLUMNS = 8;
+
+/**
+ * Which columns start hidden: the ones flagged `hideByDefault`, then — if more
+ * than `limit` would still show — the trailing ones, keeping identity (`always`)
+ * and pinned (`sticky`) columns. Nothing is removed: every hidden column stays
+ * one click away under Columns, and the chooser is forced on whenever this
+ * trims anything.
+ */
+export function defaultHiddenColumns<T>(
+  cols: Col<T>[],
+  limit = DEFAULT_VISIBLE_COLUMNS,
+): Set<string> {
+  const hidden = new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key));
+  let visible = cols.filter((c) => !hidden.has(c.key)).length;
+  for (let i = cols.length - 1; i >= 0 && visible > limit; i--) {
+    const col = cols[i];
+    if (col.always || col.sticky || hidden.has(col.key)) continue;
+    hidden.add(col.key);
+    visible--;
+  }
+  return hidden;
+}
+
 export function DataTable<T>({
   rows,
   cols,
@@ -63,11 +88,14 @@ export function DataTable<T>({
   truncatedNote,
   groupLabels,
   columnChooser = false,
+  defaultVisibleLimit = DEFAULT_VISIBLE_COLUMNS,
   emptyState,
   serverSort,
   serverPage,
   loading,
   rowKey,
+  expandedRowKey,
+  renderExpanded,
 }: {
   rows: T[];
   cols: Col<T>[];
@@ -89,6 +117,8 @@ export function DataTable<T>({
   /** Display names for the `group` values used on the columns. */
   groupLabels?: Record<string, string>;
   columnChooser?: boolean;
+  /** Keep more than the usual eight columns visible when the report requires it. */
+  defaultVisibleLimit?: number;
   emptyState?: ReactNode;
   /**
    * Hands sorting to the caller.
@@ -105,6 +135,9 @@ export function DataTable<T>({
   loading?: boolean;
   /** Stable row identity. Falls back to the row's index within the page. */
   rowKey?: (r: T) => string;
+  /** Optional full-width detail immediately below one visible row. */
+  expandedRowKey?: string | null;
+  renderExpanded?: (r: T) => ReactNode;
 }) {
   const { t, lang } = useI18n();
   // Controlled when the caller passes `search`, so a sibling layout can share
@@ -122,14 +155,14 @@ export function DataTable<T>({
   // would then be meaningless. Re-seeding on identity change keeps the defaults
   // honest without wiping a choice the reader just made on the same set.
   const colIdentity = cols.map((c) => c.key).join("|");
-  const [hidden, setHidden] = useState<Set<string>>(
-    () => new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)),
+  const [hidden, setHidden] = useState<Set<string>>(() =>
+    defaultHiddenColumns(cols, defaultVisibleLimit),
   );
   useEffect(() => {
-    setHidden(new Set(cols.filter((c) => c.hideByDefault && !c.always).map((c) => c.key)));
+    setHidden(defaultHiddenColumns(cols, defaultVisibleLimit));
     // Re-seed on the column set itself, not on every render of new col objects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colIdentity]);
+  }, [colIdentity, defaultVisibleLimit]);
 
   const visibleCols = useMemo(
     () => cols.filter((c) => c.always || !hidden.has(c.key)),
@@ -196,6 +229,9 @@ export function DataTable<T>({
   }, [visibleCols, groupLabels]);
 
   const hiddenCount = cols.filter((c) => !c.always && hidden.has(c.key)).length;
+  // A table wider than the default always offers the chooser, so the columns
+  // the default tucked away can never become unreachable.
+  const showChooser = columnChooser || cols.length > DEFAULT_VISIBLE_COLUMNS;
 
   return (
     <div className={`card overflow-hidden ${className}`}>
@@ -218,7 +254,7 @@ export function DataTable<T>({
             {rowTotal.toLocaleString("en-US")} {t("rows")}
           </span>
 
-          {columnChooser && (
+          {showChooser && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -411,43 +447,57 @@ export function DataTable<T>({
               ))}
             {!loading &&
               visible.map((r, i) => (
-                <tr
-                  key={rowKey ? rowKey(r) : i}
-                  onClick={() => onRowClick?.(r)}
-                  // A clickable row has to be reachable without a mouse, otherwise
-                  // the drill-down simply does not exist for keyboard users.
-                  tabIndex={onRowClick ? 0 : undefined}
-                  role={onRowClick ? "button" : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            onRowClick(r);
+                <Fragment key={rowKey ? rowKey(r) : i}>
+                  <tr
+                    onClick={() => onRowClick?.(r)}
+                    // A clickable row has to be reachable without a mouse, otherwise
+                    // the drill-down simply does not exist for keyboard users.
+                    tabIndex={onRowClick ? 0 : undefined}
+                    role={onRowClick ? "button" : undefined}
+                    aria-expanded={
+                      renderExpanded && onRowClick ? expandedRowKey === rowKey?.(r) : undefined
+                    }
+                    onKeyDown={
+                      onRowClick
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onRowClick(r);
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                  className={`group ${onRowClick ? "cursor-pointer" : ""}`}
-                >
-                  {visibleCols.map((c) => (
-                    <td
-                      key={c.key}
-                      className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
-                        i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
-                      } group-hover:bg-brand-soft ${
-                        c.align === "center"
-                          ? "text-center num whitespace-nowrap"
-                          : c.align === "right"
-                            ? "text-end num whitespace-nowrap"
-                            : ""
-                      } ${c.sticky ? "sticky-col font-medium" : ""}`}
-                      style={{ minWidth: c.minWidth }}
-                    >
-                      {c.render(r)}
-                    </td>
-                  ))}
-                </tr>
+                        : undefined
+                    }
+                    className={`group ${onRowClick ? "cursor-pointer" : ""}`}
+                  >
+                    {visibleCols.map((c) => (
+                      <td
+                        key={c.key}
+                        className={`px-3 py-2.5 border-b border-border align-middle transition-colors ${
+                          i % 2 === 1 ? "bg-surface-2/40" : "bg-surface"
+                        } group-hover:bg-brand-soft ${
+                          c.align === "center"
+                            ? "text-center num whitespace-nowrap"
+                            : c.align === "right"
+                              ? "text-end num whitespace-nowrap"
+                              : ""
+                        } ${c.sticky ? "sticky-col font-medium" : ""}`}
+                        style={{ minWidth: c.minWidth }}
+                      >
+                        {c.render(r)}
+                      </td>
+                    ))}
+                  </tr>
+                  {renderExpanded && expandedRowKey === rowKey?.(r) && (
+                    <tr className="bg-surface-2/60">
+                      <td
+                        colSpan={visibleCols.length}
+                        className="border-b border-border p-3 sm:p-4"
+                      >
+                        {renderExpanded(r)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
           </tbody>
         </table>

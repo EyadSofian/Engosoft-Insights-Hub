@@ -274,6 +274,8 @@ All endpoints accept the global filters as query params (`from`, `to`, `platform
 | `GET /api/course-lead-alerts`                  | Latest complete-day leads/CPL for currently spending courses, selected-period daily baseline, 28-day trend and material-change alerts                        |
 | `GET /api/teams`                               | Teams with nested salespeople, leaderboard, needs-attention list                                                                                             |
 | `GET /api/leads`                               | CRM breakdowns, lead-origin cohorts, detail rows                                                                                                             |
+| `GET /api/lead-performance`                    | Six entry-month cohorts: duplicates, unqualified reasons, PBX attempts, first-contact lag, staged funnel, and conversion to a verified paid enrollment       |
+| `GET /api/lead-performance-export`             | The same report as an Excel workbook, with its definitions and availability caveats                                                                          |
 | `GET /api/lost`                                | Loss reasons with shares, reason × team/course matrices, per-team lost rate                                                                                  |
 | `GET /api/accounting`                          | Paid accounting lines, distinct invoices, revenue groups, and detail rows                                                                                    |
 | `GET /api/full-invoiced`                       | Legacy compatibility endpoint; not a revenue source                                                                                                          |

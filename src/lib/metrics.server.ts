@@ -13,15 +13,17 @@ import {
 } from "./sheet-cache.server";
 import { isOrganicSourceKey, PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { UNATTRIBUTED_COURSE } from "./course-taxonomy";
-import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import { defaultReportingMonth } from "./reporting-window";
 import { accountingReportingDate } from "./accounting-policy";
+import { isExcludedFromSalesRevenue } from "./sales-revenue-policy";
+import { countsAsPotentialLead, excludedLeadSource } from "./lead-count-policy";
 import { PLATFORMS } from "./constants";
 import { loadMetaLiveStatus } from "./meta-live-status.server";
 import { fetchGoogleAdsCampaignStatus } from "./google-ads.server";
 import { fetchOpenAIAds } from "./openai-ads.server";
 import { isOperationalStateCurrent } from "./campaign-status-policy";
 import { leadStageBucket } from "./uncalled-leads";
+import { canonicalLossReason, groupByCanonicalReason } from "./loss-reason-taxonomy";
 import type {
   AdRow,
   AccountingRow,
@@ -292,12 +294,32 @@ class PerformanceDimensionIndex {
 
 /* --- filtering ------------------------------------------------------------ */
 
+/** Event analytics uses exactly the same stable ad/adset identity rules. */
+const performanceFilterIndexes = new WeakMap<AdRow[], PerformanceDimensionIndex>();
+export function matchesPerformanceDimensionFilters(
+  row: AttributedFact,
+  filters: GlobalFilters,
+  ads: AdRow[],
+): boolean {
+  if (!filters.adKey && !filters.adsetKey) return true;
+  let dimensions = performanceFilterIndexes.get(ads);
+  if (!dimensions) {
+    dimensions = new PerformanceDimensionIndex(ads);
+    performanceFilterIndexes.set(ads, dimensions);
+  }
+  if (filters.adsetKey && dimensions.fromFact(row, "adset").key !== filters.adsetKey) return false;
+  if (filters.adKey && dimensions.fromFact(row, "ad").key !== filters.adKey) return false;
+  return true;
+}
+
 export interface FilteredData {
   ads: AdRow[];
   crm: CrmLeadRow[];
   invoiced: InvoicedRow[];
   accounting: AccountingRow[];
   lost: LostRow[];
+  /** Source inventory is retained separately, not included in lead KPIs. */
+  excludedLeads: { recommendation: number; whatsappBroadcast: number; autodialerBroadcast: number };
   snapshot: Snapshot;
   applied: GlobalFilters;
   /** Ad accounts whose objective is not lead generation. */
@@ -457,7 +479,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
-  const crm = all.crm.filter((r) => {
+  const scopedCrm = all.crm.filter((r) => {
     if (!inRange(r.createdAt, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
@@ -474,6 +496,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   });
 
   const invoiced = all.invoiced.filter((r) => {
+    if (isExcludedFromSalesRevenue(r)) return false;
     if (!inRange(r.revenueDate, from, to)) return false;
     if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
     if (!matchesAccount(r.campaignId)) return false;
@@ -496,6 +519,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
   // with a legacy order bridge only for older workbooks.
   const accounting = all.accounting
     .filter((r) => {
+      if (isExcludedFromSalesRevenue(r)) return false;
       if (!inRange(accountingDate(r), from, to)) return false;
       if (company && r.company !== company) return false;
       if (!matchesPlatform(r.campaignKey, r.sourceKey)) return false;
@@ -519,7 +543,7 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
       return { ...row, usdPaid, usdSales: usdPaid };
     });
 
-  const lost = all.lost.filter((r) => {
+  const scopedLost = all.lost.filter((r) => {
     // Marketing analysis follows the lead cohort (creation date). The Lost page
     // can request the operational closure movement separately without mixing
     // old leads closed this month into this month's acquisition quality.
@@ -540,12 +564,24 @@ export async function getFiltered(f: GlobalFilters = {}): Promise<FilteredData> 
     return true;
   });
 
+  const excludedLeads = { recommendation: 0, whatsappBroadcast: 0, autodialerBroadcast: 0 };
+  const countedSource = (source: string, leadSegment: string): boolean => {
+    const exclusion = excludedLeadSource(source, leadSegment);
+    if (exclusion === "recommendation") excludedLeads.recommendation++;
+    if (exclusion === "whatsapp_broadcast") excludedLeads.whatsappBroadcast++;
+    if (exclusion === "autodialer_broadcast") excludedLeads.autodialerBroadcast++;
+    return exclusion === null;
+  };
+  const crm = scopedCrm.filter((row) => countedSource(row.source, row.leadSegment));
+  const lost = scopedLost.filter((row) => countedSource(row.source, row.leadSegment));
+
   return {
     ads,
     crm,
     invoiced,
     accounting,
     lost,
+    excludedLeads,
     snapshot: all,
     applied: f,
     nonLeadAccounts: all.accounts.filter((a) => a.objective !== "leads").map((a) => a.name),
@@ -598,7 +634,7 @@ function closeStats(rows: CrmLeadRow[]): { avg: Maybe; sample: number } {
 
 /* --- lead population -------------------------------------------------------- */
 
-/** Every archived CRM row, deduplicated by Odoo id. */
+/** Every stored CRM 1.26 Lost row, deduplicated by Odoo id. */
 export function archivedCrmLeads(data: FilteredData): LostRow[] {
   const seen = new Set<string>();
   return data.lost.filter((row, index) => {
@@ -610,7 +646,7 @@ export function archivedCrmLeads(data: FilteredData): LostRow[] {
 }
 
 /**
- * Reporting date for the archived population.
+ * Reporting date for the canonical Lost population.
  *
  * Marketing Lost reporting follows the lead's Odoo creation date so the loss is
  * attributed to the acquisition cohort that produced it. Close Date remains
@@ -623,24 +659,13 @@ export function archivedLostReportingDate(
   return row.createdAt;
 }
 
-const isArchivedWon = (row: LostRow): boolean => isArchivedWonStage(row.stage);
-
 /**
- * The authoritative Lost population.
- *
- * CRM stage text never participates. The handful of archived rows still marked
- * Won remain valid leads/denominator rows but cannot also be losses.
+ * The authoritative 1.26 Lost population. Direct Odoo classification already
+ * applies the distinct Lead and Opportunity rules. Stored snapshots are only
+ * admitted when their metadata carries the same contract version.
  */
 export function authoritativeLostLeads(data: FilteredData): LostRow[] {
-  return archivedCrmLeads(data).filter((row) => !isArchivedWon(row));
-}
-
-/**
- * Does this archived row count as a win? See `archived-won.ts` for the rule and
- * for the campaign that exposed its absence.
- */
-export function archivedWinCounter(data: FilteredData): (row: LostRow) => boolean {
-  return archivedWinFilter(data.crm);
+  return archivedCrmLeads(data);
 }
 
 /* --- totals ---------------------------------------------------------------- */
@@ -685,22 +710,21 @@ export function computeTotals(data: FilteredData): Totals {
     (a) => a.impressions,
   );
 
-  const allArchived = archivedCrmLeads(data);
-  const archived = allArchived.filter((row) => !isArchivedWon(row));
-  const archivedWon = allArchived.length - archived.length;
+  const lostRows = authoritativeLostLeads(data);
+  const allLostRows = lostRows;
+  const archivedWon = 0;
   const crmLeads = crm.length;
-  const totalLeads = crmLeads + allArchived.length;
-  // Archived rows keep their campaign columns, so a paid lead that was later
-  // archived as lost still belongs in the paid denominator.
+  const totalLeads = crmLeads + allLostRows.length;
+  // Canonical Lost rows keep their campaign columns, so losses remain in the
+  // acquisition denominator whether the record is archived or in Lost stage.
   const leadsFromCampaign =
     crm.filter((c) => c.fromCampaign).length +
-    allArchived.filter((l) => !!l.campaignName || !!l.campaignId).length;
-  const won =
-    crm.filter((c) => c.isWon).length + allArchived.filter(archivedWinCounter(data)).length;
+    allLostRows.filter((l) => !!l.campaignName || !!l.campaignId).length;
+  const won = crm.filter((c) => c.isWon).length;
   const lostInCrm = 0;
-  const lost = archived.length;
-  // Close time stays on CRM rows: archived rows carry no closing date, and
-  // padding the sample with zeros would drag the average toward nothing.
+  const lost = lostRows.length;
+  // Close time stays on active CRM rows; Lost movement has its own canonical
+  // date report and must not pad this sample with zeros.
   const { avg: avgCloseDays, sample: closeSample } = closeStats(crm);
 
   // Money has exactly one primary source: Accounting.USD Paid, dated by
@@ -758,7 +782,7 @@ export function computeTotals(data: FilteredData): Totals {
     platformLeads,
 
     crmLeads,
-    archivedLeads: allArchived.length,
+    archivedLeads: allLostRows.length,
     totalLeads,
     leadsFromCampaign,
     leadsOther: totalLeads - leadsFromCampaign,
@@ -791,7 +815,10 @@ export function computeTotals(data: FilteredData): Totals {
     cpa: cpaWon,
     cpaWon,
     cpaInvoices,
+    // All collections ÷ all spend: not attributed, so its explicit name is
+    // collectionsToSpend. `roas` is the same value, kept for existing API readers.
     roas: div(revenue, efficiencySpend),
+    collectionsToSpend: div(revenue, efficiencySpend),
     attributedRoas: div(attributedRevenue, efficiencySpend),
     acos: (() => {
       const r = div(efficiencySpend, revenue);
@@ -929,17 +956,15 @@ export function computePerf(data: FilteredData, grain: Grain): PerfRow[] {
     if (!b.course && c.course) b.course = c.course;
   }
 
-  // Lost counts and their denominators come exclusively from the authoritative
-  // archived population. CRM stage text never increments this counter.
-  const archivedWin = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  // Lost counts and their denominators come from the canonical type-aware
+  // population. Stage display text never decides this counter.
+  for (const l of authoritativeLostLeads(data)) {
     const dimension = dimensions.fromFact(l, grain);
     if (!dimension.key || (grain === "campaign" && !l.campaignKey)) continue;
     if (grain !== "campaign" && !l.adName && !l.adId) continue;
     const b = touch(dimension);
     b.crmLeads++;
-    if (archivedWin(l)) b.won++;
-    else if (!isArchivedWon(l)) b.lost++;
+    b.lost++;
     if (!b.course && l.course) b.course = l.course;
   }
 
@@ -1388,6 +1413,7 @@ export async function computeRecentCampaignActivity(
       0;
     period[campaignKey] = {
       spend: inPeriod?.spend ?? 0,
+      platformLeads: inPeriod?.platformLeads ?? null,
       crmLeads,
       lostArchived: inPeriod?.lost ?? 0,
       won: inPeriod?.won ?? 0,
@@ -1598,12 +1624,10 @@ export function dailyTrend(
     e.leads++;
     if (c.isWon) e.won++;
   }
-  const archivedWinOnDay = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     const date = archivedLostReportingDate(l, data.snapshot);
     if (!date) continue;
     at(date).leads++;
-    if (archivedWinOnDay(l)) at(date).won++;
   }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
@@ -1720,13 +1744,11 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
     }
   }
 
-  const archivedWinForCourse = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     if (!l.course) continue;
     const a = get(l.course, l.mainCategory);
     a.crmLeads++;
-    if (archivedWinForCourse(l)) a.won++;
-    else if (!isArchivedWon(l)) a.lost++;
+    a.lost++;
   }
 
   // Ad/ad-set/campaign names are more precise than campaign-level lead inference.
@@ -1779,6 +1801,241 @@ export function computeCourses(data: FilteredData, prev?: FilteredData): CourseA
   }
 
   return [...map.values()].sort((a, b) => b.revenue - a.revenue);
+}
+
+/* --- achieved-revenue lead cohorts --------------------------------------- */
+
+export interface RevenueLeadAttribution {
+  /** Leads created inside the selected window. */
+  currentLeads: number;
+  /** Leads created inside the same calendar window last month. */
+  previousLeads: number;
+  /** Paid revenue in the selected window. */
+  currentPeriodRevenue: number;
+  /** Paid revenue in the comparison window. */
+  previousPeriodRevenue: number;
+  /** Current-period revenue whose campaign is unique to current-period leads. */
+  currentLeadRevenue: number;
+  /** Current-period revenue whose campaign is unique to comparison-period leads. */
+  previousLeadRevenue: number;
+  /** Revenue that cannot be safely assigned to either cohort. */
+  otherLeadRevenue: number;
+  /** Why a paid accounting row could not be placed in one of the two cohorts. */
+  otherBreakdown: {
+    sharedCampaignRevenue: number;
+    outsideSelectedCohortsRevenue: number;
+    campaignNotLinkedRevenue: number;
+    sourceWithoutCampaignRevenue: number;
+    noSourceRevenue: number;
+    sharedCampaignLines: number;
+    outsideSelectedCohortsLines: number;
+    campaignNotLinkedLines: number;
+    sourceWithoutCampaignLines: number;
+    noSourceLines: number;
+  };
+  /** Full payment-period collections grouped by source/campaign and attribution bucket. */
+  sourceRows: {
+    /** Stable selector shared with the on-demand accounting-line drill-down. */
+    sourceKey: string;
+    name: string;
+    campaignId: string;
+    source: string;
+    reason:
+      | "current_period_campaign"
+      | "previous_period_campaign"
+      | "shared_campaign"
+      | "outside_selected_cohorts"
+      | "campaign_not_linked"
+      | "source_without_campaign"
+      | "no_source";
+    revenue: number;
+    lines: number;
+  }[];
+  currentLeadRevenueShare: Maybe;
+  previousLeadRevenueShare: Maybe;
+  otherLeadRevenueShare: Maybe;
+  revenueDelta: Maybe;
+}
+
+type RevenueSourceReason = RevenueLeadAttribution["sourceRows"][number]["reason"];
+
+function revenueSourceReason(
+  sale: AccountingRow,
+  currentCampaigns: Set<string>,
+  previousCampaigns: Set<string>,
+): RevenueSourceReason {
+  const campaign = sale.campaignKey;
+  return campaign && currentCampaigns.has(campaign) && !previousCampaigns.has(campaign)
+    ? "current_period_campaign"
+    : campaign && previousCampaigns.has(campaign) && !currentCampaigns.has(campaign)
+      ? "previous_period_campaign"
+      : campaign && currentCampaigns.has(campaign) && previousCampaigns.has(campaign)
+        ? "shared_campaign"
+        : campaign
+          ? "outside_selected_cohorts"
+          : sale.campaignName || sale.campaignId
+            ? "campaign_not_linked"
+            : sale.source
+              ? "source_without_campaign"
+              : "no_source";
+}
+
+function revenueSourceBucketKey(
+  sale: AccountingRow,
+  reason: RevenueSourceReason,
+  name: string,
+): string {
+  return `${reason}\u001f${sale.campaignKey || normalizeName(name)}\u001f${normalizeName(sale.source)}`;
+}
+
+function revenueCohortCampaigns(data: FilteredData) {
+  return new Set(
+    [...data.crm, ...authoritativeLostLeads(data)].map((row) => row.campaignKey).filter(Boolean),
+  );
+}
+
+/** Returns only the accounting lines represented by one visible source bucket. */
+export function getRevenueSourceAccountingLines(
+  data: FilteredData,
+  previous: FilteredData | null | undefined,
+  sourceKey: string,
+): AccountingRow[] {
+  const currentCampaigns = revenueCohortCampaigns(data);
+  const previousCampaigns = previous ? revenueCohortCampaigns(previous) : new Set<string>();
+  return data.accounting.filter((sale) => {
+    const reason = revenueSourceReason(sale, currentCampaigns, previousCampaigns);
+    const name =
+      sale.campaignName || sale.campaignId || (sale.source ? "No campaign" : "No source recorded");
+    return revenueSourceBucketKey(sale, reason, name) === sourceKey;
+  });
+}
+
+/**
+ * Splits achieved revenue by the lead cohort that can be proved from the
+ * campaign bridge. A campaign present in both periods is deliberately kept in
+ * `otherLeadRevenue`: campaign-level data cannot tell which individual lead
+ * paid, so assigning it to one month would manufacture precision.
+ */
+export function computeRevenueLeadAttribution(
+  data: FilteredData,
+  previous: FilteredData | null | undefined,
+  courseKey?: string,
+): RevenueLeadAttribution {
+  const key = courseKey ? normalizeName(courseKey) : "";
+  const rows = (source: FilteredData) => [...source.crm, ...authoritativeLostLeads(source)];
+  const relevant = (row: { course?: string }) => !key || normalizeName(row.course ?? "") === key;
+  const currentRows = rows(data).filter(relevant);
+  const previousRows = previous ? rows(previous).filter(relevant) : [];
+  const currentCampaigns = new Set(currentRows.map((row) => row.campaignKey).filter(Boolean));
+  const previousCampaigns = new Set(previousRows.map((row) => row.campaignKey).filter(Boolean));
+
+  let currentLeadRevenue = 0;
+  let previousLeadRevenue = 0;
+  let otherLeadRevenue = 0;
+  const otherBreakdown = {
+    sharedCampaignRevenue: 0,
+    outsideSelectedCohortsRevenue: 0,
+    campaignNotLinkedRevenue: 0,
+    sourceWithoutCampaignRevenue: 0,
+    noSourceRevenue: 0,
+    sharedCampaignLines: 0,
+    outsideSelectedCohortsLines: 0,
+    campaignNotLinkedLines: 0,
+    sourceWithoutCampaignLines: 0,
+    noSourceLines: 0,
+  };
+  const sourceRows = new Map<
+    string,
+    {
+      name: string;
+      sourceKey: string;
+      campaignId: string;
+      source: string;
+      reason:
+        | "current_period_campaign"
+        | "previous_period_campaign"
+        | "shared_campaign"
+        | "outside_selected_cohorts"
+        | "campaign_not_linked"
+        | "source_without_campaign"
+        | "no_source";
+      revenue: number;
+      lines: number;
+    }
+  >();
+  for (const sale of data.accounting) {
+    if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) continue;
+    const reason = revenueSourceReason(sale, currentCampaigns, previousCampaigns);
+    const name =
+      sale.campaignName || sale.campaignId || (sale.source ? "No campaign" : "No source recorded");
+    const sourceKey = revenueSourceBucketKey(sale, reason, name);
+    const source = sourceRows.get(sourceKey) ?? {
+      sourceKey,
+      name,
+      campaignId: sale.campaignId,
+      source: sale.source,
+      reason,
+      revenue: 0,
+      lines: 0,
+    };
+    source.revenue += sale.usdPaid;
+    source.lines++;
+    sourceRows.set(sourceKey, source);
+
+    if (reason === "current_period_campaign") {
+      currentLeadRevenue += sale.usdPaid;
+    } else if (reason === "previous_period_campaign") {
+      previousLeadRevenue += sale.usdPaid;
+    } else {
+      otherLeadRevenue += sale.usdPaid;
+      if (reason === "shared_campaign") {
+        otherBreakdown.sharedCampaignRevenue += sale.usdPaid;
+        otherBreakdown.sharedCampaignLines++;
+      } else if (reason === "outside_selected_cohorts") {
+        otherBreakdown.outsideSelectedCohortsRevenue += sale.usdPaid;
+        otherBreakdown.outsideSelectedCohortsLines++;
+      } else if (reason === "campaign_not_linked") {
+        otherBreakdown.campaignNotLinkedRevenue += sale.usdPaid;
+        otherBreakdown.campaignNotLinkedLines++;
+      } else if (reason === "source_without_campaign") {
+        otherBreakdown.sourceWithoutCampaignRevenue += sale.usdPaid;
+        otherBreakdown.sourceWithoutCampaignLines++;
+      } else {
+        otherBreakdown.noSourceRevenue += sale.usdPaid;
+        otherBreakdown.noSourceLines++;
+      }
+    }
+  }
+
+  const currentPeriodRevenue = data.accounting.reduce((sum, sale) => {
+    if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) return sum;
+    return sum + sale.usdPaid;
+  }, 0);
+  const previousPeriodRevenue = previous
+    ? previous.accounting.reduce((sum, sale) => {
+        if (key && normalizeName(sale.course || UNATTRIBUTED_COURSE) !== key) return sum;
+        return sum + sale.usdPaid;
+      }, 0)
+    : 0;
+
+  return {
+    currentLeads: currentRows.length,
+    previousLeads: previousRows.length,
+    currentPeriodRevenue,
+    previousPeriodRevenue,
+    currentLeadRevenue,
+    previousLeadRevenue,
+    otherLeadRevenue,
+    otherBreakdown,
+    sourceRows: [...sourceRows.values()].sort((a, b) => b.revenue - a.revenue),
+    currentLeadRevenueShare: pctOf(currentLeadRevenue, currentPeriodRevenue),
+    previousLeadRevenueShare: pctOf(previousLeadRevenue, currentPeriodRevenue),
+    otherLeadRevenueShare: pctOf(otherLeadRevenue, currentPeriodRevenue),
+    revenueDelta:
+      previousPeriodRevenue > 0
+        ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+        : null,
+  };
 }
 
 /* --- teams & people --------------------------------------------------------- */
@@ -1842,15 +2099,11 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
     }
   }
 
-  const archivedWinForTeam = archivedWinCounter(data);
-  for (const l of archivedCrmLeads(data)) {
+  for (const l of authoritativeLostLeads(data)) {
     const teamName = l.salesTeam || "—";
     const t = getTeam(teamName);
-    const win = archivedWinForTeam(l);
-    const loss = !isArchivedWon(l);
     t.agg.crmLeads++;
-    if (win) t.agg.won++;
-    else if (loss) t.agg.lost++;
+    t.agg.lost++;
     const person = l.salesperson || "—";
     let p = t.people.get(person);
     if (!p) {
@@ -1858,8 +2111,7 @@ export function computeTeams(data: FilteredData): TeamAgg[] {
       t.people.set(person, p);
     }
     p.agg.crmLeads++;
-    if (win) p.agg.won++;
-    else if (loss) p.agg.lost++;
+    p.agg.lost++;
   }
 
   // Paid accounting rows carry salesperson/team and are the authoritative
@@ -1976,15 +2228,27 @@ function matrix<T>(
 /* --- lost ------------------------------------------------------------------- */
 
 /**
- * Every Lost breakdown and rate uses the same authoritative archived
- * population. Active CRM stage text is intentionally absent from this path.
+ * Every Lost breakdown and rate uses the same canonical type-aware population.
  */
 export function computeLost(data: FilteredData): LostBreakdown {
   const rows = authoritativeLostLeads(data);
   const labels = data.snapshot.sourceLabels;
   const monthOf = (d: string) => (d ? d.slice(0, 7) : "—");
+  // Bilingual Odoo spellings of one reason are one reason: charts group by the
+  // canonical key, drill-downs keep every raw spelling (byReasonCanonical).
+  const reasonKey = (r: LostRow) => canonicalLossReason(r.lossReason).canonicalReasonKey;
+  const byReasonCanonical = groupByCanonicalReason(rows, (r) => r.lossReason);
   return {
-    byReason: groupBy(rows, (r) => r.lossReason || "—"),
+    byCategory: groupBy(rows, (r) => r.lostCategory || "—"),
+    byType: groupBy(rows, (r) => (r.recordType === "lead" ? "Lead" : "Opportunity")),
+    byReason: groupBy(rows, reasonKey),
+    byReasonCanonical,
+    reasonLabels: Object.fromEntries(
+      byReasonCanonical.map((group) => [
+        group.canonicalReasonKey,
+        { ar: group.canonicalReasonLabelAr, en: group.canonicalReasonLabelEn },
+      ]),
+    ),
     byCourse: groupBy(rows, (r) => r.course || "—"),
     byMonth: groupBy(rows, (r) => monthOf(archivedLostReportingDate(r, data.snapshot))).sort(
       (a, b) => a.label.localeCompare(b.label),
@@ -1993,16 +2257,8 @@ export function computeLost(data: FilteredData): LostBreakdown {
     bySalesperson: groupBy(rows, (r) => r.salesperson || "—"),
     bySource: groupBy(rows, (r) => labels.get(r.sourceKey) ?? r.source ?? "—"),
     byCampaign: groupBy(rows, (r) => r.campaignName || "—"),
-    reasonByTeam: matrix(
-      rows,
-      (r) => r.lossReason || "—",
-      (r) => r.salesTeam || "—",
-    ),
-    reasonByCourse: matrix(
-      rows,
-      (r) => r.lossReason || "—",
-      (r) => r.course || "—",
-    ),
+    reasonByTeam: matrix(rows, reasonKey, (r) => r.salesTeam || "—"),
+    reasonByCourse: matrix(rows, reasonKey, (r) => r.course || "—"),
     total: rows.length,
     crmLostCount: 0,
   };
@@ -2026,10 +2282,8 @@ export function computeLeadOrigin(data: FilteredData): {
   cohorts: OriginCohort[];
   otherBySource: Grouped[];
 } {
-  // Archived lost leads belong to a cohort too, otherwise this card reports a
-  // near-zero lost count while the Lost page reports hundreds.
-  const archived = archivedCrmLeads(data);
-  const archivedWin = archivedWinCounter(data);
+  // Canonical Lost records belong to their acquisition cohort too.
+  const archived = authoritativeLostLeads(data);
   const build = (
     key: "campaign" | "other",
     rows: CrmLeadRow[],
@@ -2038,8 +2292,8 @@ export function computeLeadOrigin(data: FilteredData): {
   ): OriginCohort => {
     const { avg, sample } = closeStats(rows);
     const leads = rows.length + archivedRows.length;
-    const won = rows.filter((r) => r.isWon).length + archivedRows.filter(archivedWin).length;
-    const lost = archivedRows.filter((row) => !isArchivedWon(row)).length;
+    const won = rows.filter((r) => r.isWon).length;
+    const lost = archivedRows.length;
     return {
       key,
       leads,
@@ -2108,14 +2362,12 @@ export async function isPreviousComparable(
 }
 
 /**
- * The business comparison immediately preceding a selected window.
+ * The business comparison for the same calendar dates in the previous month.
  *
- * A month-to-date selection is special: managers read 1–9 September as a
- * comparison with 1–9 August, not with the final nine days of August. The old
- * equal-length rule produced a mathematically valid but operationally wrong
- * comparison in the executive report. A complete calendar month likewise
- * compares with the complete previous calendar month. Custom windows keep the
- * ordinary immediately-preceding, equal-length behaviour.
+ * The dashboard is read as a monthly operating report, so a custom selection
+ * such as 10–16 September must compare with 10–16 August — never with the
+ * immediately preceding seven days. End-of-month dates are clamped to the
+ * last valid day in the previous month (31 March → 28 February).
  */
 export function previousPeriod(from?: string, to?: string): { from: string; to: string } | null {
   if (!from || !to) return null;
@@ -2125,35 +2377,32 @@ export function previousPeriod(from?: string, to?: string): { from: string; to: 
 
   const start = new Date(a);
   const end = new Date(b);
-  const sameCalendarMonth =
-    start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth();
-  if (start.getUTCDate() === 1 && sameCalendarMonth) {
+  const currentMonthLastDay = new Date(
+    Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  if (start.getUTCDate() === 1 && end.getUTCDate() === currentMonthLastDay) {
     const previousMonthStart = new Date(
       Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - 1, 1),
     );
-    const currentMonthEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0));
     const previousMonthEnd = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 0));
-    const comparisonDay =
-      end.getUTCDate() === currentMonthEnd.getUTCDate()
-        ? previousMonthEnd.getUTCDate()
-        : Math.min(end.getUTCDate(), previousMonthEnd.getUTCDate());
-    const previousTo = new Date(
-      Date.UTC(
-        previousMonthStart.getUTCFullYear(),
-        previousMonthStart.getUTCMonth(),
-        comparisonDay,
-      ),
-    );
     return {
       from: previousMonthStart.toISOString().slice(0, 10),
-      to: previousTo.toISOString().slice(0, 10),
+      to: previousMonthEnd.toISOString().slice(0, 10),
     };
   }
 
-  const days = Math.round((b - a) / 86_400_000) + 1;
-  const prevTo = new Date(a - 86_400_000);
-  const prevFrom = new Date(prevTo.getTime() - (days - 1) * 86_400_000);
-  return { from: prevFrom.toISOString().slice(0, 10), to: prevTo.toISOString().slice(0, 10) };
+  const shiftOneMonthBack = (value: string): string => {
+    const date = new Date(value + "T00:00:00Z");
+    const previousMonthLastDay = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0),
+    ).getUTCDate();
+    const day = Math.min(date.getUTCDate(), previousMonthLastDay);
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, day))
+      .toISOString()
+      .slice(0, 10);
+  };
+
+  return { from: shiftOneMonthBack(from), to: shiftOneMonthBack(to) };
 }
 
 export function computeDeltas(now: Totals, prev: Totals): Deltas {
@@ -2173,6 +2422,8 @@ export function computeDeltas(now: Totals, prev: Totals): Deltas {
 
 export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const all = await loadAllData();
+  const eligibleCrm = all.crm.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
+  const eligibleLost = all.lost.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
   const latest =
     [all.adsDateMax, all.crmDateMax, all.revenueDateMax].filter(Boolean).sort().pop() ?? "";
   const year = currentYear ?? (latest ? +latest.slice(0, 4) : new Date().getUTCFullYear());
@@ -2189,19 +2440,21 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const revenueOf = (y: number, m?: string) =>
     sum(
       all.accounting.filter((row) => {
+        if (isExcludedFromSalesRevenue(row)) return false;
         const d = accountingReportingDate(row, "payment");
         return inYear(d, y) && (!m || d.slice(5, 7) === m);
       }),
       (row) => row.usdPaid,
     );
   const leadsOf = (y: number, m?: string) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m)).length +
-    all.lost.filter((l) => {
+    eligibleCrm.filter((c) => inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m))
+      .length +
+    eligibleLost.filter((l) => {
       const d = archivedLostReportingDate(l, all);
       return inYear(d, y) && (!m || d.slice(5, 7) === m);
     }).length;
   const wonOf = (y: number, m?: string) =>
-    all.crm.filter(
+    eligibleCrm.filter(
       (c) => c.isWon && inYear(c.createdAt, y) && (!m || c.createdAt.slice(5, 7) === m),
     ).length;
 
@@ -2211,9 +2464,11 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const MIN_PRIOR_ROWS = 100;
   const priorCounts = {
     ads: all.ads.filter((a) => inYear(a.date, prevYear)).length,
-    crm: all.crm.filter((c) => inYear(c.createdAt, prevYear)).length,
-    accounting: all.accounting.filter((row) =>
-      inYear(accountingReportingDate(row, "payment"), prevYear),
+    crm: eligibleCrm.filter((c) => inYear(c.createdAt, prevYear)).length,
+    accounting: all.accounting.filter(
+      (row) =>
+        !isExcludedFromSalesRevenue(row) &&
+        inYear(accountingReportingDate(row, "payment"), prevYear),
     ).length,
   };
   const metricAvailability = {
@@ -2261,32 +2516,34 @@ export async function computeYoy(currentYear?: number): Promise<YoyResult> {
   const ytdRevenue = (y: number) =>
     sum(
       all.accounting.filter((row) => {
+        if (isExcludedFromSalesRevenue(row)) return false;
         const d = accountingReportingDate(row, "payment");
         return inYear(d, y) && d.slice(5) <= ytdCut;
       }),
       (row) => row.usdPaid,
     );
   const ytdLeads = (y: number) =>
-    all.crm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
-    all.lost.filter((l) => {
+    eligibleCrm.filter((c) => inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut).length +
+    eligibleLost.filter((l) => {
       const d = archivedLostReportingDate(l, all);
       return inYear(d, y) && d.slice(5) <= ytdCut;
     }).length;
   const ytdWon = (y: number) =>
-    all.crm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
+    eligibleCrm.filter((c) => c.isWon && inYear(c.createdAt, y) && c.createdAt.slice(5) <= ytdCut)
       .length;
 
-  const courseKeys = new Set(all.accounting.map((row) => row.course).filter(Boolean));
+  const eligibleRevenue = all.accounting.filter((row) => !isExcludedFromSalesRevenue(row));
+  const courseKeys = new Set(eligibleRevenue.map((row) => row.course).filter(Boolean));
   const byCourse = [...courseKeys]
     .map((course) => {
       const current = sum(
-        all.accounting.filter(
+        eligibleRevenue.filter(
           (row) => row.course === course && inYear(accountingReportingDate(row, "payment"), year),
         ),
         (row) => row.usdPaid,
       );
       const previous = sum(
-        all.accounting.filter(
+        eligibleRevenue.filter(
           (row) =>
             row.course === course && inYear(accountingReportingDate(row, "payment"), prevYear),
         ),
@@ -2354,26 +2611,18 @@ export function execSummary(
   const ar: string[] = [];
 
   en.push(
-    `Between ${window} you spent ${money(t.spend)}. The clean lead population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} non-lost CRM rows plus ${t.archivedLeads.toLocaleString("en-US")} archived rows from Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). ${t.won.toLocaleString("en-US")} closed (${pctStr(t.conversionRate)}).`,
+    `Between ${window} you spent ${money(t.spend)}. The reportable CRM population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} active non-Lost records plus ${t.lost.toLocaleString("en-US")} canonical losses under CRM 1.26. ${t.won.toLocaleString("en-US")} closed Won (${pctStr(t.conversionRate)}).`,
   );
   ar.push(
-    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. إجمالي العملاء النظيف ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} من CRM بعد استبعاد Stage=Lost، مضافاً إليهم ${t.archivedLeads.toLocaleString("en-US")} صفاً مؤرشفاً من Lost Analysis (${t.lost.toLocaleString("en-US")} Lost${t.archivedWon > 0 ? ` + ${t.archivedWon.toLocaleString("en-US")} Won` : ""}). أُغلق ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
+    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. سكان الـCRM القابلون للتقرير ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} سجل نشط غير Lost، ومعهم ${t.lost.toLocaleString("en-US")} حالة خسارة حسب عقد CRM 1.26. أُغلق Won عدد ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
   );
 
   if (t.lostArchived > 0) {
-    const wonNoteEn =
-      t.archivedWon > 0
-        ? ` ${t.archivedWon} archived rows are still marked Won in Odoo: they count as leads and as wins, never as losses.`
-        : "";
-    const wonNoteAr =
-      t.archivedWon > 0
-        ? ` وهناك ${t.archivedWon} صفاً مؤرشفاً ما زالت حالته Won في أودو، فيُحتسب ضمن العملاء وضمن الصفقات الرابحة، ولا يُحتسب ضياعاً.`
-        : "";
     en.push(
-      `All ${t.lostArchived.toLocaleString("en-US")} lost deals come from Lost Analysis; CRM stage Lost is excluded from every metric and stage chart.${wonNoteEn}`,
+      `All ${t.lostArchived.toLocaleString("en-US")} losses follow the CRM 1.26 split: archived Leads with a reason, current Opportunities in the Lost stage, and archived Opportunity history.`,
     );
     ar.push(
-      `كل الصفقات الضائعة وعددها ${t.lostArchived.toLocaleString("en-US")} مأخوذة من Lost Analysis فقط، وتم استبعاد Stage=Lost من CRM من كل المؤشرات والرسوم.${wonNoteAr}`,
+      `كل حالات الخسارة وعددها ${t.lostArchived.toLocaleString("en-US")} تتبع تقسيم CRM 1.26: Leads مؤرشفة بسبب، وOpportunities حالية داخل Lost stage، مع تاريخ الفرص المؤرشفة.`,
     );
   }
 

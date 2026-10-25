@@ -93,7 +93,7 @@ export function DashboardPageHeader({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
             <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-[11.5px] font-semibold text-text-muted">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
@@ -120,7 +120,7 @@ export function SyncStatus({ label, tone = "mint" }: { label?: string; tone?: An
   const t = toneOf(tone);
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11.5px] font-medium"
+      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11.5px] font-medium"
       style={{ background: t.surface, color: t.ink }}
     >
       <span
@@ -240,6 +240,219 @@ export function PageSection({
   );
 }
 
+/* --- management primitives --------------------------------------------- */
+
+/**
+ * Everything a management page keeps but does not lead with.
+ *
+ * One quiet row saying what is inside; the content is mounted only once it is
+ * opened, so charts inside never measure a zero-width box and a closed page
+ * costs nothing. Level 3 of a report — rows, formulas, diagnostics — lives here.
+ */
+export function MoreDetails({
+  label,
+  hint,
+  children,
+  defaultOpen = false,
+  testId,
+}: {
+  label?: string;
+  hint?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  testId?: string;
+}) {
+  const { lang } = useI18n();
+  const [open, setOpen] = useState(defaultOpen);
+  const id = `more-details-${(label ?? "details").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  return (
+    <section className="section-stack" data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((value) => !value)}
+        className="card flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-2 sm:px-5"
+      >
+        <LayoutGrid size={15} className="shrink-0 text-text-subtle" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-semibold text-text">
+            {label ?? (lang === "ar" ? "تفاصيل أكثر" : "More details")}
+          </span>
+          {hint && <span className="mt-0.5 block text-[11.5px] text-text-muted">{hint}</span>}
+        </span>
+        <ChevronDownGlyph open={open} />
+      </button>
+      {open && (
+        <div id={id} className="page-sections">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export interface WorkspaceLink {
+  to: string;
+  search?: Record<string, string>;
+  title: string;
+  description: string;
+  /** A real figure from a response already on screen, or nothing. */
+  figure?: string;
+  icon: ReactNode;
+  /** The workspace's colour family, so a reader recognises it by colour. */
+  tone?: AnyTone;
+}
+
+/**
+ * Where to go next: one row per workspace, never more than four.
+ *
+ * Coloured, like the figures above — colour is how a reader recognises an area
+ * at a glance. Four of them is the whole point: the old map offered seven.
+ */
+export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
+  const { lang } = useI18n();
+  return (
+    <div className="card-grid sm:grid-cols-2 xl:grid-cols-4" data-testid="workspace-links">
+      {links.slice(0, 4).map((link) => (
+        <Link
+          key={`${link.to}${JSON.stringify(link.search ?? {})}`}
+          to={link.to}
+          search={link.search as never}
+          className="tone-surface lift group flex min-w-0 items-center gap-3 p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]"
+          style={toneVars(link.tone)}
+        >
+          <span
+            className="grid size-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
+            style={{ background: "var(--tone-strong)" }}
+            aria-hidden="true"
+          >
+            {link.icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span
+              className="block truncate text-[13.5px] font-bold"
+              style={{ color: "var(--tone-ink)" }}
+            >
+              {link.title}
+            </span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-text-muted">
+              {link.description}
+            </span>
+            {link.figure && (
+              <bdi
+                className="num mt-1 block truncate text-[12px] font-semibold"
+                style={{ color: "var(--tone-ink)" }}
+              >
+                {link.figure}
+              </bdi>
+            )}
+          </span>
+          {lang === "ar" ? (
+            <ChevronLeft
+              size={17}
+              className="shrink-0"
+              style={{ color: "var(--tone-strong)" }}
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronRight
+              size={17}
+              className="shrink-0"
+              style={{ color: "var(--tone-strong)" }}
+              aria-hidden="true"
+            />
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export interface BreadcrumbStep {
+  key: string;
+  label: string;
+  /** Omitted on the step the reader is on. */
+  onSelect?: () => void;
+}
+
+/**
+ * Where the reader is in a hierarchy — All campaigns › Campaign › Ad set — with
+ * every earlier step one click back. This replaces a row of level tabs: moving
+ * down happens by opening a row, moving up by pressing a step here.
+ */
+export function DrilldownBreadcrumb({ steps, label }: { steps: BreadcrumbStep[]; label?: string }) {
+  const { lang } = useI18n();
+  const Separator = lang === "ar" ? ChevronLeft : ChevronRight;
+  return (
+    <nav aria-label={label ?? (lang === "ar" ? "مسار التفاصيل" : "Drill-down path")}>
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
+        {steps.map((step, index) => {
+          const last = index === steps.length - 1;
+          return (
+            <li key={step.key} className="flex min-w-0 items-center gap-1">
+              {index > 0 && (
+                <Separator size={14} className="shrink-0 text-text-subtle" aria-hidden="true" />
+              )}
+              {last || !step.onSelect ? (
+                <span
+                  aria-current={last ? "location" : undefined}
+                  className="max-w-[16rem] truncate font-semibold text-text"
+                  title={step.label}
+                >
+                  {step.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={step.onSelect}
+                  className="max-w-[12rem] cursor-pointer truncate rounded-md px-1 font-medium text-brand hover:underline"
+                  title={step.label}
+                >
+                  {step.label}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * A compact choice of view inside one page — a native select, so it is small,
+ * keyboard- and screen-reader-native and never becomes a second tab strip.
+ */
+export function ViewSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label className="inline-flex max-w-full items-center gap-2 text-[12.5px] text-text-muted">
+      <span className="shrink-0 font-medium">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="min-h-10 min-w-0 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[13px] font-semibold text-text"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /* --- KPI row ------------------------------------------------------------- */
 
 /**
@@ -305,7 +518,7 @@ export function SecondaryMetrics({
   );
 }
 
-function ChevronDownGlyph() {
+function ChevronDownGlyph({ open }: { open?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -317,7 +530,7 @@ function ChevronDownGlyph() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="shrink-0 text-text-muted transition-transform duration-150 group-open:rotate-180"
+      className={`shrink-0 text-text-muted transition-transform duration-150 group-open:rotate-180 ${open ? "rotate-180" : ""}`}
     >
       <path d="m6 9 6 6 6-6" />
     </svg>

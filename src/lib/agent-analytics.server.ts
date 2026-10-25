@@ -3,7 +3,6 @@ import type { FilteredData } from "./metrics.server";
 import { accountingReportingDate } from "./accounting-policy";
 import { normalizePersonName } from "./person-name.ts";
 import { integrationPersonMatchScore } from "./integration-person.ts";
-import { archivedWinFilter, isArchivedWonStage } from "./archived-won";
 import {
   MIN_DECIDED_OUTCOMES,
   MIN_INSIGHT_LEADS,
@@ -18,7 +17,6 @@ import { loadTargetSource } from "./sales-targets.server";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
 import {
-  chatwootPhoneKey,
   chatwootConfigured,
   getChatwootAgentSnapshot,
   getChatwootPhoneConversationEvidence,
@@ -35,10 +33,20 @@ import {
   EMPLOYEE_SCORE_WEIGHTS,
   type AgentPerformanceScore,
 } from "./employee-performance-score";
-import { callCanCoverLead, leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
+import { leadCallAggregateKey, leadStageBucket } from "./uncalled-leads";
 import { getEmployeeDirectory } from "./employee-directory.server.ts";
+import { classifyLostRow } from "./lost-classification";
+import { indexCallsByPhone, resolveLeadContactEvidence } from "./lead-contact-evidence";
+import { summarizeLeadQa, type LeadQaSummary } from "./lead-qa";
+import { countsAsPotentialLead } from "./lead-count-policy";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
+
+export interface AgentPeriodLostCourse {
+  key: string;
+  label: string;
+  count: number;
+}
 
 export interface AgentAnalyticsRow {
   key: string;
@@ -107,7 +115,27 @@ export interface AgentAnalyticsRow {
   chatwootAgentId: number | null;
   avgFirstCallMinutes: number | null;
   slaWon: number;
+  /** Same population as `closedLostInPeriod`; kept for existing readers. */
   slaLost: number;
+  /**
+   * Canonical Lost populations (`lost-classification.ts`). `lost` above stays
+   * the cohort figure; rankings of closures read `closedLostInPeriod` only.
+   */
+  cohortLost: number;
+  /** Canonical Lost records closed in the selected window, by Odoo course. */
+  periodClosedLostByCourse: AgentPeriodLostCourse[];
+  closedLostInPeriod: number;
+  createdAndLostInPeriod: number;
+  olderCohortClosedLostInPeriod: number;
+  undatedCohortClosedLostInPeriod: number;
+  /** Assigned leads with no contact found and incomplete Yeastar/Chatwoot evidence. */
+  contactUnknownDistributedLeads: number | null;
+  /** Same, for contact by the assigned owner. */
+  ownerContactUnknownDistributedLeads: number | null;
+  /** Assigned leads an employee replied to in Chatwoot inside the window. */
+  chatRepliedDistributedLeads: number | null;
+  /** Manual lead QA over this employee's leads created in the window; null when unavailable. */
+  leadQa: LeadQaSummary | null;
   decidedConversionRate: number | null;
   /**
    * Sale orders confirmed on his name in this window, in USD.
@@ -165,9 +193,12 @@ export interface TargetCoverage {
   publishedMonths: string[];
   /** Employees in the current selection matched to a published quota. */
   matched: number;
-  /** Whole published quota across every matched employee. */
+  /** Full published roster at company scope; matched employees under detail filters. */
   totalTarget: number | null;
+  /** All employee collections in the selection, including sellers without a published quota. */
   totalPaidRevenue: number;
+  /** Portion of collections from employees who have a published quota. */
+  targetedPaidRevenue: number;
   /** Collections ÷ the whole quota, %. */
   totalAchievementPaid: number | null;
   /** False when the window spans a month with no published quota. */
@@ -301,7 +332,18 @@ export interface AgentAnalyticsResult {
     lost: number;
     conversionRate: number | null;
     periodClosedWon: number;
+    /** Closed Lost in the window (= periodClosedLost), split canonically below. */
     periodClosedLost: number;
+    periodClosedLostByCourse: AgentPeriodLostCourse[];
+    createdAndLostInPeriod: number;
+    olderCohortClosedLostInPeriod: number;
+    undatedCohortClosedLostInPeriod: number;
+    /** Assigned leads with no contact found and incomplete evidence (not confirmed omissions). */
+    contactUnknownDistributedLeads: number | null;
+    ownerContactUnknownDistributedLeads: number | null;
+    leadQaVerified: number | null;
+    leadQaNeedsReview: number | null;
+    leadQaDisputed: number | null;
     decidedConversionRate: number | null;
     outboundCalls: number | null;
     answeredCalls: number | null;
@@ -585,6 +627,16 @@ const blank = (key: string, name: string): MutableAgent => ({
   avgFirstCallMinutes: null,
   slaWon: 0,
   slaLost: 0,
+  cohortLost: 0,
+  periodClosedLostByCourse: [],
+  closedLostInPeriod: 0,
+  createdAndLostInPeriod: 0,
+  olderCohortClosedLostInPeriod: 0,
+  undatedCohortClosedLostInPeriod: 0,
+  contactUnknownDistributedLeads: null,
+  ownerContactUnknownDistributedLeads: null,
+  chatRepliedDistributedLeads: null,
+  leadQa: null,
   decidedConversionRate: null,
   orderRevenue: 0,
   orderCount: 0,
@@ -849,17 +901,11 @@ function buildCourseProfiles(data: FilteredData): Map<string, AgentCourseProfile
   }
 
   const seenArchived = new Set<string>();
-  // An archived row still marked Won is a deal he won and then filed away, so
-  // it is a win here. Calling it "open" left it in his lead count forever
-  // without ever crediting the close, which is how a course could show two paid
-  // invoices beside zero wins.
-  const archivedWin = archivedWinFilter(data.crm);
   for (const lead of data.lost) {
     const id = lead.id || `${lead.salesperson}|${lead.createdAt}|${lead.contact}`;
     if (seenArchived.has(id)) continue;
     seenArchived.add(id);
-    if (archivedWin(lead)) addLeadToProfile(mutable, lead, "won");
-    else if (!isArchivedWonStage(lead.stage)) addLeadToProfile(mutable, lead, "lost");
+    addLeadToProfile(mutable, lead, "lost");
   }
   for (const invoice of data.accounting) addSaleToProfile(mutable, invoice);
 
@@ -1127,18 +1173,6 @@ function mergeChatwootAgents(map: Map<string, MutableAgent>, agents: ChatwootAge
   }
 }
 
-const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-
-function phoneKey(value: string): string {
-  const digits = value
-    .replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)))
-    .replace(/\D/g, "");
-  // Yeastar may hold +9665..., Odoo may hold 05..., and Egyptian records can
-  // similarly carry a country prefix. The subscriber's final nine digits are
-  // stable across those formats. Short extensions are never considered.
-  return digits.length >= 9 ? digits.slice(-9) : "";
-}
-
 async function mergeLeadCallCoverage(
   map: Map<string, MutableAgent>,
   data: FilteredData,
@@ -1146,19 +1180,15 @@ async function mergeLeadCallCoverage(
   from: string,
   to: string,
 ) {
-  const callsByPhone = new Map<string, CallsHubLeadCallAggregate[]>();
-  for (const call of calls) {
-    const key = phoneKey(call.phone);
-    if (!key) continue;
-    const rows = callsByPhone.get(key) ?? [];
-    rows.push(call);
-    callsByPhone.set(key, rows);
-  }
+  const callsByPhone = indexCallsByPhone(calls);
   for (const row of map.values()) {
     row.distributedLeads = 0;
     row.calledDistributedLeads = 0;
     row.ownerCalledDistributedLeads = 0;
     row.uncalledDistributedLeads = 0;
+    row.contactUnknownDistributedLeads = 0;
+    row.ownerContactUnknownDistributedLeads = 0;
+    row.chatRepliedDistributedLeads = 0;
     row.callsFromDistributedLeads = 0;
     row.callsByAssignedEmployee = 0;
     row.leadPhoneKeys.clear();
@@ -1168,7 +1198,7 @@ async function mergeLeadCallCoverage(
     string,
     { id: string; salesperson: string; phone: string; mobile: string; createdAt: string }
   >();
-  // Current follow-up excludes every closed row. Archived Lost belongs in
+  // Current follow-up excludes every closed row. Canonical CRM Lost belongs in
   // funnel reporting, while this metric answers "who still needs contact?".
   for (const lead of data.crm) {
     if (!lead.id || !lead.salesperson) continue;
@@ -1176,88 +1206,91 @@ async function mergeLeadCallCoverage(
     leads.set(lead.id, lead);
   }
 
-  const callMatchesByLead = new Map<string, CallsHubLeadCallAggregate[]>();
+  // Contact is resolved by the shared resolver, the same one the uncalled-leads
+  // queue and the employee evidence drawer use, so the tile and its list agree.
+  const window = { from, to };
+  const ownerOf = (lead: { salesperson: string }) => {
+    const key = normalizePersonName(lead.salesperson);
+    const row = map.get(key) ?? blank(key, lead.salesperson);
+    return {
+      key,
+      row,
+      isOwnerCall: (call: CallsHubLeadCallAggregate) =>
+        normalizePersonName(call.agentName) === key ||
+        Boolean(row.callExtension && call.agentExtension === row.callExtension),
+      isOwnerChatName: (name: string) => integrationPersonMatchScore(lead.salesperson, name) > 0,
+    };
+  };
+
+  const noChats = new Map();
   const chatCandidatePhones: string[] = [];
   for (const lead of leads.values()) {
-    const key = normalizePersonName(lead.salesperson);
-    if (!key) continue;
-    const row = map.get(key) ?? blank(key, lead.salesperson);
-    const matches = new Map<string, CallsHubLeadCallAggregate>();
-    for (const phone of new Set([lead.phone, lead.mobile].map(phoneKey).filter(Boolean))) {
-      for (const call of callsByPhone.get(phone) ?? []) {
-        if (!callCanCoverLead(call, lead.createdAt)) continue;
-        matches.set(leadCallAggregateKey(call), call);
-      }
-    }
-    const matched = [...matches.values()];
-    callMatchesByLead.set(lead.id, matched);
-    const ownerCalled = matched.some(
-      (call) =>
-        normalizePersonName(call.agentName) === key ||
-        (row.callExtension && call.agentExtension === row.callExtension),
-    );
-    if (!ownerCalled) chatCandidatePhones.push(lead.phone, lead.mobile);
+    const owner = ownerOf(lead);
+    if (!owner.key) continue;
+    const callsOnly = resolveLeadContactEvidence(lead, {
+      window,
+      callsByPhone,
+      callsAvailable: true,
+      chatsByPhone: noChats,
+      chatwootAvailable: false,
+      isOwnerCall: owner.isOwnerCall,
+      isOwnerChatName: owner.isOwnerChatName,
+    });
+    if (!callsOnly.calledByOwner) chatCandidatePhones.push(lead.phone, lead.mobile);
   }
-  const chatBatch = chatwootConfigured()
-    ? await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(() => null)
+  let chatwootAvailable = chatwootConfigured();
+  const chatBatch = chatwootAvailable
+    ? await getChatwootPhoneConversationEvidence(chatCandidatePhones).catch(() => {
+        chatwootAvailable = false;
+        return null;
+      })
     : null;
   const chatsByPhone = chatBatch?.evidence ?? new Map();
-  const periodStart = Date.parse(`${from}T00:00:00Z`) / 1000;
-  const periodEnd = Date.parse(`${to}T23:59:59Z`) / 1000;
 
   for (const lead of leads.values()) {
-    const key = normalizePersonName(lead.salesperson);
-    if (!key) continue;
-    const row = map.get(key) ?? blank(key, lead.salesperson);
+    const owner = ownerOf(lead);
+    if (!owner.key) continue;
+    const row = owner.row;
     row.distributedLeads += 1;
-    const matched = callMatchesByLead.get(lead.id) ?? [];
-    const matches = new Map(matched.map((call) => [leadCallAggregateKey(call), call]));
-    const createdAt = Date.parse(`${lead.createdAt.slice(0, 10)}T00:00:00Z`) / 1000;
-    const chatMatches = [...new Set([lead.phone, lead.mobile].map(chatwootPhoneKey).filter(Boolean))]
-      .flatMap((phone) => chatsByPhone.get(phone) ?? [])
-      .filter(
-        (chat) =>
-          chat.agentContactedAt > 0 &&
-          chat.agentContactedAt >= periodStart &&
-          (!Number.isFinite(createdAt) || chat.agentContactedAt >= createdAt) &&
-          chat.agentContactedAt <= periodEnd,
-      );
-    const chatByAny = chatMatches.length > 0;
-    const chatByOwner = chatMatches.some(
-      (chat) =>
-        [...(chat.agentNames ?? []), chat.assigneeName]
-          .filter(Boolean)
-          .some((name) => integrationPersonMatchScore(lead.salesperson, name) > 0),
-    );
-    if (!matches.size && !chatByAny) {
-      row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
-      map.set(key, row);
+    const evidence = resolveLeadContactEvidence(lead, {
+      window,
+      callsByPhone,
+      callsAvailable: true,
+      chatsByPhone,
+      chatwootAvailable,
+      isOwnerCall: owner.isOwnerCall,
+      isOwnerChatName: owner.isOwnerChatName,
+    });
+    if (evidence.contactedViaChat)
+      row.chatRepliedDistributedLeads = (row.chatRepliedDistributedLeads ?? 0) + 1;
+    if (evidence.contactStatus === "unknown")
+      row.contactUnknownDistributedLeads = (row.contactUnknownDistributedLeads ?? 0) + 1;
+    if (evidence.ownerContactStatus === "unknown")
+      row.ownerContactUnknownDistributedLeads = (row.ownerContactUnknownDistributedLeads ?? 0) + 1;
+    if (!evidence.contactedByAny) {
+      // Only complete evidence confirms an omission; the rest is counted as unknown above.
+      if (evidence.contactStatus === "not_contacted")
+        row.uncalledDistributedLeads = (row.uncalledDistributedLeads ?? 0) + 1;
+      map.set(owner.key, row);
       continue;
     }
     row.calledDistributedLeads = (row.calledDistributedLeads ?? 0) + 1;
-    let calledByOwner = false;
-    for (const call of matches.values()) {
-      const sameOwner =
-        normalizePersonName(call.agentName) === key ||
-        (row.callExtension && call.agentExtension === row.callExtension);
-      // Coverage is lead-grain: if two Odoo opportunities share a customer
-      // phone, each has still been reached by its assigned owner. Call totals,
-      // however, stay de-duplicated below so the same PBX call is not summed
-      // twice. The old order performed the de-duplication first and therefore
-      // under-counted owner coverage on the second opportunity.
-      if (sameOwner) calledByOwner = true;
+    // Coverage is lead-grain: if two Odoo opportunities share a customer phone,
+    // each has still been reached by its assigned owner. Call totals stay
+    // de-duplicated so the same PBX call is not summed twice.
+    for (const call of evidence.matchedCalls) {
       const matchedCallKey = leadCallAggregateKey(call);
       if (row.leadPhoneKeys.has(matchedCallKey)) continue;
       row.leadPhoneKeys.add(matchedCallKey);
       row.callsFromDistributedLeads = (row.callsFromDistributedLeads ?? 0) + call.totalCalls;
-      if (sameOwner) {
+      if (owner.isOwnerCall(call)) {
         row.callsByAssignedEmployee = (row.callsByAssignedEmployee ?? 0) + call.totalCalls;
       }
     }
-    if (calledByOwner || chatByOwner) {
+    if (evidence.contactedByOwner) {
       row.ownerCalledDistributedLeads = (row.ownerCalledDistributedLeads ?? 0) + 1;
     }
-    map.set(key, row);
+    map.set(owner.key, row);
   }
 
   for (const row of map.values()) {
@@ -1334,8 +1367,9 @@ function mergeOperationalClosures(
     return true;
   };
 
-  const countedWonIds = new Set<string>();
-  for (const lead of data.snapshot.crm) {
+  for (const lead of data.snapshot.crm.filter((row) =>
+    countsAsPotentialLead(row.source, row.leadSegment),
+  )) {
     if (!lead.isWon || !dateIncluded(lead.closedAt, filters) || !commonMatch(lead)) continue;
     if (
       filters.salesTeam &&
@@ -1348,25 +1382,34 @@ function mergeOperationalClosures(
     const row = map.get(key) ?? blank(key, lead.salesperson);
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
     row.slaWon += 1;
-    if (lead.id) countedWonIds.add(lead.id);
     map.set(key, row);
   }
 
-  // The archive is not a synonym for Lost. A deal won in Odoo gets archived
-  // like any other closed record and keeps `stage = Won`; counting the whole
-  // archive as losses booked his own wins against him and pulled the period
-  // closure rate down with them.
-  for (const lead of data.snapshot.lost) {
+  // The 1.26 Lost snapshot is already classified by type + active + reason or
+  // the XMLID-resolved Lost stage. Won remains exclusively an active Opportunity.
+  // Closed Lost in the window, split by the canonical classification into
+  // created-and-lost, older-cohort and undated-cohort closures.
+  const window = { from: filters.from, to: filters.to };
+  for (const lead of data.snapshot.lost.filter((row) =>
+    countsAsPotentialLead(row.source, row.leadSegment),
+  )) {
     if (!dateIncluded(lead.closeDate, filters) || !commonMatch(lead)) continue;
     if (filters.salesTeam && !normalizedEquals(lead.salesTeam, filters.salesTeam)) continue;
     const key = normalizePersonName(lead.salesperson);
     if (!key) continue;
-    const won = isArchivedWonStage(lead.stage);
-    if (won && lead.id && countedWonIds.has(lead.id)) continue;
     const row = map.get(key) ?? blank(key, lead.salesperson);
     if (lead.salesTeam) row.teams.add(lead.salesTeam);
-    if (won) row.slaWon += 1;
-    else row.slaLost += 1;
+    row.slaLost += 1;
+    row.closedLostInPeriod += 1;
+    const courseLabel = cleanDimensionLabel(lead.course);
+    const courseKey = normalizeDimension(courseLabel) || "uncategorized";
+    const courseLoss = row.periodClosedLostByCourse.find((item) => item.key === courseKey);
+    if (courseLoss) courseLoss.count += 1;
+    else row.periodClosedLostByCourse.push({ key: courseKey, label: courseLabel, count: 1 });
+    const { closedSplit } = classifyLostRow(lead, window);
+    if (closedSplit === "created_in_period") row.createdAndLostInPeriod += 1;
+    else if (closedSplit === "older_cohort") row.olderCohortClosedLostInPeriod += 1;
+    else row.undatedCohortClosedLostInPeriod += 1;
     map.set(key, row);
   }
 }
@@ -1395,11 +1438,23 @@ function buildTargetCoverage(
 ): TargetCoverage {
   const { byName, duplicates } = targetsByPerson(source);
   const publishedMonths = targetMonths(source);
+  // Team moves in a new workbook must not rewrite a closed month's hierarchy.
+  // For a multi-month window, use the latest published roster inside it.
+  const selectedRosterMonth = publishedMonths
+    .filter(
+      (month) =>
+        (!filters.from || month >= filters.from.slice(0, 7)) &&
+        (!filters.to || month <= filters.to.slice(0, 7)),
+    )
+    .at(-1);
+  const entryForWindow = (employeeId: string) =>
+    source[selectedRosterMonth ?? ""]?.find((entry) => entry.employeeId === employeeId);
 
   const matchedEmployeeIds = new Set<string>();
   for (const row of agents) {
     const person = byName.get(normalizePersonName(row.name));
     if (!person) continue;
+    const rosterEntry = entryForWindow(person.entry.employeeId) ?? person.entry;
     const resolved = windowTarget(person.monthly, filters.from, filters.to);
     const { target } = resolved;
     // Achievement always divides by the whole published quota, never by a
@@ -1415,11 +1470,11 @@ function buildTargetCoverage(
     if (target !== null) matchedEmployeeIds.add(person.entry.employeeId);
     row.target = {
       employeeId: person.entry.employeeId,
-      name: person.entry.name,
-      teamLeader: person.entry.teamLeader,
-      supervisor: person.entry.supervisor,
-      branch: person.entry.branch,
-      note: person.entry.note,
+      name: rosterEntry.name,
+      teamLeader: rosterEntry.teamLeader,
+      supervisor: rosterEntry.supervisor,
+      branch: rosterEntry.branch,
+      note: rosterEntry.note,
       target,
       monthsCovered: resolved.monthsCovered,
       monthsMissing: resolved.monthsMissing,
@@ -1454,16 +1509,50 @@ function buildTargetCoverage(
   }
 
   const targeted = agents.filter((row) => row.target?.target !== null && row.target !== null);
-  const totalTarget = targeted.length
-    ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
-    : null;
-  const totalPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
+  const companyScope = !(
+    filters.salesTeam ||
+    filters.salesperson ||
+    filters.course ||
+    filters.mainCategory ||
+    filters.source ||
+    filters.platform ||
+    filters.account ||
+    filters.campaign ||
+    filters.adset ||
+    filters.ad
+  );
+  const windowMonths = publishedMonths.filter(
+    (month) =>
+      (!filters.from || month >= filters.from.slice(0, 7)) &&
+      (!filters.to || month <= filters.to.slice(0, 7)),
+  );
+  // The company target is the *published roster*, including a salesperson
+  // with zero leads/collections so far. Summing only active agent rows made a
+  // month-to-date dashboard quietly shrink the October $157,500 plan.
+  const totalTarget =
+    companyScope && windowMonths.length
+      ? windowMonths.reduce(
+          (sum, month) =>
+            sum +
+            (source[month] ?? []).reduce((subtotal, entry) => subtotal + (entry.target ?? 0), 0),
+          0,
+        )
+      : targeted.length
+        ? targeted.reduce((sum, row) => sum + (row.target?.target ?? 0), 0)
+        : null;
+  const targetedPaidRevenue = targeted.reduce((sum, row) => sum + row.paidRevenue, 0);
+  // Company achievement compares the published team quota with all employee
+  // collections. Excluding sellers with no individual quota understates the
+  // company total; keep their share separately so the denominator and every
+  // employee-level target stay clear.
+  const totalPaidRevenue = agents.reduce((sum, row) => sum + row.paidRevenue, 0);
 
   return {
     publishedMonths,
     matched: matchedEmployeeIds.size,
     totalTarget,
     totalPaidRevenue,
+    targetedPaidRevenue,
     totalAchievementPaid:
       totalTarget !== null && totalTarget > 0 ? (totalPaidRevenue / totalTarget) * 100 : null,
     complete: targeted.every((row) => row.target?.complete ?? false),
@@ -1640,6 +1729,32 @@ export async function buildAgentAnalytics(
   const directory = await directoryPromise;
   for (const row of map.values()) row.displayName = directory.displayNameFor(row.name);
 
+  // Manual lead QA over each owner's leads created in the window (active CRM +
+  // canonical Lost). Separate from the AI call-quality score; null when the QA
+  // table cannot be read rather than a confident zero.
+  const leadQaByOwner = await (async () => {
+    try {
+      const { leadQaConfigured, readLeadQaVerifications } = await import("./lead-qa.server");
+      if (!leadQaConfigured()) return null;
+      const idsByOwner = new Map<string, string[]>();
+      for (const lead of [...data.crm, ...data.lost]) {
+        const key = normalizePersonName(lead.salesperson);
+        if (!key || !lead.id) continue;
+        const ids = idsByOwner.get(key) ?? [];
+        ids.push(lead.id);
+        idsByOwner.set(key, ids);
+      }
+      const verifications = await readLeadQaVerifications([
+        ...new Set([...idsByOwner.values()].flat()),
+      ]);
+      return new Map(
+        [...idsByOwner.entries()].map(([key, ids]) => [key, summarizeLeadQa(ids, verifications)]),
+      );
+    } catch {
+      return null;
+    }
+  })();
+
   const selectedAgents = [...map.values()].filter((row) => {
     // Either spelling selects the person: the filter list still offers the raw
     // Odoo user name, while a link built from what the tab shows carries the
@@ -1687,6 +1802,8 @@ export async function buildAgentAnalytics(
       row.avgFirstCallMinutes =
         row.firstCallWeight > 0 ? row.firstCallWeighted / row.firstCallWeight : null;
       row.slaMonths = row.months.size;
+      row.cohortLost = row.lost;
+      row.leadQa = leadQaByOwner?.get(row.key) ?? null;
       row.courseProfile =
         courseProfiles.get(row.key) ??
         blankCourseProfile(data.snapshot.health.lostAuthority !== "unavailable");
@@ -1777,6 +1894,20 @@ export async function buildAgentAnalytics(
       acc.lost += row.lost;
       acc.periodClosedWon += row.slaWon;
       acc.periodClosedLost += row.slaLost;
+      acc.createdAndLostInPeriod += row.createdAndLostInPeriod;
+      acc.olderCohortClosedLostInPeriod += row.olderCohortClosedLostInPeriod;
+      acc.undatedCohortClosedLostInPeriod += row.undatedCohortClosedLostInPeriod;
+      if (row.contactUnknownDistributedLeads !== null)
+        acc.contactUnknownDistributedLeads =
+          (acc.contactUnknownDistributedLeads ?? 0) + row.contactUnknownDistributedLeads;
+      if (row.ownerContactUnknownDistributedLeads !== null)
+        acc.ownerContactUnknownDistributedLeads =
+          (acc.ownerContactUnknownDistributedLeads ?? 0) + row.ownerContactUnknownDistributedLeads;
+      if (row.leadQa) {
+        acc.leadQaVerified = (acc.leadQaVerified ?? 0) + row.leadQa.verified;
+        acc.leadQaNeedsReview = (acc.leadQaNeedsReview ?? 0) + row.leadQa.needsReview;
+        acc.leadQaDisputed = (acc.leadQaDisputed ?? 0) + row.leadQa.disputed;
+      }
       if (row.outboundCalls !== null)
         acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
       if (row.answeredCalls !== null)
@@ -1826,6 +1957,19 @@ export async function buildAgentAnalytics(
       lost: 0,
       periodClosedWon: 0,
       periodClosedLost: 0,
+      periodClosedLostByCourse: [] as AgentPeriodLostCourse[],
+      createdAndLostInPeriod: 0,
+      olderCohortClosedLostInPeriod: 0,
+      undatedCohortClosedLostInPeriod: 0,
+      contactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      ownerContactUnknownDistributedLeads: callsHubStatus.leadCoverageAvailable
+        ? 0
+        : (null as number | null),
+      leadQaVerified: leadQaByOwner ? 0 : (null as number | null),
+      leadQaNeedsReview: leadQaByOwner ? 0 : (null as number | null),
+      leadQaDisputed: leadQaByOwner ? 0 : (null as number | null),
       conversionRate: null as number | null,
       decidedConversionRate: null as number | null,
       outboundCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
@@ -1854,6 +1998,17 @@ export async function buildAgentAnalytics(
       chatAwaitingReply: chatwootStatus.ok ? 0 : (null as number | null),
       chatAverageFirstResponseSeconds: null as number | null,
     },
+  );
+  const periodLostCourses = new Map<string, AgentPeriodLostCourse>();
+  for (const agent of agents) {
+    for (const item of agent.periodClosedLostByCourse) {
+      const current = periodLostCourses.get(item.key);
+      if (current) current.count += item.count;
+      else periodLostCourses.set(item.key, { ...item });
+    }
+  }
+  summary.periodClosedLostByCourse = [...periodLostCourses.values()].sort(
+    (left, right) => right.count - left.count || left.label.localeCompare(right.label),
   );
   summary.conversionRate = summary.cleanLeads > 0 ? (summary.won / summary.cleanLeads) * 100 : null;
   summary.decidedConversionRate =

@@ -1,80 +1,144 @@
 import {
   BarChart3,
-  BrainCircuit,
+  BookMarked,
   CalendarClock,
   CalendarRange,
   GraduationCap,
-  GitCompareArrows,
-  BookMarked,
   Globe2,
+  Image,
+  LayoutDashboard,
+  Layers,
   Leaf,
+  MapPinned,
   Megaphone,
   MessagesSquare,
-  MapPinned,
+  MoreHorizontal,
   Receipt,
+  Table2,
+  Target,
+  ShieldCheck,
   TrendingDown,
+  TrendingUp,
+  UserRoundSearch,
   Users,
   UsersRound,
-  UserRoundSearch,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import type { DictKey, Lang } from "@/lib/i18n";
+
+/** The parsed query string of the current location. */
+export type LocationSearch = Record<string, unknown>;
 
 export interface NavigationItem {
   to: string;
   key: DictKey;
   icon: LucideIcon;
   /**
-   * What this report is called ON THE TAB STRIP, when the dictionary entry is
-   * not what a reader needs there.
-   *
-   * `t(key)` names the PAGE — "الحسابات", "الدورات" — and those names are also
-   * the page headings, so they cannot be rewritten without renaming the report
-   * itself. A tab has a different job: sitting beside its siblings it has to
-   * say which of the three reports in this section it is. Only the items whose
-   * page name is ambiguous in that row carry one; the rest fall back to `t(key)`.
+   * What this report is called in navigation, when the dictionary entry — which
+   * names the PAGE and is also its heading — is not what a reader needs beside
+   * its siblings.
    */
   tabLabel?: Record<Lang, string>;
+  /** Query parameters the link carries, for a view that shares a route. */
+  search?: Record<string, string>;
+  /**
+   * Whether the current location is this item, beyond sharing its pathname.
+   * Omitted: any location on the route matches.
+   */
+  matches?: (search: LocationSearch) => boolean;
+  /** One line under the name in the More menu. */
+  description?: Record<Lang, string>;
 }
 
 export interface NavigationSection {
-  id: "business" | "campaigns" | "sales" | "leads" | "comparisons" | "media-buyers" | "social";
+  id: "overview" | "marketing" | "sales-crm" | "revenue" | "team" | "more";
   label: Record<Lang, string>;
   shortLabel: Record<Lang, string>;
   icon: LucideIcon;
   defaultTo: string;
+  defaultSearch?: Record<string, string>;
   items: NavigationItem[];
   aliases?: string[];
+  /**
+   * How the section's reports are offered once a reader is inside it: a short
+   * strip of tabs for a management workspace (four at most), or a single
+   * switcher for the long tail of specialist reports under More.
+   */
+  contextual: "none" | "tabs" | "menu";
 }
 
+const acquisitionSection = (search: LocationSearch) =>
+  typeof search.section === "string" ? search.section : undefined;
+const accountingView = (search: LocationSearch) =>
+  typeof search.view === "string" ? search.view : undefined;
+const courseView = (search: LocationSearch) =>
+  typeof search.view === "string" ? search.view : undefined;
+const leadsView = (search: LocationSearch) =>
+  typeof search.view === "string" ? search.view : undefined;
+
 /**
- * The information architecture mirrors an executive BI workspace: each primary
- * section owns one business question and only reveals its detailed reports when
- * it is active. Routes remain stable so bookmarks and shared links keep working.
+ * Six primary destinations, each answering one management question. Every
+ * existing URL still renders exactly the page it always did — the structure
+ * only decides where a report is listed, so bookmarks and shared links keep
+ * working. Specialist and technical reports live under More.
  */
 export const NAVIGATION_SECTIONS: NavigationSection[] = [
   {
-    id: "business",
-    label: { ar: "تحليلات البيزنس", en: "Business analytics" },
-    shortLabel: { ar: "البيزنس", en: "Business" },
-    icon: BrainCircuit,
+    id: "overview",
+    label: { ar: "نظرة عامة", en: "Overview" },
+    shortLabel: { ar: "نظرة عامة", en: "Overview" },
+    icon: LayoutDashboard,
     defaultTo: "/",
-    items: [{ to: "/", key: "business_analytics", icon: BrainCircuit }],
+    contextual: "none",
+    items: [{ to: "/", key: "business_analytics", icon: LayoutDashboard }],
   },
   {
-    id: "campaigns",
-    label: { ar: "الحملات", en: "Campaigns" },
-    shortLabel: { ar: "الحملات", en: "Campaigns" },
+    id: "marketing",
+    label: { ar: "التسويق", en: "Marketing" },
+    shortLabel: { ar: "التسويق", en: "Marketing" },
     icon: Megaphone,
-    defaultTo: "/campaigns",
+    defaultTo: "/acquisition",
+    contextual: "tabs",
     items: [
-      { to: "/campaigns", key: "campaigns", icon: Megaphone },
-      { to: "/ads", key: "ads_tech", icon: BarChart3, tabLabel: { ar: "الإعلانات", en: "Ads" } },
       {
-        to: "/attribution",
-        key: "attribution",
-        icon: MapPinned,
-        tabLabel: { ar: "إسناد المحادثات", en: "Attribution" },
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: TrendingUp,
+        tabLabel: { ar: "نظرة عامة", en: "Overview" },
+        matches: (search) => acquisitionSection(search) === undefined,
+      },
+      {
+        to: "/campaigns",
+        key: "campaigns",
+        icon: Megaphone,
+        tabLabel: { ar: "الحملات", en: "Campaigns" },
+      },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Layers,
+        tabLabel: { ar: "Ad Sets", en: "Ad Sets" },
+        search: { section: "ads", view: "adset-compare" },
+        matches: (search) =>
+          acquisitionSection(search) === "ads" && search.view === "adset-compare",
+      },
+      {
+        to: "/courses",
+        key: "courses",
+        icon: GraduationCap,
+        tabLabel: { ar: "إعلانات الكورسات", en: "Course ads" },
+        search: { view: "ads" },
+        matches: (search) => courseView(search) === "ads",
+      },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Image,
+        tabLabel: { ar: "المواد الإعلانية", en: "Creatives" },
+        search: { section: "ads", view: "creatives" },
+        matches: (search) =>
+          acquisitionSection(search) === "ads" && search.view !== "adset-compare",
       },
       {
         to: "/website",
@@ -82,79 +146,252 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         icon: Globe2,
         tabLabel: { ar: "الموقع الإلكتروني", en: "Website" },
       },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Users,
+        tabLabel: { ar: "مصادر العملاء", en: "Lead sources" },
+        search: { section: "leads" },
+        matches: (search) => acquisitionSection(search) === "leads",
+      },
+    ],
+    aliases: ["/attribution", "/landing-pages"],
+  },
+  {
+    id: "sales-crm",
+    label: { ar: "العملاء المحتملون", en: "Leads" },
+    shortLabel: { ar: "العملاء المحتملون", en: "Leads" },
+    icon: Users,
+    defaultTo: "/lead-distribution",
+    contextual: "tabs",
+    items: [
+      /**
+       * The six-month entry-cohort report leads the strip.
+       *
+       * It is the only report here that answers the management question the
+       * others feed — how many leads arrived, how good they were, how fast and
+       * how often sales chased them, and how many became a paid enrollment —
+       * and it shipped reachable only from a fourth in-page tab inside
+       * `/leads`, which no navigation surface named. A report nobody can find
+       * is a report nobody uses.
+       */
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Target,
+        tabLabel: { ar: "أداء الليدز والمبيعات", en: "Leads & sales" },
+        search: { view: "performance" },
+        matches: (search) => leadsView(search) === "performance",
+        description: {
+          ar: "٦ مجموعات شهرية: الجودة والتكرار والمتابعة والتحويل لتسجيل مدفوع",
+          en: "Six monthly cohorts: quality, duplicates, follow-up and paid conversion",
+        },
+      },
+      {
+        to: "/lead-distribution",
+        key: "crm_leads",
+        icon: Layers,
+        tabLabel: { ar: "حسب التخصص والدورة", en: "Specialty & course" },
+      },
+      {
+        to: "/lead-sources",
+        key: "lead_source_matrix",
+        icon: Table2,
+        tabLabel: { ar: "المصادر حسب الدورة", en: "Sources by course" },
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Users,
+        tabLabel: { ar: "سجلات العملاء", en: "CRM records" },
+        matches: (search) => leadsView(search) === undefined,
+      },
+      { to: "/lost", key: "lost", icon: TrendingDown, tabLabel: { ar: "المفقودة", en: "Lost" } },
     ],
   },
   {
-    id: "sales",
-    label: { ar: "المبيعات", en: "Sales" },
-    shortLabel: { ar: "المبيعات", en: "Sales" },
-    icon: Receipt,
+    id: "revenue",
+    label: { ar: "الإيرادات", en: "Revenue" },
+    shortLabel: { ar: "الإيرادات", en: "Revenue" },
+    icon: Wallet,
     defaultTo: "/accounting",
+    contextual: "tabs",
     aliases: ["/full-invoiced", "/sales", "/products"],
     items: [
       {
         to: "/accounting",
         key: "accounting",
         icon: Receipt,
-        tabLabel: { ar: "الحسابات والتحصيل", en: "Accounts & collection" },
+        tabLabel: { ar: "التحصيل", en: "Collection" },
+        matches: (search) => accountingView(search) !== "marketing",
+      },
+      {
+        to: "/accounting",
+        key: "accounting",
+        icon: TrendingUp,
+        tabLabel: { ar: "من التسويق للإيراد", en: "Marketing → revenue" },
+        search: { view: "marketing" },
+        matches: (search) => accountingView(search) === "marketing",
       },
       {
         to: "/courses",
         key: "courses",
         icon: GraduationCap,
-        tabLabel: { ar: "الكورسات", en: "Courses" },
+        tabLabel: { ar: "مبيعات الكورسات", en: "Course sales" },
+        search: { view: "sales" },
+        matches: (search) => courseView(search) !== "ads",
+      },
+    ],
+  },
+  {
+    id: "team",
+    label: { ar: "أداء الفريق", en: "Team" },
+    shortLabel: { ar: "الفريق", en: "Team" },
+    icon: UsersRound,
+    defaultTo: "/teams",
+    contextual: "tabs",
+    items: [
+      {
+        to: "/teams",
+        key: "teams",
+        icon: UsersRound,
+        tabLabel: { ar: "فريق المبيعات", en: "Sales team" },
+      },
+      {
+        to: "/media-buyers",
+        key: "media_buyers",
+        icon: UserRoundSearch,
+        tabLabel: { ar: "الميديا بايرز", en: "Media buyers" },
+      },
+    ],
+  },
+  {
+    id: "more",
+    label: { ar: "المزيد", en: "More" },
+    shortLabel: { ar: "المزيد", en: "More" },
+    icon: MoreHorizontal,
+    defaultTo: "/ads",
+    contextual: "menu",
+    items: [
+      {
+        to: "/ads",
+        key: "ads_tech",
+        icon: BarChart3,
+        tabLabel: { ar: "تحليل الإعلانات المتقدم", en: "Ads explorer" },
+        description: {
+          ar: "كل المنصات بكل الأعمدة والفلاتر",
+          en: "Every platform, every column and filter",
+        },
+      },
+      /**
+       * Two lead reports that existed only as in-page tabs. Listing them means
+       * every analytical view in the app is named by a navigation surface, so
+       * "where do I see X" has an answer that is not "scroll inside a page".
+       */
+      {
+        to: "/leads",
+        key: "leads",
+        icon: GraduationCap,
+        tabLabel: { ar: "تحليل الليدز حسب الكورس", en: "Course lead intelligence" },
+        search: { view: "intelligence" },
+        matches: (search) => leadsView(search) === "intelligence",
+        description: {
+          ar: "الأهداف ودورة الإغلاق واقتصاديات الليد لكل كورس",
+          en: "Targets, close lifecycle and lead economics per course",
+        },
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: CalendarClock,
+        tabLabel: { ar: "متابعة ليدز الأسبوع", en: "Weekly lead follow-up" },
+        search: { view: "weekly" },
+        matches: (search) => leadsView(search) === "weekly",
+        description: {
+          ar: "ليدز الأسبوع ومين لسه مستني متابعة",
+          en: "This week's leads and who is still waiting",
+        },
+      },
+      {
+        to: "/attribution",
+        key: "attribution",
+        icon: MapPinned,
+        tabLabel: { ar: "إسناد المحادثات", en: "Conversation attribution" },
+        description: { ar: "مصدر كل محادثة واتساب", en: "Where each WhatsApp chat came from" },
+      },
+      {
+        to: "/landing-pages",
+        key: "landing_pages",
+        icon: Globe2,
+        tabLabel: { ar: "صفحات الهبوط", en: "Landing pages" },
+        description: { ar: "أداء كل صفحة هبوط", en: "Performance of each landing page" },
+      },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: ShieldCheck,
+        tabLabel: { ar: "تغطية البيانات", en: "Data coverage" },
+        search: { section: "coverage" },
+        matches: (search) => acquisitionSection(search) === "coverage",
+        description: {
+          ar: "دقة الربط وحالة المصادر التقنية",
+          en: "Attribution accuracy and source health",
+        },
+      },
+      {
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Receipt,
+        tabLabel: { ar: "سجلات المبيعات المرتبطة", en: "Linked sales records" },
+        search: { section: "sales" },
+        matches: (search) => acquisitionSection(search) === "sales",
+        description: {
+          ar: "كل عميل من إعلان حتى الفاتورة",
+          en: "Every lead from ad to invoice",
+        },
       },
       {
         to: "/pricing",
         key: "price_book",
         icon: BookMarked,
-        tabLabel: { ar: "الأسعار والالتزام", en: "Pricing & compliance" },
+        tabLabel: { ar: "الأسعار والالتزام", en: "Pricing" },
+        description: { ar: "كتالوج الأسعار والعروض", en: "Price catalogue and offers" },
       },
-    ],
-  },
-  {
-    id: "leads",
-    label: { ar: "إدارة العملاء CRM", en: "CRM management" },
-    shortLabel: { ar: "CRM", en: "CRM" },
-    icon: Users,
-    defaultTo: "/leads",
-    items: [
-      { to: "/leads", key: "leads", icon: Users },
-      { to: "/lost", key: "lost", icon: TrendingDown },
-      { to: "/teams", key: "teams", icon: UsersRound },
-    ],
-  },
-  {
-    id: "comparisons",
-    label: { ar: "المقارنات", en: "Comparisons" },
-    shortLabel: { ar: "المقارنة", en: "Compare" },
-    icon: GitCompareArrows,
-    defaultTo: "/weekend",
-    items: [
-      { to: "/weekend", key: "weekend", icon: CalendarClock },
-      { to: "/yoy", key: "yoy", icon: CalendarRange },
-    ],
-  },
-  {
-    id: "media-buyers",
-    label: { ar: "أداء الميديا بايرز", en: "Media buyers" },
-    shortLabel: { ar: "الميديا", en: "Media" },
-    icon: UserRoundSearch,
-    defaultTo: "/media-buyers",
-    items: [
-      { to: "/media-buyers", key: "media_buyers", icon: UserRoundSearch },
-      { to: "/media-plan", key: "media_plan", icon: CalendarRange },
-    ],
-  },
-  {
-    id: "social",
-    label: { ar: "السوشيال ميديا", en: "Social media" },
-    shortLabel: { ar: "السوشيال", en: "Social" },
-    icon: MessagesSquare,
-    defaultTo: "/social-media",
-    items: [
-      { to: "/social-media", key: "social_media", icon: MessagesSquare },
-      { to: "/organic", key: "organic", icon: Leaf },
+      {
+        to: "/media-plan",
+        key: "media_plan",
+        icon: CalendarRange,
+        tabLabel: { ar: "خطة الميديا", en: "Media Plan" },
+        description: { ar: "الميزانية المخططة مقابل الفعلي", en: "Planned budget against actual" },
+      },
+      {
+        to: "/social-media",
+        key: "social_media",
+        icon: MessagesSquare,
+        tabLabel: { ar: "السوشيال ميديا", en: "Social media" },
+        description: { ar: "أداء الصفحات والمحتوى", en: "Page and content performance" },
+      },
+      {
+        to: "/organic",
+        key: "organic",
+        icon: Leaf,
+        tabLabel: { ar: "الأورجانيك", en: "Organic" },
+        description: { ar: "عملاء ومبيعات بدون إعلان", en: "Leads and sales without ads" },
+      },
+      {
+        to: "/weekend",
+        key: "weekend",
+        icon: CalendarClock,
+        tabLabel: { ar: "مقارنة الويك إند", en: "Weekend comparison" },
+        description: { ar: "الويك إند مقابل أيام الأسبوع", en: "Weekend against weekdays" },
+      },
+      {
+        to: "/yoy",
+        key: "yoy",
+        icon: CalendarRange,
+        tabLabel: { ar: "سنة بسنة", en: "Year on year" },
+        description: { ar: "نفس الفترة من السنة الماضية", en: "Same period last year" },
+      },
     ],
   },
 ];
@@ -163,13 +400,102 @@ export function pathMatchesRoute(pathname: string, route: string): boolean {
   return route === "/" ? pathname === "/" : pathname === route || pathname.startsWith(`${route}/`);
 }
 
-export function sectionIsActive(section: NavigationSection, pathname: string): boolean {
+export function itemIsActive(
+  item: NavigationItem,
+  pathname: string,
+  search: LocationSearch = {},
+): boolean {
+  if (!pathMatchesRoute(pathname, item.to)) return false;
+  return item.matches ? item.matches(search) : true;
+}
+
+export function sectionIsActive(
+  section: NavigationSection,
+  pathname: string,
+  search: LocationSearch = {},
+): boolean {
   return (
-    section.items.some((item) => pathMatchesRoute(pathname, item.to)) ||
+    section.items.some((item) => itemIsActive(item, pathname, search)) ||
     section.aliases?.some((route) => pathMatchesRoute(pathname, route)) === true
   );
 }
 
+export function sectionForLocation(
+  pathname: string,
+  search: LocationSearch = {},
+): NavigationSection | undefined {
+  return NAVIGATION_SECTIONS.find((section) => sectionIsActive(section, pathname, search));
+}
+
 export function sectionForPathname(pathname: string): NavigationSection | undefined {
-  return NAVIGATION_SECTIONS.find((section) => sectionIsActive(section, pathname));
+  return sectionForLocation(pathname);
+}
+
+export function itemLabel(item: NavigationItem, lang: Lang, t: (key: DictKey) => string): string {
+  return item.tabLabel?.[lang] ?? t(item.key);
+}
+
+/**
+ * The five views of Acquisition performance. Shared by the page and by
+ * navigation so the two can never name them differently.
+ */
+export const ACQUISITION_SECTIONS = [
+  { value: "overview", label: { ar: "نظرة عامة", en: "Overview" } },
+  { value: "ads", label: { ar: "الإعلانات والمواد", en: "Ads & creatives" } },
+  { value: "leads", label: { ar: "مصادر العملاء", en: "Lead sources" } },
+  { value: "sales", label: { ar: "سجلات المبيعات المرتبطة", en: "Linked sales records" } },
+  { value: "coverage", label: { ar: "تغطية البيانات", en: "Data coverage" } },
+] as const satisfies readonly { value: string; label: Record<Lang, string> }[];
+
+export type AcquisitionSectionValue = (typeof ACQUISITION_SECTIONS)[number]["value"];
+
+export interface DrawerLink {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
+  to: string;
+  search?: Record<string, string>;
+  active: boolean;
+  /** A menu section: its reports are listed behind a disclosure, not a link. */
+  menu?: boolean;
+  children: DrawerLink[];
+}
+
+/**
+ * What the phone drawer lists: the six primary destinations, and — only for the
+ * one the reader is in — its reports one level down. Nesting only where it
+ * helps keeps the first level a short, scannable list.
+ */
+export function navigationDrawerTree(
+  pathname: string,
+  search: LocationSearch,
+  lang: Lang,
+  labelOf: (item: NavigationItem) => string,
+): DrawerLink[] {
+  return NAVIGATION_SECTIONS.map((section) => {
+    const active = sectionIsActive(section, pathname, search);
+    const menu = section.contextual === "menu";
+    const children =
+      (active || menu) && section.items.length > 1
+        ? section.items.map((item, index): DrawerLink => ({
+            key: `${section.id}:${index}`,
+            label: labelOf(item),
+            icon: item.icon,
+            to: item.to,
+            search: item.search,
+            active: itemIsActive(item, pathname, search),
+            children: [],
+          }))
+        : [];
+    return {
+      key: section.id,
+      label: section.label[lang],
+      icon: section.icon,
+      to: section.defaultTo,
+      search: section.defaultSearch,
+      active,
+      menu,
+      children,
+    };
+  });
 }

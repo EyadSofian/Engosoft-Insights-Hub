@@ -77,7 +77,12 @@ describe("the registry describes reality", () => {
     // Discovered by audit: these four pages switch analytical views without
     // changing the pathname, so a path alone cannot say what the user sees.
     expect(surfaceById("website")!.views).toEqual(["owner", "campaigns", "operations"]);
-    expect(surfaceById("accounting")!.views).toEqual(["summary", "months", "profitability"]);
+    expect(surfaceById("accounting")!.views).toEqual([
+      "summary",
+      "months",
+      "profitability",
+      "marketing",
+    ]);
     expect(surfaceById("courses")!.views).toEqual(["campaigns", "alerts", "all"]);
     expect(surfaceById("lost")!.views).toEqual(["team", "course"]);
   });
@@ -140,7 +145,7 @@ describe("the registry describes reality", () => {
 describe("coverage is reported honestly", () => {
   it("counts the visible analytical surfaces", () => {
     const analytical = INSIGHTS_SURFACES.filter((s) => s.status !== "NOT_APPLICABLE");
-    expect(analytical).toHaveLength(17);
+    expect(analytical).toHaveLength(19);
   });
 
   it("names why anything is less than fully connected", () => {

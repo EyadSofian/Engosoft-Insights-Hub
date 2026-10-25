@@ -34,6 +34,7 @@ export type MetricKey =
   | "revenuePerLead"
   | "cpa"
   | "roas"
+  | "collectionsToSpend"
   | "acos";
 
 /** The four bands a metric belongs to, used for card order and table headers. */
@@ -328,20 +329,20 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     ar: {
       label: "العملاء المحتملين في النظام (CRM Leads)",
       short: "عملاء النظام",
-      formula: "ليدز الـCRM + صفوف تحليل الخسائر",
-      what: "إجمالي العملاء النظيف: الليدز المفتوحة في أودو زائد الليدز المؤرشفة في تحليل الخسائر.",
+      formula: "سجلات CRM النشطة غير Lost + حالات Lost حسب عقد 1.26",
+      what: "إجمالي السكان القابلين للتقرير: السجلات النشطة غير Lost مضافاً إليها خسائر الـLeads والـOpportunities بالتعريف الحالي.",
       how: "بنجمع الصفوف اللي عدّت شروط الاستبعاد الحالية، ومش بنعدّ الصف مرتين.",
-      source: "CRM Leads من أودو مباشرة، و Lost Analysis للمؤرشف.",
+      source: "Odoo CRM مباشرة؛ التصنيف حسب type وactive وLost Reason وstage XMLID.",
       dateBasis: CRM_WINDOW_AR,
       whenEmpty: "صفر معناه مفيش ليدز في الفترة دي فعلاً.",
     },
     en: {
       label: "CRM leads",
       short: "CRM leads",
-      formula: "CRM leads + Lost Analysis rows",
-      what: "The clean lead total: open Odoo leads plus the archived rows in Lost Analysis.",
+      formula: "Active non-Lost CRM + canonical CRM 1.26 Lost",
+      what: "The reportable population: active non-Lost records plus current Lead and Opportunity losses.",
       how: "Counts rows that pass the current exclusion guards, deduplicated by Odoo id.",
-      source: "CRM Leads direct from Odoo, and Lost Analysis for the archived population.",
+      source: "Direct Odoo CRM, classified by type, active, Lost Reason and stage XMLID.",
       dateBasis: CRM_WINDOW_EN,
       whenEmpty: "Zero genuinely means no leads in this period.",
     },
@@ -355,8 +356,8 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "Won في CRM",
       formula: "عدد الليدز اللي حالتها Won",
       what: "عدد الليدز اللي السيلز قفلها Won في أودو. دي مرحلة في الـCRM، مش الفاتورة: البيعة المدفوعة بتتعد من الفواتير في تقرير CRM والحسابات.",
-      how: "عدّ ليدز الـCRM اللي التعريف الحالي بيعتبرها رابحة، ومعاهم الصفقات اللي اتقفلت رابحة واتأرشفت بعد كده — الأرشيف مكان الصفقة المقفولة، مش مرادف للخسارة.",
-      source: "CRM Leads في أودو، ومعاها الأرشيف للصفقات اللي اتقفلت رابحة واتأرشفت بعد كده.",
+      how: "بنعد الـOpportunities النشطة الموجودة في stage عليها is_won=true. لا نستخدم probability أو won_status.",
+      source: "Odoo CRM Won stage.",
       // The one comparison every reader eventually makes, so it is answered
       // here rather than left to look like a bug.
       dateBasis:
@@ -368,8 +369,8 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "CRM Won",
       formula: "Count of leads in the Won state",
       what: "How many leads sales marked Won in Odoo. This is a CRM stage, not an invoice: paid sales are counted from invoices on the CRM and Accounting reports.",
-      how: "Counts CRM leads the current definition treats as won, plus deals closed won and then archived — the archive is where a closed deal lives, not a synonym for lost.",
-      source: "CRM Leads in Odoo, plus the archive for deals won and then filed away.",
+      how: "Counts active Opportunities in a stage whose is_won flag is true. Probability and won_status are not used.",
+      source: "Odoo CRM Won stage.",
       dateBasis:
         "Filtered by lead creation date — leads opened in the window that went on to win, not deals closed in the window. This is why the figure can differ from Total Closed Won on Odoo's own dashboard: Odoo counts what closed in the month, this counts what opened in the month and won. A lead opened in July and closed in August appears under August in Odoo and under July here.",
       whenEmpty: "Zero means none of this period's leads closed.",
@@ -382,22 +383,22 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     ar: {
       label: "الصفقات الضائعة (Lost)",
       short: "صفقات ضائعة",
-      formula: "صفوف تحليل الخسائر",
-      what: "العملاء اللي اتأرشفوا كخسارة مؤكدة.",
-      how: "من تبويب Lost Analysis بس، وبنستبعد منه الصفوف اللي حالتها لسه Won — الصفقة الرابحة بتتأرشف زي أي صفقة مقفولة، ومش خسارة. مرحلة Lost جوه CRM Leads مش بتتحسب هنا خالص.",
-      source: "أرشيف Lost المباشر من Odoo.",
+      formula: "Lost Leads + Lost Opportunities الحالية والتاريخية",
+      what: "كل حالة خسارة مؤكدة حسب نوع سجل Odoo.",
+      how: "Lead: active=false ومعه Lost Reason. Opportunity الحالية: active=true وداخل Lost stage. التاريخية: مؤرشفة ومعها سبب أو داخل Lost stage.",
+      source: "Odoo CRM مباشرة وفق عقد crm_pipeline_redesign 1.26.",
       dateBasis: CRM_WINDOW_AR,
-      whenEmpty: "صفر معناه مفيش خسائر مؤرشفة في الفترة.",
+      whenEmpty: "صفر معناه مفيش حالات Lost مطابقة للتعريف في الفترة.",
     },
     en: {
       label: "Lost deals",
       short: "Lost",
-      formula: "Lost Analysis rows",
-      what: "Leads archived as a confirmed loss.",
-      how: "From the Lost Analysis tab only, excluding rows whose stage is still Won — a won deal gets archived like any closed record and is not a loss. CRM stage text never increments this counter.",
-      source: "Direct Odoo Lost archive.",
+      formula: "Lost Leads + current and historical Lost Opportunities",
+      what: "Every confirmed loss under the type-specific Odoo rules.",
+      how: "Lead: active=false with a Lost Reason. Current Opportunity: active=true in the Lost stage. Historical: archived with a reason or in the Lost stage.",
+      source: "Direct Odoo CRM under crm_pipeline_redesign 1.26.",
       dateBasis: CRM_WINDOW_EN,
-      whenEmpty: "Zero means no archived losses in the period.",
+      whenEmpty: "Zero means no record matches the canonical Lost rules in the period.",
     },
   },
 
@@ -409,8 +410,8 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "معدل Won",
       formula: "Won في CRM ÷ إجمالي العملاء النظيف × ١٠٠",
       what: "من كل ١٠٠ ليد، كام واحد اتقفل Won في الـCRM. ده غير «التحويل المدفوع» (فواتير ÷ ليدز) اللي في تقرير CRM.",
-      how: "البسط: عدد الصفقات الرابحة (النشطة والمؤرشفة). المقام: إجمالي العملاء النظيف = ليدز الـCRM + صفوف تحليل الخسائر.",
-      source: "البسط والمقام من CRM Leads و Lost Analysis.",
+      how: "البسط: Opportunities النشطة في Won stage. المقام: السجلات النشطة غير Lost + حالات Lost بالتعريف الحالي.",
+      source: "الطرفان من Odoo CRM وفق عقد 1.26.",
       dateBasis: CRM_WINDOW_AR,
       whenEmpty: "شرطة لو مفيش ليدز في الفترة أصلاً.",
     },
@@ -419,8 +420,8 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "Won rate",
       formula: "CRM Won ÷ Total clean leads × 100",
       what: "Out of every 100 leads, how many were marked Won in CRM. This differs from paid conversion (invoices ÷ leads) on the CRM report.",
-      how: "Numerator: won count, active and archived. Denominator: clean lead total = CRM leads + Lost Analysis rows.",
-      source: "Both sides from CRM Leads and Lost Analysis.",
+      how: "Numerator: active Opportunities in a Won stage. Denominator: active non-Lost records plus canonical losses.",
+      source: "Both sides come from Odoo CRM under the 1.26 contract.",
       dateBasis: CRM_WINDOW_EN,
       whenEmpty: "A dash when the period has no leads at all.",
     },
@@ -433,20 +434,20 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     ar: {
       label: "نسبة الضياع (Lost Rate)",
       short: "نسبة الضياع",
-      formula: "تحليل الخسائر ÷ إجمالي العملاء النظيف × ١٠٠",
+      formula: "حالات Lost حسب 1.26 ÷ إجمالي سجلات CRM القابلة للتقرير × ١٠٠",
       what: "من كل ١٠٠ ليد، كام واحد ضاع خلاص.",
-      how: "البسط: صفوف Lost Analysis. المقام: نفس إجمالي العملاء النظيف بتاع نسبة الإغلاق.",
-      source: "Lost Analysis للبسط، و CRM Leads + Lost Analysis للمقام.",
+      how: "البسط: Lost Leads وLost Opportunities حسب قواعد النوع. المقام: نفس إجمالي السكان القابلين للتقرير.",
+      source: "Odoo CRM مباشرة.",
       dateBasis: CRM_WINDOW_AR,
       whenEmpty: "شرطة لو مفيش ليدز في الفترة.",
     },
     en: {
       label: "Lost rate",
       short: "Lost rate",
-      formula: "Lost Analysis ÷ Total clean leads × 100",
+      formula: "Canonical CRM 1.26 Lost ÷ reportable CRM population × 100",
       what: "Out of every 100 leads, how many were lost for good.",
-      how: "Numerator: Lost Analysis rows. Denominator: the same clean lead total as the conversion rate.",
-      source: "Lost Analysis for the numerator; CRM Leads + Lost Analysis for the denominator.",
+      how: "Numerator: type-specific Lost Leads and Opportunities. Denominator: the same reportable population used by conversion.",
+      source: "Direct Odoo CRM.",
       dateBasis: CRM_WINDOW_EN,
       whenEmpty: "A dash when the period has no leads.",
     },
@@ -557,6 +558,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     },
   },
 
+  // Campaign, ad-set and ad rows: revenue attributed to that entity ÷ its own spend.
   roas: {
     key: "roas",
     group: "efficiency",
@@ -564,22 +566,49 @@ export const METRICS: Record<MetricKey, MetricDef> = {
     ar: {
       label: "العائد على الإنفاق الإعلاني (ROAS)",
       short: "العائد",
-      formula: "الإيراد المربوط بحملة ÷ الإنفاق",
-      what: "كل دولار إعلانات رجّع كام دولار تحصيل. فوق ١× يعني الفلوس رجعت.",
-      how: "الإيراد المحصّل اللي عليه حملة مقسوم على الإنفاق الإعلاني. كل التحصيل ÷ الإنفاق بيتعرض كسياق بس، لأنه بيشمل إيراد ماجاش من إعلان.",
+      formula: "الإيراد المرتبط ÷ الإنفاق",
+      what: "كل دولار اتصرف على الحملة دي رجّع كام دولار تحصيل مرتبط بيها. فوق ١× يعني الفلوس رجعت.",
+      how: "الإيراد المحصّل المرتبط بنفس الحملة أو المجموعة أو الإعلان، مقسوم على إنفاقه.",
       source:
-        "البسط: Accounting — الفواتير المدفوعة المربوطة بحملة. المقام: الإنفاق من تبويبات الإعلانات.",
+        "البسط: Accounting — الفواتير المدفوعة المرتبطة بالحملة. المقام: إنفاق نفس الحملة من تبويبات الإعلانات.",
       dateBasis: "تاريخ الدفع للإيراد، وتاريخ الإعلان للإنفاق.",
       whenEmpty: "شرطة لو مفيش إنفاق — القسمة على صفر مش صفر، دي قيمة مش موجودة.",
     },
     en: {
       label: "Return on ad spend (ROAS)",
       short: "ROAS",
-      formula: "Campaign-linked revenue ÷ Spend",
-      what: "What each advertising dollar returned in collections. Above 1× means the money came back.",
-      how: "Collected revenue that carries a campaign, divided by ad spend. All revenue ÷ spend is shown only as context, because it includes revenue no ad produced.",
+      formula: "Attributed revenue ÷ Spend",
+      what: "What each dollar spent on this campaign returned in collections linked to it. Above 1× means the money came back.",
+      how: "Collected revenue linked to the same campaign, ad set or ad, divided by its spend.",
       source:
-        "Numerator: Accounting paid invoices linked to a campaign. Denominator: spend from the ad tabs.",
+        "Numerator: Accounting paid invoices linked to the campaign. Denominator: that campaign's spend from the ad tabs.",
+      dateBasis: "Payment Date for revenue, ad date for spend.",
+      whenEmpty: "A dash when there was no spend — dividing by zero is undefined, not zero.",
+    },
+  },
+
+  // Totals: ALL collections ÷ ALL spend. Not attributed, so it is never called ROAS.
+  collectionsToSpend: {
+    key: "collectionsToSpend",
+    group: "efficiency",
+    needsSpend: true,
+    ar: {
+      label: "نسبة التحصيل إلى الصرف الإعلاني",
+      short: "التحصيل ÷ الصرف",
+      formula: "كل التحصيل ÷ كل الإنفاق",
+      what: "كل التحصيل في الفترة مقابل كل الإنفاق الإعلاني. ليست ROAS: البسط يشمل تحصيلًا لا علاقة له بالإعلانات.",
+      how: "كل الإيراد المحصّل في الفترة مقسوم على إجمالي الإنفاق الإعلاني، بدون أي إسناد.",
+      source: "البسط: Accounting — كل الفواتير المدفوعة. المقام: الإنفاق من تبويبات الإعلانات.",
+      dateBasis: "تاريخ الدفع للإيراد، وتاريخ الإعلان للإنفاق.",
+      whenEmpty: "شرطة لو مفيش إنفاق — القسمة على صفر مش صفر، دي قيمة مش موجودة.",
+    },
+    en: {
+      label: "Collections-to-spend ratio",
+      short: "Collections ÷ spend",
+      formula: "All collections ÷ All spend",
+      what: "All money collected in the window against all ad spend. Not ROAS: the numerator includes collections unrelated to ads.",
+      how: "All collected revenue in the window divided by total ad spend, with no attribution.",
+      source: "Numerator: every Accounting paid invoice. Denominator: spend from the ad tabs.",
       dateBasis: "Payment Date for revenue, ad date for spend.",
       whenEmpty: "A dash when there was no spend — dividing by zero is undefined, not zero.",
     },
@@ -595,7 +624,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "نسبة الإنفاق للإيراد",
       formula: "الإنفاق ÷ الإيراد × ١٠٠",
       what: "الإعلانات بتاكل كام في المية من التحصيل. كل ما تقل كل ما يكون أحسن.",
-      how: "الإنفاق مقسوم على الإيراد المحصّل ومضروب في ١٠٠. هي المقلوب المئوي للعائد.",
+      how: "الإنفاق مقسوم على الإيراد المحصّل ومضروب في ١٠٠. هي المقلوب المئوي لنسبة التحصيل إلى الصرف.",
       source: "البسط: الإنفاق من تبويبات الإعلانات. المقام: Accounting — الفواتير المدفوعة.",
       dateBasis: "تاريخ الإعلان للإنفاق، وتاريخ الدفع للإيراد.",
       whenEmpty: "شرطة لو مفيش إيراد، أو لو المنصة ملهاش تبويب إنفاق — صفر هنا هيبقى معلومة غلط.",
@@ -605,7 +634,7 @@ export const METRICS: Record<MetricKey, MetricDef> = {
       short: "ACOS",
       formula: "Spend ÷ Revenue × 100",
       what: "What percentage of collections advertising eats. Lower is better.",
-      how: "Spend divided by collected revenue, times 100 — the percentage inverse of ROAS.",
+      how: "Spend divided by collected revenue, times 100 — the percentage inverse of the collections-to-spend ratio.",
       source: "Numerator: spend from the ad tabs. Denominator: Accounting paid invoices.",
       dateBasis: "Ad date for spend, Payment Date for revenue.",
       whenEmpty:
@@ -635,6 +664,7 @@ export const GLOSSARY_ORDER: MetricKey[] = [
   "cpm",
   "cpc",
   "roas",
+  "collectionsToSpend",
   "acos",
 ];
 

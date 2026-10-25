@@ -1,11 +1,17 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import {
-  getChatwootConversationCustomAttributes,
   getChatwootConversationLabels,
-  mergeChatwootConversationCustomAttributes,
   replaceChatwootConversationLabels,
+  updateChatwootConversationAttributes,
 } from "./chatwoot.server";
+import {
+  CHATWOOT_ATTRIBUTION_KEYS,
+  buildChatwootAttributionAttributes,
+  planChatwootAttributionUpdate,
+} from "./chatwoot-attribution-attributes";
+import { configuredCustomerType, configuredMarketer } from "./chatwoot-attribution-context.server";
 import {
   databaseConfigured,
   readDashboardDatasets,
@@ -52,10 +58,20 @@ export interface MetaIdentityResolution {
 }
 
 const MAX_WEBHOOK_TEXT = 1_000;
+
+/**
+ * Provider message IDs of the platform self-test. Real Meta IDs start with
+ * `wamid.`, `m_` or `aWdf`; nothing Meta sends starts with this prefix, so a
+ * self-test event can never be mistaken for, or counted as, real traffic.
+ */
+export const SELF_TEST_MESSAGE_PREFIX = "selftest.";
+
+export function isSelfTestMessageId(providerMessageId: string): boolean {
+  return providerMessageId.startsWith(SELF_TEST_MESSAGE_PREFIX);
+}
 const MAX_PROCESS_ATTEMPTS = 8;
 const MANAGED_LABEL_PREFIXES = ["src:", "channel:", "campaign:", "branch:"];
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 let workerStarted = false;
 let workerTimer: ReturnType<typeof setInterval> | null = null;
@@ -266,22 +282,7 @@ export function verifyMetaWebhookChallenge(input: {
 }
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 async function ensureSchema(): Promise<void> {
@@ -396,13 +397,15 @@ export async function ingestMetaMessageAttributionWebhook(input: {
   let duplicates = 0;
   for (const item of normalized) {
     const eventKey = `${item.provider}:${item.providerMessageId}`;
+    // A self-test event is stored (that is the proof) but parked outside the worker's statuses.
+    const selfTest = isSelfTestMessageId(item.providerMessageId);
     const result = await getPool().query(
       `INSERT INTO meta_message_attribution_events (
         event_key, provider, provider_message_id, channel, source_platform,
         destination_phone_number_id, destination_page_id, referral_source_id, ctwa_clid,
         source_url, source_type, attribution_method, attribution_confidence, unknown_reason,
-        reduced_evidence_json, payload_hash, occurred_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17)
+        reduced_evidence_json, payload_hash, occurred_at, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18)
       ON CONFLICT (provider, provider_message_id) DO UPDATE SET
         duplicate_deliveries = meta_message_attribution_events.duplicate_deliveries + 1
       RETURNING (xmax = 0) AS inserted`,
@@ -424,6 +427,7 @@ export async function ingestMetaMessageAttributionWebhook(input: {
         JSON.stringify(item.reducedEvidence),
         payloadHash,
         item.occurredAt,
+        selfTest ? "self_test" : "received",
       ],
     );
     if (result.rows[0]?.inserted) accepted += 1;
@@ -717,34 +721,36 @@ async function syncCanonicalToChatwoot(
   const allowAll = text(process.env.META_ATTRIBUTION_SYNC_ALLOW_ALL).toLowerCase() === "true";
   if (!allowAll && (!canary || canary !== conversationId)) return;
   if (mode === "attributes" || mode === "both") {
-    const wanted = Object.fromEntries(
-      Object.entries({
-        attribution_source: row.platform,
-        attribution_channel: row.channel,
-        attribution_campaign: row.campaign_name,
-        meta_campaign_id: row.campaign_id,
-        meta_adset_id: row.adset_id,
-        meta_ad_id: row.ad_id,
-        meta_creative_id: row.creative_id,
-        meta_campaign_name: row.campaign_name,
-        meta_adset_name: row.adset_name,
-        meta_ad_name: row.ad_name,
-        utm_source: row.utm_source,
-        utm_medium: row.utm_medium,
-        utm_campaign: row.utm_campaign,
-        utm_content: row.utm_content,
-        utm_term: row.utm_term,
-        ctwa_clid: row.ctwa_clid,
-        attribution_method: row.attribution_method,
-        attribution_confidence: row.confidence,
-      }).filter(([, value]) => Boolean(value)),
+    const wanted = buildChatwootAttributionAttributes({
+      channel: row.channel,
+      branch: row.branch_name || row.branch_id,
+      attributionMethod: row.attribution_method,
+      confidence: row.confidence,
+      unknownReason: row.unknown_reason,
+      source: row.platform,
+      medium: row.medium,
+      campaignName: row.campaign_name,
+      campaignId: row.campaign_id,
+      adsetId: row.adset_id,
+      adsetName: row.adset_name,
+      adId: row.ad_id,
+      adName: row.ad_name,
+      creativeId: row.creative_id,
+      creativeName: row.creative_name,
+      marketer: configuredMarketer(row.campaign_id),
+      customerType: configuredCustomerType(row.inbox_id),
+      ctwaClid: row.ctwa_clid,
+      utmSource: row.utm_source,
+      utmMedium: row.utm_medium,
+      utmCampaign: row.utm_campaign,
+      utmContent: row.utm_content,
+      utmTerm: row.utm_term,
+    });
+    await updateChatwootConversationAttributes(
+      conversationId,
+      (latest) => planChatwootAttributionUpdate(latest, wanted, "live"),
+      { ownedKeys: CHATWOOT_ATTRIBUTION_KEYS },
     );
-    const current = await getChatwootConversationCustomAttributes(conversationId);
-    const changed = Object.fromEntries(
-      Object.entries(wanted).filter(([key, value]) => text(current[key]) !== value),
-    );
-    if (Object.keys(changed).length)
-      await mergeChatwootConversationCustomAttributes(conversationId, changed);
   }
   if (mode === "labels" || mode === "both") {
     const clean = (value: string) =>
@@ -792,16 +798,17 @@ async function projectConversation(conversationId: number): Promise<Record<strin
   const x = acquisition.rows[0],
     last = latest.rows[0];
   if (!x || !last) return null;
-  await db.query(
+  const updated = await db.query<Record<string, string>>(
     `UPDATE chatwoot_conversation_attribution SET
       first_touch_id=$2,latest_touch_id=$3,first_touch_at=$4,latest_touch_at=$5,
       chatwoot_message_id=$6,provider_message_id=$7,destination_phone_number_id=$8,destination_page_id=$9,
-      channel=$10,platform=$11,source=$12,medium=$13,campaign_id=$14,campaign_name=$15,
+      channel=COALESCE(NULLIF($10,''),channel),platform=$11,source=$12,medium=$13,campaign_id=$14,campaign_name=$15,
       adset_id=$16,adset_name=$17,ad_id=$18,ad_name=$19,creative_id=$20,creative_name=$21,
       placement=$22,utm_source=$23,utm_medium=$24,utm_campaign=$25,utm_content=$26,utm_term=$27,
       referral_source_id=$28,ctwa_clid=$29,attribution_method=$30,confidence=$31,
-      attribution_scope=$32,unknown_reason=$33,updated_at=now()
-     WHERE conversation_id=$1`,
+      attribution_scope=$32,
+      unknown_reason=CASE WHEN $30='unknown' AND $33='' THEN unknown_reason ELSE $33 END,updated_at=now()
+     WHERE conversation_id=$1 RETURNING *`,
     [
       conversationId,
       x.id,
@@ -838,7 +845,8 @@ async function projectConversation(conversationId: number): Promise<Record<strin
       x.unknown_reason,
     ],
   );
-  return x;
+  // Sync from the stored conversation, which also carries channel and branch facts.
+  return updated.rows[0] ?? x;
 }
 
 async function processEvent(event: Record<string, string>): Promise<boolean> {
@@ -997,6 +1005,24 @@ async function processEvent(event: Record<string, string>): Promise<boolean> {
       unknownReason,
     ],
   );
+  if (resolution && event.provider === "whatsapp") {
+    // The QA Click-to-WhatsApp test: record the proof and stop its spend.
+    await import("./meta-credential-health.server")
+      .then(({ handleQaCtwaProof }) =>
+        handleQaCtwaProof({
+          campaignId: resolution.campaignId,
+          adId: resolution.adId,
+          creativeId: resolution.creativeId,
+          providerMessageId: event.provider_message_id,
+          conversationId: Number(match.conversation_id),
+        }),
+      )
+      .catch((error) =>
+        console.error("[meta-attribution] QA proof handling failed", {
+          message: error instanceof Error ? error.message.slice(0, 200) : "failed",
+        }),
+      );
+  }
   if (projected) await syncCanonicalToChatwoot(Number(match.conversation_id), projected);
   return true;
 }
@@ -1070,7 +1096,7 @@ export async function getMetaAttributionHealth() {
   await ensureSchema();
   const [events, catalog] = await Promise.all([
     getPool().query(
-      `SELECT count(*)::int received,count(*) FILTER (WHERE status='resolved')::int resolved,count(*) FILTER (WHERE status='unresolved')::int unresolved,count(*) FILTER (WHERE status LIKE 'waiting_%')::int waiting,count(*) FILTER (WHERE status='failed')::int failed,coalesce(sum(duplicate_deliveries),0)::int duplicate_deliveries,max(received_at) last_received_at FROM meta_message_attribution_events`,
+      `SELECT count(*)::int received,count(*) FILTER (WHERE status='resolved')::int resolved,count(*) FILTER (WHERE status='unresolved')::int unresolved,count(*) FILTER (WHERE status LIKE 'waiting_%')::int waiting,count(*) FILTER (WHERE status='failed')::int failed,coalesce(sum(duplicate_deliveries),0)::int duplicate_deliveries,max(received_at) last_received_at FROM meta_message_attribution_events WHERE status <> 'self_test'`,
     ),
     getPool().query(
       `SELECT count(*)::int rows,count(*) FILTER (WHERE campaign_id<>'')::int campaigns,count(*) FILTER (WHERE creative_id<>'')::int creatives,count(*) FILTER (WHERE effective_object_story_id<>'')::int story_ids,count(*) FILTER (WHERE source_post_id<>'')::int post_ids FROM meta_entity_identity_catalog`,

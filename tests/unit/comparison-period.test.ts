@@ -23,10 +23,10 @@ describe("management comparison periods", () => {
     });
   });
 
-  it("keeps adjacent equal-length comparison for a custom window", () => {
+  it("compares a custom window with the same calendar dates last month", () => {
     expect(previousPeriod("2026-09-10", "2026-09-16")).toEqual({
-      from: "2026-09-03",
-      to: "2026-09-09",
+      from: "2026-08-10",
+      to: "2026-08-16",
     });
   });
 

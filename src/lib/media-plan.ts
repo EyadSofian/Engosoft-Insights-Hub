@@ -1,5 +1,31 @@
 export type MediaPlanStatus = "approved" | "draft";
 
+export type MediaPlanDeliverableCategory =
+  "website" | "paid_media" | "landing_page" | "webinar" | "creative" | "organic" | "other";
+
+export type MediaPlanDeliverableMetric =
+  | "leads"
+  | "visits"
+  | "submissions"
+  | "campaigns"
+  | "creatives"
+  | "videos"
+  | "posts"
+  | "registrations"
+  | "custom";
+
+/** A management promise with a canonical source for its actual value. */
+export interface MediaPlanDeliverable {
+  key: string;
+  label: string;
+  category: MediaPlanDeliverableCategory;
+  metric: MediaPlanDeliverableMetric;
+  target: number;
+  unit: string;
+  actualSource: string;
+  matchTerms?: string[];
+}
+
 export interface MediaPlanCourseTarget {
   /** Stable editor id. Custom courses are allowed for future monthly plans. */
   key: string;
@@ -15,6 +41,14 @@ export interface MediaPlanActivityBudget {
   key: string;
   label: string;
   budgetUsd: number;
+  /** Optional delivery promise; legacy budget-only activities remain valid. */
+  category?: MediaPlanDeliverableCategory;
+  metric?: MediaPlanDeliverableMetric;
+  target?: number;
+  unit?: string;
+  actualSource?: string;
+  /** A month-to-date figure entered by an authorized editor when no API exists. */
+  reportedActual?: number;
   matchTerms?: string[];
 }
 
@@ -26,6 +60,8 @@ export interface MonthlyMediaPlan {
   paidLeadTarget: number;
   organicWebinarLeadTarget: number;
   leadGenerationBudgetUsd: number;
+  /** Source-wide envelope when the split between lead-gen and other work is unknown. */
+  overallMarketingBudgetUsd?: number;
   salesTargetUsd: number;
   courses: MediaPlanCourseTarget[];
   additionalActivities: MediaPlanActivityBudget[];
@@ -63,14 +99,34 @@ const ADDITIONAL_ACTIVITIES: MediaPlanActivityBudget[] = [
     key: "website",
     label: "Website campaigns",
     budgetUsd: 3_000,
+    category: "website",
+    metric: "leads",
+    target: 200,
+    unit: "leads",
+    actualSource: "website_crm_leads",
     matchTerms: ["web", "website", "web con", "web sign", "signup"],
   },
-  { key: "webinar", label: "Webinar promotion", budgetUsd: 500, matchTerms: ["webinar"] },
+  {
+    key: "webinar",
+    label: "Webinar promotion",
+    budgetUsd: 500,
+    category: "webinar",
+    metric: "leads",
+    target: 1_000,
+    unit: "leads",
+    actualSource: "webinar_crm_leads",
+    matchTerms: ["webinar"],
+  },
   { key: "youtube", label: "YouTube", budgetUsd: 250, matchTerms: ["youtube"] },
   {
     key: "branding",
     label: "Social media branding",
     budgetUsd: 250,
+    category: "creative",
+    metric: "creatives",
+    target: 25,
+    unit: "creatives",
+    actualSource: "creative_catalog",
     matchTerms: ["branding", "awareness"],
   },
 ];
@@ -96,14 +152,96 @@ const basePlan = (
 });
 
 /**
- * August is the approved source plan. September intentionally starts as a
- * visible draft copied from that baseline until management publishes revised
- * targets; the UI never presents copied numbers as approved September facts.
+ * August is the approved source plan. September's sales target and 17% overall
+ * marketing ceiling were confirmed by management on 2026-10-01. Its course
+ * lead targets and activity allocations are still copied August draft values.
  */
 export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
   "2026-08": basePlan("2026-08", "approved"),
-  "2026-09": basePlan("2026-09", "draft", "2026-08"),
+  "2026-09": {
+    ...basePlan("2026-09", "draft", "2026-08"),
+    salesTargetUsd: 135_000,
+    overallMarketingBudgetUsd: 22_950,
+  },
+  // Imported from the supplied October image as a DRAFT. The image says
+  // 24,700 total leads, but its six course rows sum to 4,176 and the website
+  // goal is 3,000. YouTube (300) and branding (500) have no stated unit, so
+  // they remain separate custom goals, not inferred leads in KPI denominators.
+  "2026-10": {
+    month: "2026-10",
+    status: "draft",
+    paidLeadTarget: 4_176,
+    organicWebinarLeadTarget: 0,
+    leadTarget: 4_176,
+    leadGenerationBudgetUsd: 0,
+    overallMarketingBudgetUsd: 27_575,
+    salesTargetUsd: 157_500,
+    courses: [
+      { key: "cfm", label: "CFM", targetLeads: 648, targetCpl: 0, owners: ["Sayed"] },
+      { key: "pmp", label: "PMP", targetLeads: 864, targetCpl: 0, owners: ["Sayed"] },
+      { key: "cmrp", label: "CMRP", targetLeads: 288, targetCpl: 0, owners: ["Shazly"] },
+      {
+        key: "interior",
+        label: "Décor / Interior",
+        targetLeads: 864,
+        targetCpl: 0,
+        owners: ["Sayed"],
+      },
+      { key: "bim", label: "BIM", targetLeads: 504, targetCpl: 0, owners: ["Shazly"] },
+      { key: "automotive", label: "Auto", targetLeads: 1_008, targetCpl: 0, owners: ["Shazly"] },
+    ],
+    additionalActivities: [
+      {
+        key: "website",
+        label: "Website leads",
+        budgetUsd: 0,
+        category: "website",
+        metric: "leads",
+        target: 3_000,
+        unit: "leads",
+        actualSource: "website_crm_leads",
+        matchTerms: ["website"],
+      },
+      {
+        key: "youtube",
+        label: "YouTube",
+        budgetUsd: 0,
+        category: "organic",
+        metric: "custom",
+        target: 300,
+        unit: "units",
+        actualSource: "manual_reported",
+        matchTerms: ["youtube"],
+      },
+      {
+        key: "branding",
+        label: "Social media branding",
+        budgetUsd: 0,
+        category: "creative",
+        metric: "custom",
+        target: 500,
+        unit: "units",
+        actualSource: "manual_reported",
+        matchTerms: ["branding", "awareness"],
+      },
+    ],
+  },
 };
+
+export const OCTOBER_2026_SOURCE = {
+  image: "/media-plan/october-2026-source.png",
+  statedTotalLeads: 24_700,
+  courseLeads: 4_176,
+  websiteLeads: 3_000,
+  youtubeGoal: 300,
+  brandingGoal: 500,
+  marketingBudgetUsd: 26_775,
+  overallMarketingBudgetUsd: 27_575,
+  salesTargetUsd: 157_500,
+  staffTotal: 51,
+  dailyCourseLeads: 174,
+  workingDays: 24,
+} as const;
 
 export const mediaPlanMonths = (): string[] =>
   Object.keys(MEDIA_PLANS).sort((a, b) => b.localeCompare(a));
@@ -300,6 +438,34 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
         key,
         label: shortText(row.label, `Activity ${index + 1} label`, 100),
         budgetUsd: boundedNumber(row.budgetUsd, `Activity ${index + 1} budget`, 100_000_000),
+        ...(typeof row.category === "string"
+          ? { category: row.category as MediaPlanDeliverableCategory }
+          : {}),
+        ...(typeof row.metric === "string"
+          ? { metric: row.metric as MediaPlanDeliverableMetric }
+          : {}),
+        ...(row.target !== undefined
+          ? { target: boundedNumber(row.target, `Activity ${index + 1} target`, 10_000_000) }
+          : {}),
+        ...(row.unit !== undefined
+          ? { unit: shortText(row.unit, `Activity ${index + 1} unit`, 40, false) }
+          : {}),
+        ...(row.actualSource !== undefined
+          ? {
+              actualSource: shortText(row.actualSource, `Activity ${index + 1} actual source`, 120),
+            }
+          : {}),
+        ...(row.reportedActual !== undefined &&
+        row.reportedActual !== null &&
+        row.reportedActual !== ""
+          ? {
+              reportedActual: boundedNumber(
+                row.reportedActual,
+                `Activity ${index + 1} manually reported actual`,
+                10_000_000,
+              ),
+            }
+          : {}),
         matchTerms: Array.isArray(row.matchTerms)
           ? stringList(row.matchTerms, `Activity ${index + 1} match terms`, 20)
           : [],
@@ -326,6 +492,15 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
       "leadGenerationBudgetUsd",
       100_000_000,
     ),
+    ...(raw.overallMarketingBudgetUsd !== undefined && raw.overallMarketingBudgetUsd !== null
+      ? {
+          overallMarketingBudgetUsd: boundedNumber(
+            raw.overallMarketingBudgetUsd,
+            "overallMarketingBudgetUsd",
+            100_000_000,
+          ),
+        }
+      : {}),
     salesTargetUsd: boundedNumber(raw.salesTargetUsd, "salesTargetUsd", 1_000_000_000),
     courses,
     additionalActivities,

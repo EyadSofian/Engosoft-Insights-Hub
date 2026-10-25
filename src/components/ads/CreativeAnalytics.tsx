@@ -126,20 +126,18 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
   }
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  const incompatible = selected === "organic" || (selected && selected !== "chatgpt");
+  const incompatible = selected === "organic";
   if (incompatible) {
     return (
       <Card>
         <EmptyState
           label={
-            lang === "ar"
-              ? "بيانات الكرياتيف المتصلة متاحة حاليًا لإعلانات ChatGPT"
-              : "Connected creative metadata is currently available for ChatGPT Ads"
+            lang === "ar" ? "الصفحة دي للإعلانات المدفوعة فقط" : "This page covers paid ads only"
           }
           hint={
             lang === "ar"
-              ? "اختار «الكل» أو «إعلانات ChatGPT» من شريط المنصات."
-              : "Choose All or ChatGPT Ads in the platform switcher."
+              ? "اختار الكل أو منصة إعلانية من شريط المنصات."
+              : "Choose All or an ad platform in the platform switcher."
           }
         />
       </Card>
@@ -154,16 +152,13 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
             <Sparkles size={25} />
           </span>
           <h2 className="mt-4 text-lg font-semibold text-text">
-            {lang === "ar" ? "وصّل حساب إعلانات ChatGPT" : "Connect ChatGPT Ads"}
+            {lang === "ar" ? "بيانات الإعلانات غير متاحة" : "Ad data is unavailable"}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-text-muted">
             {lang === "ar"
-              ? "أنشئ API key للقراءة من إعدادات Ads Manager، وبعدها أضفه كمتغير سري OPENAI_ADS_API_KEY. أسرار الحساب لا تصل للمتصفح."
-              : "Create a read-capable API key in Ads Manager settings, then add it as the OPENAI_ADS_API_KEY secret. Account credentials never reach the browser."}
+              ? "راجع ربط المنصة والفترة المختارة. بيانات الإعلانات وأسماؤها هتظهر هنا بعد المزامنة."
+              : "Check the platform connection and selected period. Ad names and performance will appear after syncing."}
           </p>
-          <code className="mt-4 inline-flex rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text">
-            OPENAI_ADS_API_KEY
-          </code>
         </div>
       </Card>
     );
@@ -188,8 +183,8 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
           icon={<CircleAlert size={16} />}
         >
           {lang === "ar"
-            ? "اتصال OpenAI Ads الحالي غير متاح. باقي الداشبورد مستمر، والكرياتيف المعروضة جاية من آخر نسخة PostgreSQL سليمة."
-            : "The live OpenAI Ads connection is unavailable. The rest of the dashboard remains live, while these creatives come from the last good PostgreSQL snapshot."}
+            ? "اتصال المنصة الحالي غير متاح. الكرياتيف المعروضة جاية من آخر نسخة PostgreSQL سليمة."
+            : "The live platform connection is unavailable. These ads come from the last good PostgreSQL snapshot."}
         </Notice>
       )}
 
@@ -202,7 +197,7 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
               </span>
               <div>
                 <h2 className="text-base font-semibold text-text">
-                  {lang === "ar" ? "مكتبة كرياتيف ChatGPT" : "ChatGPT creative library"}
+                  {lang === "ar" ? "أداء الكرياتيف حسب اسم الإعلان" : "Creatives by ad name"}
                 </h2>
                 <p className="text-xs text-text-muted">
                   {lang === "ar"
@@ -215,8 +210,8 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
           <Pill tone={data.health.ok ? "success" : "warning"}>
             {data.health.ok
               ? lang === "ar"
-                ? "OpenAI API متصل"
-                : "OpenAI API connected"
+                ? "بيانات الإعلانات متاحة"
+                : "Ad data available"
               : lang === "ar"
                 ? "اتصال يحتاج مراجعة"
                 : "Connection needs attention"}
@@ -251,7 +246,9 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={
-                lang === "ar" ? "دوّر في العنوان أو الحملة..." : "Search title or campaign..."
+                lang === "ar"
+                  ? "دوّر باسم الإعلان أو المجموعة أو الحملة..."
+                  : "Search ad, ad set or campaign..."
               }
               className="h-10 w-full rounded-lg border border-border bg-surface ps-9 pe-3 text-sm text-text outline-none focus:border-emerald-500"
             />
@@ -306,15 +303,15 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
           <SectionTitle
             hint={
               lang === "ar"
-                ? "أداء المنصة وأرقام Odoo متجمعين على Ad ID ثابت؛ الشرطة معناها إن القياس غير متاح."
-                : "Platform delivery and Odoo outcomes join on stable Ad ID; a dash means the metric is unavailable."
+                ? "كل بطاقة إعلان واحد حسب Ad ID. الليدز والبيع واللوست من CRM، ومعدل التحويل = البيع ÷ الليدز، والشرطة تعني إن القياس غير متاح."
+                : "Each card is one Ad ID. Leads, wins and losses come from CRM; conversion = wins / leads. A dash means unavailable."
             }
           >
             {lang === "ar" ? `${fmtNum(rows.length)} نتيجة` : `${fmtNum(rows.length)} results`}
           </SectionTitle>
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {rows.map((row) => (
-              <CreativeCard key={`${row.accountId}:${row.adId}`} row={row} />
+              <CreativeCard key={row.performanceKey} row={row} />
             ))}
           </div>
         </section>
@@ -340,7 +337,7 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
         {row.imageUrl ? (
           <img
             src={row.imageUrl}
-            alt={row.headline || row.ad}
+            alt={row.ad || row.creativeName || "Ad"}
             loading="lazy"
             referrerPolicy="no-referrer"
             className="h-full w-full object-cover"
@@ -365,11 +362,17 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wide text-text-subtle">
-              {row.creativeType.replaceAll("_", " ") || "ChatGPT ad"}
+            <p className="truncate text-[11px] text-text-muted" title={row.campaign}>
+              {lang === "ar" ? "الحملة" : "Campaign"}: {row.campaign || "—"}
             </p>
-            <h3 className="mt-1 text-[15px] font-semibold leading-snug text-text" dir="auto">
-              {row.headline || row.ad}
+            <p className="mt-0.5 truncate text-[11px] text-text-muted" title={row.adset}>
+              {lang === "ar" ? "المجموعة الإعلانية" : "Ad set"}: {row.adset || "—"}
+            </p>
+            <p className="mt-2 text-[10px] text-text-subtle">
+              {lang === "ar" ? "اسم الكرياتيف (Ad Name)" : "Creative name (Ad Name)"}
+            </p>
+            <h3 className="mt-0.5 text-[15px] font-semibold leading-snug text-text" dir="auto">
+              {row.ad || row.adset || row.creativeName || "—"}
             </h3>
           </div>
           {row.landingPageUrl && (
@@ -384,38 +387,22 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
             </a>
           )}
         </div>
-        {row.body && (
-          <p className="mt-2 line-clamp-3 text-xs leading-5 text-text-muted" dir="auto">
-            {row.body}
-          </p>
-        )}
-
-        <div className="mt-3 space-y-1 text-[11px] text-text-muted">
-          <p className="truncate" title={row.campaign}>
-            <span className="text-text-subtle">{lang === "ar" ? "الحملة:" : "Campaign:"}</span>{" "}
-            {row.campaign || "—"}
-          </p>
-          <p className="truncate" title={`${row.adset} · ${row.ad}`}>
-            <span className="text-text-subtle">{lang === "ar" ? "المجموعة:" : "Ad group:"}</span>{" "}
-            {row.adset || "—"} · {row.ad}
-          </p>
-        </div>
-
-        <dl className="mt-4 grid grid-cols-4 gap-1.5">
+        <dl className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {metric(lang === "ar" ? "الإنفاق" : "Spend", fmtUSDFull(row.spend))}
-          {metric("CTR", fmtPct(row.ctrAll, 2))}
-          {metric(lang === "ar" ? "ليدز" : "Leads", fmtNum(row.crmLeads))}
+          {metric(lang === "ar" ? "عدد الليدز" : "Leads", fmtNum(row.crmLeads))}
+          {metric(
+            lang === "ar" ? "سعر الليد" : "Cost per lead",
+            row.spend !== null && row.crmLeads > 0 ? fmtUSDFull(row.spend / row.crmLeads) : "—",
+          )}
+          {metric(lang === "ar" ? "عدد البيع" : "Won sales", fmtNum(row.won))}
+          {metric(lang === "ar" ? "عدد اللوست" : "Lost", fmtNum(row.lost))}
+          {metric(
+            lang === "ar" ? "نسبة التحويل" : "Conversion rate",
+            row.crmLeads > 0 ? fmtPct((row.won / row.crmLeads) * 100, 1) : "—",
+          )}
+          {metric(lang === "ar" ? "المبيعات" : "Revenue", fmtUSD(row.revenue))}
           {metric("ROAS", row.roas === null ? "—" : `${row.roas.toFixed(2)}×`)}
         </dl>
-
-        <div className="mt-3 grid grid-cols-3 divide-x divide-border rounded-lg border border-border py-2 text-center rtl:divide-x-reverse">
-          <SmallMetric
-            label={lang === "ar" ? "ظهور" : "Impressions"}
-            value={fmtNum(row.impressions)}
-          />
-          <SmallMetric label={lang === "ar" ? "نقرات" : "Clicks"} value={fmtNum(row.clicksAll)} />
-          <SmallMetric label={lang === "ar" ? "تحصيل" : "Revenue"} value={fmtUSD(row.revenue)} />
-        </div>
 
         {row.reviewReason && (
           <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-danger-soft px-2.5 py-2 text-[11px] text-danger">
@@ -438,14 +425,5 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
         )}
       </div>
     </Card>
-  );
-}
-
-function SmallMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 px-1.5">
-      <div className="text-[9.5px] text-text-subtle">{label}</div>
-      <div className="num mt-0.5 truncate text-xs font-semibold text-text">{value}</div>
-    </div>
   );
 }

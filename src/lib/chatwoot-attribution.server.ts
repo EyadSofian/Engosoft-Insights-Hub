@@ -1,12 +1,19 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { getSharedDatabasePool } from "./database-pool.server.ts";
 import {
-  getChatwootConversationCustomAttributes,
   getChatwootConversationLabels,
-  mergeChatwootConversationCustomAttributes,
   replaceChatwootConversationLabels,
+  updateChatwootConversationAttributes,
   chatwootPhoneKey,
 } from "./chatwoot.server";
+import {
+  CHATWOOT_ATTRIBUTION_KEYS,
+  REFERRAL_EVIDENCE_MISSING,
+  buildChatwootAttributionAttributes,
+  planChatwootAttributionUpdate,
+} from "./chatwoot-attribution-attributes";
+import { configuredCustomerType, configuredMarketer } from "./chatwoot-attribution-context.server";
 import {
   databaseConfigured,
   readDashboardDatasets,
@@ -134,7 +141,6 @@ export function verifyChatwootWebhookSignature(input: {
   return received.length === calculated.length && timingSafeEqual(received, calculated);
 }
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 let importedDataCache: {
   expiresAt: number;
@@ -148,22 +154,7 @@ let importedDataCache: {
 } | null = null;
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        connectionString.includes(".railway.internal") || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 async function ensureSchema(): Promise<void> {
@@ -516,6 +507,15 @@ function branchFromValue(value: unknown): BranchMatch | null {
   return { id, name: first(row, ["name", "branchName", "branch_name", "label"]) || id };
 }
 
+/** The configured inbox → branch mapping for one inbox, or null when none is configured. */
+export function resolveInboxBranch(inboxId: number | null): { id: string; name: string } | null {
+  return resolveBranch(inboxId);
+}
+
+export function inboxBranchMappingConfigured(): boolean {
+  return Object.keys(parseBranchMap()).length > 0;
+}
+
 function resolveBranch(
   inboxId: number | null,
   tokenEvidence?: AttributionTokenEvidence,
@@ -579,6 +579,8 @@ export function normalizeChatwootAttribution(payload: unknown): NormalizedAttrib
     referralSourceId || first(messageReferral, ["ctwa_clid", "ctwaClid"]),
   );
   const hasUtm = Boolean(utmSource || utmMedium || utmCampaign || utmContent || utmTerm);
+  // A branch mapping is an operational fact about the inbox, not marketing
+  // evidence, so it never lifts a conversation out of `unknown`.
   const method: AttributionMethod = hasReferral
     ? "meta_referral"
     : token
@@ -587,16 +589,12 @@ export function normalizeChatwootAttribution(payload: unknown): NormalizedAttrib
         ? "utm"
         : referralSourceUrl
           ? "referrer"
-          : branch
-            ? "inbox_mapping"
-            : "unknown";
+          : "unknown";
   const confidence: AttributionConfidence = hasReferral
     ? "exact"
     : token || hasUtm
       ? "strong"
-      : branch
-        ? "inferred"
-        : "unknown";
+      : "unknown";
 
   return {
     eventType,
@@ -758,9 +756,6 @@ async function resolveTrackingToken(token: string): Promise<AttributionTokenEvid
 
 /** Remove an invalid/expired tracking marker before recording a touch. */
 function withoutInvalidTrackingToken(candidate: NormalizedAttribution): NormalizedAttribution {
-  const branch = candidate.branchId
-    ? { id: candidate.branchId, name: candidate.branchName }
-    : resolveBranch(candidate.inboxId);
   const hasUtm = Boolean(
     candidate.utmSource ||
     candidate.utmMedium ||
@@ -775,16 +770,12 @@ function withoutInvalidTrackingToken(candidate: NormalizedAttribution): Normaliz
       ? "utm"
       : candidate.referralSourceUrl
         ? "referrer"
-        : branch
-          ? "inbox_mapping"
-          : "unknown";
+        : "unknown";
   const confidence: AttributionConfidence = hasNativeReferral
     ? "exact"
     : hasUtm
       ? "strong"
-      : branch
-        ? "inferred"
-        : "unknown";
+      : "unknown";
   const { trackingTokenHash: _trackingTokenHash, ...evidence } = candidate.evidence;
   return {
     ...candidate,
@@ -958,7 +949,8 @@ async function upsertConversationProjection(
       contact_id = EXCLUDED.contact_id, inbox_id = EXCLUDED.inbox_id, agent_id = EXCLUDED.agent_id,
       phone_key = EXCLUDED.phone_key, first_touch_id = EXCLUDED.first_touch_id,
       latest_touch_id = EXCLUDED.latest_touch_id, first_touch_at = EXCLUDED.first_touch_at,
-      latest_touch_at = EXCLUDED.latest_touch_at, channel = EXCLUDED.channel,
+      latest_touch_at = EXCLUDED.latest_touch_at,
+      channel = COALESCE(NULLIF(EXCLUDED.channel, ''), chatwoot_conversation_attribution.channel),
       platform = EXCLUDED.platform, source = EXCLUDED.source, medium = EXCLUDED.medium,
       campaign_id = EXCLUDED.campaign_id, campaign_name = EXCLUDED.campaign_name,
       adset_id = EXCLUDED.adset_id, adset_name = EXCLUDED.adset_name, ad_id = EXCLUDED.ad_id,
@@ -966,9 +958,14 @@ async function upsertConversationProjection(
       creative_name = EXCLUDED.creative_name, placement = EXCLUDED.placement,
       utm_source = EXCLUDED.utm_source, utm_medium = EXCLUDED.utm_medium,
       utm_campaign = EXCLUDED.utm_campaign, utm_content = EXCLUDED.utm_content,
-      utm_term = EXCLUDED.utm_term, branch_id = EXCLUDED.branch_id, branch_name = EXCLUDED.branch_name,
+      utm_term = EXCLUDED.utm_term,
+      branch_id = COALESCE(NULLIF(EXCLUDED.branch_id, ''), chatwoot_conversation_attribution.branch_id),
+      branch_name = COALESCE(NULLIF(EXCLUDED.branch_name, ''), chatwoot_conversation_attribution.branch_name),
       attribution_method = EXCLUDED.attribution_method, confidence = EXCLUDED.confidence,
-      unknown_reason = EXCLUDED.unknown_reason,
+      -- A reason recorded for missing evidence (e.g. by the historical backfill) survives later messages.
+      unknown_reason = CASE WHEN EXCLUDED.attribution_method = 'unknown'
+        THEN COALESCE(NULLIF(chatwoot_conversation_attribution.unknown_reason, ''), EXCLUDED.unknown_reason)
+        ELSE EXCLUDED.unknown_reason END,
       crm_lead_ids = EXCLUDED.crm_lead_ids, crm_status = EXCLUDED.crm_status,
       crm_won = EXCLUDED.crm_won, crm_lost = EXCLUDED.crm_lost, revenue = EXCLUDED.revenue, updated_at = now()`,
     [
@@ -981,7 +978,7 @@ async function upsertConversationProjection(
       latestTouch.id,
       firstTouch.occurred_at,
       latestTouch.occurred_at,
-      firstTouch.channel,
+      firstTouch.channel || candidate.channel,
       firstTouch.platform,
       firstTouch.source,
       firstTouch.medium,
@@ -999,11 +996,12 @@ async function upsertConversationProjection(
       firstTouch.utm_campaign,
       firstTouch.utm_content,
       firstTouch.utm_term,
-      firstTouch.branch_id,
-      firstTouch.branch_name,
+      firstTouch.branch_id || candidate.branchId,
+      firstTouch.branch_name || candidate.branchName,
       firstTouch.attribution_method,
       firstTouch.confidence,
-      firstTouch.unknown_reason,
+      firstTouch.unknown_reason ||
+        (firstTouch.attribution_method === "unknown" ? REFERRAL_EVIDENCE_MISSING : ""),
       JSON.stringify(crm.ids),
       crm.status,
       crm.won,
@@ -1041,34 +1039,34 @@ async function syncChatwoot(candidate: NormalizedAttribution, entity: MetaEntity
   if (!candidate.conversationId || syncMode() === "off") return;
   const mode = syncMode();
   if (mode === "attributes" || mode === "both") {
-    const wanted = Object.fromEntries(
-      Object.entries({
-        attribution_source: candidate.source,
-        attribution_medium: candidate.medium,
-        attribution_campaign: entity.campaignName || candidate.utmCampaign,
-        meta_campaign_id: entity.campaignId,
-        meta_adset_id: entity.adsetId,
-        meta_ad_id: entity.adId,
-        ctwa_clid: candidate.ctwaClid,
-        engosoft_branch: candidate.branchId,
-        attribution_method: candidate.attributionMethod,
-        attribution_confidence: candidate.confidence,
-        utm_source: candidate.utmSource,
-        utm_medium: candidate.utmMedium,
-        utm_campaign: candidate.utmCampaign,
-        utm_content: candidate.utmContent,
-        utm_term: candidate.utmTerm,
-      }).filter(([, value]) => Boolean(value)),
+    const wanted = buildChatwootAttributionAttributes({
+      channel: candidate.channel,
+      branch: candidate.branchName || candidate.branchId,
+      attributionMethod: candidate.attributionMethod,
+      confidence: candidate.confidence,
+      source: candidate.platform || candidate.source,
+      medium: candidate.medium,
+      campaignName: entity.campaignName,
+      campaignId: entity.campaignId,
+      adsetId: entity.adsetId,
+      adsetName: entity.adsetName,
+      adId: entity.adId,
+      adName: entity.adName,
+      creativeId: entity.creativeId,
+      ctwaClid: candidate.ctwaClid,
+      marketer: configuredMarketer(entity.campaignId),
+      customerType: configuredCustomerType(candidate.inboxId),
+      utmSource: candidate.utmSource,
+      utmMedium: candidate.utmMedium,
+      utmCampaign: candidate.utmCampaign,
+      utmContent: candidate.utmContent,
+      utmTerm: candidate.utmTerm,
+    });
+    await updateChatwootConversationAttributes(
+      candidate.conversationId,
+      (latest) => planChatwootAttributionUpdate(latest, wanted, "live"),
+      { ownedKeys: CHATWOOT_ATTRIBUTION_KEYS },
     );
-    if (Object.keys(wanted).length) {
-      const current = await getChatwootConversationCustomAttributes(candidate.conversationId);
-      const changed = Object.fromEntries(
-        Object.entries(wanted).filter(([key, value]) => string(current[key]) !== value),
-      );
-      if (Object.keys(changed).length) {
-        await mergeChatwootConversationCustomAttributes(candidate.conversationId, changed);
-      }
-    }
   }
   if (mode === "labels" || mode === "both") {
     const current = await getChatwootConversationLabels(candidate.conversationId);
@@ -1089,6 +1087,12 @@ export async function processChatwootAttributionEvent(input: {
   payload: unknown;
   rawBody: string;
   deliveryId?: string;
+  /**
+   * A reconstructed event for a conversation whose webhook never arrived. It
+   * projects the attribution row only: no Chatwoot write and no Meta
+   * correlation, and an unknown result records why the evidence is missing.
+   */
+  replay?: { unknownReason: string };
 }): Promise<{
   accepted: boolean;
   duplicate: boolean;
@@ -1213,6 +1217,27 @@ export async function processChatwootAttributionEvent(input: {
     );
     const crm = await crmMatch(finalCandidate.phoneKey);
     await upsertConversationProjection(finalCandidate.conversationId!, finalCandidate, crm);
+    if (input.replay) {
+      await db.query(
+        `UPDATE chatwoot_conversation_attribution
+            SET unknown_reason = $2, updated_at = now()
+          WHERE conversation_id = $1 AND attribution_method = 'unknown'
+            AND unknown_reason IN ('', $3)`,
+        [finalCandidate.conversationId, input.replay.unknownReason, REFERRAL_EVIDENCE_MISSING],
+      );
+      await db.query(
+        `UPDATE chatwoot_event_inbox
+            SET status = 'processed', locked_at = NULL, processed_at = now(), last_error = ''
+          WHERE id = $1`,
+        [eventId],
+      );
+      return {
+        accepted: true,
+        duplicate,
+        projected: Boolean(touch.rows[0]),
+        conversationId: finalCandidate.conversationId,
+      };
+    }
     if (finalCandidate.trackingToken) {
       await db.query(
         `UPDATE chatwoot_attribution_tokens

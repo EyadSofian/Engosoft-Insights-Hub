@@ -111,14 +111,20 @@ const numberOrNull = (value: unknown): number | null => {
 
 const count = (value: unknown): number => Math.max(0, numberOrNull(value) ?? 0);
 
-async function request(path: string, init?: RequestInit, attempt = 0): Promise<unknown> {
+async function request(
+  path: string,
+  init?: RequestInit,
+  attempt = 0,
+  immediate = false,
+): Promise<unknown> {
   const cfg = config();
   if (!chatwootConfigured()) throw new Error("Chatwoot is not configured");
   const minInterval = Math.max(
     0,
     Math.min(10_000, Number(process.env.CHATWOOT_REQUEST_MIN_INTERVAL_MS) || 0),
   );
-  if (minInterval > 0) {
+  // `immediate` skips pacing so an attribute write follows its final read with no added gap.
+  if (minInterval > 0 && !immediate) {
     const waitMs = Math.max(0, requestNotBefore - Date.now());
     requestNotBefore = Math.max(Date.now(), requestNotBefore) + minInterval;
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -141,7 +147,7 @@ async function request(path: string, init?: RequestInit, attempt = 0): Promise<u
         ? Math.min(15_000, retryAfter * 1_000)
         : Math.min(12_000, 1_500 * 2 ** attempt);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
-    return request(path, init, attempt + 1);
+    return request(path, init, attempt + 1, immediate);
   }
   if (!response.ok) throw new Error(`Chatwoot returned HTTP ${response.status}`);
   return response.json();
@@ -628,20 +634,199 @@ export async function getChatwootConversationCustomAttributes(
   return object(response?.custom_attributes) || {};
 }
 
-export async function mergeChatwootConversationCustomAttributes(
+const attributeWriteQueues = new Map<number, Promise<unknown>>();
+
+/** Runs one conversation's attribute writes one at a time within this process. */
+function serializeConversationWrite<T>(conversationId: number, task: () => Promise<T>): Promise<T> {
+  const previous = attributeWriteQueues.get(conversationId) ?? Promise.resolve();
+  const run = previous.then(task);
+  const tail = run.catch(() => undefined);
+  attributeWriteQueues.set(conversationId, tail);
+  void tail.then(() => {
+    if (attributeWriteQueues.get(conversationId) === tail)
+      attributeWriteQueues.delete(conversationId);
+  });
+  return run;
+}
+
+export interface ChatwootAttributeWriteResult {
+  /** The owned attributes this call wrote; empty when nothing needed to change. */
+  written: Record<string, unknown>;
+  attempts: number;
+}
+
+/** Attribute values compare by JSON so booleans, numbers and strings round-trip exactly. */
+function sameAttributeValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+/**
+ * Updates attributes that the caller owns without disturbing anything else.
+ *
+ * Chatwoot's custom_attributes endpoint replaces the conversation's whole
+ * attribute hash and has no merge or version check, so every write here:
+ * - runs serialized per conversation, so this service never races itself;
+ * - plans against a fresh read taken immediately before the POST, with only a
+ *   synchronous plan and no pacing delay between the two;
+ * - sends the latest hash back with the changes applied, and only changes
+ *   keys listed in `ownedKeys`, so keys owned by bots, automations or agents
+ *   are never removed or altered;
+ * - reads again afterwards and retries if another integration overwrote the
+ *   change in the meantime.
+ */
+export async function updateChatwootConversationAttributes(
   conversationId: number,
-  customAttributes: Record<string, string>,
-): Promise<void> {
+  plan: (latest: Record<string, unknown>) => Record<string, unknown>,
+  options: { ownedKeys: readonly string[]; maxAttempts?: number },
+): Promise<ChatwootAttributeWriteResult> {
   if (!Number.isInteger(conversationId) || conversationId <= 0) {
     throw new Error("A valid Chatwoot conversation id is required");
   }
+  const owned = new Set(options.ownedKeys);
+  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 3));
+  return serializeConversationWrite(conversationId, async () => {
+    const cfg = config();
+    const path = `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/custom_attributes`;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const latest = await getChatwootConversationCustomAttributes(conversationId);
+      const changes = Object.fromEntries(
+        Object.entries(plan(latest)).filter(
+          ([key, value]) =>
+            owned.has(key) &&
+            value !== undefined &&
+            value !== null &&
+            value !== "" &&
+            !sameAttributeValue(latest[key], value),
+        ),
+      );
+      if (!Object.keys(changes).length) return { written: {}, attempts: attempt };
+      await request(
+        path,
+        { method: "POST", body: JSON.stringify({ custom_attributes: { ...latest, ...changes } }) },
+        0,
+        true,
+      );
+      const persisted = await getChatwootConversationCustomAttributes(conversationId);
+      if (
+        Object.entries(changes).every(([key, value]) => sameAttributeValue(persisted[key], value))
+      )
+        return { written: changes, attempts: attempt };
+    }
+    throw new Error(
+      `Chatwoot attributes for conversation ${conversationId} did not persist after ${maxAttempts} attempts`,
+    );
+  });
+}
+
+export interface ChatwootInboxSummary {
+  id: number;
+  channelType: string;
+  name: string;
+}
+
+/** The account's inboxes and their channel types: the trusted inbox → channel mapping. */
+export async function listChatwootInboxes(): Promise<ChatwootInboxSummary[]> {
+  const cfg = config();
+  const response = object(
+    await request(`/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/inboxes`),
+  );
+  const rows = Array.isArray(response?.payload) ? response.payload : [];
+  return rows
+    .map((row) => object(row))
+    .filter((row): row is Record<string, unknown> => Boolean(row))
+    .map((row) => ({
+      id: Number(row.id),
+      channelType: String(row.channel_type || "").trim(),
+      name: String(row.name || "").trim(),
+    }))
+    .filter((row) => Number.isInteger(row.id) && row.id > 0);
+}
+
+/** Keys of the conversation custom attributes defined in the account. */
+export async function listChatwootConversationAttributeKeys(): Promise<string[]> {
+  const cfg = config();
+  const response = await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions?attribute_model=0`,
+  );
+  const rows = Array.isArray(response)
+    ? response
+    : Array.isArray(object(response)?.payload)
+      ? (object(response)?.payload as unknown[])
+      : [];
+  return rows
+    .map((row) => object(row))
+    .filter(
+      (row): row is Record<string, unknown> =>
+        Boolean(row) && ["conversation_attribute", 0, "0"].includes(row?.attribute_model as never),
+    )
+    .map((row) => String(row.attribute_key || "").trim())
+    .filter(Boolean);
+}
+
+/** Adds one text conversation attribute definition. It never edits an existing one. */
+export async function createChatwootConversationAttributeDefinition(input: {
+  key: string;
+  name: string;
+  description: string;
+}): Promise<void> {
   const cfg = config();
   await request(
-    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${encodeURIComponent(String(conversationId))}/custom_attributes`,
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions`,
     {
       method: "POST",
-      body: JSON.stringify({ custom_attributes: customAttributes, merge: true }),
+      body: JSON.stringify({
+        attribute_display_name: input.name,
+        attribute_key: input.key,
+        attribute_description: input.description,
+        attribute_display_type: 0,
+        attribute_model: 0,
+      }),
     },
+  );
+}
+
+export interface ChatwootAttributeDefinitionSummary {
+  id: number;
+  key: string;
+  name: string;
+}
+
+/** Conversation attribute definitions with their IDs and display names. */
+export async function listChatwootConversationAttributeDefinitions(): Promise<
+  ChatwootAttributeDefinitionSummary[]
+> {
+  const cfg = config();
+  const response = await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions?attribute_model=0`,
+  );
+  const rows = Array.isArray(response)
+    ? response
+    : Array.isArray(object(response)?.payload)
+      ? (object(response)?.payload as unknown[])
+      : [];
+  return rows
+    .map((row) => object(row))
+    .filter(
+      (row): row is Record<string, unknown> =>
+        Boolean(row) && ["conversation_attribute", 0, "0"].includes(row?.attribute_model as never),
+    )
+    .map((row) => ({
+      id: Number(row.id),
+      key: String(row.attribute_key || "").trim(),
+      name: String(row.attribute_display_name || "").trim(),
+    }))
+    .filter((row) => Number.isInteger(row.id) && row.id > 0 && row.key);
+}
+
+/** Changes only the display label of an existing definition; its key and values stay as they are. */
+export async function renameChatwootConversationAttributeDefinition(
+  id: number,
+  name: string,
+): Promise<void> {
+  const cfg = config();
+  await request(
+    `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/custom_attribute_definitions/${encodeURIComponent(String(id))}`,
+    { method: "PATCH", body: JSON.stringify({ attribute_display_name: name }) },
   );
 }
 
@@ -832,3 +1017,45 @@ import {
   readDashboardDataset,
   writeDashboardDataset,
 } from "./dashboard-db.server.ts";
+
+/**
+ * One page (25) of the account's conversations, newest first by creation.
+ * Read-only; used by the attribution reconciliation to find conversations the
+ * webhook never delivered.
+ */
+export async function listChatwootConversationsPage(
+  page: number,
+): Promise<Record<string, unknown>[]> {
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations?status=all&assignee_type=all&sort_by=created_at_desc&page=${Math.max(1, Math.floor(page))}`,
+    ),
+  );
+  const data = object(response?.data);
+  const payload = data?.payload ?? response?.payload;
+  return Array.isArray(payload)
+    ? payload
+        .map((row) => object(row))
+        .filter((row): row is Record<string, unknown> => Boolean(row))
+    : [];
+}
+
+/** Messages of one conversation (Chatwoot returns the latest 20, older with `before`). Read-only. */
+export async function listChatwootConversationMessages(
+  conversationId: number,
+  before?: number,
+): Promise<Record<string, unknown>[]> {
+  const cfg = config();
+  const response = object(
+    await request(
+      `/api/v1/accounts/${encodeURIComponent(cfg.accountId)}/conversations/${conversationId}/messages${before ? `?before=${before}` : ""}`,
+    ),
+  );
+  const payload = response?.payload;
+  return Array.isArray(payload)
+    ? payload
+        .map((row) => object(row))
+        .filter((row): row is Record<string, unknown> => Boolean(row))
+    : [];
+}

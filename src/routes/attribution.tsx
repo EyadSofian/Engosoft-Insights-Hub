@@ -15,7 +15,10 @@ import {
   KpiRow,
   PageSection,
   PageSections,
+  SecondaryMetrics,
 } from "@/components/dashboard-bits";
+import { AcquisitionOverviewSection } from "@/components/attribution/AcquisitionOverviewSection";
+import { MetaDestinationMixSection } from "@/components/attribution/MetaDestinationMixSection";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { FunnelBars } from "@/components/ui-bits";
 import { useApi } from "@/lib/use-api";
@@ -575,7 +578,7 @@ function Attribution() {
     },
     {
       key: "spend",
-      header: A ? "الصرف" : "Spend",
+      header: A ? "الصرف المطابق" : "Matched spend",
       align: "right",
       render: (row) => fmtUSD(row.spend),
       sortValue: (row) => row.spend ?? -1,
@@ -628,18 +631,20 @@ function Attribution() {
     <PageSections>
       <DashboardPageHeader
         icon={<MessagesSquare size={22} />}
-        title={A ? "إسناد المحادثات متعدد القنوات" : "Multi-channel conversation attribution"}
+        title={A ? "إسناد الاستحواذ" : "Acquisition attribution"}
         subtitle={
           A
-            ? "من الإعلان أو الرابط إلى المحادثة ثم نتيجة CRM، دون افتراض مصدر غير مثبت."
-            : "From ad or link to conversation and CRM outcome, without inventing unproven sources."
+            ? "كل عميل ومحادثة وإرسال جديد من دليل المزود. تفاصيل المحادثات تليه، وتقارير Meta الإجمالية منفصلة في آخر الصفحة."
+            : "Every new lead, conversation and landing submission from provider evidence. Conversation-level detail follows; Meta's aggregate reporting is shown separately at the end."
         }
         period={period}
         tone="violet"
       />
 
+      <AcquisitionOverviewSection />
+
       <PageSection
-        title={A ? "فلاتر الإسناد" : "Attribution filters"}
+        title={A ? "إسناد المحادثات: الفلاتر" : "Conversation-level attribution filters"}
         hint={
           A ? "الحملة والإعلان يُطابقان بالمعرّف الدقيق." : "Campaign and ad filters use exact IDs."
         }
@@ -736,108 +741,120 @@ function Attribution() {
       </PageSection>
 
       <PageSection level="headline" aria-label={A ? "مؤشرات الإسناد" : "Attribution metrics"}>
-        <KpiRow>
-          <MetricDetailTrigger
-            detail={metrics.conversations}
-            card={{
-              index: 0,
-              sub: A ? "كل المحادثات المسجلة" : "All recorded conversations",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.attributed}
-            card={{
-              index: 1,
-              sub: A ? "تشمل CTWA وUTM والتوكن" : "CTWA, UTM, and tracking tokens",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.paidCampaigns}
-            card={{
-              index: 2,
-              sub: A ? "معرّف حملة Meta مُثبت" : "Resolved Meta campaign ID",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.organicDirect}
-            card={{
-              index: 3,
-              sub: A ? "قناة معروفة دون إحالة مدفوعة" : "Known channel, no paid referral",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.ctwa}
-            card={{
-              index: 4,
-              sub: A ? "إحالات Meta الأصلية" : "Native Meta referrals",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.unknownRate}
-            card={{
-              index: 5,
-              sub: A ? "حالة قابلة للقياس وليست أورجانيك" : "Measured, not silently called organic",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.crmMatched}
-            card={{
-              index: 4,
-              sub: A ? `مغلق بنجاح: ${fmtNum(totals?.won)}` : `Won: ${fmtNum(totals?.won)}`,
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.spend}
-            card={{
-              index: 5,
-              sub: totals?.spendAvailable
-                ? A
-                  ? "بمعرّف حملة Meta دقيق"
-                  : "Exact Meta campaign-ID join"
-                : A
-                  ? "غير متاح بلا تطابق دقيق"
-                  : "Unavailable without an exact join",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.cpl}
-            card={{
-              index: 6,
-              sub: totals?.spendAvailable
-                ? A
-                  ? `تغطية: ${fmtNum(totals.spendCoveredConversations)} محادثة`
-                  : `Coverage: ${fmtNum(totals.spendCoveredConversations)} conversations`
-                : A
-                  ? "لا يُقدّر من أسماء الحملات"
-                  : "Never estimated from names",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.cpa}
-            card={{
-              index: 7,
-              sub: A ? "الصرف المطابق ÷ فرص CRM المغلقة" : "Matched spend ÷ CRM-won conversations",
-              loading: summary.isLoading,
-            }}
-          />
-          <MetricDetailTrigger
-            detail={metrics.roas}
-            card={{
-              index: 8,
-              sub: A ? "إيراد المحادثات المطابقة ÷ الصرف" : "Covered conversation revenue ÷ spend",
-              loading: summary.isLoading,
-            }}
-          />
-        </KpiRow>
+        <>
+          <KpiRow>
+            <MetricDetailTrigger
+              detail={metrics.conversations}
+              card={{
+                index: 0,
+                sub: A ? "كل المحادثات المسجلة" : "All recorded conversations",
+                loading: summary.isLoading,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.attributed}
+              card={{
+                index: 1,
+                sub: A ? "تشمل CTWA وUTM والتوكن" : "CTWA, UTM, and tracking tokens",
+                loading: summary.isLoading,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.paidCampaigns}
+              card={{
+                index: 2,
+                sub: A ? "معرّف حملة Meta مُثبت" : "Resolved Meta campaign ID",
+                loading: summary.isLoading,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.organicDirect}
+              card={{
+                index: 3,
+                sub: A ? "قناة معروفة دون إحالة مدفوعة" : "Known channel, no paid referral",
+                loading: summary.isLoading,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.ctwa}
+              card={{
+                index: 4,
+                sub: A ? "إحالات Meta الأصلية" : "Native Meta referrals",
+                loading: summary.isLoading,
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.unknownRate}
+              card={{
+                index: 5,
+                sub: A
+                  ? "حالة قابلة للقياس وليست أورجانيك"
+                  : "Measured, not silently called organic",
+                loading: summary.isLoading,
+              }}
+            />
+          </KpiRow>
+          <SecondaryMetrics count={5}>
+            <KpiRow>
+              <MetricDetailTrigger
+                detail={metrics.crmMatched}
+                card={{
+                  index: 4,
+                  sub: A ? `مغلق بنجاح: ${fmtNum(totals?.won)}` : `Won: ${fmtNum(totals?.won)}`,
+                  loading: summary.isLoading,
+                }}
+              />
+              <MetricDetailTrigger
+                detail={metrics.spend}
+                card={{
+                  index: 5,
+                  sub: totals?.spendAvailable
+                    ? A
+                      ? "بمعرّف حملة Meta دقيق"
+                      : "Exact Meta campaign-ID join"
+                    : A
+                      ? "غير متاح بلا تطابق دقيق"
+                      : "Unavailable without an exact join",
+                  loading: summary.isLoading,
+                }}
+              />
+              <MetricDetailTrigger
+                detail={metrics.cpl}
+                card={{
+                  index: 6,
+                  sub: totals?.spendAvailable
+                    ? A
+                      ? `تغطية: ${fmtNum(totals.spendCoveredConversations)} محادثة`
+                      : `Coverage: ${fmtNum(totals.spendCoveredConversations)} conversations`
+                    : A
+                      ? "لا يُقدّر من أسماء الحملات"
+                      : "Never estimated from names",
+                  loading: summary.isLoading,
+                }}
+              />
+              <MetricDetailTrigger
+                detail={metrics.cpa}
+                card={{
+                  index: 7,
+                  sub: A
+                    ? "الصرف المطابق ÷ فرص CRM المغلقة"
+                    : "Matched spend ÷ CRM-won conversations",
+                  loading: summary.isLoading,
+                }}
+              />
+              <MetricDetailTrigger
+                detail={metrics.roas}
+                card={{
+                  index: 8,
+                  sub: A
+                    ? "إيراد المحادثات المطابقة ÷ الصرف"
+                    : "Covered conversation revenue ÷ spend",
+                  loading: summary.isLoading,
+                }}
+              />
+            </KpiRow>
+          </SecondaryMetrics>
+        </>
       </PageSection>
 
       <PageSection
@@ -1024,6 +1041,8 @@ function Attribution() {
           }
         />
       </PageSection>
+
+      <MetaDestinationMixSection />
     </PageSections>
   );
 }

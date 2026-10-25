@@ -162,8 +162,8 @@ function MetricsGlossary({ open, onClose }: { open: boolean; onClose: () => void
 
           <p className="text-[11.5px] text-text-muted leading-relaxed px-1">
             {lang === "ar"
-              ? "ملاحظة مهمة: الإيراد مصدره الوحيد هو الفواتير المدفوعة في تبويب Accounting بتاريخ الدفع. أوامر البيع و Full Invoiced Orders مؤشرات استرشادية ومش مصدر إيراد. والخسائر مصدرها Lost Analysis وحده، مش مرحلة Lost جوه CRM Leads."
-              : "Note: revenue has exactly one source — paid invoices on the Accounting tab, dated by Payment Date. Sales orders and Full Invoiced Orders are advisory and never a revenue source. Losses come from Lost Analysis alone, never from CRM stage text."}
+              ? "ملاحظة مهمة: الإيراد مصدره الوحيد هو الفواتير المدفوعة في تبويب Accounting بتاريخ الدفع. أوامر البيع و Full Invoiced Orders مؤشرات استرشادية ومش مصدر إيراد. والخسائر متصنفة مباشرة من Odoo حسب عقد CRM 1.26."
+              : "Note: revenue has exactly one source — paid invoices on the Accounting tab, dated by Payment Date. Sales orders and Full Invoiced Orders are advisory and never a revenue source. Losses are classified directly from Odoo under CRM 1.26."}
           </p>
         </div>
       </div>

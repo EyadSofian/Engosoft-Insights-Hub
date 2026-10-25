@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,14 +24,22 @@ import {
   useFilters,
 } from "@/lib/filter-store";
 import { approvedReportingEnd, DEFAULT_DATE_PRESET } from "@/lib/reporting-window";
-import { useModalGuard } from "@/lib/ui-store";
+import { uiStore, useModalGuard } from "@/lib/ui-store";
+import { attachHeaderAutoHide } from "@/lib/header-auto-hide";
 import { chromeStore, useChrome } from "@/lib/chrome-store";
 import type { AcquisitionChannel, CampaignObjective, DataHealth, Platform } from "@/lib/types";
-import { ACQUISITION_CHANNEL_LABEL, ACQUISITION_CHANNELS } from "@/lib/constants";
+import {
+  ACQUISITION_CHANNEL_COLOR,
+  ACQUISITION_CHANNEL_LABEL,
+  ACQUISITION_CHANNELS,
+} from "@/lib/constants";
 import { acquisitionChannel } from "@/lib/acquisition-channel";
 import { Segmented } from "./ui-bits";
 import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { NavigationDrawer } from "./NavigationDrawer";
+import { GlobalSearch } from "./GlobalSearch";
+import logoImg from "@/assets/engosoft-logo.png";
 
 export interface FiltersResp {
   accounts: {
@@ -98,6 +106,8 @@ export function useFiltersData() {
       return res.json();
     },
     staleTime: 5 * 60_000,
+    refetchOnWindowFocus: "always",
+    refetchInterval: 60_000,
   });
 }
 
@@ -112,21 +122,145 @@ function latestDate(data?: FiltersResp): string | undefined {
 const sortedUnique = (values: string[]): string[] =>
   [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
+/** One compact entry point for the channel scope, instead of a row of chips. */
+function ChannelPicker() {
+  const { t, lang } = useI18n();
+  const filters = useFilters();
+  const [open, setOpen] = useState(false);
+  const active = acquisitionChannel(filters);
+  const activeLabel = active ? ACQUISITION_CHANNEL_LABEL[active][lang] : t("all_channels");
+  const activeColor = active
+    ? ACQUISITION_CHANNEL_COLOR[active]
+    : "color-mix(in oklab, var(--brand) 70%, var(--text))";
+
+  const select = (channel?: AcquisitionChannel) => {
+    setAcquisitionFilter(channel);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${lang === "ar" ? "اختيار القنوات" : "Choose channels"}: ${activeLabel}`}
+          className="inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold text-text transition-[border-color,background,transform] hover:border-brand/45 hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:min-w-[148px] sm:px-3"
+        >
+          <span
+            className="size-2 shrink-0 rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_10%,transparent)]"
+            style={{ background: activeColor }}
+            aria-hidden="true"
+          />
+          <span className="hidden truncate sm:inline">{activeLabel}</span>
+          <span className="sm:hidden">{active ? "1" : lang === "ar" ? "الكل" : "All"}</span>
+          <span className="ms-auto text-text-subtle" aria-hidden="true">
+            ▾
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-[min(20rem,calc(100vw-1.75rem))] rounded-2xl border-border bg-surface p-2 shadow-xl"
+      >
+        <div className="mb-1 flex items-center justify-between px-2 py-1">
+          <div>
+            <div className="text-sm font-semibold text-text">
+              {lang === "ar" ? "القنوات" : "Channels"}
+            </div>
+            <div className="text-[11px] text-text-muted">
+              {lang === "ar" ? "اختار نطاق الأرقام" : "Choose the reporting scope"}
+            </div>
+          </div>
+          <SlidersHorizontal size={16} className="text-brand" aria-hidden="true" />
+        </div>
+        <div className="grid gap-1" role="menu">
+          <ChannelOption
+            label={t("all_channels")}
+            color="var(--brand)"
+            active={!active}
+            onClick={() => select()}
+          />
+          {ACQUISITION_CHANNELS.map((channel) => (
+            <ChannelOption
+              key={channel}
+              label={ACQUISITION_CHANNEL_LABEL[channel][lang]}
+              color={ACQUISITION_CHANNEL_COLOR[channel]}
+              active={active === channel}
+              onClick={() => select(channel)}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ChannelOption({
+  label,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={active}
+      onClick={onClick}
+      className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 text-sm font-semibold transition-colors ${
+        active ? "bg-brand-soft text-brand" : "text-text-muted hover:bg-surface-2 hover:text-text"
+      }`}
+    >
+      <span
+        className="size-2 shrink-0 rounded-full"
+        style={{ background: color }}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1 truncate text-start">{label}</span>
+      {active && <Check size={16} className="shrink-0" aria-hidden="true" />}
+    </button>
+  );
+}
+
 export function TopBar({ title }: { title?: string }) {
-  const { t, lang, setLang, theme, toggleTheme } = useI18n();
+  const { t, lang } = useI18n();
   const filters = useFilters();
   const qc = useQueryClient();
+  const routeHref = useLocation({ select: (location) => location.href });
+  const previousRoute = useRef(routeHref);
   const [refreshing, setRefreshing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const chrome = useChrome();
-  // The top controls no longer react to scroll either. A manager should not
-  // lose filters, refresh or the navigation switch just because they reached
-  // the lower half of a report.
+  // The bar hides on the way down and returns on the way up (see
+  // header-auto-hide.ts). That runs outside React: the controller flips one
+  // attribute on <html> and CSS slides the bar, so scrolling never re-renders
+  // the shell. The reserve below stays constant, so nothing in the page moves.
   const compact = false;
-  const hidden = false;
   const { barRef, reserved } = useReservedHeight(true, false);
 
+  useEffect(() => {
+    const element = barRef.current;
+    if (!element) return;
+    return attachHeaderAutoHide(element, {
+      isModalOpen: uiStore.isOpen,
+      subscribeModal: uiStore.subscribe,
+    });
+  }, [barRef]);
+
   const { data } = useFiltersData();
+  // The shell stays mounted when switching pages or in-page views. Revalidate
+  // active reports on navigation, including the global source-health badge;
+  // otherwise yesterday's cached result can follow the user between tabs.
+  useEffect(() => {
+    if (previousRoute.current === routeHref) return;
+    previousRoute.current = routeHref;
+    void qc.invalidateQueries({ type: "active" });
+  }, [routeHref, qc]);
   const activeCount = activeDimensionCount(filters);
   const latest = latestDate(data);
 
@@ -162,23 +296,35 @@ export function TopBar({ title }: { title?: string }) {
       <header
         ref={barRef}
         data-app-chrome=""
-        className="app-topbar chrome-slide chrome-bar fixed top-0 z-30 pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]"
+        className="app-topbar chrome-slide chrome-bar fixed top-0 z-(--z-header) pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem]"
         style={{
           insetInlineStart: "var(--chrome-nav-inset)",
           insetInlineEnd: 0,
+          paddingTop: "env(safe-area-inset-top)",
           transition:
             "transform var(--dur-chrome) var(--ease-chrome), inset-inline-start var(--dur-chrome) var(--ease-chrome)",
-          transform: hidden ? "translateY(-100%)" : "translateY(0)",
         }}
       >
         <div className={`flex items-center gap-2 ${compact ? "py-1.5" : "py-2"}`}>
           {/* Desktop shows the logo in the sidebar; mobile needs branding here.
               The page title itself lives in each page's DashboardPageHeader, so the bar
               stays a controls strip and never repeats the heading. */}
+          {/* Below lg: menu, mark and wordmark — the rail's job moves into the
+              drawer. The wordmark gives way first at 320px, never the controls. */}
           <div className="flex shrink-0 items-center gap-2 min-w-0">
-            <span className="lg:hidden shrink-0 font-semibold text-[14px] sm:text-[15px] tracking-tight text-text">
-              ENGOSOFT
-            </span>
+            <NavigationDrawer />
+            <Link
+              to="/"
+              className="flex shrink-0 items-center gap-2 rounded-lg lg:hidden"
+              aria-label="ENGOSOFT"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border bg-white">
+                <img src={logoImg} alt="" className="h-5 w-5 object-contain" />
+              </span>
+              <span className="hidden font-semibold text-[14px] tracking-tight text-text min-[360px]:inline sm:text-[15px]">
+                ENGOSOFT
+              </span>
+            </Link>
             {title && (
               <h1 className="text-base sm:text-lg font-semibold text-text truncate min-w-0">
                 {title}
@@ -186,99 +332,22 @@ export function TopBar({ title }: { title?: string }) {
             )}
           </div>
 
-          {/* Below sm only the two controls a reader reaches for on a phone stay
-              on the bar — filters and refresh. Everything else moves into the
-              overflow menu rather than shrinking below a usable tap size, which
-              is what used to squeeze the wordmark off the left edge at 320px. */}
+          {/* Search, channel scope and period are the three decisions readers
+              make most often. The utility icons live behind one menu so the
+              header reads as a workspace control bar, not a toolbar of orphans. */}
           <div className="ms-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <GlobalSearch />
+            <ChannelPicker />
+            <div className="shrink-0">
+              <DateFilter latest={latest} />
+            </div>
             <SyncBadge data={data} />
-
-            <Link
-              to="/guide"
-              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
-              aria-label={lang === "ar" ? "دليل الاستخدام" : "User guide"}
-              title={lang === "ar" ? "دليل الاستخدام" : "User guide"}
-            >
-              <BookOpen size={16} />
-            </Link>
-
-            <button
-              onClick={() => setSheetOpen(true)}
-              className="relative inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2 active:scale-[0.97] sm:h-9 sm:min-w-0 sm:px-3"
-              aria-label={t("filters")}
-            >
-              <SlidersHorizontal size={16} />
-              <span className="hidden sm:inline">{t("filters")}</span>
-              {activeCount > 0 && (
-                <span
-                  className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full text-[10px] font-bold text-white num"
-                  style={{ background: "var(--accent)" }}
-                >
-                  {activeCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={doRefresh}
-              disabled={refreshing}
-              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] disabled:opacity-60 sm:h-9 sm:w-9"
-              aria-label={t("refresh")}
-              title={t("refresh")}
-            >
-              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-            </button>
-
-            <NavigationVisibilityButton />
-
-            <button
-              onClick={toggleTheme}
-              className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
-              aria-label={t("theme")}
-              title={t("theme")}
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-
-            <button
-              onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="hidden h-9 cursor-pointer items-center justify-center gap-1 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold transition-colors hover:bg-surface-2 active:scale-[0.97] sm:inline-flex"
-              aria-label="Toggle language"
-            >
-              <Languages size={16} />
-              <span>{lang === "ar" ? "EN" : "ع"}</span>
-            </button>
-
-            <OverflowMenu data={data} />
-          </div>
-        </div>
-
-        {/* Period and platform are the most-used controls, so they stay on the
-            bar whenever it is whole. Scrolling down trades them for content and
-            one scroll back up returns them; the active period is still named on
-            the date button itself, which survives into the compact bar.
-            On a phone the platform strip runs to the screen edge on purpose: the
-            item clipped by the edge is what tells the reader it scrolls. */}
-        <div
-          hidden={compact}
-          className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 pb-2 sm:flex"
-        >
-          <div className="shrink-0">
-            <DateFilter latest={latest} />
-          </div>
-          <div className="hscroll bleed-x [--bleed:0.875rem] min-w-0 sm:[--bleed:0px]">
-            <Segmented
-              value={acquisitionChannel(filters) ?? "all"}
-              onChange={(v) =>
-                setAcquisitionFilter(v === "all" ? undefined : (v as AcquisitionChannel))
-              }
-              options={[
-                { value: "all", label: t("all_channels") },
-                ...ACQUISITION_CHANNELS.map((channel) => ({
-                  value: channel,
-                  label: ACQUISITION_CHANNEL_LABEL[channel][lang],
-                })),
-              ]}
+            <OverflowMenu
+              data={data}
+              activeCount={activeCount}
+              refreshing={refreshing}
+              onOpenFilters={() => setSheetOpen(true)}
+              onRefresh={doRefresh}
             />
           </div>
         </div>
@@ -305,44 +374,6 @@ export function TopBar({ title }: { title?: string }) {
 
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} data={data} />
     </>
-  );
-}
-
-/**
- * The explicit navigation switch. It is always available in the fixed bar, so
- * a collapsed rail can be brought back without relying on hover, scroll or an
- * invisible screen-edge target.
- */
-function NavigationVisibilityButton() {
-  const { lang } = useI18n();
-  const chrome = useChrome();
-  const label = chrome.navHidden
-    ? lang === "ar"
-      ? "فتح قائمة التنقل (⌘/Ctrl + B)"
-      : "Open navigation (⌘/Ctrl + B)"
-    : lang === "ar"
-      ? "تصغير قائمة التنقل (⌘/Ctrl + B)"
-      : "Collapse navigation (⌘/Ctrl + B)";
-
-  return (
-    <button
-      type="button"
-      onClick={() => chromeStore.toggleNavigation()}
-      aria-pressed={!chrome.navHidden}
-      aria-label={label}
-      title={label}
-      className={`hidden h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors active:scale-[0.97] lg:inline-flex ${
-        chrome.navHidden
-          ? "border-brand bg-brand-soft text-brand"
-          : "border-border bg-surface text-text-muted hover:bg-surface-2"
-      }`}
-    >
-      {chrome.navHidden ? (
-        <PanelRightOpen size={16} className="rtl:-scale-x-100" />
-      ) : (
-        <PanelRightClose size={16} className="rtl:-scale-x-100" />
-      )}
-    </button>
   );
 }
 
@@ -404,33 +435,110 @@ function useReservedHeight(measure: boolean, hidden: boolean) {
 }
 
 /**
- * The controls that do not fit a phone bar: theme, language, the user guide and
- * the freshness readout that was previously invisible below `md`. Rendered only
- * below `sm`, where the inline buttons are hidden — the two never both show.
+ * One utility menu for controls that should not compete with search, channels
+ * and period. It is deliberately available at every width: the header has one
+ * predictable actions button instead of a row of unrelated icons.
  */
-function OverflowMenu({ data }: { data?: FiltersResp }) {
+function OverflowMenu({
+  data,
+  activeCount,
+  refreshing,
+  onOpenFilters,
+  onRefresh,
+}: {
+  data?: FiltersResp;
+  activeCount: number;
+  refreshing: boolean;
+  onOpenFilters: () => void;
+  onRefresh: () => void | Promise<void>;
+}) {
   const { t, lang, setLang, theme, toggleTheme } = useI18n();
+  const chrome = useChrome();
   const [open, setOpen] = useState(false);
 
   const rowClass =
-    "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm text-text transition-colors hover:bg-surface-2 cursor-pointer";
+    "flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-sm text-text transition-colors hover:bg-surface-2 cursor-pointer";
+  const navigationLabel = chrome.navHidden
+    ? lang === "ar"
+      ? "فتح قائمة التنقل"
+      : "Open navigation"
+    : lang === "ar"
+      ? "تصغير قائمة التنقل"
+      : "Collapse navigation";
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex sm:hidden h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface transition-colors hover:bg-surface-2 active:scale-[0.97] cursor-pointer"
+          className="relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface text-text transition-colors hover:border-brand/45 hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:w-10"
           aria-label={lang === "ar" ? "خيارات إضافية" : "More options"}
         >
           <MoreHorizontal size={18} />
+          {activeCount > 0 && (
+            <span
+              className="absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold text-white num"
+              style={{ background: "var(--accent)" }}
+            >
+              {activeCount}
+            </span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[min(16rem,calc(100vw-1.75rem))] rounded-xl p-1.5"
+        className="w-[min(19rem,calc(100vw-1.75rem))] rounded-2xl p-1.5"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
+        <div className="px-2.5 pb-1.5 pt-1">
+          <div className="text-sm font-semibold text-text">
+            {lang === "ar" ? "أدوات الهيدر" : "Header tools"}
+          </div>
+          <div className="text-[11px] text-text-muted">
+            {lang === "ar" ? "كل الأدوات في مكان واحد" : "Everything else, in one place"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onOpenFilters();
+            setOpen(false);
+          }}
+          className={rowClass}
+        >
+          <SlidersHorizontal size={16} className="text-brand" />
+          <span className="flex-1 text-start">{t("filters")}</span>
+          {activeCount > 0 && (
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-bold text-brand num">
+              {activeCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={refreshing}
+          onClick={() => {
+            void onRefresh();
+            setOpen(false);
+          }}
+          className={`${rowClass} disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          <RefreshCw size={16} className={refreshing ? "animate-spin" : "text-text-muted"} />
+          <span>{t("refresh")}</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={!chrome.navHidden}
+          onClick={() => {
+            chromeStore.toggleNavigation();
+            setOpen(false);
+          }}
+          className={rowClass}
+        >
+          {chrome.navHidden ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
+          <span>{navigationLabel}</span>
+        </button>
+        <div className="my-1 border-t border-border" />
         <button type="button" onClick={toggleTheme} className={rowClass}>
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           <span>{t("theme")}</span>
@@ -477,6 +585,8 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
 
   const danger = failed.length > 0;
   const count = danger ? failed.length : stale.length;
+  const firstSourceKey = (danger ? failed[0] : stale[0])?.split(":")[0]?.trim();
+  const firstSourceLabel = data?.tabSyncs.find((tab) => tab.key === firstSourceKey)?.label || firstSourceKey;
 
   // What the reader can act on: how many sources are affected, and what that
   // does to the figures. The source names themselves are internal worksheet
@@ -489,6 +599,11 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
     : lang === "ar"
       ? `يتم عرض آخر نسخة ناجحة لـ ${count} من المصادر — قد تنقص أحدث الصفوف.`
       : `Showing the last good copy for ${count} source${count === 1 ? "" : "s"} — the newest rows may be missing.`;
+  const namedText = count === 1 && firstSourceLabel
+    ? lang === "ar"
+      ? `${firstSourceLabel}: ${text}`
+      : `${firstSourceLabel}: ${text}`
+    : text;
 
   const detail = (danger ? failed : stale).join(" · ");
 
@@ -504,8 +619,8 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
       role="status"
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "currentColor" }} />
-      <span className="truncate" title={`${text}\n\n${detail}`}>
-        {text}
+      <span className="truncate" title={`${namedText}\n\n${detail}`}>
+        {namedText}
       </span>
     </div>
   );
@@ -586,7 +701,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
       </span>
       {level !== "ok" && lagging && (
         <span className="num shrink-0" style={{ color }} title={tooltip}>
-          · {lang === "ar" ? "أقدم مصدر" : "oldest source"} {fmtAge(ageH(lagging.syncedAt))}
+          · {lagging.label} {fmtAge(ageH(lagging.syncedAt))}
         </span>
       )}
     </span>

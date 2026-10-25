@@ -47,7 +47,8 @@ import { useApi } from "@/lib/use-api";
  */
 export const Route = createFileRoute("/sales")({
   beforeLoad: () => {
-    throw redirect({ to: "/accounting", replace: true });
+    // Sales performance lives on Accounting's marketing → revenue view.
+    throw redirect({ to: "/accounting", search: { view: "marketing" }, replace: true });
   },
   component: SalesReport,
 });

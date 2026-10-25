@@ -302,12 +302,22 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   },
   {
     id: "ads",
-    routes: ["/ads"],
+    /**
+     * `/creatives` already declares itself as this surface's `creatives` tab
+     * through `useRegisterNexusView("ads", …)`, but its pathname was not on any
+     * contract — so the page said "you are on ads/creatives" and the router
+     * said the route did not exist. Both now agree.
+     */
+    routes: ["/ads", "/creatives"],
     section: "campaigns",
     title: t("الإعلانات", "Ads"),
     status: "CONNECTED",
     sensitivity: "internal",
-    views: [],
+    views: [
+      { id: "delivery", title: t("التسليم والإنفاق", "Delivery and spend") },
+      { id: "creatives", title: t("المواد الإعلانية", "Creatives") },
+    ],
+    defaultViews: ["delivery"],
     operations: ["summary", "list", "detail"],
     filters: [...PERIOD_FILTERS, "platform", "account", "campaign", "adset", "ad"],
     entities: ["campaign", "adset", "ad"],
@@ -324,6 +334,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
           "health.lostExclusions",
           "platformCoverageAll",
         ],
+      },
+      {
+        endpoint: "/api/ads-creatives",
+        as: "creatives",
+        required: false,
+        views: ["creatives"],
+        why: "Per-creative delivery and spend, which the ad-level table cannot answer because one creative runs under several ads.",
+        summaryPaths: ["totals", "summary"],
       },
     ],
     rows: [
@@ -421,6 +439,16 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
           ),
         ],
       },
+      {
+        id: "marketing",
+        title: t("أداء المبيعات من التسويق", "Sales performance (marketing → revenue)"),
+        caveats: [
+          t(
+            "الإيراد هنا مؤرخ بتاريخ وصول العميل، أما ملخص الحسابات فبتاريخ الدفع؛ الرقمان لا يتساويان ولا يُجمعان.",
+            "Revenue here is dated by when the lead arrived; the accounting summary dates it by payment. The totals do not match and must not be added.",
+          ),
+        ],
+      },
     ],
     defaultViews: ["summary"],
     operations: ["summary", "list", "trend"],
@@ -442,6 +470,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
           "health.lostExclusions",
           "source",
         ],
+      },
+      {
+        endpoint: "/api/acquisition/closed-loop",
+        as: "marketingRevenue",
+        required: true,
+        views: ["marketing"],
+        why: "Every tracked lead's campaign, ad, creative, CRM outcome, order, invoice and paid revenue, dated by acquisition.",
+        summaryPaths: ["kpis", "insights", "coverageSummary"],
       },
       {
         /**
@@ -611,13 +647,46 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
   },
   {
     id: "leads",
-    routes: ["/leads"],
+    /**
+     * `/lead-distribution` and `/lead-sources` are separate pathnames rather
+     * than views, but they are the same subject and the same CRM population,
+     * so a lead question asked while standing on either must resolve here.
+     * Both shipped with no contract at all, which is how "كام ليد في كل كورس؟"
+     * could be answered on screen and refused by the assistant on the same page.
+     */
+    routes: ["/leads", "/lead-distribution", "/lead-sources"],
     section: "leads",
     title: t("الليدز", "Leads"),
     status: "CONNECTED",
     // Lead rows carry phone and email.
     sensitivity: "personal",
-    views: [],
+    views: [
+      { id: "crm", title: t("سجل العملاء والـCRM", "Leads and CRM") },
+      { id: "intelligence", title: t("تحليل الليدز حسب الكورس", "Course lead intelligence") },
+      { id: "weekly", title: t("متابعة ليدز الأسبوع", "Weekly lead follow-up") },
+      {
+        id: "performance",
+        title: t("أداء الليدز والمبيعات · ٦ أشهر", "Leads and sales · six months"),
+        caveats: [
+          t(
+            "التحويل هنا حد أدنى مثبت: أمر بيع مرتبط بالفرصة مباشرةً وصافي فواتيره موجب. Won في الـCRM مش محتسب.",
+            "Conversion here is a verified lower bound: an exactly opportunity-linked sale order with a positive net. CRM Won is not counted.",
+          ),
+          t(
+            "المجموعات بشهر دخول الليد، فالبيع المتأخر يرجع لشهر دخوله مش لشهر الدفع.",
+            "Cohorts follow the lead's entry month, so a later sale stays with its entry month rather than its payment month.",
+          ),
+        ],
+      },
+    ],
+    /**
+     * The CRM table is what `/leads` opens on, so it is what "no view" means.
+     * The cohort report is deliberately NOT a default: it is a fixed six-month
+     * window that ignores the global date filter, and folding it into an
+     * unscoped lead question would answer a question about March with figures
+     * from a window the caller never asked for.
+     */
+    defaultViews: ["crm"],
     operations: ["summary", "list", "trend"],
     filters: [...PERIOD_FILTERS, "source", "course", "salesTeam", "salesperson", "campaign"],
     entities: ["source", "course", "salesperson"],
@@ -660,6 +729,50 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: false,
         why: "Leads distributed but never called — the follow-up gap behind a conversion drop.",
         summaryPaths: ["summary", "range", "leads"],
+      },
+      {
+        /**
+         * The six-month entry-cohort report: duplicates, unqualified reasons,
+         * PBX attempt distribution, time to first contact, and conversion to a
+         * verified paid enrollment. Every one of those is a question management
+         * asks in words, and none of them was reachable.
+         */
+        endpoint: "/api/lead-performance",
+        as: "cohorts",
+        required: false,
+        views: ["performance"],
+        why: "Entry-month cohorts: duplicate and unqualified rates, call attempts, first-contact lag, and conversion to a verified paid enrollment.",
+        summaryPaths: ["selected", "coverage", "availability"],
+      },
+      {
+        endpoint: "/api/lead-intelligence",
+        as: "intelligence",
+        required: false,
+        views: ["intelligence"],
+        why: "Per-course lead targets, close lifecycle, lead quality and the unit economics of one lead.",
+        summaryPaths: ["totals", "summary"],
+      },
+      {
+        endpoint: "/api/weekly-lead-followup",
+        as: "weekly",
+        required: false,
+        views: ["weekly"],
+        why: "This week's leads and whether each one has actually been followed up yet.",
+        summaryPaths: ["summary", "totals"],
+      },
+      {
+        endpoint: "/api/lead-course-distribution",
+        as: "distribution",
+        required: false,
+        why: "How the CRM population splits across courses and specialties, by record type and stage.",
+        summaryPaths: ["totals", "summary"],
+      },
+      {
+        endpoint: "/api/lead-source-matrix",
+        as: "sourceMatrix",
+        required: false,
+        why: "Lead source against course as a matrix, which neither breakdown answers on its own.",
+        summaryPaths: ["totals", "summary"],
       },
     ],
     rows: [
@@ -903,14 +1016,19 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
           "health.crmExclusions",
           "health.lostExclusions",
           "metricAvailability",
+          "annual.currentFrom",
+          "annual.currentTo",
+          "annual.previousFrom",
+          "annual.previousTo",
+          "annual.coverage",
         ],
       },
     ],
     freshnessPaths: ["health"],
     caveats: [
       t(
-        "مش كل مقياس متاح للسنتين؛ اللي ناقص بيبان في metricAvailability.",
-        "Not every metric exists for both years; what is missing is listed in metricAvailability.",
+        "المقارنة تتوقف عند الشهر المختار ونفس اليوم للشهر الجاري. النواقص التاريخية ظاهرة في annual.coverage وmetricAvailability، ولا تُعتبر صفرًا.",
+        "The comparison stops at the selected month and the same day for an unfinished current month. Missing history appears in annual.coverage and metricAvailability; it is not a zero.",
       ),
     ],
   },
@@ -1030,6 +1148,66 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
   },
   {
+    id: "management_review",
+    routes: ["/management-review"],
+    section: "media-buyers",
+    title: t("مراجعة الأداء والخطة", "Performance and plan review"),
+    status: "CONNECTED",
+    sensitivity: "internal",
+    views: [],
+    operations: ["summary", "list", "compare", "trend"],
+    filters: ["month"],
+    entities: ["course"],
+    sources: [
+      {
+        endpoint: "/api/management-review",
+        as: "root",
+        required: true,
+        why: "Monthly Odoo creation cohorts, canonical Lost, paid revenue, platform spend and saved media-plan targets.",
+        summaryPaths: [
+          "selected.month",
+          "selected.coverage",
+          "selected.target",
+          "selected.actual",
+          "selected.achievement",
+          "selected.funnel.lostRate",
+          "selected.funnel.noAnswerRate",
+          "selected.funnel.freshConversion",
+          "selected.funnel.oldConversion",
+          "selected.funnel.turnaroundDays",
+          "selected.funnel.reasons",
+          "selected.funnel.topConversionCourse",
+          "selected.funnel.topFreshCourse",
+          "historical",
+          "methodology",
+        ],
+      },
+    ],
+    rows: [
+      {
+        collection: "rows",
+        kind: "month",
+        fields: [
+          "month",
+          "planStatus",
+          "coverage",
+          "target",
+          "actual",
+          "achievement",
+          "funnelAvailable",
+        ],
+        limit: 24,
+      },
+    ],
+    freshnessPaths: ["today", "historical.syncedAt"],
+    caveats: [
+      t(
+        "حالة الـWon/Lost الحالية محسوبة على شهر إنشاء الليد، وليست لقطة بنهاية ذلك الشهر. تحويل Fresh/Old Data يقتصر على الليدز الموسومة في Odoo.",
+        "Current Won/Lost states are attributed to creation month, not saved month-end states. Fresh/Old conversion uses only explicitly tagged Odoo leads.",
+      ),
+    ],
+  },
+  {
     id: "social_media",
     routes: ["/social-media"],
     section: "social",
@@ -1092,13 +1270,151 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
   },
   {
+    id: "acquisition_performance",
+    routes: ["/acquisition"],
+    section: "campaigns",
+    title: t("تحليل أداء الاستحواذ", "Acquisition performance"),
+    status: "CONNECTED",
+    sensitivity: "internal",
+    views: [
+      { id: "overview", title: t("نظرة عامة", "Overview") },
+      { id: "ads", title: t("الإعلانات والمواد", "Ads & creatives") },
+      { id: "leads", title: t("العملاء والجودة", "Leads & quality") },
+      { id: "sales", title: t("المبيعات والإيراد", "Sales & revenue") },
+      { id: "coverage", title: t("تغطية البيانات", "Data coverage") },
+    ],
+    defaultViews: ["overview"],
+    operations: ["summary"],
+    filters: [...PERIOD_FILTERS],
+    entities: ["campaign", "source"],
+    sources: [
+      {
+        endpoint: "/api/acquisition/performance",
+        as: "root",
+        required: true,
+        operations: ["summary"],
+        why: "Acquisitions by channel, campaign, ad set, ad, creative, landing page and Meta form, today and for the period, with exact-ID spend joins.",
+        summaryPaths: ["kpis", "confidence", "metaAggregate", "unmatched", "today", "blockers"],
+      },
+      {
+        endpoint: "/api/acquisition/closed-loop",
+        as: "closedLoop",
+        required: false,
+        why: "The closed loop: each exact acquisition linked to its CRM lead by provider ID, with interest, quotation, win, sale order and paid revenue, rolled up by campaign, ad set, ad and creative.",
+        summaryPaths: ["kpis", "coverageSummary", "insights", "sources", "matches", "refresh"],
+      },
+      {
+        endpoint: "/api/acquisition/inferred-links",
+        as: "inferredLinks",
+        required: false,
+        views: ["coverage"],
+        why: "How safe the inferred phone-key CRM links are: day gaps, ambiguity and duplicate risk. Counts and IDs only.",
+        summaryPaths: ["links", "dayGap", "ambiguity", "duplicateRisk", "outcomes"],
+      },
+      {
+        endpoint: "/api/meta/messaging-readiness",
+        as: "messagingReadiness",
+        required: false,
+        views: ["coverage"],
+        why: "WhatsApp, Messenger and Instagram attribution readiness: checklist states, last infrastructure self-test, real deliveries.",
+        summaryPaths: ["whatsapp.status", "messenger.status", "instagram.status", "generatedAt"],
+      },
+      {
+        endpoint: "/api/meta/credential-health",
+        as: "credentialHealth",
+        required: false,
+        views: ["coverage"],
+        why: "Which Meta capabilities the configured credentials have (connected / not connected). No credential text.",
+        summaryPaths: ["credentials"],
+      },
+      {
+        endpoint: "/api/meta/catalog-reconcile",
+        as: "catalogReconcile",
+        required: false,
+        views: ["coverage"],
+        why: "The Meta catalog reconciliation state: ads read, lead forms and image URLs recovered, ads Meta refused.",
+        summaryPaths: ["status", "summary", "catalog"],
+      },
+    ],
+    rows: [
+      {
+        collection: "closedLoop.grains.campaign",
+        kind: "campaign",
+        fields: [
+          "campaignName",
+          "campaignId",
+          "spend",
+          "leads",
+          "crmMatched",
+          "qualified",
+          "quotations",
+          "won",
+          "revenue",
+          "cpl",
+          "cac",
+          "winRate",
+          "roas",
+        ],
+        limit: 25,
+      },
+      {
+        collection: "closedLoop.grains.creative",
+        kind: "creative",
+        fields: [
+          "creativeName",
+          "creativeId",
+          "spend",
+          "leads",
+          "crmMatched",
+          "qualified",
+          "quotations",
+          "won",
+          "revenue",
+          "cpl",
+          "costPerQualified",
+          "winRate",
+          "roas",
+        ],
+        limit: 25,
+      },
+    ],
+    freshnessPaths: ["generatedAt", "kpis.spendThrough", "closedLoop.refresh.finishedAt"],
+    caveats: [
+      t(
+        "الحملة والإعلان والمادة تُنسب بالمعرّف الدقيق فقط؛ غير المعروف يبقى غير معروف ولا يُسمى عضويًا.",
+        "Campaigns, ads and creatives are credited by exact ID only; unknown stays unknown and is never called organic.",
+      ),
+      t(
+        "أرقام Meta المجمّعة (عملاء المنصة) تقارير وليست سجلات، ولا تُضاف إلى الأحداث.",
+        "Meta aggregate lead totals are platform reporting, not records, and are never added to events.",
+      ),
+      t(
+        "نسب الجودة والفوز مقامها العملاء المطابقون في CRM فقط؛ العميل غير المطابق نتيجته غير معروفة ولا يُحسب خسارة.",
+        "Quality and win rates use CRM-matched leads as the denominator; an unmatched lead has an unknown outcome and is never counted as lost.",
+      ),
+      t(
+        "الأصل (فيديو أو صورة) مؤشر تقارير فقط؛ التحويل يُنسب للمادة الإعلانية وليس لأصل بعينه.",
+        "An asset (video or image) is a reporting signal only; conversions are credited to the creative, never to one asset.",
+      ),
+    ],
+  },
+  {
     id: "attribution",
-    routes: ["/attribution"],
+    /**
+     * `/landing-pages` is the same question one step earlier in the journey —
+     * where a visit came from and what it did — so it resolves here rather
+     * than being left without a contract, which is what it shipped with.
+     */
+    routes: ["/attribution", "/landing-pages"],
     section: "campaigns",
     title: t("إسناد محادثات واتساب", "Conversation attribution"),
     status: "CONNECTED",
     sensitivity: "personal",
-    views: [],
+    views: [
+      { id: "conversations", title: t("المحادثات", "Conversations") },
+      { id: "landing", title: t("صفحات الهبوط", "Landing pages") },
+    ],
+    defaultViews: ["conversations"],
     operations: ["summary", "list"],
     filters: [
       ...PERIOD_FILTERS,
@@ -1132,6 +1448,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         operations: ["list"],
         why: "The bounded conversation rows behind attribution totals and CRM outcomes.",
         summaryPaths: ["total"],
+      },
+      {
+        endpoint: "/api/landing-attribution/summary",
+        as: "landing",
+        required: false,
+        views: ["landing"],
+        why: "Landing-page views, form starts, submissions and the step rates between them, by first or latest touch.",
+        summaryPaths: ["totals", "pages"],
       },
     ],
     rows: [

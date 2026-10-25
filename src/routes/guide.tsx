@@ -193,8 +193,8 @@ function GuidePage() {
           }
           description={
             ar
-              ? "العملاء المحتملون يعرض CRM الحالي. تحليل الـLost التسويقي يمشي بتاريخ إنشاء الليد عشان يقيس جودة ليدز نفس الفترة، وتحت منه حركة مستقلة للي اتقفل Lost بتاريخ الإغلاق. Won المؤرشف لا يتحسب Lost."
-              : "Leads shows current CRM. Marketing Lost follows lead creation date to measure the same acquisition cohort; a separate movement card shows what closed Lost by close date. Archived Won is never counted as Lost."
+              ? "إدارة العملاء والـ CRM تعرض كل الـstages والـOpen Status والـWon والـLost حسب CRM 1.26. تحليل الـLost يمشي بتاريخ إنشاء الليد للكوهورت، ومعه حركة مستقلة بتاريخ الخسارة المناسب لكل نوع سجل."
+              : "CRM & Customer Management shows every stage, Open Status, Won and CRM 1.26 Lost. Lost analysis follows creation date for cohort quality and keeps a separate movement view using the correct loss date for each record type."
           }
           to="/lost"
         >
@@ -203,6 +203,26 @@ function GuidePage() {
 
         <GuideSection
           number="04"
+          icon={<Target size={19} />}
+          title={
+            ar
+              ? "قيّم جودة الليدز والمتابعة بالأرقام"
+              : "Judge lead quality and follow-up by figures"
+          }
+          path={ar ? "العملاء المحتملون ← أداء الليدز والمبيعات" : "Leads → Leads & sales"}
+          description={
+            ar
+              ? "ست مجموعات شهرية بشهر دخول الليد، فالبيع المتأخر يرجع لشهر دخوله. كل مرحلة بنسبة تحويلها، وأعمدة المحاولات وزمن أول اتصال موجودة لكل كورس ومصدر وميديا باير وسيلز — يعني تقييم الفريق يبقى على نفس الأساس للكل. التحويل محسوب على أمر بيع مرتبط بالفرصة مباشرةً وصافي فواتيره موجب، وWon في الـCRM لوحده مش محتسب. اللي مفيش عليه دليل يظهر شرطة، مش صفر."
+              : "Six cohorts by the lead's entry month, so a later sale stays with the month it arrived in. Every funnel stage carries its own conversion, and the attempt and first-contact columns reach each course, source, media buyer and salesperson — so the team is judged on one basis. Conversion needs an exactly opportunity-linked sale order with a positive net; CRM Won alone never counts. Anything without evidence shows an em dash, never a zero."
+          }
+          to="/leads"
+          search={{ view: "performance" }}
+        >
+          <MockCohort ar={ar} />
+        </GuideSection>
+
+        <GuideSection
+          number="05"
           icon={<GraduationCap size={19} />}
           title={ar ? "قارن الدورات والحملات المرتبطة" : "Compare courses and linked campaigns"}
           path={ar ? "المبيعات ← الدورات" : "Sales → Courses"}
@@ -217,7 +237,7 @@ function GuidePage() {
         </GuideSection>
 
         <GuideSection
-          number="05"
+          number="06"
           icon={<BadgeDollarSign size={19} />}
           title={ar ? "راجع الفاتورة وتاريخ التحصيل" : "Audit invoice recognition dates"}
           path={ar ? "المبيعات ← الحسابات" : "Sales → Accounting"}
@@ -232,7 +252,7 @@ function GuidePage() {
         </GuideSection>
 
         <GuideSection
-          number="06"
+          number="07"
           icon={<Sparkles size={19} />}
           title={ar ? "اسأل المساعد بصيغة مباشرة" : "Ask the assistant directly"}
           path={ar ? "زر المساعد أسفل الشاشة" : "Assistant button at the bottom"}
@@ -320,6 +340,7 @@ function GuideSection({
   path,
   description,
   to,
+  search,
   children,
 }: {
   number: string;
@@ -328,6 +349,8 @@ function GuideSection({
   path: string;
   description: string;
   to?: string;
+  /** Query params for a report that shares a route with its siblings. */
+  search?: Record<string, string>;
   children: ReactNode;
 }) {
   const { lang } = useI18n();
@@ -346,7 +369,11 @@ function GuideSection({
                 {path}
               </Pill>
               {to && (
-                <Link to={to} className="text-xs font-semibold text-brand hover:underline">
+                <Link
+                  to={to}
+                  search={search}
+                  className="text-xs font-semibold text-brand hover:underline"
+                >
                   {lang === "ar" ? "فتح التقرير" : "Open report"}
                 </Link>
               )}
@@ -430,6 +457,51 @@ function MockFunnel({ ar }: { ar: boolean }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The cohort funnel, drawn with each stage's own conversion.
+ *
+ * Illustrative numbers, and they say so: a guide that shows plausible live
+ * figures teaches a reader to quote them.
+ */
+function MockCohort({ ar }: { ar: boolean }) {
+  const stages: [string, string, string][] = [
+    [ar ? "دخلت CRM" : "Entered CRM", "503", "100%"],
+    [ar ? "تم التواصل (PBX)" : "Contacted (PBX)", "418", "88%"],
+    [ar ? "فرصة الآن" : "Opportunity now", "214", "43%"],
+    [ar ? "تسجيل مدفوع مثبت" : "Verified paid", "61", "12%"],
+  ];
+  const widths = ["100%", "83%", "43%", "12%"];
+  const colors = [
+    "var(--sky-strong)",
+    "var(--violet-strong)",
+    "var(--amber-strong)",
+    "var(--mint-strong)",
+  ];
+  return (
+    <div className="space-y-2.5">
+      {stages.map(([label, value, share], index) => (
+        <div key={label}>
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <span className="text-[12px] text-text">{label}</span>
+            <span className="num text-[12px] text-text-muted">
+              <b className="text-text">{value}</b> · {share}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-surface-3">
+            <div
+              className="h-full rounded-full"
+              style={{ width: widths[index], background: colors[index] }}
+            />
+          </div>
+        </div>
+      ))}
+      <p className="pt-1 text-[11px] text-text-muted">
+        {ar ? "أرقام توضيحية فقط." : "Illustrative figures only."}
+      </p>
     </div>
   );
 }

@@ -30,7 +30,9 @@ export const DICT = {
   media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
   media_plan: { ar: "خطة الميديا الشهرية", en: "Monthly media plan" },
   ads_tech: { ar: "الإعلانات", en: "Ads / Technical" },
+  acquisition_performance: { ar: "تحليل أداء الاستحواذ", en: "Acquisition performance" },
   attribution: { ar: "إسناد المحادثات", en: "Conversation attribution" },
+  landing_pages: { ar: "صفحات الهبوط", en: "Landing pages" },
   accounting: { ar: "الحسابات", en: "Accounting" },
   sales: { ar: "المبيعات", en: "Sales / Revenue" },
   leads: { ar: "العملاء المحتملون", en: "Leads (CRM)" },
@@ -149,9 +151,12 @@ export const DICT = {
 
   // date presets
   date_range: { ar: "الفترة الزمنية", en: "Date range" },
+  preset_today: { ar: "اليوم", en: "Today" },
   preset_7: { ar: "آخر ٧ أيام", en: "Last 7 days" },
   preset_30: { ar: "آخر ٣٠ يوماً", en: "Last 30 days" },
   preset_month: { ar: "هذا الشهر", en: "This month" },
+  preset_prev_month: { ar: "الشهر السابق", en: "Previous month" },
+  preset_same_period_last_month: { ar: "نفس الفترة الشهر الماضي", en: "Same period last month" },
   preset_year: { ar: "هذا العام", en: "This year" },
   preset_all: { ar: "كل الفترات", en: "All time" },
   custom_range: { ar: "فترة مخصصة", en: "Custom range" },
@@ -187,6 +192,7 @@ export const DICT = {
   cpa_invoices: { ar: "عدد الفواتير", en: "Invoices" },
   acos: { ar: "نسبة الإنفاق للإيراد", en: "ACOS" },
   crm_leads: { ar: "عملاء محتملون", en: "CRM Leads" },
+  lead_source_matrix: { ar: "مصادر العملاء حسب الدورة", en: "Lead sources by course" },
   platform_leads: { ar: "عملاء حسب المنصة", en: "Platform leads" },
   won: { ar: "صفقات مغلقة", en: "Won" },
   lost_count: { ar: "صفقات ضائعة", en: "Lost" },
@@ -385,16 +391,16 @@ export const DICT = {
     en: "Rows excluded from the lead total",
   },
   excluded_stages_note: {
-    ar: "هذه الصفوف موجودة في الشيت لكنها خارج التعريف المعتمد: مرحلة Lost مكانها تبويب Lost Analysis وحده، و Old Auto Dialer ليست عملاء تجاريين. وجود Lost هنا يعني أن مزامنة n8n ترسل صفوفاً لا يجب أن ترسلها.",
-    en: "These rows exist in the sheet but fall outside the approved definition: stage Lost belongs to Lost Analysis alone, and Old Auto Dialer rows are not commercial leads. Any Lost here means the n8n sync is shipping rows it should withhold.",
+    ar: "هذه صفوف قديمة من fallback الشيت خرجت من السكان التشغيليين. Lost الحالي يُصنّف مباشرة من Odoo حسب نوع السجل، وOld Auto Dialer ليس مساراً تجارياً.",
+    en: "These legacy fallback rows sit outside the operational population. Current Lost is classified directly from Odoo by record type, and Old Auto Dialer is not a commercial pipeline.",
   },
   missing_spend_tab_note: {
     ar: "تكلفة هذه المنصة غائبة عن الملف، فتظهر تكلفة العميل وتكلفة الصفقة أقل من الحقيقة ويظهر العائد أعلى منها. الأرقام تصبح صحيحة فور إضافة تبويب إنفاق لها.",
     en: "This platform's cost is missing from the workbook, so CPL and CPA read low and ROAS reads high. The numbers become correct as soon as it has a spend tab.",
   },
   lost_population_note: {
-    ar: "جدول الخسائر وتصنيف المرحلة «ضائع» في النظام مجموعتان مختلفتان من الصفوف، ولا تتطابق أعدادهما.",
-    en: 'The Lost tab and CRM stage "Lost" are two different row populations; their counts do not match.',
+    ar: "Lost في CRM 1.26 له قاعدتان: الـLead مؤرشف بسبب والـOpportunity داخل Lost stage؛ التاب يجمعهما دون تكرار.",
+    en: "CRM 1.26 has two Lost rules: an archived Lead with a reason and an Opportunity in the Lost stage; the tab combines them without duplication.",
   },
 
   // yoy

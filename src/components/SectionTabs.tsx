@@ -1,9 +1,20 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { pathMatchesRoute, sectionForPathname } from "@/lib/navigation";
+import { itemIsActive, itemLabel, sectionForLocation } from "@/lib/navigation";
+import { MoreReportsList, useLocationSearch } from "./MoreReports";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 /**
+ * The one contextual navigation layer.
+ *
+ * A management workspace (Marketing, Sales & CRM, Revenue, Team) shows its
+ * two to four reports as tabs. The specialist reports under More show a single
+ * switcher naming the current report instead of a twelve-tab strip. A page
+ * inside a workspace does not add a second switch of its own: anything deeper
+ * is a breadcrumb, a dropdown or a drawer.
+ *
  * Route-backed secondary navigation.
  *
  * Links keep browser history, deep links and keyboard behavior intact, while
@@ -12,15 +23,19 @@ import { pathMatchesRoute, sectionForPathname } from "@/lib/navigation";
  * `tablist`: these controls navigate to separate pages rather than swapping
  * panels in-place.
  *
- * It sticks directly under the top bar and rides up with it: once the bar hides
- * the tabs park at the top of the viewport on their own, so the reader keeps
- * one line saying where they are while the rest of the chrome is gone.
+ * It sticks directly under the top bar. When the bar slides away on a downward
+ * scroll the strip follows it up on the same transform (`chrome-follow`) and
+ * parks at the top of the viewport, so the reader keeps one line saying where
+ * they are while the rest of the chrome is gone.
  */
 export function SectionTabs() {
   const { pathname } = useLocation();
+  const search = useLocationSearch();
   const { t, lang } = useI18n();
-  const section = sectionForPathname(pathname);
+  const section = sectionForLocation(pathname, search);
   const ref = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Anything stacking below this strip — a page's own tab bar — needs its
   // height, and that height is zero on the pages and breakpoints where the
@@ -50,7 +65,7 @@ export function SectionTabs() {
     };
   });
 
-  if (!section || section.items.length < 2) return null;
+  if (!section || section.contextual === "none" || section.items.length < 2) return null;
 
   const SectionIcon = section.icon;
   const label = section.label[lang];
@@ -59,18 +74,21 @@ export function SectionTabs() {
     <nav
       ref={ref}
       data-app-chrome=""
-      aria-label={lang === "ar" ? `تقارير ${label}` : `${label} reports`}
+      aria-label={
+        lang === "ar"
+          ? section.id === "sales-crm"
+            ? "تقارير العملاء المحتملين"
+            : `تقارير ${label}`
+          : `${label} reports`
+      }
       // Shown at every width, not only below `lg`. The rail auto-hides on the
       // first downward scroll, and it was taking the section's sub-navigation
       // with it — on a long report a desktop reader had no way back to a
       // sibling tab without scrolling up. A section with a single report still
       // renders nothing at all (see the guard above), so this costs a row only
       // where there is genuinely something to switch between.
-      className="chrome-bar sticky z-20"
-      style={{
-        top: "var(--chrome-header-h, 0px)",
-        transition: "top var(--dur-chrome) var(--ease-chrome)",
-      }}
+      className="chrome-bar chrome-follow sticky z-(--z-sticky)"
+      style={{ top: "var(--chrome-header-h, 0px)" }}
     >
       <div className="pad-safe-x [--pad-x:0.875rem] sm:[--pad-x:1.5rem] mx-auto flex w-full max-w-[1600px] items-stretch gap-2">
         {/* The section's own name, at EVERY width — phone included.
@@ -88,38 +106,138 @@ export function SectionTabs() {
             <SectionIcon size={15} />
           </span>
           <span className="truncate text-[12.5px] sm:text-sm">{label}</span>
-          <span className="hidden whitespace-nowrap text-[11px] font-medium text-text-subtle sm:inline">
-            {lang === "ar" ? `· ${section.items.length} تبويبات` : `· ${section.items.length} tabs`}
-          </span>
           <span className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
         </div>
 
-        <div className="hscroll flex min-w-0 flex-1 items-stretch gap-1">
-          {section.items.map((item) => {
-            const active = pathMatchesRoute(pathname, item.to);
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                aria-current={active ? "page" : undefined}
-                /* Filled in the brand colour when you are on it, a quiet
-                   hairline outline when you are not — so the strip reads as
-                   "one of these three, and it is this one" rather than as a
-                   row of links with one of them slightly darker. */
-                className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
-                  active
-                    ? "border-brand bg-brand text-white shadow-sm"
-                    : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
-                }`}
+        {section.contextual === "menu" ? (
+          <div className="flex min-w-0 flex-1 items-center py-1.5">
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-semibold text-text transition-colors hover:bg-surface-2 sm:text-sm"
+                  aria-label={lang === "ar" ? "اختيار تقرير آخر" : "Switch report"}
+                >
+                  {(() => {
+                    const current = section.items.find((item) =>
+                      itemIsActive(item, pathname, search),
+                    );
+                    const Icon = current?.icon;
+                    return (
+                      <>
+                        {Icon && (
+                          <Icon size={15} className="shrink-0 text-brand" aria-hidden="true" />
+                        )}
+                        <span className="truncate">
+                          {current ? itemLabel(current, lang, t) : section.label[lang]}
+                        </span>
+                      </>
+                    );
+                  })()}
+                  <ChevronDown size={15} className="shrink-0 text-text-muted" aria-hidden="true" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-[min(20rem,calc(100vw-2rem))] max-h-[70dvh] overflow-y-auto rounded-xl p-2"
+                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               >
-                <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
-                <span>{item.tabLabel?.[lang] ?? t(item.key)}</span>
-              </Link>
-            );
-          })}
-        </div>
+                <MoreReportsList onNavigate={() => setMenuOpen(false)} />
+              </PopoverContent>
+            </Popover>
+          </div>
+        ) : (
+          <>
+            <div className="hscroll hidden min-w-0 flex-1 items-stretch gap-1 sm:flex">
+              {section.items.map((item, index) => {
+                const active = itemIsActive(item, pathname, search);
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={`${item.to}:${index}`}
+                    to={item.to}
+                    search={item.search as never}
+                    activeOptions={{ exact: true, includeSearch: true }}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
+                      active
+                        ? "border-brand bg-brand text-white shadow-sm"
+                        : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+                    }`}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+                    <span>{itemLabel(item, lang, t)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="flex min-w-0 flex-1 items-center py-1.5 sm:hidden">
+              <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-semibold text-text"
+                    aria-label={lang === "ar" ? "تغيير مساحة العمل" : "Switch workspace"}
+                  >
+                    {(() => {
+                      const current = section.items.find((item) =>
+                        itemIsActive(item, pathname, search),
+                      );
+                      const Icon = current?.icon;
+                      return (
+                        <>
+                          {Icon && (
+                            <Icon size={15} className="shrink-0 text-brand" aria-hidden="true" />
+                          )}
+                          <span className="truncate">
+                            {current ? itemLabel(current, lang, t) : section.label[lang]}
+                          </span>
+                        </>
+                      );
+                    })()}
+                    <ChevronDown
+                      size={15}
+                      className="shrink-0 text-text-muted"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-[min(20rem,calc(100vw-2rem))] rounded-xl p-2"
+                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                >
+                  <div className="grid gap-1">
+                    {section.items.map((item, index) => {
+                      const active = itemIsActive(item, pathname, search);
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={`${item.to}:mobile:${index}`}
+                          to={item.to}
+                          search={item.search as never}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${
+                            active
+                              ? "bg-brand text-white"
+                              : "text-text-muted hover:bg-surface-2 hover:text-text"
+                          }`}
+                        >
+                          <Icon size={16} aria-hidden="true" />
+                          <span>{itemLabel(item, lang, t)}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </>
+        )}
       </div>
     </nav>
   );

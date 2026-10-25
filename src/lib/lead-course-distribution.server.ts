@@ -1,0 +1,298 @@
+import { loadCrmRawByDomain, type CrmRawRow } from "./crm-odoo.server";
+import { lostEventWindow } from "./crm-lost-events";
+import {
+  classifyLeadCourse,
+  isLostOpportunity,
+  leadLifecycleBucket,
+  leadStage,
+  type LeadLifecycleBucket,
+} from "./lead-course-distribution";
+import { mainCategoryForCourse } from "./course-taxonomy";
+import { countsAsPotentialLead, excludedLeadSource } from "./lead-count-policy";
+import { odooConfig, searchRead } from "./odoo.server";
+import type { GlobalFilters } from "./types";
+
+export interface CourseLeadRecord {
+  id: string;
+  contact: string;
+  createdAt: string;
+  recordType: string;
+  stage: string;
+  actualStage: string;
+  course: string;
+  rawCategory: string;
+  specialty: string;
+  verified: boolean;
+  priority: string;
+  salesperson: string;
+  salesTeam: string;
+  source: string;
+  leadSegment: string;
+  company: string;
+  phone: string;
+  email: string;
+  odooUrl: string;
+}
+
+export interface CourseLeadGroup {
+  label: string;
+  count: number;
+  hot: number;
+  unverified: number;
+  leadActive: number;
+  leadLost: number;
+  leadOther: number;
+  opportunities: number;
+  opportunityLost: number;
+  opportunityStages: Record<string, number>;
+}
+
+export interface CourseLeadDistribution {
+  total: number;
+  excludedSources: {
+    recommendation: number;
+    whatsappBroadcast: number;
+    autodialerBroadcast: number;
+  };
+  unverified: number;
+  lifecycle: {
+    leadActive: number;
+    leadLost: number;
+    leadOther: number;
+    opportunities: number;
+    opportunityLost: number;
+  };
+  stages: string[];
+  byCourse: CourseLeadGroup[];
+  bySpecialty: CourseLeadGroup[];
+  detail: { rows: CourseLeadRecord[]; total: number; page: number; pageSize: number } | null;
+  period: { from: string; to: string };
+  source: string;
+  fetchedAt: string;
+}
+
+const cache = new Map<string, { expiresAt: number; promise: Promise<CrmRawRow[]> }>();
+
+type OdooStage = { id: number; name: string; sequence: number };
+let stageCache: { expiresAt: number; promise: Promise<OdooStage[]> } | null = null;
+
+async function odooStages(): Promise<OdooStage[]> {
+  if (stageCache && stageCache.expiresAt > Date.now()) return stageCache.promise;
+  const promise = searchRead<OdooStage>("crm.stage", [], ["name", "sequence"], {
+    order: "sequence,id",
+    context: { active_test: false, lang: "en_US" },
+    policy: { attempts: 2, timeoutMs: 30_000 },
+  });
+  stageCache = { expiresAt: Date.now() + 5 * 60_000, promise };
+  void promise.catch(() => {
+    if (stageCache?.promise === promise) stageCache = null;
+  });
+  return promise;
+}
+
+const fallbackStageOrder = [
+  "preparation",
+  "new",
+  "open",
+  "long follow up",
+  "quotation sent",
+  "won",
+  "lost",
+  "archived",
+];
+
+function stageName(value: string): string {
+  return value.split(" / ")[0].trim().toLocaleLowerCase("en");
+}
+
+/** Odoo's crm.stage sequence controls the opportunity rail, including custom stages. */
+export function sortOpportunityStages(stages: string[], odooOrder: OdooStage[]): string[] {
+  const ranks = new Map<string, number>();
+  odooOrder.forEach((stage, index) => {
+    const name = stageName(stage.name);
+    if (!ranks.has(name)) ranks.set(name, index);
+  });
+  return [...stages].sort((a, b) => {
+    const rank = (value: string) => {
+      const fallback = fallbackStageOrder.indexOf(stageName(value));
+      return (
+        ranks.get(stageName(value)) ??
+        odooOrder.length + (fallback < 0 ? fallbackStageOrder.length : fallback) + 1
+      );
+    };
+    return rank(a) - rank(b) || a.localeCompare(b);
+  });
+}
+
+export function loadCrmDateRows(filters: GlobalFilters): Promise<CrmRawRow[]> {
+  const bounds = lostEventWindow(filters.from, filters.to);
+  const domain: unknown[] = [];
+  if (bounds.start) domain.push(["create_date", ">=", bounds.start]);
+  if (bounds.end) domain.push(["create_date", "<", bounds.end]);
+  const key = `${bounds.start ?? ""}|${bounds.end ?? ""}`;
+  const now = Date.now();
+  const existing = cache.get(key);
+  if (existing && existing.expiresAt > now) return existing.promise;
+  if (cache.size > 12) cache.delete(cache.keys().next().value!);
+  const promise = loadCrmRawByDomain(domain, { attempts: 2, timeoutMs: 90_000 });
+  cache.set(key, { expiresAt: now + 60_000, promise });
+  void promise.catch(() => cache.delete(key));
+  return promise;
+}
+
+function toRecord(row: CrmRawRow): CourseLeadRecord {
+  const rawCategory = row["Course Categories"] || "";
+  const classification = classifyLeadCourse(rawCategory);
+  const id = row.__odoo_id;
+  return {
+    id,
+    contact: row["اسم جهة الاتصال"] || `#${id}`,
+    createdAt: row["أنشئ في"] || "",
+    recordType: row["Record Type"] || "",
+    stage: leadStage(row["Business Status"] || "", row.Stage || ""),
+    actualStage: row.Stage || "",
+    course: classification.course,
+    rawCategory,
+    specialty: classification.specialty,
+    verified: classification.verified,
+    priority: row.Priority || "",
+    salesperson: row.Salesperson || "",
+    salesTeam: row["Sales Team"] || "",
+    source: row.Source || "",
+    leadSegment: row["Lead Segment"] || "",
+    company: row.Company || "",
+    phone: row.Phone || row.Mobile || "",
+    email: row.Email || "",
+    odooUrl: `${odooConfig().url}/web#id=${encodeURIComponent(id)}&model=crm.lead&view_type=form`,
+  };
+}
+
+function grouped(records: CourseLeadRecord[], key: "course" | "specialty") {
+  const groups = new Map<string, CourseLeadGroup>();
+  for (const record of records) {
+    const label = record[key];
+    const group: CourseLeadGroup = groups.get(label) ?? {
+      label,
+      count: 0,
+      hot: 0,
+      unverified: 0,
+      leadActive: 0,
+      leadLost: 0,
+      leadOther: 0,
+      opportunities: 0,
+      opportunityLost: 0,
+      opportunityStages: {},
+    };
+    group.count++;
+    if (record.priority === "Hot") group.hot++;
+    if (!record.verified) group.unverified++;
+    const bucket = leadLifecycleBucket(record.recordType, record.stage);
+    if (bucket === "lead_active") group.leadActive++;
+    else if (bucket === "lead_lost") group.leadLost++;
+    else if (bucket === "lead_other") group.leadOther++;
+    else {
+      group.opportunities++;
+      if (isLostOpportunity(record.recordType, record.stage)) group.opportunityLost++;
+      group.opportunityStages[record.stage] = (group.opportunityStages[record.stage] ?? 0) + 1;
+    }
+    groups.set(label, group);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function loadLeadCourseRecords(filters: GlobalFilters): Promise<CourseLeadRecord[]> {
+  const raw = await loadCrmDateRows(filters);
+  return raw
+    .filter((row) => row.__odoo_id && ["lead", "opportunity"].includes(row["Record Type"]))
+    .map(toRecord)
+    .filter((row) => {
+      const day = row.createdAt.slice(0, 10);
+      if (filters.from && day < filters.from) return false;
+      if (filters.to && day > filters.to) return false;
+      if (filters.company && row.company !== filters.company) return false;
+      if (filters.course && row.course !== filters.course) return false;
+      if (filters.mainCategory && mainCategoryForCourse(row.course) !== filters.mainCategory)
+        return false;
+      if (filters.salesTeam && row.salesTeam !== filters.salesTeam) return false;
+      if (filters.salesperson && row.salesperson !== filters.salesperson) return false;
+      if (filters.source && row.source !== filters.source) return false;
+      return true;
+    });
+}
+
+export async function leadCourseDistribution(
+  filters: GlobalFilters,
+  detail?: {
+    dimension: "course" | "specialty";
+    label: string;
+    bucket?: LeadLifecycleBucket;
+    stage?: string;
+    opportunityLost?: boolean;
+    page: number;
+  },
+): Promise<CourseLeadDistribution> {
+  const [sourceRows, stageDefinitions] = await Promise.all([
+    loadLeadCourseRecords(filters),
+    // Keep the page available if Odoo temporarily refuses the stage metadata read.
+    odooStages().catch(() => []),
+  ]);
+  const excludedSources = {
+    recommendation: sourceRows.filter(
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "recommendation",
+    ).length,
+    whatsappBroadcast: sourceRows.filter(
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "whatsapp_broadcast",
+    ).length,
+    autodialerBroadcast: sourceRows.filter(
+      (row) => excludedLeadSource(row.source, row.leadSegment) === "autodialer_broadcast",
+    ).length,
+  };
+  const rows = sourceRows.filter((row) => countsAsPotentialLead(row.source, row.leadSegment));
+  const stages = sortOpportunityStages(
+    [...new Set(rows.filter((row) => row.recordType === "opportunity").map((row) => row.stage))],
+    stageDefinitions,
+  );
+  const pageSize = 50;
+  const detailRows = detail
+    ? rows
+        .filter(
+          (row) =>
+            row[detail.dimension] === detail.label &&
+            (!detail.bucket || leadLifecycleBucket(row.recordType, row.stage) === detail.bucket) &&
+            (!detail.opportunityLost || isLostOpportunity(row.recordType, row.stage)) &&
+            (!detail.stage || (row.recordType === "opportunity" && row.stage === detail.stage)),
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    : null;
+  return {
+    total: rows.length,
+    excludedSources,
+    unverified: rows.filter((row) => !row.verified).length,
+    lifecycle: {
+      leadActive: rows.filter(
+        (row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_active",
+      ).length,
+      leadLost: rows.filter((row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_lost")
+        .length,
+      leadOther: rows.filter(
+        (row) => leadLifecycleBucket(row.recordType, row.stage) === "lead_other",
+      ).length,
+      opportunities: rows.filter((row) => row.recordType === "opportunity").length,
+      opportunityLost: rows.filter((row) => isLostOpportunity(row.recordType, row.stage)).length,
+    },
+    stages,
+    byCourse: grouped(rows, "course"),
+    bySpecialty: grouped(rows, "specialty"),
+    detail: detailRows
+      ? {
+          rows: detailRows.slice((detail!.page - 1) * pageSize, detail!.page * pageSize),
+          total: detailRows.length,
+          page: detail!.page,
+          pageSize,
+        }
+      : null,
+    period: { from: filters.from || "", to: filters.to || "" },
+    source: "Odoo CRM · Course Categories · creation date",
+    fetchedAt: new Date().toISOString(),
+  };
+}

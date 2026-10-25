@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeDollarSign,
@@ -25,9 +25,9 @@ import {
 } from "@/components/accounting/CourseRevenueExplorer";
 import {
   AccountingMonthlyView,
-  AccountingProfitabilityView,
   type AccountingMonth,
 } from "@/components/accounting/AccountingSubViews";
+import { ProfitAndLossView } from "@/components/accounting/ProfitAndLossView";
 import { DataTable, type Col } from "@/components/DataTable";
 import {
   BarList,
@@ -49,7 +49,7 @@ import {
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
-import { fmtDate, fmtNum, fmtPct, fmtUSDExact, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtUSDExact, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { DEFAULT_FX_RATES } from "@/lib/fx-rates";
 import type { DataHealth, GlobalFilters, Grouped, Totals } from "@/lib/types";
@@ -57,8 +57,31 @@ import { useModalGuard } from "@/lib/ui-store";
 import { useApi } from "@/lib/use-api";
 import { useFiltersData } from "@/components/TopBar";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
+import { SalesPerformance } from "@/components/acquisition/SalesPerformance";
+import { EntryCohortView } from "@/components/accounting/EntryCohortView";
+import { NetSalesView } from "@/components/accounting/NetSalesView";
 
-export const Route = createFileRoute("/accounting")({ component: Accounting });
+type AccountingView =
+  "summary" | "months" | "cohorts" | "profitability" | "net-sales" | "marketing";
+const ACCOUNTING_VIEWS: readonly AccountingView[] = [
+  "summary",
+  "months",
+  "cohorts",
+  "profitability",
+  "net-sales",
+  "marketing",
+];
+
+export const Route = createFileRoute("/accounting")({
+  validateSearch: (search: Record<string, unknown>): { view?: AccountingView } => {
+    const view = typeof search.view === "string" ? search.view : "";
+    return (ACCOUNTING_VIEWS as readonly string[]).includes(view) && view !== "summary"
+      ? { view: view as AccountingView }
+      : {};
+  },
+  component: Accounting,
+});
 
 interface AccountingDetail {
   id: string;
@@ -100,6 +123,23 @@ interface AccountingResponse {
     productLines: number;
     averageInvoice: number | null;
   };
+  creditNoteReconciliation: {
+    status: "live" | "unavailable" | "not_applicable";
+    documents: Array<{
+      id: number;
+      movement: string;
+      invoiceDate: string;
+      company: string;
+      partner: string;
+      currency: string;
+      amount: number;
+      odooUrl: string;
+      inAccountingSnapshot: boolean;
+    }>;
+    addedDocuments: number;
+    addedUsd: number;
+    unsupportedCurrencies: string[];
+  };
   byProduct: Grouped[];
   byProductCategory: Grouped[];
   byMainCategory: Grouped[];
@@ -130,16 +170,25 @@ function Accounting() {
   const { t, lang } = useI18n();
   const filters = useFilters();
   const [exportOpen, setExportOpen] = useState(false);
-  const [view, setView] = useState<"summary" | "months" | "profitability">("summary");
+  // The view lives in the URL, so the Revenue workspace tabs (which navigate on
+  // this same route) and the report dropdown can never disagree with the page.
+  const view: AccountingView = Route.useSearch().view ?? "summary";
+  const navigate = useNavigate({ from: "/accounting" });
+  const setView = (next: AccountingView) =>
+    void navigate({ search: { view: next === "summary" ? undefined : next } });
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
   useRegisterNexusView("accounting", { tab: view });
   const [fxEgpInput, setFxEgpInput] = useState(filters.fxEgp ?? String(DEFAULT_FX_RATES.EGP));
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
-  const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting");
+  const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting", {
+    enabled: view !== "net-sales" && view !== "profitability",
+  });
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+  const companyScopeLabel =
+    filters.company || (lang === "ar" ? "كل شركات تقرير الأرباح والخسائر" : "All P&L companies");
   // Built once per response, not once per card: the five summary figures share
   // the same distributions and the same day series.
   const metrics = useMemo(() => (data ? accountingMetrics(data, lang) : null), [data, lang]);
@@ -171,7 +220,8 @@ function Accounting() {
     filterStore.setFxRates(DEFAULT_FX_RATES.EGP, DEFAULT_FX_RATES.SAR);
   };
 
-  if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error && view !== "net-sales" && view !== "profitability")
+    return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const cols: Col<AccountingDetail>[] = [
     {
@@ -333,14 +383,67 @@ function Accounting() {
       <DashboardPageHeader
         flush
         icon={<Receipt size={20} />}
-        title={t("accounting")}
+        title={
+          view === "net-sales"
+            ? lang === "ar"
+              ? "صافي مبيعات الشركة"
+              : "Net company sales"
+            : view === "profitability"
+              ? lang === "ar"
+                ? "الأرباح والخسائر"
+                : "Profit and Loss"
+              : view === "marketing"
+                ? lang === "ar"
+                  ? "من التسويق للإيراد"
+                  : "Marketing → revenue"
+                : t("accounting")
+        }
         subtitle={
-          lang === "ar"
-            ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
-            : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
+          view === "net-sales"
+            ? lang === "ar"
+              ? "المبيعات من القيود المحاسبية المرحّلة، بدون ضريبة القيمة المضافة وبعد رسوم التحصيل"
+              : "Posted accounting sales excluding VAT and collection fees"
+            : view === "profitability"
+              ? lang === "ar"
+                ? "الدخل والمصروفات وصافي الربح من القيود المحاسبية المرحّلة في Odoo"
+                : "Income, expenses and net profit from posted Odoo journal entries"
+              : lang === "ar"
+                ? `الفواتير المدفوعة على مستوى بند المنتج، حسب ${dateBasis === "invoice" ? "تاريخ الفاتورة" : "تاريخ الدفع"}`
+                : `Paid invoices at product-line grain, reported by ${dateBasis === "invoice" ? "Invoice Date" : "Payment Date"}`
         }
         period={reportingPeriod}
       />
+
+      {view !== "marketing" && (
+        <nav
+          aria-label={lang === "ar" ? "تقارير المحاسبة" : "Accounting reports"}
+          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
+        >
+          {(
+            [
+              ["summary", lang === "ar" ? "ملخص التحصيل" : "Collection summary"],
+              ["months", lang === "ar" ? "مقارنة الشهور" : "Monthly comparison"],
+              ["cohorts", lang === "ar" ? "مصدر العملاء" : "Customer cohorts"],
+              ["profitability", lang === "ar" ? "الأرباح والخسائر" : "Profit and Loss"],
+              ["net-sales", lang === "ar" ? "صافي المبيعات" : "Net sales"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-current={view === value ? "page" : undefined}
+              className={`min-h-11 shrink-0 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+                view === value
+                  ? "border-brand bg-brand text-white shadow-sm"
+                  : "border-border bg-surface text-text-muted hover:border-brand/40 hover:text-text"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {/* The reporting basis and the company scope are settings, not findings.
           They belong to the report and must stay reachable, but they were
@@ -353,15 +456,19 @@ function Accounting() {
             {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
           </span>
           <span className="text-[11.5px] text-text-muted">
-            {dateBasis === "invoice"
+            {view === "net-sales" || view === "profitability"
               ? lang === "ar"
-                ? "تاريخ الفاتورة"
-                : "Invoice Date"
-              : lang === "ar"
-                ? "تاريخ الدفع"
-                : "Payment Date"}
+                ? "تاريخ القيد المرحّل"
+                : "Posted journal date"
+              : dateBasis === "invoice"
+                ? lang === "ar"
+                  ? "تاريخ الفاتورة"
+                  : "Invoice Date"
+                : lang === "ar"
+                  ? "تاريخ الدفع"
+                  : "Payment Date"}
             {" · "}
-            {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
+            {companyScopeLabel}
           </span>
           <ChevronDown
             size={16}
@@ -369,43 +476,53 @@ function Accounting() {
           />
         </summary>
         <div className="grid gap-4 border-t border-border p-3.5 sm:p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
-              <CalendarDays size={15} className="text-brand" />
-              {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+          {view !== "net-sales" && view !== "profitability" && (
+            <div>
+              <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+                <CalendarDays size={15} className="text-brand" />
+                {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
+              </div>
+              <Segmented
+                value={dateBasis}
+                onChange={(value) =>
+                  filterStore.set({
+                    dateBasis: value === "invoice" ? "invoice" : undefined,
+                  })
+                }
+                size="md"
+                options={[
+                  {
+                    value: "payment",
+                    label: lang === "ar" ? "تاريخ الدفع — الافتراضي" : "Payment Date — default",
+                  },
+                  {
+                    value: "invoice",
+                    label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
+                  },
+                ]}
+              />
             </div>
-            <Segmented
-              value={dateBasis}
-              onChange={(value) =>
-                filterStore.set({
-                  dateBasis: value === "invoice" ? "invoice" : undefined,
-                })
-              }
-              size="md"
-              options={[
-                {
-                  value: "payment",
-                  label: lang === "ar" ? "تاريخ الدفع — الافتراضي" : "Payment Date — default",
-                },
-                {
-                  value: "invoice",
-                  label: lang === "ar" ? "تاريخ الفاتورة" : "Invoice Date",
-                },
-              ]}
-            />
-          </div>
+          )}
 
           <label className="block">
             <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
               <Building2 size={15} className="text-brand" />
-              {lang === "ar" ? "شركة الفاتورة" : "Invoice company"}
+              {view === "profitability"
+                ? lang === "ar"
+                  ? "شركة التقرير"
+                  : "Report company"
+                : lang === "ar"
+                  ? "شركة الفاتورة"
+                  : "Invoice company"}
             </span>
             <select
               value={filters.company ?? ""}
               onChange={(event) => filterStore.set({ company: event.target.value || undefined })}
               className="min-h-11 w-full cursor-pointer rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15"
             >
-              <option value="">{lang === "ar" ? "كل الشركات" : "All companies"}</option>
+              <option value="">
+                {lang === "ar" ? "كل شركات تقرير الأرباح والخسائر" : "All P&L companies"}
+              </option>
               {(filterOptions?.companies ?? []).map((company) => (
                 <option key={company} value={company}>
                   {company}
@@ -415,45 +532,33 @@ function Accounting() {
           </label>
 
           <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-xs text-text-muted">
-            <div className="font-semibold text-text">
-              {filters.company || (lang === "ar" ? "كل الشركات" : "All companies")}
-            </div>
+            <div className="font-semibold text-text">{companyScopeLabel}</div>
             <div className="mt-1">
-              {dateBasis === "invoice"
+              {view === "net-sales" || view === "profitability"
                 ? lang === "ar"
-                  ? "الفترة تُطبّق على تاريخ الفاتورة"
-                  : "Range applies to Invoice Date"
-                : lang === "ar"
-                  ? "الفترة على تاريخ الدفع الفعلي، مش Due Date"
-                  : "Range uses the actual Payment Date, never Due Date"}
+                  ? "الفترة تُطبّق على تاريخ القيد في Odoo"
+                  : "Range applies to Odoo journal entry date"
+                : dateBasis === "invoice"
+                  ? lang === "ar"
+                    ? "الفترة تُطبّق على تاريخ الفاتورة"
+                    : "Range applies to Invoice Date"
+                  : lang === "ar"
+                    ? "الفترة على تاريخ الدفع الفعلي، مش Due Date"
+                    : "Range uses the actual Payment Date, never Due Date"}
             </div>
           </div>
         </div>
       </details>
 
-      <div className="hscroll bleed-x [--bleed:0.875rem] sm:[--bleed:0px] pb-1">
-        <Segmented
-          value={view}
-          onChange={setView}
-          size="md"
-          options={[
-            {
-              value: "summary",
-              label: lang === "ar" ? "ملخص الحسابات" : "Accounting summary",
-            },
-            {
-              value: "months",
-              label: lang === "ar" ? "مقارنة الشهور" : "Monthly comparison",
-            },
-            {
-              value: "profitability",
-              label: lang === "ar" ? "الربحية" : "Profitability",
-            },
-          ]}
-        />
-      </div>
-
-      {isLoading || !data ? (
+      {view === "marketing" ? (
+        <SalesPerformance />
+      ) : view === "net-sales" ? (
+        <NetSalesView />
+      ) : view === "profitability" ? (
+        <ProfitAndLossView />
+      ) : view === "cohorts" ? (
+        <EntryCohortView />
+      ) : isLoading || !data ? (
         <>
           <Skeleton className="h-28" />
           <Skeleton className="h-96" />
@@ -469,7 +574,14 @@ function Accounting() {
                     index: 0,
                     hero: true,
                     valueWrap: true,
-                    sub: lang === "ar" ? "USD Paid حسب Payment Date" : "USD Paid by Payment Date",
+                    sub:
+                      dateBasis === "invoice"
+                        ? lang === "ar"
+                          ? "فواتير وإشعارات خصم حسب تاريخ الفاتورة"
+                          : "Invoices and credit notes by Invoice Date"
+                        : lang === "ar"
+                          ? "الفواتير المدفوعة حسب تاريخ الدفع"
+                          : "Paid invoices by Payment Date",
                   }}
                 />
                 <MetricDetailTrigger
@@ -484,11 +596,95 @@ function Accounting() {
                   detail={{ ...metrics!.lines, title: t("product_lines") }}
                   card={{ index: 3 }}
                 />
-                <MetricDetailTrigger
-                  detail={metrics!.credits}
-                  card={{ index: 4, valueWrap: true, sub: fmtUSDExact(data.summary.creditNoteUsd) }}
-                />
+                {dateBasis === "invoice" && (
+                  <MetricDetailTrigger
+                    detail={metrics!.credits}
+                    card={{ index: 4, valueWrap: true }}
+                  />
+                )}
               </KpiRow>
+
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.status === "unavailable" && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? "تعذر التحقق المباشر من إشعارات الخصم في Odoo. المعروض حاليًا من آخر نسخة متزامنة وقد لا يشمل أحدث الإشعارات."
+                      : "Live Odoo credit-note verification is unavailable. The last synced copy may omit recent notes."}
+                  </Notice>
+                )}
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.unsupportedCurrencies.length > 0 && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? `بعض الإشعارات بعملة لا يوجد لها تحويل دولار معتمد (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")})؛ ظهرت في التفاصيل ولم تُخصم من رقم الدولار.`
+                      : `Some credit notes use currencies without an approved USD conversion (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")}); they are listed but not deducted from USD revenue.`}
+                  </Notice>
+                )}
+              {dateBasis === "invoice" &&
+                data.creditNoteReconciliation.status === "not_applicable" && (
+                  <Notice tone="warning">
+                    {lang === "ar"
+                      ? "عند تصفية الإيرادات بمصدر أو كورس أو موظف، لا يمكن إسناد كل إشعارات الخصم لهذا البُعد بدقة. أزل هذه التصفية لعرض كل الإشعارات المنشورة."
+                      : "Credit notes cannot all be attributed reliably to a marketing, course or employee filter. Clear that filter to see every posted note."}
+                  </Notice>
+                )}
+
+              {dateBasis === "invoice" && data.creditNoteReconciliation.documents.length > 0 && (
+                <details className="group card overflow-hidden">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden sm:px-5">
+                    <RotateCcw size={17} className="shrink-0 text-amber-600" aria-hidden="true" />
+                    <span className="text-[13px] font-semibold text-text">
+                      {lang === "ar"
+                        ? "إشعارات الخصم المنشورة في Odoo"
+                        : "Posted Odoo credit notes"}
+                    </span>
+                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                      {fmtNum(data.creditNoteReconciliation.documents.length)}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className="ms-auto text-text-muted transition-transform group-open:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="border-t border-border px-4 pb-4 sm:px-5">
+                    <p className="py-3 text-[11.5px] text-text-muted">
+                      {lang === "ar"
+                        ? "الإشعارات الملغاة مستبعدة. كل مبلغ معروض بعملة المستند ويُخصم من الإيراد في تاريخ إشعار الخصم."
+                        : "Cancelled notes are excluded. Amounts use each document's currency and reduce revenue on the credit-note date."}
+                    </p>
+                    <div className="max-h-72 overflow-auto rounded-xl border border-border">
+                      {data.creditNoteReconciliation.documents.map((document) => (
+                        <a
+                          key={document.id}
+                          href={document.odooUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-3 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-surface-2"
+                        >
+                          <span className="min-w-0">
+                            <span className="num font-semibold text-brand">
+                              {document.movement}
+                            </span>
+                            <span className="ms-2 text-text-muted">{document.company}</span>
+                          </span>
+                          <span className="flex items-center gap-4">
+                            <span className="num text-text-muted">{document.invoiceDate}</span>
+                            <span className="num font-semibold text-amber-700">
+                              {Math.abs(document.amount).toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              {document.currency}
+                            </span>
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              )}
+
+              <ClosedLoopSalesBridge />
 
               <details className="group card overflow-hidden">
                 <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">
@@ -663,7 +859,6 @@ function Accounting() {
           )}
 
           {view === "months" && <AccountingMonthlyView monthly={data.monthly} />}
-          {view === "profitability" && <AccountingProfitabilityView />}
         </>
       )}
     </div>
@@ -710,6 +905,7 @@ function accountingMetrics(
 ): Record<string, MetricDetail> {
   const A = lang === "ar";
   const S = data.summary;
+  const invoiceBasis = data.source.dateBasis === "Invoice Date";
   const collectionTrend = data.byDay
     .filter((row) => Number.isFinite(row.revenue))
     .map((row) => ({ date: row.date, value: row.revenue }));
@@ -717,15 +913,23 @@ function accountingMetrics(
   const revenue: MetricDetail = {
     id: "accounting.revenue",
     title: A ? "الإيراد المحصّل" : "Collected revenue",
-    value: fmtUSDExact(S.paidUsd),
+    value: fmtUSDFull(S.paidUsd),
     tone: "mint",
     icon: <BadgeDollarSign size={16} />,
-    definition: A
-      ? "المبالغ المدفوعة فعليًا خلال الفترة، محسوبة بتاريخ الدفع من عمود USD Paid. الفاتورة التي صدرت ولم تُدفع بعد لا تدخل هنا."
-      : "Money actually collected in the period, counted on payment date from the USD Paid column. An invoice raised but not yet paid is not in this figure.",
-    formula: A
-      ? "مجموع USD Paid لكل فاتورة يقع تاريخ دفعها داخل الفترة المحددة، بعد خصم إشعارات الخصم."
-      : "Sum of USD Paid for every invoice whose payment date falls inside the window, credit notes deducted.",
+    definition: invoiceBasis
+      ? A
+        ? "قيمة الفواتير المدفوعة بتاريخ الفاتورة، بعد خصم إشعارات الخصم المنشورة في نفس تاريخ فاتورتها."
+        : "Paid invoice value by Invoice Date, net of posted credit notes on their own Invoice Date."
+      : A
+        ? "المبالغ المدفوعة فعليًا خلال الفترة حسب تاريخ الدفع. إشعارات الخصم تظهر في عرض تاريخ الفاتورة فقط."
+        : "Paid invoices by Payment Date. Credit notes appear only in the Invoice Date view.",
+    formula: invoiceBasis
+      ? A
+        ? "مجموع USD Paid للفواتير بتاريخ الفاتورة ناقص إشعارات الخصم المنشورة بتاريخ فاتورتها."
+        : "Invoice-date USD Paid less posted credit notes on their own invoice dates."
+      : A
+        ? "مجموع USD Paid للفواتير المدفوعة حسب تاريخ الدفع؛ دون إشعارات الخصم."
+        : "Paid invoice USD Paid by payment date; credit notes excluded.",
     trend:
       collectionTrend.length > 1
         ? {
@@ -739,13 +943,13 @@ function accountingMetrics(
       {
         key: "avg",
         label: A ? "متوسط الفاتورة" : "Average invoice",
-        value: fmtUSDExact(S.averageInvoice),
+        value: fmtUSDFull(S.averageInvoice),
       },
       { key: "lines", label: A ? "بنود المنتجات" : "Product lines", value: fmtNum(S.productLines) },
       {
         key: "credit",
         label: A ? "إشعارات خصم" : "Credit notes",
-        value: fmtUSDExact(S.creditNoteUsd),
+        value: fmtUSDFull(S.creditNoteUsd),
       },
     ],
     breakdowns: [
@@ -914,16 +1118,16 @@ function accountingMetrics(
     tone: S.creditNotes > 0 ? "rose" : "amber",
     icon: <RotateCcw size={16} />,
     definition: A
-      ? "الفواتير التي أُلغيت أو صدر لها إشعار خصم داخل الفترة. قيمتها مخصومة بالفعل من الإيراد المعروض."
-      : "Invoices cancelled or credited inside the period. Their value is already deducted from the revenue shown.",
+      ? "إشعارات الخصم المنشورة في Odoo (Posted) بتاريخ فاتورتها خلال الفترة؛ الإشعارات الملغاة غير محسوبة. كل مستند يُعد مرة واحدة حتى لو له أكثر من بند."
+      : "Posted Odoo credit notes dated by their own Invoice Date. Cancelled notes are excluded, and each document counts once regardless of line count.",
     formula: A
-      ? `${fmtNum(S.creditNotes)} إشعار بقيمة ${fmtUSDExact(S.creditNoteUsd)}، مخصومة من ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} إجمالي محصّل قبل الخصم.`
-      : `${fmtNum(S.creditNotes)} notes worth ${fmtUSDExact(S.creditNoteUsd)}, deducted from ${fmtUSDExact(S.paidUsd + S.creditNoteUsd)} collected before the deduction.`,
+      ? `${fmtNum(S.creditNotes)} إشعار بقيمة ${fmtUSDExact(Math.abs(S.creditNoteUsd))}، مخصومة من ${fmtUSDExact(S.paidUsd - S.creditNoteUsd)} قبل الخصم.`
+      : `${fmtNum(S.creditNotes)} notes worth ${fmtUSDExact(Math.abs(S.creditNoteUsd))}, deducted from ${fmtUSDExact(S.paidUsd - S.creditNoteUsd)} before credits.`,
     supporting: [
       {
         key: "value",
         label: A ? "قيمة الإشعارات" : "Credit value",
-        value: fmtUSDExact(S.creditNoteUsd),
+        value: fmtUSDExact(Math.abs(S.creditNoteUsd)),
       },
       {
         key: "net",
@@ -934,9 +1138,32 @@ function accountingMetrics(
       {
         key: "share",
         label: A ? "نسبتها من التحصيل" : "Share of collection",
-        value: S.paidUsd > 0 ? fmtPct((S.creditNoteUsd / S.paidUsd) * 100, 1) : "—",
+        value: S.paidUsd > 0 ? fmtPct((Math.abs(S.creditNoteUsd) / S.paidUsd) * 100, 1) : "—",
       },
     ],
+    records: {
+      title: A ? "مستندات Credit Note في Odoo" : "Odoo credit-note documents",
+      hint: A
+        ? "اضغط على المستند لفتحه في Odoo. القيمة بعملة الفاتورة؛ المجموع أعلى الكارد بالدولار."
+        : "Open any document in Odoo. Row values use the invoice currency; the card total is USD.",
+      rows: data.creditNoteReconciliation.documents.slice(0, 5).map((document) => ({
+        key: String(document.id),
+        title: document.movement,
+        subtitle: `${document.invoiceDate} · ${document.company}${document.partner ? ` · ${document.partner}` : ""}`,
+        value: `${Math.abs(document.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${document.currency}`,
+        meta: document.inAccountingSnapshot
+          ? A
+            ? "متزامن"
+            : "Synced"
+          : A
+            ? "أُضيف مباشرة من Odoo"
+            : "Added directly from Odoo",
+        href: document.odooUrl,
+      })),
+      emptyLabel: A
+        ? "لا توجد إشعارات خصم منشورة في الفترة"
+        : "No posted credit notes in this period",
+    },
   };
 
   return { revenue, invoices, average, lines, credits };

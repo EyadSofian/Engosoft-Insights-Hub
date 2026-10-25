@@ -4,72 +4,279 @@ export const Route = createFileRoute("/api/leads")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { getFiltered, computeTotals, computeLeadOrigin, groupBy } =
-          await import("@/lib/metrics.server");
+        const { getFiltered, groupBy } = await import("@/lib/metrics.server");
+        const { CRM_CONTRACT_VERSION } = await import("@/lib/crm-contract");
+        const { loadFreshLostPipeline, loadArchivedLostLeads } =
+          await import("@/lib/crm-fresh-lost.server");
+        const { odooConfig } = await import("@/lib/odoo.server");
         const { parseFilters, json, capped } = await import("@/lib/api.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const labels = data.snapshot.sourceLabels;
-        const { buildSalesFunnel } = await import("@/lib/sales-funnel.server");
-        const { leadStageBucket } = await import("@/lib/uncalled-leads");
-        const salesFunnel = buildSalesFunnel(data, filters);
-        const followUpRows = data.crm.filter((lead) => {
-          const bucket = leadStageBucket(lead.cleanedStage || lead.stage);
-          return !lead.isWon && bucket !== "won" && bucket !== "junk";
-        });
+        const [freshPipeline, archivedLeads] = await Promise.all([
+          loadFreshLostPipeline(filters, data.snapshot),
+          loadArchivedLostLeads(filters, data.snapshot),
+        ]);
+        const odooBaseUrl = odooConfig().url;
+        const { summarizeStageSla } = await import("@/lib/crm-stage-sla");
+        const { crmSourceDistribution } = await import("@/lib/crm-source-distribution");
 
-        const detail = capped(
-          data.crm.map((c) => ({
-            createdAt: c.createdAt,
-            contact: c.contact,
-            campaign: c.campaignName,
-            adName: c.adName,
-            adset: c.adset,
-            adsetOrigin: c.adsetOrigin,
-            course: c.course,
-            stage: c.cleanedStage,
-            source: labels.get(c.sourceKey) ?? c.source,
-            salesperson: c.salesperson,
-            salesTeam: c.salesTeam,
-            subTeam: c.subTeam,
-            priority: c.priority,
-            closedAt: c.closedAt,
-            daysToClose: c.daysToClose,
-          })),
+        // The workspace and the Lost analysis must agree on a single live
+        // Odoo population. A snapshot fallback made their totals drift.
+        if (
+          freshPipeline.availability !== "available" ||
+          archivedLeads.availability !== "available"
+        ) {
+          return json(
+            {
+              error: "Live Odoo Lost records are unavailable; no snapshot fallback was used.",
+              code: "ODOO_LIVE_UNAVAILABLE",
+              details: {
+                opportunities: freshPipeline.error ?? null,
+                leads: archivedLeads.error ?? null,
+              },
+            },
+            503,
+          );
+        }
+
+        const activeRows = data.crm.map((row) => ({
+          id: row.id,
+          odooUrl: row.id
+            ? `${odooBaseUrl}/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`
+            : "",
+          createdAt: row.createdAt,
+          contact: row.contact,
+          phone: row.phone,
+          mobile: row.mobile,
+          email: row.email,
+          recordType: row.recordType,
+          active: row.active,
+          status: row.businessStatus,
+          stageKey: row.stageKey,
+          displayStageKey: row.businessStatus === "won" ? "won" : row.stageKey,
+          stage: row.cleanedStage || row.stage,
+          source: labels.get(row.sourceKey) ?? row.source,
+          medium: row.medium,
+          communicationLanguage: row.communicationLanguage,
+          campaign: row.campaignName,
+          campaignId: row.campaignId,
+          adName: row.adName,
+          adId: row.adId,
+          adset: row.adset,
+          course: row.course,
+          courses: row.courses,
+          salesperson: row.salesperson,
+          salesTeam: row.salesTeam,
+          probability: row.probability,
+          automatedProbability: row.automatedProbability,
+          closingDurationDays: row.closingDurationDays,
+          priority: row.priority,
+          readyToConvert: row.readyToConvert,
+          leadSegment: row.leadSegment,
+          openStatus: row.openStatus,
+          closingChannel: row.closingChannel,
+          lostCategory: row.lostCategory,
+          lossReason: row.lossReason,
+          inventoryBucket: row.inventoryBucket,
+          courseLanguage: row.courseLanguage,
+          courseType: row.courseType,
+          customerType: row.customerType,
+          callingReply: row.callingReply,
+          jobType: row.jobType,
+          howFoundUs: row.howFoundUs,
+          company: row.company,
+          tags: row.tags,
+          targetName: row.targetName,
+          resignTarget: row.resignTarget,
+          facebookLeadId: row.facebookLeadId,
+          validateClosedReason: row.validateClosedReason,
+          lastStageUpdate: row.lastStageUpdate,
+          wonDate: row.wonDate || row.closedAt,
+          lostDate: row.lostDate,
+          conversionDate: row.conversionDate,
+          closedAt: row.closedAt,
+          daysToClose: row.daysToClose,
+        }));
+
+        const toLostWorkspaceRow = (row: (typeof freshPipeline.records)[number]) => ({
+          id: row.id,
+          odooUrl: row.odooUrl,
+          createdAt: row.createdAt,
+          contact: row.contact,
+          phone: "",
+          mobile: "",
+          email: "",
+          recordType: row.recordType,
+          active: row.active,
+          status: "lost" as const,
+          // The live Lost reads carry the original stage label, but not its
+          // XMLID. The display lane remains Lost for both record types.
+          stageKey: "other" as const,
+          displayStageKey: "lost" as const,
+          stage: row.stage,
+          source: row.source,
+          medium: "",
+          communicationLanguage: "",
+          campaign: "",
+          campaignId: "",
+          adName: "",
+          adId: "",
+          adset: "",
+          course: row.course,
+          courses: row.course,
+          salesperson: row.salesperson,
+          salesTeam: row.salesTeam,
+          probability: 0,
+          automatedProbability: 0,
+          closingDurationDays: null,
+          priority: "",
+          readyToConvert: false,
+          leadSegment: "",
+          openStatus: "",
+          closingChannel: "",
+          lostCategory: row.lostCategory,
+          lossReason: row.lossReason,
+          inventoryBucket: "",
+          courseLanguage: "",
+          courseType: "",
+          customerType: "",
+          callingReply: "",
+          jobType: "",
+          howFoundUs: "",
+          company: row.company,
+          tags: "",
+          targetName: "",
+          resignTarget: "",
+          facebookLeadId: "",
+          validateClosedReason: "",
+          lastStageUpdate: "",
+          wonDate: "",
+          lostDate: "",
+          conversionDate: "",
+          closedAt: "",
+          daysToClose: null,
+        });
+        const lostRows = [...freshPipeline.records, ...archivedLeads.records].map(
+          toLostWorkspaceRow,
         );
 
+        const workspaceRows = [...activeRows, ...lostRows];
+        const stageKeys = ["preparation", "new", "open", "quotation", "won", "lost"] as const;
+        const inStage = (key: (typeof stageKeys)[number]) =>
+          workspaceRows.filter((row) => row.displayStageKey === key);
+        const top = <T>(rows: T[], pick: (row: T) => string) =>
+          groupBy(rows, (row) => pick(row) || "—").slice(0, 8);
+        const facets = (rows: typeof workspaceRows) => ({
+          byType: top(rows, (row) => (row.recordType === "lead" ? "Lead" : "Opportunity")),
+          bySource: top(rows, (row) => row.source),
+          byTeam: top(rows, (row) => row.salesTeam),
+          byCourse: top(rows, (row) => row.course),
+          byPriority: top(rows, (row) => row.priority),
+          byLeadSegment: top(rows, (row) => row.leadSegment),
+          byOpenStatus: top(rows, (row) => row.openStatus),
+          byCallingReply: top(rows, (row) => row.callingReply),
+          byClosingChannel: top(rows, (row) => row.closingChannel),
+          byLostCategory: top(rows, (row) => row.lostCategory),
+          byLostReason: top(rows, (row) => row.lossReason),
+          byPreviousStage: top(rows, (row) => row.stage),
+          byCourseLanguage: top(rows, (row) => row.courseLanguage),
+          byCourseType: top(rows, (row) => row.courseType),
+          byCustomerType: top(rows, (row) => row.customerType),
+        });
+
+        const stages = stageKeys.map((key) => {
+          const rows = inStage(key);
+          return {
+            key,
+            count: rows.length,
+            leads: rows.filter((row) => row.recordType === "lead").length,
+            opportunities: rows.filter((row) => row.recordType === "opportunity").length,
+            active: rows.filter((row) => row.active).length,
+          };
+        });
+
         return json({
-          totals: computeTotals(data),
-          pipeline: {
-            followUp: followUpRows.length,
-            fresh: followUpRows.filter(
-              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "fresh",
+          contractVersion: CRM_CONTRACT_VERSION,
+          sla: summarizeStageSla(data.crm, odooBaseUrl),
+          lostEventContract: "2026-09-16-normal-odoo-filters-v1",
+          summary: {
+            total: workspaceRows.length,
+            activeLeads: activeRows.filter((row) => row.recordType === "lead").length,
+            openOpportunities: activeRows.filter((row) => row.status === "open").length,
+            won: activeRows.filter((row) => row.status === "won").length,
+            lost: lostRows.length,
+            lostLeads: lostRows.filter((row) => row.recordType === "lead").length,
+            lostOpportunities: lostRows.filter((row) => row.recordType === "opportunity").length,
+            currentLostOpportunities: lostRows.filter(
+              (row) => row.recordType === "opportunity" && row.active,
             ).length,
-            stalled: followUpRows.filter(
-              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "stalled",
+            historicalLostOpportunities: lostRows.filter(
+              (row) => row.recordType === "opportunity" && !row.active,
             ).length,
-            activeDeals: followUpRows.filter(
-              (lead) => leadStageBucket(lead.cleanedStage || lead.stage) === "deal",
+            // Never infer a canonical Odoo stage from a legacy translated
+            // label. Keeping this count visible prevents an old snapshot from
+            // making New/Open/Quotation look like real business zeroes.
+            unmappedOperationalStages: activeRows.filter(
+              (row) => (row.status === "lead" || row.status === "open") && row.stageKey === "other",
             ).length,
+            longFollowUpStages: activeRows.filter(
+              (row) =>
+                (row.status === "lead" || row.status === "open") &&
+                row.stageKey === "other" &&
+                row.stage.trim().toLowerCase() === "long follow up",
+            ).length,
+            readyToConvert: activeRows.filter(
+              (row) => row.recordType === "lead" && row.readyToConvert,
+            ).length,
+            unsourced: workspaceRows.filter((row) => !row.source).length,
           },
-          salesFunnel,
-          origin: computeLeadOrigin(data),
-          byStage: groupBy(data.crm, (c) => c.cleanedStage || "—"),
-          bySource: groupBy(data.crm, (c) => labels.get(c.sourceKey) ?? c.source ?? "—"),
-          byCourse: groupBy(data.crm, (c) => c.course || "—"),
-          byTeam: groupBy(data.crm, (c) => c.salesTeam || "—"),
-          bySubTeam: groupBy(data.crm, (c) => c.subTeam || "—"),
-          bySalesperson: groupBy(data.crm, (c) => c.salesperson || "—"),
-          byCampaign: groupBy(
-            data.crm.filter((c) => c.fromCampaign),
-            (c) => c.campaignName || "—",
+          stages,
+          sourceDistribution: crmSourceDistribution(workspaceRows),
+          facets: facets(workspaceRows),
+          stageFacets: Object.fromEntries(stageKeys.map((key) => [key, facets(inStage(key))])),
+          statusFacets: {
+            all: facets(workspaceRows),
+            leads: facets(workspaceRows.filter((row) => row.recordType === "lead")),
+            activeLeads: facets(
+              workspaceRows.filter((row) => row.recordType === "lead" && row.active),
+            ),
+            ready: facets(
+              workspaceRows.filter(
+                (row) => row.recordType === "lead" && row.active && row.readyToConvert,
+              ),
+            ),
+            pipeline: facets(
+              workspaceRows.filter((row) => row.status === "lead" || row.status === "open"),
+            ),
+            open: facets(workspaceRows.filter((row) => row.status === "open")),
+            won: facets(workspaceRows.filter((row) => row.status === "won")),
+            lost: facets(workspaceRows.filter((row) => row.status === "lost")),
+          },
+          lostTypeFacets: {
+            leads: facets(lostRows.filter((row) => row.recordType === "lead")),
+            opportunities: facets(lostRows.filter((row) => row.recordType === "opportunity")),
+          },
+          freshLostPipeline: { ...freshPipeline, records: undefined },
+          freshLostPipelineFacets: {
+            bySource: top(freshPipeline.records, (row) => row.source),
+            byTeam: top(freshPipeline.records, (row) => row.salesTeam),
+            byLostReason: top(freshPipeline.records, (row) => row.lossReason),
+            byLostCategory: top(freshPipeline.records, (row) => row.lostCategory),
+          },
+          freshLostPipelineDetail: capped(freshPipeline.records),
+          archivedLostLeads: { ...archivedLeads, records: undefined },
+          archivedLostLeadsFacets: {
+            bySource: top(archivedLeads.records, (row) => row.source),
+            byTeam: top(archivedLeads.records, (row) => row.salesTeam),
+            byLostReason: top(archivedLeads.records, (row) => row.lossReason),
+            byLostCategory: top(archivedLeads.records, (row) => row.lostCategory),
+          },
+          archivedLostLeadsDetail: capped(archivedLeads.records),
+          detail: capped(
+            workspaceRows.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
           ),
-          byPriority: groupBy(data.crm, (c) => c.priority || "—"),
-          byMonth: groupBy(data.crm, (c) => (c.createdAt ? c.createdAt.slice(0, 7) : "—")).sort(
-            (a, b) => a.label.localeCompare(b.label),
-          ),
-          detail,
           health: data.snapshot.health,
           appliedFilters: filters,
         });

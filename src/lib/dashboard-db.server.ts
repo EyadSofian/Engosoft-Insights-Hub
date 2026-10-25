@@ -6,7 +6,8 @@
 // so existing parsers can migrate away from Google Sheets without a risky
 // reporting rewrite.
 import { createHash } from "node:crypto";
-import { Pool, type PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
+import { getSharedDatabasePool, withDatasetWritePermit } from "./database-pool.server.ts";
 
 export type DashboardDataset =
   | "meta_ads"
@@ -19,6 +20,8 @@ export type DashboardDataset =
   | "ads_legacy"
   | "crm"
   | "lost"
+  | "annual_crm_2024"
+  | "annual_crm_2025"
   | "invoiced"
   | "website_sales"
   | "pbx_extensions"
@@ -72,6 +75,8 @@ const DATASETS = new Set<DashboardDataset>([
   "ads_legacy",
   "crm",
   "lost",
+  "annual_crm_2024",
+  "annual_crm_2025",
   "invoiced",
   "website_sales",
   "pbx_extensions",
@@ -82,7 +87,6 @@ const DATASETS = new Set<DashboardDataset>([
   "sales_summary",
 ]);
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 
 export function databaseConfigured(): boolean {
@@ -94,23 +98,7 @@ export function isDashboardDataset(value: unknown): value is DashboardDataset {
 }
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    const isRailwayInternal = connectionString.includes(".railway.internal");
-    pool = new Pool({
-      connectionString,
-      max: 5,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        isRailwayInternal || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 async function ensureSchema(): Promise<void> {
@@ -137,6 +125,25 @@ async function ensureSchema(): Promise<void> {
           synced_at timestamptz NOT NULL DEFAULT now(),
           error text NOT NULL DEFAULT '',
           metadata jsonb NOT NULL DEFAULT '{}'::jsonb
+        );
+
+        CREATE TABLE IF NOT EXISTS ad_delivery_accounts (
+          dataset text NOT NULL,
+          account_id text NOT NULL,
+          account_name text NOT NULL,
+          currency text NOT NULL,
+          discovered_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (dataset, account_id)
+        );
+        CREATE TABLE IF NOT EXISTS ad_delivery_coverage (
+          dataset text NOT NULL,
+          account_id text NOT NULL,
+          from_date date NOT NULL,
+          to_date date NOT NULL,
+          expected_spend numeric NOT NULL,
+          row_count integer NOT NULL,
+          verified_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (dataset, account_id, from_date, to_date)
         );
       `,
       )
@@ -528,6 +535,95 @@ export async function readDashboardDataset(dataset: DashboardDataset): Promise<D
   return (await readDashboardDatasets([dataset]))[0];
 }
 
+/** Ignore ordinary batches and any completion claim from the wrong workflow. */
+export function completedAdCoverageClaim(
+  dataset: DashboardDataset,
+  metadata: Record<string, unknown>,
+): { from: string; to: string; accounts: { id: string; name: string }[] } | null {
+  const workflows: Partial<Record<DashboardDataset, string>> = {
+    meta_ads: "imS2VrWslYHhnFNn",
+    snap_ads: "x9iHWEw7cE3ELqOp",
+  };
+  const expectedWorkflow = workflows[dataset];
+  if (!expectedWorkflow || metadata.workflowId !== expectedWorkflow || metadata.completed !== true)
+    return null;
+  const from = metadata.since;
+  const to = metadata.until;
+  const accounts = metadata.accounts;
+  if (
+    typeof from !== "string" ||
+    typeof to !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(to) ||
+    from > to ||
+    !Array.isArray(accounts) ||
+    accounts.length < 1 ||
+    accounts.length > 100 ||
+    Number(metadata.accountCount) !== accounts.length
+  )
+    return null;
+  const parsed = accounts.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const account = value as Record<string, unknown>;
+    const id = typeof account.id === "string" ? account.id.trim() : "";
+    const name = typeof account.name === "string" ? account.name.trim() : id;
+    const validId = dataset === "meta_ads" ? /^act_\d+$/.test(id) : /^[0-9a-f-]{36}$/i.test(id);
+    return validId && name && account.currency === "USD" ? { id, name } : null;
+  });
+  if (
+    parsed.some((account) => !account) ||
+    new Set(parsed.map((account) => account!.id)).size !== parsed.length
+  )
+    return null;
+  return {
+    from,
+    to,
+    accounts: parsed.filter((account): account is { id: string; name: string } => !!account),
+  };
+}
+
+/** Persist the exact account/date window only after the source workflow finishes. */
+async function recordCompletedAdCoverage(
+  client: PoolClient,
+  dataset: DashboardDataset,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  const claim = completedAdCoverageClaim(dataset, metadata);
+  if (!claim) return;
+  const { from, to } = claim;
+  for (const account of claim.accounts) {
+    await client.query(
+      `INSERT INTO ad_delivery_accounts (dataset, account_id, account_name, currency)
+       VALUES ($1, $2, $3, 'USD')
+       ON CONFLICT (dataset, account_id) DO UPDATE SET
+         account_name = CASE
+           WHEN EXCLUDED.account_name = EXCLUDED.account_id
+             THEN ad_delivery_accounts.account_name
+           ELSE EXCLUDED.account_name END,
+         discovered_at = now()`,
+      [dataset, account.id, account.name],
+    );
+    const {
+      rows: [totals],
+    } = await client.query<{ row_count: number; spend: string }>(
+      `SELECT count(*)::integer AS row_count,
+         coalesce(sum(nullif(row_data->>'Spend (Cost)', '')::numeric), 0)::text AS spend
+       FROM dashboard_rows WHERE dataset = $1 AND row_data->>'__account_id' = $2
+         AND record_date BETWEEN $3::date AND $4::date`,
+      [dataset, account.id, from, to],
+    );
+    await client.query(
+      `INSERT INTO ad_delivery_coverage
+         (dataset, account_id, from_date, to_date, expected_spend, row_count)
+       VALUES ($1, $2, $3::date, $4::date, $5::numeric, $6)
+       ON CONFLICT (dataset, account_id, from_date, to_date) DO UPDATE SET
+         expected_spend = EXCLUDED.expected_spend,
+         row_count = EXCLUDED.row_count, verified_at = now()`,
+      [dataset, account.id, from, to, totals?.spend ?? "0", totals?.row_count ?? 0],
+    );
+  }
+}
+
 export async function writeDashboardDataset(
   dataset: DashboardDataset,
   inputRows: Record<string, unknown>[],
@@ -537,66 +633,67 @@ export async function writeDashboardDataset(
     metadata?: Record<string, unknown>;
   } = {},
 ): Promise<DatasetWriteResult> {
-  await ensureSchema();
-  const { rows, duplicates } = prepareDashboardRows(dataset, inputRows.map(stringRow));
-  const contentHash = dashboardRowsContentHash(rows);
-  const syncedAtRaw = options.syncedAt?.trim();
-  const syncedAt =
-    syncedAtRaw && Number.isFinite(Date.parse(syncedAtRaw))
-      ? new Date(syncedAtRaw).toISOString()
-      : new Date().toISOString();
-  const client = await getPool().connect();
-  try {
-    await client.query("BEGIN");
-    // A dataset replace is one logical write. Serialise competing writers for
-    // this dataset so two n8n runs cannot interleave DELETE/INSERT operations.
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [dataset]);
+  return withDatasetWritePermit(async () => {
+    await ensureSchema();
+    const { rows, duplicates } = prepareDashboardRows(dataset, inputRows.map(stringRow));
+    const contentHash = dashboardRowsContentHash(rows);
+    const syncedAtRaw = options.syncedAt?.trim();
+    const syncedAt =
+      syncedAtRaw && Number.isFinite(Date.parse(syncedAtRaw))
+        ? new Date(syncedAtRaw).toISOString()
+        : new Date().toISOString();
+    const client = await getPool().connect();
+    try {
+      await client.query("BEGIN");
+      // A dataset replace is one logical write. Serialise competing writers for
+      // this dataset so two n8n runs cannot interleave DELETE/INSERT operations.
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [dataset]);
 
-    const metadata = { ...(options.metadata ?? {}), contentHash };
-    if (options.mode === "replace") {
-      const existing = await client.query<{ row_count: number; content_hash: string }>(
-        `SELECT row_count, metadata->>'contentHash' AS content_hash
+      const metadata = { ...(options.metadata ?? {}), contentHash };
+      if (options.mode === "replace") {
+        const existing = await client.query<{ row_count: number; content_hash: string }>(
+          `SELECT row_count, metadata->>'contentHash' AS content_hash
            FROM dashboard_sync_state
           WHERE dataset = $1`,
-        [dataset],
-      );
-      const state = existing.rows[0];
-      if (state?.content_hash === contentHash && state.row_count === rows.length) {
-        await client.query(
-          `UPDATE dashboard_sync_state
+          [dataset],
+        );
+        const state = existing.rows[0];
+        if (state?.content_hash === contentHash && state.row_count === rows.length) {
+          await client.query(
+            `UPDATE dashboard_sync_state
               SET status = 'success', synced_at = $2::timestamptz, error = '', metadata = $3::jsonb
             WHERE dataset = $1`,
-          [dataset, syncedAt, JSON.stringify(metadata)],
-        );
-        await client.query("COMMIT");
-        return {
-          dataset,
-          receivedRows: inputRows.length,
-          rowCount: rows.length,
-          syncedAt,
-          duplicates,
-          writtenRows: 0,
-          unchanged: true,
-        };
-      }
-      await client.query(`DELETE FROM dashboard_rows WHERE dataset = $1`, [dataset]);
-    }
-    for (let index = 0; index < rows.length; index += INSERT_CHUNK_ROWS) {
-      await upsertChunk(client, dataset, rows.slice(index, index + INSERT_CHUNK_ROWS), syncedAt);
-    }
-    const rowCount =
-      options.mode === "replace"
-        ? rows.length
-        : Number(
-            (
-              await client.query<{ count: string }>(
-                `SELECT count(*)::text AS count FROM dashboard_rows WHERE dataset = $1`,
-                [dataset],
-              )
-            ).rows[0]?.count ?? 0,
+            [dataset, syncedAt, JSON.stringify(metadata)],
           );
-    await client.query(
-      `INSERT INTO dashboard_sync_state
+          await client.query("COMMIT");
+          return {
+            dataset,
+            receivedRows: inputRows.length,
+            rowCount: rows.length,
+            syncedAt,
+            duplicates,
+            writtenRows: 0,
+            unchanged: true,
+          };
+        }
+        await client.query(`DELETE FROM dashboard_rows WHERE dataset = $1`, [dataset]);
+      }
+      for (let index = 0; index < rows.length; index += INSERT_CHUNK_ROWS) {
+        await upsertChunk(client, dataset, rows.slice(index, index + INSERT_CHUNK_ROWS), syncedAt);
+      }
+      const rowCount =
+        options.mode === "replace"
+          ? rows.length
+          : Number(
+              (
+                await client.query<{ count: string }>(
+                  `SELECT count(*)::text AS count FROM dashboard_rows WHERE dataset = $1`,
+                  [dataset],
+                )
+              ).rows[0]?.count ?? 0,
+            );
+      await client.query(
+        `INSERT INTO dashboard_sync_state
          (dataset, status, row_count, synced_at, error, metadata)
        VALUES ($1, 'success', $2, $3::timestamptz, '', $4::jsonb)
        ON CONFLICT (dataset) DO UPDATE SET
@@ -605,24 +702,26 @@ export async function writeDashboardDataset(
          synced_at = EXCLUDED.synced_at,
          error = EXCLUDED.error,
          metadata = EXCLUDED.metadata`,
-      [dataset, rowCount, syncedAt, JSON.stringify(metadata)],
-    );
-    await client.query("COMMIT");
-    return {
-      dataset,
-      receivedRows: inputRows.length,
-      rowCount,
-      syncedAt,
-      duplicates,
-      writtenRows: rows.length,
-      unchanged: false,
-    };
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+        [dataset, rowCount, syncedAt, JSON.stringify(metadata)],
+      );
+      await recordCompletedAdCoverage(client, dataset, metadata);
+      await client.query("COMMIT");
+      return {
+        dataset,
+        receivedRows: inputRows.length,
+        rowCount,
+        syncedAt,
+        duplicates,
+        writtenRows: rows.length,
+        unchanged: false,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
 }
 
 export async function markDashboardDatasetFailed(

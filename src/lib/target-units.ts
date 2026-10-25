@@ -15,7 +15,8 @@ export const TARGET_UNIT_LAYOUT = [
         key: "bahaa-ramadan",
         nameAr: "فريق بهاء رمضان",
         nameEn: "Bahaa Ramadan Team",
-        employeeIds: ["238", "338", "482", "503", "606", "346"],
+        // Hady (319) is a member of Bahaa's team, not an independent target.
+        employeeIds: ["238", "338", "482", "503", "606", "346", "319"],
       },
       {
         key: "ahmed-saeed",
@@ -40,26 +41,39 @@ export const TARGET_UNIT_LAYOUT = [
         key: "asmaa-fathy",
         nameAr: "فريق أسماء فتحي",
         nameEn: "Asmaa Fathy Team",
-        employeeIds: ["235", "597"],
+        // Abdullah Mohsen (335) is a member of Asmaa's team, not an independent target.
+        // Sara has sales but no published personal quota; her row is still
+        // shown inside the team while excluded from target achievement totals.
+        employeeIds: ["235", "597", "335", "sara.abdullah@engosoft.com"],
       },
     ],
   },
 ] as const;
 
-export const STANDALONE_TARGET_EMPLOYEE_IDS = ["335", "319"] as const;
+export const STANDALONE_TARGET_EMPLOYEE_IDS = [] as const;
+
+const TARGET_UNIT_EMPLOYEE_IDS = new Set<string>(
+  TARGET_UNIT_LAYOUT.flatMap((unit) => unit.leaders.flatMap((leader) => leader.employeeIds)),
+);
+
+/** True for people explicitly assigned to a unit, including untargeted members. */
+export function isTargetUnitEmployee(employeeId: string): boolean {
+  return TARGET_UNIT_EMPLOYEE_IDS.has(employeeId);
+}
 
 export interface TargetUnitMemberInput {
   key: string;
   employeeId: string;
   name: string;
-  target: number;
+  /** `null` means the person has sales but no published personal quota. */
+  target: number | null;
   paidRevenue: number;
   orderRevenue: number | null;
 }
 
 export interface TargetUnitMember extends TargetUnitMemberInput {
-  achievement: number;
-  remaining: number;
+  achievement: number | null;
+  remaining: number | null;
 }
 
 export interface TargetLeaderRollup {
@@ -89,15 +103,22 @@ export interface TargetUnitRollup {
 function memberRollup(member: TargetUnitMemberInput): TargetUnitMember {
   return {
     ...member,
-    achievement: member.target > 0 ? (member.paidRevenue / member.target) * 100 : 0,
-    remaining: Math.max(0, member.target - member.paidRevenue),
+    achievement:
+      member.target !== null && member.target > 0
+        ? (member.paidRevenue / member.target) * 100
+        : null,
+    remaining: member.target !== null ? Math.max(0, member.target - member.paidRevenue) : null,
   };
 }
 
 function totals(members: TargetUnitMember[]) {
-  const target = members.reduce((sum, member) => sum + member.target, 0);
-  const paidRevenue = members.reduce((sum, member) => sum + member.paidRevenue, 0);
-  const orderRevenue = members.reduce((sum, member) => sum + (member.orderRevenue ?? 0), 0);
+  // Untargeted members remain visible inside their team, but their collections
+  // must stay outside target achievement — the same rule used by the employee
+  // target cards and the overall target notice.
+  const targeted = members.filter((member) => member.target !== null);
+  const target = targeted.reduce((sum, member) => sum + (member.target ?? 0), 0);
+  const paidRevenue = targeted.reduce((sum, member) => sum + member.paidRevenue, 0);
+  const orderRevenue = targeted.reduce((sum, member) => sum + (member.orderRevenue ?? 0), 0);
   return {
     target,
     paidRevenue,

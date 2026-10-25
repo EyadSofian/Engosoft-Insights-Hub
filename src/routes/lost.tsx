@@ -1,6 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { CalendarClock, Info, MessageSquareWarning, Percent, TrendingDown } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState, type CSSProperties } from "react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  Info,
+  MessageSquareWarning,
+  Percent,
+  TrendingDown,
+} from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { fmtDate, fmtNum, fmtPct, useI18n } from "@/lib/i18n";
 import {
@@ -8,30 +18,70 @@ import {
   Card,
   ErrorState,
   Notice,
+  Pill,
   SectionTitle,
   Segmented,
   Skeleton,
 } from "@/components/ui-bits";
-import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { DashboardPageHeader, KpiRow } from "@/components/dashboard-bits";
+import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
+import { CourseLostMovement } from "@/components/CourseLostMovement";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricBreakdownGroup, MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { DataTable, type Col } from "@/components/DataTable";
-import type { DataHealth, Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
-import { hasReportableLost, usesStoredLost } from "@/lib/lost-authority";
+import type { Grouped, LostBreakdown, Matrix, Totals } from "@/lib/types";
+import type { CourseLeadLossReport, CourseLostMovementReport } from "@/lib/course-lead-loss";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/lost")({ component: Lost });
 
-type ShareView = "reason" | "course" | "team" | "salesperson" | "source" | "month";
+type ShareView =
+  "category" | "reason" | "type" | "course" | "team" | "salesperson" | "source" | "month";
+
+interface DuplicateEvidenceView {
+  supported: boolean;
+  matchedRecordCount: number;
+  sources: ("provider_id" | "phone")[];
+}
 
 interface LostRowView {
+  id: string;
+  contact: string;
+  phone: string;
+  mobile: string;
+  email: string;
+  odooUrl: string;
   createdAt: string;
   closeDate: string;
+  lostDateBasis: string;
+  recordType: "lead" | "opportunity";
+  active: boolean;
+  category: string;
   reportingDate: string;
+  closedInPeriod?: boolean;
   campaign: string;
   adName: string;
   reason: string;
+  rawReason?: string;
+  canonicalReasonKey?: string;
+  canonicalReasonLabelAr?: string;
+  canonicalReasonLabelEn?: string;
+  duplicateEvidence: DuplicateEvidenceView | null;
   course: string;
   mainCategory: string;
   salesTeam: string;
@@ -40,8 +90,72 @@ interface LostRowView {
   stage: string;
 }
 
+interface LostChatterView {
+  id: number;
+  createdAt: string;
+  lostAt: string;
+  lostDateBasis: string;
+  elapsedHours: number | null;
+  lastBeforeLoss: ChatterMessage | null;
+  messages: ChatterMessage[];
+  truncated: boolean;
+  fetchedAt: string;
+}
+
+interface ChatterMessage {
+  id: number;
+  date: string;
+  kind: string;
+  subtype: string;
+  author: string;
+  subject: string;
+  text: string;
+  beforeLoss: boolean;
+}
+
+function cairoTimestamp(value: string, lang: "ar" | "en"): string {
+  if (!value) return "—";
+  const parsed = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Africa/Cairo",
+      }).format(parsed);
+}
+
+function snapshotAgeDays(row: LostRowView): number | null {
+  const created = Date.parse(row.createdAt || row.reportingDate);
+  const lost = Date.parse(row.closeDate);
+  return Number.isFinite(created) && Number.isFinite(lost) && lost >= created
+    ? Math.floor((lost - created) / 86_400_000)
+    : null;
+}
+
 interface Resp {
+  health?: { crmAuthority?: string };
+  denominatorAuthority: {
+    source: "odoo_live" | "snapshot_long_range";
+    nonLost: number;
+    snapshotNonLost: number;
+    nonLostDelta: number;
+    directLostCrossCheck: number | null;
+    lostCrossCheckDelta: number | null;
+    fetchedAt: string | null;
+  };
   breakdown: LostBreakdown;
+  courseLeadLoss: CourseLeadLossReport;
+  courseLostMovement: CourseLostMovementReport;
+  cohortAuthority: {
+    source: "odoo_live" | "snapshot_fallback";
+    total: number;
+    lostLeads: number;
+    lostOpportunities: number;
+    snapshotTotal: number;
+    snapshotDelta: number;
+    fetchedAt: string;
+  };
   teamLostRates: { team: string; leads: number; lost: number; rate: number | null }[];
   totals: Totals;
   closureMovement: {
@@ -50,9 +164,23 @@ interface Resp {
     createdInPeriod: number;
     campaignCreatedInPeriod: number;
     fromOlderCohorts: number;
+    olderCohortClosedLostInPeriod?: number;
+    undatedCohortClosedLostInPeriod?: number;
+    lostLeads: number;
+    lostOpportunities: number;
+    dateBasisCounts: Record<string, number>;
+    dateFieldAudit: { closeDateInPeriod: number; lostDateInPeriod: number };
   };
-  detail: { rows: LostRowView[]; total: number; truncated: boolean };
-  health: DataHealth;
+  detail: {
+    rows: LostRowView[];
+    total: number;
+    truncated: boolean;
+    offset: number;
+    limit: number;
+    reasonKey?: string;
+    courseKey?: string;
+    scope?: "closed" | "cohort" | "cohort-live";
+  };
 }
 
 /** A Lost distribution the response already carried, as a drill-down section. */
@@ -80,6 +208,28 @@ function lostSection(
   };
 }
 
+/** Canonical reason keys in the reader's language; unknown keys fall back to themselves. */
+type ShareRow = Grouped & { key?: string };
+
+function translatedReasons(breakdown: LostBreakdown, lang: "ar" | "en"): ShareRow[] {
+  return breakdown.byReason.map((row) => ({
+    ...row,
+    key: row.label,
+    label: breakdown.reasonLabels?.[row.label]?.[lang] ?? row.label,
+  }));
+}
+
+function translatedReasonMatrix(
+  breakdown: LostBreakdown,
+  matrix: Matrix,
+  lang: "ar" | "en",
+): Matrix {
+  return {
+    ...matrix,
+    rows: matrix.rows.map((key) => breakdown.reasonLabels?.[key]?.[lang] ?? key),
+  };
+}
+
 /**
  * What the four Lost figures are made of.
  *
@@ -92,10 +242,13 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
   const B = data.breakdown;
   const T = data.totals;
   const M = data.closureMovement;
-  const topReason = B.byReason[0] ?? null;
+  // Reasons arrive grouped by canonical key; each is shown in the reader's language.
+  const reasons = translatedReasons(B, lang);
+  const topReason = reasons[0] ?? null;
 
   const common = [
-    lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", B.byReason, lang),
+    lostSection("categories", A ? "فئات الخسارة" : "Loss categories", B.byCategory, lang),
+    lostSection("reasons", A ? "أهم أسباب الخسارة" : "Main loss reasons", reasons, lang),
     lostSection("teams", A ? "أكثر الفرق تأثرًا" : "Most affected teams", B.byTeam, lang),
     lostSection("courses", A ? "أكثر الدورات تأثرًا" : "Most affected courses", B.byCourse, lang),
     lostSection("sources", A ? "حسب المصدر" : "By source", B.bySource, lang),
@@ -109,8 +262,8 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
       tone: "rose",
       icon: <TrendingDown size={16} />,
       definition: A
-        ? "العملاء الذين أُنشئوا داخل الفترة وانتهت صفقتهم بالخسارة، من مصدر الخسائر المعتمد وحده."
-        : "Leads created inside the window whose deal ended as lost, from the approved Lost source only.",
+        ? "كل حالات Lost المطابقة لعقد CRM 1.26: الـLead المؤرشف بسبب، والـOpportunity الموجودة في Lost stage، مع التاريخ القديم المؤرشف."
+        : "Every loss under CRM 1.26: archived Leads with a reason, Opportunities in the Lost stage, plus archived historical losses.",
       formula: A
         ? `${fmtNum(B.total)} صفقة ضائعة، محسوبة بتاريخ إنشاء الليد لا بتاريخ إغلاقه.`
         : `${fmtNum(B.total)} lost deals, counted on the lead's creation date and not on its close date.`,
@@ -145,8 +298,8 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
       tone: "rose",
       icon: <Percent size={16} />,
       definition: A
-        ? "نسبة العملاء المحتملين الذين انتهت صفقتهم بالخسارة داخل الفترة. النسبة وحدها بلا معنى بغير عدديها."
-        : "The share of leads whose deal ended as lost inside the period. The percentage means nothing without both of its numbers.",
+        ? "من الليدز التي أُنشئت داخل الفترة المحددة: نسبة ما أصبح منها Lost حتى لحظة تحديث التقرير، حتى لو تاريخ الإغلاق بعد الفترة. هذه ليست نسبة الحالات التي اتقفلت خلال الشهر."
+        : "Of leads created in the selected period, the share now marked Lost at refresh time, even when closure happened later. This is not the share closed during the month.",
       formula: `${fmtNum(T.lost)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.lostRate, 2)}`,
       supporting: [
         { key: "lost", label: A ? "البسط · ضائعة" : "Numerator · lost", value: fmtNum(T.lost) },
@@ -185,13 +338,13 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
     },
     closed: {
       id: "lost.closed",
-      title: A ? "اتقفل خلال الفترة" : "Closed in period",
+      title: A ? "Lost بتاريخ إغلاق داخل الفترة" : "Lost by close date in period",
       value: fmtNum(M.closedLost),
       tone: "amber",
       icon: <CalendarClock size={16} />,
       definition: A
-        ? "الصفقات التي أُغلقت خاسرة داخل الفترة أيًا كان تاريخ إنشائها. هذا مقياس عمل الفترة، بخلاف الرقم المجاور الذي يقيس كوهورت الليدز."
-        : "Deals closed as lost inside the window, whatever their creation date. This measures the period's work, unlike the figure beside it, which measures the period's lead cohort.",
+        ? "حالات Lost التي سُجل تاريخ خسارتها داخل الفترة: date_closed للـLeads وlost_verification_date للـOpportunities."
+        : "Losses dated inside the window: date_closed for Leads and lost_verification_date for Opportunities.",
       formula: A
         ? `منها ${fmtNum(M.createdInPeriod)} أُنشئت داخل الفترة و${fmtNum(M.fromOlderCohorts)} من كوهورتات أقدم.`
         : `Of these, ${fmtNum(M.createdInPeriod)} were created inside the window and ${fmtNum(M.fromOlderCohorts)} came from older cohorts.`,
@@ -204,8 +357,17 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
         {
           key: "older",
           label: A ? "من كوهورتات أقدم" : "From older cohorts",
-          value: fmtNum(M.fromOlderCohorts),
+          value: fmtNum(M.olderCohortClosedLostInPeriod ?? M.fromOlderCohorts),
         },
+        ...(M.undatedCohortClosedLostInPeriod
+          ? [
+              {
+                key: "undated",
+                label: A ? "بلا تاريخ إنشاء صالح" : "No valid creation date",
+                value: fmtNum(M.undatedCohortClosedLostInPeriod),
+              },
+            ]
+          : []),
         {
           key: "campaign",
           label: A ? "من حملات" : "From campaigns",
@@ -213,7 +375,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
         },
         { key: "cohort", label: A ? "كوهورت الفترة" : "Cohort lost", value: fmtNum(B.total) },
       ],
-      breakdowns: common.slice(0, 3),
+      breakdowns: common.slice(0, 4),
     },
     reason: {
       id: "lost.reason",
@@ -240,7 +402,7 @@ function lostMetrics(data: Resp, lang: "ar" | "en"): Record<string, MetricDetail
             },
           ]
         : undefined,
-      breakdowns: [common[0], common[2]],
+      breakdowns: [common[1], common[0]],
     },
   };
 }
@@ -249,23 +411,68 @@ function Lost() {
   const reportingPeriod = useReportingPeriod();
   const { t, lang } = useI18n();
   const [matrixView, setMatrixView] = useState<"team" | "course">("team");
+  const [courseReportView, setCourseReportView] = useState<"movement" | "cohort">("cohort");
+  const [workspaceView, setWorkspaceView] = useState<"overview" | "timing">("overview");
 
   /** Tell Nexus which view is open — the route does not change with the tab. */
-  useRegisterNexusView("lost", { tab: matrixView });
+  useRegisterNexusView("lost", {
+    tab: matrixView,
+    parameters: { courseReport: courseReportView },
+  });
   const [shareView, setShareView] = useState<ShareView>("reason");
+  const [selectedReason, setSelectedReason] = useState<{ key: string; label: string } | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<{
+    key: string;
+    label: string;
+    scope: "closed" | "cohort-live";
+  } | null>(null);
+  const [reasonOffset, setReasonOffset] = useState(0);
+  const [courseOffset, setCourseOffset] = useState(0);
+  const [selectedRecord, setSelectedRecord] = useState<LostRowView | null>(null);
   const { data, isLoading, error, refetch } = useApi<Resp>("/api/lost");
+  const reasonQuery = useApi<Resp>(
+    `/api/lost?detailReason=${encodeURIComponent(selectedReason?.key ?? "")}&detailOffset=${reasonOffset}&detailLimit=50`,
+    { enabled: selectedReason !== null },
+  );
+  const courseQuery = useApi<Resp>(
+    `/api/lost?detailCourse=${encodeURIComponent(selectedCourse?.key ?? "")}&detailScope=${selectedCourse?.scope ?? "cohort-live"}&detailOffset=${courseOffset}&detailLimit=50`,
+    { enabled: selectedCourse !== null },
+  );
+
+  useEffect(() => setReasonOffset(0), [selectedReason?.key]);
+  useEffect(() => setCourseOffset(0), [selectedCourse?.key]);
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   // Built from the response the strip already renders, so a card and its panel
   // can never disagree.
   const metrics = data ? lostMetrics(data, lang) : null;
+  const lostDateFallbackCount = data
+    ? Object.entries(data.closureMovement.dateBasisCounts)
+        .filter(([basis]) => basis.includes("fallback") || basis === "unknown")
+        .reduce((sum, [, count]) => sum + count, 0)
+    : 0;
 
   const cols: Col<LostRowView>[] = [
     {
+      key: "contact",
+      header: lang === "ar" ? "الليد" : "Lead",
+      sticky: true,
+      always: true,
+      minWidth: "180px",
+      sortValue: (r) => r.contact || r.id,
+      render: (r) => (
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-text" title={r.contact}>
+            {r.contact || `CRM #${r.id}`}
+          </div>
+          <div className="num mt-0.5 text-[10px] text-text-muted">CRM #{r.id}</div>
+        </div>
+      ),
+    },
+    {
       key: "reportingDate",
       header: lang === "ar" ? "تاريخ إنشاء الليد" : "Lead creation date",
-      sticky: true,
       width: "120px",
       sortValue: (r) => r.reportingDate,
       render: (r) => fmtDate(r.reportingDate, lang),
@@ -278,14 +485,55 @@ function Lost() {
       render: (r) => fmtDate(r.closeDate, lang),
     },
     {
+      key: "recordType",
+      header: lang === "ar" ? "النوع" : "Type",
+      sortValue: (r) => r.recordType,
+      render: (r) => (
+        <Pill tone={r.recordType === "lead" ? "brand" : "warning"}>
+          {r.recordType === "lead" ? "Lead" : "Opportunity"}
+        </Pill>
+      ),
+    },
+    {
+      key: "category",
+      header: lang === "ar" ? "فئة الخسارة" : "Lost category",
+      sortValue: (r) => r.category,
+      render: (r) => r.category || "—",
+    },
+    {
       key: "reason",
       header: t("loss_reason"),
-      sortValue: (r) => r.reason,
-      render: (r) => (
-        <span className="truncate block max-w-[220px]" title={r.reason}>
-          {r.reason || "—"}
-        </span>
-      ),
+      // Canonical reason on screen; the raw Odoo spelling stays on hover and in the CSV.
+      sortValue: (r) => r.canonicalReasonKey ?? r.reason,
+      render: (r) => {
+        const label =
+          (lang === "ar" ? r.canonicalReasonLabelAr : r.canonicalReasonLabelEn) || r.reason || "—";
+        return (
+          <span
+            className="truncate block max-w-[220px]"
+            title={r.rawReason !== undefined ? `${label} · Odoo: ${r.rawReason || "—"}` : r.reason}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "duplicateEvidence",
+      header: lang === "ar" ? "دليل التكرار" : "Duplicate evidence",
+      sortValue: (r) => (r.duplicateEvidence?.supported ? 1 : 0),
+      render: (r) =>
+        r.canonicalReasonKey !== "duplicate" ? (
+          <span className="text-text-subtle">—</span>
+        ) : r.duplicateEvidence?.supported ? (
+          <Pill tone="success">
+            {lang === "ar"
+              ? `${fmtNum(r.duplicateEvidence.matchedRecordCount)} مطابق`
+              : `${fmtNum(r.duplicateEvidence.matchedRecordCount)} match`}
+          </Pill>
+        ) : (
+          <Pill tone="warning">{lang === "ar" ? "يحتاج مراجعة" : "Needs review"}</Pill>
+        ),
     },
     {
       key: "course",
@@ -339,11 +587,41 @@ function Lost() {
         title={t("lost")}
         subtitle={
           lang === "ar"
-            ? "تحليل جودة التسويق حسب تاريخ دخول الليد، وحركة الإغلاق ظاهرة لوحدها"
-            : "Marketing quality by lead creation date, with closures reported separately"
+            ? "Lost Leads وLost Opportunities بقواعد CRM 1.26، مع فصل الكوهورت عن حركة الخسارة"
+            : "Lost Leads and Opportunities under CRM 1.26, separating cohort quality from loss movement"
         }
         period={reportingPeriod}
       />
+
+      <nav
+        aria-label={lang === "ar" ? "تقارير اللوست المرتبطة" : "Related Lost reports"}
+        className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
+      >
+        <span className="font-bold text-text">
+          {lang === "ar" ? "كمّل تحليل اللوست:" : "Continue Lost analysis:"}
+        </span>
+        <Link
+          to="/leads"
+          search={{ view: "quality" }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar"
+            ? "جودة الليدز واللوست · قرارات الشيت"
+            : "Lead quality & Lost · sheet decisions"}
+        </Link>
+        <Link
+          to="/leads"
+          search={{ view: "lost" }}
+          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+        >
+          {lang === "ar" ? "لوست حسب شهر دخول الليد" : "Lost by lead entry month"}
+        </Link>
+        <span className="basis-full text-text-muted">
+          {lang === "ar"
+            ? "أرقام هذه الصفحة من أودو؛ قرارات الشيت لا تُضاف إليها لأن الشيت لا يحتوي CRM ID يربط كل صف بسجل أودو."
+            : "This page uses Odoo; sheet decisions are not added because the sheet has no CRM ID to match each row."}
+        </span>
+      </nav>
 
       {isLoading || !data ? (
         <>
@@ -352,55 +630,6 @@ function Lost() {
         </>
       ) : (
         <>
-          {/* The reader is told exactly what is wrong with the figures — that
-              they are stopped, or that they are a stored copy — because both
-              change what the page means. What they are not told on the page
-              itself is which store the copy lives in: naming the database is
-              an instruction to nobody who reads this report. It stays one
-              disclosure away, for whoever can act on it. */}
-          {!hasReportableLost(data.health.lostAuthority) && (
-            <DataHealthSummary
-              issues={[
-                {
-                  tone: "danger",
-                  message:
-                    lang === "ar"
-                      ? "أرقام الخسائر متوقفة في هذه الفترة."
-                      : "Lost figures are stopped for this period.",
-                  impact:
-                    lang === "ar"
-                      ? "المصدر المعتمد للخسائر غير متاح، ونعرض توقفاً بدلاً من صفر مضلل."
-                      : "The approved Lost source is unavailable, so the report stops rather than showing a misleading zero.",
-                  technical:
-                    lang === "ar"
-                      ? "Archived Lost غير متاح من Odoo مباشرة ولا من آخر نسخة مخزّنة."
-                      : "Archived Lost is unavailable from Odoo directly and from the last stored snapshot.",
-                },
-              ]}
-            />
-          )}
-          {usesStoredLost(data.health.lostAuthority) && (
-            <DataHealthSummary
-              issues={[
-                {
-                  tone: "warning",
-                  message:
-                    lang === "ar"
-                      ? "أرقام الخسائر معروضة من آخر نسخة ناجحة."
-                      : "Lost figures are served from the last good copy.",
-                  impact:
-                    lang === "ar"
-                      ? "البيانات موجودة وغير محسوبة صفراً، لكن أحدث الصفوف قد تنقص."
-                      : "The data is present and is not counted as zero, but the newest rows may be missing.",
-                  technical:
-                    lang === "ar"
-                      ? "المصدر المباشر Odoo Archived Lost متعذر مؤقتاً؛ يتم استخدام النسخة المخزّنة."
-                      : "The direct Odoo Archived Lost source is temporarily unreachable; the stored snapshot is in use.",
-                },
-              ]}
-            />
-          )}
-
           {/* Four coloured cards rather than four cells of a divided strip
               inside a card. Same four figures, each of them now openable — and
               one less card-inside-a-card. */}
@@ -421,7 +650,13 @@ function Lost() {
             />
             <MetricDetailTrigger
               detail={metrics!.closed}
-              card={{ index: 2, sub: lang === "ar" ? "حسب تاريخ الإغلاق" : "By close date" }}
+              card={{
+                index: 2,
+                sub:
+                  lang === "ar"
+                    ? `يشمل ${fmtNum(data.closureMovement.fromOlderCohorts)} سجلًا من إنشاء أقدم`
+                    : `Includes ${fmtNum(data.closureMovement.fromOlderCohorts)} older-created records`,
+              }}
             />
             <MetricDetailTrigger
               detail={metrics!.reason}
@@ -435,187 +670,490 @@ function Lost() {
             />
           </KpiRow>
 
-          <Card className="border-brand/20 bg-brand-soft/35">
-            <SectionTitle
-              hint={
-                lang === "ar"
-                  ? "ده تقرير حركة تشغيلية بتاريخ الإغلاق؛ منفصل عن تحليل جودة حملات الفترة اللي فوق."
-                  : "This operational movement uses close date and stays separate from the acquisition cohort above."
-              }
-            >
-              <span className="inline-flex items-center gap-2">
-                <CalendarClock size={17} className="text-brand" />
-                {lang === "ar"
-                  ? "إيه اللي اتقفل Lost خلال الفترة؟"
-                  : "What closed Lost in the period?"}
-              </span>
-            </SectionTitle>
-            <p className="mb-4 text-sm leading-7 text-text-muted">
+          {data.denominatorAuthority.source !== "odoo_live" && (
+            <Notice tone="warning" icon={<AlertTriangle size={16} />}>
               {lang === "ar"
-                ? `خلال الفترة اتقفل ${fmtNum(data.closureMovement.closedLost)} ليد Lost. منهم ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} جايين من Campaign واتعملوا أصلًا في نفس الفترة، و${fmtNum(data.closureMovement.fromOlderCohorts)} كانوا ليدز أقدم واتقفلوا دلوقتي.`
-                : `${fmtNum(data.closureMovement.closedLost)} leads closed Lost in the period. ${fmtNum(data.closureMovement.campaignCreatedInPeriod)} were campaign leads created in the same period, while ${fmtNum(data.closureMovement.fromOlderCohorts)} came from older cohorts.`}
-            </p>
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              {[
-                [lang === "ar" ? "اتقفل Lost" : "Closed Lost", data.closureMovement.closedLost],
-                [
-                  lang === "ar" ? "عليه Campaign" : "With campaign",
-                  data.closureMovement.fromCampaign,
-                ],
-                [
-                  lang === "ar" ? "اتعمل في نفس الفترة" : "Created in period",
-                  data.closureMovement.createdInPeriod,
-                ],
-                [
-                  lang === "ar" ? "Campaign من نفس الفترة" : "Period campaign cohort",
-                  data.closureMovement.campaignCreatedInPeriod,
-                ],
-              ].map(([label, value]) => (
-                <div
-                  key={String(label)}
-                  className="rounded-xl border border-border bg-surface/85 p-3"
-                >
-                  <div className="text-[11px] text-text-muted">{label}</div>
-                  <div className="num mt-1 text-xl font-semibold text-text">
-                    {fmtNum(Number(value))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <SectionTitle
-              hint={
-                lang === "ar"
-                  ? "اختار زاوية واحدة بدل عرض كل الرسومات معًا."
-                  : "Choose one lens instead of displaying every chart at once."
-              }
-            >
-              {lang === "ar" ? "أين تتجمع الخسائر؟" : "Where are losses concentrated?"}
-            </SectionTitle>
-            <div className="hscroll mb-5 flex gap-2">
-              {(
-                [
-                  ["reason", t("loss_reason")],
-                  ["course", t("by_course")],
-                  ["team", t("by_team")],
-                  ["salesperson", t("by_salesperson")],
-                  ["source", t("by_source")],
-                  ["month", t("by_month")],
-                ] as [ShareView, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setShareView(key)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${shareView === key ? "border-danger bg-danger-soft text-danger" : "border-border text-text-muted hover:bg-surface-2"}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <ShareRows rows={shareRows(data.breakdown, shareView)} sorted={shareView === "month"} />
-          </Card>
-
-          <details className="card overflow-hidden">
-            <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+                ? "الفترة المختارة أطول من 93 يومًا؛ مقام نسبة Lost من آخر نسخة CRM محفوظة، وليس من قراءة Odoo المباشرة. اختار شهرًا أو شهرين للمطابقة الحية قبل اعتماد النسبة."
+                : "The selected range exceeds 93 days; the Lost-rate denominator comes from the last saved CRM copy, not live Odoo. Select one or two months for a live reconciliation before relying on the rate."}
+            </Notice>
+          )}
+          {(data.denominatorAuthority.nonLostDelta !== 0 ||
+            (data.denominatorAuthority.lostCrossCheckDelta ?? 0) !== 0) && (
+            <Notice tone="warning" icon={<AlertTriangle size={16} />}>
               {lang === "ar"
-                ? "تحليل متقدم: نسب الفرق ومصفوفة الأسباب"
-                : "Advanced: team rates and reason matrix"}
-            </summary>
-            <div className="space-y-5 border-t border-border p-4 sm:p-5">
-              <div className="table-wrap scroll-hint-x">
-                <table className="w-full min-w-[420px] text-sm">
-                  <thead>
-                    <tr className="text-[11px] uppercase tracking-wide text-text-muted">
-                      <th className="py-2 text-start">{t("team")}</th>
-                      <th className="py-2 text-end">{t("crm_leads")}</th>
-                      <th className="py-2 text-end">{t("lost_count")}</th>
-                      <th className="py-2 text-end">{t("lost_rate")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.teamLostRates.map((row) => (
-                      <tr key={row.team} className="border-t border-border">
-                        <td className="max-w-[220px] truncate py-2.5 pe-3" title={row.team}>
-                          {row.team}
-                        </td>
-                        <td className="num py-2.5 text-end">{fmtNum(row.leads)}</td>
-                        <td className="num py-2.5 text-end">{fmtNum(row.lost)}</td>
-                        <td className="num py-2.5 text-end font-medium">{fmtPct(row.rate, 1)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <SectionTitle
-                action={
-                  <Segmented
-                    value={matrixView}
-                    onChange={setMatrixView}
-                    options={[
-                      { value: "team", label: t("by_team") },
-                      { value: "course", label: t("by_course") },
-                    ]}
-                  />
-                }
+                ? `نسبة Lost الرئيسية تحسب البسط والمقام من Odoo المباشر. تفصيلات النسخة المحفوظة قد تختلف: فرق باقي الليدز ${fmtNum(Math.abs(data.denominatorAuthority.nonLostDelta))}، وفرق مراجعة Lost ${fmtNum(Math.abs(data.denominatorAuthority.lostCrossCheckDelta ?? 0))}.`
+                : `The main Lost rate uses live Odoo for both numerator and denominator. Saved-copy details may differ: ${fmtNum(Math.abs(data.denominatorAuthority.nonLostDelta))} non-Lost and ${fmtNum(Math.abs(data.denominatorAuthority.lostCrossCheckDelta ?? 0))} Lost cross-check difference.`}
+            </Notice>
+          )}
+          {data.cohortAuthority.snapshotDelta !== 0 && (
+            <Notice tone="warning" icon={<AlertTriangle size={16} />}>
+              {lang === "ar"
+                ? `Odoo المباشر فيه ${fmtNum(data.cohortAuthority.total)} Lost مقابل ${fmtNum(data.cohortAuthority.snapshotTotal)} في النسخة المحفوظة؛ فارق ${fmtNum(Math.abs(data.cohortAuthority.snapshotDelta))} سجل. التفصيلات التي تعتمد النسخة المحفوظة قد تتأخر عن الرقم الرئيسي.`
+                : `Live Odoo has ${fmtNum(data.cohortAuthority.total)} Lost versus ${fmtNum(data.cohortAuthority.snapshotTotal)} in the saved copy, a ${fmtNum(Math.abs(data.cohortAuthority.snapshotDelta))}-record gap. Snapshot-based detail may lag the main total.`}
+            </Notice>
+          )}
+
+          <div
+            className="flex flex-wrap gap-2 rounded-2xl border border-border bg-surface p-1.5 shadow-sm"
+            role="tablist"
+            aria-label={lang === "ar" ? "تحليل الخسائر" : "Loss analysis"}
+          >
+            {(
+              [
+                ["overview", lang === "ar" ? "نظرة عامة على الخسائر" : "Loss overview"],
+                ["timing", lang === "ar" ? "وقت الخسارة وسجل التواصل" : "Time to loss & chatter"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={workspaceView === key}
+                onClick={() => setWorkspaceView(key)}
+                className={`min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition ${workspaceView === key ? "bg-brand text-white shadow-sm" : "text-text-muted hover:bg-surface-2"}`}
               >
-                {lang === "ar" ? "سبب الضياع × " : "Loss reason × "}
-                {matrixView === "team" ? t("team") : t("course")}
-              </SectionTitle>
-              <MatrixTable
-                matrix={
-                  matrixView === "team"
-                    ? data.breakdown.reasonByTeam
-                    : data.breakdown.reasonByCourse
-                }
-              />
-            </div>
-          </details>
+                {label}
+              </button>
+            ))}
+          </div>
 
-          <details className="card overflow-hidden">
-            <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+          {workspaceView === "timing" ? (
+            <LostTimingPanel
+              rows={data.detail.rows}
+              total={data.detail.total}
+              lang={lang}
+              onSelect={setSelectedRecord}
+            />
+          ) : (
+            <>
+              <Card className="border-brand/20 bg-brand-soft/35">
+                <SectionTitle
+                  hint={
+                    lang === "ar"
+                      ? "ده تقرير حركة تشغيلية بتاريخ الإغلاق؛ منفصل عن تحليل جودة حملات الفترة اللي فوق."
+                      : "This operational movement uses close date and stays separate from the acquisition cohort above."
+                  }
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarClock size={17} className="text-brand" />
+                    {lang === "ar"
+                      ? "إيه اللي اتقفل Lost خلال الفترة؟"
+                      : "What closed Lost in the period?"}
+                  </span>
+                </SectionTitle>
+                <p className="mb-4 text-sm leading-7 text-text-muted">
+                  {lang === "ar"
+                    ? `خلال الفترة اتسجل ${fmtNum(data.closureMovement.closedLost)} حالة Lost: ${fmtNum(data.closureMovement.lostLeads)} Leads و${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. منها ${fmtNum(data.closureMovement.createdInPeriod)} أُنشئت داخل الفترة و${fmtNum(data.closureMovement.fromOlderCohorts)} من إنشاء أقدم.`
+                    : `${fmtNum(data.closureMovement.closedLost)} losses were dated in the period: ${fmtNum(data.closureMovement.lostLeads)} Leads and ${fmtNum(data.closureMovement.lostOpportunities)} Opportunities. ${fmtNum(data.closureMovement.createdInPeriod)} were created in-period and ${fmtNum(data.closureMovement.fromOlderCohorts)} came from older cohorts.`}
+                </p>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  {[
+                    [lang === "ar" ? "اتقفل Lost" : "Closed Lost", data.closureMovement.closedLost],
+                    [lang === "ar" ? "Lost Leads" : "Lost Leads", data.closureMovement.lostLeads],
+                    [
+                      lang === "ar" ? "Lost Opportunities" : "Lost Opportunities",
+                      data.closureMovement.lostOpportunities,
+                    ],
+                    [
+                      lang === "ar" ? "من إنشاء أقدم" : "Created before period",
+                      data.closureMovement.fromOlderCohorts,
+                    ],
+                  ].map(([label, value]) => (
+                    <div
+                      key={String(label)}
+                      className="rounded-xl border border-border bg-surface/85 p-3"
+                    >
+                      <div className="text-[11px] text-text-muted">{label}</div>
+                      <div className="num mt-1 text-xl font-semibold text-text">
+                        {fmtNum(Number(value))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {lostDateFallbackCount > 0 && (
+                  <Notice tone="warning" className="mt-3" icon={<Info size={16} />}>
+                    {lang === "ar"
+                      ? `${fmtNum(lostDateFallbackCount)} Opportunity لا تملك lost_verification_date؛ تاريخ الحركة فيها محسوب من آخر تغيير مرحلة وفق عقد CRM 1.26، ومعلّم بوضوح داخل تفاصيل السجل.`
+                      : `${fmtNum(lostDateFallbackCount)} Opportunities have no lost_verification_date. Their movement date uses the last stage change under CRM 1.26 and is explicitly labelled in record details.`}
+                  </Notice>
+                )}
+              </Card>
+
+              <div className="rounded-2xl border border-border bg-surface p-1.5 shadow-sm">
+                <div
+                  className="grid grid-cols-2 gap-1.5"
+                  role="tablist"
+                  aria-label={lang === "ar" ? "تقارير Lost حسب الكورس" : "Course Lost reports"}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={courseReportView === "cohort"}
+                    onClick={() => setCourseReportView("cohort")}
+                    className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "cohort" ? "bg-brand text-white shadow-md shadow-brand/20" : "text-text-muted hover:bg-surface-2"}`}
+                  >
+                    {lang === "ar"
+                      ? "Lost حسب الكورس · Creation Date"
+                      : "Lost by course · creation date"}
+                    <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
+                      {fmtNum(data.courseLeadLoss.totals.lost)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={courseReportView === "movement"}
+                    onClick={() => setCourseReportView("movement")}
+                    className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
+                  >
+                    {lang === "ar" ? "حركة Lost · تاريخ الإغلاق" : "Lost movement · close date"}
+                    <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
+                      {fmtNum(data.courseLostMovement.totals.lost)}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {courseReportView === "movement" ? (
+                <CourseLostMovement
+                  report={data.courseLostMovement}
+                  onSelect={(row) =>
+                    setSelectedCourse({ key: row.key, label: row.label, scope: "closed" })
+                  }
+                />
+              ) : (
+                <CourseLeadLossComparison
+                  report={data.courseLeadLoss}
+                  onSelect={(row) =>
+                    setSelectedCourse({ key: row.key, label: row.label, scope: "cohort-live" })
+                  }
+                />
+              )}
+
+              <Card>
+                <SectionTitle
+                  hint={
+                    lang === "ar"
+                      ? "اختار زاوية واحدة بدل عرض كل الرسومات معًا."
+                      : "Choose one lens instead of displaying every chart at once."
+                  }
+                >
+                  {lang === "ar" ? "أين تتجمع الخسائر؟" : "Where are losses concentrated?"}
+                </SectionTitle>
+                <div className="hscroll mb-5 flex gap-2">
+                  {(
+                    [
+                      ["category", lang === "ar" ? "فئة الخسارة" : "Lost category"],
+                      ["type", "Lead / Opportunity"],
+                      ["reason", t("loss_reason")],
+                      ["course", t("by_course")],
+                      ["team", t("by_team")],
+                      ["salesperson", t("by_salesperson")],
+                      ["source", t("by_source")],
+                      ["month", t("by_month")],
+                    ] as [ShareView, string][]
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setShareView(key)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${shareView === key ? "border-danger bg-danger-soft text-danger" : "border-border text-text-muted hover:bg-surface-2"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <ShareRows
+                  rows={
+                    shareView === "reason"
+                      ? translatedReasons(data.breakdown, lang)
+                      : shareRows(data.breakdown, shareView)
+                  }
+                  sorted={shareView === "month"}
+                  selectedKey={selectedReason?.key}
+                  onSelect={
+                    shareView === "reason"
+                      ? (row) => setSelectedReason({ key: row.key ?? row.label, label: row.label })
+                      : undefined
+                  }
+                />
+              </Card>
+
+              <details className="card overflow-hidden">
+                <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+                  {lang === "ar"
+                    ? "تحليل متقدم: نسب الفرق ومصفوفة الأسباب"
+                    : "Advanced: team rates and reason matrix"}
+                </summary>
+                <div className="space-y-5 border-t border-border p-4 sm:p-5">
+                  <div className="table-wrap scroll-hint-x">
+                    <table className="w-full min-w-[420px] text-sm">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                          <th className="py-2 text-start">{t("team")}</th>
+                          <th className="py-2 text-end">{t("crm_leads")}</th>
+                          <th className="py-2 text-end">{t("lost_count")}</th>
+                          <th className="py-2 text-end">{t("lost_rate")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.teamLostRates.map((row) => (
+                          <tr key={row.team} className="border-t border-border">
+                            <td className="max-w-[220px] truncate py-2.5 pe-3" title={row.team}>
+                              {row.team}
+                            </td>
+                            <td className="num py-2.5 text-end">{fmtNum(row.leads)}</td>
+                            <td className="num py-2.5 text-end">{fmtNum(row.lost)}</td>
+                            <td className="num py-2.5 text-end font-medium">
+                              {fmtPct(row.rate, 1)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <SectionTitle
+                    action={
+                      <Segmented
+                        value={matrixView}
+                        onChange={setMatrixView}
+                        options={[
+                          { value: "team", label: t("by_team") },
+                          { value: "course", label: t("by_course") },
+                        ]}
+                      />
+                    }
+                  >
+                    {lang === "ar" ? "سبب الضياع × " : "Loss reason × "}
+                    {matrixView === "team" ? t("team") : t("course")}
+                  </SectionTitle>
+                  <MatrixTable
+                    matrix={translatedReasonMatrix(
+                      data.breakdown,
+                      matrixView === "team"
+                        ? data.breakdown.reasonByTeam
+                        : data.breakdown.reasonByCourse,
+                      lang,
+                    )}
+                  />
+                </div>
+              </details>
+
+              <details className="card overflow-hidden">
+                <summary className="cursor-pointer list-none px-4 py-4 text-sm font-semibold text-text sm:px-5">
+                  {lang === "ar"
+                    ? `السجلات التفصيلية (${fmtNum(data.detail.total)})`
+                    : `Detailed records (${fmtNum(data.detail.total)})`}
+                </summary>
+                <div className="border-t border-border p-3">
+                  <DataTable
+                    rows={data.detail.rows}
+                    cols={cols}
+                    searchable={(r) =>
+                      `${r.id} ${r.contact} ${r.category} ${r.reason} ${r.recordType} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
+                    }
+                    onRowClick={setSelectedRecord}
+                    rowKey={(r) => r.id}
+                    initialSort={{ key: "reportingDate", dir: -1 }}
+                    csvFilename="engosoft-lost"
+                    maxHeight={620}
+                    csvRow={(r) => ({
+                      crm_id: r.id,
+                      contact: r.contact,
+                      created: r.createdAt,
+                      close_date: r.closeDate,
+                      lost_date_basis: r.lostDateBasis,
+                      reporting_date: r.reportingDate,
+                      record_type: r.recordType,
+                      active: String(r.active),
+                      lost_category: r.category,
+                      reason: r.reason,
+                      canonical_reason_key: r.canonicalReasonKey ?? "",
+                      canonical_reason:
+                        (lang === "ar" ? r.canonicalReasonLabelAr : r.canonicalReasonLabelEn) ?? "",
+                      raw_reason: r.rawReason ?? r.reason,
+                      duplicate_identity_supported: String(r.duplicateEvidence?.supported ?? ""),
+                      duplicate_matched_records: r.duplicateEvidence?.matchedRecordCount ?? "",
+                      course: r.course,
+                      main_category: r.mainCategory,
+                      sales_team: r.salesTeam,
+                      salesperson: r.salesperson,
+                      source: r.source,
+                      campaign: r.campaign,
+                      ad_name: r.adName,
+                      stage: r.stage,
+                    })}
+                  />
+                </div>
+              </details>
+            </>
+          )}
+        </>
+      )}
+
+      <Dialog
+        open={selectedReason !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedReason(null);
+        }}
+      >
+        <DialogContent
+          dir={lang === "ar" ? "rtl" : "ltr"}
+          className="max-h-[90vh] w-[min(97vw,1180px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
+        >
+          <DialogHeader className="sticky top-0 z-20 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <span>{selectedReason?.label}</span>
+              {reasonQuery.data && (
+                <Pill tone="danger">{fmtNum(reasonQuery.data.detail.total)}</Pill>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-6 text-text-muted">
               {lang === "ar"
-                ? `السجلات التفصيلية (${fmtNum(data.detail.total)})`
-                : `Detailed records (${fmtNum(data.detail.total)})`}
-            </summary>
-            <div className="border-t border-border p-3">
+                ? "كل الـLeads والـOpportunities تحت سبب الخسارة ده. اضغط على أي صف لعرض تفاصيله ثم فتحه والتعديل عليه في Odoo."
+                : "Every Lead and Opportunity under this loss reason. Select a row to inspect it, then open and edit it in Odoo."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 sm:p-4">
+            {reasonQuery.isLoading ? (
+              <Skeleton className="h-[420px]" />
+            ) : reasonQuery.error ? (
+              <ErrorState
+                message={(reasonQuery.error as Error).message}
+                onRetry={() => reasonQuery.refetch()}
+              />
+            ) : reasonQuery.data ? (
               <DataTable
-                rows={data.detail.rows}
+                rows={reasonQuery.data.detail.rows}
                 cols={cols}
+                onRowClick={setSelectedRecord}
+                rowKey={(r) => r.id}
                 searchable={(r) =>
-                  `${r.reason} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.campaign}`
+                  `${r.id} ${r.contact} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.source} ${r.campaign}`
                 }
-                initialSort={{ key: "reportingDate", dir: -1 }}
-                csvFilename="engosoft-lost"
-                maxHeight={620}
+                serverPage={{
+                  offset: reasonQuery.data.detail.offset,
+                  total: reasonQuery.data.detail.total,
+                  size: reasonQuery.data.detail.limit,
+                  onOffset: setReasonOffset,
+                }}
+                maxHeight={560}
+                csvFilename={`engosoft-lost-${selectedReason?.key ?? "reason"}`}
                 csvRow={(r) => ({
+                  crm_id: r.id,
+                  contact: r.contact,
                   created: r.createdAt,
                   close_date: r.closeDate,
-                  reporting_date: r.reportingDate,
+                  lost_date_basis: r.lostDateBasis,
+                  record_type: r.recordType,
                   reason: r.reason,
+                  canonical_reason_key: r.canonicalReasonKey ?? "",
+                  duplicate_identity_supported: String(r.duplicateEvidence?.supported ?? ""),
+                  duplicate_matched_records: r.duplicateEvidence?.matchedRecordCount ?? "",
                   course: r.course,
-                  main_category: r.mainCategory,
                   sales_team: r.salesTeam,
                   salesperson: r.salesperson,
                   source: r.source,
                   campaign: r.campaign,
-                  ad_name: r.adName,
                   stage: r.stage,
                 })}
               />
-            </div>
-          </details>
-        </>
-      )}
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={selectedCourse !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCourse(null);
+        }}
+      >
+        <DialogContent
+          dir={lang === "ar" ? "rtl" : "ltr"}
+          className="max-h-[90vh] w-[min(97vw,1180px)] max-w-none overflow-y-auto rounded-2xl border-border bg-surface p-0 text-text"
+        >
+          <DialogHeader className="sticky top-0 z-20 border-b border-border bg-surface px-5 py-4 pe-12 text-start">
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <span>{lang === "ar" ? "Lost حسب الكورس:" : "Lost by course:"}</span>
+              <span>{selectedCourse?.label}</span>
+              {courseQuery.data && (
+                <Pill tone="danger">{fmtNum(courseQuery.data.detail.total)}</Pill>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-6 text-text-muted">
+              {selectedCourse?.scope === "cohort-live"
+                ? lang === "ar"
+                  ? "كل الـLeads والـOpportunities التي Creation Date بتاعها داخل الفترة وأصبحت Lost تحت الكورس ده — من Odoo المباشر. اضغط على أي صف لفتحه في Odoo."
+                  : "Every Lead and Opportunity created in the period that became Lost for this course, read from live Odoo. Select a row to open it in Odoo."
+                : lang === "ar"
+                  ? "كل الـLeads والـOpportunities التي اتقفلت Lost خلال الفترة تحت الكورس ده. اضغط على أي صف لعرض بياناته وفتحه في Odoo."
+                  : "Every Lead and Opportunity closed Lost during the period for this course. Select a row to inspect it and open it in Odoo."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 sm:p-4">
+            {courseQuery.isLoading ? (
+              <Skeleton className="h-[420px]" />
+            ) : courseQuery.error ? (
+              <ErrorState
+                message={(courseQuery.error as Error).message}
+                onRetry={() => courseQuery.refetch()}
+              />
+            ) : courseQuery.data ? (
+              <DataTable
+                rows={courseQuery.data.detail.rows}
+                cols={cols}
+                onRowClick={setSelectedRecord}
+                rowKey={(r) => r.id}
+                searchable={(r) =>
+                  `${r.id} ${r.contact} ${r.course} ${r.salesTeam} ${r.salesperson} ${r.source} ${r.reason}`
+                }
+                serverPage={{
+                  offset: courseQuery.data.detail.offset,
+                  total: courseQuery.data.detail.total,
+                  size: courseQuery.data.detail.limit,
+                  onOffset: setCourseOffset,
+                }}
+                maxHeight={560}
+                csvFilename={`engosoft-lost-course-${selectedCourse?.key ?? "course"}`}
+                csvRow={(r) => ({
+                  crm_id: r.id,
+                  contact: r.contact,
+                  created: r.createdAt,
+                  close_date: r.closeDate,
+                  lost_date_basis: r.lostDateBasis,
+                  record_type: r.recordType,
+                  reason: r.reason,
+                  course: r.course,
+                  sales_team: r.salesTeam,
+                  salesperson: r.salesperson,
+                  source: r.source,
+                  campaign: r.campaign,
+                  stage: r.stage,
+                  odoo_url: r.odooUrl,
+                })}
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <LostRecordSheet
+        record={selectedRecord}
+        lang={lang}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRecord(null);
+        }}
+      />
     </div>
   );
 }
 
 function shareRows(breakdown: LostBreakdown, view: ShareView): Grouped[] {
   return {
+    category: breakdown.byCategory,
     reason: breakdown.byReason,
+    type: breakdown.byType,
     course: breakdown.byCourse,
     team: breakdown.byTeam,
     salesperson: breakdown.bySalesperson,
@@ -624,8 +1162,63 @@ function shareRows(breakdown: LostBreakdown, view: ShareView): Grouped[] {
   }[view];
 }
 
-function ShareRows({ rows, sorted }: { rows: Grouped[]; sorted?: boolean }) {
+function ShareRows({
+  rows,
+  sorted,
+  selectedKey,
+  onSelect,
+}: {
+  rows: ShareRow[];
+  sorted?: boolean;
+  selectedKey?: string;
+  onSelect?: (row: ShareRow) => void;
+}) {
+  const { lang } = useI18n();
   const items = (sorted ? rows : [...rows].sort((a, b) => b.count - a.count)).slice(0, 10);
+  const peak = Math.max(...items.map((item) => item.count), 1);
+  if (onSelect) {
+    return (
+      <div className="space-y-2.5">
+        {items.map((item, index) => {
+          const key = item.key ?? item.label;
+          const selected = key === selectedKey;
+          return (
+            <button
+              key={`${key}-${index}`}
+              type="button"
+              onClick={() => onSelect(item)}
+              className={`stagger group block w-full rounded-xl border px-3 py-2.5 text-start transition hover:-translate-y-0.5 hover:border-danger/45 hover:shadow-sm ${
+                selected ? "border-danger/50 bg-danger-soft/45" : "border-transparent bg-surface"
+              }`}
+              style={{ "--i": index } as CSSProperties}
+            >
+              <span className="mb-1.5 flex items-baseline justify-between gap-3">
+                <span className="truncate text-[13px] font-semibold text-text" title={item.label}>
+                  {item.label}
+                </span>
+                <span className="num shrink-0 text-[13px] font-semibold text-text">
+                  {fmtNum(item.count)}
+                  <span className="ms-1.5 text-[11px] font-normal text-text-muted">
+                    ({fmtPct(item.share, 1)})
+                  </span>
+                </span>
+              </span>
+              <span className="block h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <span
+                  className="block h-full rounded-full bg-danger transition-[width] duration-500 group-hover:brightness-95"
+                  style={{ width: `${Math.max(1.5, (item.count / peak) * 100)}%` }}
+                />
+              </span>
+              <span className="mt-1.5 flex items-center justify-end gap-1 text-[10px] font-medium text-danger opacity-80">
+                {lang === "ar" ? "عرض السجلات" : "View records"}
+                <ExternalLink size={11} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   return (
     <BarList
       items={items.map((g) => ({
@@ -641,6 +1234,420 @@ function ShareRows({ rows, sorted }: { rows: Grouped[]; sorted?: boolean }) {
       format={fmtNum}
       color="var(--danger)"
     />
+  );
+}
+
+function LostTimingPanel({
+  rows,
+  total,
+  lang,
+  onSelect,
+}: {
+  rows: LostRowView[];
+  total: number;
+  lang: "ar" | "en";
+  onSelect: (row: LostRowView) => void;
+}) {
+  const A = lang === "ar";
+  const bands = [
+    { key: "0–7", min: 0, max: 7, label: A ? "أول 7 أيام" : "First 7 days" },
+    { key: "8–30", min: 8, max: 30, label: A ? "من 8 إلى 30 يوم" : "Days 8–30" },
+    { key: "31–60", min: 31, max: 60, label: A ? "من 31 إلى 60 يوم" : "Days 31–60" },
+    { key: "61+", min: 61, max: Infinity, label: A ? "بعد 60 يوم" : "After 60 days" },
+  ];
+  const dated = rows.map((row) => snapshotAgeDays(row)).filter((n): n is number => n !== null);
+  const ordered = [...dated].sort((a, b) => a - b);
+  const median = ordered.length ? ordered[Math.floor((ordered.length - 1) / 2)] : null;
+  const cols: Col<LostRowView>[] = [
+    {
+      key: "contact",
+      header: A ? "الليد" : "Lead",
+      sticky: true,
+      always: true,
+      minWidth: "175px",
+      render: (r) => <span className="font-semibold text-text">{r.contact || `CRM #${r.id}`}</span>,
+    },
+    {
+      key: "created",
+      header: A ? "دخل إمتى" : "Created",
+      sortValue: (r) => r.createdAt,
+      render: (r) => fmtDate(r.createdAt, lang),
+    },
+    {
+      key: "lost",
+      header: A ? "اتقفل Lost إمتى" : "Lost",
+      sortValue: (r) => r.closeDate,
+      render: (r) => fmtDate(r.closeDate, lang),
+    },
+    {
+      key: "age",
+      header: A ? "بعد كام يوم" : "Days to loss",
+      sortValue: (r) => snapshotAgeDays(r) ?? -1,
+      render: (r) => (
+        <span className="num font-bold text-danger">
+          {snapshotAgeDays(r) === null
+            ? "—"
+            : `${fmtNum(snapshotAgeDays(r)!)} ${A ? "يوم" : "days"}`}
+        </span>
+      ),
+    },
+    {
+      key: "basis",
+      header: A ? "دقة تاريخ Lost" : "Loss date basis",
+      render: (r) => (
+        <Pill tone={r.lostDateBasis.includes("fallback") ? "warning" : "success"}>
+          {r.lostDateBasis.includes("fallback")
+            ? A
+              ? "تاريخ بديل"
+              : "Fallback"
+            : A
+              ? "تاريخ مسجل"
+              : "Recorded"}
+        </Pill>
+      ),
+    },
+    {
+      key: "reason",
+      header: A ? "سبب Lost" : "Lost reason",
+      render: (r) => (A ? r.canonicalReasonLabelAr : r.canonicalReasonLabelEn) || r.reason || "—",
+    },
+    {
+      key: "chatter",
+      header: A ? "التواصل" : "Chatter",
+      render: () => (
+        <span className="font-semibold text-brand">{A ? "افتح السجل ←" : "Open timeline →"}</span>
+      ),
+    },
+  ];
+  return (
+    <Card className="overflow-hidden border-brand/20 bg-surface">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-brand">
+            <Clock3 size={20} />
+            <span className="text-xs font-bold tracking-wide">
+              {A ? "رحلة العميل قبل الخسارة" : "Journey before loss"}
+            </span>
+          </div>
+          <h2 className="text-xl font-bold text-text">
+            {A ? "دخل إمتى، وخسرناه بعد قد إيه؟" : "When did they arrive, and how long until loss?"}
+          </h2>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-text-muted">
+            {A
+              ? "الأيام محسوبة من تاريخ إنشاء الليد إلى تاريخ Lost المسجل في Odoo. افتح أي صف لقراءة آخر تواصل موثق قبل الإغلاق وسجل الـChatter؛ لا نفترض حدوث مكالمة من مجرد تغيير المرحلة."
+              : "Days run from lead creation to Odoo's recorded loss date. Open a row to inspect the last documented activity and chatter; a stage change alone does not prove a call."}
+          </p>
+        </div>
+        <Pill tone="brand">
+          {fmtNum(total)} {A ? "حالة Lost" : "lost records"}
+        </Pill>
+      </div>
+      {rows.length < total && (
+        <Notice tone="warning" className="mb-4" icon={<Info size={16} />}>
+          {A
+            ? `الأرقام التوزيعية أدناه تخص أول ${fmtNum(rows.length)} سجل معروض فقط من ${fmtNum(total)}؛ افتح فترة أقصر للتدقيق الكامل.`
+            : `Timing bands cover the first ${fmtNum(rows.length)} displayed records of ${fmtNum(total)}; select a shorter range for a full audit.`}
+        </Notice>
+      )}
+      <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-xl border border-brand/20 bg-brand-soft/45 p-4">
+          <div className="text-xs text-text-muted">
+            {A ? "وسيط مدة الخسارة" : "Median time to loss"}
+          </div>
+          <div className="num mt-2 text-2xl font-bold text-brand">
+            {median === null ? "—" : `${fmtNum(median)} ${A ? "يوم" : "days"}`}
+          </div>
+        </div>
+        {bands.map((band) => {
+          const count = dated.filter((days) => days >= band.min && days <= band.max).length;
+          return (
+            <div key={band.key} className="rounded-xl border border-border bg-surface-2/45 p-4">
+              <div className="text-xs text-text-muted">{band.label}</div>
+              <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(count)}</div>
+              <div className="mt-1 text-[11px] text-text-muted">
+                {fmtPct(dated.length ? (count / dated.length) * 100 : null, 1)}{" "}
+                {A ? "من المؤرخين" : "of dated losses"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <DataTable
+        rows={rows}
+        cols={cols}
+        rowKey={(r) => r.id}
+        onRowClick={onSelect}
+        searchable={(r) => `${r.id} ${r.contact} ${r.reason} ${r.course} ${r.source}`}
+        initialSort={{ key: "created", dir: -1 }}
+        maxHeight={650}
+        csvFilename="engosoft-lost-timing"
+        csvRow={(r) => ({
+          crm_id: r.id,
+          contact: r.contact,
+          created: r.createdAt,
+          lost: r.closeDate,
+          days_to_loss: snapshotAgeDays(r) ?? "",
+          loss_date_basis: r.lostDateBasis,
+          source: r.source,
+          course: r.course,
+          reason: r.reason,
+          odoo_url: r.odooUrl,
+        })}
+      />
+    </Card>
+  );
+}
+
+function LostRecordSheet({
+  record,
+  lang,
+  onOpenChange,
+}: {
+  record: LostRowView | null;
+  lang: "ar" | "en";
+  onOpenChange: (open: boolean) => void;
+}) {
+  const chatter = useApi<LostChatterView>(
+    `/api/lost-chatter?id=${encodeURIComponent(record?.id ?? "")}`,
+    { enabled: record !== null },
+  );
+  const reason = record
+    ? (lang === "ar" ? record.canonicalReasonLabelAr : record.canonicalReasonLabelEn) ||
+      record.reason ||
+      "—"
+    : "—";
+  const facts: [string, string][] = [];
+  if (record) {
+    facts.push(
+      [lang === "ar" ? "CRM ID" : "CRM ID", record.id],
+      [lang === "ar" ? "النوع" : "Type", record.recordType],
+      [lang === "ar" ? "الحالة" : "Status", "Registered Lost"],
+      [lang === "ar" ? "سبب الخسارة" : "Loss reason", reason],
+      [lang === "ar" ? "المرحلة" : "Stage", record.stage || "—"],
+      [lang === "ar" ? "تاريخ الإنشاء" : "Created", record.createdAt || "—"],
+      [lang === "ar" ? "تاريخ Lost" : "Lost date", record.closeDate || "—"],
+      [lang === "ar" ? "فريق المبيعات" : "Sales team", record.salesTeam || "—"],
+      [lang === "ar" ? "الموظف" : "Salesperson", record.salesperson || "—"],
+      [lang === "ar" ? "المصدر" : "Source", record.source || "—"],
+    );
+    facts.push(
+      [lang === "ar" ? "أساس تاريخ Lost" : "Lost date basis", record.lostDateBasis || "—"],
+      [lang === "ar" ? "الدورة" : "Course", record.course || "—"],
+      [lang === "ar" ? "الحملة" : "Campaign", record.campaign || "—"],
+    );
+  }
+
+  return (
+    <Sheet open={record !== null} onOpenChange={onOpenChange}>
+      <SheetContent
+        side={lang === "ar" ? "left" : "right"}
+        dir={lang === "ar" ? "rtl" : "ltr"}
+        className="w-[min(94vw,480px)] overflow-y-auto border-border bg-surface p-0 text-text sm:max-w-[480px]"
+      >
+        {record && (
+          <>
+            <SheetHeader className="border-b border-border bg-surface-2/60 px-5 py-5 pe-12 text-start">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <Pill tone="danger">Registered Lost</Pill>
+                <span className="num text-[11px] text-text-muted">CRM #{record.id}</span>
+              </div>
+              <SheetTitle className="text-start text-xl text-text">
+                {record.contact || `CRM #${record.id}`}
+              </SheetTitle>
+              <SheetDescription className="text-start text-xs leading-6 text-text-muted">
+                {lang === "ar"
+                  ? "راجع الدليل هنا، ثم افتح السجل الأصلي في Odoo لو محتاج تعديل."
+                  : "Review the evidence here, then open the source record in Odoo if it needs editing."}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="space-y-4 p-5">
+              {record.canonicalReasonKey === "duplicate" && (
+                <Notice
+                  tone={record.duplicateEvidence?.supported ? "info" : "warning"}
+                  icon={
+                    record.duplicateEvidence?.supported ? (
+                      <CheckCircle2 size={16} className="text-success" />
+                    ) : (
+                      <AlertTriangle size={16} />
+                    )
+                  }
+                >
+                  {record.duplicateEvidence?.supported
+                    ? lang === "ar"
+                      ? `يوجد دليل هوية مطابق مع ${fmtNum(record.duplicateEvidence.matchedRecordCount)} سجل CRM آخر عبر ${record.duplicateEvidence.sources.includes("provider_id") ? "Provider Lead ID" : "رقم الهاتف"}.`
+                      : `Identity evidence matches ${fmtNum(record.duplicateEvidence.matchedRecordCount)} other CRM record(s).`
+                    : lang === "ar"
+                      ? "لم نجد سجلًا آخر مطابقًا بالـProvider Lead ID أو الهاتف داخل نطاق بيانات الداشبورد؛ السبب يحتاج مراجعة يدوية."
+                      : "No other record matched by provider lead id or phone in dashboard scope; the reason needs manual review."}
+                </Notice>
+              )}
+
+              <dl className="overflow-hidden rounded-2xl border border-border bg-surface">
+                {facts.map(([label, value], index) => (
+                  <div
+                    key={label}
+                    className={`grid grid-cols-[minmax(100px,0.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-xs ${index ? "border-t border-border" : ""}`}
+                  >
+                    <dt className="text-text-muted">{label}</dt>
+                    <dd className="min-w-0 break-words font-medium text-text" dir="auto">
+                      {value || "—"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {(record.phone || record.mobile || record.email) && (
+                <div className="rounded-2xl border border-border bg-surface-2/45 p-4">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                    {lang === "ar" ? "بيانات التواصل" : "Contact details"}
+                  </div>
+                  <div className="space-y-1 text-sm text-text" dir="ltr">
+                    {record.phone && <div>{record.phone}</div>}
+                    {record.mobile && record.mobile !== record.phone && <div>{record.mobile}</div>}
+                    {record.email && <div>{record.email}</div>}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-brand/20 bg-brand-soft/30 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-text">
+                  <Clock3 size={17} className="text-brand" />
+                  {lang === "ar"
+                    ? "من الإنشاء للخسارة · دليل Odoo"
+                    : "Creation to loss · Odoo evidence"}
+                </div>
+                {chatter.isLoading ? (
+                  <Skeleton className="h-28" />
+                ) : chatter.error ? (
+                  <Notice tone="warning" icon={<AlertTriangle size={16} />}>
+                    {lang === "ar"
+                      ? "تعذّر جلب سجل الـChatter الآن. افتح السجل الأصلي في Odoo للتحقق."
+                      : "Could not load chatter now. Open the original Odoo record to verify."}
+                  </Notice>
+                ) : chatter.data ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl bg-surface p-3">
+                        <div className="text-text-muted">
+                          {lang === "ar" ? "إنشاء الليد" : "Created"}
+                        </div>
+                        <div className="mt-1 font-semibold text-text">
+                          {cairoTimestamp(chatter.data.createdAt, lang)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-surface p-3">
+                        <div className="text-text-muted">
+                          {lang === "ar" ? "تسجيل Lost" : "Marked Lost"}
+                        </div>
+                        <div className="mt-1 font-semibold text-text">
+                          {cairoTimestamp(chatter.data.lostAt, lang)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="num mt-3 text-lg font-bold text-danger">
+                      {chatter.data.elapsedHours === null
+                        ? "—"
+                        : chatter.data.elapsedHours < 48
+                          ? `${fmtNum(Math.round(chatter.data.elapsedHours))} ${lang === "ar" ? "ساعة" : "hours"}`
+                          : `${fmtNum(Math.round(chatter.data.elapsedHours / 24))} ${lang === "ar" ? "يوم" : "days"}`}
+                    </div>
+                    {chatter.data.lostDateBasis.includes("fallback") && (
+                      <p className="mt-1 text-[11px] text-warning">
+                        {lang === "ar"
+                          ? "تاريخ الخسارة بديل من آخر تحديث للمرحلة؛ المدة تقديرية وليست وقت إغلاق مؤكّد."
+                          : "The loss date falls back to a stage update; elapsed time is an estimate."}
+                      </p>
+                    )}
+                    <div className="mt-4 border-t border-border pt-3">
+                      <div className="mb-2 text-xs font-bold text-text">
+                        {lang === "ar"
+                          ? "آخر رسالة أو نشاط موثق قبل Lost"
+                          : "Last documented message or activity before loss"}
+                      </div>
+                      {chatter.data.lastBeforeLoss ? (
+                        <div className="rounded-xl border border-border bg-surface p-3 text-xs leading-6 text-text">
+                          <div className="mb-1 text-[11px] text-text-muted">
+                            {cairoTimestamp(chatter.data.lastBeforeLoss.date, lang)} ·{" "}
+                            {chatter.data.lastBeforeLoss.author ||
+                              chatter.data.lastBeforeLoss.subtype ||
+                              chatter.data.lastBeforeLoss.kind ||
+                              "Odoo"}
+                          </div>
+                          <div className="whitespace-pre-wrap break-words" dir="auto">
+                            {chatter.data.lastBeforeLoss.text ||
+                              chatter.data.lastBeforeLoss.subject}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted">
+                          {lang === "ar"
+                            ? "لا يوجد نص تواصل موثق قبل Lost ضمن الرسائل التي أمكن قراءتها؛ لا يمكن الجزم بحدوث مكالمة."
+                            : "No documented contact text before loss in the readable messages; a call cannot be confirmed."}
+                        </p>
+                      )}
+                    </div>
+                    <details className="mt-3 border-t border-border pt-3">
+                      <summary className="cursor-pointer text-xs font-semibold text-brand">
+                        {lang === "ar"
+                          ? `عرض Chatter (${fmtNum(chatter.data.messages.length)} رسالة)`
+                          : `Show chatter (${fmtNum(chatter.data.messages.length)} messages)`}
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        {chatter.data.messages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`rounded-xl border p-3 text-xs ${message.beforeLoss ? "border-border bg-surface" : "border-warning/30 bg-warning-soft/30"}`}
+                          >
+                            <div className="mb-1 text-[11px] text-text-muted">
+                              {cairoTimestamp(message.date, lang)} ·{" "}
+                              {message.author || message.subtype || message.kind || "Odoo"}
+                              {!message.beforeLoss
+                                ? lang === "ar"
+                                  ? " · بعد Lost"
+                                  : " · after loss"
+                                : ""}
+                            </div>
+                            <div
+                              className="whitespace-pre-wrap break-words leading-5 text-text"
+                              dir="auto"
+                            >
+                              {message.text || message.subject || message.subtype}
+                            </div>
+                          </div>
+                        ))}
+                        {chatter.data.truncated && (
+                          <p className="text-[11px] text-warning">
+                            {lang === "ar"
+                              ? "أُظهرت أحدث 150 رسالة فقط؛ افتح Odoo للسجل الكامل."
+                              : "Showing only the latest 150 messages; open Odoo for the full history."}
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  </>
+                ) : null}
+              </div>
+
+              <a
+                href={record.odooUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand/40"
+              >
+                <ExternalLink size={17} />
+                {lang === "ar" ? "فتح وتعديل الـLead في Odoo" : "Open and edit the Lead in Odoo"}
+              </a>
+              <p className="text-center text-[10px] leading-5 text-text-muted">
+                {lang === "ar"
+                  ? "التعديل يتم في Odoo نفسه للحفاظ على الصلاحيات والـaudit trail."
+                  : "Editing stays in Odoo so permissions and the audit trail remain intact."}
+              </p>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 

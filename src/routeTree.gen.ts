@@ -11,14 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountingRouteImport } from './routes/accounting'
+import { Route as AcquisitionRouteImport } from './routes/acquisition'
 import { Route as AdsRouteImport } from './routes/ads'
 import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
+import { Route as CreativesRouteImport } from './routes/creatives'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
+import { Route as LandingPagesRouteImport } from './routes/landing-pages'
+import { Route as LeadDistributionRouteImport } from './routes/lead-distribution'
+import { Route as LeadSourcesRouteImport } from './routes/lead-sources'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as LostRouteImport } from './routes/lost'
+import { Route as ManagementReviewRouteImport } from './routes/management-review'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
 import { Route as MediaPlanRouteImport } from './routes/media-plan'
 import { Route as OrganicRouteImport } from './routes/organic'
@@ -32,6 +38,7 @@ import { Route as WeekendRouteImport } from './routes/weekend'
 import { Route as YoyRouteImport } from './routes/yoy'
 import { Route as ApiAccountingRouteImport } from './routes/api/accounting'
 import { Route as ApiAccountingExportRouteImport } from './routes/api/accounting-export'
+import { Route as ApiAccountingNetSalesRouteImport } from './routes/api/accounting-net-sales'
 import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiAdsCreativesRouteImport } from './routes/api/ads-creatives'
 import { Route as ApiAgentCourseIntelligenceRouteImport } from './routes/api/agent-course-intelligence'
@@ -50,31 +57,65 @@ import { Route as ApiEmployeeEvidenceRouteImport } from './routes/api/employee-e
 import { Route as ApiFiltersRouteImport } from './routes/api/filters'
 import { Route as ApiFullInvoicedRouteImport } from './routes/api/full-invoiced'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiLeadCourseDistributionRouteImport } from './routes/api/lead-course-distribution'
+import { Route as ApiLeadCourseExportRouteImport } from './routes/api/lead-course-export'
+import { Route as ApiLeadIntelligenceRouteImport } from './routes/api/lead-intelligence'
+import { Route as ApiLeadPerformanceRouteImport } from './routes/api/lead-performance'
+import { Route as ApiLeadPerformanceExportRouteImport } from './routes/api/lead-performance-export'
+import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
+import { Route as ApiLeadSourceMatrixRouteImport } from './routes/api/lead-source-matrix'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
+import { Route as ApiLostArchiveAuditRouteImport } from './routes/api/lost-archive-audit'
+import { Route as ApiLostChatterRouteImport } from './routes/api/lost-chatter'
+import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
+import { Route as ApiMediaPlanLeadsRouteImport } from './routes/api/media-plan-leads'
+import { Route as ApiMetaDestinationMixRouteImport } from './routes/api/meta-destination-mix'
 import { Route as ApiOrganicRouteImport } from './routes/api/organic'
 import { Route as ApiOverviewRouteImport } from './routes/api/overview'
+import { Route as ApiOverviewRevenueSourceRouteImport } from './routes/api/overview-revenue-source'
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
+import { Route as ApiProfitabilityLedgerRouteImport } from './routes/api/profitability-ledger'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
+import { Route as ApiRevenueCohortsRouteImport } from './routes/api/revenue-cohorts'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
+import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
 import { Route as ApiWeekendRouteImport } from './routes/api/weekend'
+import { Route as ApiWeeklyLeadFollowupRouteImport } from './routes/api/weekly-lead-followup'
 import { Route as ApiYoyRouteImport } from './routes/api/yoy'
+import { Route as ApiAcquisitionClosedLoopRouteImport } from './routes/api/acquisition.closed-loop'
+import { Route as ApiAcquisitionClosedLoopRefreshRouteImport } from './routes/api/acquisition.closed-loop-refresh'
+import { Route as ApiAcquisitionCreativeDetailRouteImport } from './routes/api/acquisition.creative-detail'
+import { Route as ApiAcquisitionEventsRouteImport } from './routes/api/acquisition.events'
+import { Route as ApiAcquisitionInferredLinksRouteImport } from './routes/api/acquisition.inferred-links'
+import { Route as ApiAcquisitionPerformanceRouteImport } from './routes/api/acquisition.performance'
+import { Route as ApiAcquisitionSummaryRouteImport } from './routes/api/acquisition.summary'
+import { Route as ApiAttributionChatwootFactsBackfillRouteImport } from './routes/api/attribution.chatwoot-facts-backfill'
+import { Route as ApiAttributionChatwootReconcileRouteImport } from './routes/api/attribution.chatwoot-reconcile'
 import { Route as ApiAttributionConversationsRouteImport } from './routes/api/attribution.conversations'
 import { Route as ApiAttributionHealthRouteImport } from './routes/api/attribution.health'
 import { Route as ApiAttributionMetaHealthRouteImport } from './routes/api/attribution.meta-health'
 import { Route as ApiAttributionSummaryRouteImport } from './routes/api/attribution.summary'
 import { Route as ApiAttributionTokensRouteImport } from './routes/api/attribution.tokens'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthSsoRouteImport } from './routes/api/auth.sso'
 import { Route as ApiChatwootWebhookRouteImport } from './routes/api/chatwoot.webhook'
 import { Route as ApiIngestDatasetRouteImport } from './routes/api/ingest.dataset'
+import { Route as ApiLandingAttributionEventsRouteImport } from './routes/api/landing-attribution.events'
+import { Route as ApiLandingAttributionSummaryRouteImport } from './routes/api/landing-attribution.summary'
+import { Route as ApiMetaCatalogReconcileRouteImport } from './routes/api/meta.catalog-reconcile'
+import { Route as ApiMetaCredentialHealthRouteImport } from './routes/api/meta.credential-health'
+import { Route as ApiMetaLeadgenWebhookRouteImport } from './routes/api/meta.leadgen-webhook'
+import { Route as ApiMetaMessagingReadinessRouteImport } from './routes/api/meta.messaging-readiness'
 import { Route as ApiMetaWhatsappAttributionWebhookRouteImport } from './routes/api/meta.whatsapp-attribution-webhook'
 import { Route as ApiPricesAdviceRouteImport } from './routes/api/prices.advice'
 import { Route as ApiPricesCatalogRouteImport } from './routes/api/prices.catalog'
@@ -89,11 +130,13 @@ import { Route as ApiPricingItemsRouteImport } from './routes/api/pricing.items'
 import { Route as ApiPricingMappingsRouteImport } from './routes/api/pricing.mappings'
 import { Route as ApiPricingPublishRouteImport } from './routes/api/pricing.publish'
 import { Route as ApiPricingRecalculateRouteImport } from './routes/api/pricing.recalculate'
+import { Route as ApiRevenueAccessLoginRouteImport } from './routes/api/revenue-access.login'
 import { Route as ApiTelegramPreviewRouteImport } from './routes/api/telegram.preview'
 import { Route as ApiTelegramSendCourseAlertsRouteImport } from './routes/api/telegram.send-course-alerts'
 import { Route as ApiTelegramSendDailyRouteImport } from './routes/api/telegram.send-daily'
 import { Route as ApiTelegramSetupRouteImport } from './routes/api/telegram.setup'
 import { Route as ApiTelegramWebhookRouteImport } from './routes/api/telegram.webhook'
+import { Route as ApiMetaLeadAdsOperationsRouteImport } from './routes/api/meta.lead-ads.operations'
 import { Route as ApiPricingImportPreviewRouteImport } from './routes/api/pricing.import.preview'
 import { Route as ApiPricingInvoicesMovementRouteImport } from './routes/api/pricing.invoices.$movement'
 
@@ -105,6 +148,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountingRoute = AccountingRouteImport.update({
   id: '/accounting',
   path: '/accounting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcquisitionRoute = AcquisitionRouteImport.update({
+  id: '/acquisition',
+  path: '/acquisition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdsRoute = AdsRouteImport.update({
@@ -127,6 +175,11 @@ const CoursesRoute = CoursesRouteImport.update({
   path: '/courses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreativesRoute = CreativesRouteImport.update({
+  id: '/creatives',
+  path: '/creatives',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FullInvoicedRoute = FullInvoicedRouteImport.update({
   id: '/full-invoiced',
   path: '/full-invoiced',
@@ -137,6 +190,21 @@ const GuideRoute = GuideRouteImport.update({
   path: '/guide',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LandingPagesRoute = LandingPagesRouteImport.update({
+  id: '/landing-pages',
+  path: '/landing-pages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadDistributionRoute = LeadDistributionRouteImport.update({
+  id: '/lead-distribution',
+  path: '/lead-distribution',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadSourcesRoute = LeadSourcesRouteImport.update({
+  id: '/lead-sources',
+  path: '/lead-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LeadsRoute = LeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -145,6 +213,11 @@ const LeadsRoute = LeadsRouteImport.update({
 const LostRoute = LostRouteImport.update({
   id: '/lost',
   path: '/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManagementReviewRoute = ManagementReviewRouteImport.update({
+  id: '/management-review',
+  path: '/management-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaBuyersRoute = MediaBuyersRouteImport.update({
@@ -210,6 +283,11 @@ const ApiAccountingRoute = ApiAccountingRouteImport.update({
 const ApiAccountingExportRoute = ApiAccountingExportRouteImport.update({
   id: '/api/accounting-export',
   path: '/api/accounting-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountingNetSalesRoute = ApiAccountingNetSalesRouteImport.update({
+  id: '/api/accounting-net-sales',
+  path: '/api/accounting-net-sales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdsRoute = ApiAdsRouteImport.update({
@@ -304,6 +382,43 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeadCourseDistributionRoute =
+  ApiLeadCourseDistributionRouteImport.update({
+    id: '/api/lead-course-distribution',
+    path: '/api/lead-course-distribution',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiLeadCourseExportRoute = ApiLeadCourseExportRouteImport.update({
+  id: '/api/lead-course-export',
+  path: '/api/lead-course-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadIntelligenceRoute = ApiLeadIntelligenceRouteImport.update({
+  id: '/api/lead-intelligence',
+  path: '/api/lead-intelligence',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadPerformanceRoute = ApiLeadPerformanceRouteImport.update({
+  id: '/api/lead-performance',
+  path: '/api/lead-performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadPerformanceExportRoute =
+  ApiLeadPerformanceExportRouteImport.update({
+    id: '/api/lead-performance-export',
+    path: '/api/lead-performance-export',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiLeadQaRoute = ApiLeadQaRouteImport.update({
+  id: '/api/lead-qa',
+  path: '/api/lead-qa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadSourceMatrixRoute = ApiLeadSourceMatrixRouteImport.update({
+  id: '/api/lead-source-matrix',
+  path: '/api/lead-source-matrix',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLeadsRoute = ApiLeadsRouteImport.update({
   id: '/api/leads',
   path: '/api/leads',
@@ -312,6 +427,21 @@ const ApiLeadsRoute = ApiLeadsRouteImport.update({
 const ApiLostRoute = ApiLostRouteImport.update({
   id: '/api/lost',
   path: '/api/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLostArchiveAuditRoute = ApiLostArchiveAuditRouteImport.update({
+  id: '/api/lost-archive-audit',
+  path: '/api/lost-archive-audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLostChatterRoute = ApiLostChatterRouteImport.update({
+  id: '/api/lost-chatter',
+  path: '/api/lost-chatter',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagementReviewRoute = ApiManagementReviewRouteImport.update({
+  id: '/api/management-review',
+  path: '/api/management-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaBuyersRoute = ApiMediaBuyersRouteImport.update({
@@ -329,6 +459,16 @@ const ApiMediaPlanActivityRoute = ApiMediaPlanActivityRouteImport.update({
   path: '/api/media-plan-activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaPlanLeadsRoute = ApiMediaPlanLeadsRouteImport.update({
+  id: '/api/media-plan-leads',
+  path: '/api/media-plan-leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaDestinationMixRoute = ApiMetaDestinationMixRouteImport.update({
+  id: '/api/meta-destination-mix',
+  path: '/api/meta-destination-mix',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrganicRoute = ApiOrganicRouteImport.update({
   id: '/api/organic',
   path: '/api/organic',
@@ -339,6 +479,12 @@ const ApiOverviewRoute = ApiOverviewRouteImport.update({
   path: '/api/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOverviewRevenueSourceRoute =
+  ApiOverviewRevenueSourceRouteImport.update({
+    id: '/api/overview-revenue-source',
+    path: '/api/overview-revenue-source',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiProductsRoute = ApiProductsRouteImport.update({
   id: '/api/products',
   path: '/api/products',
@@ -349,14 +495,29 @@ const ApiProfitabilityRoute = ApiProfitabilityRouteImport.update({
   path: '/api/profitability',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfitabilityLedgerRoute = ApiProfitabilityLedgerRouteImport.update({
+  id: '/api/profitability-ledger',
+  path: '/api/profitability-ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
   id: '/api/refresh',
   path: '/api/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRevenueCohortsRoute = ApiRevenueCohortsRouteImport.update({
+  id: '/api/revenue-cohorts',
+  path: '/api/revenue-cohorts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSalesRoute = ApiSalesRouteImport.update({
   id: '/api/sales',
   path: '/api/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTargetsRoute = ApiTargetsRouteImport.update({
@@ -384,11 +545,68 @@ const ApiWeekendRoute = ApiWeekendRouteImport.update({
   path: '/api/weekend',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWeeklyLeadFollowupRoute = ApiWeeklyLeadFollowupRouteImport.update({
+  id: '/api/weekly-lead-followup',
+  path: '/api/weekly-lead-followup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiYoyRoute = ApiYoyRouteImport.update({
   id: '/api/yoy',
   path: '/api/yoy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAcquisitionClosedLoopRoute =
+  ApiAcquisitionClosedLoopRouteImport.update({
+    id: '/api/acquisition/closed-loop',
+    path: '/api/acquisition/closed-loop',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionClosedLoopRefreshRoute =
+  ApiAcquisitionClosedLoopRefreshRouteImport.update({
+    id: '/api/acquisition/closed-loop-refresh',
+    path: '/api/acquisition/closed-loop-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionCreativeDetailRoute =
+  ApiAcquisitionCreativeDetailRouteImport.update({
+    id: '/api/acquisition/creative-detail',
+    path: '/api/acquisition/creative-detail',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionEventsRoute = ApiAcquisitionEventsRouteImport.update({
+  id: '/api/acquisition/events',
+  path: '/api/acquisition/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAcquisitionInferredLinksRoute =
+  ApiAcquisitionInferredLinksRouteImport.update({
+    id: '/api/acquisition/inferred-links',
+    path: '/api/acquisition/inferred-links',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionPerformanceRoute =
+  ApiAcquisitionPerformanceRouteImport.update({
+    id: '/api/acquisition/performance',
+    path: '/api/acquisition/performance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAcquisitionSummaryRoute = ApiAcquisitionSummaryRouteImport.update({
+  id: '/api/acquisition/summary',
+  path: '/api/acquisition/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttributionChatwootFactsBackfillRoute =
+  ApiAttributionChatwootFactsBackfillRouteImport.update({
+    id: '/api/attribution/chatwoot-facts-backfill',
+    path: '/api/attribution/chatwoot-facts-backfill',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAttributionChatwootReconcileRoute =
+  ApiAttributionChatwootReconcileRouteImport.update({
+    id: '/api/attribution/chatwoot-reconcile',
+    path: '/api/attribution/chatwoot-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAttributionConversationsRoute =
   ApiAttributionConversationsRouteImport.update({
     id: '/api/attribution/conversations',
@@ -416,6 +634,16 @@ const ApiAttributionTokensRoute = ApiAttributionTokensRouteImport.update({
   path: '/api/attribution/tokens',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSsoRoute = ApiAuthSsoRouteImport.update({
   id: '/api/auth/sso',
   path: '/api/auth/sso',
@@ -431,6 +659,39 @@ const ApiIngestDatasetRoute = ApiIngestDatasetRouteImport.update({
   path: '/api/ingest/dataset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLandingAttributionEventsRoute =
+  ApiLandingAttributionEventsRouteImport.update({
+    id: '/api/landing-attribution/events',
+    path: '/api/landing-attribution/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiLandingAttributionSummaryRoute =
+  ApiLandingAttributionSummaryRouteImport.update({
+    id: '/api/landing-attribution/summary',
+    path: '/api/landing-attribution/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMetaCatalogReconcileRoute = ApiMetaCatalogReconcileRouteImport.update({
+  id: '/api/meta/catalog-reconcile',
+  path: '/api/meta/catalog-reconcile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaCredentialHealthRoute = ApiMetaCredentialHealthRouteImport.update({
+  id: '/api/meta/credential-health',
+  path: '/api/meta/credential-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaLeadgenWebhookRoute = ApiMetaLeadgenWebhookRouteImport.update({
+  id: '/api/meta/leadgen-webhook',
+  path: '/api/meta/leadgen-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaMessagingReadinessRoute =
+  ApiMetaMessagingReadinessRouteImport.update({
+    id: '/api/meta/messaging-readiness',
+    path: '/api/meta/messaging-readiness',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMetaWhatsappAttributionWebhookRoute =
   ApiMetaWhatsappAttributionWebhookRouteImport.update({
     id: '/api/meta/whatsapp-attribution-webhook',
@@ -502,6 +763,11 @@ const ApiPricingRecalculateRoute = ApiPricingRecalculateRouteImport.update({
   path: '/api/pricing/recalculate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRevenueAccessLoginRoute = ApiRevenueAccessLoginRouteImport.update({
+  id: '/api/revenue-access/login',
+  path: '/api/revenue-access/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTelegramPreviewRoute = ApiTelegramPreviewRouteImport.update({
   id: '/api/telegram/preview',
   path: '/api/telegram/preview',
@@ -528,6 +794,12 @@ const ApiTelegramWebhookRoute = ApiTelegramWebhookRouteImport.update({
   path: '/api/telegram/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaLeadAdsOperationsRoute =
+  ApiMetaLeadAdsOperationsRouteImport.update({
+    id: '/api/meta/lead-ads/operations',
+    path: '/api/meta/lead-ads/operations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPricingImportPreviewRoute = ApiPricingImportPreviewRouteImport.update({
   id: '/api/pricing/import/preview',
   path: '/api/pricing/import/preview',
@@ -543,14 +815,20 @@ const ApiPricingInvoicesMovementRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -564,6 +842,7 @@ export interface FileRoutesByFullPath {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -582,31 +861,65 @@ export interface FileRoutesByFullPath {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
+  '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
+  '/api/lead-performance-export': typeof ApiLeadPerformanceExportRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
+  '/api/lost-chatter': typeof ApiLostChatterRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -621,25 +934,33 @@ export interface FileRoutesByFullPath {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -653,6 +974,7 @@ export interface FileRoutesByTo {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -671,31 +993,65 @@ export interface FileRoutesByTo {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
+  '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
+  '/api/lead-performance-export': typeof ApiLeadPerformanceExportRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
+  '/api/lost-chatter': typeof ApiLostChatterRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -710,11 +1066,13 @@ export interface FileRoutesByTo {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -722,14 +1080,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accounting': typeof AccountingRoute
+  '/acquisition': typeof AcquisitionRoute
   '/ads': typeof AdsRoute
   '/attribution': typeof AttributionRoute
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
+  '/creatives': typeof CreativesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
+  '/landing-pages': typeof LandingPagesRoute
+  '/lead-distribution': typeof LeadDistributionRoute
+  '/lead-sources': typeof LeadSourcesRoute
   '/leads': typeof LeadsRoute
   '/lost': typeof LostRoute
+  '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
   '/organic': typeof OrganicRoute
@@ -743,6 +1107,7 @@ export interface FileRoutesById {
   '/yoy': typeof YoyRoute
   '/api/accounting': typeof ApiAccountingRoute
   '/api/accounting-export': typeof ApiAccountingExportRoute
+  '/api/accounting-net-sales': typeof ApiAccountingNetSalesRoute
   '/api/ads': typeof ApiAdsRoute
   '/api/ads-creatives': typeof ApiAdsCreativesRoute
   '/api/agent-course-intelligence': typeof ApiAgentCourseIntelligenceRoute
@@ -761,31 +1126,65 @@ export interface FileRoutesById {
   '/api/filters': typeof ApiFiltersRoute
   '/api/full-invoiced': typeof ApiFullInvoicedRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/lead-course-distribution': typeof ApiLeadCourseDistributionRoute
+  '/api/lead-course-export': typeof ApiLeadCourseExportRoute
+  '/api/lead-intelligence': typeof ApiLeadIntelligenceRoute
+  '/api/lead-performance': typeof ApiLeadPerformanceRoute
+  '/api/lead-performance-export': typeof ApiLeadPerformanceExportRoute
+  '/api/lead-qa': typeof ApiLeadQaRoute
+  '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
+  '/api/lost-chatter': typeof ApiLostChatterRoute
+  '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
+  '/api/media-plan-leads': typeof ApiMediaPlanLeadsRoute
+  '/api/meta-destination-mix': typeof ApiMetaDestinationMixRoute
   '/api/organic': typeof ApiOrganicRoute
   '/api/overview': typeof ApiOverviewRoute
+  '/api/overview-revenue-source': typeof ApiOverviewRevenueSourceRoute
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
+  '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
   '/api/refresh': typeof ApiRefreshRoute
+  '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
   '/api/weekend': typeof ApiWeekendRoute
+  '/api/weekly-lead-followup': typeof ApiWeeklyLeadFollowupRoute
   '/api/yoy': typeof ApiYoyRoute
+  '/api/acquisition/closed-loop': typeof ApiAcquisitionClosedLoopRoute
+  '/api/acquisition/closed-loop-refresh': typeof ApiAcquisitionClosedLoopRefreshRoute
+  '/api/acquisition/creative-detail': typeof ApiAcquisitionCreativeDetailRoute
+  '/api/acquisition/events': typeof ApiAcquisitionEventsRoute
+  '/api/acquisition/inferred-links': typeof ApiAcquisitionInferredLinksRoute
+  '/api/acquisition/performance': typeof ApiAcquisitionPerformanceRoute
+  '/api/acquisition/summary': typeof ApiAcquisitionSummaryRoute
+  '/api/attribution/chatwoot-facts-backfill': typeof ApiAttributionChatwootFactsBackfillRoute
+  '/api/attribution/chatwoot-reconcile': typeof ApiAttributionChatwootReconcileRoute
   '/api/attribution/conversations': typeof ApiAttributionConversationsRoute
   '/api/attribution/health': typeof ApiAttributionHealthRoute
   '/api/attribution/meta-health': typeof ApiAttributionMetaHealthRoute
   '/api/attribution/summary': typeof ApiAttributionSummaryRoute
   '/api/attribution/tokens': typeof ApiAttributionTokensRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/sso': typeof ApiAuthSsoRoute
   '/api/chatwoot/webhook': typeof ApiChatwootWebhookRoute
   '/api/ingest/dataset': typeof ApiIngestDatasetRoute
+  '/api/landing-attribution/events': typeof ApiLandingAttributionEventsRoute
+  '/api/landing-attribution/summary': typeof ApiLandingAttributionSummaryRoute
+  '/api/meta/catalog-reconcile': typeof ApiMetaCatalogReconcileRoute
+  '/api/meta/credential-health': typeof ApiMetaCredentialHealthRoute
+  '/api/meta/leadgen-webhook': typeof ApiMetaLeadgenWebhookRoute
+  '/api/meta/messaging-readiness': typeof ApiMetaMessagingReadinessRoute
   '/api/meta/whatsapp-attribution-webhook': typeof ApiMetaWhatsappAttributionWebhookRoute
   '/api/prices/advice': typeof ApiPricesAdviceRoute
   '/api/prices/catalog': typeof ApiPricesCatalogRoute
@@ -800,11 +1199,13 @@ export interface FileRoutesById {
   '/api/pricing/mappings': typeof ApiPricingMappingsRoute
   '/api/pricing/publish': typeof ApiPricingPublishRoute
   '/api/pricing/recalculate': typeof ApiPricingRecalculateRoute
+  '/api/revenue-access/login': typeof ApiRevenueAccessLoginRoute
   '/api/telegram/preview': typeof ApiTelegramPreviewRoute
   '/api/telegram/send-course-alerts': typeof ApiTelegramSendCourseAlertsRoute
   '/api/telegram/send-daily': typeof ApiTelegramSendDailyRoute
   '/api/telegram/setup': typeof ApiTelegramSetupRoute
   '/api/telegram/webhook': typeof ApiTelegramWebhookRoute
+  '/api/meta/lead-ads/operations': typeof ApiMetaLeadAdsOperationsRoute
   '/api/pricing/import/preview': typeof ApiPricingImportPreviewRoute
   '/api/pricing/invoices/$movement': typeof ApiPricingInvoicesMovementRoute
 }
@@ -813,14 +1214,20 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
+    | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -834,6 +1241,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -852,31 +1260,65 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
+    | '/api/lead-intelligence'
+    | '/api/lead-performance'
+    | '/api/lead-performance-export'
+    | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
+    | '/api/lost-chatter'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
+    | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
+    | '/api/acquisition/performance'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -891,25 +1333,33 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
+    | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -923,6 +1373,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -941,31 +1392,65 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
+    | '/api/lead-intelligence'
+    | '/api/lead-performance'
+    | '/api/lead-performance-export'
+    | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
+    | '/api/lost-chatter'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
+    | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
+    | '/api/acquisition/performance'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -980,25 +1465,33 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   id:
     | '__root__'
     | '/'
     | '/accounting'
+    | '/acquisition'
     | '/ads'
     | '/attribution'
     | '/campaigns'
     | '/courses'
+    | '/creatives'
     | '/full-invoiced'
     | '/guide'
+    | '/landing-pages'
+    | '/lead-distribution'
+    | '/lead-sources'
     | '/leads'
     | '/lost'
+    | '/management-review'
     | '/media-buyers'
     | '/media-plan'
     | '/organic'
@@ -1012,6 +1505,7 @@ export interface FileRouteTypes {
     | '/yoy'
     | '/api/accounting'
     | '/api/accounting-export'
+    | '/api/accounting-net-sales'
     | '/api/ads'
     | '/api/ads-creatives'
     | '/api/agent-course-intelligence'
@@ -1030,31 +1524,65 @@ export interface FileRouteTypes {
     | '/api/filters'
     | '/api/full-invoiced'
     | '/api/health'
+    | '/api/lead-course-distribution'
+    | '/api/lead-course-export'
+    | '/api/lead-intelligence'
+    | '/api/lead-performance'
+    | '/api/lead-performance-export'
+    | '/api/lead-qa'
+    | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
+    | '/api/lost-chatter'
+    | '/api/management-review'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
+    | '/api/media-plan-leads'
+    | '/api/meta-destination-mix'
     | '/api/organic'
     | '/api/overview'
+    | '/api/overview-revenue-source'
     | '/api/products'
     | '/api/profitability'
+    | '/api/profitability-ledger'
     | '/api/refresh'
+    | '/api/revenue-cohorts'
     | '/api/sales'
+    | '/api/search'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
     | '/api/weekend'
+    | '/api/weekly-lead-followup'
     | '/api/yoy'
+    | '/api/acquisition/closed-loop'
+    | '/api/acquisition/closed-loop-refresh'
+    | '/api/acquisition/creative-detail'
+    | '/api/acquisition/events'
+    | '/api/acquisition/inferred-links'
+    | '/api/acquisition/performance'
+    | '/api/acquisition/summary'
+    | '/api/attribution/chatwoot-facts-backfill'
+    | '/api/attribution/chatwoot-reconcile'
     | '/api/attribution/conversations'
     | '/api/attribution/health'
     | '/api/attribution/meta-health'
     | '/api/attribution/summary'
     | '/api/attribution/tokens'
+    | '/api/auth/login'
+    | '/api/auth/logout'
     | '/api/auth/sso'
     | '/api/chatwoot/webhook'
     | '/api/ingest/dataset'
+    | '/api/landing-attribution/events'
+    | '/api/landing-attribution/summary'
+    | '/api/meta/catalog-reconcile'
+    | '/api/meta/credential-health'
+    | '/api/meta/leadgen-webhook'
+    | '/api/meta/messaging-readiness'
     | '/api/meta/whatsapp-attribution-webhook'
     | '/api/prices/advice'
     | '/api/prices/catalog'
@@ -1069,11 +1597,13 @@ export interface FileRouteTypes {
     | '/api/pricing/mappings'
     | '/api/pricing/publish'
     | '/api/pricing/recalculate'
+    | '/api/revenue-access/login'
     | '/api/telegram/preview'
     | '/api/telegram/send-course-alerts'
     | '/api/telegram/send-daily'
     | '/api/telegram/setup'
     | '/api/telegram/webhook'
+    | '/api/meta/lead-ads/operations'
     | '/api/pricing/import/preview'
     | '/api/pricing/invoices/$movement'
   fileRoutesById: FileRoutesById
@@ -1081,14 +1611,20 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountingRoute: typeof AccountingRoute
+  AcquisitionRoute: typeof AcquisitionRoute
   AdsRoute: typeof AdsRoute
   AttributionRoute: typeof AttributionRoute
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
+  CreativesRoute: typeof CreativesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
+  LandingPagesRoute: typeof LandingPagesRoute
+  LeadDistributionRoute: typeof LeadDistributionRoute
+  LeadSourcesRoute: typeof LeadSourcesRoute
   LeadsRoute: typeof LeadsRoute
   LostRoute: typeof LostRoute
+  ManagementReviewRoute: typeof ManagementReviewRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
   MediaPlanRoute: typeof MediaPlanRoute
   OrganicRoute: typeof OrganicRoute
@@ -1102,6 +1638,7 @@ export interface RootRouteChildren {
   YoyRoute: typeof YoyRoute
   ApiAccountingRoute: typeof ApiAccountingRoute
   ApiAccountingExportRoute: typeof ApiAccountingExportRoute
+  ApiAccountingNetSalesRoute: typeof ApiAccountingNetSalesRoute
   ApiAdsRoute: typeof ApiAdsRoute
   ApiAdsCreativesRoute: typeof ApiAdsCreativesRoute
   ApiAgentCourseIntelligenceRoute: typeof ApiAgentCourseIntelligenceRoute
@@ -1120,31 +1657,65 @@ export interface RootRouteChildren {
   ApiFiltersRoute: typeof ApiFiltersRoute
   ApiFullInvoicedRoute: typeof ApiFullInvoicedRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiLeadCourseDistributionRoute: typeof ApiLeadCourseDistributionRoute
+  ApiLeadCourseExportRoute: typeof ApiLeadCourseExportRoute
+  ApiLeadIntelligenceRoute: typeof ApiLeadIntelligenceRoute
+  ApiLeadPerformanceRoute: typeof ApiLeadPerformanceRoute
+  ApiLeadPerformanceExportRoute: typeof ApiLeadPerformanceExportRoute
+  ApiLeadQaRoute: typeof ApiLeadQaRoute
+  ApiLeadSourceMatrixRoute: typeof ApiLeadSourceMatrixRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
+  ApiLostArchiveAuditRoute: typeof ApiLostArchiveAuditRoute
+  ApiLostChatterRoute: typeof ApiLostChatterRoute
+  ApiManagementReviewRoute: typeof ApiManagementReviewRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
+  ApiMediaPlanLeadsRoute: typeof ApiMediaPlanLeadsRoute
+  ApiMetaDestinationMixRoute: typeof ApiMetaDestinationMixRoute
   ApiOrganicRoute: typeof ApiOrganicRoute
   ApiOverviewRoute: typeof ApiOverviewRoute
+  ApiOverviewRevenueSourceRoute: typeof ApiOverviewRevenueSourceRoute
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
+  ApiProfitabilityLedgerRoute: typeof ApiProfitabilityLedgerRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
+  ApiRevenueCohortsRoute: typeof ApiRevenueCohortsRoute
   ApiSalesRoute: typeof ApiSalesRoute
+  ApiSearchRoute: typeof ApiSearchRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
   ApiWeekendRoute: typeof ApiWeekendRoute
+  ApiWeeklyLeadFollowupRoute: typeof ApiWeeklyLeadFollowupRoute
   ApiYoyRoute: typeof ApiYoyRoute
+  ApiAcquisitionClosedLoopRoute: typeof ApiAcquisitionClosedLoopRoute
+  ApiAcquisitionClosedLoopRefreshRoute: typeof ApiAcquisitionClosedLoopRefreshRoute
+  ApiAcquisitionCreativeDetailRoute: typeof ApiAcquisitionCreativeDetailRoute
+  ApiAcquisitionEventsRoute: typeof ApiAcquisitionEventsRoute
+  ApiAcquisitionInferredLinksRoute: typeof ApiAcquisitionInferredLinksRoute
+  ApiAcquisitionPerformanceRoute: typeof ApiAcquisitionPerformanceRoute
+  ApiAcquisitionSummaryRoute: typeof ApiAcquisitionSummaryRoute
+  ApiAttributionChatwootFactsBackfillRoute: typeof ApiAttributionChatwootFactsBackfillRoute
+  ApiAttributionChatwootReconcileRoute: typeof ApiAttributionChatwootReconcileRoute
   ApiAttributionConversationsRoute: typeof ApiAttributionConversationsRoute
   ApiAttributionHealthRoute: typeof ApiAttributionHealthRoute
   ApiAttributionMetaHealthRoute: typeof ApiAttributionMetaHealthRoute
   ApiAttributionSummaryRoute: typeof ApiAttributionSummaryRoute
   ApiAttributionTokensRoute: typeof ApiAttributionTokensRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthSsoRoute: typeof ApiAuthSsoRoute
   ApiChatwootWebhookRoute: typeof ApiChatwootWebhookRoute
   ApiIngestDatasetRoute: typeof ApiIngestDatasetRoute
+  ApiLandingAttributionEventsRoute: typeof ApiLandingAttributionEventsRoute
+  ApiLandingAttributionSummaryRoute: typeof ApiLandingAttributionSummaryRoute
+  ApiMetaCatalogReconcileRoute: typeof ApiMetaCatalogReconcileRoute
+  ApiMetaCredentialHealthRoute: typeof ApiMetaCredentialHealthRoute
+  ApiMetaLeadgenWebhookRoute: typeof ApiMetaLeadgenWebhookRoute
+  ApiMetaMessagingReadinessRoute: typeof ApiMetaMessagingReadinessRoute
   ApiMetaWhatsappAttributionWebhookRoute: typeof ApiMetaWhatsappAttributionWebhookRoute
   ApiPricesAdviceRoute: typeof ApiPricesAdviceRoute
   ApiPricesCatalogRoute: typeof ApiPricesCatalogRoute
@@ -1159,11 +1730,13 @@ export interface RootRouteChildren {
   ApiPricingMappingsRoute: typeof ApiPricingMappingsRoute
   ApiPricingPublishRoute: typeof ApiPricingPublishRoute
   ApiPricingRecalculateRoute: typeof ApiPricingRecalculateRoute
+  ApiRevenueAccessLoginRoute: typeof ApiRevenueAccessLoginRoute
   ApiTelegramPreviewRoute: typeof ApiTelegramPreviewRoute
   ApiTelegramSendCourseAlertsRoute: typeof ApiTelegramSendCourseAlertsRoute
   ApiTelegramSendDailyRoute: typeof ApiTelegramSendDailyRoute
   ApiTelegramSetupRoute: typeof ApiTelegramSetupRoute
   ApiTelegramWebhookRoute: typeof ApiTelegramWebhookRoute
+  ApiMetaLeadAdsOperationsRoute: typeof ApiMetaLeadAdsOperationsRoute
   ApiPricingImportPreviewRoute: typeof ApiPricingImportPreviewRoute
   ApiPricingInvoicesMovementRoute: typeof ApiPricingInvoicesMovementRoute
 }
@@ -1182,6 +1755,13 @@ declare module '@tanstack/react-router' {
       path: '/accounting'
       fullPath: '/accounting'
       preLoaderRoute: typeof AccountingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/acquisition': {
+      id: '/acquisition'
+      path: '/acquisition'
+      fullPath: '/acquisition'
+      preLoaderRoute: typeof AcquisitionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ads': {
@@ -1212,6 +1792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/creatives': {
+      id: '/creatives'
+      path: '/creatives'
+      fullPath: '/creatives'
+      preLoaderRoute: typeof CreativesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/full-invoiced': {
       id: '/full-invoiced'
       path: '/full-invoiced'
@@ -1226,6 +1813,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuideRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/landing-pages': {
+      id: '/landing-pages'
+      path: '/landing-pages'
+      fullPath: '/landing-pages'
+      preLoaderRoute: typeof LandingPagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lead-distribution': {
+      id: '/lead-distribution'
+      path: '/lead-distribution'
+      fullPath: '/lead-distribution'
+      preLoaderRoute: typeof LeadDistributionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lead-sources': {
+      id: '/lead-sources'
+      path: '/lead-sources'
+      fullPath: '/lead-sources'
+      preLoaderRoute: typeof LeadSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/leads': {
       id: '/leads'
       path: '/leads'
@@ -1238,6 +1846,13 @@ declare module '@tanstack/react-router' {
       path: '/lost'
       fullPath: '/lost'
       preLoaderRoute: typeof LostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/management-review': {
+      id: '/management-review'
+      path: '/management-review'
+      fullPath: '/management-review'
+      preLoaderRoute: typeof ManagementReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media-buyers': {
@@ -1329,6 +1944,13 @@ declare module '@tanstack/react-router' {
       path: '/api/accounting-export'
       fullPath: '/api/accounting-export'
       preLoaderRoute: typeof ApiAccountingExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/accounting-net-sales': {
+      id: '/api/accounting-net-sales'
+      path: '/api/accounting-net-sales'
+      fullPath: '/api/accounting-net-sales'
+      preLoaderRoute: typeof ApiAccountingNetSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ads': {
@@ -1457,6 +2079,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/lead-course-distribution': {
+      id: '/api/lead-course-distribution'
+      path: '/api/lead-course-distribution'
+      fullPath: '/api/lead-course-distribution'
+      preLoaderRoute: typeof ApiLeadCourseDistributionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-course-export': {
+      id: '/api/lead-course-export'
+      path: '/api/lead-course-export'
+      fullPath: '/api/lead-course-export'
+      preLoaderRoute: typeof ApiLeadCourseExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-intelligence': {
+      id: '/api/lead-intelligence'
+      path: '/api/lead-intelligence'
+      fullPath: '/api/lead-intelligence'
+      preLoaderRoute: typeof ApiLeadIntelligenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-performance': {
+      id: '/api/lead-performance'
+      path: '/api/lead-performance'
+      fullPath: '/api/lead-performance'
+      preLoaderRoute: typeof ApiLeadPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-performance-export': {
+      id: '/api/lead-performance-export'
+      path: '/api/lead-performance-export'
+      fullPath: '/api/lead-performance-export'
+      preLoaderRoute: typeof ApiLeadPerformanceExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-qa': {
+      id: '/api/lead-qa'
+      path: '/api/lead-qa'
+      fullPath: '/api/lead-qa'
+      preLoaderRoute: typeof ApiLeadQaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lead-source-matrix': {
+      id: '/api/lead-source-matrix'
+      path: '/api/lead-source-matrix'
+      fullPath: '/api/lead-source-matrix'
+      preLoaderRoute: typeof ApiLeadSourceMatrixRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/leads': {
       id: '/api/leads'
       path: '/api/leads'
@@ -1469,6 +2140,27 @@ declare module '@tanstack/react-router' {
       path: '/api/lost'
       fullPath: '/api/lost'
       preLoaderRoute: typeof ApiLostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lost-archive-audit': {
+      id: '/api/lost-archive-audit'
+      path: '/api/lost-archive-audit'
+      fullPath: '/api/lost-archive-audit'
+      preLoaderRoute: typeof ApiLostArchiveAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lost-chatter': {
+      id: '/api/lost-chatter'
+      path: '/api/lost-chatter'
+      fullPath: '/api/lost-chatter'
+      preLoaderRoute: typeof ApiLostChatterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/management-review': {
+      id: '/api/management-review'
+      path: '/api/management-review'
+      fullPath: '/api/management-review'
+      preLoaderRoute: typeof ApiManagementReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media-buyers': {
@@ -1492,6 +2184,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMediaPlanActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/media-plan-leads': {
+      id: '/api/media-plan-leads'
+      path: '/api/media-plan-leads'
+      fullPath: '/api/media-plan-leads'
+      preLoaderRoute: typeof ApiMediaPlanLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta-destination-mix': {
+      id: '/api/meta-destination-mix'
+      path: '/api/meta-destination-mix'
+      fullPath: '/api/meta-destination-mix'
+      preLoaderRoute: typeof ApiMetaDestinationMixRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organic': {
       id: '/api/organic'
       path: '/api/organic'
@@ -1504,6 +2210,13 @@ declare module '@tanstack/react-router' {
       path: '/api/overview'
       fullPath: '/api/overview'
       preLoaderRoute: typeof ApiOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/overview-revenue-source': {
+      id: '/api/overview-revenue-source'
+      path: '/api/overview-revenue-source'
+      fullPath: '/api/overview-revenue-source'
+      preLoaderRoute: typeof ApiOverviewRevenueSourceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/products': {
@@ -1520,6 +2233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProfitabilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profitability-ledger': {
+      id: '/api/profitability-ledger'
+      path: '/api/profitability-ledger'
+      fullPath: '/api/profitability-ledger'
+      preLoaderRoute: typeof ApiProfitabilityLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/refresh': {
       id: '/api/refresh'
       path: '/api/refresh'
@@ -1527,11 +2247,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/revenue-cohorts': {
+      id: '/api/revenue-cohorts'
+      path: '/api/revenue-cohorts'
+      fullPath: '/api/revenue-cohorts'
+      preLoaderRoute: typeof ApiRevenueCohortsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sales': {
       id: '/api/sales'
       path: '/api/sales'
       fullPath: '/api/sales'
       preLoaderRoute: typeof ApiSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/targets': {
@@ -1569,11 +2303,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWeekendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/weekly-lead-followup': {
+      id: '/api/weekly-lead-followup'
+      path: '/api/weekly-lead-followup'
+      fullPath: '/api/weekly-lead-followup'
+      preLoaderRoute: typeof ApiWeeklyLeadFollowupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/yoy': {
       id: '/api/yoy'
       path: '/api/yoy'
       fullPath: '/api/yoy'
       preLoaderRoute: typeof ApiYoyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/closed-loop': {
+      id: '/api/acquisition/closed-loop'
+      path: '/api/acquisition/closed-loop'
+      fullPath: '/api/acquisition/closed-loop'
+      preLoaderRoute: typeof ApiAcquisitionClosedLoopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/closed-loop-refresh': {
+      id: '/api/acquisition/closed-loop-refresh'
+      path: '/api/acquisition/closed-loop-refresh'
+      fullPath: '/api/acquisition/closed-loop-refresh'
+      preLoaderRoute: typeof ApiAcquisitionClosedLoopRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/creative-detail': {
+      id: '/api/acquisition/creative-detail'
+      path: '/api/acquisition/creative-detail'
+      fullPath: '/api/acquisition/creative-detail'
+      preLoaderRoute: typeof ApiAcquisitionCreativeDetailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/events': {
+      id: '/api/acquisition/events'
+      path: '/api/acquisition/events'
+      fullPath: '/api/acquisition/events'
+      preLoaderRoute: typeof ApiAcquisitionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/inferred-links': {
+      id: '/api/acquisition/inferred-links'
+      path: '/api/acquisition/inferred-links'
+      fullPath: '/api/acquisition/inferred-links'
+      preLoaderRoute: typeof ApiAcquisitionInferredLinksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/performance': {
+      id: '/api/acquisition/performance'
+      path: '/api/acquisition/performance'
+      fullPath: '/api/acquisition/performance'
+      preLoaderRoute: typeof ApiAcquisitionPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/acquisition/summary': {
+      id: '/api/acquisition/summary'
+      path: '/api/acquisition/summary'
+      fullPath: '/api/acquisition/summary'
+      preLoaderRoute: typeof ApiAcquisitionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/chatwoot-facts-backfill': {
+      id: '/api/attribution/chatwoot-facts-backfill'
+      path: '/api/attribution/chatwoot-facts-backfill'
+      fullPath: '/api/attribution/chatwoot-facts-backfill'
+      preLoaderRoute: typeof ApiAttributionChatwootFactsBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attribution/chatwoot-reconcile': {
+      id: '/api/attribution/chatwoot-reconcile'
+      path: '/api/attribution/chatwoot-reconcile'
+      fullPath: '/api/attribution/chatwoot-reconcile'
+      preLoaderRoute: typeof ApiAttributionChatwootReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/attribution/conversations': {
@@ -1611,6 +2415,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAttributionTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/sso': {
       id: '/api/auth/sso'
       path: '/api/auth/sso'
@@ -1630,6 +2448,48 @@ declare module '@tanstack/react-router' {
       path: '/api/ingest/dataset'
       fullPath: '/api/ingest/dataset'
       preLoaderRoute: typeof ApiIngestDatasetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/landing-attribution/events': {
+      id: '/api/landing-attribution/events'
+      path: '/api/landing-attribution/events'
+      fullPath: '/api/landing-attribution/events'
+      preLoaderRoute: typeof ApiLandingAttributionEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/landing-attribution/summary': {
+      id: '/api/landing-attribution/summary'
+      path: '/api/landing-attribution/summary'
+      fullPath: '/api/landing-attribution/summary'
+      preLoaderRoute: typeof ApiLandingAttributionSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/catalog-reconcile': {
+      id: '/api/meta/catalog-reconcile'
+      path: '/api/meta/catalog-reconcile'
+      fullPath: '/api/meta/catalog-reconcile'
+      preLoaderRoute: typeof ApiMetaCatalogReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/credential-health': {
+      id: '/api/meta/credential-health'
+      path: '/api/meta/credential-health'
+      fullPath: '/api/meta/credential-health'
+      preLoaderRoute: typeof ApiMetaCredentialHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/leadgen-webhook': {
+      id: '/api/meta/leadgen-webhook'
+      path: '/api/meta/leadgen-webhook'
+      fullPath: '/api/meta/leadgen-webhook'
+      preLoaderRoute: typeof ApiMetaLeadgenWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/messaging-readiness': {
+      id: '/api/meta/messaging-readiness'
+      path: '/api/meta/messaging-readiness'
+      fullPath: '/api/meta/messaging-readiness'
+      preLoaderRoute: typeof ApiMetaMessagingReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta/whatsapp-attribution-webhook': {
@@ -1730,6 +2590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPricingRecalculateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/revenue-access/login': {
+      id: '/api/revenue-access/login'
+      path: '/api/revenue-access/login'
+      fullPath: '/api/revenue-access/login'
+      preLoaderRoute: typeof ApiRevenueAccessLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram/preview': {
       id: '/api/telegram/preview'
       path: '/api/telegram/preview'
@@ -1765,6 +2632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/lead-ads/operations': {
+      id: '/api/meta/lead-ads/operations'
+      path: '/api/meta/lead-ads/operations'
+      fullPath: '/api/meta/lead-ads/operations'
+      preLoaderRoute: typeof ApiMetaLeadAdsOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/pricing/import/preview': {
       id: '/api/pricing/import/preview'
       path: '/api/pricing/import/preview'
@@ -1785,14 +2659,20 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountingRoute: AccountingRoute,
+  AcquisitionRoute: AcquisitionRoute,
   AdsRoute: AdsRoute,
   AttributionRoute: AttributionRoute,
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
+  CreativesRoute: CreativesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
+  LandingPagesRoute: LandingPagesRoute,
+  LeadDistributionRoute: LeadDistributionRoute,
+  LeadSourcesRoute: LeadSourcesRoute,
   LeadsRoute: LeadsRoute,
   LostRoute: LostRoute,
+  ManagementReviewRoute: ManagementReviewRoute,
   MediaBuyersRoute: MediaBuyersRoute,
   MediaPlanRoute: MediaPlanRoute,
   OrganicRoute: OrganicRoute,
@@ -1806,6 +2686,7 @@ const rootRouteChildren: RootRouteChildren = {
   YoyRoute: YoyRoute,
   ApiAccountingRoute: ApiAccountingRoute,
   ApiAccountingExportRoute: ApiAccountingExportRoute,
+  ApiAccountingNetSalesRoute: ApiAccountingNetSalesRoute,
   ApiAdsRoute: ApiAdsRoute,
   ApiAdsCreativesRoute: ApiAdsCreativesRoute,
   ApiAgentCourseIntelligenceRoute: ApiAgentCourseIntelligenceRoute,
@@ -1824,31 +2705,66 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFiltersRoute: ApiFiltersRoute,
   ApiFullInvoicedRoute: ApiFullInvoicedRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiLeadCourseDistributionRoute: ApiLeadCourseDistributionRoute,
+  ApiLeadCourseExportRoute: ApiLeadCourseExportRoute,
+  ApiLeadIntelligenceRoute: ApiLeadIntelligenceRoute,
+  ApiLeadPerformanceRoute: ApiLeadPerformanceRoute,
+  ApiLeadPerformanceExportRoute: ApiLeadPerformanceExportRoute,
+  ApiLeadQaRoute: ApiLeadQaRoute,
+  ApiLeadSourceMatrixRoute: ApiLeadSourceMatrixRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
+  ApiLostArchiveAuditRoute: ApiLostArchiveAuditRoute,
+  ApiLostChatterRoute: ApiLostChatterRoute,
+  ApiManagementReviewRoute: ApiManagementReviewRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
+  ApiMediaPlanLeadsRoute: ApiMediaPlanLeadsRoute,
+  ApiMetaDestinationMixRoute: ApiMetaDestinationMixRoute,
   ApiOrganicRoute: ApiOrganicRoute,
   ApiOverviewRoute: ApiOverviewRoute,
+  ApiOverviewRevenueSourceRoute: ApiOverviewRevenueSourceRoute,
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
+  ApiProfitabilityLedgerRoute: ApiProfitabilityLedgerRoute,
   ApiRefreshRoute: ApiRefreshRoute,
+  ApiRevenueCohortsRoute: ApiRevenueCohortsRoute,
   ApiSalesRoute: ApiSalesRoute,
+  ApiSearchRoute: ApiSearchRoute,
   ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,
   ApiWeekendRoute: ApiWeekendRoute,
+  ApiWeeklyLeadFollowupRoute: ApiWeeklyLeadFollowupRoute,
   ApiYoyRoute: ApiYoyRoute,
+  ApiAcquisitionClosedLoopRoute: ApiAcquisitionClosedLoopRoute,
+  ApiAcquisitionClosedLoopRefreshRoute: ApiAcquisitionClosedLoopRefreshRoute,
+  ApiAcquisitionCreativeDetailRoute: ApiAcquisitionCreativeDetailRoute,
+  ApiAcquisitionEventsRoute: ApiAcquisitionEventsRoute,
+  ApiAcquisitionInferredLinksRoute: ApiAcquisitionInferredLinksRoute,
+  ApiAcquisitionPerformanceRoute: ApiAcquisitionPerformanceRoute,
+  ApiAcquisitionSummaryRoute: ApiAcquisitionSummaryRoute,
+  ApiAttributionChatwootFactsBackfillRoute:
+    ApiAttributionChatwootFactsBackfillRoute,
+  ApiAttributionChatwootReconcileRoute: ApiAttributionChatwootReconcileRoute,
   ApiAttributionConversationsRoute: ApiAttributionConversationsRoute,
   ApiAttributionHealthRoute: ApiAttributionHealthRoute,
   ApiAttributionMetaHealthRoute: ApiAttributionMetaHealthRoute,
   ApiAttributionSummaryRoute: ApiAttributionSummaryRoute,
   ApiAttributionTokensRoute: ApiAttributionTokensRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthSsoRoute: ApiAuthSsoRoute,
   ApiChatwootWebhookRoute: ApiChatwootWebhookRoute,
   ApiIngestDatasetRoute: ApiIngestDatasetRoute,
+  ApiLandingAttributionEventsRoute: ApiLandingAttributionEventsRoute,
+  ApiLandingAttributionSummaryRoute: ApiLandingAttributionSummaryRoute,
+  ApiMetaCatalogReconcileRoute: ApiMetaCatalogReconcileRoute,
+  ApiMetaCredentialHealthRoute: ApiMetaCredentialHealthRoute,
+  ApiMetaLeadgenWebhookRoute: ApiMetaLeadgenWebhookRoute,
+  ApiMetaMessagingReadinessRoute: ApiMetaMessagingReadinessRoute,
   ApiMetaWhatsappAttributionWebhookRoute:
     ApiMetaWhatsappAttributionWebhookRoute,
   ApiPricesAdviceRoute: ApiPricesAdviceRoute,
@@ -1864,11 +2780,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPricingMappingsRoute: ApiPricingMappingsRoute,
   ApiPricingPublishRoute: ApiPricingPublishRoute,
   ApiPricingRecalculateRoute: ApiPricingRecalculateRoute,
+  ApiRevenueAccessLoginRoute: ApiRevenueAccessLoginRoute,
   ApiTelegramPreviewRoute: ApiTelegramPreviewRoute,
   ApiTelegramSendCourseAlertsRoute: ApiTelegramSendCourseAlertsRoute,
   ApiTelegramSendDailyRoute: ApiTelegramSendDailyRoute,
   ApiTelegramSetupRoute: ApiTelegramSetupRoute,
   ApiTelegramWebhookRoute: ApiTelegramWebhookRoute,
+  ApiMetaLeadAdsOperationsRoute: ApiMetaLeadAdsOperationsRoute,
   ApiPricingImportPreviewRoute: ApiPricingImportPreviewRoute,
   ApiPricingInvoicesMovementRoute: ApiPricingInvoicesMovementRoute,
 }

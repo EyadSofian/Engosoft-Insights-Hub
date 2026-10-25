@@ -16,7 +16,8 @@
 //   * Publishing is atomic. A book becomes live, and any book it replaces is
 //     archived, inside one transaction.
 import { createHash, randomUUID } from "node:crypto";
-import { Pool, type PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
+import { getSharedDatabasePool } from "../database-pool.server.ts";
 import type {
   ComplianceStatus,
   InvoicePriceAudit,
@@ -33,7 +34,6 @@ import type {
   ProductMapping,
 } from "./pricing-types.ts";
 
-let pool: Pool | null = null;
 let schemaPromise: Promise<void> | null = null;
 
 export function pricingDatabaseConfigured(): boolean {
@@ -41,23 +41,7 @@ export function pricingDatabaseConfigured(): boolean {
 }
 
 function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not configured");
-  if (!pool) {
-    const isRailwayInternal = connectionString.includes(".railway.internal");
-    pool = new Pool({
-      connectionString,
-      max: 4,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-      allowExitOnIdle: true,
-      ssl:
-        isRailwayInternal || process.env.PGSSLMODE === "disable"
-          ? false
-          : { rejectUnauthorized: false },
-    });
-  }
-  return pool;
+  return getSharedDatabasePool();
 }
 
 const SCHEMA = `

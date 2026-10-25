@@ -68,11 +68,11 @@ function operationalFilters(filters: GlobalFilters): GlobalFilters {
 }
 
 export async function buildCurrentCourseLeadAlertReport(filters: GlobalFilters = {}) {
-  const { archivedCrmLeads, archivedLostReportingDate, attributedAdCourse, getFiltered } =
+  const { authoritativeLostLeads, archivedLostReportingDate, attributedAdCourse, getFiltered } =
     await import("./metrics.server");
   const data = await getFiltered(operationalFilters(filters));
   const yesterday = shiftDay(cairoDay(), -1);
-  const archived = archivedCrmLeads(data);
+  const archived = authoritativeLostLeads(data);
   const adMax = latest(data.ads.map((row) => row.date));
   const leadMax = latest([
     ...data.crm.map((row) => row.createdAt),

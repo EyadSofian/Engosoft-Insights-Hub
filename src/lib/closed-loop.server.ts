@@ -1,0 +1,2323 @@
+import { createHash } from "node:crypto";
+import {
+  BUSINESS_TIME_ZONE,
+  acquisitionDatabaseConfigured,
+  eventsCte,
+  getPool,
+  numericCell,
+  adRowsWhere,
+  AD_ROW_DATE,
+  where,
+} from "./acquisition-attribution.server";
+import {
+  CLOSED_LOOP_GRAINS,
+  addFact,
+  closedLoopFunnel,
+  coverageOf,
+  creativeAssets,
+  crmOutcome,
+  emptyMetrics,
+  finalizeMetrics,
+  linkAcquisitionsToCrm,
+  rankByLeadQuality,
+  readableCreativeName,
+  rollupByGrain,
+  type AcquisitionFactRow,
+  type AcquisitionIdentity,
+  type AttributionConfidence,
+  type ClosedLoopGrain,
+  type CreativeAsset,
+  type CrmOutcome,
+  type CrmRecord,
+  type GrainRow,
+  type MatchConfidence,
+  type PaidInvoiceLine,
+  type QualityMetrics,
+  type SaleOrderLink,
+  type SpendRow,
+} from "./closed-loop";
+import { cheapVersusQuality, closedLoopKpis, type KpiStatus } from "./closed-loop-kpis";
+import { PLATFORMS, PLATFORM_LABEL } from "./constants";
+import {
+  acquisitionInScope,
+  exactAttributionAvailable,
+  managementHealth,
+  managementScopeFrom,
+  reconcileRevenue,
+  scopeKey,
+  scopeSpend,
+  type ManagementScope,
+  type RevenueAttribution,
+} from "./management-scope";
+
+/**
+ * Closed-loop Marketing → Sales identity graph.
+ *
+ * A scheduled refresh materialises five small tables from data the dashboard
+ * already syncs plus one Odoo read (sales orders with their opportunity):
+ *
+ *   meta_entity_graph      Account → Campaign → Ad Set → Ad → Creative, by ad ID
+ *   meta_creative_assets   provider video IDs / image hashes per creative (reporting only)
+ *   crm_lead_outcomes      lifecycle, orders, invoices and paid revenue per CRM record
+ *   crm_sale_order_links   sale.order → opportunity (the deterministic revenue link)
+ *   acquisition_crm_links  acquisition_event_id → CRM record, with method and confidence
+ *
+ * Reads join those tables to the canonical acquisition events. Nothing here
+ * matches on a name, and no personal data (phone, email, contact name) is
+ * stored in these tables or returned by the read model.
+ */
+
+type Row = Record<string, unknown>;
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const s = (value: unknown): string => (value == null ? "" : String(value).trim());
+const text = s;
+const obj = (value: unknown): Row =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : {};
+const n = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+let schemaReady: Promise<void> | null = null;
+
+export function ensureClosedLoopSchema(): Promise<void> {
+  schemaReady ??= getPool()
+    .query(
+      `CREATE TABLE IF NOT EXISTS meta_entity_graph (
+         ad_id text PRIMARY KEY,
+         ad_name text NOT NULL DEFAULT '',
+         account_id text NOT NULL DEFAULT '',
+         campaign_id text NOT NULL DEFAULT '',
+         campaign_name text NOT NULL DEFAULT '',
+         adset_id text NOT NULL DEFAULT '',
+         adset_name text NOT NULL DEFAULT '',
+         creative_id text NOT NULL DEFAULT '',
+         creative_name text NOT NULL DEFAULT '',
+         media_type text NOT NULL DEFAULT '',
+         headline text NOT NULL DEFAULT '',
+         thumbnail_url text NOT NULL DEFAULT '',
+         image_url text NOT NULL DEFAULT '',
+         video_id text NOT NULL DEFAULT '',
+         image_hash text NOT NULL DEFAULT '',
+         effective_object_story_id text NOT NULL DEFAULT '',
+         source_post_id text NOT NULL DEFAULT '',
+         landing_page_url text NOT NULL DEFAULT '',
+         permalink_url text NOT NULL DEFAULT '',
+         refreshed_at timestamptz NOT NULL DEFAULT now()
+       );
+       ALTER TABLE meta_entity_graph ADD COLUMN IF NOT EXISTS lead_form_id text NOT NULL DEFAULT '';
+       ALTER TABLE meta_entity_graph ADD COLUMN IF NOT EXISTS page_id text NOT NULL DEFAULT '';
+       CREATE INDEX IF NOT EXISTS meta_entity_graph_creative_idx ON meta_entity_graph (creative_id);
+       CREATE INDEX IF NOT EXISTS meta_entity_graph_campaign_idx ON meta_entity_graph (campaign_id, adset_id);
+
+       CREATE TABLE IF NOT EXISTS meta_creative_assets (
+         creative_id text NOT NULL,
+         ad_id text NOT NULL DEFAULT '',
+         asset_type text NOT NULL,
+         asset_id text NOT NULL,
+         video_id text NOT NULL DEFAULT '',
+         image_hash text NOT NULL DEFAULT '',
+         asset_url text NOT NULL DEFAULT '',
+         thumbnail_url text NOT NULL DEFAULT '',
+         attribution_level text NOT NULL DEFAULT 'reporting',
+         PRIMARY KEY (creative_id, asset_type, asset_id)
+       );
+       ALTER TABLE meta_creative_assets ADD COLUMN IF NOT EXISTS asset_text text NOT NULL DEFAULT '';
+
+       CREATE TABLE IF NOT EXISTS crm_sale_order_links (
+         sale_order_id text PRIMARY KEY,
+         sale_order_name text NOT NULL,
+         opportunity_id text NOT NULL,
+         state text NOT NULL DEFAULT '',
+         date_order timestamptz,
+         refreshed_at timestamptz NOT NULL DEFAULT now()
+       );
+       CREATE INDEX IF NOT EXISTS crm_sale_order_links_opportunity_idx ON crm_sale_order_links (opportunity_id);
+
+       CREATE TABLE IF NOT EXISTS crm_lead_outcomes (
+         crm_lead_id text PRIMARY KEY,
+         record_type text NOT NULL DEFAULT '',
+         business_status text NOT NULL DEFAULT '',
+         stage_key text NOT NULL DEFAULT '',
+         salesperson text NOT NULL DEFAULT '',
+         sales_team text NOT NULL DEFAULT '',
+         course text NOT NULL DEFAULT '',
+         source text NOT NULL DEFAULT '',
+         facebook_lead_id text NOT NULL DEFAULT '',
+         ad_id text NOT NULL DEFAULT '',
+         crm_campaign_id text NOT NULL DEFAULT '',
+         created_at timestamptz,
+         won_at timestamptz,
+         interested boolean NOT NULL DEFAULT false,
+         qualified boolean NOT NULL DEFAULT false,
+         quotation boolean NOT NULL DEFAULT false,
+         won boolean NOT NULL DEFAULT false,
+         lost boolean NOT NULL DEFAULT false,
+         sale_order_ids text[] NOT NULL DEFAULT '{}',
+         invoice_count integer NOT NULL DEFAULT 0,
+         revenue_paid_usd numeric NOT NULL DEFAULT 0,
+         first_invoice_at date,
+         refreshed_at timestamptz NOT NULL DEFAULT now()
+       );
+       CREATE INDEX IF NOT EXISTS crm_lead_outcomes_fb_idx ON crm_lead_outcomes (facebook_lead_id);
+
+       CREATE TABLE IF NOT EXISTS acquisition_crm_links (
+         id bigserial PRIMARY KEY,
+         acquisition_event_id text NOT NULL,
+         crm_lead_id text NOT NULL,
+         crm_opportunity_id text NOT NULL DEFAULT '',
+         partner_id text NOT NULL DEFAULT '',
+         chatwoot_conversation_id text NOT NULL DEFAULT '',
+         chatwoot_contact_id text NOT NULL DEFAULT '',
+         provider_lead_id text NOT NULL DEFAULT '',
+         landing_submission_id text NOT NULL DEFAULT '',
+         match_method text NOT NULL,
+         match_confidence text NOT NULL,
+         is_primary boolean NOT NULL DEFAULT false,
+         matched_at timestamptz NOT NULL DEFAULT now(),
+         UNIQUE (acquisition_event_id, crm_lead_id)
+       );
+       ALTER TABLE acquisition_crm_links ADD COLUMN IF NOT EXISTS ambiguity_reason text NOT NULL DEFAULT '';
+       CREATE UNIQUE INDEX IF NOT EXISTS acquisition_crm_links_primary_idx
+         ON acquisition_crm_links (acquisition_event_id) WHERE is_primary;
+       CREATE INDEX IF NOT EXISTS acquisition_crm_links_crm_idx ON acquisition_crm_links (crm_lead_id);
+
+       CREATE TABLE IF NOT EXISTS closed_loop_refresh_state (
+         id integer PRIMARY KEY DEFAULT 1,
+         started_at timestamptz,
+         finished_at timestamptz,
+         status text NOT NULL DEFAULT 'never',
+         summary jsonb NOT NULL DEFAULT '{}'::jsonb,
+         last_error text NOT NULL DEFAULT ''
+       );`,
+    )
+    .then(() => undefined)
+    .catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  return schemaReady;
+}
+
+/* --- refresh ---------------------------------------------------------------- */
+
+interface GraphRow {
+  adId: string;
+  adName: string;
+  accountId: string;
+  campaignId: string;
+  campaignName: string;
+  adsetId: string;
+  adsetName: string;
+  creativeId: string;
+  creativeName: string;
+  mediaType: string;
+  headline: string;
+  thumbnailUrl: string;
+  imageUrl: string;
+  videoId: string;
+  imageHash: string;
+  effectiveObjectStoryId: string;
+  sourcePostId: string;
+  landingPageUrl: string;
+  permalinkUrl: string;
+  feedAssets: { type: "video" | "image"; id: string; url?: string; thumbnailUrl?: string }[];
+  leadFormId: string;
+  pageId: string;
+  assetMetadata: { titles: string[]; bodies: string[]; linkUrls: string[] };
+}
+
+async function loadMetaGraph(): Promise<GraphRow[]> {
+  const pool = getPool();
+  const [creatives, ads, images] = await Promise.all([
+    // Oldest first, so the most recent read of an ad's creative wins.
+    pool.query<Row>(
+      `SELECT row_data FROM dashboard_rows WHERE dataset = 'meta_ad_creatives'
+         AND COALESCE(row_data->>'__ad_id','') <> ''
+       ORDER BY row_data->>'__synced_at' ASC NULLS FIRST`,
+    ),
+    pool.query<Row>(
+      `SELECT DISTINCT ON (row_data->>'__ad_id') row_data
+         FROM dashboard_rows
+        WHERE dataset = 'meta_ads' AND COALESCE(row_data->>'__ad_id','') <> ''
+        ORDER BY row_data->>'__ad_id', ${AD_ROW_DATE} DESC NULLS LAST`,
+    ),
+    pool
+      .query<Row>(`SELECT account_id, image_hash, url FROM meta_image_assets WHERE url <> ''`)
+      .catch(() => ({ rows: [] as Row[] })),
+  ]);
+  const imageUrl = new Map(
+    images.rows.map((row) => [`${s(row.account_id)}|${s(row.image_hash)}`, s(row.url)]),
+  );
+  const graph = new Map<string, GraphRow>();
+  const blank = (adId: string): GraphRow => ({
+    adId,
+    adName: "",
+    accountId: "",
+    campaignId: "",
+    campaignName: "",
+    adsetId: "",
+    adsetName: "",
+    creativeId: "",
+    creativeName: "",
+    mediaType: "",
+    headline: "",
+    thumbnailUrl: "",
+    imageUrl: "",
+    videoId: "",
+    imageHash: "",
+    effectiveObjectStoryId: "",
+    sourcePostId: "",
+    landingPageUrl: "",
+    permalinkUrl: "",
+    feedAssets: [],
+    leadFormId: "",
+    pageId: "",
+    assetMetadata: { titles: [], bodies: [], linkUrls: [] },
+  });
+  // Ad insight rows first: they carry the hierarchy for every delivered ad.
+  for (const { row_data } of ads.rows) {
+    const r = row_data as Row;
+    const adId = s(r.__ad_id);
+    const row = blank(adId);
+    row.adName = s(r["Ad Name"]);
+    row.accountId = s(r.__account_id);
+    row.campaignId = s(r.__campaign_id);
+    row.campaignName = s(r["اسم الكامبين"]) || s(r["Campaign Name"]);
+    row.adsetId = s(r.__adset_id);
+    row.adsetName = s(r["Ad set name"]) || s(r["Ad Set Name"]);
+    row.creativeId = s(r.__creative_id) || s(r["Creative ID"]);
+    row.creativeName = s(r["Creative Name"]);
+    graph.set(adId, row);
+  }
+  // Creative sync rows are the authority for creative identity and media.
+  for (const { row_data } of creatives.rows) {
+    const r = row_data as Row;
+    const adId = s(r.__ad_id);
+    const row = graph.get(adId) ?? blank(adId);
+    row.adName = s(r["Ad Name"]) || row.adName;
+    row.accountId = s(r.__account_id) || row.accountId;
+    row.campaignId = s(r.__campaign_id) || row.campaignId;
+    row.campaignName = s(r["Campaign Name"]) || row.campaignName;
+    row.adsetId = s(r.__adset_id) || row.adsetId;
+    row.adsetName = s(r["Ad Set Name"]) || row.adsetName;
+    row.creativeId = s(r.__creative_id) || s(r["Creative ID"]) || row.creativeId;
+    row.creativeName = s(r["Creative Name"]) || row.creativeName;
+    row.mediaType = s(r["Media Type"]) || s(r["Creative Type"]);
+    row.headline = s(r["Creative Headline"]);
+    row.thumbnailUrl = s(r["Creative Thumbnail URL"]);
+    row.imageUrl = s(r["Creative Image URL"]);
+    row.videoId = s(r["Creative Video ID"]);
+    row.imageHash = s(r["Creative Image Hash"]);
+    row.effectiveObjectStoryId = s(r.effective_object_story_id);
+    row.sourcePostId = s(r.source_post_id);
+    row.landingPageUrl = s(r["Creative Landing Page URL"]);
+    row.permalinkUrl = s(r["Creative Permalink URL"]);
+    row.leadFormId = s(r["Lead Form ID"]);
+    try {
+      const parsed = JSON.parse(s(r["Creative Assets"]) || "[]");
+      if (Array.isArray(parsed)) row.feedAssets = parsed;
+    } catch {
+      row.feedAssets = [];
+    }
+    try {
+      const parsed = JSON.parse(s(r["Creative Asset Metadata"]) || "{}") as Row;
+      const strings = (value: unknown) =>
+        Array.isArray(value) ? value.map((entry) => s(entry)).filter(Boolean) : [];
+      row.assetMetadata = {
+        titles: strings(parsed.titles),
+        bodies: strings(parsed.bodies),
+        linkUrls: strings(parsed.linkUrls),
+      };
+    } catch {
+      row.assetMetadata = { titles: [], bodies: [], linkUrls: [] };
+    }
+    graph.set(adId, row);
+  }
+  for (const row of graph.values()) {
+    // A story ID is `<page id>_<post id>`: the page is part of the provider identity.
+    row.pageId = row.effectiveObjectStoryId.includes("_")
+      ? row.effectiveObjectStoryId.split("_")[0]!
+      : "";
+    const account = row.accountId.startsWith("act_") ? row.accountId : `act_${row.accountId}`;
+    const resolve = (hash: string) => (hash ? (imageUrl.get(`${account}|${hash}`) ?? "") : "");
+    if (row.imageHash && !row.imageUrl) row.imageUrl = resolve(row.imageHash);
+    row.feedAssets = row.feedAssets.map((asset) =>
+      asset.type === "image" && !asset.url ? { ...asset, url: resolve(asset.id) } : asset,
+    );
+  }
+  return [...graph.values()];
+}
+
+async function loadCrmRecords(): Promise<(CrmRecord & Row)[]> {
+  const result = await getPool().query<Row>(
+    `SELECT dataset,
+            row_data->>'__odoo_id' AS id,
+            COALESCE(row_data->>'Record Type','') AS record_type,
+            COALESCE(row_data->>'Business Status','') AS business_status,
+            COALESCE(row_data->>'Stage Key','') AS stage_key,
+            COALESCE(row_data->>'Open Status','') AS open_status,
+            COALESCE(row_data->>'Priority','') AS priority,
+            COALESCE(row_data->>'أنشئ في','') AS created_at,
+            COALESCE(row_data->>'Won Date','') AS won_at,
+            btrim(COALESCE(row_data->>'Facebook Lead ID','')) AS facebook_lead_id,
+            btrim(COALESCE(row_data->>'Ad ID','')) AS ad_id,
+            btrim(COALESCE(row_data->>'Campaign ID','')) AS campaign_id,
+            COALESCE(row_data->>'Salesperson','') AS salesperson,
+            COALESCE(row_data->>'Sales Team','') AS sales_team,
+            COALESCE(NULLIF(row_data->>'Course',''), row_data->>'Courses', '') AS course,
+            COALESCE(row_data->>'cleaned Source', row_data->>'Source', '') AS source
+       FROM dashboard_rows
+      WHERE dataset IN ('crm','lost') AND COALESCE(row_data->>'__odoo_id','') <> ''`,
+  );
+  // The active and Lost populations are disjoint by contract; keep the first copy defensively.
+  const byId = new Map<string, CrmRecord & Row>();
+  for (const row of result.rows) {
+    const id = s(row.id);
+    if (byId.has(id)) continue;
+    byId.set(id, {
+      ...row,
+      id,
+      recordType: s(row.record_type),
+      businessStatus: s(row.business_status),
+      stageKey: s(row.stage_key),
+      openStatus: s(row.open_status),
+      priority: s(row.priority),
+      createdAt: s(row.created_at),
+      facebookLeadId: s(row.facebook_lead_id),
+      adId: s(row.ad_id),
+      campaignId: s(row.campaign_id),
+    });
+  }
+  return [...byId.values()];
+}
+
+async function loadSaleOrders(): Promise<{ orders: SaleOrderLink[] | null; error: string }> {
+  try {
+    const { odooConfigured, odooConfig, searchRead } = await import("./odoo.server");
+    if (!odooConfigured()) return { orders: null, error: "Odoo is not configured" };
+    const rows = await searchRead<{
+      id: number;
+      name?: string;
+      opportunity_id?: [number, string] | false;
+      state?: string;
+      date_order?: string;
+    }>(
+      "sale.order",
+      [
+        ["state", "in", ["sale", "done"]],
+        ["opportunity_id", "!=", false],
+        ["date_order", ">=", `${odooConfig().startDate} 00:00:00`],
+      ],
+      ["name", "opportunity_id", "state", "date_order"],
+      { context: { active_test: false } },
+    );
+    const orders = rows
+      .filter((row) => Array.isArray(row.opportunity_id))
+      .map((row) => ({
+        orderId: String(row.id),
+        orderName: s(row.name),
+        opportunityId: String((row.opportunity_id as [number, string])[0]),
+        state: s(row.state),
+        dateOrder: s(row.date_order),
+      })) as (SaleOrderLink & { dateOrder: string })[];
+    // A 2026 paid invoice can belong to a 2025 sale order. The normal order
+    // sync starts in 2026, so look up only invoice-referenced orders it missed.
+    // Never use salesperson or customer name as a substitute for opportunity_id.
+    try {
+      const invoiceOrders = await getPool().query<{ order_name: string }>(
+        `SELECT DISTINCT row_data->>'Sales Order #' AS order_name
+           FROM dashboard_rows
+          WHERE dataset = 'accounting'
+            AND NULLIF(TRIM(row_data->>'Sales Order #'), '') IS NOT NULL`,
+      );
+      const known = new Set(orders.map((order) => order.orderName));
+      const missingNames = invoiceOrders.rows
+        .map((row) => s(row.order_name))
+        .filter((name) => name && !known.has(name));
+      if (missingNames.length) {
+        const historic = await searchRead<{
+          id: number;
+          name?: string;
+          opportunity_id?: [number, string] | false;
+          state?: string;
+          date_order?: string;
+        }>(
+          "sale.order",
+          [
+            ["name", "in", missingNames],
+            ["opportunity_id", "!=", false],
+            ["state", "in", ["sale", "done"]],
+          ],
+          ["name", "opportunity_id", "state", "date_order"],
+          { context: { active_test: false } },
+        );
+        for (const row of historic) {
+          if (!Array.isArray(row.opportunity_id) || known.has(s(row.name))) continue;
+          orders.push({
+            orderId: String(row.id),
+            orderName: s(row.name),
+            opportunityId: String(row.opportunity_id[0]),
+            state: s(row.state),
+            dateOrder: s(row.date_order),
+          });
+          known.add(s(row.name));
+        }
+      }
+    } catch (error) {
+      return {
+        orders,
+        error: `Historic invoice-order lookup: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    return { orders, error: "" };
+  } catch (error) {
+    return { orders: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Paid invoice lines for CRM outcomes. The Accounting authority (deduplicated
+ * paid lines, credit notes signed, USD at the dashboard FX rates) is the source,
+ * so stored outcome revenue reconciles to the Accounting page. The raw dataset
+ * read below is only a fallback when the snapshot cannot be loaded, and the
+ * refresh records that it happened.
+ */
+async function loadPaidInvoiceLines(errors: string[] = []): Promise<PaidInvoiceLine[]> {
+  try {
+    const [
+      { loadAllData },
+      { accountingUsdPaid, DEFAULT_FX_RATES },
+      { isExcludedFromSalesRevenue },
+    ] = await Promise.all([
+      import("./sheet-cache.server"),
+      import("./fx-rates"),
+      import("./sales-revenue-policy"),
+    ]);
+    const snapshot = await loadAllData();
+    if (snapshot.accounting.length) {
+      return snapshot.accounting
+        .filter((row) => row.orderRef)
+        .map((row) => ({
+          orderName: row.orderRef,
+          movement: row.movement,
+          usdPaid: isExcludedFromSalesRevenue(row) ? 0 : accountingUsdPaid(row, DEFAULT_FX_RATES),
+          paymentDate: (row.isCreditNote
+            ? row.invoiceDate || row.paymentDate
+            : row.paymentDate
+          ).slice(0, 10),
+        }));
+    }
+    errors.push("accounting authority: snapshot has no Accounting rows; stored dataset used");
+  } catch (error) {
+    errors.push(
+      `accounting authority: ${error instanceof Error ? error.message : String(error)}; stored dataset used`,
+    );
+  }
+  const result = await getPool().query<Row>(
+    `SELECT COALESCE(row_data->>'Sales Order #','') AS order_name,
+            COALESCE(row_data->>'حركة', row_data->>'Movement', '') AS movement,
+            COALESCE(row_data->>'$ Sales', row_data->>'USD Paid', '0') AS usd,
+            COALESCE(row_data->>'Payment Date', '') AS payment_date
+       FROM dashboard_rows
+      WHERE dataset = 'accounting' AND COALESCE(row_data->>'Sales Order #','') <> ''`,
+  );
+  return result.rows.map((row) => {
+    const movement = s(row.movement);
+    const usd = n(s(row.usd).replace(/[^0-9.-]/g, ""));
+    // Customer credit notes (RINV) reduce paid revenue.
+    return {
+      orderName: s(row.order_name),
+      movement,
+      usdPaid: /^RINV/i.test(movement) && usd > 0 ? -usd : usd,
+      paymentDate: s(row.payment_date).slice(0, 10),
+    };
+  });
+}
+
+async function loadAcquisitionIdentities(
+  crm: readonly CrmRecord[],
+): Promise<AcquisitionIdentity[]> {
+  const pool = getPool();
+  const present = async (table: string) =>
+    Boolean((await pool.query<Row>(`SELECT to_regclass($1) AS t`, [`public.${table}`])).rows[0]?.t);
+  const identities = new Map<string, AcquisitionIdentity>();
+  // Meta leads the CRM carries with their provider lead ID.
+  for (const record of crm) {
+    if (!record.facebookLeadId) continue;
+    const id = `meta_lead:${record.facebookLeadId}`;
+    identities.set(id, {
+      acquisitionEventId: id,
+      entityType: "meta_lead",
+      providerLeadId: record.facebookLeadId,
+      chatwootConversationId: "",
+      chatwootContactId: "",
+      landingSubmissionId: "",
+      chatwootCrmLeadIds: [],
+    });
+  }
+  if (await present("meta_lead_acquisitions")) {
+    for (const row of (await pool.query<Row>(`SELECT lead_id FROM meta_lead_acquisitions`)).rows) {
+      const leadId = s(row.lead_id);
+      identities.set(`meta_lead:${leadId}`, {
+        acquisitionEventId: `meta_lead:${leadId}`,
+        entityType: "meta_lead",
+        providerLeadId: leadId,
+        chatwootConversationId: "",
+        chatwootContactId: "",
+        landingSubmissionId: "",
+        chatwootCrmLeadIds: [],
+      });
+    }
+  }
+  if (await present("chatwoot_conversation_attribution")) {
+    const rows = await pool.query<Row>(
+      `SELECT conversation_id::text AS conversation_id, COALESCE(contact_id::text,'') AS contact_id, crm_lead_ids,
+              to_char(first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}', 'YYYY-MM-DD HH24:MI:SS') AS occurred_at
+         FROM chatwoot_conversation_attribution`,
+    );
+    for (const row of rows.rows) {
+      const id = `chatwoot_conversation:${s(row.conversation_id)}`;
+      const crmIds = Array.isArray(row.crm_lead_ids) ? (row.crm_lead_ids as unknown[]).map(s) : [];
+      identities.set(id, {
+        acquisitionEventId: id,
+        entityType: "chatwoot_conversation",
+        providerLeadId: "",
+        chatwootConversationId: s(row.conversation_id),
+        chatwootContactId: s(row.contact_id),
+        landingSubmissionId: "",
+        chatwootCrmLeadIds: crmIds,
+        occurredAt: s(row.occurred_at),
+      });
+    }
+  }
+  return [...identities.values()];
+}
+
+/** Odoo datetimes arrive as Cairo wall-clock text; store them as instants. */
+function cairoInstant(value: string): string | null {
+  const text = s(value);
+  if (!/^\d{4}-\d{2}-\d{2}/.test(text)) return null;
+  return text.length > 10 ? text.slice(0, 19) : `${text} 00:00:00`;
+}
+
+/**
+ * Inserts rows through one parameterised `unnest` per chunk. `text[]` columns
+ * take a comma-joined string and `cairo_ts` columns take Cairo wall-clock text.
+ */
+async function bulkInsert(
+  client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  table: string,
+  columns: {
+    name: string;
+    type: "text" | "boolean" | "integer" | "numeric" | "date" | "text[]" | "cairo_ts";
+  }[],
+  rows: unknown[][],
+) {
+  const CHUNK = 2000;
+  const paramType = (type: string) => (type === "text[]" || type === "cairo_ts" ? "text" : type);
+  const selectExpr = (type: string, column: string) =>
+    type === "text[]"
+      ? `COALESCE(string_to_array(NULLIF(${column}, ''), ','), '{}')`
+      : type === "cairo_ts"
+        ? `(NULLIF(${column}, '')::timestamp AT TIME ZONE '${BUSINESS_TIME_ZONE}')`
+        : column;
+  for (let offset = 0; offset < rows.length; offset += CHUNK) {
+    const chunk = rows.slice(offset, offset + CHUNK);
+    await client.query(
+      `INSERT INTO ${table} (${columns.map((column) => column.name).join(", ")})
+       SELECT ${columns.map((column, index) => selectExpr(column.type, `c${index}`)).join(", ")}
+         FROM unnest(${columns.map((column, index) => `$${index + 1}::${paramType(column.type)}[]`).join(", ")})
+           AS u(${columns.map((_, index) => `c${index}`).join(", ")})`,
+      columns.map((_, index) => chunk.map((row) => row[index] ?? null)),
+    );
+  }
+}
+
+export interface ClosedLoopRefreshSummary {
+  metaAds: number;
+  metaCreatives: number;
+  metaAssets: number;
+  crmRecords: number;
+  saleOrders: number;
+  saleOrdersPreserved: boolean;
+  outcomes: number;
+  acquisitionIdentities: number;
+  links: number;
+  primaryLinks: number;
+  exactLinks: number;
+  inferredLinks: number;
+  ambiguousLinks: number;
+  errors: string[];
+  durationMs: number;
+}
+
+let refreshing: Promise<ClosedLoopRefreshSummary> | null = null;
+
+/** Rebuilds the identity graph. Idempotent; concurrent calls share one run. */
+export function refreshClosedLoop(): Promise<ClosedLoopRefreshSummary> {
+  refreshing ??= runRefresh().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+async function runRefresh(): Promise<ClosedLoopRefreshSummary> {
+  const started = Date.now();
+  await ensureClosedLoopSchema();
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO closed_loop_refresh_state (id, started_at, status) VALUES (1, now(), 'running')
+     ON CONFLICT (id) DO UPDATE SET started_at = now(), status = 'running'`,
+  );
+  const errors: string[] = [];
+  try {
+    const [graph, crm, sales, invoices] = await Promise.all([
+      loadMetaGraph(),
+      loadCrmRecords(),
+      loadSaleOrders(),
+      loadPaidInvoiceLines(errors),
+    ]);
+    if (sales.error) errors.push(`sale orders: ${sales.error}`);
+
+    let orders = sales.orders;
+    if (!orders) {
+      // Keep the last good order links rather than wiping revenue on an Odoo outage.
+      orders = (
+        await pool.query<Row>(
+          `SELECT sale_order_id, sale_order_name, opportunity_id, state FROM crm_sale_order_links`,
+        )
+      ).rows.map((row) => ({
+        orderId: s(row.sale_order_id),
+        orderName: s(row.sale_order_name),
+        opportunityId: s(row.opportunity_id),
+        state: s(row.state),
+      }));
+    }
+
+    const ordersByOpportunity = new Map<string, SaleOrderLink[]>();
+    for (const order of orders) {
+      const list = ordersByOpportunity.get(order.opportunityId) ?? [];
+      list.push(order);
+      ordersByOpportunity.set(order.opportunityId, list);
+    }
+    const invoicesByOrder = new Map<string, PaidInvoiceLine[]>();
+    for (const line of invoices) {
+      const list = invoicesByOrder.get(line.orderName) ?? [];
+      list.push(line);
+      invoicesByOrder.set(line.orderName, list);
+    }
+    const outcomes = crm.map((record) => {
+      const own = ordersByOpportunity.get(record.id) ?? [];
+      const lines = own.flatMap((order) => invoicesByOrder.get(order.orderName) ?? []);
+      return { record, outcome: crmOutcome(record, own, lines) };
+    });
+
+    const identities = await loadAcquisitionIdentities(crm);
+    const links = linkAcquisitionsToCrm(identities, crm);
+    const assets: CreativeAsset[] = [];
+    for (const row of graph) {
+      if (!row.creativeId) continue;
+      assets.push(
+        ...creativeAssets({
+          creativeId: row.creativeId,
+          adId: row.adId,
+          videoId: row.videoId,
+          imageHash: row.imageHash,
+          imageUrl: row.imageUrl,
+          thumbnailUrl: row.thumbnailUrl,
+          feedAssets: row.feedAssets,
+        }),
+      );
+    }
+    for (const row of graph) {
+      if (!row.creativeId) continue;
+      const text = [
+        ...row.assetMetadata.titles.map((value) => ["title", value] as const),
+        ...row.assetMetadata.bodies.map((value) => ["body", value] as const),
+        ...row.assetMetadata.linkUrls.map((value) => ["link_url", value] as const),
+      ];
+      for (const [type, value] of text) {
+        assets.push({
+          creativeId: row.creativeId,
+          adId: row.adId,
+          assetType: type as CreativeAsset["assetType"],
+          assetId: `text:${createHash("sha1").update(value).digest("hex").slice(0, 16)}`,
+          videoId: "",
+          imageHash: "",
+          assetUrl: type === "link_url" ? value : "",
+          thumbnailUrl: "",
+          attributionLevel: "metadata",
+          assetText: type === "link_url" ? "" : value.slice(0, 500),
+        });
+      }
+    }
+    const uniqueAssets = [
+      ...new Map(
+        assets.map((asset) => [`${asset.creativeId}|${asset.assetType}|${asset.assetId}`, asset]),
+      ).values(),
+    ];
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "TRUNCATE meta_entity_graph, meta_creative_assets, crm_lead_outcomes, acquisition_crm_links",
+      );
+      await bulkInsert(
+        client,
+        "meta_entity_graph",
+        [
+          { name: "ad_id", type: "text" },
+          { name: "ad_name", type: "text" },
+          { name: "account_id", type: "text" },
+          { name: "campaign_id", type: "text" },
+          { name: "campaign_name", type: "text" },
+          { name: "adset_id", type: "text" },
+          { name: "adset_name", type: "text" },
+          { name: "creative_id", type: "text" },
+          { name: "creative_name", type: "text" },
+          { name: "media_type", type: "text" },
+          { name: "headline", type: "text" },
+          { name: "thumbnail_url", type: "text" },
+          { name: "image_url", type: "text" },
+          { name: "video_id", type: "text" },
+          { name: "image_hash", type: "text" },
+          { name: "effective_object_story_id", type: "text" },
+          { name: "source_post_id", type: "text" },
+          { name: "landing_page_url", type: "text" },
+          { name: "permalink_url", type: "text" },
+          { name: "lead_form_id", type: "text" },
+          { name: "page_id", type: "text" },
+        ],
+        graph.map((row) => [
+          row.adId,
+          row.adName,
+          row.accountId,
+          row.campaignId,
+          row.campaignName,
+          row.adsetId,
+          row.adsetName,
+          row.creativeId,
+          row.creativeName,
+          row.mediaType,
+          row.headline,
+          row.thumbnailUrl,
+          row.imageUrl,
+          row.videoId,
+          row.imageHash,
+          row.effectiveObjectStoryId,
+          row.sourcePostId,
+          row.landingPageUrl,
+          row.permalinkUrl,
+          row.leadFormId,
+          row.pageId,
+        ]),
+      );
+      await bulkInsert(
+        client,
+        "meta_creative_assets",
+        [
+          { name: "creative_id", type: "text" },
+          { name: "ad_id", type: "text" },
+          { name: "asset_type", type: "text" },
+          { name: "asset_id", type: "text" },
+          { name: "video_id", type: "text" },
+          { name: "image_hash", type: "text" },
+          { name: "asset_url", type: "text" },
+          { name: "thumbnail_url", type: "text" },
+          { name: "attribution_level", type: "text" },
+          { name: "asset_text", type: "text" },
+        ],
+        uniqueAssets.map((asset) => [
+          asset.creativeId,
+          asset.adId,
+          asset.assetType,
+          asset.assetId,
+          asset.videoId,
+          asset.imageHash,
+          asset.assetUrl,
+          asset.thumbnailUrl,
+          asset.attributionLevel,
+          asset.assetText ?? "",
+        ]),
+      );
+      if (sales.orders) {
+        await client.query("TRUNCATE crm_sale_order_links");
+        await bulkInsert(
+          client,
+          "crm_sale_order_links",
+          [
+            { name: "sale_order_id", type: "text" },
+            { name: "sale_order_name", type: "text" },
+            { name: "opportunity_id", type: "text" },
+            { name: "state", type: "text" },
+            { name: "date_order", type: "cairo_ts" },
+          ],
+          (sales.orders as (SaleOrderLink & { dateOrder: string })[]).map((order) => [
+            order.orderId,
+            order.orderName,
+            order.opportunityId,
+            order.state,
+            cairoInstant(order.dateOrder),
+          ]),
+        );
+      }
+      await bulkInsert(
+        client,
+        "crm_lead_outcomes",
+        [
+          { name: "crm_lead_id", type: "text" },
+          { name: "record_type", type: "text" },
+          { name: "business_status", type: "text" },
+          { name: "stage_key", type: "text" },
+          { name: "salesperson", type: "text" },
+          { name: "sales_team", type: "text" },
+          { name: "course", type: "text" },
+          { name: "source", type: "text" },
+          { name: "facebook_lead_id", type: "text" },
+          { name: "ad_id", type: "text" },
+          { name: "crm_campaign_id", type: "text" },
+          { name: "created_at", type: "cairo_ts" },
+          { name: "won_at", type: "cairo_ts" },
+          { name: "interested", type: "boolean" },
+          { name: "qualified", type: "boolean" },
+          { name: "quotation", type: "boolean" },
+          { name: "won", type: "boolean" },
+          { name: "lost", type: "boolean" },
+          { name: "sale_order_ids", type: "text[]" },
+          { name: "invoice_count", type: "integer" },
+          { name: "revenue_paid_usd", type: "numeric" },
+          { name: "first_invoice_at", type: "date" },
+        ],
+        outcomes.map(({ record, outcome }) => [
+          record.id,
+          record.recordType,
+          record.businessStatus,
+          record.stageKey,
+          s(record.salesperson),
+          s(record.sales_team),
+          s(record.course),
+          s(record.source),
+          record.facebookLeadId,
+          record.adId,
+          record.campaignId,
+          cairoInstant(record.createdAt),
+          cairoInstant(s(record.won_at)),
+          outcome.interested,
+          outcome.qualified,
+          outcome.quotation,
+          outcome.won,
+          outcome.lost,
+          outcome.saleOrderIds.join(","),
+          outcome.invoiceCount,
+          outcome.revenuePaidUsd,
+          outcome.firstInvoiceAt || null,
+        ]),
+      );
+      await bulkInsert(
+        client,
+        "acquisition_crm_links",
+        [
+          { name: "acquisition_event_id", type: "text" },
+          { name: "crm_lead_id", type: "text" },
+          { name: "crm_opportunity_id", type: "text" },
+          { name: "chatwoot_conversation_id", type: "text" },
+          { name: "chatwoot_contact_id", type: "text" },
+          { name: "provider_lead_id", type: "text" },
+          { name: "landing_submission_id", type: "text" },
+          { name: "match_method", type: "text" },
+          { name: "match_confidence", type: "text" },
+          { name: "is_primary", type: "boolean" },
+          { name: "ambiguity_reason", type: "text" },
+        ],
+        links.map((link) => [
+          link.acquisitionEventId,
+          link.crmLeadId,
+          link.crmOpportunityId,
+          link.chatwootConversationId,
+          link.chatwootContactId,
+          link.providerLeadId,
+          link.landingSubmissionId,
+          link.matchMethod,
+          link.matchConfidence,
+          link.isPrimary,
+          link.ambiguityReason ?? "",
+        ]),
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const summary: ClosedLoopRefreshSummary = {
+      metaAds: graph.length,
+      metaCreatives: new Set(graph.map((row) => row.creativeId).filter(Boolean)).size,
+      metaAssets: uniqueAssets.length,
+      crmRecords: crm.length,
+      saleOrders: orders.length,
+      saleOrdersPreserved: !sales.orders,
+      outcomes: outcomes.length,
+      acquisitionIdentities: identities.length,
+      links: links.length,
+      primaryLinks: links.filter((link) => link.isPrimary).length,
+      exactLinks: links.filter((link) => link.isPrimary && link.matchConfidence === "exact").length,
+      inferredLinks: links.filter((link) => link.isPrimary && link.matchConfidence === "inferred")
+        .length,
+      ambiguousLinks: new Set(
+        links
+          .filter((link) => link.matchConfidence === "ambiguous")
+          .map((link) => link.acquisitionEventId),
+      ).size,
+      errors,
+      durationMs: Date.now() - started,
+    };
+    // Leads the CRM holds without an ad ID wait for an exact lookup by lead ID.
+    await import("./meta-leadgen.server")
+      .then((module) => module.queueCrmMetaLeadsWithoutAdId())
+      .catch(() => undefined);
+    await pool.query(
+      `UPDATE closed_loop_refresh_state
+          SET finished_at = now(), status = $1, summary = $2::jsonb, last_error = $3 WHERE id = 1`,
+      [errors.length ? "partial" : "ok", JSON.stringify(summary), errors.join("; ")],
+    );
+    cache.clear();
+    return summary;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await pool
+      .query(
+        `UPDATE closed_loop_refresh_state SET finished_at = now(), status = 'failed', last_error = $1 WHERE id = 1`,
+        [message.slice(0, 1000)],
+      )
+      .catch(() => {});
+    throw error;
+  }
+}
+
+export async function closedLoopRefreshState() {
+  await ensureClosedLoopSchema();
+  const row = (await getPool().query<Row>(`SELECT * FROM closed_loop_refresh_state WHERE id = 1`))
+    .rows[0];
+  return row
+    ? {
+        status: s(row.status),
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+        summary: row.summary,
+        lastError: s(row.last_error),
+      }
+    : { status: "never", startedAt: null, finishedAt: null, summary: null, lastError: "" };
+}
+
+let worker: ReturnType<typeof setInterval> | null = null;
+
+/** Refreshes shortly after boot and then on an interval (CLOSED_LOOP_REFRESH_MINUTES, 0 disables). */
+export function startClosedLoopWorker() {
+  if (worker || !acquisitionDatabaseConfigured()) return;
+  const minutes = Number(process.env.CLOSED_LOOP_REFRESH_MINUTES ?? 30);
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+  const run = () =>
+    refreshClosedLoop().catch((error) =>
+      console.error(
+        "[closed-loop] refresh failed:",
+        error instanceof Error ? error.message : error,
+      ),
+    );
+  // Migrate at boot: readers of the acquisition layer depend on these columns.
+  ensureClosedLoopSchema().catch((error) =>
+    console.error(
+      "[closed-loop] schema migration failed:",
+      error instanceof Error ? error.message : error,
+    ),
+  );
+  setTimeout(run, 90_000).unref?.();
+  worker = setInterval(run, minutes * 60_000);
+  worker.unref?.();
+
+  // Incremental catalog reconciliation: new ads, old-schema rows and rows not
+  // re-read for a week. Bounded per run; a full historical pass is an admin POST.
+  const reconcileHours = Number(process.env.META_CATALOG_RECONCILE_HOURS ?? 6);
+  if (Number.isFinite(reconcileHours) && reconcileHours > 0) {
+    const reconcile = () =>
+      import("./meta-catalog-reconcile.server")
+        .then(({ runMetaCatalogReconcile }) => runMetaCatalogReconcile({ maxAds: 400 }))
+        .then((summary) => (summary.fetched > 0 ? refreshClosedLoop() : undefined))
+        .catch((error) =>
+          console.error(
+            "[catalog-reconcile] scheduled run failed:",
+            error instanceof Error ? error.message : error,
+          ),
+        );
+    setTimeout(reconcile, 5 * 60_000).unref?.();
+    setInterval(reconcile, reconcileHours * 3_600_000).unref?.();
+  }
+}
+
+/* --- read model -------------------------------------------------------------- */
+
+const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+const CACHE_TTL_MS = 60_000;
+
+function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as Promise<T>;
+  const value = compute();
+  cache.set(key, { at: Date.now(), value });
+  value.catch(() => cache.delete(key));
+  return value;
+}
+
+function businessToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function resolveRange(from?: string, to?: string) {
+  const end = to && DATE.test(to) ? to : businessToday();
+  const start = from && DATE.test(from) ? from : `${end.slice(0, 7)}-01`;
+  return start <= end ? { from: start, to: end } : { from: end, to: start };
+}
+
+interface FactRecord extends AcquisitionFactRow {
+  sourceType: string;
+  occurredAt: string;
+  crmLeadId: string;
+  matchMethod: string;
+  stageKey: string;
+  businessStatus: string;
+  salesTeam: string;
+  source: string;
+  wonAt: string;
+  mediaThumbnail: string;
+}
+
+async function loadFacts(range: { from: string; to: string }): Promise<FactRecord[]> {
+  const { cte } = await eventsCte();
+  if (!cte) return [];
+  const { sql, params } = where(range);
+  const result = await getPool().query<Row>(
+    `${cte}
+     SELECT e.acquisition_event_id, e.entity_type, e.destination_channel, e.source_platform, e.source_type,
+            e.attribution_confidence, e.campaign_id, e.campaign_name, e.adset_id, e.adset_name,
+            e.ad_id, e.ad_name, e.creative_id, e.creative_name, e.form_id, e.landing_page_id,
+            to_char(e.occurred_at AT TIME ZONE '${BUSINESS_TIME_ZONE}', 'YYYY-MM-DD HH24:MI') AS occurred_at,
+            l.crm_lead_id, l.match_method, l.match_confidence,
+            o.stage_key, o.business_status, o.salesperson, o.sales_team, o.course, o.source,
+            to_char(o.won_at AT TIME ZONE '${BUSINESS_TIME_ZONE}', 'YYYY-MM-DD') AS won_at,
+            o.interested, o.qualified, o.quotation, o.won, o.lost, o.sale_order_ids,
+            o.invoice_count, o.revenue_paid_usd, to_char(o.first_invoice_at, 'YYYY-MM-DD') AS first_invoice_at
+       FROM (SELECT * FROM acquisition_events ${sql}) e
+       LEFT JOIN acquisition_crm_links l ON l.acquisition_event_id = e.acquisition_event_id AND l.is_primary
+       LEFT JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+      WHERE e.entity_type IN ('meta_lead','chatwoot_conversation','landing_submission')`,
+    params,
+  );
+  return result.rows.map((row) => {
+    const linked =
+      Boolean(s(row.crm_lead_id)) && row.interested !== null && row.interested !== undefined;
+    const outcome: CrmOutcome | null = linked
+      ? {
+          crmLeadId: s(row.crm_lead_id),
+          interested: row.interested === true,
+          qualified: row.qualified === true,
+          quotation: row.quotation === true,
+          won: row.won === true,
+          lost: row.lost === true,
+          saleOrderIds: Array.isArray(row.sale_order_ids) ? (row.sale_order_ids as string[]) : [],
+          invoiceCount: n(row.invoice_count),
+          revenuePaidUsd: n(row.revenue_paid_usd),
+          firstInvoiceAt: s(row.first_invoice_at).slice(0, 10),
+        }
+      : null;
+    const confidence = s(row.attribution_confidence);
+    return {
+      acquisitionEventId: s(row.acquisition_event_id),
+      entityType: s(row.entity_type),
+      destinationChannel: s(row.destination_channel),
+      sourcePlatform: s(row.source_platform),
+      sourceType: s(row.source_type),
+      attributionConfidence: (["exact", "declared", "inferred"].includes(confidence)
+        ? confidence
+        : confidence === "strong"
+          ? "declared"
+          : "unknown") as AttributionConfidence,
+      campaignId: s(row.campaign_id),
+      campaignName: s(row.campaign_name),
+      adsetId: s(row.adset_id),
+      adsetName: s(row.adset_name),
+      adId: s(row.ad_id),
+      adName: s(row.ad_name),
+      creativeId: s(row.creative_id),
+      creativeName: readableCreativeName(s(row.creative_name)),
+      formId: s(row.form_id),
+      landingPageId: s(row.landing_page_id),
+      course: s(row.course),
+      salesperson: s(row.salesperson),
+      matchConfidence: (linked ? s(row.match_confidence) : "") as MatchConfidence | "",
+      outcome,
+      occurredAt: s(row.occurred_at),
+      crmLeadId: linked ? s(row.crm_lead_id) : "",
+      matchMethod: linked ? s(row.match_method) : "",
+      stageKey: s(row.stage_key),
+      businessStatus: s(row.business_status),
+      salesTeam: s(row.sales_team),
+      source: s(row.source),
+      wonAt: s(row.won_at),
+      mediaThumbnail: "",
+    };
+  });
+}
+
+async function loadSpend(range: { from: string; to: string }): Promise<SpendRow[]> {
+  const result = await getPool().query<Row>(
+    `SELECT r.row_data->>'__ad_id' AS ad_id,
+            COALESCE(NULLIF(r.row_data->>'__campaign_id',''), g.campaign_id, '') AS campaign_id,
+            COALESCE(NULLIF(r.row_data->>'__adset_id',''), g.adset_id, '') AS adset_id,
+            COALESCE(NULLIF(r.row_data->>'__creative_id',''), g.creative_id, '') AS creative_id,
+            sum(${numericCell("Spend (Cost)")}) AS spend,
+            sum(${numericCell("Impressions")}) AS impressions,
+            sum(${numericCell("Link Clicks")}) AS clicks
+       FROM dashboard_rows r
+       LEFT JOIN meta_entity_graph g ON g.ad_id = r.row_data->>'__ad_id'
+      WHERE r.dataset = 'meta_ads' AND COALESCE(r.row_data->>'__ad_id','') <> ''${adRowsWhere(range).replaceAll("row_data", "r.row_data").replaceAll("record_date", "r.record_date")}
+      GROUP BY 1,2,3,4`,
+  );
+  return result.rows.map((row) => ({
+    adId: s(row.ad_id),
+    campaignId: s(row.campaign_id),
+    adsetId: s(row.adset_id),
+    creativeId: s(row.creative_id),
+    spend: n(row.spend),
+    impressions: n(row.impressions),
+    clicks: n(row.clicks),
+  }));
+}
+
+/** What each upstream source can and cannot currently supply. Counts only. */
+async function loadSourceStatus() {
+  const pool = getPool();
+  const table = async (name: string) =>
+    Boolean((await pool.query<Row>(`SELECT to_regclass($1) AS t`, [`public.${name}`])).rows[0]?.t);
+  const [events, reconcile] = await Promise.all([
+    table("meta_message_attribution_events"),
+    table("meta_catalog_reconcile_state"),
+  ]);
+  const [messaging, adsSync, reconciled] = await Promise.all([
+    events
+      ? pool.query<Row>(
+          `SELECT count(*) FILTER (WHERE status = 'resolved')::int AS resolved FROM meta_message_attribution_events`,
+        )
+      : Promise.resolve({ rows: [{ resolved: 0 }] as Row[] }),
+    pool.query<Row>(
+      `SELECT dataset, synced_at,
+              to_char((synced_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date, 'YYYY-MM-DD') AS through
+         FROM dashboard_sync_state WHERE dataset IN ('meta_ads', 'crm')`,
+    ),
+    reconcile
+      ? pool.query<Row>(`SELECT finished_at FROM meta_catalog_reconcile_state WHERE id = 1`)
+      : Promise.resolve({ rows: [] as Row[] }),
+  ]);
+  const syncRow = (dataset: string) => adsSync.rows.find((row) => s(row.dataset) === dataset);
+  const crmSyncedAt = syncRow("crm")?.synced_at;
+  return {
+    messagingResolved: n(messaging.rows[0]?.resolved),
+    metaAdsSyncedThrough: s(syncRow("meta_ads")?.through),
+    crmSyncedAt:
+      crmSyncedAt instanceof Date ? crmSyncedAt.toISOString() : crmSyncedAt ? s(crmSyncedAt) : null,
+    catalogReconciledAt: reconciled.rows[0]?.finished_at ?? null,
+    leadAdsTokenConfigured: Boolean(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim()),
+  };
+}
+
+const DIMENSIONS = [
+  "platform",
+  "campaign",
+  "adset",
+  "ad",
+  "creative",
+  "form",
+  "landing_page",
+  "course",
+  "salesperson",
+] as const;
+type Dimension = (typeof DIMENSIONS)[number];
+
+function dimensionValue(fact: FactRecord, dimension: Dimension): { key: string; label: string } {
+  switch (dimension) {
+    case "platform":
+      return { key: fact.sourcePlatform || "unknown", label: fact.sourcePlatform || "unknown" };
+    case "campaign":
+      return fact.attributionConfidence === "exact" && fact.campaignId
+        ? { key: fact.campaignId, label: fact.campaignName || fact.campaignId }
+        : { key: "", label: "" };
+    case "adset":
+      return fact.attributionConfidence === "exact" && fact.adsetId
+        ? { key: fact.adsetId, label: fact.adsetName || fact.adsetId }
+        : { key: "", label: "" };
+    case "ad":
+      return fact.attributionConfidence === "exact" && fact.adId
+        ? { key: fact.adId, label: fact.adName || fact.adId }
+        : { key: "", label: "" };
+    case "creative":
+      return fact.attributionConfidence === "exact" && fact.creativeId
+        ? { key: fact.creativeId, label: fact.creativeName || fact.creativeId }
+        : { key: "", label: "" };
+    case "form":
+      return { key: fact.formId, label: fact.formId };
+    case "landing_page":
+      return { key: fact.landingPageId, label: fact.landingPageId };
+    case "course":
+      return fact.outcome
+        ? { key: fact.course || "—", label: fact.course || "—" }
+        : { key: "", label: "" };
+    case "salesperson":
+      return fact.outcome
+        ? { key: fact.salesperson || "—", label: fact.salesperson || "—" }
+        : { key: "", label: "" };
+  }
+}
+
+function coverageByType(facts: readonly FactRecord[]) {
+  const groups: Record<string, FactRecord[]> = {
+    meta_instant_form: [],
+    whatsapp: [],
+    messenger: [],
+    instagram: [],
+    website_chat: [],
+    landing_submission: [],
+  };
+  for (const fact of facts) {
+    if (fact.entityType === "meta_lead") groups.meta_instant_form.push(fact);
+    else if (fact.entityType === "landing_submission") groups.landing_submission.push(fact);
+    else if (fact.destinationChannel === "instagram_dm") groups.instagram.push(fact);
+    else if (fact.destinationChannel in groups) groups[fact.destinationChannel].push(fact);
+  }
+  return Object.entries(groups).map(([type, rows]) => ({ type, ...coverageOf(rows) }));
+}
+
+interface RevenueAuthority {
+  /** Accounting USD (FX authority) per CRM record, every payment date, through the exact order link. */
+  byLead: Map<string, { usd: number; invoices: Set<string>; firstPaidAt: string }>;
+  /** Every Accounting line whose payment date is in the window, with its linked CRM record if any. */
+  paymentWindow: { usd: number; crmLeadId: string }[];
+  linksAvailable: boolean;
+}
+
+/**
+ * Paid revenue for the closed loop comes from the Accounting authority — the
+ * same deduplicated, FX-recalculated rows the Accounting page totals — joined
+ * only through `crm_sale_order_links` (sale order → opportunity). Attribution
+ * decides which CRM record is credited; it never creates money.
+ */
+async function loadRevenueAuthority(
+  range: { from: string; to: string },
+  fxFilters: { fxEgp?: string; fxSar?: string },
+): Promise<RevenueAuthority> {
+  const [
+    { loadAllData },
+    { accountingUsdPaid, fxRatesFromFilters },
+    { accountingReportingDate },
+    { isExcludedFromSalesRevenue },
+  ] = await Promise.all([
+    import("./sheet-cache.server"),
+    import("./fx-rates"),
+    import("./accounting-policy"),
+    import("./sales-revenue-policy"),
+  ]);
+  const [snapshot, links] = await Promise.all([
+    loadAllData(),
+    getPool().query<Row>(`SELECT sale_order_name, opportunity_id FROM crm_sale_order_links`),
+  ]);
+  const fx = fxRatesFromFilters(fxFilters);
+  const opportunityByOrder = new Map<string, string>();
+  const conflicting = new Set<string>();
+  for (const row of links.rows) {
+    const order = s(row.sale_order_name);
+    const opportunity = s(row.opportunity_id);
+    if (!order || !opportunity) continue;
+    const previous = opportunityByOrder.get(order);
+    if (previous && previous !== opportunity) conflicting.add(order);
+    else opportunityByOrder.set(order, opportunity);
+  }
+  // An order name that points at two opportunities is not a deterministic link.
+  for (const order of conflicting) opportunityByOrder.delete(order);
+
+  const byLead: RevenueAuthority["byLead"] = new Map();
+  const paymentWindow: RevenueAuthority["paymentWindow"] = [];
+  for (const row of snapshot.accounting) {
+    const usd = isExcludedFromSalesRevenue(row) ? 0 : accountingUsdPaid(row, fx);
+    const crmLeadId = row.orderRef ? (opportunityByOrder.get(row.orderRef.trim()) ?? "") : "";
+    if (crmLeadId) {
+      const entry = byLead.get(crmLeadId) ?? {
+        usd: 0,
+        invoices: new Set<string>(),
+        firstPaidAt: "",
+      };
+      entry.usd += usd;
+      if (!row.isCreditNote) {
+        if (row.movement) entry.invoices.add(row.movement);
+        if (row.paymentDate && (!entry.firstPaidAt || row.paymentDate < entry.firstPaidAt))
+          entry.firstPaidAt = row.paymentDate;
+      }
+      byLead.set(crmLeadId, entry);
+    }
+    const date = accountingReportingDate(row, "payment");
+    if (date && date >= range.from && date <= range.to) paymentWindow.push({ usd, crmLeadId });
+  }
+  return { byLead, paymentWindow, linksAvailable: links.rows.length > 0 };
+}
+
+function applyRevenueAuthority(facts: FactRecord[], authority: RevenueAuthority): void {
+  for (const fact of facts) {
+    if (!fact.outcome) continue;
+    const revenue = authority.byLead.get(fact.crmLeadId);
+    fact.outcome.revenuePaidUsd = revenue ? Math.round(revenue.usd * 100) / 100 : 0;
+    fact.outcome.invoiceCount = revenue?.invoices.size ?? 0;
+    fact.outcome.firstInvoiceAt = revenue?.firstPaidAt ?? "";
+  }
+}
+
+/** How each CRM record is attributed, across all time: exact Meta, inferred with a campaign, or none. */
+async function loadAttributionByLead(): Promise<Map<string, RevenueAttribution>> {
+  const pool = getPool();
+  const conversations = Boolean(
+    (await pool.query<Row>(`SELECT to_regclass('public.chatwoot_conversation_attribution') AS t`))
+      .rows[0]?.t,
+  );
+  const result = await pool.query<Row>(
+    `SELECT l.crm_lead_id,
+            bool_or(l.match_confidence = 'exact' AND g.ad_id IS NOT NULL) AS exact,
+            ${conversations ? "bool_or(l.match_confidence = 'inferred' AND COALESCE(c.campaign_id, '') <> '')" : "false"} AS inferred
+       FROM acquisition_crm_links l
+       JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+       LEFT JOIN meta_entity_graph g ON o.ad_id <> '' AND g.ad_id = o.ad_id
+       ${
+         conversations
+           ? "LEFT JOIN chatwoot_conversation_attribution c ON l.chatwoot_conversation_id <> '' AND c.conversation_id::text = l.chatwoot_conversation_id"
+           : ""
+       }
+      WHERE l.is_primary
+      GROUP BY l.crm_lead_id`,
+  );
+  const map = new Map<string, RevenueAttribution>();
+  for (const row of result.rows) {
+    if (row.exact === true) map.set(s(row.crm_lead_id), "exact");
+    else if (row.inferred === true) map.set(s(row.crm_lead_id), "inferred");
+  }
+  return map;
+}
+
+async function loadCohortLeadIds(range: { from: string; to: string }): Promise<string[]> {
+  const result = await getPool().query<Row>(
+    `SELECT crm_lead_id FROM crm_lead_outcomes
+      WHERE (created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date BETWEEN $1::date AND $2::date`,
+    [range.from, range.to],
+  );
+  return result.rows.map((row) => s(row.crm_lead_id));
+}
+
+/** Selected-scope figures from the generalized engine (metrics.server), platform by platform. */
+async function loadScopeTotals(
+  range: { from: string; to: string },
+  scope: ManagementScope,
+  fxFilters: { fxEgp?: string; fxSar?: string },
+) {
+  const { getFiltered, computeTotals } = await import("./metrics.server");
+  const base = { from: range.from, to: range.to, fxEgp: fxFilters.fxEgp, fxSar: fxFilters.fxSar };
+  const scoped = await getFiltered({
+    ...base,
+    platform: scope.kind === "platform" ? scope.platform : undefined,
+    channel: scope.kind === "organic" ? "organic" : undefined,
+  });
+  const totals = computeTotals(scoped);
+  const platforms = await Promise.all(
+    PLATFORMS.map(async (platform) => {
+      const data =
+        scope.kind === "platform" && scope.platform === platform
+          ? scoped
+          : await getFiltered({ ...base, platform });
+      const platformTotals = computeTotals(data);
+      const health = data.snapshot.health.platformSources?.[platform];
+      return {
+        platform,
+        spend: platformTotals.spend,
+        adRows: data.ads.length,
+        sourceHealthy: !health || !health.configured || health.ok,
+        crmLeads: platformTotals.totalLeads,
+      };
+    }),
+  );
+  const uniqueIds = (rows: { id: string }[]) => {
+    const ids = new Set<string>();
+    let anonymous = 0;
+    for (const row of rows) {
+      if (row.id) ids.add(row.id);
+      else anonymous += 1;
+    }
+    return ids.size + anonymous;
+  };
+  return {
+    spend: scopeSpend(scope, platforms),
+    platformLeads: totals.platformLeads,
+    uniqueCrmLeads: uniqueIds([...scoped.crm, ...scoped.lost]),
+    uniqueWonCustomers: uniqueIds(scoped.crm.filter((row) => row.isWon)),
+    collectedRevenue: Math.round(totals.revenue * 100) / 100,
+    scopeLabel:
+      scope.kind === "all"
+        ? { en: "All channels", ar: "كل القنوات" }
+        : scope.kind === "organic"
+          ? { en: "Organic", ar: "أورجانيك" }
+          : PLATFORM_LABEL[scope.platform],
+  };
+}
+
+export interface ClosedLoopFilters {
+  from?: string;
+  to?: string;
+  platform?: string;
+  channel?: string;
+  fxEgp?: string;
+  fxSar?: string;
+}
+
+export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
+  if (!acquisitionDatabaseConfigured()) return { configured: false as const };
+  const range = resolveRange(filters.from, filters.to);
+  const scope = managementScopeFrom(filters);
+  const exactOk = exactAttributionAvailable(scope);
+  const fxFilters = { fxEgp: filters.fxEgp, fxSar: filters.fxSar };
+  const cacheKey = [
+    "closed-loop",
+    range.from,
+    range.to,
+    scopeKey(scope),
+    filters.fxEgp ?? "",
+    filters.fxSar ?? "",
+  ].join("|");
+  return cached(cacheKey, async () => {
+    await ensureClosedLoopSchema();
+    const pool = getPool();
+    const [
+      allFacts,
+      allSpend,
+      graphRows,
+      catalog,
+      refresh,
+      crmTotals,
+      sources,
+      authority,
+      attributionByLead,
+      cohortLeadIds,
+      scopeTotals,
+    ] = await Promise.all([
+      loadFacts(range),
+      loadSpend(range),
+      pool.query<Row>(
+        `SELECT DISTINCT ON (creative_id) creative_id, creative_name, media_type, headline, thumbnail_url,
+                image_url, video_id, landing_page_url, permalink_url
+           FROM meta_entity_graph WHERE creative_id <> '' ORDER BY creative_id, (thumbnail_url <> '') DESC`,
+      ),
+      pool.query<Row>(
+        `SELECT count(DISTINCT campaign_id) FILTER (WHERE campaign_id <> '')::int AS campaigns,
+                count(DISTINCT adset_id) FILTER (WHERE adset_id <> '')::int AS adsets,
+                count(*)::int AS ads,
+                count(DISTINCT creative_id) FILTER (WHERE creative_id <> '')::int AS creatives,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type IN ('video','image')) AS assets,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'video') AS video_assets,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'image') AS image_assets,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE asset_type = 'image' AND (asset_url <> '' OR thumbnail_url <> '')) AS image_assets_with_url,
+                (SELECT count(*)::int FROM meta_creative_assets WHERE attribution_level = 'metadata') AS copy_variations,
+                count(*) FILTER (WHERE lead_form_id <> '')::int AS ads_with_form,
+                count(DISTINCT lead_form_id) FILTER (WHERE lead_form_id <> '')::int AS forms
+           FROM meta_entity_graph`,
+      ),
+      closedLoopRefreshState(),
+      pool.query<Row>(
+        `SELECT count(*)::int AS crm_records,
+                count(*) FILTER (WHERE (created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date BETWEEN $1::date AND $2::date)::int AS crm_created_in_period,
+                count(*) FILTER (WHERE facebook_lead_id <> '')::int AS with_facebook_lead_id,
+                (SELECT count(*)::int FROM crm_sale_order_links) AS sale_orders_linked
+           FROM crm_lead_outcomes`,
+        [range.from, range.to],
+      ),
+      loadSourceStatus(),
+      loadRevenueAuthority(range, fxFilters),
+      loadAttributionByLead(),
+      loadCohortLeadIds(range),
+      loadScopeTotals(range, scope, fxFilters),
+    ]);
+
+    // Revenue comes from the Accounting authority; then everything narrows to the
+    // selected scope. Meta spend rows exist only where exact Meta attribution does,
+    // so a Snapchat/TikTok/Google/Organic selection never shows Meta rows.
+    applyRevenueAuthority(allFacts, authority);
+    const facts = allFacts.filter((fact) => acquisitionInScope(fact, scope));
+    const spend = exactOk ? allSpend : [];
+
+    const media = new Map(graphRows.rows.map((row) => [s(row.creative_id), row]));
+    const grains = Object.fromEntries(
+      CLOSED_LOOP_GRAINS.map((grain) => [grain, rollupByGrain(facts, spend, grain)]),
+    ) as Record<ClosedLoopGrain, GrainRow[]>;
+    for (const row of grains.creative) {
+      const m = media.get(row.creativeId);
+      Object.assign(row, {
+        thumbnailUrl: s(m?.thumbnail_url) || s(m?.image_url),
+        mediaType: s(m?.media_type),
+        videoId: s(m?.video_id),
+        headline: s(m?.headline),
+        creativeName: readableCreativeName(row.creativeName || s(m?.creative_name), s(m?.headline)),
+      });
+    }
+    // Names for spend-only rows come from the Meta graph, never from CRM text.
+    const graphNames = await pool.query<Row>(
+      `SELECT ad_id, ad_name, campaign_id, campaign_name, adset_id, adset_name, creative_id, creative_name FROM meta_entity_graph`,
+    );
+    const names = {
+      campaign: new Map<string, string>(),
+      adset: new Map<string, string>(),
+      ad: new Map<string, string>(),
+      creative: new Map<string, string>(),
+    };
+    const creativeIdByAd = new Map<string, string>();
+    for (const row of graphNames.rows) {
+      if (s(row.campaign_id)) names.campaign.set(s(row.campaign_id), s(row.campaign_name));
+      if (s(row.adset_id)) names.adset.set(s(row.adset_id), s(row.adset_name));
+      if (s(row.ad_id)) {
+        names.ad.set(s(row.ad_id), s(row.ad_name));
+        if (s(row.creative_id)) creativeIdByAd.set(s(row.ad_id), s(row.creative_id));
+      }
+      if (s(row.creative_id))
+        names.creative.set(s(row.creative_id), readableCreativeName(s(row.creative_name)));
+    }
+    for (const grain of CLOSED_LOOP_GRAINS) {
+      for (const row of grains[grain]) {
+        row.campaignName ||= names.campaign.get(row.campaignId) ?? "";
+        row.adsetName ||= names.adset.get(row.adsetId) ?? "";
+        row.adName ||= names.ad.get(row.adId) ?? "";
+        row.creativeName ||= names.creative.get(row.creativeId) ?? "";
+      }
+    }
+    // The materials tab reports one Ad ID per row. Attach the ad's creative
+    // preview without changing its ad-level spend, leads or sales attribution.
+    for (const row of grains.ad) {
+      // A fact-bearing ad can intentionally have no creative ID when its
+      // sources disagree. Do not fill that ambiguity from today's catalog.
+      if (!row.creativeId && row.leads === 0) row.creativeId = creativeIdByAd.get(row.adId) ?? "";
+      row.creativeName ||= names.creative.get(row.creativeId) ?? "";
+      const m = media.get(row.creativeId);
+      Object.assign(row, {
+        thumbnailUrl: s(m?.thumbnail_url) || s(m?.image_url),
+        mediaType: s(m?.media_type),
+      });
+    }
+
+    const assets = await pool.query<Row>(
+      `SELECT creative_id, asset_type, asset_id, asset_url, thumbnail_url FROM meta_creative_assets
+        WHERE asset_type IN ('video','image')`,
+    );
+    const creativeById = new Map(grains.creative.map((row) => [row.creativeId, row]));
+    const assetRows = assets.rows
+      .map((asset) => {
+        const creative = creativeById.get(s(asset.creative_id));
+        return {
+          assetType: s(asset.asset_type),
+          assetId: s(asset.asset_id),
+          assetUrl: s(asset.asset_url),
+          thumbnailUrl: s(asset.thumbnail_url),
+          creativeId: s(asset.creative_id),
+          creativeName: creative?.creativeName ?? names.creative.get(s(asset.creative_id)) ?? "",
+          attributionLevel: "reporting" as const,
+          creative: creative ?? null,
+        };
+      })
+      .filter((row) => row.creative);
+
+    const totals = emptyMetrics();
+    facts.forEach((fact) => addFact(totals, fact));
+    totals.spend = spend.reduce((sum, row) => sum + row.spend, 0);
+    totals.impressions = spend.reduce((sum, row) => sum + row.impressions, 0);
+    totals.clicks = spend.reduce((sum, row) => sum + row.clicks, 0);
+    finalizeMetrics(totals);
+    const exactTotals = emptyMetrics();
+    facts
+      .filter((fact) => fact.attributionConfidence === "exact")
+      .forEach((fact) => addFact(exactTotals, fact));
+    exactTotals.spend = grains.campaign
+      .filter((row) => row.leads > 0)
+      .reduce((sum, row) => sum + row.spend, 0);
+    finalizeMetrics(exactTotals);
+
+    const byDimension = Object.fromEntries(
+      DIMENSIONS.map((dimension) => {
+        const buckets = new Map<string, { key: string; label: string; metrics: QualityMetrics }>();
+        for (const fact of facts) {
+          const value = dimensionValue(fact, dimension);
+          if (!value.key) continue;
+          const bucket = buckets.get(value.key) ?? { ...value, metrics: emptyMetrics() };
+          addFact(bucket.metrics, fact);
+          buckets.set(value.key, bucket);
+        }
+        const spendByKey = new Map<string, number>();
+        const spendKey = {
+          campaign: "campaignId",
+          adset: "adsetId",
+          ad: "adId",
+          creative: "creativeId",
+        } as const;
+        if (dimension in spendKey) {
+          for (const row of spend) {
+            const key = row[spendKey[dimension as keyof typeof spendKey]];
+            if (key) spendByKey.set(key, (spendByKey.get(key) ?? 0) + row.spend);
+          }
+        }
+        return [
+          dimension,
+          [...buckets.values()]
+            .map((bucket) => {
+              bucket.metrics.spend = spendByKey.get(bucket.key) ?? 0;
+              finalizeMetrics(bucket.metrics);
+              return bucket;
+            })
+            .sort(
+              (a, b) => b.metrics.revenue - a.metrics.revenue || b.metrics.leads - a.metrics.leads,
+            )
+            .slice(0, 100),
+        ];
+      }),
+    );
+
+    const coverage = coverageOf(facts);
+    const metaLeads = facts.filter((fact) => fact.entityType === "meta_lead");
+    const metaCoverage = coverageOf(metaLeads);
+    const conversations = facts.filter((fact) => fact.entityType === "chatwoot_conversation");
+    const trackedSpend = exactTotals.spend;
+    const exactFacts = facts.filter((fact) => fact.attributionConfidence === "exact");
+    const exactMatched = exactFacts.filter(
+      (fact) => fact.outcome && fact.matchConfidence === "exact",
+    );
+    const kpis = closedLoopKpis({
+      all: totals,
+      tracked: exactTotals,
+      totalSpend: totals.spend,
+      trackedSpend,
+      // A period with no Meta rows is zero only if Meta was synced after it ended.
+      spendSynced: allSpend.length > 0 || sources.metaAdsSyncedThrough >= range.to,
+      crmSynced: Boolean(refresh.finishedAt),
+      scope,
+      metaEvents: allFacts.filter((fact) =>
+        acquisitionInScope(fact, { kind: "platform", platform: "meta" }),
+      ).length,
+      exactUniqueLeads: new Set(exactMatched.map((fact) => fact.crmLeadId)).size,
+      exactUniqueWon: new Set(
+        exactMatched.filter((fact) => fact.outcome?.won).map((fact) => fact.crmLeadId),
+      ).size,
+      exactCrmMatchesInScope: facts.filter(
+        (fact) => fact.outcome && fact.matchConfidence === "exact",
+      ).length,
+      scopeTotals,
+    });
+
+    // Attributed + unattributed always add back to the Accounting population of
+    // the same basis: every payment in the window, or every lead created in it.
+    const attributionOf = (crmLeadId: string): RevenueAttribution =>
+      crmLeadId ? (attributionByLead.get(crmLeadId) ?? "none") : "none";
+    const paymentDateReconciliation = reconcileRevenue(
+      "payment_date",
+      authority.paymentWindow.map((line) => ({
+        usd: line.usd,
+        attribution: attributionOf(line.crmLeadId),
+      })),
+    );
+    const leadCohortReconciliation = reconcileRevenue(
+      "lead_cohort",
+      cohortLeadIds.map((id) => ({
+        usd: authority.byLead.get(id)?.usd ?? 0,
+        attribution: attributionOf(id),
+      })),
+    );
+    const revenueReconciliation = exactOk
+      ? {
+          paymentDate: paymentDateReconciliation,
+          leadCohort: leadCohortReconciliation,
+          linksAvailable: authority.linksAvailable,
+          /**
+           * The Overview's exact cohort revenue minus the exact slice of the
+           * lead-cohort reconciliation. Both read the same Accounting rows; a
+           * non-zero value is a disagreement to investigate, shown, not hidden.
+           */
+          exactCohortDifference:
+            Math.round(
+              (exactTotals.revenue - leadCohortReconciliation.exactAttributedRevenue) * 100,
+            ) / 100,
+        }
+      : null;
+    const finishedAt = refresh.finishedAt as unknown;
+    const health = managementHealth({
+      scope,
+      window: range,
+      spend: scopeTotals.spend,
+      metaAdsSyncedThrough: sources.metaAdsSyncedThrough,
+      closedLoopRefreshedAt:
+        finishedAt instanceof Date ? finishedAt.toISOString() : finishedAt ? s(finishedAt) : null,
+      closedLoopStatus: refresh.status,
+      crmSyncedAt: sources.crmSyncedAt,
+      exactShareOfEvents: facts.length ? (exactFacts.length / facts.length) * 100 : null,
+      events: facts.length,
+    });
+    const messagingStatus: KpiStatus = sources.messagingResolved > 0 ? "ok" : "not_connected";
+    const messaging = (await import("./meta-messaging-readiness.server")
+      .then((module) => module.storedMessagingReadiness())
+      .catch(() => null)) as Row | null;
+    const ambiguousIds = new Set(
+      (
+        await pool
+          .query<Row>(
+            `SELECT DISTINCT acquisition_event_id FROM acquisition_crm_links WHERE match_confidence = 'ambiguous'`,
+          )
+          .catch(() => ({ rows: [] as Row[] }))
+      ).rows.map((row) => s(row.acquisition_event_id)),
+    );
+    const crmBreakdown = {
+      exact: facts.filter((fact) => fact.outcome && fact.matchConfidence === "exact").length,
+      inferred: facts.filter((fact) => fact.outcome && fact.matchConfidence === "inferred").length,
+      ambiguous: facts.filter((fact) => !fact.outcome && ambiguousIds.has(fact.acquisitionEventId))
+        .length,
+      unmatched: facts.filter((fact) => !fact.outcome && !ambiguousIds.has(fact.acquisitionEventId))
+        .length,
+    };
+    const chatwootHealth = await import("./chatwoot-attribution-reconcile.server")
+      .then((module) => module.chatwootOperationalHealth())
+      .catch(() => null);
+    const coverageSummary = [
+      {
+        key: "meta_lead_attribution",
+        label: { en: "Meta lead attribution", ar: "إسناد عملاء Meta" },
+        numerator: metaCoverage.withAdId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: {
+          en: "Instant-form leads whose exact campaign, ad set and ad are known.",
+          ar: "عملاء النماذج الفورية المعروف حملتهم ومجموعتهم وإعلانهم بالضبط.",
+        },
+      },
+      {
+        key: "creative_attribution",
+        label: { en: "Creative attribution", ar: "إسناد المادة الإعلانية" },
+        numerator: metaCoverage.withCreativeId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: {
+          en: "Leads whose ad's creative Meta still returns.",
+          ar: "العملاء الذين ما زالت Meta تُرجع المادة الإعلانية لإعلانهم.",
+        },
+      },
+      {
+        key: "form_attribution",
+        label: { en: "Lead form", ar: "نموذج العميل" },
+        numerator: metaCoverage.withFormId,
+        denominator: metaCoverage.total,
+        status: (metaCoverage.total ? "ok" : "no_denominator") as KpiStatus,
+        note: sources.leadAdsTokenConfigured
+          ? {
+              en: "Form from the lead record or from the ad's form setting.",
+              ar: "النموذج من سجل العميل أو من إعداد نموذج الإعلان.",
+            }
+          : {
+              en: "Form taken from the ad's form setting. Form names and answers need Meta Lead Ads access, which is not connected.",
+              ar: "النموذج مأخوذ من إعداد نموذج الإعلان. أسماء النماذج والإجابات تحتاج صلاحية Meta Lead Ads وهي غير متصلة.",
+            },
+      },
+      {
+        key: "crm_match",
+        label: { en: "CRM match", ar: "المطابقة في CRM" },
+        numerator: metaCoverage.crmMatchedExact,
+        denominator: metaCoverage.total,
+        status: (refresh.finishedAt
+          ? metaCoverage.total
+            ? "ok"
+            : "no_denominator"
+          : "pending_sync") as KpiStatus,
+        note: {
+          en: "Leads matched to a CRM record by Meta's lead ID.",
+          ar: "عملاء مطابقون لسجل CRM بمعرّف العميل من Meta.",
+        },
+      },
+      ...(["whatsapp", "messenger", "instagram"] as const).map((channel) => {
+        const readiness = obj(messaging?.[channel]);
+        const status = text(readiness.status) || "not_connected";
+        const channelFacts = conversations.filter((fact) =>
+          channel === "instagram"
+            ? fact.destinationChannel === "instagram_dm"
+            : fact.destinationChannel === channel,
+        );
+        const name = {
+          whatsapp: ["WhatsApp", "واتساب"],
+          messenger: ["Messenger", "ماسنجر"],
+          instagram: ["Instagram", "إنستغرام"],
+        }[channel];
+        return {
+          key: `messaging_${channel}`,
+          label: { en: `${name[0]} attribution`, ar: `إسناد ${name[1]}` },
+          numerator: channelFacts.filter((fact) => fact.attributionConfidence === "exact").length,
+          denominator: channelFacts.length,
+          status: (status === "connected" ? "ok" : "not_connected") as KpiStatus,
+          channelStatus: status,
+          note:
+            status === "connected"
+              ? {
+                  en: "Conversations with an exact ad referral from Meta.",
+                  ar: "محادثات لها إحالة إعلان دقيقة من Meta.",
+                }
+              : status === "infrastructure_ready_meta_approval_pending"
+                ? {
+                    en: "Software verified; waiting for Meta's review of messaging access.",
+                    ar: "البرمجيات جاهزة؛ بانتظار مراجعة Meta لصلاحية الرسائل.",
+                  }
+                : status === "infrastructure_ready_credential_pending"
+                  ? {
+                      en: "Software verified; completes automatically once the Attribution credential is in Railway.",
+                      ar: "البرمجيات جاهزة؛ يكتمل تلقائيًا عند إضافة بيانات اعتماد Attribution في Railway.",
+                    }
+                  : status === "inbox_setup_required"
+                    ? {
+                        en: "Instagram messages do not reach Chatwoot yet; an Instagram inbox is needed.",
+                        ar: "رسائل إنستغرام لا تصل إلى Chatwoot بعد؛ يلزم صندوق وارد لإنستغرام.",
+                      }
+                    : status === "infrastructure_ready_awaiting_traffic"
+                      ? {
+                          en: "Ready; waiting for the first ad-started message.",
+                          ar: "جاهز؛ بانتظار أول رسالة من إعلان.",
+                        }
+                      : {
+                          en: "Not connected: conversation sources stay unknown.",
+                          ar: "غير متصل: يبقى مصدر المحادثات غير معروف.",
+                        },
+        };
+      }),
+      {
+        key: "historical_chatwoot",
+        technical: true,
+        label: { en: "Historical conversations", ar: "المحادثات السابقة" },
+        numerator: conversations.filter((fact) => fact.attributionConfidence !== "unknown").length,
+        denominator: conversations.length,
+        status: "historical_evidence_missing" as KpiStatus,
+        note: {
+          en: "Conversations recorded before referral capture keep an unknown source: the evidence was never stored.",
+          ar: "المحادثات المسجلة قبل التقاط الإحالة يبقى مصدرها غير معروف: الدليل لم يُحفظ أصلًا.",
+        },
+      },
+      {
+        key: "chatwoot_ingestion",
+        label: { en: "Chatwoot ingestion", ar: "استقبال محادثات Chatwoot" },
+        numerator: chatwootHealth?.presentRows ?? 0,
+        denominator: chatwootHealth?.expectedRows ?? 0,
+        status: (chatwootHealth ? "ok" : "pending_sync") as KpiStatus,
+        channelStatus: chatwootHealth
+          ? chatwootHealth.flagged
+            ? "needs_attention"
+            : "healthy"
+          : "not_checked",
+        note: chatwootHealth
+          ? chatwootHealth.flagged
+            ? {
+                en: `${chatwootHealth.missing} conversations missing an attribution row, ${chatwootHealth.failedOrStuck} failed or stuck events.`,
+                ar: `${chatwootHealth.missing} محادثة بلا صف إسناد، و${chatwootHealth.failedOrStuck} حدث فاشل أو عالق.`,
+              }
+            : {
+                en: "Every conversation with an inbound message has its attribution row.",
+                ar: "كل محادثة بها رسالة واردة لها صف إسناد.",
+              }
+          : { en: "Not checked yet.", ar: "لم يُفحص بعد." },
+      },
+    ];
+    // Rates and ROAS need a sample big enough to mean something.
+    const MIN_MATCHED = 20;
+    const MIN_SPEND = 100;
+    const best = (score: (row: GrainRow) => number, rows = grains.creative) =>
+      [...rows].filter((row) => score(row) > 0).sort((a, b) => score(b) - score(a))[0] ?? null;
+
+    const leadSources = new Map<string, { key: string; metrics: QualityMetrics }>();
+    for (const fact of facts.filter((row) => row.attributionConfidence === "exact")) {
+      const key = `${fact.sourcePlatform || "unknown"}|${fact.entityType}`;
+      const bucket = leadSources.get(key) ?? { key, metrics: emptyMetrics() };
+      addFact(bucket.metrics, fact);
+      leadSources.set(key, bucket);
+    }
+    const bestLeadSource =
+      [...leadSources.values()]
+        .map((bucket) => ({
+          key: bucket.key,
+          sourcePlatform: bucket.key.split("|")[0]!,
+          entityType: bucket.key.split("|")[1]!,
+          metrics: finalizeMetrics(bucket.metrics),
+        }))
+        .sort(
+          (a, b) => b.metrics.revenue - a.metrics.revenue || b.metrics.leads - a.metrics.leads,
+        )[0] ?? null;
+
+    return {
+      configured: true as const,
+      period: range,
+      businessTimeZone: BUSINESS_TIME_ZONE,
+      refresh,
+      /** The platform scope every figure below was computed in. */
+      scope,
+      exactAttributionAvailable: exactOk,
+      scopeTotals,
+      health,
+      revenueReconciliation,
+      kpis,
+      coverageSummary,
+      crmBreakdown,
+      chatwootHealth,
+      messagingChannels: messaging
+        ? Object.fromEntries(
+            (["whatsapp", "messenger", "instagram"] as const).map((channel) => [
+              channel,
+              {
+                status: text(obj(messaging[channel]).status) || "not_connected",
+                label: obj(messaging[channel]).label ?? null,
+              },
+            ]),
+          )
+        : null,
+      sources: {
+        leadAdsDirect: sources.leadAdsTokenConfigured ? "ok" : "not_connected",
+        messaging: messagingStatus,
+        metaAdsSyncedThrough: sources.metaAdsSyncedThrough,
+        catalogReconciledAt: sources.catalogReconciledAt,
+      },
+      insights: {
+        bestCampaign: best((row) => row.revenue, grains.campaign),
+        bestCreative: best((row) => row.revenue),
+        bestLeadSource,
+        cheapVersusQuality: cheapVersusQuality(grains.creative),
+      },
+      marketing: {
+        campaigns: n(catalog.rows[0]?.campaigns),
+        adsets: n(catalog.rows[0]?.adsets),
+        ads: n(catalog.rows[0]?.ads),
+        creatives: n(catalog.rows[0]?.creatives),
+        assets: n(catalog.rows[0]?.assets),
+        videoAssets: n(catalog.rows[0]?.video_assets),
+        imageAssets: n(catalog.rows[0]?.image_assets),
+        imageAssetsWithUrl: n(catalog.rows[0]?.image_assets_with_url),
+        copyVariations: n(catalog.rows[0]?.copy_variations),
+        adsWithLeadForm: n(catalog.rows[0]?.ads_with_form),
+        leadForms: n(catalog.rows[0]?.forms),
+      },
+      crm: {
+        records: n(crmTotals.rows[0]?.crm_records),
+        createdInPeriod: n(crmTotals.rows[0]?.crm_created_in_period),
+        withFacebookLeadId: n(crmTotals.rows[0]?.with_facebook_lead_id),
+        saleOrdersLinked: n(crmTotals.rows[0]?.sale_orders_linked),
+      },
+      coverage,
+      coverageByType: coverageByType(facts),
+      matches: {
+        exact: facts.filter((fact) => fact.outcome && fact.matchConfidence === "exact").length,
+        inferred: facts.filter((fact) => fact.outcome && fact.matchConfidence === "inferred")
+          .length,
+        unmatched: facts.filter((fact) => !fact.outcome).length,
+      },
+      totals,
+      exactTotals,
+      funnel: closedLoopFunnel({
+        impressions: totals.impressions || null,
+        clicks: totals.clicks || null,
+        metrics: exactTotals,
+      }),
+      funnelAll: closedLoopFunnel({ impressions: null, clicks: null, metrics: totals }),
+      grains,
+      assets: assetRows.map(({ creative, ...row }) => ({
+        ...row,
+        spend: creative?.spend ?? 0,
+        leads: creative?.leads ?? 0,
+        crmMatched: creative?.crmMatched ?? 0,
+        won: creative?.won ?? 0,
+        revenue: creative?.revenue ?? 0,
+      })),
+      leadQuality: Object.fromEntries(
+        CLOSED_LOOP_GRAINS.map((grain) => [
+          grain,
+          rankByLeadQuality(grains[grain].filter((row) => row.leads > 0)).slice(0, 100),
+        ]),
+      ),
+      byDimension,
+      best: {
+        leads: best((row) => row.leads),
+        qualified: best((row) => row.qualified),
+        winRate: best((row) => (row.crmMatched >= MIN_MATCHED ? (row.winRate ?? 0) : 0)),
+        revenue: best((row) => row.revenue),
+        roas: best((row) =>
+          row.spend >= MIN_SPEND && row.crmMatched >= MIN_MATCHED ? (row.roas ?? 0) : 0,
+        ),
+      },
+      outcomes: facts
+        .filter((fact) => fact.outcome)
+        .sort(
+          (a, b) =>
+            (b.outcome?.revenuePaidUsd ?? 0) - (a.outcome?.revenuePaidUsd ?? 0) ||
+            b.occurredAt.localeCompare(a.occurredAt),
+        )
+        .slice(0, 1000)
+        .map(outcomeRecord),
+    };
+  });
+}
+
+function outcomeRecord(fact: FactRecord) {
+  return {
+    acquisitionEventId: fact.acquisitionEventId,
+    occurredAt: fact.occurredAt,
+    entityType: fact.entityType,
+    destinationChannel: fact.destinationChannel,
+    sourcePlatform: fact.sourcePlatform,
+    attributionConfidence: fact.attributionConfidence,
+    campaignId: fact.campaignId,
+    campaignName: fact.campaignName,
+    adsetId: fact.adsetId,
+    adsetName: fact.adsetName,
+    adId: fact.adId,
+    adName: fact.adName,
+    creativeId: fact.creativeId,
+    creativeName: fact.creativeName,
+    formId: fact.formId,
+    landingPageId: fact.landingPageId,
+    crmLeadId: fact.crmLeadId,
+    matchMethod: fact.matchMethod,
+    matchConfidence: fact.matchConfidence,
+    stageKey: fact.stageKey,
+    businessStatus: fact.businessStatus,
+    salesperson: fact.salesperson,
+    salesTeam: fact.salesTeam,
+    course: fact.course,
+    interested: fact.outcome?.interested ?? false,
+    qualified: fact.outcome?.qualified ?? false,
+    quotation: fact.outcome?.quotation ?? false,
+    won: fact.outcome?.won ?? false,
+    lost: fact.outcome?.lost ?? false,
+    saleOrderIds: fact.outcome?.saleOrderIds ?? [],
+    invoiceCount: fact.outcome?.invoiceCount ?? 0,
+    revenue: fact.outcome?.revenuePaidUsd ?? 0,
+    wonAt: fact.wonAt,
+    firstInvoiceAt: fact.outcome?.firstInvoiceAt ?? "",
+  };
+}
+
+/** Everything about one creative: media, hierarchy, spend, acquisitions, quality and sales. */
+export async function getCreativeDetail(
+  creativeId: string,
+  filters: { from?: string; to?: string } = {},
+) {
+  if (!acquisitionDatabaseConfigured()) return { configured: false as const };
+  const id = s(creativeId);
+  if (!/^[\w.:-]{1,64}$/.test(id)) return { configured: true as const, found: false as const };
+  const range = resolveRange(filters.from, filters.to);
+  return cached(`creative|${id}|${range.from}|${range.to}`, async () => {
+    await ensureClosedLoopSchema();
+    const pool = getPool();
+    const [ads, assets, facts, spend, historical, authority] = await Promise.all([
+      pool.query<Row>(
+        `SELECT * FROM meta_entity_graph WHERE creative_id = $1 ORDER BY campaign_name, adset_name, ad_name`,
+        [id],
+      ),
+      pool.query<Row>(
+        `SELECT asset_type, asset_id, asset_url, thumbnail_url, attribution_level FROM meta_creative_assets WHERE creative_id = $1`,
+        [id],
+      ),
+      loadFacts(range),
+      loadSpend(range),
+      pool.query<Row>(
+        `SELECT count(*)::int AS leads, count(*) FILTER (WHERE o.won)::int AS won,
+                COALESCE(sum(o.revenue_paid_usd), 0) AS revenue
+           FROM crm_lead_outcomes o JOIN meta_entity_graph g ON g.ad_id = o.ad_id
+          WHERE g.creative_id = $1 AND o.facebook_lead_id <> ''`,
+        [id],
+      ),
+      loadRevenueAuthority(range, {}),
+    ]);
+    applyRevenueAuthority(facts, authority);
+    if (!ads.rows.length)
+      return { configured: true as const, found: false as const, period: range };
+    const adIds = new Set(ads.rows.map((row) => s(row.ad_id)));
+    const creativeFacts = facts.filter(
+      (fact) => fact.creativeId === id || (fact.adId && adIds.has(fact.adId)),
+    );
+    const exactFacts = creativeFacts.filter(
+      (fact) => fact.attributionConfidence === "exact" && fact.creativeId === id,
+    );
+    const creativeSpend = spend.filter((row) => row.creativeId === id || adIds.has(row.adId));
+    const metrics = emptyMetrics();
+    exactFacts.forEach((fact) => addFact(metrics, fact));
+    metrics.spend = creativeSpend.reduce((sum, row) => sum + row.spend, 0);
+    metrics.impressions = creativeSpend.reduce((sum, row) => sum + row.impressions, 0);
+    metrics.clicks = creativeSpend.reduce((sum, row) => sum + row.clicks, 0);
+    finalizeMetrics(metrics);
+    const first = ads.rows[0];
+    return {
+      configured: true as const,
+      found: true as const,
+      period: range,
+      creative: {
+        creativeId: id,
+        creativeName: readableCreativeName(s(first.creative_name), s(first.headline)),
+        mediaType: s(first.media_type),
+        headline: s(first.headline),
+        thumbnailUrl: s(first.thumbnail_url) || s(first.image_url),
+        imageUrl: s(first.image_url),
+        videoId: s(first.video_id),
+        landingPageUrl: s(first.landing_page_url),
+        permalinkUrl: s(first.permalink_url),
+        effectiveObjectStoryId: s(first.effective_object_story_id),
+        sourcePostId: s(first.source_post_id),
+      },
+      hierarchy: ads.rows.map((row) => ({
+        accountId: s(row.account_id),
+        campaignId: s(row.campaign_id),
+        campaignName: s(row.campaign_name),
+        adsetId: s(row.adset_id),
+        adsetName: s(row.adset_name),
+        adId: s(row.ad_id),
+        adName: s(row.ad_name),
+      })),
+      assets: assets.rows,
+      metrics,
+      funnel: closedLoopFunnel({
+        impressions: metrics.impressions || null,
+        clicks: metrics.clicks || null,
+        metrics,
+      }),
+      coverage: {
+        ...coverageOf(creativeFacts),
+        exactForCreative: exactFacts.length,
+        unmatched: exactFacts.filter((fact) => !fact.outcome).length,
+      },
+      allTime: {
+        crmLeads: n(historical.rows[0]?.leads),
+        won: n(historical.rows[0]?.won),
+        revenue: n(historical.rows[0]?.revenue),
+      },
+      records: exactFacts
+        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+        .slice(0, 500)
+        .map(outcomeRecord),
+    };
+  });
+}
+
+/**
+ * Audit of every inferred (phone-key) CRM link: how far apart the two dates
+ * are, whether the conversation had other CRM candidates, and whether one CRM
+ * record is claimed by several conversations. Counts and IDs only, no phone
+ * numbers. Inferred links never feed exact KPIs; this shows how safe they are.
+ */
+export async function getInferredLinkAudit() {
+  if (!acquisitionDatabaseConfigured()) return { configured: false as const };
+  await ensureClosedLoopSchema();
+  const pool = getPool();
+  const hasConversations = Boolean(
+    (await pool.query<Row>(`SELECT to_regclass('public.chatwoot_conversation_attribution') AS t`))
+      .rows[0]?.t,
+  );
+  if (!hasConversations) return { configured: true as const, links: 0 };
+  const result = await pool.query<Row>(
+    `WITH inferred AS (
+       SELECT l.acquisition_event_id, l.crm_lead_id, l.is_primary, l.match_confidence, l.ambiguity_reason, o.business_status, o.won,
+              o.revenue_paid_usd, o.created_at AS crm_created_at, c.first_touch_at,
+              jsonb_array_length(c.crm_lead_ids) AS phone_candidates,
+              ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
+                - (c.first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date) AS day_gap
+         FROM acquisition_crm_links l
+         JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+         LEFT JOIN chatwoot_conversation_attribution c
+           ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
+        WHERE l.match_confidence IN ('inferred','ambiguous')
+     ),
+     shared AS (SELECT crm_lead_id FROM inferred GROUP BY crm_lead_id HAVING count(*) > 1),
+     multi AS (SELECT acquisition_event_id FROM inferred GROUP BY acquisition_event_id HAVING count(*) > 1)
+     SELECT count(*)::int AS links,
+            count(*) FILTER (WHERE is_primary)::int AS primary_links,
+            count(DISTINCT acquisition_event_id)::int AS conversations,
+            count(DISTINCT crm_lead_id)::int AS crm_records,
+            count(*) FILTER (WHERE day_gap BETWEEN -1 AND 0)::int AS same_day,
+            count(*) FILTER (WHERE day_gap BETWEEN 1 AND 7)::int AS within_week,
+            count(*) FILTER (WHERE day_gap BETWEEN 8 AND 30)::int AS within_month,
+            count(*) FILTER (WHERE day_gap IS NULL OR day_gap < -1 OR day_gap > 30)::int AS outside_window,
+            count(*) FILTER (WHERE phone_candidates > 1)::int AS phone_key_with_other_crm_records,
+            (SELECT count(*)::int FROM multi) AS conversations_with_several_links,
+            (SELECT count(*)::int FROM shared) AS crm_records_claimed_by_several_conversations,
+            count(*) FILTER (WHERE match_confidence = 'ambiguous')::int AS ambiguous,
+            count(*) FILTER (WHERE ambiguity_reason = 'phone_key_shared_by_several_crm_records')::int AS ambiguous_shared_phone,
+            count(*) FILTER (WHERE ambiguity_reason = 'crm_record_claimed_by_several_conversations')::int AS ambiguous_claimed,
+            count(*) FILTER (WHERE won AND match_confidence = 'inferred')::int AS won,
+            COALESCE(sum(revenue_paid_usd) FILTER (WHERE is_primary), 0) AS revenue
+       FROM inferred`,
+  );
+  const sample = await pool.query<Row>(
+    `SELECT l.acquisition_event_id, l.crm_lead_id, l.match_confidence, l.ambiguity_reason, o.business_status,
+            ((o.created_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date
+              - (c.first_touch_at AT TIME ZONE '${BUSINESS_TIME_ZONE}')::date) AS day_gap,
+            jsonb_array_length(c.crm_lead_ids) AS phone_candidates
+       FROM acquisition_crm_links l
+       JOIN crm_lead_outcomes o ON o.crm_lead_id = l.crm_lead_id
+       LEFT JOIN chatwoot_conversation_attribution c
+         ON 'chatwoot_conversation:' || c.conversation_id::text = l.acquisition_event_id
+      WHERE l.match_confidence IN ('inferred','ambiguous')
+      ORDER BY (l.match_confidence = 'ambiguous') DESC, phone_candidates DESC NULLS LAST, day_gap DESC NULLS LAST
+      LIMIT 200`,
+  );
+  const r = result.rows[0] ?? {};
+  return {
+    configured: true as const,
+    method: "chatwoot_phone_key",
+    window: {
+      fromDays: -1,
+      toDays: 30,
+      rule: "CRM record created between one day before and 30 days after the conversation started.",
+    },
+    links: n(r.links),
+    primaryLinks: n(r.primary_links),
+    conversations: n(r.conversations),
+    crmRecords: n(r.crm_records),
+    dayGap: {
+      sameDay: n(r.same_day),
+      withinWeek: n(r.within_week),
+      withinMonth: n(r.within_month),
+      outsideWindow: n(r.outside_window),
+    },
+    ambiguity: {
+      phoneKeyWithOtherCrmRecords: n(r.phone_key_with_other_crm_records),
+      conversationsWithSeveralLinks: n(r.conversations_with_several_links),
+    },
+    duplicateRisk: {
+      crmRecordsClaimedBySeveralConversations: n(r.crm_records_claimed_by_several_conversations),
+    },
+    outcomes: { won: n(r.won), revenue: n(r.revenue) },
+    flaggedAmbiguous: {
+      total: n(r.ambiguous),
+      sharedPhone: n(r.ambiguous_shared_phone),
+      crmClaimedBySeveralConversations: n(r.ambiguous_claimed),
+      rule: "Ambiguous links are kept for audit, never primary, and carry no CRM outcome.",
+    },
+    promotedToExact: 0,
+    rows: sample.rows.map((row) => ({
+      acquisitionEventId: s(row.acquisition_event_id),
+      crmLeadId: s(row.crm_lead_id),
+      confidence: s(row.match_confidence),
+      ambiguityReason: s(row.ambiguity_reason),
+      businessStatus: s(row.business_status),
+      dayGap: row.day_gap == null ? null : n(row.day_gap),
+      phoneCandidates: n(row.phone_candidates),
+    })),
+  };
+}

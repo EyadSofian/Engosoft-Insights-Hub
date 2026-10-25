@@ -90,6 +90,11 @@ export function pageTypeFor(path: string): NexusPageType {
     sales: "sales",
     teams: "teams",
     leads: "leads",
+    // Separate pathnames, one subject: both report the same CRM population,
+    // so a lead question asked on either resolves against the lead surface
+    // rather than falling through to "other".
+    "lead-distribution": "leads",
+    "lead-sources": "leads",
     lost: "lost",
     accounting: "accounting",
     products: "products",
@@ -102,6 +107,11 @@ export function pageTypeFor(path: string): NexusPageType {
     "social-media": "social_media",
     organic: "organic",
     attribution: "attribution",
+    acquisition: "attribution",
+    // Where a visit came from is the same subject as where a chat came from,
+    // one step earlier in the journey.
+    "landing-pages": "attribution",
+    creatives: "ads",
     guide: "guide",
     // Legacy bookmarks that redirect into Accounting.
     "full-invoiced": "accounting",

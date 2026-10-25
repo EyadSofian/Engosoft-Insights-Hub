@@ -1,10 +1,9 @@
 // Server-only authoritative CRM reader.
 //
-// CRM and Lost are two disjoint Odoo populations:
-//   - CRM: active records assigned to a real user, excluding any Lost/Closed
-//     Lost stage and the non-commercial Old Auto Dialer stage.
-//   - Lost: archived opportunities (active=false, probability=0) handled by an
-//     internal user backed by an Employee record and carrying a Lost Reason.
+// CRM and Lost are two disjoint Odoo populations under the 1.26 contract:
+//   - CRM: active Leads plus active open/Won Opportunities.
+//   - Lost: archived Leads with a reason, active Lost-stage Opportunities, and
+//     historical archived Lost Opportunities.
 //
 // Credentials stay in environment variables and are consumed by odoo.server.
 // This module deliberately returns sheet-shaped rows so the existing campaign,
@@ -14,18 +13,55 @@ import {
   m2oId,
   m2oName,
   odooCall,
+  odooCallWithPolicy,
   odooConfig,
   searchRead,
   type Domain,
   type M2O,
 } from "./odoo.server";
+import {
+  crmNormalScopeDomain,
+  crmBusinessStatus,
+  crmStageKeyForExternalId,
+  isCanonicalLost,
+  isCrmRecordType,
+  type CrmContractRecord,
+  type CrmStageKey,
+} from "./crm-contract";
+import { canonicalCourseValue } from "./course-taxonomy";
+import { canonicalLossReason } from "./loss-reason-taxonomy";
+import { countsAsPotentialLead } from "./lead-count-policy";
 
 export type CrmRawRow = Record<string, string>;
 
-interface OdooField {
+export interface OdooField {
   string?: string;
   type?: string;
   relation?: string;
+}
+
+export function buildCrmCandidateDomains(
+  metadata: Record<string, OdooField>,
+  floor: string,
+): { activeDomain: Domain; inactiveDomain: Domain } {
+  return {
+    activeDomain: crmNormalScopeDomain([
+      ["active", "=", true],
+      ...dateSinceDomain(
+        metadata,
+        ["create_date", "lost_verification_date", "date_last_stage_update"],
+        floor,
+      ),
+    ]),
+    inactiveDomain: crmNormalScopeDomain([
+      ["active", "=", false],
+      ...dateSinceDomain(
+        metadata,
+        ["create_date", "date_closed", "lost_verification_date", "date_last_stage_update"],
+        floor,
+      ),
+    ]),
+  };
 }
 
 interface OdooCrmLead {
@@ -38,32 +74,32 @@ interface OdooCrmLead {
   priority?: string | false;
   phone?: string | false;
   mobile?: string | false;
+  email_from?: string | false;
   user_id?: M2O;
   team_id?: M2O;
   stage_id?: M2O;
   company_id?: M2O;
   campaign_id?: M2O;
   source_id?: M2O;
+  medium_id?: M2O;
+  lang_id?: M2O;
   lost_reason_id?: M2O;
+  lost_category_id?: M2O;
+  stage_is_lost?: boolean;
+  stage_is_won?: boolean;
   create_date?: string | false;
   write_date?: string | false;
   date_last_stage_update?: string | false;
   date_closed?: string | false;
+  lost_verification_date?: string | false;
+  won_date?: string | false;
+  date_conversion?: string | false;
   probability?: number;
+  automated_probability?: number;
+  closing_duration_days?: number;
+  product_ids?: number[];
+  tag_ids?: number[];
   [key: string]: unknown;
-}
-
-interface OdooUser {
-  id: number;
-  name: string;
-  share: boolean;
-  active: boolean;
-}
-
-interface OdooEmployee {
-  id: number;
-  user_id: M2O;
-  active: boolean;
 }
 
 export interface CrmExclusionDiagnostics {
@@ -87,6 +123,135 @@ export interface DirectCrmSnapshot {
   };
 }
 
+/** A compact creation-day cohort from all historical Odoo CRM scopes. */
+export interface HistoricalCrmDay {
+  createdAt: string;
+  course: string;
+  leads: number;
+  won: number;
+  lost: number;
+  inventoryLeads: number;
+  noAnswer: number;
+  replyKnown: number;
+  freshLeads: number;
+  freshWon: number;
+  oldLeads: number;
+  oldWon: number;
+  turnaroundDaysSum: number;
+  turnaroundSamples: number;
+  lostReasons: Record<string, number>;
+}
+
+export function historicalCrmYearDomain(year: 2024 | 2025): Domain {
+  return [
+    ["create_date", ">=", `${year - 1}-12-31 21:00:00`],
+    ["create_date", "<", `${year + 1}-01-01 22:00:00`],
+  ];
+}
+
+/**
+ * The operational CRM snapshot starts in 2026 and excludes Inventory. Read
+ * every 2024/2025 Odoo lead once here, including Inventory and any lead later
+ * moved back to normal CRM. Collapse rows before persisting anything.
+ */
+export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<HistoricalCrmDay[]> {
+  const metadata = await odooCall<Record<string, OdooField>>("crm.lead", "fields_get", [], {
+    attributes: ["string", "type", "relation"],
+    context: companyContext({ active_test: false }),
+  });
+  if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
+  if (!metadata.source_id) throw new Error("CRM lead source field is unavailable");
+  const customFields = customFieldPlan(metadata);
+  const courseField = customFields.courseCategories;
+  const fields = [
+    "id",
+    "create_date",
+    "inventory_bucket",
+    "type",
+    "active",
+    "stage_id",
+    "stage_is_lost",
+    "stage_is_won",
+    "lost_reason_id",
+    "source_id",
+    "lead_segment_id",
+    "date_closed",
+    "won_date",
+    "lost_verification_date",
+    customFields.callingReply,
+    courseField,
+  ].filter((field) => Boolean(field && metadata[field]));
+  const [leads, stageKeys] = await Promise.all([
+    searchRead<OdooCrmLead>("crm.lead", historicalCrmYearDomain(year), fields, {
+      context: { active_test: false },
+    }),
+    loadStageKeys(),
+  ]);
+  const days = new Map<string, HistoricalCrmDay>();
+  for (const lead of leads) {
+    const createdAt = date(lead.create_date);
+    if (
+      !createdAt.startsWith(`${year}-`) ||
+      !isCrmRecordType(normalize(lead.type)) ||
+      !countsAsPotentialLead(m2oName(lead.source_id), m2oName(lead.lead_segment_id as M2O))
+    )
+      continue;
+    const course = canonicalCourseValue(custom(lead, courseField));
+    const key = `${createdAt}\u001f${course}`;
+    const day = days.get(key) ?? {
+      createdAt,
+      course,
+      leads: 0,
+      won: 0,
+      lost: 0,
+      inventoryLeads: 0,
+      noAnswer: 0,
+      replyKnown: 0,
+      freshLeads: 0,
+      freshWon: 0,
+      oldLeads: 0,
+      oldWon: 0,
+      turnaroundDaysSum: 0,
+      turnaroundSamples: 0,
+      lostReasons: {},
+    };
+    const status = crmBusinessStatus(contractRecord(lead, stageKeys));
+    day.leads++;
+    if (status === "won") day.won++;
+    if (status === "lost") day.lost++;
+    if (display(lead.inventory_bucket)) day.inventoryLeads++;
+    const reply = normalize(custom(lead, customFields.callingReply));
+    if (reply) day.replyKnown++;
+    const reason = m2oName(lead.lost_reason_id);
+    const reasonKey = status === "lost" ? canonicalLossReason(reason).canonicalReasonKey : "";
+    if (reasonKey) day.lostReasons[reasonKey] = (day.lostReasons[reasonKey] ?? 0) + 1;
+    if (reply === "not answer" || reply === "no answer" || reasonKey === "not_reached")
+      day.noAnswer++;
+    const segment = normalize(m2oName(lead.lead_segment_id as M2O));
+    if (segment === "fresh") {
+      day.freshLeads++;
+      if (status === "won") day.freshWon++;
+    } else if (segment === "old data") {
+      day.oldLeads++;
+      if (status === "won") day.oldWon++;
+    }
+    if (status === "won" || status === "lost") {
+      const closed = date(lead.date_closed || lead.won_date || lead.lost_verification_date);
+      const days = (Date.parse(closed) - Date.parse(createdAt)) / 86_400_000;
+      if (Number.isFinite(days) && days >= 0) {
+        day.turnaroundDaysSum += days;
+        day.turnaroundSamples++;
+      }
+    }
+    days.set(key, day);
+  }
+  const archived = [...days.values()].reduce((sum, row) => sum + row.inventoryLeads, 0);
+  if (archived === 0) throw new Error(`Odoo Inventory records are missing for ${year}`);
+  return [...days.values()].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.course.localeCompare(b.course),
+  );
+}
+
 const emptyDiagnostics = (): CrmExclusionDiagnostics => ({
   candidates: 0,
   accepted: 0,
@@ -108,24 +273,6 @@ const normalize = (value: unknown): string =>
     .replace(/[_–—/\\().?:]+/g, " ")
     .replace(/\s+/g, " ");
 
-const PUBLIC_TECHNICAL_USER_NAMES = new Set(["public user for ksa - engosoft"]);
-
-function isTechnicalIdentity(name: string, includeEngosoftDomain: boolean): boolean {
-  const normalized = normalize(name);
-  if (PUBLIC_TECHNICAL_USER_NAMES.has(normalized)) return true;
-  if (includeEngosoftDomain && normalized === "engosoft.com") return true;
-  return /\b(public|portal|website|system|technical)\s+user\b|\bbot\b/.test(normalized);
-}
-
-function isExcludedCrmStage(stage: string): boolean {
-  const normalized = normalize(stage);
-  if (normalized === "old auto dialer") return true;
-  if (normalized === "lost" || normalized === "closed lost" || normalized === "close lost")
-    return true;
-  if (/(^|\s)lost($|\s)/.test(normalized)) return true;
-  return /مفقود|خاسر|ضائع|خسارة/.test(normalized);
-}
-
 function display(value: unknown): string {
   if (value === false || value === null || value === undefined) return "";
   if (Array.isArray(value)) {
@@ -144,9 +291,13 @@ function date(value: unknown): string {
   return dateTime(value).slice(0, 10);
 }
 
-function dateTime(value: unknown): string {
+export function dateTime(value: unknown): string {
+  // Odoo serialises an empty date/datetime as the boolean `false`. Turning it
+  // into the literal string "false" makes it truthy and prevents every
+  // documented fallback (`lost_verification_date` -> stage date -> close date).
+  if (value === false || value === null || value === undefined) return "";
   const raw = String(value ?? "").trim();
-  if (!raw) return "";
+  if (!raw || raw.toLowerCase() === "false") return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const instant = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`);
   if (!Number.isFinite(instant.getTime())) return raw;
@@ -213,27 +364,22 @@ function customFieldPlan(metadata: Record<string, OdooField>): CustomFields {
     ),
     campaignName: resolveField(
       metadata,
-      ["x_studio_campaign_name", "x_campaign_name"],
+      ["campaign_name", "x_studio_campaign_name", "x_campaign_name"],
       ["Campaign Name", "اسم الحملة"],
     ),
     campaignId: resolveField(
       metadata,
-      ["x_studio_campaign_id", "x_campaign_id"],
+      ["campaign_id2", "x_studio_campaign_id", "x_campaign_id"],
       ["Campaign ID", "معرف الحملة"],
     ),
     courseCategories: resolveField(
       metadata,
-      [
-        "x_studio_course_categories",
-        "x_course_categories",
-        "course_categories",
-        "course_category_ids",
-      ],
+      ["x_studio_course_categories"],
       ["Course Categories", "Course Category"],
     ),
     callingReply: resolveField(
       metadata,
-      ["x_studio_calling_reply", "x_calling_reply", "calling_reply"],
+      ["x_studio_answered", "x_studio_calling_reply", "x_calling_reply", "calling_reply"],
       ["Calling reply?", "Calling Reply", "Call Reply"],
     ),
   };
@@ -243,13 +389,129 @@ function custom(lead: OdooCrmLead, field: string): string {
   return field ? display(lead[field]) : "";
 }
 
-function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
+function contractRecord(
+  lead: OdooCrmLead,
+  stageKeys?: Map<number, CrmStageKey>,
+): CrmContractRecord {
+  // The redesigned module publishes stable XMLIDs for every lifecycle stage.
+  // Some Odoo installations do not expose the optional computed
+  // `stage_is_lost`/`stage_is_won` fields on crm.lead, so the XMLID mapping is
+  // the durable authority rather than letting those records fall into `other`.
+  const mappedStage = stageKeys?.get(m2oId(lead.stage_id));
+  return {
+    type: normalize(lead.type),
+    active: lead.active !== false,
+    stageIsLost: lead.stage_is_lost === true || mappedStage === "lost",
+    stageIsWon: lead.stage_is_won === true || mappedStage === "won",
+    hasLostReason: m2oId(lead.lost_reason_id) > 0,
+  };
+}
+
+/**
+ * Resolve stable stage XMLIDs through the stage model itself.
+ *
+ * `ir.model.data` is intentionally restricted for the reporting service
+ * account in production, even though the same account can read crm.stage.
+ * Odoo's model-level `get_external_id` exposes a stable XMLID without widening
+ * that account's access to system metadata. The mapping includes documented
+ * legacy aliases where a stage has more than one XMLID.
+ */
+async function loadStageKeys(policy?: {
+  attempts?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<Map<number, CrmStageKey>> {
+  const stages = await searchRead<{ id: number }>("crm.stage", [], ["id"], {
+    context: { active_test: false },
+    policy,
+  });
+  if (!stages.length) return new Map();
+
+  const externalIds = await odooCallWithPolicy<Record<string, string | false>>(
+    "crm.stage",
+    "get_external_id",
+    [stages.map((stage) => stage.id)],
+    { context: companyContext({ active_test: false }) },
+    policy,
+  );
+  return new Map(
+    stages.map((stage) => [stage.id, crmStageKeyForExternalId(externalIds[String(stage.id)])]),
+  );
+}
+
+function actualStageKey(lead: OdooCrmLead, stageKeys: Map<number, CrmStageKey>): CrmStageKey {
+  const mappedStage = stageKeys.get(m2oId(lead.stage_id));
+  if (lead.stage_is_lost || mappedStage === "lost") return "lost";
+  if (lead.stage_is_won || mappedStage === "won") return "won";
+  return mappedStage ?? "other";
+}
+
+/**
+ * Build an Odoo OR domain using only fields that the live model publishes.
+ * `lost_verification_date` belongs to the redesigned module and is optional
+ * during a rollout; mentioning an absent field makes the whole search_read
+ * fail, which had silently forced production back onto its old snapshot.
+ */
+function dateSinceDomain(
+  metadata: Record<string, OdooField>,
+  candidates: string[],
+  floor: string,
+): Domain {
+  const clauses = candidates
+    .filter((field) => Boolean(metadata[field]))
+    .map((field) => [field, ">=", floor]);
+  if (clauses.length <= 1) return clauses;
+  return [...Array(clauses.length - 1).fill("|"), ...clauses];
+}
+
+function lossDate(lead: OdooCrmLead): string {
+  return normalize(lead.type) === "opportunity"
+    ? dateTime(lead.lost_verification_date) ||
+        dateTime(lead.date_last_stage_update) ||
+        dateTime(lead.date_closed)
+    : dateTime(lead.date_closed) || dateTime(lead.write_date);
+}
+
+function lossDateBasis(lead: OdooCrmLead): string {
+  if (normalize(lead.type) === "opportunity") {
+    if (dateTime(lead.lost_verification_date)) return "lost_verification_date";
+    if (dateTime(lead.date_last_stage_update)) return "date_last_stage_update_fallback";
+    if (dateTime(lead.date_closed)) return "date_closed_fallback";
+    return "missing";
+  }
+  if (dateTime(lead.date_closed)) return "date_closed";
+  if (dateTime(lead.write_date)) return "write_date_fallback";
+  return "missing";
+}
+
+function priorityLabel(lead: OdooCrmLead): string {
+  const business = display(lead.priority2);
+  if (business) return { "0": "Cold", "1": "Intermediate", "2": "Hot" }[business] ?? business;
+  const core = display(lead.priority);
+  return { "0": "Low", "1": "Medium", "2": "High", "3": "Very High" }[core] ?? core;
+}
+
+function commonRaw(
+  lead: OdooCrmLead,
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
   const rawStage = m2oName(lead.stage_id);
   const rawSource = m2oName(lead.source_id);
   const rawCourse = custom(lead, fields.courseCategories);
+  const contract = contractRecord(lead, stageKeys);
+  const status = crmBusinessStatus(contract);
   return {
     __odoo_id: String(lead.id),
+    __odoo_create_date_utc: display(lead.create_date),
+    __odoo_last_stage_update_utc: display(lead.date_last_stage_update),
     __odoo_write_date: dateTime(lead.write_date),
+    "Record Type": contract.type,
+    "Record Active": String(contract.active),
+    "Business Status": status ?? "archived",
+    "Stage Key": actualStageKey(lead, stageKeys),
     "Ad Name": custom(lead, fields.adName),
     "Ad ID": custom(lead, fields.adId),
     "Ad Set Name": custom(lead, fields.adsetName),
@@ -262,6 +524,7 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
       display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
     Phone: display(lead.phone),
     Mobile: display(lead.mobile),
+    Email: display(lead.email_from),
     Salesperson: m2oName(lead.user_id),
     "فريق المبيعات": m2oName(lead.team_id),
     "Sales Team": m2oName(lead.team_id),
@@ -271,96 +534,174 @@ function toCrmRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
     "أنشئ في": dateTime(lead.create_date),
     "التاريخ المقفل": dateTime(lead.date_closed),
     "Closing Date": date(lead.date_closed),
+    "Lost Date": lossDate(lead),
+    "Lost Date Basis": lossDateBasis(lead),
+    "Won Date": dateTime(lead.won_date),
+    "Conversion Date": dateTime(lead.date_conversion),
     Source: rawSource,
     "cleaned Source": rawSource.split("[")[0].trim(),
+    Medium: m2oName(lead.medium_id as M2O),
+    "Communication Language": m2oName(lead.lang_id as M2O),
     "Course Categories": rawCourse,
     Course: rawCourse,
+    Courses: (lead.product_ids ?? [])
+      .map((id) => productNames.get(Number(id)) ?? "")
+      .filter(Boolean)
+      .join(", "),
     "Main Category": "",
-    Priority: display(lead.priority),
+    Priority: priorityLabel(lead),
+    Probability: String(lead.probability ?? 0),
+    "Automated Probability": String(lead.automated_probability ?? 0),
+    "Closing Duration Days": String(lead.closing_duration_days ?? 0),
+    "Ready to Convert": display(lead.x_studio_ready_to_convert_1),
+    "Lead Segment": m2oName(lead.lead_segment_id as M2O),
+    "Open Status": m2oName(lead.open_status_id as M2O),
+    "Closing Won Channel": m2oName(lead.closing_channel_id as M2O),
+    "Lost Category": m2oName(lead.lost_category_id),
+    "Inventory Bucket": display(lead.inventory_bucket),
+    "Course Language": display(lead.course_languages),
+    "Course Type": display(lead.course_type),
+    "Customer Type": display(lead.customer_type),
+    "Job Type": display(lead.x_studio_customer_type_1),
+    "How Found Us": display(lead.x_studio_how_found_us),
+    Company: m2oName(lead.company_id),
+    Tags: (lead.tag_ids ?? [])
+      .map((id) => tagNames.get(Number(id)) ?? "")
+      .filter(Boolean)
+      .join(", "),
+    "Target Name": display(lead.target_name),
+    "Resign Target": display(lead.resign_target),
+    "Facebook Lead ID": display(lead.fb_lead_id),
+    "Validate Closed Lost Reason": display(lead.x_studio_validate_closed_reason),
     "Calling reply?": custom(lead, fields.callingReply),
     "سبب الضياع": m2oName(lead.lost_reason_id),
     "Date\r": date(lead.create_date),
-    نشط: "true",
+    نشط: String(contract.active),
   };
 }
 
-function toLostRaw(lead: OdooCrmLead, fields: CustomFields): CrmRawRow {
-  const rawStage = m2oName(lead.stage_id);
-  const rawSource = m2oName(lead.source_id);
-  const rawCourse = custom(lead, fields.courseCategories);
-  return {
-    __odoo_id: String(lead.id),
-    __odoo_write_date: dateTime(lead.write_date),
-    "Ad Name": custom(lead, fields.adName),
-    "Ad ID": custom(lead, fields.adId),
-    "Ad Set Name": custom(lead, fields.adsetName),
-    "Ad Set ID": custom(lead, fields.adsetId),
-    "Campaign Name": m2oName(lead.campaign_id) || custom(lead, fields.campaignName),
-    "Campaign ID": custom(lead, fields.campaignId),
-    "اسم جهة الاتصال":
-      display(lead.contact_name) || display(lead.partner_name) || display(lead.name),
-    Phone: display(lead.phone),
-    Mobile: display(lead.mobile),
-    "مندوب المبيعات": m2oName(lead.user_id),
-    "فريق المبيعات": m2oName(lead.team_id),
-    المرحلة: rawStage,
-    "Cleaned Stage": rawStage,
-    "أنشئ في": dateTime(lead.create_date),
-    "التاريخ المقفل": dateTime(lead.date_closed),
-    "Closing Date": date(lead.date_closed),
-    "Course Categories": rawCourse,
-    Course: rawCourse,
-    "Main Category": "",
-    "سبب الضياع": m2oName(lead.lost_reason_id),
-    المصدر: rawSource,
-    "cleaned Source": rawSource.split("[")[0].trim(),
-    "Date\r": date(lead.create_date),
-    نشط: "false",
-  };
-}
-
-function validateActiveIdentity(lead: OdooCrmLead, diagnostics: CrmExclusionDiagnostics): boolean {
-  const userId = m2oId(lead.user_id);
-  if (!userId) {
-    diagnostics.unassigned++;
-    return false;
-  }
-  // The accepted CRM reference keeps the normal `engosoft.com` assignee but
-  // excludes public/portal/website identities. Historical CRM leads are not
-  // required to have a current hr.employee record.
-  if (isTechnicalIdentity(m2oName(lead.user_id), false)) {
-    diagnostics.technicalIdentity++;
-    return false;
-  }
-  return true;
-}
-
-function validateLostIdentity(
+function toCrmRaw(
   lead: OdooCrmLead,
-  users: Map<number, OdooUser>,
-  employeeUserIds: Set<number>,
-  diagnostics: CrmExclusionDiagnostics,
-): boolean {
-  const userId = m2oId(lead.user_id);
-  if (!userId) {
-    diagnostics.unassigned++;
-    return false;
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
+  return commonRaw(lead, fields, stageKeys, productNames, tagNames);
+}
+
+/** Event analytics must fetch the event's records, including older/reopened
+ * records. The acquisition floor and current Lost state do not restrict this read.
+ */
+export async function loadCrmRawByIds(
+  ids: readonly number[],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
+  if (!ids.length) return [];
+  const domains: unknown[][] = [];
+  for (let offset = 0; offset < ids.length; offset += 1000)
+    domains.push([["id", "in", ids.slice(offset, offset + 1000)]]);
+  return loadCrmRawFromDomains(domains, policy);
+}
+
+/** Direct current-state reads share the same explicit normal-CRM scope.
+ * The caller supplies business/date predicates, never a permission fallback.
+ */
+export async function loadCrmRawByDomain(
+  domain: readonly unknown[],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
+  return loadCrmRawFromDomains([[...domain]], policy);
+}
+
+async function loadCrmRawFromDomains(
+  domains: readonly unknown[][],
+  policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal },
+): Promise<CrmRawRow[]> {
+  const metadata = await odooCallWithPolicy<Record<string, OdooField>>(
+    "crm.lead",
+    "fields_get",
+    [],
+    {
+      attributes: ["string", "type", "relation"],
+      context: companyContext({ active_test: false, lang: "en_US" }),
+    },
+    policy,
+  );
+  if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
+  const plan = customFieldPlan(metadata);
+  const standard = [
+    "id",
+    "name",
+    "contact_name",
+    "partner_name",
+    "priority",
+    "priority2",
+    "phone",
+    "mobile",
+    "email_from",
+    "type",
+    "active",
+    "create_date",
+    "date_conversion",
+    "inventory_bucket",
+    "stage_id",
+    "stage_is_lost",
+    "stage_is_won",
+    "source_id",
+    "company_id",
+    "user_id",
+    "team_id",
+    "campaign_id",
+    "lost_reason_id",
+    "lost_category_id",
+  ];
+  const fields = [
+    ...new Set([...standard.filter((f) => metadata[f]), ...Object.values(plan).filter(Boolean)]),
+  ];
+  const stages = await loadStageKeys(policy);
+  const out: CrmRawRow[] = [];
+  for (const domain of domains) {
+    const rows = await searchRead<OdooCrmLead>("crm.lead", crmNormalScopeDomain(domain), fields, {
+      context: { active_test: false, lang: "en_US" },
+      policy,
+    });
+    out.push(
+      ...rows
+        .filter((r) => !display(r.inventory_bucket))
+        .map((r) => commonRaw(r, plan, stages, new Map(), new Map())),
+    );
   }
-  const user = users.get(userId);
-  const displayName = user?.name || m2oName(lead.user_id);
-  if (isTechnicalIdentity(displayName, true)) {
-    diagnostics.technicalIdentity++;
-    return false;
-  }
-  if (!user || user.share) {
-    diagnostics.nonInternalUser++;
-    return false;
-  }
-  if (!employeeUserIds.has(userId)) {
-    diagnostics.noEmployee++;
-    return false;
-  }
-  return true;
+  return out;
+}
+
+function toLostRaw(
+  lead: OdooCrmLead,
+  fields: CustomFields,
+  stageKeys: Map<number, CrmStageKey>,
+  productNames: Map<number, string>,
+  tagNames: Map<number, string>,
+): CrmRawRow {
+  const raw = commonRaw(lead, fields, stageKeys, productNames, tagNames);
+  const canonicalLostDate = lossDate(lead);
+  return {
+    ...raw,
+    // Private authority fields are deliberately outside the legacy Sheet
+    // schema. Stored/enrichment rows have historically reused the visible
+    // `Closing Date`/`Lost Date` columns with different meanings; keeping the
+    // canonical Odoo values under dedicated keys prevents that old payload
+    // from changing an operational closure count during a merge.
+    __canonical_lost_date: canonicalLostDate,
+    __canonical_lost_date_basis: lossDateBasis(lead),
+    "مندوب المبيعات": raw.Salesperson,
+    المرحلة: raw.Stage,
+    المصدر: raw.Source,
+    // `date_closed` is empty for active Lost-stage Opportunities in 1.26.
+    // Keep the raw value above for audit, but use the canonical per-type date
+    // for movement reporting and the Lost workspace.
+    "Closing Date": canonicalLostDate.slice(0, 10),
+    "Lost Date": canonicalLostDate,
+  };
 }
 
 /**
@@ -384,18 +725,46 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
     "priority",
     "phone",
     "mobile",
+    "email_from",
     "user_id",
     "team_id",
     "stage_id",
     "company_id",
     "campaign_id",
     "source_id",
+    "medium_id",
+    "lang_id",
     "lost_reason_id",
+    "lost_category_id",
+    "stage_is_lost",
+    "stage_is_won",
     "create_date",
     "write_date",
     "date_last_stage_update",
     "date_closed",
+    "lost_verification_date",
+    "won_date",
+    "date_conversion",
     "probability",
+    "automated_probability",
+    "closing_duration_days",
+    "product_ids",
+    "tag_ids",
+    "priority2",
+    "x_studio_ready_to_convert_1",
+    "lead_segment_id",
+    "open_status_id",
+    "closing_channel_id",
+    "inventory_bucket",
+    "course_languages",
+    "course_type",
+    "customer_type",
+    "x_studio_customer_type_1",
+    "x_studio_how_found_us",
+    "target_name",
+    "resign_target",
+    "fb_lead_id",
+    "x_studio_validate_closed_reason",
   ];
   const fields = [
     ...new Set([
@@ -408,74 +777,102 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const floorDay = new Date(`${cfg.startDate}T00:00:00Z`);
   floorDay.setUTCDate(floorDay.getUTCDate() - 1);
   const floor = `${floorDay.toISOString().slice(0, 10)} 00:00:00`;
-  const activeDomain: Domain = [
-    ["active", "=", true],
-    ["create_date", ">=", floor],
-  ];
-  const lostDomain: Domain = [
-    ["active", "=", false],
-    ["probability", "=", 0],
-    // Pull both marketing cohorts (create_date) and operational closures
-    // (date_closed). The dashboard keeps the two questions separate.
-    "|",
-    ["create_date", ">=", floor],
-    ["date_closed", ">=", floor],
-  ];
+  const { activeDomain, inactiveDomain } = buildCrmCandidateDomains(metadata, floor);
 
-  const [activeCandidates, lostCandidates, rawUsers, employees] = await Promise.all([
+  const [activeCandidates, inactiveCandidates, stageKeys] = await Promise.all([
     searchRead<OdooCrmLead>("crm.lead", activeDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<OdooCrmLead>("crm.lead", lostDomain, fields, {
+    searchRead<OdooCrmLead>("crm.lead", inactiveDomain, fields, {
       context: { active_test: false },
     }),
-    searchRead<OdooUser>("res.users", [["share", "=", false]], ["name", "share", "active"], {
-      context: { active_test: false },
-    }),
-    searchRead<OdooEmployee>("hr.employee", [], ["user_id", "active"], {
-      context: { active_test: false },
-    }),
+    loadStageKeys(),
   ]);
-
-  const users = new Map(rawUsers.map((user) => [user.id, user]));
-  const employeeUserIds = new Set(
-    employees.map((employee) => m2oId(employee.user_id)).filter(Boolean),
-  );
+  const productIds = [
+    ...new Set(
+      [...activeCandidates, ...inactiveCandidates]
+        .flatMap((lead) => lead.product_ids ?? [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
+  const tagIds = [
+    ...new Set(
+      [...activeCandidates, ...inactiveCandidates]
+        .flatMap((lead) => lead.tag_ids ?? [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
+  const [products, tags] = await Promise.all([
+    productIds.length
+      ? searchRead<{ id: number; display_name?: string }>(
+          "product.product",
+          [["id", "in", productIds]],
+          ["display_name"],
+          { context: { active_test: false } },
+        )
+      : [],
+    tagIds.length
+      ? searchRead<{ id: number; display_name?: string }>(
+          "crm.tag",
+          [["id", "in", tagIds]],
+          ["display_name"],
+          { context: { active_test: false } },
+        )
+      : [],
+  ]);
+  const productNames = new Map(products.map((product) => [product.id, product.display_name ?? ""]));
+  const tagNames = new Map(tags.map((tag) => [tag.id, tag.display_name ?? ""]));
 
   const crmDiagnostics = emptyDiagnostics();
   const activeInPeriod = activeCandidates.filter((lead) => date(lead.create_date) >= cfg.startDate);
   crmDiagnostics.candidates = activeInPeriod.length;
   const crm = activeInPeriod
     .filter((lead) => {
-      if (!validateActiveIdentity(lead, crmDiagnostics)) return false;
-      if (isExcludedCrmStage(m2oName(lead.stage_id))) {
+      const contract = contractRecord(lead, stageKeys);
+      if (!isCrmRecordType(contract.type)) {
+        crmDiagnostics.wrongType++;
+        return false;
+      }
+      // Defence in depth: the Odoo query already applies the normal-CRM scope,
+      // but a malformed or mocked RPC response must not leak inventory rows.
+      if (display(lead.inventory_bucket)) {
         crmDiagnostics.excludedStage++;
         return false;
       }
+      // The Lost population owns active Lost-stage Opportunities so the two
+      // arrays stay disjoint and all downstream denominators remain exact.
+      if (isCanonicalLost(contract)) return false;
       return true;
     })
-    .map((lead) => toCrmRaw(lead, customFields));
+    .map((lead) => toCrmRaw(lead, customFields, stageKeys, productNames, tagNames));
   crmDiagnostics.accepted = crm.length;
 
   const lostDiagnostics = emptyDiagnostics();
-  const lostInPeriod = lostCandidates.filter(
-    (lead) => date(lead.create_date) >= cfg.startDate || date(lead.date_closed) >= cfg.startDate,
+  const lostInPeriod = [...activeCandidates, ...inactiveCandidates].filter(
+    (lead) =>
+      date(lead.create_date) >= cfg.startDate ||
+      date(lead.date_closed) >= cfg.startDate ||
+      date(lead.lost_verification_date) >= cfg.startDate ||
+      date(lead.date_last_stage_update) >= cfg.startDate,
   );
   lostDiagnostics.candidates = lostInPeriod.length;
   const lost = lostInPeriod
     .filter((lead) => {
-      if (!validateLostIdentity(lead, users, employeeUserIds, lostDiagnostics)) return false;
-      if (normalize(lead.type) !== "opportunity") {
+      const contract = contractRecord(lead, stageKeys);
+      if (!isCrmRecordType(contract.type)) {
         lostDiagnostics.wrongType++;
         return false;
       }
-      if (!m2oId(lead.lost_reason_id)) {
-        lostDiagnostics.missingLostReason++;
+      // Same defence for the disjoint Lost population.
+      if (display(lead.inventory_bucket)) {
+        lostDiagnostics.excludedStage++;
         return false;
       }
-      return true;
+      return isCanonicalLost(contract);
     })
-    .map((lead) => toLostRaw(lead, customFields));
+    .map((lead) => toLostRaw(lead, customFields, stageKeys, productNames, tagNames));
   lostDiagnostics.accepted = lost.length;
 
   return {

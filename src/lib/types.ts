@@ -21,6 +21,10 @@ export type AdSetOrigin =
   /** Row carries no ad at all. */
   | "none";
 
+export type CrmRecordType = "lead" | "opportunity";
+export type CrmBusinessStatus = "lead" | "open" | "won" | "lost";
+export type CrmStageKey = "preparation" | "new" | "open" | "quotation" | "won" | "lost" | "other";
+
 export interface GlobalFilters {
   from?: string; // YYYY-MM-DD
   to?: string;
@@ -59,7 +63,8 @@ export interface GlobalFilters {
   lostDateBasis?: "creation" | "closed";
 }
 
-export type DatePreset = "7d" | "30d" | "month" | "year" | "all";
+export type DatePreset =
+  "today" | "7d" | "30d" | "month" | "prev_month" | "same_period_last_month" | "year" | "all";
 
 /* --- normalized rows ------------------------------------------------------ */
 
@@ -111,6 +116,20 @@ export interface AdCreative {
   effectiveObjectStoryId?: string;
   /** Provider post/story identity when Meta exposes it separately. */
   sourcePostId?: string;
+  /** Meta image hash of the primary image, when Meta returned one. */
+  imageHash?: string;
+  /** Every video and image asset in `asset_feed_spec`/`object_story_spec`, by provider ID. */
+  assets?: { type: "video" | "image"; id: string; url?: string; thumbnailUrl?: string }[];
+  /**
+   * The instant form configured on the ad's creative call to action. It is the
+   * form a lead on this ad was submitted through, read from the ad setting, not
+   * from the lead record itself.
+   */
+  leadFormId?: string;
+  /** Where the form ID was read: the creative's call to action, or the existing page post the ad promotes. */
+  leadFormSource?: "creative_call_to_action" | "post_call_to_action";
+  /** Text variations in a flexible/dynamic creative. Reporting metadata only. */
+  assetMetadata?: { titles: string[]; bodies: string[]; linkUrls: string[] };
   creativeType: string;
   /** Normalized presentation family used by the dashboard gallery. */
   mediaType: string;
@@ -152,7 +171,14 @@ export interface CreativeAnalyticsRow extends AdCreative {
 
 export interface CrmLeadRow {
   id: string;
+  recordType: CrmRecordType;
+  active: boolean;
+  businessStatus: CrmBusinessStatus;
+  /** Stable XMLID-derived stage key. The translated stage label is display-only. */
+  stageKey: CrmStageKey;
   createdAt: string;
+  /** Source Odoo create_date in UTC when present. */
+  createdAtUtc?: string;
   closedAt: string;
   /** Days from creation to close. Only meaningful when `closedAt` is set. */
   daysToClose: number | null;
@@ -166,6 +192,7 @@ export interface CrmLeadRow {
   contact: string;
   phone: string;
   mobile: string;
+  email: string;
   salesperson: string;
   /** Parent team, e.g. "Operation Team". */
   salesTeam: string;
@@ -175,17 +202,47 @@ export interface CrmLeadRow {
   cleanedStage: string;
   /** Last time the lead moved stage in Odoo; used as a conservative contact-age proxy. */
   lastStageUpdate: string;
+  /** Original Odoo UTC datetime; the day-only display field cannot support a 7pm SLA. */
+  lastStageUpdateUtc: string;
   /** Raw Odoo "Calling reply?" value when that custom field is available. */
   callingReply: string;
   isWon: boolean;
-  /** Always false in reportable CRM; Lost exists only in the archived population. */
+  /** False in this disjoint array; canonical Lost records live in `Snapshot.lost`. */
   isLost: boolean;
   source: string;
+  medium: string;
+  communicationLanguage: string;
   /** Case-normalized source key. `uchat` and `UChat` collapse to one. */
   sourceKey: string;
   course: string;
+  /** Optional many-to-many Odoo Courses (`product_ids`), comma-separated for display. */
+  courses: string;
   mainCategory: string;
   priority: string;
+  probability: number;
+  automatedProbability: number;
+  closingDurationDays: number | null;
+  readyToConvert: boolean;
+  leadSegment: string;
+  openStatus: string;
+  closingChannel: string;
+  lostCategory: string;
+  lossReason: string;
+  inventoryBucket: string;
+  courseLanguage: string;
+  courseType: string;
+  customerType: string;
+  jobType: string;
+  howFoundUs: string;
+  company: string;
+  tags: string;
+  targetName: string;
+  resignTarget: string;
+  facebookLeadId: string;
+  validateClosedReason: string;
+  wonDate: string;
+  lostDate: string;
+  conversionDate: string;
   /** True when the lead carries a campaign name or id. */
   fromCampaign: boolean;
 }
@@ -240,6 +297,8 @@ export interface AccountingRow {
   invoiceDate: string;
   orderRef: string;
   product: string;
+  /** Stable Odoo product record ID when available. */
+  odooProductId?: string;
   productCategory: string;
   mainCategory: string;
   productCode: string;
@@ -326,12 +385,18 @@ export interface WebsiteSaleRow {
   priceDifference: number | null;
 }
 
-/** A confirmed lost lead from the archived CRM population (`active=false`, probability=0). */
+/** A canonical loss under crm_pipeline_redesign 1.26 (Lead and Opportunity rules differ). */
 export interface LostRow {
   id: string;
+  recordType: CrmRecordType;
+  active: boolean;
+  businessStatus: "lost";
+  /** Actual stage is preserved for Lost Leads; `stageKey` is therefore not always `lost`. */
+  stageKey: CrmStageKey;
   contact: string;
   phone: string;
   mobile: string;
+  email: string;
   campaignName: string;
   campaignId: string;
   campaignKey: string;
@@ -340,15 +405,49 @@ export interface LostRow {
   adset: string;
   lossReason: string;
   course: string;
+  /** Optional many-to-many Odoo Courses (`product_ids`), comma-separated for display. */
+  courses: string;
   mainCategory: string;
   salesTeam: string;
   salesperson: string;
   source: string;
+  medium: string;
+  communicationLanguage: string;
   sourceKey: string;
   stage: string;
   createdAt: string;
-  /** Odoo `date_closed`; used for the separate operational closure movement report. */
+  /** Source Odoo create_date in UTC when present. */
+  createdAtUtc?: string;
+  /** Canonical Lost movement date: Lead `date_closed`; Opportunity verification/stage date. */
   closeDate: string;
+  lostDate: string;
+  /** Which Odoo field supplied `lostDate`; fallback bases stay visible to QA. */
+  lostDateBasis: string;
+  lastStageUpdate: string;
+  lostCategory: string;
+  probability: number;
+  automatedProbability: number;
+  closingDurationDays: number | null;
+  readyToConvert: boolean;
+  leadSegment: string;
+  openStatus: string;
+  closingChannel: string;
+  inventoryBucket: string;
+  courseLanguage: string;
+  courseType: string;
+  customerType: string;
+  priority: string;
+  callingReply: string;
+  jobType: string;
+  howFoundUs: string;
+  company: string;
+  tags: string;
+  targetName: string;
+  resignTarget: string;
+  facebookLeadId: string;
+  validateClosedReason: string;
+  wonDate: string;
+  conversionDate: string;
 }
 
 /* --- aggregates ----------------------------------------------------------- */
@@ -380,18 +479,18 @@ export interface Totals {
   platformLeads: Maybe;
 
   /* CRM side */
-  /** Non-lost rows on the CRM Leads tab. CRM stage Lost is deliberately excluded. */
+  /** Active non-Lost CRM rows; current Lost-stage Opportunities live in the disjoint Lost set. */
   crmLeads: number;
-  /** Authoritative archived-lost population from Lost Analysis. */
+  /** Canonical Lost population. Legacy name retained for API compatibility. */
   archivedLeads: number;
-  /** Every lead: non-lost CRM rows + authoritative Lost Analysis rows. */
+  /** Reportable CRM population: active non-Lost rows + canonical Lost rows. */
   totalLeads: number;
   leadsFromCampaign: number;
   leadsOther: number;
   won: number;
-  /** Lost total from Lost Analysis only. */
+  /** Canonical 1.26 Lost total across Leads and Opportunities. */
   lost: number;
-  /** Always zero: CRM-stage Lost never participates in reporting. */
+  /** Always zero because canonical Lost rows are held in a disjoint internal set. */
   lostInCrm: number;
   /** Same authoritative count as `lost`. Kept for API compatibility. */
   lostArchived: number;
@@ -434,7 +533,11 @@ export interface Totals {
   cpa: Maybe;
   cpaWon: Maybe;
   cpaInvoices: Maybe;
+  /** All collections ÷ all spend. Not attributed — kept under this name for API compatibility; never label it ROAS. */
   roas: Maybe;
+  /** Explicit name for `roas` above: the non-attributed collections-to-spend ratio. */
+  collectionsToSpend: Maybe;
+  /** Campaign-attributed collections ÷ spend: the only total that is a ROAS. */
   attributedRoas: Maybe;
   acos: Maybe;
   attributedAcos: Maybe;
@@ -588,9 +691,11 @@ export interface CampaignOperationalState {
 /** Business result attributed to a currently eligible campaign inside the selected date filter. */
 export interface CampaignPeriodSummary {
   spend: number;
-  /** Reportable CRM rows only; archived Lost rows are deliberately excluded. */
+  /** Platform-reported lead total inside the selected reporting window. */
+  platformLeads: number | null;
+  /** Active non-Lost CRM rows attributed to this campaign. */
   crmLeads: number;
-  /** Authoritative archived Lost rows attributed to this campaign in the selected period. */
+  /** Canonical Lost rows attributed to this campaign in the selected period. */
   lostArchived: number;
   won: number;
   invoices: number;
@@ -674,7 +779,13 @@ export interface Grouped {
 }
 
 export interface LostBreakdown {
+  byCategory: Grouped[];
+  byType: Grouped[];
+  /** Grouped by `canonicalReasonKey`; `label` is the key, translate it with `reasonLabels`. */
   byReason: Grouped[];
+  /** Canonical reasons with every raw Odoo spelling folded into each, for audit drill-downs. */
+  byReasonCanonical: import("./loss-reason-taxonomy").CanonicalReasonGroup[];
+  reasonLabels: Record<string, { ar: string; en: string }>;
   byCourse: Grouped[];
   byMonth: Grouped[];
   byTeam: Grouped[];
@@ -711,7 +822,7 @@ export interface DataHealth {
   platformSources?: Partial<Record<Platform, PlatformSourceHealth>>;
   /** Authoritative CRM source used for this snapshot. */
   crmAuthority: "google-sheet" | "odoo-direct" | "postgres-last-good" | "google-sheet-fallback";
-  /** Archived Lost is fail-closed and falls back only to its PostgreSQL last-good copy. */
+  /** Canonical Lost is fail-closed and falls back only to its PostgreSQL last-good copy. */
   lostAuthority: "odoo-direct" | "postgres-last-good" | "unavailable";
   /** Marketing Lost cohorts are filtered by Odoo lead creation date. */
   lostDateBasis: "creation_date" | "unavailable";
@@ -753,7 +864,7 @@ export interface DataHealth {
     wrongType: number;
     missingLostReason: number;
   };
-  /** The same audit counters for the authoritative archived-Lost population. */
+  /** The same audit counters for the canonical Lost population. */
   lostExclusions: {
     candidates: number;
     accepted: number;

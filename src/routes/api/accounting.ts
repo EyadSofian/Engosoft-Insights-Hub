@@ -9,11 +9,59 @@ export const Route = createFileRoute("/api/accounting")({
         const { buildAccountingCourses } = await import("@/lib/accounting-courses");
         const { fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
+        const { accountingCreditNotes } = await import("@/lib/accounting-credit-notes.server");
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
-        const rows = data.accounting;
         const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
+        // Credit notes are invoice-date accounting documents, not payment
+        // events. Only the Invoice Date view displays and deducts them.
+        let rows =
+          dateBasis === "invoice"
+            ? data.accounting
+            : data.accounting.filter((row) => !row.isCreditNote);
+        let creditNoteReconciliation: Awaited<
+          ReturnType<typeof accountingCreditNotes>
+        >["reconciliation"] = {
+          status: "not_applicable",
+          documents: [],
+          addedDocuments: 0,
+          addedUsd: 0,
+          unsupportedCurrencies: [],
+        };
+        const hasAttributionFilter = Boolean(
+          filters.platform ||
+          filters.channel ||
+          filters.account ||
+          filters.campaign ||
+          filters.campaignKey ||
+          filters.adset ||
+          filters.adsetKey ||
+          filters.ad ||
+          filters.adKey ||
+          filters.source ||
+          filters.course ||
+          filters.mainCategory ||
+          filters.salesTeam ||
+          filters.salesperson,
+        );
+        if (dateBasis === "invoice" && !hasAttributionFilter) {
+          try {
+            const reconciled = await accountingCreditNotes(
+              rows,
+              filters.from || data.applied.from || "",
+              filters.to || data.applied.to || "",
+              fxRatesFromFilters(filters),
+              filters.company || "",
+            );
+            rows = reconciled.rows;
+            creditNoteReconciliation = reconciled.reconciliation;
+          } catch {
+            // The snapshot remains a last-good copy. Never turn an Odoo outage
+            // into a fabricated zero-credit-note assertion.
+            creditNoteReconciliation.status = "unavailable";
+          }
+        }
         const accountingDate = (row: (typeof rows)[number]) =>
           accountingReportingDate(row, dateBasis);
         const dateBasisLabel = dateBasis === "invoice" ? "Invoice Date" : "Payment Date";
@@ -99,7 +147,8 @@ export const Route = createFileRoute("/api/accounting")({
         }
 
         return json({
-          totals: computeTotals(data),
+          totals: computeTotals({ ...data, accounting: rows }),
+          creditNoteReconciliation,
           summary: {
             paidUsd,
             invoices: invoiceCount,

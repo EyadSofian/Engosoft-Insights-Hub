@@ -367,7 +367,7 @@ export function PricingTabBar<T extends string>({
       aria-label={label}
       className="hscroll scroll-hint-x sticky z-10 rounded-xl border border-border bg-surface"
       style={{
-        top: "calc(var(--chrome-header-h, 0px) + var(--chrome-sections-h, 0px))",
+        top: "calc(var(--chrome-header-offset, 0px) + var(--chrome-sections-h, 0px))",
         transition: "top var(--dur-chrome) var(--ease-chrome)",
         ["--scroll-hint-bg" as string]: "var(--surface)",
       }}

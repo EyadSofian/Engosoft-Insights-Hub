@@ -18,6 +18,7 @@ import { useApi } from "@/lib/use-api";
 import type { CreativeAnalyticsRow, PlatformSourceHealth } from "@/lib/types";
 import { PlatformBadges } from "@/components/metric-bits";
 import { Skeleton } from "@/components/ui-bits";
+import { CreativeDetail } from "@/components/acquisition/ClosedLoop";
 
 interface CreativeResponse {
   rows: CreativeAnalyticsRow[];
@@ -116,16 +117,19 @@ function CreativeCard({
   rank,
   showWinner,
   showCampaign = false,
+  onOpenDetail,
 }: {
   row: CreativeAnalyticsRow;
   rank: number;
   showWinner: boolean;
   showCampaign?: boolean;
+  /** Opens the creative's own detail: its leads, who handled them, sales and revenue. */
+  onOpenDetail?: (creativeId: string) => void;
 }) {
   const { lang } = useI18n();
   const previewUrl = row.permalinkUrl || row.landingPageUrl;
   const title =
-    row.creativeName || row.ad || (lang === "ar" ? "كرياتيف بدون اسم" : "Unnamed creative");
+    row.ad || row.adset || row.creativeName || (lang === "ar" ? "إعلان بدون اسم" : "Unnamed ad");
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md">
@@ -162,10 +166,11 @@ function CreativeCard({
               >
                 {title}
               </h5>
-              <p className="mt-0.5 truncate text-[9.5px] text-text-subtle" title={row.ad}>
-                {showCampaign
-                  ? `${lang === "ar" ? "الحملة" : "Campaign"}: ${row.campaign || "—"}`
-                  : `${lang === "ar" ? "الإعلان" : "Ad"}: ${row.ad || "—"}`}
+              <p className="mt-0.5 truncate text-[9.5px] text-text-subtle" title={row.campaign}>
+                {lang === "ar" ? "الحملة" : "Campaign"}: {row.campaign || "—"}
+              </p>
+              <p className="truncate text-[9.5px] text-text-subtle" title={row.adset}>
+                {lang === "ar" ? "المجموعة الإعلانية" : "Ad set"}: {row.adset || "—"}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -194,25 +199,39 @@ function CreativeCard({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           <Metric
             label={lang === "ar" ? "إنفاق" : "Spend"}
             value={row.spend === null ? "—" : fmtUSD(row.spend)}
           />
-          <Metric label="CTR" value={fmtPct(row.ctrAll, 2)} />
-          <Metric label={lang === "ar" ? "ليد CRM" : "CRM leads"} value={fmtNum(row.crmLeads)} />
-          <Metric label={lang === "ar" ? "رابحة" : "Won"} value={fmtNum(row.won)} />
-          <Metric label={lang === "ar" ? "إيراد" : "Revenue"} value={fmtUSD(row.revenue)} />
+          <Metric label={lang === "ar" ? "عدد الليدز" : "Leads"} value={fmtNum(row.crmLeads)} />
+          <Metric
+            label={lang === "ar" ? "سعر الليد" : "Cost per lead"}
+            value={row.spend !== null && row.crmLeads > 0 ? fmtUSD(row.spend / row.crmLeads) : "—"}
+          />
+          <Metric label={lang === "ar" ? "عدد البيع" : "Won sales"} value={fmtNum(row.won)} />
+          <Metric label={lang === "ar" ? "عدد اللوست" : "Lost"} value={fmtNum(row.lost)} />
+          <Metric
+            label={lang === "ar" ? "نسبة التحويل" : "Conversion rate"}
+            value={row.crmLeads > 0 ? fmtPct((row.won / row.crmLeads) * 100, 1) : "—"}
+          />
+          <Metric label={lang === "ar" ? "المبيعات" : "Revenue"} value={fmtUSD(row.revenue)} />
           <Metric label="ROAS" value={row.roas === null ? "—" : `${row.roas.toFixed(2)}×`} />
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-2">
-          <span
-            className="num max-w-[68%] truncate text-[9px] text-text-subtle"
-            title={row.creativeId}
-          >
-            ID {row.creativeId || "—"}
-          </span>
+          {onOpenDetail && row.creativeId && row.platform === "meta" ? (
+            <button
+              type="button"
+              onClick={() => onOpenDetail(row.creativeId)}
+              className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md text-[11px] font-semibold text-brand hover:underline"
+              title={`ID ${row.creativeId}`}
+            >
+              {lang === "ar" ? "العملاء والمبيعات" : "Leads & sales"}
+            </button>
+          ) : (
+            <span />
+          )}
           {previewUrl ? (
             <a
               href={previewUrl}
@@ -243,6 +262,7 @@ export function CampaignCreativeGallery({
 }) {
   const { lang } = useI18n();
   const [sort, setSort] = useState<CreativeSort>("won");
+  const [detailCreativeId, setDetailCreativeId] = useState<string | null>(null);
   const { data, isLoading, isError } = useApi<CreativeResponse>(
     `/api/ads-creatives?campaignKey=${encodeURIComponent(campaignKey)}`,
     { enabled: !!campaignKey },
@@ -365,6 +385,7 @@ export function CampaignCreativeGallery({
               row={row}
               rank={index}
               showWinner={SORTS[sort].value(row) > 0}
+              onOpenDetail={setDetailCreativeId}
             />
           ))}
         </div>
@@ -377,6 +398,7 @@ export function CampaignCreativeGallery({
             : `Showing the first 30 of ${fmtNum(rows.length)} creatives.`}
         </p>
       )}
+      <CreativeDetail creativeId={detailCreativeId} onClose={() => setDetailCreativeId(null)} />
     </section>
   );
 }

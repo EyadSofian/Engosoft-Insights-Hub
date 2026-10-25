@@ -1181,8 +1181,8 @@ function Methodology({ data, lang }: { data: WeekendResponse; lang: "ar" | "en" 
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             {lang === "ar"
-              ? "الليد يُنسب ليوم إنشائه في Odoo حتى لو أُغلق لاحقًا. Lost مأخوذ من Archived Lost المعتمد لنفس دفعة الإنشاء، ونسبة المبيعات هي Won ÷ إجمالي الليدز؛ لا يتم اختراع ربط محاسبي غير موجود بين الليد والفاتورة. متوسط الصرف اليومي يشمل أيام الصرف الصفري داخل العينة."
-              : "A lead is attributed to its Odoo creation day even if it closes later. Lost comes from the authoritative Archived Lost cohort, while sales rate is Won ÷ total leads; no unsupported lead-to-invoice link is invented. Average daily spend includes zero-spend days in the sample."}
+              ? "الليد يُنسب ليوم إنشائه في Odoo حتى لو أُغلق لاحقًا. Lost مأخوذ من التصنيف المعتمد لعقد CRM 1.26 لنفس دفعة الإنشاء، ونسبة المبيعات هي Won ÷ إجمالي الليدز؛ لا يتم اختراع ربط محاسبي غير موجود بين الليد والفاتورة. متوسط الصرف اليومي يشمل أيام الصرف الصفري داخل العينة."
+              : "A lead is attributed to its Odoo creation day even if it closes later. Lost follows the canonical CRM 1.26 classification for the same cohort, while sales rate is Won ÷ total leads; no unsupported lead-to-invoice link is invented. Average daily spend includes zero-spend days in the sample."}
           </p>
           <p className="mt-2 text-[11px] leading-relaxed text-text-subtle">
             {lang === "ar"

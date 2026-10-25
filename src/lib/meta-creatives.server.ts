@@ -93,6 +93,33 @@ function freshCreative(creative: AdCreative, now: number): boolean {
   return Number.isFinite(syncedAt) && now - syncedAt < CACHE_MS;
 }
 
+/**
+ * The lead form an instant-form ad collects into. Meta keeps it on the call to
+ * action of whichever story spec the creative uses, or on the asset feed of a
+ * flexible creative.
+ */
+export function leadFormIdOf(creativeValue: unknown): string {
+  const creative = object(creativeValue);
+  const story = object(creative.object_story_spec);
+  const specs = [story.link_data, story.video_data, story.template_data, story.photo_data].map(
+    object,
+  );
+  for (const spec of specs) {
+    const value = object(object(spec.call_to_action).value);
+    const id = text(value.lead_gen_form_id);
+    if (id) return id;
+    for (const child of list(spec.child_attachments)) {
+      const childId = text(object(object(child.call_to_action).value).lead_gen_form_id);
+      if (childId) return childId;
+    }
+  }
+  for (const action of list(object(creative.asset_feed_spec).call_to_actions)) {
+    const id = text(object(action.value).lead_gen_form_id);
+    if (id) return id;
+  }
+  return "";
+}
+
 /** Pure normalizer kept exported so Meta response changes are fixture-tested. */
 export function normalizeMetaGraphAd(
   rawValue: unknown,
@@ -134,6 +161,58 @@ export function normalizeMetaGraphAd(
     video.image_url,
     imageUrl,
   );
+  const imageHash =
+    text(creative.image_hash) ||
+    text(link.image_hash) ||
+    text(photo.image_hash) ||
+    text(assetImages[0]?.hash);
+  // Provider asset identities only: video IDs and image hashes. Meta attributes
+  // results to the ad and creative, so these are reporting context, not grains.
+  const feedAssets = [
+    ...(videoId
+      ? [{ type: "video" as const, id: videoId, thumbnailUrl: text(creative.thumbnail_url) }]
+      : []),
+    ...(imageHash ? [{ type: "image" as const, id: imageHash, url: imageUrl }] : []),
+    ...assetVideos
+      .map((asset) => ({
+        type: "video" as const,
+        id: text(asset.video_id),
+        thumbnailUrl: text(asset.thumbnail_url),
+      }))
+      .filter((asset) => asset.id),
+    ...assetImages
+      .map((asset) => ({ type: "image" as const, id: text(asset.hash), url: text(asset.url) }))
+      .filter((asset) => asset.id),
+    ...children
+      .map((child) => ({
+        type: "image" as const,
+        id: text(child.image_hash),
+        url: text(child.picture),
+      }))
+      .filter((asset) => asset.id),
+    ...children
+      .map((child) => ({
+        type: "video" as const,
+        id: text(child.video_id),
+        thumbnailUrl: text(child.picture),
+      }))
+      .filter((asset) => asset.id),
+  ].filter(
+    (asset, index, all) =>
+      all.findIndex((other) => other.type === asset.type && other.id === asset.id) === index,
+  );
+  const leadFormId = leadFormIdOf(creative);
+  const assetMetadata = {
+    titles: list(assets.titles)
+      .map((entry) => text(entry.text))
+      .filter(Boolean),
+    bodies: list(assets.bodies)
+      .map((entry) => text(entry.text))
+      .filter(Boolean),
+    linkUrls: list(assets.link_urls)
+      .map((entry) => text(entry.website_url) || text(entry.display_url))
+      .filter(Boolean),
+  };
   const isCarousel = children.length > 1 || assetImages.length + assetVideos.length > 1;
   const mediaType = isCarousel ? "carousel" : videoId ? "video" : imageUrl ? "image" : "text";
   const headline =
@@ -176,6 +255,11 @@ export function normalizeMetaGraphAd(
     thumbnailUrl,
     videoUrl: "",
     videoId,
+    imageHash,
+    assets: feedAssets,
+    leadFormId,
+    leadFormSource: leadFormId ? "creative_call_to_action" : undefined,
+    assetMetadata,
     permalinkUrl: httpUrl(creative.instagram_permalink_url),
     landingPageUrl: httpUrl(
       link.link,
@@ -192,7 +276,7 @@ export function normalizeMetaGraphAd(
   };
 }
 
-function storageRow(creative: AdCreative): Record<string, unknown> {
+export function creativeStorageRow(creative: AdCreative): Record<string, unknown> {
   return {
     __creative_key: `${creative.accountId}|${creative.adId}|${creative.creativeId}`,
     __account_id: creative.accountId,
@@ -217,6 +301,15 @@ function storageRow(creative: AdCreative): Record<string, unknown> {
     "Creative Thumbnail URL": creative.thumbnailUrl,
     "Creative Video URL": creative.videoUrl,
     "Creative Video ID": creative.videoId,
+    "Creative Image Hash": creative.imageHash || "",
+    "Creative Assets": JSON.stringify(creative.assets ?? []),
+    "Lead Form ID": creative.leadFormId || "",
+    "Lead Form Source": creative.leadFormId
+      ? creative.leadFormSource || "creative_call_to_action"
+      : "",
+    "Creative Asset Metadata": JSON.stringify(
+      creative.assetMetadata ?? { titles: [], bodies: [], linkUrls: [] },
+    ),
     "Creative Permalink URL": creative.permalinkUrl,
     "Creative Landing Page URL": creative.landingPageUrl,
     "Creative Status": creative.status,
@@ -285,6 +378,128 @@ async function fetchBatch(
   }
 }
 
+const THUMBNAIL_SIZE = "600";
+const THUMBNAIL_BATCH = 50;
+
+/**
+ * Meta returns a 64×64 thumbnail when a creative is read through its ad and
+ * honours `thumbnail_width/height` only when the creative is read directly. A
+ * card showing the creative needs the larger one, so read those directly in
+ * batches and swap them in. A failure keeps the small thumbnail.
+ */
+export async function enlargeCreativeThumbnails(
+  creatives: AdCreative[],
+  token: string,
+  apiVersion: string,
+): Promise<number> {
+  const ids = [...new Set(creatives.map((creative) => creative.creativeId).filter(Boolean))];
+  const large = new Map<string, string>();
+  for (let index = 0; index < ids.length; index += THUMBNAIL_BATCH) {
+    const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
+    url.searchParams.set("ids", ids.slice(index, index + THUMBNAIL_BATCH).join(","));
+    url.searchParams.set("fields", "thumbnail_url");
+    url.searchParams.set("thumbnail_width", THUMBNAIL_SIZE);
+    url.searchParams.set("thumbnail_height", THUMBNAIL_SIZE);
+    url.searchParams.set("access_token", token);
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      const payload = object(await response.json());
+      if (!response.ok || Object.keys(object(payload.error)).length) continue;
+      for (const [id, entry] of Object.entries(payload)) {
+        const thumbnail = httpUrl(object(entry).thumbnail_url);
+        if (thumbnail) large.set(id, thumbnail);
+      }
+    } catch {
+      // Keep the thumbnails Meta already gave.
+    }
+  }
+  let replaced = 0;
+  for (const creative of creatives) {
+    const thumbnail = large.get(creative.creativeId);
+    if (!thumbnail) continue;
+    creative.thumbnailUrl = thumbnail;
+    replaced += 1;
+  }
+  return replaced;
+}
+
+const pageTokens = new Map<string, { token: string; expiresAt: number }>();
+
+/**
+ * An ad that promotes an existing page post keeps its instant form on the
+ * post's call to action, not in the creative spec. Reading the post needs a
+ * page access token, derived at runtime from the system-user token and kept in
+ * memory only (never stored, logged or returned).
+ */
+export async function resolvePostLeadForms(
+  creatives: AdCreative[],
+  token: string,
+  apiVersion: string,
+): Promise<number> {
+  const byPage = new Map<string, AdCreative[]>();
+  for (const creative of creatives) {
+    const story = creative.effectiveObjectStoryId || "";
+    if (creative.leadFormId || !/^\d+_\d+$/.test(story)) continue;
+    const page = story.split("_")[0]!;
+    byPage.set(page, [...(byPage.get(page) ?? []), creative]);
+  }
+  let resolved = 0;
+  for (const [page, list] of byPage) {
+    let pageToken = pageTokens.get(page);
+    if (!pageToken || pageToken.expiresAt < Date.now()) {
+      try {
+        const url = new URL(`https://graph.facebook.com/${apiVersion}/${page}`);
+        url.searchParams.set("fields", "access_token");
+        url.searchParams.set("access_token", token);
+        const payload = object(
+          await (
+            await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+          ).json(),
+        );
+        const value = text(payload.access_token);
+        if (!value) continue;
+        pageToken = { token: value, expiresAt: Date.now() + 50 * 60_000 };
+        pageTokens.set(page, pageToken);
+      } catch {
+        continue;
+      }
+    }
+    for (let index = 0; index < list.length; index += THUMBNAIL_BATCH) {
+      const chunk = list.slice(index, index + THUMBNAIL_BATCH);
+      const url = new URL(`https://graph.facebook.com/${apiVersion}/`);
+      url.searchParams.set(
+        "ids",
+        [...new Set(chunk.map((creative) => creative.effectiveObjectStoryId))].join(","),
+      );
+      url.searchParams.set("fields", "call_to_action");
+      url.searchParams.set("access_token", pageToken.token);
+      try {
+        const payload = object(
+          await (
+            await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+          ).json(),
+        );
+        if (Object.keys(object(payload.error)).length) continue;
+        for (const creative of chunk) {
+          const cta = object(object(payload[creative.effectiveObjectStoryId || ""]).call_to_action);
+          const formId = text(object(cta.value).lead_gen_form_id);
+          if (!formId) continue;
+          creative.leadFormId = formId;
+          creative.leadFormSource = "post_call_to_action";
+          resolved += 1;
+        }
+      } catch {
+        // Keep the creative without a form: it stays "form unknown".
+      }
+    }
+  }
+  return resolved;
+}
+
 const emptyResult = (configured: boolean, message: string): MetaCreativeSyncResult => ({
   configured,
   ok: false,
@@ -296,6 +511,8 @@ const emptyResult = (configured: boolean, message: string): MetaCreativeSyncResu
   syncedAt: "",
   message,
 });
+
+export { AD_FIELDS as META_CREATIVE_AD_FIELDS };
 
 export async function syncMetaCreativesDirect(
   input: readonly AdCreative[],
@@ -378,6 +595,8 @@ export async function syncMetaCreativesDirect(
       }
     }
 
+    await enlargeCreativeThumbnails(fetched, token, apiVersion);
+    await resolvePostLeadForms(fetched, token, apiVersion);
     for (const creative of fetched) {
       memory.set(creative.adId, { expiresAt: now + CACHE_MS, creative });
     }
@@ -386,7 +605,7 @@ export async function syncMetaCreativesDirect(
     let persisted = false;
     if (fetched.length && databaseConfigured()) {
       try {
-        await writeDashboardDataset("meta_ad_creatives", fetched.map(storageRow), {
+        await writeDashboardDataset("meta_ad_creatives", fetched.map(creativeStorageRow), {
           mode: "upsert",
           syncedAt,
           metadata: {

@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -22,6 +23,7 @@ import {
   InsightCard,
   InsightRow,
   KpiRow,
+  MoreDetails,
   PageSection,
   PageSections,
 } from "@/components/dashboard-bits";
@@ -31,6 +33,8 @@ import type { MetricDetail } from "@/lib/metric-detail";
 import { campaignReturnBand } from "@/lib/campaign-return-band";
 import { CompareBars } from "@/components/ads/CompareBars";
 import { CampaignActivityPanel } from "@/components/CampaignActivityPanel";
+import { OverviewCampaignRecords } from "@/components/overview-records";
+import { CampaignDetail, type CampaignTab } from "@/components/campaigns/CampaignDetail";
 import { roasVerdict, verdictWord } from "@/components/ads/verdict";
 import { MetricsGlossaryButton } from "@/components/ads/MetricsGlossary";
 import { FilterSummary } from "@/components/ads/FilterSummary";
@@ -39,12 +43,22 @@ import { ratioCell } from "@/components/ads/cells";
 import type { CampaignActivity, DataHealth, PerfRow, Totals } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
-type CampaignsSearch = { view?: "attributedRevenue" };
-type CampaignWorkspaceTab = "decision" | "live" | "analysis";
+type CampaignsSearch = {
+  view?: "attributedRevenue";
+  /** The campaign whose detail is open, by its stable performance key. */
+  campaign?: string;
+  tab?: CampaignTab;
+};
+
+const CAMPAIGN_TABS: CampaignTab[] = ["overview", "ads", "sales"];
 
 export const Route = createFileRoute("/campaigns")({
   validateSearch: (search: Record<string, unknown>): CampaignsSearch => ({
     view: search.view === "attributedRevenue" ? "attributedRevenue" : undefined,
+    campaign: typeof search.campaign === "string" && search.campaign ? search.campaign : undefined,
+    tab: CAMPAIGN_TABS.includes(search.tab as CampaignTab)
+      ? (search.tab as CampaignTab)
+      : undefined,
   }),
   component: Campaigns,
 });
@@ -56,6 +70,72 @@ interface Resp {
   activity: CampaignActivity;
   unknownAdsetKey: string;
   health: DataHealth;
+}
+
+interface WebsiteChannelData {
+  totals?: { leads: number; won: number; sales: number };
+}
+
+const CHANNEL_TONES = [
+  { accent: "var(--sky-strong)", surface: "var(--sky-surface)" },
+  { accent: "var(--mint-strong)", surface: "var(--mint-surface)" },
+  { accent: "var(--violet-strong)", surface: "var(--violet-surface)" },
+  { accent: "var(--amber-strong)", surface: "var(--amber-surface)" },
+  { accent: "var(--rose-strong)", surface: "var(--rose-surface)" },
+  { accent: "var(--sky-strong)", surface: "var(--sky-surface)" },
+] as const;
+
+function ChannelCard({
+  label,
+  icon,
+  to,
+  value,
+  detail,
+  connected,
+  index,
+  lang,
+}: {
+  label: string;
+  icon: ReactNode;
+  to: string;
+  value: string;
+  detail: string;
+  connected: boolean;
+  index: number;
+  lang: "ar" | "en";
+}) {
+  const tone = CHANNEL_TONES[index % CHANNEL_TONES.length];
+  return (
+    <Link to={to as never} className="block min-w-0">
+      <Card
+        className="h-full overflow-hidden border-border/80 p-3 transition-transform hover:-translate-y-0.5"
+        style={{ borderTop: `3px solid ${tone.accent}` }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span
+            className="grid size-8 place-items-center rounded-xl"
+            style={{ background: tone.surface, color: tone.accent }}
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+          <span className="text-[11px] font-bold text-text-subtle">↗</span>
+        </div>
+        <p className="mt-3 truncate text-[12px] font-bold text-text" title={label}>
+          {label}
+        </p>
+        <p className="mt-1 text-lg font-black tracking-tight text-text">{value}</p>
+        <p className={`mt-1 text-[10.5px] ${connected ? "text-text-muted" : "text-text-subtle"}`}>
+          {detail}
+        </p>
+        {!connected && (
+          <p className="mt-2 text-[10px] font-semibold text-text-subtle">
+            {lang === "ar" ? "المصدر غير متصل" : "Source not connected"}
+          </p>
+        )}
+      </Card>
+    </Link>
+  );
 }
 
 /**
@@ -176,15 +256,16 @@ function headlineDetails(
 
 function Campaigns() {
   const { t, lang } = useI18n();
-  const { view: initialView } = Route.useSearch();
+  const { view: initialView, campaign: openCampaign, tab: campaignTab } = Route.useSearch();
+  const navigate = useNavigate({ from: "/campaigns" });
   const filters = useFilters();
   const [grain, setGrain] = useState<Grain>("campaign");
-  const [workspaceTab, setWorkspaceTab] = useState<CampaignWorkspaceTab>("decision");
   // One panel for the three readings: whichever card was pressed last.
   // Declares this page to ENGO Nexus, so "حلل الصفحة دي" and "التاب ده"
   // have something to resolve against. Ids and state only — no figures.
-  useRegisterNexusView("campaigns", { tab: workspaceTab });
+  useRegisterNexusView("campaigns", { tab: "decision" });
   const { data, isLoading, error, refetch } = useApi<Resp>(`/api/campaigns?grain=${grain}`);
+  const { data: websiteChannelData } = useApi<WebsiteChannelData>("/api/website");
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
@@ -192,6 +273,10 @@ function Campaigns() {
   const totals = data?.totals;
   const spend = totals?.spend ?? 0;
   const headline = campaignHeadlines(data?.rows ?? []);
+  const metaRows = data?.rows.filter((row) => row.platforms.includes("meta")) ?? [];
+  const metaLeads = metaRows.reduce((sum, row) => sum + (row.platformLeads ?? 0), 0);
+  const websiteLeads = websiteChannelData?.totals?.leads ?? null;
+  const websiteWon = websiteChannelData?.totals?.won ?? null;
   const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
   // Built from the response already on screen — the drill-down never re-queries
   // and so can never disagree with the card that opened it.
@@ -218,13 +303,51 @@ function Campaigns() {
       })
     : null;
   const insights = headlineDetails(headline, lang);
+  // The campaign the reader opened, if any: its own screen replaces the list
+  // rather than unfolding underneath it.
+  const detailRow = openCampaign
+    ? (data?.rows.find((entry) => entry.key === openCampaign) ??
+      data?.rows.find((entry) => entry.campaignKey === openCampaign))
+    : undefined;
+  const openDetail = (key: string) =>
+    void navigate({
+      search: (prev: CampaignsSearch) => ({ ...prev, campaign: key, tab: undefined }),
+    });
+  const closeDetail = () =>
+    void navigate({
+      search: (prev: CampaignsSearch) => ({ ...prev, campaign: undefined, tab: undefined }),
+    });
+
+  if (openCampaign && data && detailRow)
+    return (
+      <CampaignDetail
+        row={detailRow}
+        rows={data.rows}
+        state={Object.values(data.activity.delivery).find(
+          (entry) =>
+            entry.campaignKey === detailRow.campaignKey || entry.campaignKey === detailRow.key,
+        )}
+        lostAvailable={hasReportableLost(data.health.lostAuthority)}
+        tab={campaignTab ?? "overview"}
+        onTab={(next) =>
+          void navigate({
+            search: (prev: CampaignsSearch) => ({
+              ...prev,
+              tab: next === "overview" ? undefined : next,
+            }),
+          })
+        }
+        onBack={closeDetail}
+        period={period}
+      />
+    );
 
   return (
     <div>
       <DashboardPageHeader
         flush
         icon={<Megaphone size={20} />}
-        title={t("campaigns")}
+        title={lang === "ar" ? "نظرة عامة على التسويق" : "Marketing Overview"}
         subtitle={
           lang === "ar"
             ? "أداء حملاتك التسويقية عبر جميع القنوات"
@@ -240,6 +363,88 @@ function Campaigns() {
           aria-label={lang === "ar" ? "مؤشرات الفترة" : "Period figures"}
         >
           <FilterSummary />
+
+          <div className="mt-4">
+            <SectionTitle
+              hint={
+                lang === "ar"
+                  ? "نظرة سريعة على القنوات؛ افتح أي بطاقة للتفاصيل."
+                  : "A compact view of the channels; open a card for its report."
+              }
+            >
+              {lang === "ar" ? "ملخص القنوات" : "Channel summary"}
+            </SectionTitle>
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <ChannelCard
+                label="Meta Ads"
+                icon={<Megaphone size={15} />}
+                to="/ads"
+                value={data ? fmtNum(metaLeads) : "—"}
+                detail={lang === "ar" ? "ليدز أبلغت عنها المنصة" : "platform-reported leads"}
+                connected={Boolean(data)}
+                index={0}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Website"
+                icon={<TrendingUp size={15} />}
+                to="/website"
+                value={websiteLeads === null ? "—" : fmtNum(websiteLeads)}
+                detail={
+                  websiteWon === null
+                    ? lang === "ar"
+                      ? "ليدز من مصدر Website"
+                      : "leads from CRM source Website"
+                    : lang === "ar"
+                      ? `${fmtNum(websiteWon)} رابحة`
+                      : `${fmtNum(websiteWon)} won`
+                }
+                connected={websiteLeads !== null}
+                index={1}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Landing Pages"
+                icon={<Target size={15} />}
+                to="/landing-pages"
+                value="—"
+                detail={lang === "ar" ? "التسليم التفصيلي" : "delivery detail"}
+                connected={false}
+                index={2}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Lead Forms"
+                icon={<Users size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "نماذج Meta" : "Meta forms"}
+                connected={false}
+                index={3}
+                lang={lang}
+              />
+              <ChannelCard
+                label="WhatsApp"
+                icon={<Activity size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "مصدر الرسائل" : "message source"}
+                connected={false}
+                index={4}
+                lang={lang}
+              />
+              <ChannelCard
+                label="Messenger"
+                icon={<BarChart3 size={15} />}
+                to="/acquisition"
+                value="—"
+                detail={lang === "ar" ? "مصدر الرسائل" : "message source"}
+                connected={false}
+                index={5}
+                lang={lang}
+              />
+            </div>
+          </div>
 
           {/* The period's five figures, and the three readings of it worth
               acting on. Both describe the selected window rather than any one
@@ -303,22 +508,22 @@ function Campaigns() {
               <MetricCardDetailTrigger
                 detail={metrics.roas}
                 card={{
-                  metric: "roas",
+                  metric: "collectionsToSpend",
                   index: 4,
                   icon: <TrendingUp size={14} />,
-                  value: ratioCell(totals.attributedRoas, spend, (v) => `${v.toFixed(2)}×`),
+                  value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
                   unavailableReason:
                     spend <= 0
                       ? lang === "ar"
                         ? "مفيش إنفاق مسجّل في الفترة المختارة."
                         : "No recorded spend in the selected period."
                       : undefined,
-                  verdict: roasVerdict(totals.attributedRoas, spend) ?? undefined,
-                  verdictLabel: verdictWord(roasVerdict(totals.attributedRoas, spend), lang),
+                  verdict: roasVerdict(totals.roas, spend) ?? undefined,
+                  verdictLabel: verdictWord(roasVerdict(totals.roas, spend), lang),
                   note:
                     lang === "ar"
-                      ? `البسط هو الإيراد المربوط بحملات (${fmtUSD(totals.attributedRevenue)}). كل التحصيل ÷ الإنفاق = ${fmtRoas(totals.roas)}، وده مش ROAS إعلاني.`
-                      : `The numerator is campaign-linked revenue (${fmtUSD(totals.attributedRevenue)}). All revenue ÷ spend is ${fmtRoas(totals.roas)}, which is not advertising ROAS.`,
+                      ? `البسط هنا كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}).`
+                      : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}).`,
                 }}
               />
             </KpiRow>
@@ -434,118 +639,54 @@ function Campaigns() {
           level="primary"
           aria-label={lang === "ar" ? "مساحة عمل الحملات" : "Campaign workspace"}
         >
-          <div
-            role="tablist"
-            aria-label={lang === "ar" ? "أقسام صفحة الحملات" : "Campaign workspace"}
-            /* Scrolls with full labels on a phone, equal 3-up from `sm`. */
-            className="hscroll flex gap-1 rounded-2xl border border-border bg-surface-2 p-1 sm:grid sm:grid-cols-3"
-          >
-            {(
-              [
-                {
-                  key: "decision" as const,
-                  label: lang === "ar" ? "قرار سريع" : "Quick decision",
-                  description: lang === "ar" ? "ناجحة ولا محتاجة تدخل؟" : "What needs action?",
-                  icon: Target,
-                },
-                {
-                  key: "live" as const,
-                  label: lang === "ar" ? "الحملات الشغالة" : "Live campaigns",
-                  description:
-                    lang === "ar" ? "حالة التشغيل على المنصات" : "Platform delivery state",
-                  icon: Activity,
-                },
-                {
-                  key: "analysis" as const,
-                  label: lang === "ar" ? "تحليل الفترة" : "Period analysis",
-                  description:
-                    lang === "ar" ? "صرف، إيراد، وكل التفاصيل" : "Spend, revenue and detail",
-                  icon: BarChart3,
-                },
-              ] satisfies Array<{
-                key: CampaignWorkspaceTab;
-                label: string;
-                description: string;
-                icon: typeof Target;
-              }>
-            ).map((tab) => {
-              const active = workspaceTab === tab.key;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setWorkspaceTab(tab.key)}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-start transition-colors sm:min-w-0 sm:shrink sm:px-3 ${
-                    active ? "bg-surface text-text shadow-sm" : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 text-[12.5px] font-bold sm:text-[13.5px]">
-                    <span
-                      className="grid size-6 shrink-0 place-items-center rounded-lg transition-colors"
-                      style={
-                        active
-                          ? { background: "var(--sky-strong)", color: "#fff" }
-                          : { background: "var(--surface-3)", color: "var(--text-subtle)" }
-                      }
-                      aria-hidden="true"
-                    >
-                      <Icon size={13} />
-                    </span>
-                    <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
-                  </span>
-                  <span className="mt-0.5 hidden truncate ps-8 text-[10.5px] text-text-subtle sm:block">
-                    {tab.description}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
           {isLoading || !data || !totals ? (
             <Skeleton className="h-[520px]" />
           ) : (
             <>
-              {workspaceTab === "decision" && (
-                <PerfExplorer
-                  rows={data.rows}
-                  grain={grain}
-                  onGrainChange={setGrain}
-                  initialView={initialView}
-                  unknownAdsetKey={data.unknownAdsetKey}
-                  csvPrefix="engosoft"
-                  activeCampaignStates={Object.values(data.activity.delivery)}
-                  lostAvailable={hasReportableLost(data.health.lostAuthority)}
-                  spendAvailable={spend > 0}
-                  spendNote={
-                    spend <= 0
-                      ? lang === "ar"
-                        ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
-                        : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
-                      : undefined
-                  }
-                  title={
-                    grain === "campaign"
-                      ? lang === "ar"
-                        ? "قرار الحملات اللي شغالة دلوقتي"
-                        : "Live campaign decisions"
-                      : lang === "ar"
-                        ? "تفاصيل الحملة"
-                        : "Campaign details"
-                  }
-                  subtitle={
-                    lang === "ar"
-                      ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
-                      : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
-                  }
-                />
-              )}
+              <PerfExplorer
+                rows={data.rows}
+                grain={grain}
+                onGrainChange={setGrain}
+                initialView={initialView}
+                unknownAdsetKey={data.unknownAdsetKey}
+                csvPrefix="engosoft"
+                onOpenDetail={grain === "campaign" ? openDetail : undefined}
+                activeCampaignStates={Object.values(data.activity.delivery)}
+                lostAvailable={hasReportableLost(data.health.lostAuthority)}
+                spendAvailable={spend > 0}
+                spendNote={
+                  spend <= 0
+                    ? lang === "ar"
+                      ? "مفيش إنفاق مسجّل في النطاق الحالي، فالمؤشرات المبنية على الإنفاق بتظهر شرطة."
+                      : "No recorded spend in the current scope, so spend-derived metrics render as a dash."
+                    : undefined
+                }
+                title={
+                  grain === "campaign"
+                    ? lang === "ar"
+                      ? "قرار الحملات اللي شغالة دلوقتي"
+                      : "Live campaign decisions"
+                    : lang === "ar"
+                      ? "تفاصيل الحملة"
+                      : "Campaign details"
+                }
+                subtitle={
+                  lang === "ar"
+                    ? "ابدأ من هنا: ناجحة، متابعة، ضعيفة، أو بدري للحكم. حملات web-con بتتحسب كتحويلات موقع، مش ليدز CRM."
+                    : "Start here: Successful, Watch, Weak, or Too early. web-con is evaluated as website conversion, not CRM lead generation."
+                }
+              />
 
-              {workspaceTab === "live" && <CampaignActivityPanel activity={data.activity} />}
-
-              {workspaceTab === "analysis" && (
+              <MoreDetails
+                label={lang === "ar" ? "تحليل إضافي" : "More analysis"}
+                hint={
+                  lang === "ar"
+                    ? "حالة التشغيل على المنصات، الإنفاق مقابل التحصيل، وملاحظات البيانات"
+                    : "Platform delivery status, spend against collections, and data notes"
+                }
+              >
+                <CampaignActivityPanel activity={data.activity} />
+                <OverviewCampaignRecords />
                 <>
                   <SectionTitle
                     hint={
@@ -669,7 +810,7 @@ function Campaigns() {
                       : `${fmtNum(data.rows.length)} rows at this level. Blended CPA is ${fmtUSDFull(totals.cpa)} on the ${filters.cpaBasis === "invoices" ? "invoice-count" : "won-deals"} basis.`}
                   </p>
                 </>
-              )}
+              </MoreDetails>
             </>
           )}
         </PageSection>

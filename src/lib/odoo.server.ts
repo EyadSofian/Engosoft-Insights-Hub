@@ -15,6 +15,8 @@ export interface OdooConfig {
   apiKey: string;
   /** The companies this dashboard reports on: Egypt, KSA, UAE. */
   companyIds: number[];
+  /** Companies consolidated by the Odoo Profit and Loss report. */
+  pnlCompanyIds: number[];
   /** Earliest date any Products query will look at. */
   startDate: string;
 }
@@ -46,6 +48,9 @@ export function odooConfig(): OdooConfig {
     apiKey: process.env.ODOO_API_KEY || "",
     // Matches `cids=2-3-4` in the Odoo web URLs the team uses.
     companyIds: numberList(process.env.ODOO_COMPANY_IDS, [2, 3, 4]),
+    // Matches the five selected report companies in Odoo (`cids=3-2-6-4-5`),
+    // excluding the parent company that is not part of the consolidated report.
+    pnlCompanyIds: numberList(process.env.ODOO_PNL_COMPANY_IDS, [2, 3, 4, 5, 6]),
     startDate: process.env.ODOO_START_DATE || "2026-01-01",
   };
 }
@@ -84,6 +89,7 @@ async function rpc(
   method: string,
   args: unknown[],
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const cfg = odooConfig();
   const res = await fetch(`${cfg.url}/jsonrpc`, {
@@ -95,7 +101,9 @@ async function rpc(
       params: { service, method, args },
       id: Math.floor(Math.random() * 1e9),
     }),
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs),
   });
 
   if (!res.ok) throw new OdooError(`Odoo responded ${res.status}`, "server");
@@ -161,7 +169,7 @@ export async function odooCallWithPolicy<T>(
   method: string,
   args: unknown[] = [],
   kwargs: Record<string, unknown> = {},
-  policy: { attempts?: number; timeoutMs?: number } = {},
+  policy: { attempts?: number; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<T> {
   const cfg = odooConfig();
   let lastError: unknown;
@@ -170,12 +178,14 @@ export async function odooCallWithPolicy<T>(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
+      policy.signal?.throwIfAborted();
       const user = await uid();
       return (await rpc(
         "object",
         "execute_kw",
         [cfg.db, user, cfg.apiKey, model, method, args, kwargs],
         timeoutMs,
+        policy.signal,
       )) as T;
     } catch (err) {
       lastError = err;
@@ -209,7 +219,12 @@ export async function searchRead<T extends { id: number }>(
   model: string,
   domain: Domain,
   fields: string[],
-  options: { order?: string; limit?: number; context?: Record<string, unknown> } = {},
+  options: {
+    order?: string;
+    limit?: number;
+    context?: Record<string, unknown>;
+    policy?: { attempts?: number; timeoutMs?: number; signal?: AbortSignal };
+  } = {},
 ): Promise<T[]> {
   const pageSize = 2000;
   const out: T[] = [];
@@ -217,12 +232,18 @@ export async function searchRead<T extends { id: number }>(
 
   for (let offset = 0; out.length < hardLimit; offset += pageSize) {
     const take = Math.min(pageSize, hardLimit - out.length);
-    const page = await odooCall<T[]>(model, "search_read", [domain, fields], {
-      offset,
-      limit: take,
-      order: options.order ?? "id",
-      context: companyContext(options.context),
-    });
+    const page = await odooCallWithPolicy<T[]>(
+      model,
+      "search_read",
+      [domain, fields],
+      {
+        offset,
+        limit: take,
+        order: options.order ?? "id",
+        context: companyContext(options.context),
+      },
+      options.policy,
+    );
     out.push(...page);
     if (page.length < take) break;
   }
