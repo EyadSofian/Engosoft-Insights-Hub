@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ArchiveRow } from "@/lib/lost-archive-audit";
 
 export const Route = createFileRoute("/api/lost-archive-audit")({
   server: {
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/api/lost-archive-audit")({
         const { lostArchiveGoogleConfigured, readLostArchiveGoogle } =
           await import("@/lib/lost-archive-google.server");
         const params = new URL(request.url).searchParams;
-        let rows = [];
+        let rows: ArchiveRow[] = [];
         let status: "success" | "failed" | "never" = "never";
         let syncedAt = "";
         if (lostArchiveGoogleConfigured()) {
