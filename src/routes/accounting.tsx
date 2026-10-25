@@ -596,40 +596,35 @@ function Accounting() {
                   detail={{ ...metrics!.lines, title: t("product_lines") }}
                   card={{ index: 3 }}
                 />
-                {dateBasis === "invoice" && (
-                  <MetricDetailTrigger
-                    detail={metrics!.credits}
-                    card={{ index: 4, valueWrap: true }}
-                  />
-                )}
+                <MetricDetailTrigger
+                  detail={metrics!.credits}
+                  card={{ index: 4, valueWrap: true }}
+                />
               </KpiRow>
 
-              {dateBasis === "invoice" &&
-                data.creditNoteReconciliation.status === "unavailable" && (
-                  <Notice tone="warning">
-                    {lang === "ar"
-                      ? "تعذر التحقق المباشر من إشعارات الخصم في Odoo. المعروض حاليًا من آخر نسخة متزامنة وقد لا يشمل أحدث الإشعارات."
-                      : "Live Odoo credit-note verification is unavailable. The last synced copy may omit recent notes."}
-                  </Notice>
-                )}
-              {dateBasis === "invoice" &&
-                data.creditNoteReconciliation.unsupportedCurrencies.length > 0 && (
-                  <Notice tone="warning">
-                    {lang === "ar"
-                      ? `بعض الإشعارات بعملة لا يوجد لها تحويل دولار معتمد (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")})؛ ظهرت في التفاصيل ولم تُخصم من رقم الدولار.`
-                      : `Some credit notes use currencies without an approved USD conversion (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")}); they are listed but not deducted from USD revenue.`}
-                  </Notice>
-                )}
-              {dateBasis === "invoice" &&
-                data.creditNoteReconciliation.status === "not_applicable" && (
-                  <Notice tone="warning">
-                    {lang === "ar"
-                      ? "عند تصفية الإيرادات بمصدر أو كورس أو موظف، لا يمكن إسناد كل إشعارات الخصم لهذا البُعد بدقة. أزل هذه التصفية لعرض كل الإشعارات المنشورة."
-                      : "Credit notes cannot all be attributed reliably to a marketing, course or employee filter. Clear that filter to see every posted note."}
-                  </Notice>
-                )}
+              {data.creditNoteReconciliation.status === "unavailable" && (
+                <Notice tone="warning">
+                  {lang === "ar"
+                    ? "تعذر التحقق المباشر من إشعارات الخصم في Odoo. المعروض حاليًا من آخر نسخة متزامنة وقد لا يشمل أحدث الإشعارات."
+                    : "Live Odoo credit-note verification is unavailable. The last synced copy may omit recent notes."}
+                </Notice>
+              )}
+              {data.creditNoteReconciliation.unsupportedCurrencies.length > 0 && (
+                <Notice tone="warning">
+                  {lang === "ar"
+                    ? `بعض الإشعارات بعملة لا يوجد لها تحويل دولار معتمد (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")})؛ ظهرت في التفاصيل ولم تُخصم من رقم الدولار.`
+                    : `Some credit notes use currencies without an approved USD conversion (${data.creditNoteReconciliation.unsupportedCurrencies.join(", ")}); they are listed but not deducted from USD revenue.`}
+                </Notice>
+              )}
+              {data.creditNoteReconciliation.status === "not_applicable" && (
+                <Notice tone="warning">
+                  {lang === "ar"
+                    ? "عند تصفية الإيرادات بمصدر أو كورس أو موظف، لا يمكن إسناد كل إشعارات الخصم لهذا البُعد بدقة. أزل هذه التصفية لعرض كل الإشعارات المنشورة."
+                    : "Credit notes cannot all be attributed reliably to a marketing, course or employee filter. Clear that filter to see every posted note."}
+                </Notice>
+              )}
 
-              {dateBasis === "invoice" && data.creditNoteReconciliation.documents.length > 0 && (
+              {data.creditNoteReconciliation.documents.length > 0 && (
                 <details className="group card overflow-hidden">
                   <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden sm:px-5">
                     <RotateCcw size={17} className="shrink-0 text-amber-600" aria-hidden="true" />

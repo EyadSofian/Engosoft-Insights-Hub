@@ -407,6 +407,20 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         },
       },
       {
+        // The one place that says whether a number was checked against the
+        // system it came from. It belongs near the top of the tools list, not
+        // buried under them: it is what somebody reaches for when a figure
+        // looks wrong.
+        to: "/number-review",
+        key: "number_review",
+        icon: ShieldCheck,
+        tabLabel: { ar: "مراجعة الأرقام", en: "Number review" },
+        description: {
+          ar: "كل رقم مهم: جاي منين، ومطابق للمصدر ولا لأ",
+          en: "Every key number: where it came from, and whether the source agrees",
+        },
+      },
+      {
         to: "/social-media",
         key: "social_media",
         icon: MessagesSquare,

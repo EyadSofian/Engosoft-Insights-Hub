@@ -994,6 +994,38 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
   },
   {
+    id: "number_review",
+    routes: ["/number-review"],
+    section: "data",
+    title: t("مراجعة الأرقام", "Number review"),
+    status: "CONNECTED",
+    sensitivity: "internal",
+    views: [],
+    operations: ["summary"],
+    filters: [...PERIOD_FILTERS],
+    entities: [],
+    sources: [
+      {
+        endpoint: "/api/source-reconciliation",
+        as: "root",
+        required: true,
+        why: "Whether each headline number equals the figure in the system it came from.",
+        summaryPaths: ["period", "generatedAt", "summary", "worst", "groups"],
+      },
+    ],
+    freshnessPaths: ["generatedAt", "period"],
+    caveats: [
+      t(
+        "أخضر هنا معناه إن المصدر نفسه اتسأل ووافق. الرقم اللي مفيش طريقة نسأل مصدره عنه بيظهر «مش متأكدين» ومينفعش يتعامل معاه كأنه مظبوط.",
+        "Green here means the source itself was asked and agreed. A number whose source cannot be reached is reported as unverified and must not be treated as confirmed.",
+      ),
+      t(
+        "صرف Snapchat مش مراجع، لأن مفيش مفاتيح Snapchat على السيرفر.",
+        "Snapchat spend is unverified: no Snapchat credentials are deployed.",
+      ),
+    ],
+  },
+  {
     id: "yoy",
     routes: ["/yoy"],
     section: "comparisons",

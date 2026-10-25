@@ -73,6 +73,7 @@ interface GoogleAdsResultRow {
   };
   segments?: {
     date?: string;
+    conversionActionCategory?: string;
   };
   metrics?: {
     costMicros?: string | number;
@@ -102,7 +103,20 @@ export interface GoogleAdsDaily {
   spend: number;
   impressions: number;
   clicks: number;
+  /** Every conversion action, whatever it measures. Not a lead count. */
   conversions: number;
+  /**
+   * Conversions whose action category is an actual acquisition: a submitted
+   * lead form, a lead phone call, a contact, an appointment, a quote request,
+   * a sign-up or an imported lead.
+   *
+   * This exists because `conversions` is not a lead count on this account.
+   * In September 2026 its 1,296.38 conversions were 1,287 YouTube channel
+   * subscriptions (category ENGAGEMENT) and 9.38 purchases, against zero
+   * lead-form submissions -- which reported Google's cost per lead as $0.53
+   * and made it look roughly ten times more efficient than Meta.
+   */
+  leadConversions: number;
   syncedAt: string;
 }
 
@@ -278,6 +292,55 @@ function gaql(from: string, to: string): string {
     WHERE segments.date BETWEEN '${from}' AND '${to}'
     ORDER BY segments.date
   `;
+}
+
+/**
+ * Google's conversion-action categories that represent an acquisition.
+ * ENGAGEMENT, PURCHASE, YOUTUBE_FOLLOW_ON_VIEWS and the rest are deliberately
+ * absent: they are real conversions but they are not leads.
+ */
+export const LEAD_CONVERSION_CATEGORIES = [
+  "SUBMIT_LEAD_FORM",
+  "PHONE_CALL_LEAD",
+  "CONTACT",
+  "BOOK_APPOINTMENT",
+  "REQUEST_QUOTE",
+  "SIGNUP",
+  "IMPORTED_LEAD",
+] as const;
+
+/**
+ * Lead conversions at the same grain as the delivery report.
+ *
+ * `segments.conversion_action_category` cannot join the main query: it would
+ * repeat every ad-day once per category and multiply cost, impressions and
+ * clicks. So it is one extra filtered query per customer, which returns only
+ * the handful of ad-days that produced a lead.
+ */
+export function leadConversionsGaql(from: string, to: string): string {
+  const categories = LEAD_CONVERSION_CATEGORIES.map((category) => `'${category}'`).join(", ");
+  return `
+    SELECT
+      campaign.id,
+      ad_group.id,
+      ad_group_ad.ad.id,
+      segments.date,
+      segments.conversion_action_category,
+      metrics.conversions
+    FROM ad_group_ad
+    WHERE segments.date BETWEEN '${from}' AND '${to}'
+      AND segments.conversion_action_category IN (${categories})
+  `;
+}
+
+/** Keyed so a lead conversion lands on the ad-day that earned it. */
+export function googleAdDayKey(row: {
+  date: string;
+  campaignId: string;
+  adsetId: string;
+  adId: string;
+}): string {
+  return [row.date, row.campaignId, row.adsetId, row.adId].join("\u001f");
 }
 
 function campaignStatusGaql(): string {
@@ -545,6 +608,33 @@ async function fetchGoogleAdsUncached(): Promise<GoogleAdsFetchResult> {
         );
       }
 
+      // Leads come from their own filtered query. If it fails, the delivery
+      // numbers above still stand: lead conversions stay at zero rather than
+      // falling back to all conversions, which are not leads.
+      const leadByAdDay = new Map<string, number>();
+      try {
+        const leadRows = await searchCustomer(
+          cfg,
+          customerId,
+          leadConversionsGaql(cfg.startDate, cfg.endDate),
+        );
+        for (const raw of leadRows) {
+          const key = googleAdDayKey({
+            date: String(raw.segments?.date ?? ""),
+            campaignId: String(raw.campaign?.id ?? ""),
+            adsetId: String(raw.adGroup?.id ?? ""),
+            adId: String(raw.adGroupAd?.ad?.id ?? ""),
+          });
+          leadByAdDay.set(key, (leadByAdDay.get(key) ?? 0) + numberOf(raw.metrics?.conversions));
+        }
+      } catch (error) {
+        errors.push(
+          `Google Ads customer ${customerId} lead conversions: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
       for (const raw of rawRows) {
         const accountId = String(raw.customer?.id ?? customerId);
         const campaignId = String(raw.campaign?.id ?? "");
@@ -565,6 +655,15 @@ async function fetchGoogleAdsUncached(): Promise<GoogleAdsFetchResult> {
           impressions: numberOf(metrics.impressions),
           clicks: numberOf(metrics.clicks),
           conversions: numberOf(metrics.conversions),
+          leadConversions:
+            leadByAdDay.get(
+              googleAdDayKey({
+                date: String(raw.segments?.date ?? ""),
+                campaignId,
+                adsetId,
+                adId,
+              }),
+            ) ?? 0,
           syncedAt,
         });
       }

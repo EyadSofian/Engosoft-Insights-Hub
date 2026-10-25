@@ -162,7 +162,7 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
   if (!metadata.inventory_bucket) throw new Error("CRM Inventory scope field is unavailable");
   if (!metadata.source_id) throw new Error("CRM lead source field is unavailable");
   const customFields = customFieldPlan(metadata);
-  const courseField = customFields.courseCategories;
+  const courseFields = customFields.courseCategories;
   const fields = [
     "id",
     "create_date",
@@ -178,8 +178,8 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
     "date_closed",
     "won_date",
     "lost_verification_date",
-    customFields.callingReply,
-    courseField,
+    ...customFields.callingReply,
+    ...courseFields,
   ].filter((field) => Boolean(field && metadata[field]));
   const [leads, stageKeys] = await Promise.all([
     searchRead<OdooCrmLead>("crm.lead", historicalCrmYearDomain(year), fields, {
@@ -196,7 +196,7 @@ export async function loadHistoricalCrmYear(year: 2024 | 2025): Promise<Historic
       !countsAsPotentialLead(m2oName(lead.source_id), m2oName(lead.lead_segment_id as M2O))
     )
       continue;
-    const course = canonicalCourseValue(custom(lead, courseField));
+    const course = canonicalCourseValue(custom(lead, courseFields));
     const key = `${createdAt}\u001f${course}`;
     const day = days.get(key) ?? {
       createdAt,
@@ -320,64 +320,81 @@ function normalizeFieldLabel(value: unknown): string {
   return normalize(value).replace(/\s/g, "");
 }
 
-function resolveField(
+/**
+ * Every field this Odoo actually has for one dimension, in preference order.
+ *
+ * Resolving to a single name is not safe here: this database carries two
+ * ad-set pairs, `adset_id`/`adset_name` (populated on ~77% of leads) and
+ * `ad_set_id`/`ad_set_name` (present but empty on every row). Picking the
+ * first name that *exists* chose the empty pair, which blanked "Ad Set ID" on
+ * every CRM row and pushed ad-set attribution onto a name-only guess. So keep
+ * all of them and let each row answer with whichever one it filled in.
+ */
+function resolveFields(
   metadata: Record<string, OdooField>,
   candidates: string[],
   labels: string[],
-): string {
-  for (const candidate of candidates) if (metadata[candidate]) return candidate;
+): string[] {
+  const found = candidates.filter((candidate) => metadata[candidate]);
   const wanted = new Set(labels.map(normalizeFieldLabel));
   for (const [name, field] of Object.entries(metadata)) {
-    if (wanted.has(normalizeFieldLabel(field.string))) return name;
+    if (wanted.has(normalizeFieldLabel(field.string)) && !found.includes(name)) found.push(name);
   }
-  return "";
+  return found;
 }
 
 interface CustomFields {
-  adName: string;
-  adId: string;
-  adsetName: string;
-  adsetId: string;
-  campaignName: string;
-  campaignId: string;
-  courseCategories: string;
-  callingReply: string;
+  adName: string[];
+  adId: string[];
+  adsetName: string[];
+  adsetId: string[];
+  campaignName: string[];
+  campaignId: string[];
+  courseCategories: string[];
+  callingReply: string[];
 }
 
 function customFieldPlan(metadata: Record<string, OdooField>): CustomFields {
   return {
-    adName: resolveField(
+    adName: resolveFields(
       metadata,
-      ["x_studio_ad_name", "x_ad_name", "ad_name"],
+      ["x_studio_ad_name", "x_ad_name", "ad_name", "adname"],
       ["Ad Name", "اسم الإعلان"],
     ),
-    adId: resolveField(metadata, ["x_studio_ad_id", "x_ad_id", "ad_id"], ["Ad ID", "معرف الإعلان"]),
-    adsetName: resolveField(
+    adId: resolveFields(
       metadata,
-      ["x_studio_ad_set_name", "x_ad_set_name", "ad_set_name", "adset_name"],
+      ["x_studio_ad_id", "x_ad_id", "ad_id", "adid"],
+      ["Ad ID", "معرف الإعلان"],
+    ),
+    // `adset_*` first: in this database it is the populated pair and
+    // `ad_set_*` exists only as an empty duplicate. Both are kept so a row
+    // decides, and an instance that fills the other one still resolves.
+    adsetName: resolveFields(
+      metadata,
+      ["x_studio_ad_set_name", "x_ad_set_name", "adset_name", "ad_set_name"],
       ["Ad Set Name", "اسم مجموعة الإعلانات"],
     ),
-    adsetId: resolveField(
+    adsetId: resolveFields(
       metadata,
-      ["x_studio_ad_set_id", "x_ad_set_id", "ad_set_id", "adset_id"],
-      ["Ad Set ID", "معرف مجموعة الإعلانات"],
+      ["x_studio_ad_set_id", "x_ad_set_id", "adset_id", "ad_set_id"],
+      ["Ad Set ID", "Ad Set Id", "معرف مجموعة الإعلانات"],
     ),
-    campaignName: resolveField(
+    campaignName: resolveFields(
       metadata,
       ["campaign_name", "x_studio_campaign_name", "x_campaign_name"],
       ["Campaign Name", "اسم الحملة"],
     ),
-    campaignId: resolveField(
+    campaignId: resolveFields(
       metadata,
       ["campaign_id2", "x_studio_campaign_id", "x_campaign_id"],
       ["Campaign ID", "معرف الحملة"],
     ),
-    courseCategories: resolveField(
+    courseCategories: resolveFields(
       metadata,
       ["x_studio_course_categories"],
       ["Course Categories", "Course Category"],
     ),
-    callingReply: resolveField(
+    callingReply: resolveFields(
       metadata,
       ["x_studio_answered", "x_studio_calling_reply", "x_calling_reply", "calling_reply"],
       ["Calling reply?", "Calling Reply", "Call Reply"],
@@ -385,9 +402,17 @@ function customFieldPlan(metadata: Record<string, OdooField>): CustomFields {
   };
 }
 
-function custom(lead: OdooCrmLead, field: string): string {
-  return field ? display(lead[field]) : "";
+function custom(lead: OdooCrmLead, fields: string[]): string {
+  for (const field of fields) {
+    const value = display(lead[field]);
+    if (value) return value;
+  }
+  return "";
 }
+
+/* Exported for `scripts/test-crm-custom-fields.mjs`, which pins the two
+   ad-set pairs this Odoo carries. Nothing else reads them. */
+export { customFieldPlan as crmCustomFieldPlan, custom as crmCustomValue };
 
 function contractRecord(
   lead: OdooCrmLead,
@@ -769,7 +794,7 @@ export async function loadDirectCrm(): Promise<DirectCrmSnapshot> {
   const fields = [
     ...new Set([
       ...standardFields.filter((field) => metadata[field]),
-      ...Object.values(customFields).filter(Boolean),
+      ...Object.values(customFields).flat().filter(Boolean),
     ]),
   ];
   // Pull one extra UTC day, then apply the reporting floor after converting to

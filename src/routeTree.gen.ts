@@ -27,6 +27,7 @@ import { Route as LostRouteImport } from './routes/lost'
 import { Route as ManagementReviewRouteImport } from './routes/management-review'
 import { Route as MediaBuyersRouteImport } from './routes/media-buyers'
 import { Route as MediaPlanRouteImport } from './routes/media-plan'
+import { Route as NumberReviewRouteImport } from './routes/number-review'
 import { Route as OrganicRouteImport } from './routes/organic'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -84,6 +85,7 @@ import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiRevenueCohortsRouteImport } from './routes/api/revenue-cohorts'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as ApiSourceReconciliationRouteImport } from './routes/api/source-reconciliation'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
@@ -228,6 +230,11 @@ const MediaBuyersRoute = MediaBuyersRouteImport.update({
 const MediaPlanRoute = MediaPlanRouteImport.update({
   id: '/media-plan',
   path: '/media-plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NumberReviewRoute = NumberReviewRouteImport.update({
+  id: '/number-review',
+  path: '/number-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganicRoute = OrganicRouteImport.update({
@@ -518,6 +525,11 @@ const ApiSalesRoute = ApiSalesRouteImport.update({
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSourceReconciliationRoute = ApiSourceReconciliationRouteImport.update({
+  id: '/api/source-reconciliation',
+  path: '/api/source-reconciliation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTargetsRoute = ApiTargetsRouteImport.update({
@@ -831,6 +843,7 @@ export interface FileRoutesByFullPath {
   '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
+  '/number-review': typeof NumberReviewRoute
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
@@ -888,6 +901,7 @@ export interface FileRoutesByFullPath {
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -963,6 +977,7 @@ export interface FileRoutesByTo {
   '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
+  '/number-review': typeof NumberReviewRoute
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
@@ -1020,6 +1035,7 @@ export interface FileRoutesByTo {
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -1096,6 +1112,7 @@ export interface FileRoutesById {
   '/management-review': typeof ManagementReviewRoute
   '/media-buyers': typeof MediaBuyersRoute
   '/media-plan': typeof MediaPlanRoute
+  '/number-review': typeof NumberReviewRoute
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
@@ -1153,6 +1170,7 @@ export interface FileRoutesById {
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
@@ -1230,6 +1248,7 @@ export interface FileRouteTypes {
     | '/management-review'
     | '/media-buyers'
     | '/media-plan'
+    | '/number-review'
     | '/organic'
     | '/pricing'
     | '/products'
@@ -1287,6 +1306,7 @@ export interface FileRouteTypes {
     | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
+    | '/api/source-reconciliation'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1362,6 +1382,7 @@ export interface FileRouteTypes {
     | '/management-review'
     | '/media-buyers'
     | '/media-plan'
+    | '/number-review'
     | '/organic'
     | '/pricing'
     | '/products'
@@ -1419,6 +1440,7 @@ export interface FileRouteTypes {
     | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
+    | '/api/source-reconciliation'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1494,6 +1516,7 @@ export interface FileRouteTypes {
     | '/management-review'
     | '/media-buyers'
     | '/media-plan'
+    | '/number-review'
     | '/organic'
     | '/pricing'
     | '/products'
@@ -1551,6 +1574,7 @@ export interface FileRouteTypes {
     | '/api/revenue-cohorts'
     | '/api/sales'
     | '/api/search'
+    | '/api/source-reconciliation'
     | '/api/targets'
     | '/api/teams'
     | '/api/uncalled-leads'
@@ -1627,6 +1651,7 @@ export interface RootRouteChildren {
   ManagementReviewRoute: typeof ManagementReviewRoute
   MediaBuyersRoute: typeof MediaBuyersRoute
   MediaPlanRoute: typeof MediaPlanRoute
+  NumberReviewRoute: typeof NumberReviewRoute
   OrganicRoute: typeof OrganicRoute
   PricingRoute: typeof PricingRoute
   ProductsRoute: typeof ProductsRoute
@@ -1684,6 +1709,7 @@ export interface RootRouteChildren {
   ApiRevenueCohortsRoute: typeof ApiRevenueCohortsRoute
   ApiSalesRoute: typeof ApiSalesRoute
   ApiSearchRoute: typeof ApiSearchRoute
+  ApiSourceReconciliationRoute: typeof ApiSourceReconciliationRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
@@ -1867,6 +1893,13 @@ declare module '@tanstack/react-router' {
       path: '/media-plan'
       fullPath: '/media-plan'
       preLoaderRoute: typeof MediaPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/number-review': {
+      id: '/number-review'
+      path: '/number-review'
+      fullPath: '/number-review'
+      preLoaderRoute: typeof NumberReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organic': {
@@ -2266,6 +2299,13 @@ declare module '@tanstack/react-router' {
       path: '/api/search'
       fullPath: '/api/search'
       preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/source-reconciliation': {
+      id: '/api/source-reconciliation'
+      path: '/api/source-reconciliation'
+      fullPath: '/api/source-reconciliation'
+      preLoaderRoute: typeof ApiSourceReconciliationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/targets': {
@@ -2675,6 +2715,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManagementReviewRoute: ManagementReviewRoute,
   MediaBuyersRoute: MediaBuyersRoute,
   MediaPlanRoute: MediaPlanRoute,
+  NumberReviewRoute: NumberReviewRoute,
   OrganicRoute: OrganicRoute,
   PricingRoute: PricingRoute,
   ProductsRoute: ProductsRoute,
@@ -2732,6 +2773,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRevenueCohortsRoute: ApiRevenueCohortsRoute,
   ApiSalesRoute: ApiSalesRoute,
   ApiSearchRoute: ApiSearchRoute,
+  ApiSourceReconciliationRoute: ApiSourceReconciliationRoute,
   ApiTargetsRoute: ApiTargetsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,

@@ -21,7 +21,10 @@ const record = (overrides = {}) => ({
 });
 
 assert.equal(CRM_CONTRACT_VERSION, "17.0.1.26.0");
-assert.equal(CRM_SNAPSHOT_SCHEMA_REVISION, "normal-crm-inventory-scope-v3");
+// Bumping this is how a deploy invalidates stored CRM snapshots, so the pin
+// has to move with it deliberately. It had been left on v3 while the code
+// shipped v4, which made `npm run test:crm-contract` fail on main.
+assert.equal(CRM_SNAPSHOT_SCHEMA_REVISION, "normal-crm-inventory-scope-v4-stage-sla-utc");
 
 assert.equal(crmBusinessStatus(record()), "lead", "active Lead stays workable");
 assert.equal(

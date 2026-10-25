@@ -25,6 +25,7 @@ export const DICT = {
   business_analytics: { ar: "تحليلات البيزنس", en: "Business analytics" },
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
+  number_review: { ar: "مراجعة الأرقام", en: "Number review" },
   weekend: { ar: "أداء الويك إند", en: "Weekend performance" },
   organic: { ar: "أورجانيك", en: "Organic" },
   media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
