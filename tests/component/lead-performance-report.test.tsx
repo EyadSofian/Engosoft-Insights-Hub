@@ -286,7 +286,8 @@ describe("the six-month lead-to-paid report", () => {
     fireEvent.click(within(classification).getByRole("tab", { name: "Lead Segment tag" }));
     expect(within(classification).getByText(/Blank field/i)).toBeTruthy();
     const freshLeadType = within(classification).getByText(/Lead record type/i).parentElement!;
-    const freshOpportunityType = within(classification).getByText(/Opportunity record type/i).parentElement!;
+    const freshOpportunityType =
+      within(classification).getByText(/Opportunity record type/i).parentElement!;
     expect(within(freshLeadType).getByText("0")).toBeTruthy();
     expect(within(freshOpportunityType).getByText("1")).toBeTruthy();
     fireEvent.click(within(classification).getByRole("tab", { name: "Contact evidence" }));
@@ -349,6 +350,37 @@ describe("the six-month lead-to-paid report", () => {
     // the month total never could.
     expect(within(breakdown).getByText(/Average attempts/i)).toBeTruthy();
     expect(within(breakdown).getByText(/Hours to first attempt/i)).toBeTruthy();
+  });
+
+  it("makes the Lost split and each row's own denominator visible across filters", async () => {
+    mount(
+      response({
+        selected: group("2026-09", { leads: 100, lost: 40, lostLeads: 10, lostOpportunities: 30 }),
+        byCourse: [
+          group("CFM", { leads: 50, lost: 20, lostLeads: 5, lostOpportunities: 15, lostRate: 40 }),
+          group("PMP", { leads: 20, lost: 12, lostLeads: 2, lostOpportunities: 10, lostRate: 60 }),
+        ],
+      }),
+    );
+    const breakdown = (await screen.findByText("Lost breakdown by filter")).closest("section")!;
+    expect(
+      within(breakdown).getByText(/Lost leads \+ lost opportunities = total lost/),
+    ).toBeTruthy();
+    const cfm = within(breakdown).getByRole("heading", { name: "CFM" }).closest("article")!;
+    expect(cfm.textContent).toContain("20 lost now");
+    expect(cfm.textContent).toContain("50 new CRM records");
+    expect(cfm.textContent).toContain("40.0%");
+    expect(within(cfm).getByText("5")).toBeTruthy();
+    expect(within(cfm).getByText("15")).toBeTruthy();
+
+    fireEvent.change(within(breakdown).getByRole("textbox", { name: "Search this breakdown…" }), {
+      target: { value: "pmp" },
+    });
+    expect(within(breakdown).queryByRole("heading", { name: "CFM" })).toBeNull();
+    expect(within(breakdown).getByRole("heading", { name: "PMP" })).toBeTruthy();
+    fireEvent.click(within(breakdown).getByRole("button", { name: "Source" }));
+    expect(within(breakdown).getByRole("heading", { name: "Facebook" })).toBeTruthy();
+    expect(within(breakdown).queryByRole("heading", { name: "PMP" })).toBeNull();
   });
 
   it("exports the cohort the reader is looking at, not a default", async () => {

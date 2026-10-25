@@ -40,6 +40,7 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { LeadClassificationAudit } from "@/components/leads/LeadClassificationAudit";
+import { LostBreakdown, type LostDimension } from "@/components/leads/LostBreakdown";
 import {
   performanceStages,
   type PerformanceGroup,
@@ -64,7 +65,6 @@ type Response = PerformanceResult & {
   };
 };
 type Dimension = "course" | "source" | "platform" | "campaign" | "buyer" | "owner" | "closer";
-type LostDimension = "course" | "platform" | "source" | "owner" | "buyer";
 
 const copy = {
   ar: {
@@ -381,12 +381,7 @@ const extra = {
     duplicateAll: "كل السجلات",
     duplicateOnly: "تطابق محتمل",
     nonDuplicate: "بلا تطابق ظاهر",
-    lostBreakdown: "تفصيل الـLost حسب الفلاتر",
-    lostBreakdownHint:
-      "نفس مجموعة شهر الدخول المختارة، حسب الحالة الحالية في أودو. النسبة من سجلات كل صف، لا من إجمالي Lost.",
     platform: "المنصة / القناة",
-    lostLead: "Lost Leads",
-    lostOpp: "Lost Opportunities",
     stageShare: "من إجمالي الدخول",
     stageStep: "من الليدز القابلة لمطابقة الهاتف",
     stageProxy: "مؤشر حالة حالية، وليس انتقالًا مسجلًا",
@@ -440,12 +435,7 @@ const extra = {
     duplicateAll: "All records",
     duplicateOnly: "Potential matches",
     nonDuplicate: "No visible match",
-    lostBreakdown: "Lost by filter",
-    lostBreakdownHint:
-      "Selected entry-month cohort, using current Odoo Lost status. Each rate uses that row's records as denominator.",
     platform: "Platform / channel",
-    lostLead: "Lost Leads",
-    lostOpp: "Lost Opportunities",
     stageShare: "of all entries",
     stageStep: "of phone-matchable leads",
     stageProxy: "A current-status proxy, not a logged transition",
@@ -1758,101 +1748,14 @@ export function SixMonthPerformance() {
         </PageSection>
       </div>
 
-      <PageSection
-        title={x.lostBreakdown}
-        hint={x.lostBreakdownHint}
-        icon={<TrendingDown size={16} />}
-        tone="rose"
-        id="performance-lost-breakdown"
-        action={
-          <Segmented
-            value={lostDimension}
-            onChange={setLostDimension}
-            options={lostDimensions.map((item) => ({ value: item.id, label: item.label }))}
-          />
-        }
-      >
-        <Card padded={false} className="overflow-hidden">
-          <DataTable<PerformanceGroup>
-            rows={activeLostDimension.rows}
-            cols={[
-              {
-                key: "name",
-                header: activeLostDimension.label,
-                always: true,
-                sticky: true,
-                render: (row) =>
-                  row.name === "—" ? (lang === "ar" ? "غير منسوب" : "Unattributed") : row.name,
-                sortValue: (row) => row.name,
-              },
-              {
-                key: "leads",
-                header: t.leads,
-                align: "right",
-                render: (row) => n(row.leads),
-                sortValue: (row) => row.leads,
-              },
-              {
-                key: "lostLeads",
-                header: x.lostLead,
-                align: "right",
-                render: (row) => n(row.lostLeads),
-                sortValue: (row) => row.lostLeads,
-              },
-              {
-                key: "lostOpportunities",
-                header: x.lostOpp,
-                align: "right",
-                render: (row) => n(row.lostOpportunities),
-                sortValue: (row) => row.lostOpportunities,
-              },
-              {
-                key: "lostRate",
-                header: t.lost,
-                align: "right",
-                render: (row) => `${n(row.lost)} · ${pct(row.lostRate)}`,
-                sortValue: (row) => row.lost,
-              },
-              {
-                key: "noAnswer",
-                header: t.noAnswer,
-                align: "right",
-                render: (row) => n(row.noAnswer),
-                sortValue: (row) => row.noAnswer,
-              },
-              {
-                key: "unreachable",
-                header: t.unreachable,
-                align: "right",
-                render: (row) => n(row.unreachable),
-                sortValue: (row) => row.unreachable,
-              },
-              {
-                key: "noInterest",
-                header: t.noInterest,
-                align: "right",
-                render: (row) => n(row.noInterest),
-                sortValue: (row) => row.noInterest,
-              },
-            ]}
-            searchable={(row) => row.name}
-            initialSort={{ key: "lostRate", dir: -1 }}
-            rowKey={(row) => row.name}
-            csvFilename={`engosoft-lost-${lostDimension}-${data.selectedMonth}`}
-            csvRow={(row) => ({
-              name: row.name,
-              leads: row.leads,
-              lostLeads: row.lostLeads,
-              lostOpportunities: row.lostOpportunities,
-              lost: row.lost,
-              lostRate: row.lostRate ?? "",
-              noAnswer: row.noAnswer,
-              unreachable: row.unreachable,
-              noInterest: row.noInterest,
-            })}
-          />
-        </Card>
-      </PageSection>
+      <LostBreakdown
+        cohort={selected}
+        rows={activeLostDimension.rows}
+        dimensions={lostDimensions.map((item) => ({ id: item.id, label: item.label }))}
+        dimension={lostDimension}
+        onDimensionChange={setLostDimension}
+        month={data.selectedMonth}
+      />
 
       <PageSection
         title={t.breakdown}
