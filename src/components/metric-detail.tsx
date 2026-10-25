@@ -156,10 +156,14 @@ export function MetricFiltersSummary({
  */
 export function MetricDefinition({
   definition,
+  source,
+  why,
   formula,
   caveat,
 }: {
   definition: string;
+  source?: string;
+  why?: string;
   formula?: string;
   caveat?: string;
 }) {
@@ -169,8 +173,24 @@ export function MetricDefinition({
 
   return (
     <section data-testid="metric-definition">
-      <SectionLabel>{lang === "ar" ? "ما هذا الرقم؟" : "What is this?"}</SectionLabel>
+      <SectionLabel>{lang === "ar" ? "الرقم ده إيه؟" : "What is this?"}</SectionLabel>
       <p className="text-[13px] leading-relaxed text-text">{definition}</p>
+      {source && (
+        <>
+          <div className="mt-3">
+            <SectionLabel>{lang === "ar" ? "جه منين؟" : "Where does it come from?"}</SectionLabel>
+          </div>
+          <p className="text-[13px] leading-relaxed text-text">{source}</p>
+        </>
+      )}
+      {why && (
+        <>
+          <div className="mt-3">
+            <SectionLabel>{lang === "ar" ? "ليه يهمك؟" : "Why it matters"}</SectionLabel>
+          </div>
+          <p className="text-[13px] leading-relaxed text-text">{why}</p>
+        </>
+      )}
       {formula && (
         <>
           <button
@@ -181,7 +201,7 @@ export function MetricDefinition({
             className="mt-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
           >
             <Sigma size={12} aria-hidden="true" />
-            {lang === "ar" ? "طريقة الحساب" : "How it is calculated"}
+            {lang === "ar" ? "اتحسب إزاي؟" : "How it is calculated"}
           </button>
           {open && (
             <p
@@ -221,7 +241,7 @@ export function MetricProvenance({
   return (
     <section data-testid="metric-provenance">
       <SectionLabel>
-        {lang === "ar" ? "مصدر الرقم بالضبط" : "Exact source of this figure"}
+        {lang === "ar" ? "جه منين بالظبط؟" : "Exact source of this figure"}
       </SectionLabel>
       <div className="overflow-hidden rounded-2xl border border-border bg-surface">
         <div className="flex items-start gap-3 border-b border-border bg-surface-2/70 px-3.5 py-3">
@@ -231,14 +251,14 @@ export function MetricProvenance({
           <dl className="grid min-w-0 flex-1 gap-x-5 gap-y-2 sm:grid-cols-2">
             <div>
               <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
-                {lang === "ar" ? "النظام" : "System"}
+                {lang === "ar" ? "السيستم" : "System"}
               </dt>
               <dd className="mt-0.5 text-[12px] font-semibold text-text">{provenance.system}</dd>
             </div>
             {provenance.model && (
               <div>
                 <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
-                  {lang === "ar" ? "الموديل" : "Model"}
+                  {lang === "ar" ? "الجدول" : "Model"}
                 </dt>
                 <dd className="num mt-0.5 text-[12px] font-semibold text-text">
                   {provenance.model}
@@ -252,7 +272,7 @@ export function MetricProvenance({
           {provenance.query && (
             <div>
               <div className="mb-1 text-[12px] font-bold text-text-subtle">
-                {lang === "ar" ? "قاعدة دخول السجل في الرقم" : "Record inclusion rule"}
+                {lang === "ar" ? "مين بيتحسب في الرقم" : "Record inclusion rule"}
               </div>
               <code
                 dir="ltr"
@@ -266,7 +286,7 @@ export function MetricProvenance({
           {provenance.fields && provenance.fields.length > 0 && (
             <div>
               <div className="mb-1.5 text-[12px] font-bold text-text-subtle">
-                {lang === "ar" ? "حقول Odoo المستخدمة" : "Odoo fields used"}
+                {lang === "ar" ? "الخانات اللي اتاخدت من Odoo" : "Odoo fields used"}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {provenance.fields.map((field) => (
@@ -285,7 +305,7 @@ export function MetricProvenance({
           {provenance.dateBasis && (
             <p className="text-[12px] leading-5 text-text-muted">
               <span className="font-bold text-text">
-                {lang === "ar" ? "أساس الفترة: " : "Period basis: "}
+                {lang === "ar" ? "بنحسب بتاريخ: " : "Period basis: "}
               </span>
               {provenance.dateBasis}
             </p>
@@ -372,7 +392,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
       {rows.length === 0 ? (
         <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-muted">
           {group.emptyLabel ??
-            (lang === "ar" ? "لا توجد بيانات في هذه الفترة" : "Nothing in this period")}
+            (lang === "ar" ? "مفيش داتا في الفترة دي" : "Nothing in this period")}
         </p>
       ) : (
         <ul className="space-y-2.5">
@@ -413,7 +433,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
           search={group.moreSearch as never}
           className="mt-2.5 inline-flex items-center gap-1 text-[12px] font-bold text-brand hover:underline"
         >
-          {group.moreLabel ?? (lang === "ar" ? "عرض الكل" : "View all")}
+          {group.moreLabel ?? (lang === "ar" ? "شوف الكل" : "View all")}
           {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
         </Link>
       )}
@@ -438,7 +458,7 @@ export function MetricRecords({ records }: { records: NonNullable<MetricDetail["
       {records.rows.length === 0 ? (
         <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-muted">
           {records.emptyLabel ??
-            (lang === "ar" ? "لا توجد سجلات في هذه الفترة" : "No records in this period")}
+            (lang === "ar" ? "مفيش سجلات في الفترة دي" : "No records in this period")}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border">
@@ -485,7 +505,9 @@ function MetricSupporting({ facts }: { facts: NonNullable<MetricDetail["supporti
   const { lang } = useI18n();
   return (
     <section data-testid="metric-supporting">
-      <SectionLabel>{lang === "ar" ? "أرقام تفسّر الرقم" : "Numbers behind it"}</SectionLabel>
+      <SectionLabel>
+        {lang === "ar" ? "الأرقام اللي ورا الرقم ده" : "Numbers behind it"}
+      </SectionLabel>
       <div className="grid grid-cols-2 gap-2">
         {facts.map((fact) => (
           <div key={fact.key} className="rounded-xl border border-border bg-surface-2/60 px-3 py-2">
@@ -552,7 +574,7 @@ export function MetricNexusAction({
         style={{ background: "var(--brand)" }}
       >
         <Sparkles size={14} aria-hidden="true" />
-        {lang === "ar" ? "اسأل Nexus عن هذا الرقم" : "Ask Nexus about this number"}
+        {lang === "ar" ? "اسأل Nexus عن الرقم ده" : "Ask Nexus about this number"}
       </button>
       {questions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -618,7 +640,7 @@ export function MetricDetailSheet({
       onClose={onClose}
       title={detail.title}
       subtitle={
-        lang === "ar" ? "تفاصيل المؤشر ومصدره" : "What the figure is, and where it comes from"
+        lang === "ar" ? "الرقم ده إيه وجه منين" : "What the figure is, and where it comes from"
       }
       width="min(620px, 100vw)"
       footer={
@@ -651,6 +673,8 @@ export function MetricDetailSheet({
 
         <MetricDefinition
           definition={detail.definition}
+          source={detail.source}
+          why={detail.why}
           formula={detail.formula}
           caveat={detail.caveat}
         />
@@ -845,7 +869,7 @@ export function InsightDetailTrigger({
         <InsightCard
           {...card}
           onClick={open}
-          actionLabel={card.actionLabel ?? (lang === "ar" ? "على أي أساس؟" : "On what basis?")}
+          actionLabel={card.actionLabel ?? (lang === "ar" ? "على أساس إيه؟" : "On what basis?")}
           ariaLabel={
             lang === "ar"
               ? `${title} — عرض الأرقام التي أدت لهذه القراءة`

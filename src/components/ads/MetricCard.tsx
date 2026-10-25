@@ -125,7 +125,7 @@ export function MetricCard({
   const unavailable = !!unavailableReason;
   const family = tone ?? METRIC_TONE[metric] ?? "slate";
   const interactive = Boolean(onClick);
-  const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
+  const cue = actionLabel ?? (lang === "ar" ? "شوف التفاصيل" : "View detail");
 
   return (
     <div

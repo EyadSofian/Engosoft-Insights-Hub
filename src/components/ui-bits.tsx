@@ -238,7 +238,7 @@ export function KpiCard({
 
   const interactive = Boolean(onClick);
   const Tag = interactive ? "button" : "div";
-  const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
+  const cue = actionLabel ?? (lang === "ar" ? "شوف التفاصيل" : "View detail");
 
   return (
     <Tag

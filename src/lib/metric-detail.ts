@@ -139,6 +139,10 @@ export interface MetricDetail {
   deltaInvert?: boolean;
   /** One sentence in the reader's own words. Never the SQL. */
   definition: string;
+  /** Where the number comes from, in plain words: which system, which records. */
+  source?: string;
+  /** Why the reader should care: what a move in this number tells them. */
+  why?: string;
   /** The arithmetic, for whoever wants to check it. Shown behind a control. */
   formula?: string;
   /** A caveat that changes what the figure means. Rendered, never hidden. */
