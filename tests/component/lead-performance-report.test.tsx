@@ -234,11 +234,49 @@ afterEach(() => {
 
 describe("the six-month lead-to-paid report", () => {
   it("separates new entries from the current Fresh tag and exposes a searchable record audit", async () => {
-    mount(response());
+    const example = response();
+    mount(
+      response({
+        selected: group("2026-09", {
+          leads: 4,
+          opportunities: 2,
+          lostLeads: 1,
+          lostOpportunities: 1,
+          crmWon: 0,
+          freshTagged: 1,
+        }),
+        records: [
+          example.records[0],
+          {
+            ...example.records[0],
+            id: "active-lead",
+            recordType: "lead",
+            status: "lead",
+            leadSegment: "",
+          },
+          {
+            ...example.records[0],
+            id: "lost-lead",
+            recordType: "lead",
+            status: "lost",
+            leadSegment: "",
+          },
+          {
+            ...example.records[0],
+            id: "fresh-opportunity",
+            recordType: "opportunity",
+            status: "open",
+            leadSegment: "Fresh",
+          },
+        ],
+      }),
+    );
     await waitFor(() => expect(screen.getByText(/Read this report at a glance/i)).toBeTruthy());
     const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
     expect(within(summary).getByText(/Lead Segment = Fresh now/i)).toBeTruthy();
-    expect(within(summary).getByText(/Fresh is the current Odoo classification/i)).toBeTruthy();
+    expect(within(summary).getByText(/Current record type: Lead/i)).toBeTruthy();
+    expect(within(summary).getByText(/Lead tagged Fresh/i)).toBeTruthy();
+    expect(within(summary).getByText(/Opportunity tagged Fresh/i)).toBeTruthy();
     expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
     expect(within(summary).getByText(/Before CRM: unavailable/i)).toBeTruthy();
     const classification = screen
@@ -247,6 +285,10 @@ describe("the six-month lead-to-paid report", () => {
     expect(within(classification).getByText(/Lost Opportunity/i)).toBeTruthy();
     fireEvent.click(within(classification).getByRole("tab", { name: "Lead Segment tag" }));
     expect(within(classification).getByText(/Blank field/i)).toBeTruthy();
+    const freshLeadType = within(classification).getByText(/Lead record type/i).parentElement!;
+    const freshOpportunityType = within(classification).getByText(/Opportunity record type/i).parentElement!;
+    expect(within(freshLeadType).getByText("0")).toBeTruthy();
+    expect(within(freshOpportunityType).getByText("1")).toBeTruthy();
     fireEvent.click(within(classification).getByRole("tab", { name: "Contact evidence" }));
     expect(within(classification).getByText(/No PBX attempt visible/i)).toBeTruthy();
     fireEvent.click(within(classification).getByRole("tab", { name: "Before CRM" }));

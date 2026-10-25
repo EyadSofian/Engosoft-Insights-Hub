@@ -156,8 +156,16 @@ const copy = {
     freshUnmatched: "تعذرت مطابقة الهاتف",
     freshCallCaveat:
       "غياب مكالمة PBX لا يثبت أن السيلز لم يتعامل مع الليد؛ قد توجد متابعة في Chatter أو واتساب.",
-    leadRecordsNow: "سجلات Lead الآن (نشط أو Lost)",
-    opportunityNow: "سجلات Opportunity الآن",
+    leadRecordsNow: "نوع السجل Lead الآن",
+    opportunityNow: "نوع السجل Opportunity الآن",
+    activeLeadCount: "نشط",
+    lostLeadCount: "Lost",
+    openOpportunityCount: "Open",
+    wonOpportunityCount: "Won",
+    freshLeadTag: "Lead موسوم Fresh",
+    freshOpportunityTag: "Opportunity موسومة Fresh",
+    freshTagNote:
+      "وسم Fresh منفصل عن حالة السجل؛ لا يدخل Lost Lead ضمن Fresh إلا لو الحقل نفسه مكتوب فيه Fresh.",
     preCrmUnavailable: "قبل CRM: غير متاح",
     classificationPrompt:
       "راجع تابات حالة CRM والتصنيف والاتصال أدناه؛ Fresh ليس مرادفًا لليد الذي لم يُتصل به.",
@@ -290,8 +298,16 @@ const copy = {
     freshUnmatched: "Phone not safely matchable",
     freshCallCaveat:
       "No PBX call does not prove Sales did not work the lead; Chatter or WhatsApp follow-up may exist.",
-    leadRecordsNow: "Lead records now (active or Lost)",
-    opportunityNow: "Opportunity records now",
+    leadRecordsNow: "Current record type: Lead",
+    opportunityNow: "Current record type: Opportunity",
+    activeLeadCount: "Active",
+    lostLeadCount: "Lost",
+    openOpportunityCount: "Open",
+    wonOpportunityCount: "Won",
+    freshLeadTag: "Lead tagged Fresh",
+    freshOpportunityTag: "Opportunity tagged Fresh",
+    freshTagNote:
+      "Fresh is a separate tag. A Lost Lead only counts as Fresh when its Lead Segment field actually says Fresh.",
     preCrmUnavailable: "Before CRM: unavailable",
     classificationPrompt:
       "Use the CRM state, classification and contact tabs below. Fresh does not mean untouched.",
@@ -1042,6 +1058,15 @@ export function SixMonthPerformance() {
 
   const selected = data.selected;
   const leadRecordsNow = data.records.filter((row) => row.recordType === "lead").length;
+  const activeLeadsNow = data.records.filter(
+    (row) => row.recordType === "lead" && row.status === "lead",
+  ).length;
+  const freshLeadsNow = data.records.filter(
+    (row) => row.recordType === "lead" && row.leadSegment.trim().toLowerCase() === "fresh",
+  ).length;
+  const freshOpportunitiesNow = data.records.filter(
+    (row) => row.recordType === "opportunity" && row.leadSegment.trim().toLowerCase() === "fresh",
+  ).length;
   const selectedCollections = data.collectionsByMonth.find(
     (row) => row.month === data.selectedMonth,
   );
@@ -1278,24 +1303,56 @@ export function SixMonthPerformance() {
           <Card className="border-sky-strong/20 bg-sky-surface/50">
             <div className="text-xs font-semibold text-text-muted">{t.enteredBasis}</div>
             <div className="num mt-2 text-3xl font-bold text-text">{n(selected.leads)}</div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-text-muted">{t.leadRecordsNow}</span>
-                <b className="num mt-1 block text-base text-text">{n(leadRecordsNow)}</b>
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="rounded-xl border border-sky-strong/20 bg-surface/80 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-text">{t.leadRecordsNow}</span>
+                  <b className="num text-lg text-text">{n(leadRecordsNow)}</b>
+                </div>
+                <p className="mt-1 text-text-muted">
+                  <span className="num font-semibold text-mint-strong">{n(activeLeadsNow)}</span>{" "}
+                  {t.activeLeadCount}
+                  <span className="mx-1.5">·</span>
+                  <span className="num font-semibold text-rose-strong">
+                    {n(selected.lostLeads)}
+                  </span>{" "}
+                  {t.lostLeadCount}
+                </p>
               </div>
-              <div>
-                <span className="text-text-muted">{t.opportunityNow}</span>
-                <b className="num mt-1 block text-base text-text">{n(selected.opportunities)}</b>
+              <div className="rounded-xl border border-brand/20 bg-surface/80 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-text">{t.opportunityNow}</span>
+                  <b className="num text-lg text-text">{n(selected.opportunities)}</b>
+                </div>
+                <p className="mt-1 text-text-muted">
+                  <span className="num font-semibold text-brand">
+                    {n(selected.opportunities - selected.lostOpportunities - selected.crmWon)}
+                  </span>{" "}
+                  {t.openOpportunityCount}
+                  <span className="mx-1.5">·</span>
+                  <span className="num font-semibold text-mint-strong">
+                    {n(selected.crmWon)}
+                  </span>{" "}
+                  {t.wonOpportunityCount}
+                  <span className="mx-1.5">·</span>
+                  <span className="num font-semibold text-rose-strong">
+                    {n(selected.lostOpportunities)}
+                  </span>{" "}
+                  {t.lostLeadCount}
+                </p>
               </div>
             </div>
-            <div className="mt-3 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
-              <p>
-                <b className="text-text">
-                  {t.freshNow}: {n(selected.freshTagged)}
-                </b>{" "}
-                · {t.freshMeaning}
+            <div className="mt-3 rounded-xl border border-amber-strong/20 bg-amber-surface/40 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
+              <p className="font-semibold text-text">
+                {t.freshNow}: <span className="num">{n(selected.freshTagged)}</span>
               </p>
-              <p className="mt-2">
+              <p className="mt-1">
+                {t.freshLeadTag}: <b className="num text-text">{n(freshLeadsNow)}</b>
+                <span className="mx-1.5">·</span>
+                {t.freshOpportunityTag}: <b className="num text-text">{n(freshOpportunitiesNow)}</b>
+              </p>
+              <p className="mt-1.5">{t.freshTagNote}</p>
+              <p className="mt-1.5">
                 {t.preCrmUnavailable}. {t.classificationPrompt}
               </p>
             </div>

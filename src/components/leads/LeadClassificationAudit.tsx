@@ -26,6 +26,9 @@ const wording = {
     segmentHint:
       "هذا حقل تصنيف حالي، لا مرحلة من مسار البيع. قد يبقى Fresh على Opportunity مفتوحة أو Won أو Lost.",
     freshCross: "الموسومون Fresh الآن موزعون على الحالات التالية",
+    freshLead: "من نوع Lead",
+    freshOpportunity: "من نوع Opportunity",
+    freshNote: "Lead النشط ليس Fresh تلقائيًا؛ نعتمد على قيمة حقل Lead Segment نفسها.",
     blank: "الحقل فارغ",
     contactHint:
       "المكالمة بعد إنشاء السجل، مطابقة هاتف فريدة في Yeastar. لا تعني المكالمة بالضرورة رد العميل، وغيابها ليس حكمًا بعدم عمل السيلز.",
@@ -62,6 +65,10 @@ const wording = {
     segmentHint:
       "This is a current classification field, not a sales stage. Fresh can remain on Open, Won or Lost Opportunities.",
     freshCross: "Records currently tagged Fresh are in these CRM states",
+    freshLead: "Lead record type",
+    freshOpportunity: "Opportunity record type",
+    freshNote:
+      "An active Lead is not automatically tagged Fresh; only the Lead Segment field decides this count.",
     blank: "Blank field",
     contactHint:
       "Calls after record creation with a unique Yeastar phone match. A call does not prove the customer answered; no visible call does not prove sales did nothing.",
@@ -146,6 +153,8 @@ export function LeadClassificationAudit({
         .filter((row) => row.count > 0),
       contactRows,
       freshCount: fresh.length,
+      freshLeadCount: fresh.filter((row) => row.recordType === "lead").length,
+      freshOpportunityCount: fresh.filter((row) => row.recordType === "opportunity").length,
     };
   }, [records, t]);
 
@@ -211,6 +220,21 @@ export function LeadClassificationAudit({
             <div className="num mt-1 text-3xl font-bold text-text">
               {summary.freshCount.toLocaleString()}
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl border border-sky-strong/20 bg-surface/80 px-3 py-2">
+                <div className="text-text-muted">{t.freshLead}</div>
+                <b className="num mt-1 block text-xl text-text">
+                  {summary.freshLeadCount.toLocaleString()}
+                </b>
+              </div>
+              <div className="rounded-xl border border-brand/20 bg-surface/80 px-3 py-2">
+                <div className="text-text-muted">{t.freshOpportunity}</div>
+                <b className="num mt-1 block text-xl text-text">
+                  {summary.freshOpportunityCount.toLocaleString()}
+                </b>
+              </div>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-text-muted">{t.freshNote}</p>
             <p className="mt-2 text-xs leading-5 text-text-muted">{t.freshCross}</p>
             <div className="mt-3 divide-y divide-border">
               {summary.freshStatus.map((row) => (
