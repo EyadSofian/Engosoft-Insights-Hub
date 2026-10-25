@@ -45,6 +45,9 @@ export interface PerformanceQa {
 export interface PerformanceGroup {
   name: string;
   leads: number;
+  /** Current Odoo Lead Segment field, not a historical entry-state snapshot. */
+  freshTagged: number;
+  segmentMissing: number;
   duplicateSameMonth: number;
   duplicateEarlierMonth: number;
   confirmedDuplicate: number;
@@ -79,6 +82,31 @@ export interface PerformanceGroup {
   callMatchable: number | null;
 }
 
+/** Auditable selected-month rows, without customer phone/email/name in the API. */
+export interface PerformanceRecord {
+  id: string;
+  createdAt: string;
+  course: string;
+  source: string;
+  campaign: string;
+  mediaBuyer: string;
+  salesperson: string;
+  closer: string;
+  recordType: "lead" | "opportunity";
+  status: "lead" | "open" | "won" | "lost";
+  leadSegment: string;
+  duplicate: "same" | "earlier" | null;
+  unqualifiedCategory: "customer_data" | "course_fit" | "unspecified" | null;
+  lossReasonAr: string;
+  lossReasonEn: string;
+  attempts: number | null;
+  firstCallLagHours: number | null;
+  firstCallLagDays: number | null;
+  paidOrders: number;
+  paidRevenue: number;
+  paidLater: boolean;
+}
+
 /**
  * One step of the acquisition funnel, with both rates a reader needs.
  *
@@ -106,6 +134,7 @@ export interface PerformanceResult {
   selectedMonth: string;
   rows: PerformanceGroup[];
   selected: PerformanceGroup;
+  records: PerformanceRecord[];
   /** Selected cohort stages, with rates only where denominators are evidenced. */
   stages: PerformanceStage[];
   byCourse: PerformanceGroup[];
@@ -195,6 +224,8 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
   return {
     name,
     leads: records.length,
+    freshTagged: records.filter((row) => row.leadSegment.trim().toLowerCase() === "fresh").length,
+    segmentMissing: records.filter((row) => !row.leadSegment.trim()).length,
     duplicateSameMonth: records.filter((row) => row.duplicate === "same").length,
     duplicateEarlierMonth: records.filter((row) => row.duplicate === "earlier").length,
     confirmedDuplicate: records.filter(
@@ -561,6 +592,32 @@ export function buildLeadPerformance(input: {
     selectedMonth,
     rows,
     selected,
+    records: selectedRecords.map((row) => {
+      const buyer = row.campaign.trim() ? mediaBuyerForCampaign(row.course, row.campaign) : null;
+      return {
+        id: row.id,
+        createdAt: row.createdAt,
+        course: row.course,
+        source: row.source,
+        campaign: row.campaign,
+        mediaBuyer: buyer && buyer !== "ambiguous" ? MEDIA_BUYERS[buyer].name : "",
+        salesperson: row.salesperson,
+        closer: row.closer,
+        recordType: row.recordType,
+        status: row.status,
+        leadSegment: row.leadSegment,
+        duplicate: row.duplicate,
+        unqualifiedCategory: row.unqualifiedCategory,
+        lossReasonAr: row.status === "lost" ? row.reason.canonicalReasonLabelAr : "",
+        lossReasonEn: row.status === "lost" ? row.reason.canonicalReasonLabelEn : "",
+        attempts: coverage.callsAvailable ? row.calls : null,
+        firstCallLagHours: coverage.callsAvailable ? row.firstCallLagHours : null,
+        firstCallLagDays: coverage.callsAvailable ? row.firstCallLagDays : null,
+        paidOrders: row.paidOrders.size,
+        paidRevenue: round2(row.paidRevenue),
+        paidLater: row.paidLater,
+      };
+    }),
     stages: performanceStages(selected, coverage.linksAvailable),
     byCourse: groups(selectedRecords, (row) => row.course, coverage.callsAvailable),
     bySource: groups(selectedRecords, (row) => row.source, coverage.callsAvailable),

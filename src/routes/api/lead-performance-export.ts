@@ -45,6 +45,8 @@ export const Route = createFileRoute("/api/lead-performance-export")({
         months.addRow([
           ar ? "شهر الدخول" : "Entry month",
           ar ? "سجلات جديدة" : "New records",
+          ar ? "موسوم Fresh حاليًا" : "Currently tagged Fresh",
+          ar ? "تصنيف أودو فارغ" : "Missing Odoo segment",
           ar ? "تكرار داخل الشهر" : "Duplicate same month",
           ar ? "تكرار من شهر سابق" : "Duplicate prior month",
           ar ? "تكرار مؤكد في أودو" : "Confirmed Odoo duplicate",
@@ -72,6 +74,8 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           months.addRow([
             row.name,
             row.leads,
+            row.freshTagged,
+            row.segmentMissing,
             row.duplicateSameMonth,
             row.duplicateEarlierMonth,
             row.confirmedDuplicate,
@@ -138,6 +142,8 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           sheet.addRow([
             label,
             ar ? "ليدز" : "Leads",
+            ar ? "موسوم Fresh حاليًا" : "Currently tagged Fresh",
+            ar ? "تصنيف أودو فارغ" : "Missing Odoo segment",
             ar ? "تكرار محتمل" : "Potential duplicates",
             ar ? "غير مؤهل" : "Unqualified",
             ar ? "لا يرد" : "No answer",
@@ -157,6 +163,8 @@ export const Route = createFileRoute("/api/lead-performance-export")({
             sheet.addRow([
               safe(row.name),
               row.leads,
+              row.freshTagged,
+              row.segmentMissing,
               row.duplicateSameMonth + row.duplicateEarlierMonth,
               row.unqualified,
               row.noAnswer,
@@ -200,11 +208,64 @@ export const Route = createFileRoute("/api/lead-performance-export")({
         for (const row of result.unqualifiedReasons)
           reasons.addRow([categoryLabel[row.category]![ar ? "ar" : "en"], row.count]);
 
+        const records = workbook.addWorksheet(ar ? "سجلات الشهر المختار" : "Selected lead records");
+        records.addRow([
+          ar ? "رقم أودو" : "Odoo ID",
+          ar ? "تاريخ الدخول" : "Entry date",
+          ar ? "الكورس" : "Course",
+          ar ? "المصدر" : "Source",
+          ar ? "الحملة" : "Campaign",
+          ar ? "الميديا باير" : "Media buyer",
+          ar ? "مسؤول الليد" : "Lead owner",
+          ar ? "النوع الحالي" : "Current record type",
+          ar ? "الحالة الحالية" : "Current status",
+          ar ? "Lead Segment حاليًا" : "Current Lead Segment",
+          ar ? "التكرار المحتمل" : "Potential duplicate",
+          ar ? "سبب الفقدان" : "Loss reason",
+          ar ? "محاولات PBX" : "PBX attempts",
+          ar ? "ساعات لأول محاولة" : "Hours to first attempt",
+          ar ? "أوامر مدفوعة مثبتة" : "Verified paid orders",
+          ar ? "تحصيل مثبت USD" : "Verified collections USD",
+          ar ? "دفع لاحقًا" : "Paid later",
+          ar ? "السيلز المغلق" : "Paid closer",
+        ]);
+        for (const row of result.records) {
+          records.addRow([
+            safe(row.id),
+            safe(row.createdAt),
+            safe(row.course),
+            safe(row.source),
+            safe(row.campaign),
+            safe(row.mediaBuyer),
+            safe(row.salesperson),
+            row.recordType,
+            row.status,
+            safe(row.leadSegment),
+            row.duplicate ?? dash,
+            safe(ar ? row.lossReasonAr : row.lossReasonEn),
+            num(row.attempts),
+            num(
+              row.firstCallLagHours ??
+                (row.firstCallLagDays === null ? null : row.firstCallLagDays * 24),
+            ),
+            paid(row.paidOrders),
+            paid(row.paidRevenue),
+            paidReady ? (row.paidLater ? (ar ? "نعم" : "Yes") : ar ? "لا" : "No") : dash,
+            paidReady ? safe(row.closer) : dash,
+          ]);
+        }
+
         const notes = workbook.addWorksheet(ar ? "التعريفات والحدود" : "Definitions and limits");
         notes.addRow([ar ? "البند" : "Item", ar ? "القيمة" : "Value"]);
         const lines: [string, string][] = [
           [ar ? "الفترة" : "Window", `${result.months[0]} → ${result.asOf}`],
           [ar ? "الشهر المختار" : "Selected month", result.selectedMonth],
+          [
+            ar ? "معنى Fresh" : "Fresh definition",
+            ar
+              ? "عدد الدخول هو كل سجلات أودو المنشأة في الشهر، لا يساوي Fresh المؤكد. Lead Segment حقل حالي؛ التحديد التاريخي عند الدخول غير متاح، وبعض السجلات بلا تصنيف."
+              : "Entry count covers all Odoo records created in the month, not a confirmed Fresh total. Lead Segment is current-state only; historical entry status is unavailable and some records are blank.",
+          ],
           [ar ? "فلتر الكورس" : "Course filter", params.get("course") || (ar ? "الكل" : "All")],
           [ar ? "مزامنة CRM" : "CRM synced at", availability.crmSyncedAt],
           [ar ? "مزامنة Lost" : "Lost synced at", availability.lostSyncedAt],

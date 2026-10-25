@@ -42,6 +42,7 @@ import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-c
 import {
   performanceStages,
   type PerformanceGroup,
+  type PerformanceRecord,
   type PerformanceResult,
 } from "@/lib/lead-performance";
 
@@ -145,6 +146,35 @@ const copy = {
     cohortVsPayment:
       "مش نفس المؤشر: الفواتير حسب تاريخ الدفع تشمل ليدز من شهور سابقة وقد تشمل فواتير بلا ربط مؤكد. التسجيلات المثبتة أعلاه تُنسب لشهر دخول الليد، ولا تضم إلا الربط المباشر بأمر البيع. لا يصح اعتبار الفرق ليدز مفقودة أو نسبة تحويل.",
     paymentRevenue: "تحصيل فواتير الشهر",
+    freshNow: "موسومة Fresh حاليًا في أودو",
+    segmentUnknown: "بلا تصنيف Fresh / غيره",
+    quickRead: "ملخص واضح قبل التفاصيل",
+    quickReadHint: "الأساس، ما ثبت، وما يحتاج استكمالًا — بدون خلط بينهم.",
+    enteredBasis: "دخلت في شهر الاختيار",
+    verifiedOutcome: "تسجيلات مدفوعة مؤكدة",
+    evidenceGap: "حدود البيانات المهمة",
+    freshGap:
+      "Fresh التاريخي غير مثبت: حقل Lead Segment يعرض قيمته الحالية فقط، وسجلات كثيرة بلا تصنيف. لذلك عدد الدخول ليس عدد Fresh المؤكد.",
+    paidGap:
+      "الفواتير التي لا نعرف ليدها ليست صفر مبيعات؛ التحويل المعروض حد أدنى من الربط المباشر فقط.",
+    funnelGap:
+      "انتقالات مراحل الفرصة السابقة غير مسجلة هنا؛ لا يمكن حساب معدل كل انتقال تاريخي بدقة.",
+    qaGap: "لا توجد مراجعات جودة يدوية لهذه المجموعة؛ صفر Unqualified لا يعني أن كل الليدز مؤهلة.",
+    recordList: "راجع الليدز واحدًا واحدًا",
+    recordListHint:
+      "سجلات شهر الدخول المختار؛ ابحث بالرقم أو الكورس أو المصدر أو الحملة أو السيلز. افتح الرقم للمراجعة في أودو.",
+    recordId: "رقم أودو",
+    entryDate: "تاريخ الدخول",
+    currentState: "الحالة الآن",
+    segment: "تصنيف أودو الآن",
+    attempts: "محاولات PBX",
+    firstAttempt: "أول محاولة بعد (ساعة)",
+    duplicateFlag: "التكرار",
+    none: "غير مثبت",
+    paidFlag: "تسجيل مدفوع",
+    recordType: "نوع السجل",
+    reason: "سبب الفقدان",
+    recordCountHint: "هذا الجدول يعرض المجموعة المختارة فقط ولا يضيف ليدز إلى الإجمالي.",
   },
   en: {
     title: "From lead to paid enrollment",
@@ -228,6 +258,37 @@ const copy = {
     cohortVsPayment:
       "These are different measures: payment-month invoices can belong to older leads or lack an exact link. Verified enrollments above are credited to the lead entry month only after a direct sale-order link. The difference is not missing leads or a conversion rate.",
     paymentRevenue: "Payment-month collections",
+    freshNow: "Tagged Fresh in Odoo now",
+    segmentUnknown: "No current Lead Segment",
+    quickRead: "Read this report at a glance",
+    quickReadHint: "The denominator, verified outcome and evidence gaps are kept separate.",
+    enteredBasis: "Entered in selected month",
+    verifiedOutcome: "Verified paid enrollments",
+    evidenceGap: "Important evidence gaps",
+    freshGap:
+      "Historical Fresh status is unverified: Lead Segment is its current value and many records are blank. Entry count is not a confirmed Fresh count.",
+    paidGap:
+      "Invoices without an exact lead link are not zero sales. Conversion shown is a lower bound from direct links only.",
+    funnelGap:
+      "Past opportunity-stage transitions are not logged here, so true stage-to-stage historical conversion cannot be calculated.",
+    qaGap:
+      "This cohort has no manual QA reviews. Zero Unqualified does not mean all leads were qualified.",
+    recordList: "Audit individual leads",
+    recordListHint:
+      "Records created in the selected month. Search by ID, course, source, campaign or owner, then open an ID in Odoo.",
+    recordId: "Odoo ID",
+    entryDate: "Entry date",
+    currentState: "Current state",
+    segment: "Current Odoo segment",
+    attempts: "PBX attempts",
+    firstAttempt: "First attempt after (hours)",
+    duplicateFlag: "Duplicate",
+    none: "Not evidenced",
+    paidFlag: "Paid enrollment",
+    recordType: "Record type",
+    reason: "Loss reason",
+    recordCountHint:
+      "This list belongs to the selected cohort only; it adds no records to the totals.",
   },
 } as const;
 
@@ -254,6 +315,8 @@ const extra = {
     contactedStage: "تم التواصل معها (PBX)",
     within24: "أول اتصال خلال ٢٤ ساعة (بتوقيت إنشاء دقيق)",
     groupColumns: {
+      fresh: "Fresh الآن",
+      segmentMissing: "تصنيف ناقص",
       duplicates: "تكرار",
       dupSame: "تكرار داخل الشهر",
       dupPrev: "تكرار من شهر سابق",
@@ -293,6 +356,8 @@ const extra = {
     contactedStage: "Contacted (PBX)",
     within24: "First call within 24 hours (exact creation time)",
     groupColumns: {
+      fresh: "Fresh now",
+      segmentMissing: "Missing segment",
       duplicates: "Duplicates",
       dupSame: "Duplicate, same month",
       dupPrev: "Duplicate, prior month",
@@ -324,6 +389,16 @@ const pct = (value: number | null | undefined) =>
   value === null || value === undefined ? "—" : fmtPct(value, 1);
 const money = (value: number | null | undefined) =>
   value === null || value === undefined ? "—" : fmtUSD(value);
+
+function currentState(row: PerformanceRecord, lang: "ar" | "en") {
+  if (lang === "en") return row.status;
+  return { lead: "ليد نشط", open: "فرصة مفتوحة", won: "مغلق بنجاح", lost: "مفقود" }[row.status];
+}
+
+function recordType(row: PerformanceRecord, lang: "ar" | "en") {
+  if (lang === "en") return row.recordType;
+  return row.recordType === "lead" ? "ليد" : "فرصة بيعية";
+}
 
 /** `2026-07` the way a reader says it, so a month strip is not six ISO stamps. */
 function monthLabel(month: string, lang: "ar" | "en"): string {
@@ -664,6 +739,24 @@ export function SixMonthPerformance() {
       sortValue: (row) => row.leads,
     },
     {
+      key: "freshTagged",
+      header: x.groupColumns.fresh,
+      group: "volume",
+      align: "right",
+      headerTitle: t.freshGap,
+      render: (row) => n(row.freshTagged),
+      sortValue: (row) => row.freshTagged,
+    },
+    {
+      key: "segmentMissing",
+      header: x.groupColumns.segmentMissing,
+      group: "volume",
+      align: "right",
+      headerTitle: t.freshGap,
+      render: (row) => n(row.segmentMissing),
+      sortValue: (row) => row.segmentMissing,
+    },
+    {
       key: "duplicates",
       header: x.groupColumns.duplicates,
       label: x.groupColumns.duplicates,
@@ -843,6 +936,8 @@ export function SixMonthPerformance() {
   const csvRow = (row: PerformanceGroup): Record<string, string | number> => ({
     name: row.name,
     leads: row.leads,
+    freshTagged: row.freshTagged,
+    segmentMissing: row.segmentMissing,
     duplicateSameMonth: row.duplicateSameMonth,
     duplicateEarlierMonth: row.duplicateEarlierMonth,
     confirmedDuplicate: row.confirmedDuplicate,
@@ -928,6 +1023,138 @@ export function SixMonthPerformance() {
     data.coverage.qaAvailable && data.coverage.qaReviewed === 0 && t.noQaReviews,
   ].filter((value): value is string => Boolean(value));
   const exportParams = new URLSearchParams({ month: data.selectedMonth, lang });
+  const hasFreshGap = selected.segmentMissing > 0;
+  const hasPaidGap = data.coverage.unlinkedAccountingInvoices > 0;
+  const hasQaGap = data.coverage.qaReviewed === 0;
+
+  const recordColumns: Col<PerformanceRecord>[] = [
+    {
+      key: "id",
+      header: t.recordId,
+      always: true,
+      sticky: true,
+      render: (row) => (
+        <a
+          className="font-semibold text-sky-strong underline underline-offset-2"
+          href={`https://engosoft.com/web#id=${encodeURIComponent(row.id)}&model=crm.lead&view_type=form`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {row.id}
+        </a>
+      ),
+      sortValue: (row) => Number(row.id) || row.id,
+    },
+    {
+      key: "createdAt",
+      header: t.entryDate,
+      render: (row) => row.createdAt,
+      sortValue: (row) => row.createdAt,
+    },
+    {
+      key: "course",
+      header: t.course,
+      render: (row) => row.course || "—",
+      sortValue: (row) => row.course,
+    },
+    {
+      key: "source",
+      header: t.source,
+      render: (row) => row.source || "—",
+      sortValue: (row) => row.source,
+    },
+    {
+      key: "campaign",
+      header: t.campaign,
+      render: (row) => row.campaign || "—",
+      sortValue: (row) => row.campaign,
+    },
+    {
+      key: "buyer",
+      header: t.buyer,
+      render: (row) => row.mediaBuyer || "—",
+      sortValue: (row) => row.mediaBuyer,
+    },
+    {
+      key: "owner",
+      header: t.owner,
+      render: (row) => row.salesperson || "—",
+      sortValue: (row) => row.salesperson,
+    },
+    {
+      key: "status",
+      header: t.currentState,
+      render: (row) => currentState(row, lang),
+      sortValue: (row) => row.status,
+    },
+    {
+      key: "attempts",
+      header: t.attempts,
+      align: "right",
+      render: (row) => n(row.attempts),
+      sortValue: (row) => row.attempts ?? -1,
+    },
+    {
+      key: "firstAttempt",
+      header: t.firstAttempt,
+      align: "right",
+      render: (row) =>
+        row.firstCallLagHours !== null
+          ? n(row.firstCallLagHours)
+          : row.firstCallLagDays !== null
+            ? `${n(row.firstCallLagDays * 24)}*`
+            : "—",
+      sortValue: (row) => row.firstCallLagHours ?? (row.firstCallLagDays ?? -1) * 24,
+    },
+    {
+      key: "paid",
+      header: t.paidFlag,
+      align: "right",
+      render: (row) =>
+        paidReady
+          ? row.paidOrders
+            ? `${n(row.paidOrders)} · ${money(row.paidRevenue)}`
+            : "0"
+          : "—",
+      sortValue: (row) => row.paidOrders,
+    },
+    {
+      key: "segment",
+      header: t.segment,
+      hideByDefault: true,
+      render: (row) => row.leadSegment || "—",
+      sortValue: (row) => row.leadSegment,
+    },
+    {
+      key: "type",
+      header: t.recordType,
+      hideByDefault: true,
+      render: (row) => recordType(row, lang),
+      sortValue: (row) => row.recordType,
+    },
+    {
+      key: "duplicate",
+      header: t.duplicateFlag,
+      hideByDefault: true,
+      render: (row) =>
+        row.duplicate === "same" ? t.same : row.duplicate === "earlier" ? t.previous : "—",
+      sortValue: (row) => row.duplicate ?? "",
+    },
+    {
+      key: "reason",
+      header: t.reason,
+      hideByDefault: true,
+      render: (row) => (lang === "ar" ? row.lossReasonAr : row.lossReasonEn) || "—",
+      sortValue: (row) => row.lossReasonEn,
+    },
+    {
+      key: "closer",
+      header: t.closer,
+      hideByDefault: true,
+      render: (row) => (paidReady ? row.closer || "—" : "—"),
+      sortValue: (row) => row.closer,
+    },
+  ];
 
   return (
     <PageSections>
@@ -964,6 +1191,51 @@ export function SixMonthPerformance() {
           </Pill>
         </div>
       </DashboardPageHeader>
+
+      <PageSection
+        title={t.quickRead}
+        hint={`${monthLabel(data.selectedMonth, lang)} · ${t.quickReadHint}`}
+        icon={<BadgeCheck size={16} />}
+        tone="sky"
+        id="performance-summary"
+      >
+        <div className="grid gap-3 lg:grid-cols-3">
+          <Card className="border-sky-strong/20 bg-sky-surface/50">
+            <div className="text-xs font-semibold text-text-muted">{t.enteredBasis}</div>
+            <div className="num mt-2 text-3xl font-bold text-text">{n(selected.leads)}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-text-muted">{t.freshNow}</span>
+                <b className="num mt-1 block text-base text-text">{n(selected.freshTagged)}</b>
+              </div>
+              <div>
+                <span className="text-text-muted">{t.segmentUnknown}</span>
+                <b className="num mt-1 block text-base text-text">{n(selected.segmentMissing)}</b>
+              </div>
+            </div>
+          </Card>
+          <Card className="border-mint-strong/20 bg-mint-surface/50">
+            <div className="text-xs font-semibold text-text-muted">{t.verifiedOutcome}</div>
+            <div className="num mt-2 text-3xl font-bold text-text">
+              {paidReady ? n(selected.paidLeads) : "—"}
+            </div>
+            <div className="mt-3 text-xs leading-6 text-text-muted">
+              {t.rate}:{" "}
+              <b className="text-text">{paidReady ? pct(selected.conversionRate) : "—"}</b> ·{" "}
+              {t.later}: <b className="text-text">{paidReady ? n(selected.paidLater) : "—"}</b>
+            </div>
+          </Card>
+          <Card className="border-amber-strong/20 bg-amber-surface/50">
+            <div className="text-xs font-semibold text-text-muted">{t.evidenceGap}</div>
+            <div className="mt-3 space-y-2 text-[12px] leading-5 text-text-muted">
+              {hasFreshGap && <p>{t.freshGap}</p>}
+              {hasPaidGap && <p>{t.paidGap}</p>}
+              {hasQaGap && <p>{t.qaGap}</p>}
+              <p>{t.funnelGap}</p>
+            </div>
+          </Card>
+        </div>
+      </PageSection>
 
       {notices.length > 0 && (
         <div className="space-y-2">
@@ -1092,6 +1364,40 @@ export function SixMonthPerformance() {
         tone="sky"
         id="performance-trend"
       >
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {data.rows.map((row) => (
+            <button
+              key={row.name}
+              type="button"
+              aria-pressed={row.name === data.selectedMonth}
+              onClick={() => setMonth(row.name)}
+              className={`rounded-2xl border p-3 text-start transition-colors hover:border-sky-strong ${
+                row.name === data.selectedMonth
+                  ? "border-sky-strong bg-sky-surface shadow-sm"
+                  : "border-border bg-surface"
+              }`}
+            >
+              <span className="text-xs font-semibold text-text">{monthLabel(row.name, lang)}</span>
+              <span className="num mt-2 block text-2xl font-bold text-text">{n(row.leads)}</span>
+              <span className="text-[11px] text-text-muted">{t.leads}</span>
+              <span className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                <span className="text-rose-strong">
+                  {t.lost}
+                  <b className="num mt-0.5 block text-sm">
+                    {n(row.lost)} · {pct(row.lostRate)}
+                  </b>
+                </span>
+                <span className="text-mint-strong">
+                  {t.paid}
+                  <b className="num mt-0.5 block text-sm">
+                    {paidReady ? n(row.paidLeads) : "—"} ·{" "}
+                    {paidReady ? pct(row.conversionRate) : "—"}
+                  </b>
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
         <Card padded={false} className="overflow-hidden">
           <DataTable<MonthRow>
             rows={monthRows}
@@ -1119,7 +1425,7 @@ export function SixMonthPerformance() {
             ]}
             groupLabels={bandLabels}
             columnChooser
-            defaultVisibleLimit={11}
+            defaultVisibleLimit={15}
             pageSize={6}
             initialSort={{ key: "name", dir: 1 }}
             onRowClick={(row) => setMonth(row.name)}
@@ -1280,7 +1586,7 @@ export function SixMonthPerformance() {
             cols={groupCols(activeDimension.label, dimension === "closer")}
             groupLabels={bandLabels}
             columnChooser
-            defaultVisibleLimit={11}
+            defaultVisibleLimit={15}
             searchable={(row) => row.name}
             initialSort={{ key: "leads", dir: -1 }}
             rowKey={(row) => row.name}
@@ -1289,6 +1595,53 @@ export function SixMonthPerformance() {
             emptyState={
               <p className="p-8 text-center text-sm text-text-muted">{x.noDimensionRows}</p>
             }
+          />
+        </Card>
+      </PageSection>
+
+      <PageSection
+        title={t.recordList}
+        hint={`${monthLabel(data.selectedMonth, lang)} · ${n(data.records.length)} ${t.rows}`}
+        icon={<Users size={16} />}
+        tone="sky"
+        id="performance-records"
+      >
+        <Card padded={false} className="overflow-hidden">
+          <p className="px-4 pt-4 text-xs leading-6 text-text-muted">
+            {t.recordListHint} {t.recordCountHint}
+          </p>
+          <DataTable<PerformanceRecord>
+            rows={data.records}
+            cols={recordColumns}
+            searchable={(row) =>
+              [row.id, row.course, row.source, row.campaign, row.mediaBuyer, row.salesperson].join(
+                " ",
+              )
+            }
+            columnChooser
+            defaultVisibleLimit={11}
+            pageSize={20}
+            maxHeight={640}
+            initialSort={{ key: "createdAt", dir: -1 }}
+            rowKey={(row) => row.id}
+            csvFilename={`engosoft-lead-records-${data.selectedMonth}`}
+            csvRow={(row) => ({
+              id: row.id,
+              createdAt: row.createdAt,
+              course: row.course,
+              source: row.source,
+              campaign: row.campaign,
+              mediaBuyer: row.mediaBuyer,
+              salesperson: row.salesperson,
+              status: row.status,
+              leadSegment: row.leadSegment,
+              duplicate: row.duplicate ?? "",
+              attempts: row.attempts ?? "",
+              firstCallLagHours: row.firstCallLagHours ?? "",
+              lossReason: lang === "ar" ? row.lossReasonAr : row.lossReasonEn,
+              paidOrders: paidReady ? row.paidOrders : "",
+              paidUsd: paidReady ? row.paidRevenue : "",
+            })}
           />
         </Card>
       </PageSection>

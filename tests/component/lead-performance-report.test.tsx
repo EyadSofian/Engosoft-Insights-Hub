@@ -43,6 +43,8 @@ const MONTHS = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"
 const group = (name: string, patch: Record<string, unknown> = {}) => ({
   name,
   leads: 100,
+  freshTagged: 24,
+  segmentMissing: 60,
   duplicateSameMonth: 6,
   duplicateEarlierMonth: 4,
   confirmedDuplicate: 2,
@@ -79,6 +81,31 @@ const response = (patch: Record<string, unknown> = {}) => ({
   selectedMonth: "2026-09",
   rows: MONTHS.map((month) => group(month)),
   selected: group("2026-09"),
+  records: [
+    {
+      id: "153853",
+      createdAt: "2026-09-15",
+      course: "CFM",
+      source: "Facebook",
+      campaign: "cfm-sayed",
+      mediaBuyer: "Sayed",
+      salesperson: "Sales A",
+      closer: "Closer A",
+      recordType: "opportunity",
+      status: "lost",
+      leadSegment: "Fresh",
+      duplicate: "same",
+      unqualifiedCategory: null,
+      lossReasonAr: "لا يرد",
+      lossReasonEn: "No answer",
+      attempts: 2,
+      firstCallLagHours: 9.5,
+      firstCallLagDays: 0,
+      paidOrders: 0,
+      paidRevenue: 0,
+      paidLater: false,
+    },
+  ],
   stages: [],
   byCourse: [group("PMP"), group("CFM", { leads: 40, averageAttempts: 1.1 })],
   bySource: [group("Facebook")],
@@ -166,6 +193,19 @@ afterEach(() => {
 });
 
 describe("the six-month lead-to-paid report", () => {
+  it("separates new entries from the current Fresh tag and exposes a searchable record audit", async () => {
+    mount(response());
+    await waitFor(() => expect(screen.getByText(/Read this report at a glance/i)).toBeTruthy());
+    const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
+    expect(within(summary).getByText(/Tagged Fresh in Odoo now/i)).toBeTruthy();
+    expect(within(summary).getByText(/No current Lead Segment/i)).toBeTruthy();
+    expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
+    const audit = screen.getByText(/Audit individual leads/i).closest("section")!;
+    expect(within(audit).getByText("153853").closest("a")?.getAttribute("href")).toContain(
+      "model=crm.lead",
+    );
+    expect(within(audit).getByText(/PBX attempts/i)).toBeTruthy();
+  });
   it("shows a verified contact rate but does not invent opportunity or paid transitions", async () => {
     mount(response());
     await waitFor(() => expect(screen.getByText(/Evidence-backed funnel/i)).toBeTruthy());

@@ -68,8 +68,30 @@ describe("six-month lead performance", () => {
     expect(result.selected.leads).toBe(2);
     expect(result.coverage.excludedBroadcast).toBe(1);
     expect(result.coverage.excludedRecommendation).toBe(1);
+    expect(result.records.map((row) => row.id)).toEqual(["1", "2"]);
     expect(result.selected.duplicateSameMonth).toBe(1);
     expect(result.rows[1]?.duplicateEarlierMonth).toBe(1);
+  });
+
+  it("keeps the entry cohort distinct from the current Fresh tag and emits auditable records", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [
+        lead("fresh", "2026-05-03", { leadSegment: "Fresh", phone: "+966500000001" }),
+        lead("blank", "2026-05-04", { leadSegment: "", phone: "+966500000002" }),
+      ],
+      invoices: [],
+      links: [],
+      calls: [{ phone: "+966500000001", day: "2026-05-03", totalCalls: 2 }],
+    });
+    expect(result.selected.leads).toBe(2);
+    expect(result.selected.freshTagged).toBe(1);
+    expect(result.selected.segmentMissing).toBe(1);
+    expect(result.records).toHaveLength(2);
+    expect(result.records.find((row) => row.id === "fresh")?.attempts).toBe(2);
+    expect(result.records.find((row) => row.id === "blank")?.leadSegment).toBe("");
+    expect("phone" in result.records[0]!).toBe(false);
+    expect("email" in result.records[0]!).toBe(false);
   });
 
   it("counts only positive-net exact-linked orders and attributes later payments to the entry month", () => {
