@@ -73,7 +73,7 @@ function VariantChips({
       {rows.slice(0, 4).map((row) => (
         <span
           key={row.key}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-surface-2 px-2 py-1 text-[11px] text-text-muted"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-surface-2 px-2 py-1 text-[12px] text-text-muted"
         >
           <span className="truncate">{variantLabel(row.key, lang)}</span>
           <span className="num shrink-0 font-semibold text-text">
@@ -82,7 +82,7 @@ function VariantChips({
         </span>
       ))}
       {rows.length > 4 && (
-        <span className="self-center text-[11px] text-text-subtle">+{rows.length - 4}</span>
+        <span className="self-center text-[12px] text-text-subtle">+{rows.length - 4}</span>
       )}
     </div>
   );
@@ -105,7 +105,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
               : "Each card groups all Odoo products under one finance category. Select it to inspect products, invoices, and types."
           }
           action={
-            <div className="hidden items-center gap-2 text-[11px] text-text-muted sm:flex">
+            <div className="hidden items-center gap-2 text-[12px] text-text-muted sm:flex">
               <BookOpen size={15} />
               <span className="num">{fmtNum(data.summary.families)}</span>
               <span>{lang === "ar" ? "كاتجوري" : "categories"}</span>
@@ -135,11 +135,11 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand/75">
+                      <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-brand/75">
                         {lang === "ar" ? "Product Category" : "Product category"}
                       </p>
                       <p className="truncate text-[15px] font-bold text-text">{row.family}</p>
-                      <p className="mt-1 truncate text-[11px] text-text-subtle">
+                      <p className="mt-1 truncate text-[12px] text-text-subtle">
                         {fmtNum(row.products.length)} {lang === "ar" ? "منتج" : "products"}
                       </p>
                     </div>
@@ -162,7 +162,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
                         }}
                       />
                     </div>
-                    <span className="num shrink-0 text-[11px] text-text-muted">
+                    <span className="num shrink-0 text-[12px] text-text-muted">
                       {data.summary.quantityAvailable && (
                         <>
                           {fmtNum(row.quantity)} {lang === "ar" ? "وحدة" : "units"} ·{" "}
@@ -266,7 +266,7 @@ function CourseDrawer({
           <div className="min-w-0">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <Pill tone="brand">{lang === "ar" ? "Product Category" : "Product category"}</Pill>
-              <span className="text-[11px] text-text-muted">
+              <span className="text-[12px] text-text-muted">
                 {fmtNum(course.products.length)} {lang === "ar" ? "منتج من Odoo" : "Odoo products"}
               </span>
             </div>
@@ -316,7 +316,7 @@ function CourseDrawer({
             </SectionTitle>
             <div className="table-wrap scroll-hint-x rounded-xl border border-border">
               <table className="w-full min-w-[660px] text-sm">
-                <thead className="bg-surface-2 text-[11px] text-text-muted">
+                <thead className="bg-surface-2 text-[12px] text-text-muted">
                   <tr>
                     <th className="px-3 py-2.5 text-start font-medium">
                       {lang === "ar" ? "المنتج" : "Product"}
@@ -342,10 +342,10 @@ function CourseDrawer({
                     <tr key={product.key} className="border-t border-border align-top">
                       <td className="max-w-[300px] px-3 py-3">
                         <p className="font-medium text-text">{product.name}</p>
-                        <p className="mt-0.5 text-[11px] text-text-subtle">
+                        <p className="mt-0.5 text-[12px] text-text-subtle">
                           {[product.code, product.category].filter(Boolean).join(" · ") || "—"}
                         </p>
-                        <p className="mt-1 text-[11px] text-text-muted">
+                        <p className="mt-1 text-[12px] text-text-muted">
                           {sourceLabel(
                             product.sources[0]?.key ?? "__none__",
                             product.sources[0]?.label ?? "",
@@ -500,7 +500,7 @@ function EventRows({
               style={{ width: `${Math.max(1.5, (Math.abs(row.revenueUsd) / peak) * 100)}%` }}
             />
           </span>
-          <span className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-text-muted">
+          <span className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-text-muted">
             <span>{lang === "ar" ? "عرض التفاصيل" : "View details"}</span>
             <span className="num">
               {fmtPct(courseRevenue ? (row.revenueUsd / courseRevenue) * 100 : null, 2)}
@@ -561,20 +561,20 @@ function EventDetailDialog({
 
         <dl className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-surface-2 p-3">
-            <dt className="text-[11px] text-text-muted">{lang === "ar" ? "الإيراد" : "Revenue"}</dt>
+            <dt className="text-[12px] text-text-muted">{lang === "ar" ? "الإيراد" : "Revenue"}</dt>
             <dd className="num mt-1 break-all text-base font-semibold text-text">
               {fmtUSDFull(event.revenueUsd)}
             </dd>
           </div>
           <div className="rounded-xl bg-surface-2 p-3">
-            <dt className="text-[11px] text-text-muted">
+            <dt className="text-[12px] text-text-muted">
               {lang === "ar" ? "الفواتير" : "Invoices"}
             </dt>
             <dd className="num mt-1 text-base font-semibold text-text">{fmtNum(event.invoices)}</dd>
           </div>
           {quantityAvailable && (
             <div className="rounded-xl bg-surface-2 p-3">
-              <dt className="text-[11px] text-text-muted">
+              <dt className="text-[12px] text-text-muted">
                 {lang === "ar" ? "الكمية" : "Quantity"}
               </dt>
               <dd className="num mt-1 text-base font-semibold text-text">
@@ -583,7 +583,7 @@ function EventDetailDialog({
             </div>
           )}
           <div className="rounded-xl bg-surface-2 p-3">
-            <dt className="text-[11px] text-text-muted">
+            <dt className="text-[12px] text-text-muted">
               {lang === "ar" ? "نسبتها من إيراد الكاتجوري" : "Share of category revenue"}
             </dt>
             <dd className="num mt-1 text-base font-semibold text-text">{fmtPct(share, 2)}</dd>

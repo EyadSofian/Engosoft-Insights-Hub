@@ -98,7 +98,7 @@ export function MetricDetailHeader({
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <DeltaBadge value={delta} invert={deltaInvert} />
           {period && (
-            <span className="text-[11px]" style={{ color: t.ink, opacity: 0.7 }}>
+            <span className="text-[12px]" style={{ color: t.ink, opacity: 0.7 }}>
               {period}
             </span>
           )}
@@ -135,8 +135,8 @@ export function MetricFiltersSummary({
     >
       {chips.map((chip) => (
         <div key={chip.key} className="flex min-w-0 items-baseline gap-1.5">
-          <dt className="text-[10.5px] font-semibold text-text-subtle">{chip.label}:</dt>
-          <dd className="text-[11.5px] font-medium text-text">
+          <dt className="text-[12px] font-semibold text-text-subtle">{chip.label}:</dt>
+          <dd className="text-[12px] font-medium text-text">
             <bdi>{chip.value}</bdi>
           </dd>
         </div>
@@ -178,7 +178,7 @@ export function MetricDefinition({
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-controls={id}
-            className="mt-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            className="mt-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
           >
             <Sigma size={12} aria-hidden="true" />
             {lang === "ar" ? "طريقة الحساب" : "How it is calculated"}
@@ -186,7 +186,7 @@ export function MetricDefinition({
           {open && (
             <p
               id={id}
-              className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-[11.5px] leading-relaxed text-text-muted"
+              className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-[12px] leading-relaxed text-text-muted"
             >
               <bdi>{formula}</bdi>
             </p>
@@ -195,7 +195,7 @@ export function MetricDefinition({
       )}
       {caveat && (
         <p
-          className="mt-2 rounded-xl px-3 py-2 text-[11.5px] leading-relaxed"
+          className="mt-2 rounded-xl px-3 py-2 text-[12px] leading-relaxed"
           style={{ background: "var(--amber-surface)", color: "var(--amber-ink)" }}
         >
           {caveat}
@@ -230,14 +230,14 @@ export function MetricProvenance({
           </span>
           <dl className="grid min-w-0 flex-1 gap-x-5 gap-y-2 sm:grid-cols-2">
             <div>
-              <dt className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-subtle">
+              <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
                 {lang === "ar" ? "النظام" : "System"}
               </dt>
               <dd className="mt-0.5 text-[12px] font-semibold text-text">{provenance.system}</dd>
             </div>
             {provenance.model && (
               <div>
-                <dt className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-text-subtle">
+                <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
                   {lang === "ar" ? "الموديل" : "Model"}
                 </dt>
                 <dd className="num mt-0.5 text-[12px] font-semibold text-text">
@@ -251,12 +251,12 @@ export function MetricProvenance({
         <div className="space-y-3 px-3.5 py-3">
           {provenance.query && (
             <div>
-              <div className="mb-1 text-[10px] font-bold text-text-subtle">
+              <div className="mb-1 text-[12px] font-bold text-text-subtle">
                 {lang === "ar" ? "قاعدة دخول السجل في الرقم" : "Record inclusion rule"}
               </div>
               <code
                 dir="ltr"
-                className="block overflow-x-auto rounded-xl border border-border bg-surface-2 px-3 py-2 text-left text-[10.5px] leading-5 text-text"
+                className="block overflow-x-auto rounded-xl border border-border bg-surface-2 px-3 py-2 text-left text-[12px] leading-5 text-text"
               >
                 {provenance.query}
               </code>
@@ -265,7 +265,7 @@ export function MetricProvenance({
 
           {provenance.fields && provenance.fields.length > 0 && (
             <div>
-              <div className="mb-1.5 text-[10px] font-bold text-text-subtle">
+              <div className="mb-1.5 text-[12px] font-bold text-text-subtle">
                 {lang === "ar" ? "حقول Odoo المستخدمة" : "Odoo fields used"}
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -273,7 +273,7 @@ export function MetricProvenance({
                   <span
                     key={field}
                     dir="ltr"
-                    className="num rounded-lg border border-border bg-surface px-2 py-1 text-[10px] font-semibold text-text-muted"
+                    className="num rounded-lg border border-border bg-surface px-2 py-1 text-[12px] font-semibold text-text-muted"
                   >
                     {field}
                   </span>
@@ -283,7 +283,7 @@ export function MetricProvenance({
           )}
 
           {provenance.dateBasis && (
-            <p className="text-[11px] leading-5 text-text-muted">
+            <p className="text-[12px] leading-5 text-text-muted">
               <span className="font-bold text-text">
                 {lang === "ar" ? "أساس الفترة: " : "Period basis: "}
               </span>
@@ -291,7 +291,7 @@ export function MetricProvenance({
             </p>
           )}
           {provenance.note && (
-            <p className="rounded-xl bg-surface-2 px-3 py-2 text-[11px] leading-5 text-text-muted">
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-[12px] leading-5 text-text-muted">
               {provenance.note}
             </p>
           )}
@@ -327,7 +327,7 @@ export function MetricTrendSection({
     <section data-testid="metric-trend">
       <SectionLabel>{trend.label}</SectionLabel>
       {points.length < 2 ? (
-        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
+        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] leading-relaxed text-text-muted">
           {trend.emptyLabel ??
             (lang === "ar"
               ? "لا توجد سلسلة زمنية كافية لهذه الفترة، ولن يُرسم خط لا تدعمه البيانات."
@@ -342,7 +342,7 @@ export function MetricTrendSection({
         />
       )}
       {trend.previous && (
-        <p className="mt-1.5 text-[11px] text-text-muted">
+        <p className="mt-1.5 text-[12px] text-text-muted">
           {trend.previous.label}:{" "}
           <span className="num font-semibold text-text">{trend.previous.value}</span>
         </p>
@@ -370,7 +370,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
     <section data-testid={`metric-breakdown-${group.id}`}>
       <SectionLabel hint={group.hint}>{group.title}</SectionLabel>
       {rows.length === 0 ? (
-        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-muted">
+        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-muted">
           {group.emptyLabel ??
             (lang === "ar" ? "لا توجد بيانات في هذه الفترة" : "Nothing in this period")}
         </p>
@@ -399,7 +399,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
                     />
                   </div>
                   {row.meta && (
-                    <span className="num shrink-0 text-[10.5px] text-text-muted">{row.meta}</span>
+                    <span className="num shrink-0 text-[12px] text-text-muted">{row.meta}</span>
                   )}
                 </div>
               </li>
@@ -411,7 +411,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
         <Link
           to={group.moreTo}
           search={group.moreSearch as never}
-          className="mt-2.5 inline-flex items-center gap-1 text-[11.5px] font-bold text-brand hover:underline"
+          className="mt-2.5 inline-flex items-center gap-1 text-[12px] font-bold text-brand hover:underline"
         >
           {group.moreLabel ?? (lang === "ar" ? "عرض الكل" : "View all")}
           {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
@@ -436,7 +436,7 @@ export function MetricRecords({ records }: { records: NonNullable<MetricDetail["
     <section data-testid="metric-records">
       <SectionLabel hint={records.hint}>{records.title}</SectionLabel>
       {records.rows.length === 0 ? (
-        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-muted">
+        <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-muted">
           {records.emptyLabel ??
             (lang === "ar" ? "لا توجد سجلات في هذه الفترة" : "No records in this period")}
         </p>
@@ -462,16 +462,14 @@ export function MetricRecords({ records }: { records: NonNullable<MetricDetail["
                   )}
                 </div>
                 {row.subtitle && (
-                  <div className="mt-0.5 truncate text-[10.5px] text-text-muted">
-                    {row.subtitle}
-                  </div>
+                  <div className="mt-0.5 truncate text-[12px] text-text-muted">{row.subtitle}</div>
                 )}
               </div>
               <div className="shrink-0 text-end">
                 {row.value && (
                   <div className="num text-[12.5px] font-semibold text-text">{row.value}</div>
                 )}
-                {row.meta && <div className="text-[10px] text-text-muted">{row.meta}</div>}
+                {row.meta && <div className="text-[12px] text-text-muted">{row.meta}</div>}
               </div>
             </li>
           ))}
@@ -491,9 +489,9 @@ function MetricSupporting({ facts }: { facts: NonNullable<MetricDetail["supporti
       <div className="grid grid-cols-2 gap-2">
         {facts.map((fact) => (
           <div key={fact.key} className="rounded-xl border border-border bg-surface-2/60 px-3 py-2">
-            <div className="text-[10px] font-semibold text-text-subtle">{fact.label}</div>
+            <div className="text-[12px] font-semibold text-text-subtle">{fact.label}</div>
             <div className="num mt-0.5 text-[14px] font-bold text-text">{fact.value}</div>
-            {fact.hint && <div className="mt-0.5 text-[10px] text-text-muted">{fact.hint}</div>}
+            {fact.hint && <div className="mt-0.5 text-[12px] text-text-muted">{fact.hint}</div>}
           </div>
         ))}
       </div>
@@ -563,7 +561,7 @@ export function MetricNexusAction({
               key={question}
               type="button"
               onClick={() => ask(question)}
-              className="cursor-pointer rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-text-muted transition-colors hover:border-brand hover:text-brand"
+              className="cursor-pointer rounded-full border border-border bg-surface px-2.5 py-1 text-[12px] font-medium text-text-muted transition-colors hover:border-brand hover:text-brand"
             >
               {question}
             </button>
@@ -579,10 +577,10 @@ export function MetricNexusAction({
 function SectionLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-2">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-text-subtle">
+      <h3 className="text-[12px] font-bold uppercase tracking-[0.06em] text-text-subtle">
         {children}
       </h3>
-      {hint && <p className="mt-0.5 text-[10.5px] leading-snug text-text-muted">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{hint}</p>}
     </div>
   );
 }

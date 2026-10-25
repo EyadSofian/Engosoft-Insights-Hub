@@ -46,7 +46,7 @@ export function MoreReportsList({ onNavigate }: { onNavigate?: () => void }) {
                   {itemLabel(item, lang, t)}
                 </span>
                 {item.description && (
-                  <span className="block truncate text-[11px] text-text-muted">
+                  <span className="block truncate text-[12px] text-text-muted">
                     {item.description[lang]}
                   </span>
                 )}

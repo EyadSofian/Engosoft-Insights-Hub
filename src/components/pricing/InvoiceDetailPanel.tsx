@@ -109,7 +109,7 @@ export function InvoiceDetailPanel({
             {ar ? "فتح السجل الموثّق في أودو" : "Open the verified Odoo record"}
           </a>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-text-subtle">
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-text-subtle">
             <Lock size={13} aria-hidden="true" />
             {ar
               ? "لم يتم إنشاء رابط أودو لأن المطابقة لم تتأكد."
@@ -137,7 +137,7 @@ export function InvoiceDetailPanel({
         <DetailSection title={ar ? "طريقة الدفع الفعلية" : "How it was settled"}>
           <div className="rounded-lg border border-border bg-surface-2/45 px-3 py-2.5 text-[12px]">
             <div className="font-semibold text-text">{methodLabel(data.payment.method, lang)}</div>
-            <div className="mt-0.5 text-[11px] text-text-muted">
+            <div className="mt-0.5 text-[12px] text-text-muted">
               {ar ? "مصدر التحقق" : "Source"}:{" "}
               {ar
                 ? data.payment.source === "account_payment"
@@ -148,7 +148,7 @@ export function InvoiceDetailPanel({
                 : data.payment.source}
             </div>
             {!!data.payment.breakdown.length && (
-              <ul className="mt-1.5 space-y-0.5 text-[11px] text-text-muted">
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-text-muted">
                 {data.payment.breakdown.map((entry, index) => (
                   <li key={`${entry.raw}${index}`} className="num flex justify-between gap-2">
                     <span>
@@ -246,7 +246,7 @@ export function InvoiceDetailPanel({
                 </div>
 
                 {(line.pricingContext === "package" || line.pricingContext === "offer_bundle") && (
-                  <div className="mt-2 rounded-md border border-success/20 bg-success-soft px-2.5 py-2 text-[11px] leading-relaxed text-text-muted">
+                  <div className="mt-2 rounded-md border border-success/20 bg-success-soft px-2.5 py-2 text-[12px] leading-relaxed text-text-muted">
                     <span className="font-semibold text-success">
                       {line.pricingContext === "offer_bundle"
                         ? ar
@@ -272,10 +272,10 @@ export function InvoiceDetailPanel({
                   </div>
                 )}
 
-                <p className="mt-2 text-[11.5px] leading-relaxed text-text-muted">
+                <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
                   {auditReasonLabel(line, lang)}
                 </p>
-                <p className="mt-1 text-[10.5px] text-text-subtle">
+                <p className="mt-1 text-[12px] text-text-subtle">
                   {matchLabel(line.matchType, lang)} · {ar ? "الكمية" : "Qty"}{" "}
                   <span className="num">{line.quantity}</span>
                 </p>

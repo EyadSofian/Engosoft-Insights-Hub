@@ -53,7 +53,7 @@ export function PriceRangeTrack({
     return (
       <div className="min-w-0">
         <TrackLabel label={label} Icon={Icon} />
-        <p className="mt-2 text-[11px] text-text-subtle">
+        <p className="mt-2 text-[12px] text-text-subtle">
           {note ?? (ar ? "لا يوجد سعر معتمد" : "No approved price")}
         </p>
       </div>
@@ -99,7 +99,7 @@ export function PriceRangeTrack({
       >
         {/* End values sit above their own ends of the band and stay in Latin
             digits in both languages, so two rows of figures line up. */}
-        <div className="flex items-baseline justify-between gap-2 text-[11px] font-semibold">
+        <div className="flex items-baseline justify-between gap-2 text-[12px] font-semibold">
           <span className="num text-text-muted">{fmtCompactMoney(low)}</span>
           {!fixed && <span className="num text-text">{fmtCompactMoney(high)}</span>}
         </div>
@@ -135,7 +135,7 @@ export function PriceRangeTrack({
              * shift follows the page direction rather than assuming left.
              */
             <span
-              className="absolute top-[13px] whitespace-nowrap text-[10px] font-bold leading-none"
+              className="absolute top-[13px] whitespace-nowrap text-[12px] font-bold leading-none"
               style={{
                 insetInlineStart: `${pct(marker.value)}%`,
                 transform: ar ? "translateX(50%)" : "translateX(-50%)",
@@ -151,7 +151,7 @@ export function PriceRangeTrack({
       </div>
 
       {(note || marker) && (
-        <p className="mt-0.5 truncate text-[10px] leading-snug text-text-subtle">
+        <p className="mt-0.5 truncate text-[12px] leading-snug text-text-subtle">
           {note ?? marker?.label}
         </p>
       )}
@@ -161,7 +161,7 @@ export function PriceRangeTrack({
 
 function TrackLabel({ label, Icon }: { label: string; Icon?: LucideIcon }) {
   return (
-    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+    <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
       {Icon && <Icon size={12} aria-hidden="true" />}
       <span className="truncate">{label}</span>
     </div>

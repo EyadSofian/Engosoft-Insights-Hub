@@ -66,16 +66,16 @@ export function CourseListRow(props: CourseRowProps) {
       {/* 1 — identity */}
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-bold text-text-muted">
+          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold text-text-muted">
             <bdi>{entry.rawCode || "—"}</bdi>
           </span>
-          <span className="text-[10.5px] font-medium text-text-subtle">
+          <span className="text-[12px] font-medium text-text-subtle">
             {deliveryLabel(entry.deliveryType, lang)}
           </span>
           {mode === "package" && <Pill tone="warning">{ar ? "باقة" : "Package"}</Pill>}
           {entry.onHold && (
             <span
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-bold"
               style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
             >
               <OctagonMinus size={11} aria-hidden="true" />
@@ -92,7 +92,7 @@ export function CourseListRow(props: CourseRowProps) {
           <bdi className="line-clamp-2">{title}</bdi>
         </button>
 
-        <p className="mt-0.5 truncate text-[10.5px] text-text-subtle">
+        <p className="mt-0.5 truncate text-[12px] text-text-subtle">
           {specializationLabel}
           {entry.subcategory ? ` · ${entry.subcategory}` : ""}
           {inForceSince
@@ -123,14 +123,14 @@ export function CourseListRow(props: CourseRowProps) {
 
       {/* 3 — the second currency, quoted as published rather than converted */}
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+        <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
           {ar ? "مصر" : "Egypt"}
         </div>
         <div className="num mt-1 truncate text-[12.5px] font-bold text-text">
           {egypt ? fmtMoney(egypt.floor, egypt.currency, lang) : "—"}
         </div>
         {!egypt && (
-          <p className="text-[10px] text-text-subtle">{ar ? "لا سعر مصري" : "No EGP price"}</p>
+          <p className="text-[12px] text-text-subtle">{ar ? "لا سعر مصري" : "No EGP price"}</p>
         )}
       </div>
 
@@ -138,14 +138,14 @@ export function CourseListRow(props: CourseRowProps) {
       <div className="flex items-center justify-between gap-2 xl:justify-end">
         <div className="flex flex-wrap items-center gap-1.5">
           {demand > 0 && (
-            <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-bold text-brand">
+            <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[12px] font-bold text-brand">
               <TrendingUp size={11} aria-hidden="true" />
               {fmtNum(demand)} {ar ? "مبيعات" : "sales"}
             </span>
           )}
           {!!offers.length && (
             <span
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-bold"
               style={{ background: "var(--offer-soft)", color: "var(--offer)" }}
             >
               <BadgePercent size={11} aria-hidden="true" />
@@ -154,14 +154,14 @@ export function CourseListRow(props: CourseRowProps) {
           )}
           {!!breaches?.breaches && (
             <span
-              className="num inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold"
+              className="num inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-bold"
               style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
             >
               {fmtNum(breaches.breaches)} {ar ? "مخالفة" : "breaches"}
             </span>
           )}
           {!demand && !offers.length && !breaches?.breaches && !entry.onHold && (
-            <span className="text-[10.5px] text-text-subtle">
+            <span className="text-[12px] text-text-subtle">
               {ar ? "لا مبيعات في الفترة" : "No sales in period"}
             </span>
           )}
@@ -170,7 +170,7 @@ export function CourseListRow(props: CourseRowProps) {
         <button
           type="button"
           onClick={onOpen}
-          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:border-brand hover:bg-brand-soft hover:text-brand"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:border-brand hover:bg-brand-soft hover:text-brand"
         >
           {ar ? "التفاصيل" : "Details"}
           <ChevronLeft size={13} aria-hidden="true" className="ltr:rotate-180" />
@@ -238,15 +238,15 @@ export function CourseCompactRow(props: CourseRowProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-text-muted">
+            <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold text-text-muted">
               <bdi>{entry.rawCode || "—"}</bdi>
             </span>
-            <span className="text-[10px] font-medium text-text-subtle">
+            <span className="text-[12px] font-medium text-text-subtle">
               {deliveryLabel(entry.deliveryType, lang)}
             </span>
             {entry.onHold && (
               <span
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                className="rounded px-1.5 py-0.5 text-[12px] font-bold"
                 style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
               >
                 {ar ? "موقوف" : "On hold"}
@@ -256,7 +256,7 @@ export function CourseCompactRow(props: CourseRowProps) {
           <h3 className="mt-1 line-clamp-2 text-[12.5px] font-bold leading-snug text-text">
             <bdi>{title}</bdi>
           </h3>
-          <p className="mt-0.5 truncate text-[10px] text-text-subtle">{specializationLabel}</p>
+          <p className="mt-0.5 truncate text-[12px] text-text-subtle">{specializationLabel}</p>
         </div>
         <ChevronLeft
           size={16}
@@ -288,14 +288,14 @@ export function CourseCompactRow(props: CourseRowProps) {
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {demand > 0 && (
-          <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand">
+          <span className="num inline-flex items-center gap-1 rounded bg-brand-soft px-1.5 py-0.5 text-[12px] font-bold text-brand">
             <TrendingUp size={10} aria-hidden="true" />
             {fmtNum(demand)} {ar ? "مبيعات" : "sales"}
           </span>
         )}
         {!!offers.length && (
           <span
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold"
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-bold"
             style={{ background: "var(--offer-soft)", color: "var(--offer)" }}
           >
             <BadgePercent size={10} aria-hidden="true" />
@@ -304,14 +304,14 @@ export function CourseCompactRow(props: CourseRowProps) {
         )}
         {!!breaches?.breaches && (
           <span
-            className="num rounded px-1.5 py-0.5 text-[10px] font-bold"
+            className="num rounded px-1.5 py-0.5 text-[12px] font-bold"
             style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
           >
             {fmtNum(breaches.breaches)} {ar ? "مخالفة" : "breaches"}
           </span>
         )}
         {!demand && !offers.length && !breaches?.breaches && (
-          <span className="text-[10px] text-text-subtle">
+          <span className="text-[12px] text-text-subtle">
             {ar ? "لا مبيعات في الفترة" : "No sales in period"}
           </span>
         )}
@@ -323,11 +323,11 @@ export function CourseCompactRow(props: CourseRowProps) {
 function MiniBand({ label, band, hint }: { label: string; band: string; hint?: string }) {
   return (
     <div className="min-w-0 rounded-lg bg-surface-2/70 px-2.5 py-1.5">
-      <dt className="truncate text-[9.5px] font-semibold uppercase tracking-wide text-text-subtle">
+      <dt className="truncate text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
         {label}
       </dt>
       <dd className="num mt-0.5 truncate text-[12px] font-bold text-text">{band}</dd>
-      {hint && <dd className="num truncate text-[9.5px] text-text-subtle">{hint}</dd>}
+      {hint && <dd className="num truncate text-[12px] text-text-subtle">{hint}</dd>}
     </div>
   );
 }

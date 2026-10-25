@@ -110,6 +110,26 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
 }
 
 /**
+ * The tone of a card: KPI cards, readings, workspace links.
+ *
+ * The card itself is neutral — white surface, the shared hairline, figures in
+ * the page's own text colour — and the family survives only where it carries
+ * meaning: the icon, the sparkline, the hero rule and the "view detail" cue.
+ * A full pastel surface per card put five or six colours side by side on every
+ * screen, none of which meant good or bad, and that noise is what tired the
+ * eye. Semantic colour still comes from deltas, verdict pills and charts.
+ */
+export function cardToneVars(tone: AnyTone | undefined): React.CSSProperties {
+  const t = toneOf(tone);
+  return {
+    "--tone-surface": "var(--surface)",
+    "--tone-border": "var(--border)",
+    "--tone-ink": "var(--text)",
+    "--tone-strong": t.strong,
+  } as React.CSSProperties;
+}
+
+/**
  * The family a return figure belongs to, on the same bands the ROAS pill and
  * the campaign table already use — so a ratio can never be mint in one place
  * and rose in another.
@@ -130,3 +150,23 @@ export const TONE = {
   danger: { fg: TONES.rose.strong, bg: TONES.rose.surface, border: TONES.rose.border },
   violet: { fg: TONES.violet.strong, bg: TONES.violet.surface, border: TONES.violet.border },
 };
+
+/**
+ * A note, warning or alert: every word stays on screen, in the page's own
+ * text colour on a white surface, with the meaning carried by a 3px edge in
+ * the inline-start and the icon.
+ *
+ * Notes used to fill the full width with a pink, orange or blue wash and set
+ * the whole paragraph in the warning colour itself — orange on pale orange is
+ * about 2.4:1, unreadable — and three or four of them stacked above the first
+ * figure made every page open on an alarm.
+ */
+export function calloutStyle(accent: string): React.CSSProperties {
+  return {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderInlineStartWidth: "3px",
+    borderInlineStartColor: accent,
+    color: "var(--text)",
+  };
+}

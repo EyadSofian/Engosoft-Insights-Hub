@@ -59,7 +59,7 @@ export function label(map: Record<string, Copy>, key: string, A: boolean): strin
 export function nameWithId(name: string, id: string) {
   if (!name && !id) return "—";
   if (!name) {
-    return <span className="font-mono text-[11px] text-text-muted">ID {id}</span>;
+    return <span className="font-mono text-[12px] text-text-muted">ID {id}</span>;
   }
   // A campaign or creative name is its own bidi run: Latin, digits and slashes
   // inside an Arabic table must not reorder, and a name is never styled as a figure.

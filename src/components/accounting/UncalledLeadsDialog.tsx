@@ -345,7 +345,7 @@ export function UncalledLeadsDialog({
                   </div>
 
                   {scope === "owner" && data.summary.rescuedByColleague !== null && (
-                    <p className="rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+                    <p className="rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[12px] leading-relaxed text-text-muted">
                       {lang === "ar"
                         ? `منهم ${fmtNum(data.summary.rescuedByColleague)} ليد تواصل معها زميل آخر بدل الموظف المسؤول، والباقي (${fmtNum(data.summary.uncalled ?? 0)}) لم يتواصل معها أي موظف.`
                         : `${fmtNum(data.summary.rescuedByColleague)} were contacted by a colleague instead of their owner; the remaining ${fmtNum(data.summary.uncalled ?? 0)} were not contacted by any employee.`}
@@ -358,14 +358,14 @@ export function UncalledLeadsDialog({
                       <b className="text-sm text-text">
                         {lang === "ar" ? "التوزيع بالشهر" : "Month by month"}
                       </b>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-text-muted">
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-text-muted">
                         {lang === "ar"
                           ? "كل ليد محسوب على شهر إنشائه هو، لا على شهر إقفاله. نسبة الإغلاق = الرابحة ÷ اللي اتحسم، والشهر اللي لسه ما حسمش حاجة يظهر «—» لا صفر."
                           : "Each lead counts against its own creation month, not its closing month. Close rate is won ÷ decided; a month that has decided nothing shows “—”, never a zero."}
                       </p>
                     </header>
                     <div className="table-wrap max-h-56 overflow-auto">
-                      <table className="w-full min-w-[960px] text-start text-[11px]">
+                      <table className="w-full min-w-[960px] text-start text-[12px]">
                         <thead className="sticky top-0 bg-surface-2/90 text-text-muted">
                           <tr>
                             <th className="px-3 py-2 text-start font-medium">
@@ -500,7 +500,7 @@ export function UncalledLeadsDialog({
                         <b className="text-sm text-text">
                           {lang === "ar" ? "الليدز" : "The leads"}
                         </b>
-                        <p className="mt-0.5 text-[10px] text-text-muted">
+                        <p className="mt-0.5 text-[12px] text-text-muted">
                           <bdi dir="ltr" className="num">
                             {fmtNum(data.leads.total)}
                           </bdi>{" "}
@@ -515,18 +515,18 @@ export function UncalledLeadsDialog({
                             type="button"
                             disabled={data.leads.page <= 1}
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
-                            className="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-semibold text-text disabled:opacity-40"
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-text disabled:opacity-40"
                           >
                             {lang === "ar" ? "السابق" : "Previous"}
                           </button>
-                          <span className="num text-[10px] text-text-muted">
+                          <span className="num text-[12px] text-text-muted">
                             {data.leads.page} / {data.leads.totalPages}
                           </span>
                           <button
                             type="button"
                             disabled={!data.leads.hasNext}
                             onClick={() => setPage((current) => current + 1)}
-                            className="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-semibold text-text disabled:opacity-40"
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-text disabled:opacity-40"
                           >
                             {lang === "ar" ? "التالي" : "Next"}
                           </button>
@@ -567,7 +567,7 @@ export function UncalledLeadsDialog({
                                 verification={leadQa.data?.verifications?.[lead.id]}
                               />
                             </div>
-                            <small className="mt-1 block text-[10px] text-text-muted">
+                            <small className="mt-1 block text-[12px] text-text-muted">
                               {lang === "ar" ? "أُنشئ" : "Created"}{" "}
                               <bdi dir="ltr" className="num">
                                 {lead.createdAt.slice(0, 10) || "—"}
@@ -583,7 +583,7 @@ export function UncalledLeadsDialog({
                               {lead.course ? ` · ${lead.course}` : ""}
                             </small>
                             {!employee && (
-                              <small className="mt-0.5 block truncate text-[10px] text-text-muted">
+                              <small className="mt-0.5 block truncate text-[12px] text-text-muted">
                                 {lang === "ar" ? "المسؤول" : "Owner"}: {lead.salesperson || "—"}
                                 {scope === "owner" && lead.calledBy.length > 0 && (
                                   <>
@@ -606,14 +606,14 @@ export function UncalledLeadsDialog({
                                 {lead.reasons.map((reason) => (
                                   <span
                                     key={reason}
-                                    className="rounded-md border border-border bg-surface-2/60 px-1.5 py-0.5 text-[9px] text-text-muted"
+                                    className="rounded-md border border-border bg-surface-2/60 px-1.5 py-0.5 text-[12px] text-text-muted"
                                   >
                                     {UNCALLED_REASON_LABELS[reason]?.[lang] ?? reason}
                                   </span>
                                 ))}
                               </div>
                             )}
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9px]">
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
                               {lead.chatConversationCount > 0 ? (
                                 <>
                                   <span className="rounded-md border border-brand/20 bg-brand-soft/40 px-2 py-1 font-semibold text-brand">
@@ -688,7 +688,7 @@ export function UncalledLeadsDialog({
                                 href={lead.latestChatUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold hover:bg-brand-soft ${
+                                className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold hover:bg-brand-soft ${
                                   lead.chatAwaitingReply
                                     ? "border-danger/25 bg-danger-soft text-danger"
                                     : "border-brand/20 bg-brand-soft/40 text-brand"
@@ -709,7 +709,7 @@ export function UncalledLeadsDialog({
                                 href={lead.latestCallUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                                className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                               >
                                 {lang === "ar" ? "مكالمة الزميل" : "Colleague's call"}
                                 <ExternalLink size={11} className="ms-1 inline" />
@@ -720,13 +720,13 @@ export function UncalledLeadsDialog({
                                 href={lead.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                                className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                               >
                                 {lang === "ar" ? "فتح الليد" : "Open lead"}
                                 <ExternalLink size={11} className="ms-1 inline" />
                               </a>
                             ) : (
-                              <bdi dir="ltr" className="num text-[10px] text-text-muted">
+                              <bdi dir="ltr" className="num text-[12px] text-text-muted">
                                 #{lead.id}
                               </bdi>
                             )}
@@ -743,7 +743,7 @@ export function UncalledLeadsDialog({
                     </div>
                   </article>
 
-                  <p className="text-[10px] leading-relaxed text-text-muted">
+                  <p className="text-[12px] leading-relaxed text-text-muted">
                     {lang === "ar"
                       ? "المطابقة تتم بآخر 9 أرقام من الهاتف بين Odoo وYeastar وChatwoot، وداخل الفترة المختارة فقط. الليدز Lost وWon لا تدخل قائمة المتابعة، ورسالة العميل بلا رد تظل حالة عاجلة."
                       : "Matching uses the final nine phone digits across Odoo, Yeastar, and Chatwoot inside the selected window. Lost and Won leads are excluded; a customer message without an employee reply remains urgent."}

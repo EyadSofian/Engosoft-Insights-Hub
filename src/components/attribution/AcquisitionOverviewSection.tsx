@@ -536,11 +536,11 @@ export function AcquisitionOverviewSection() {
             #{row.entity_id}
           </a>
         ) : row.entity_type === "meta_lead" ? (
-          <span className="font-mono text-[11px]">
+          <span className="font-mono text-[12px]">
             {A ? "عميل" : "Lead"} {row.provider_lead_id}
           </span>
         ) : (
-          <span className="font-mono text-[11px]">{row.entity_id}</span>
+          <span className="font-mono text-[12px]">{row.entity_id}</span>
         ),
     },
   ];
@@ -605,7 +605,7 @@ export function AcquisitionOverviewSection() {
         <div>
           <div>{fmtNum(row.leads)}</div>
           {n(row.organic_leads) ? (
-            <div className="text-[11px] text-text-muted">
+            <div className="text-[12px] text-text-muted">
               {fmtNum(row.organic_leads)} {A ? "عضوي" : "organic"}
             </div>
           ) : null}

@@ -418,7 +418,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
     name || id ? (
       <div>
         <div className="truncate text-sm font-semibold text-text">{name || id}</div>
-        {id && name ? <div className="font-mono text-[11px] text-text-muted">{id}</div> : null}
+        {id && name ? <div className="font-mono text-[12px] text-text-muted">{id}</div> : null}
         <div className="text-xs text-text-muted">{detail}</div>
       </div>
     ) : (
@@ -1046,7 +1046,7 @@ function MessagingAcquisition({ data, loading, A }: SectionProps) {
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+            <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
               {A
                 ? "دردشة الموقع كمصدر تحتاج UTM أو توكن تتبع؛ صندوق الموقع وحده قناة وليس مصدرًا."
                 : "Website chat as a source needs UTM or a tracking token; the website inbox alone is a channel, not a source."}
@@ -1109,7 +1109,7 @@ function LandingPerformance({ data, loading, A }: SectionProps) {
       render: (row) => (
         <div>
           <div className="text-text">{row.landing_page_name}</div>
-          <div className="font-mono text-[11px] text-text-muted">
+          <div className="font-mono text-[12px] text-text-muted">
             /{row.landing_page_slug || row.landing_page_id}
           </div>
         </div>
@@ -1312,7 +1312,7 @@ function LandingPerformance({ data, loading, A }: SectionProps) {
           csvFilename="engosoft-landing-page-performance.csv"
         />
         {landing?.unresolvedCreativeUrls ? (
-          <p className="text-[11px] text-text-muted">
+          <p className="text-[12px] text-text-muted">
             {A
               ? `${fmtNum(landing.unresolvedCreativeUrls)} رابط مادة إعلانية مختصر (engosoft.com/r/…) لم يُحل إلى صفحة، لذلك لا يُحسب هنا.`
               : `${fmtNum(landing.unresolvedCreativeUrls)} creative short links (engosoft.com/r/…) are not resolved to a page, so they are not counted here.`}
@@ -1478,7 +1478,7 @@ function MetaFormAnalysis({ data, loading, A }: SectionProps) {
         <div>
           {nameWithId(row.form_name, row.form_id)}
           {row.page_name ? (
-            <div className="text-[11px] text-text-muted">{row.page_name}</div>
+            <div className="text-[12px] text-text-muted">{row.page_name}</div>
           ) : null}
         </div>
       ),

@@ -50,7 +50,7 @@ export function MetricInfo({
       >
         <div className="px-3.5 py-2.5 border-b border-border bg-surface-2">
           <div className="text-[13px] font-semibold text-text leading-snug">{copy.label}</div>
-          <div className="num text-[11px] text-brand mt-0.5" dir="auto">
+          <div className="num text-[12px] text-brand mt-0.5" dir="auto">
             {copy.formula}
           </div>
         </div>
@@ -70,7 +70,7 @@ export function MetricInfo({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+      <dt className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
         {label}
       </dt>
       <dd className="text-text-muted mt-0.5">{children}</dd>

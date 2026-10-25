@@ -74,7 +74,7 @@ export function CourseDetailPanel({
       onClose={onClose}
       eyebrow={
         <>
-          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-bold text-text-muted">
+          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold text-text-muted">
             <bdi>{entry.rawCode || "—"}</bdi>
           </span>
           <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
@@ -99,7 +99,7 @@ export function CourseDetailPanel({
             {ar ? "عرض فواتير هذه الدورة" : "Show this course's invoices"}
           </button>
           {!canWrite && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-text-subtle">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-text-subtle">
               <Lock size={13} aria-hidden="true" />
               {ar ? "تعديل الأسعار يحتاج صلاحية" : "Editing prices needs permission"}
             </span>
@@ -173,7 +173,7 @@ export function CourseDetailPanel({
                 </span>
                 <span className="num font-bold">{bandText(offer, lang)}</span>
                 {offer.validTo && (
-                  <span className="num w-full text-[10.5px] opacity-80">
+                  <span className="num w-full text-[12px] opacity-80">
                     {ar ? "ينتهي في" : "Ends"} {fmtDate(offer.validTo, lang)}
                   </span>
                 )}
@@ -215,10 +215,10 @@ export function CourseDetailPanel({
                   </span>
                   <RowStatusBadge row={row} />
                 </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
+                <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
                   {auditReasonLabel(row, lang)}
                 </p>
-                <p className="num mt-1 text-[10.5px] text-text-subtle">
+                <p className="num mt-1 text-[12px] text-text-subtle">
                   {row.salesperson || (ar ? "بدون موظف" : "No salesperson")} ·{" "}
                   {methodLabel(row.paymentMethod, lang)} ·{" "}
                   {row.paymentDate || row.invoiceDate || row.saleDate || "—"}
@@ -240,7 +240,7 @@ export function CourseDetailPanel({
       </DetailSection>
 
       <DetailSection title={ar ? "مصدر السعر" : "Where the price comes from"}>
-        <div className="rounded-lg border border-border bg-surface-2/45 px-3 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
+        <div className="rounded-lg border border-border bg-surface-2/45 px-3 py-2.5 text-[12px] leading-relaxed text-text-muted">
           {book ? (
             <>
               <div>
@@ -252,7 +252,7 @@ export function CourseDetailPanel({
                 <span className="text-text-subtle">{ar ? "سارية من" : "Effective from"}: </span>
                 {fmtDate(book.effectiveFrom, lang)}
               </div>
-              <p className="mt-1.5 text-[10.5px] text-text-subtle">
+              <p className="mt-1.5 text-[12px] text-text-subtle">
                 {ar
                   ? "القائمة المنشورة لا تُعدّل؛ أي تغيير ينشئ نسخة جديدة، فتبقى فاتورة قديمة محكومة بسعر وقتها."
                   : "A published book is never edited; a change makes a new version, so an old invoice keeps being judged against the price of its own day."}
@@ -267,7 +267,7 @@ export function CourseDetailPanel({
           {rules.map((rule) => (
             <li
               key={rule.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-[11.5px]"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-[12px]"
             >
               <span className="flex flex-wrap items-center gap-1.5">
                 <Pill tone={rule.scope === "offer" ? "warning" : "neutral"}>
@@ -277,7 +277,7 @@ export function CourseDetailPanel({
                 <span className="num text-text-subtle">{rule.currency}</span>
               </span>
               <strong className="num text-text">{bandText(rule, lang)}</strong>
-              <span className="num w-full text-[10px] text-text-subtle">
+              <span className="num w-full text-[12px] text-text-subtle">
                 {ar ? "الصف" : "row"} {rule.sourceRow}
                 {rule.sourceSheet ? ` · ${rule.sourceSheet}` : ""}
                 {rule.validFrom ? ` · ${ar ? "من" : "from"} ${fmtDate(rule.validFrom, lang)}` : ""}

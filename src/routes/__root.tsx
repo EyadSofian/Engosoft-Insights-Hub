@@ -25,7 +25,7 @@ var l=localStorage.getItem('engo_lang')||'ar';
 document.documentElement.lang=l;
 document.documentElement.dir=l==='ar'?'rtl':'ltr';
 var t=localStorage.getItem('engo_theme');
-if(!t)t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+if(!t)t='dark';
 if(t==='dark')document.documentElement.classList.add('dark');
 }catch(e){}})();`;
 
@@ -108,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap",
       },
     ],
   }),

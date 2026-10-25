@@ -34,7 +34,7 @@ export function AdSetComparison({
           >
             {row.adsetName || `ID ${row.adsetId}`}
           </bdi>
-          <span className="font-mono text-[10px] text-text-muted">{row.adsetId}</span>
+          <span className="font-mono text-[12px] text-text-muted">{row.adsetId}</span>
         </div>
       ),
       sortValue: (row) => row.adsetName || row.adsetId,

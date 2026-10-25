@@ -191,7 +191,7 @@ export function LeadQaControl({
           event.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-semibold text-text hover:border-brand"
+        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[12px] font-semibold text-text hover:border-brand"
         title={A ? "التحقق اليدوي من الليد" : "Manual lead QA"}
       >
         <ShieldCheck size={11} />
@@ -245,7 +245,7 @@ export function LeadQaControl({
                       href={String(href)}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg border border-brand/20 px-2 py-1 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                      className="rounded-lg border border-brand/20 px-2 py-1 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                     >
                       {text}
                       <ExternalLink size={10} className="ms-1 inline" />
@@ -353,7 +353,7 @@ export function LeadQaControl({
               </label>
             ) : null}
             {verification?.verifiedAt ? (
-              <p className="text-[11px] text-text-muted">
+              <p className="text-[12px] text-text-muted">
                 {A ? "آخر تحقق" : "Last verified"}: {verification.verifiedBy || "—"} ·{" "}
                 <bdi dir="ltr" className="num">
                   {verification.verifiedAt.slice(0, 16).replace("T", " ")}

@@ -466,7 +466,7 @@ function Lost() {
           <div className="truncate font-semibold text-text" title={r.contact}>
             {r.contact || `CRM #${r.id}`}
           </div>
-          <div className="num mt-0.5 text-[10px] text-text-muted">CRM #{r.id}</div>
+          <div className="num mt-0.5 text-[12px] text-text-muted">CRM #{r.id}</div>
         </div>
       ),
     },
@@ -763,7 +763,7 @@ function Lost() {
                       key={String(label)}
                       className="rounded-xl border border-border bg-surface/85 p-3"
                     >
-                      <div className="text-[11px] text-text-muted">{label}</div>
+                      <div className="text-[12px] text-text-muted">{label}</div>
                       <div className="num mt-1 text-xl font-semibold text-text">
                         {fmtNum(Number(value))}
                       </div>
@@ -889,7 +889,7 @@ function Lost() {
                   <div className="table-wrap scroll-hint-x">
                     <table className="w-full min-w-[420px] text-sm">
                       <thead>
-                        <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                        <tr className="text-[12px] uppercase tracking-wide text-text-muted">
                           <th className="py-2 text-start">{t("team")}</th>
                           <th className="py-2 text-end">{t("crm_leads")}</th>
                           <th className="py-2 text-end">{t("lost_count")}</th>
@@ -1198,7 +1198,7 @@ function ShareRows({
                 </span>
                 <span className="num shrink-0 text-[13px] font-semibold text-text">
                   {fmtNum(item.count)}
-                  <span className="ms-1.5 text-[11px] font-normal text-text-muted">
+                  <span className="ms-1.5 text-[12px] font-normal text-text-muted">
                     ({fmtPct(item.share, 1)})
                   </span>
                 </span>
@@ -1209,7 +1209,7 @@ function ShareRows({
                   style={{ width: `${Math.max(1.5, (item.count / peak) * 100)}%` }}
                 />
               </span>
-              <span className="mt-1.5 flex items-center justify-end gap-1 text-[10px] font-medium text-danger opacity-80">
+              <span className="mt-1.5 flex items-center justify-end gap-1 text-[12px] font-medium text-danger opacity-80">
                 {lang === "ar" ? "عرض السجلات" : "View records"}
                 <ExternalLink size={11} />
               </span>
@@ -1227,7 +1227,7 @@ function ShareRows({
         meta: (
           <span>
             <span className="num">{fmtNum(g.count)}</span>
-            <span className="num text-[11px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
+            <span className="num text-[12px] text-text-muted ms-1.5">({fmtPct(g.share, 1)})</span>
           </span>
         ),
       }))}
@@ -1364,7 +1364,7 @@ function LostTimingPanel({
             <div key={band.key} className="rounded-xl border border-border bg-surface-2/45 p-4">
               <div className="text-xs text-text-muted">{band.label}</div>
               <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(count)}</div>
-              <div className="mt-1 text-[11px] text-text-muted">
+              <div className="mt-1 text-[12px] text-text-muted">
                 {fmtPct(dated.length ? (count / dated.length) * 100 : null, 1)}{" "}
                 {A ? "من المؤرخين" : "of dated losses"}
               </div>
@@ -1449,7 +1449,7 @@ function LostRecordSheet({
             <SheetHeader className="border-b border-border bg-surface-2/60 px-5 py-5 pe-12 text-start">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <Pill tone="danger">Registered Lost</Pill>
-                <span className="num text-[11px] text-text-muted">CRM #{record.id}</span>
+                <span className="num text-[12px] text-text-muted">CRM #{record.id}</span>
               </div>
               <SheetTitle className="text-start text-xl text-text">
                 {record.contact || `CRM #${record.id}`}
@@ -1499,7 +1499,7 @@ function LostRecordSheet({
 
               {(record.phone || record.mobile || record.email) && (
                 <div className="rounded-2xl border border-border bg-surface-2/45 p-4">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                     {lang === "ar" ? "بيانات التواصل" : "Contact details"}
                   </div>
                   <div className="space-y-1 text-sm text-text" dir="ltr">
@@ -1553,7 +1553,7 @@ function LostRecordSheet({
                           : `${fmtNum(Math.round(chatter.data.elapsedHours / 24))} ${lang === "ar" ? "يوم" : "days"}`}
                     </div>
                     {chatter.data.lostDateBasis.includes("fallback") && (
-                      <p className="mt-1 text-[11px] text-warning">
+                      <p className="mt-1 text-[12px] text-warning">
                         {lang === "ar"
                           ? "تاريخ الخسارة بديل من آخر تحديث للمرحلة؛ المدة تقديرية وليست وقت إغلاق مؤكّد."
                           : "The loss date falls back to a stage update; elapsed time is an estimate."}
@@ -1567,7 +1567,7 @@ function LostRecordSheet({
                       </div>
                       {chatter.data.lastBeforeLoss ? (
                         <div className="rounded-xl border border-border bg-surface p-3 text-xs leading-6 text-text">
-                          <div className="mb-1 text-[11px] text-text-muted">
+                          <div className="mb-1 text-[12px] text-text-muted">
                             {cairoTimestamp(chatter.data.lastBeforeLoss.date, lang)} ·{" "}
                             {chatter.data.lastBeforeLoss.author ||
                               chatter.data.lastBeforeLoss.subtype ||
@@ -1599,7 +1599,7 @@ function LostRecordSheet({
                             key={message.id}
                             className={`rounded-xl border p-3 text-xs ${message.beforeLoss ? "border-border bg-surface" : "border-warning/30 bg-warning-soft/30"}`}
                           >
-                            <div className="mb-1 text-[11px] text-text-muted">
+                            <div className="mb-1 text-[12px] text-text-muted">
                               {cairoTimestamp(message.date, lang)} ·{" "}
                               {message.author || message.subtype || message.kind || "Odoo"}
                               {!message.beforeLoss
@@ -1617,7 +1617,7 @@ function LostRecordSheet({
                           </div>
                         ))}
                         {chatter.data.truncated && (
-                          <p className="text-[11px] text-warning">
+                          <p className="text-[12px] text-warning">
                             {lang === "ar"
                               ? "أُظهرت أحدث 150 رسالة فقط؛ افتح Odoo للسجل الكامل."
                               : "Showing only the latest 150 messages; open Odoo for the full history."}
@@ -1638,7 +1638,7 @@ function LostRecordSheet({
                 <ExternalLink size={17} />
                 {lang === "ar" ? "فتح وتعديل الـLead في Odoo" : "Open and edit the Lead in Odoo"}
               </a>
-              <p className="text-center text-[10px] leading-5 text-text-muted">
+              <p className="text-center text-[12px] leading-5 text-text-muted">
                 {lang === "ar"
                   ? "التعديل يتم في Odoo نفسه للحفاظ على الصلاحيات والـaudit trail."
                   : "Editing stays in Odoo so permissions and the audit trail remain intact."}
@@ -1664,7 +1664,7 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
         <thead className="sticky top-0 z-10">
           <tr>
             <th
-              className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border text-start sticky-col z-20 text-text-muted"
+              className="px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border text-start sticky-col z-20 text-text-muted"
               style={{ background: "var(--surface-2)", minWidth: 200 }}
             >
               {lang === "ar" ? "السبب" : "Reason"}
@@ -1672,13 +1672,13 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
             {matrix.cols.map((c) => (
               <th
                 key={c}
-                className="px-2 py-2.5 text-[11px] font-semibold bg-surface-2 border-b border-border text-end text-text-muted whitespace-nowrap"
+                className="px-2 py-2.5 text-[12px] font-semibold bg-surface-2 border-b border-border text-end text-text-muted whitespace-nowrap"
                 title={c}
               >
                 <span className="block max-w-[110px] truncate">{c}</span>
               </th>
             ))}
-            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase bg-surface-2 border-b border-border text-end text-text-muted">
+            <th className="px-3 py-2.5 text-[12px] font-semibold uppercase bg-surface-2 border-b border-border text-end text-text-muted">
               {lang === "ar" ? "الإجمالي" : "Total"}
             </th>
           </tr>
@@ -1708,7 +1708,7 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
                   ) : (
                     <>
                       {fmtNum(v)}
-                      <span className="text-[10px] text-text-muted ms-1">
+                      <span className="text-[12px] text-text-muted ms-1">
                         {share(v).toFixed(1)}%
                       </span>
                     </>
@@ -1717,7 +1717,7 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
               ))}
               <td className="px-3 py-2 border-b border-border text-end num font-semibold bg-surface-2/60">
                 {fmtNum(matrix.rowTotals[i])}
-                <span className="text-[10px] text-text-muted ms-1">
+                <span className="text-[12px] text-text-muted ms-1">
                   {share(matrix.rowTotals[i]).toFixed(1)}%
                 </span>
               </td>

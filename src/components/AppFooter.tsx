@@ -28,7 +28,7 @@ export function AppFooter() {
           </span>
           <div className="min-w-0 leading-tight">
             <div className="text-[13px] font-bold tracking-tight text-text">ENGOSOFT</div>
-            <div className="truncate text-[11px] text-text-muted">{t("app_sub")}</div>
+            <div className="truncate text-[12px] text-text-muted">{t("app_sub")}</div>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export function AppFooter() {
           </ul>
         </nav>
 
-        <p className="text-[11.5px] text-text-subtle">© {new Date().getFullYear()} Engosoft</p>
+        <p className="text-[12px] text-text-subtle">© {new Date().getFullYear()} Engosoft</p>
       </div>
     </footer>
   );

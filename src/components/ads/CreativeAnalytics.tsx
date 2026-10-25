@@ -326,7 +326,7 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
   const reviewTone = approved ? "success" : row.reviewStatus === "rejected" ? "danger" : "warning";
   const metric = (label: string, value: React.ReactNode) => (
     <div className="min-w-0 rounded-lg bg-surface-2 px-2.5 py-2">
-      <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+      <dt className="truncate text-[12px] text-text-muted">{label}</dt>
       <dd className="num mt-0.5 truncate text-sm font-semibold text-text">{value}</dd>
     </div>
   );
@@ -362,13 +362,13 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-[11px] text-text-muted" title={row.campaign}>
+            <p className="truncate text-[12px] text-text-muted" title={row.campaign}>
               {lang === "ar" ? "الحملة" : "Campaign"}: {row.campaign || "—"}
             </p>
-            <p className="mt-0.5 truncate text-[11px] text-text-muted" title={row.adset}>
+            <p className="mt-0.5 truncate text-[12px] text-text-muted" title={row.adset}>
               {lang === "ar" ? "المجموعة الإعلانية" : "Ad set"}: {row.adset || "—"}
             </p>
-            <p className="mt-2 text-[10px] text-text-subtle">
+            <p className="mt-2 text-[12px] text-text-subtle">
               {lang === "ar" ? "اسم الكرياتيف (Ad Name)" : "Creative name (Ad Name)"}
             </p>
             <h3 className="mt-0.5 text-[15px] font-semibold leading-snug text-text" dir="auto">
@@ -405,7 +405,7 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
         </dl>
 
         {row.reviewReason && (
-          <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-danger-soft px-2.5 py-2 text-[11px] text-danger">
+          <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-danger-soft px-2.5 py-2 text-[12px] text-danger">
             <CircleAlert size={13} className="mt-0.5 shrink-0" />
             <span>{row.reviewReason.replaceAll("_", " ")}</span>
           </p>
@@ -415,7 +415,7 @@ function CreativeCard({ row }: { row: CreativeAnalyticsRow }) {
             href={row.landingPageUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 flex items-center justify-between gap-2 text-[11px] text-text-subtle hover:text-emerald-600"
+            className="mt-3 flex items-center justify-between gap-2 text-[12px] text-text-subtle hover:text-emerald-600"
           >
             <span className="truncate" dir="ltr">
               {row.landingPageUrl}

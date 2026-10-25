@@ -142,6 +142,10 @@
   --font-sans:
     "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
+  /* Headline figures only. A semi-condensed face lets a six-digit amount sit
+     large in a quarter-width card; Arabic words in the same slot ("غير متوفر")
+     fall through to Plex Arabic. */
+  --font-figure: "Barlow Semi Condensed", var(--font-sans);
 }
 
 :root {
@@ -151,16 +155,17 @@
   --ink: #001e3c;
   --ink-soft: #0b3158;
 
-  /* A cool, quiet canvas. Panels are white and sit ON it; KPI cards are
-     coloured and sit on it too, so the page reads as three depths rather than
-     one continuous sheet of white. */
-  --bg: #f4f7fb;
-  --bg-subtle: #eef3f9;
+  /* A cool canvas one clear step darker than the white panels that sit on it
+     (1.17:1, against 1.07:1 before), with hairlines that can actually be seen
+     (1.56:1). On the old values a card and the page were the same sheet of
+     white, and the eye had no edge to rest on. */
+  --bg: #e9eef5;
+  --bg-subtle: #e2e8f0;
   --surface: #ffffff;
-  --surface-2: #f4f7fb;
-  --surface-3: #e8eff8;
-  --border: #dfe7f1;
-  --border-strong: #c5d3e4;
+  --surface-2: #f3f6fa;
+  --surface-3: #e6ecf4;
+  --border: #c4d0de;
+  --border-strong: #a9b8cb;
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -201,9 +206,12 @@
   --slate-ink: #3d4d63;
   --slate-strong: #66758a;
 
+  /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
+     even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
+     for body text and is a large part of why the dashboard tired the eyes. */
   --text: #0b1f3a;
-  --text-muted: #66758a;
-  --text-subtle: #8b99ac;
+  --text-muted: #52627a;
+  --text-subtle: #5a6a80;
   --text-inverse: #ffffff;
 
   --brand: #1469e8;
@@ -240,7 +248,7 @@
      navy slab, which made the one persistently darkest region of a light
      dashboard the part carrying no data. */
   --nav-surface: #ffffff;
-  --nav-border: #e2e8f0;
+  --nav-border: #c4d0de;
   --nav-text: #0b1f38;
   --nav-text-muted: #5a6b81;
   --nav-hover: #f2f5f9;
@@ -521,21 +529,25 @@
   --ink: #061426;
   --ink-soft: #0c2949;
 
-  --bg: #070f1c;
-  --bg-subtle: #0a1626;
-  --surface: #0f1c2f;
-  --surface-2: #16263c;
-  --surface-3: #1e3149;
-  --border: #1f3149;
-  --border-strong: #2c4362;
+  /* The default theme: an operations room in Engosoft's own navy. The canvas
+     recedes, panels sit one step forward, and figures are the brightest thing
+     on the screen — white for the number, colour only as a signal. Secondary
+     text is 9:1 and the faintest text 6.6:1 on a panel. */
+  --bg: #050d18;
+  --bg-subtle: #08131f;
+  --surface: #0d1c30;
+  --surface-2: #13253d;
+  --surface-3: #1a3050;
+  --border: #26405f;
+  --border-strong: #375a84;
 
-  --text: #e8eef7;
-  --text-muted: #94a6bd;
-  --text-subtle: #6b809a;
+  --text: #f2f6fc;
+  --text-muted: #aebdd1;
+  --text-subtle: #8fa2bb;
   --text-inverse: #06111f;
 
-  --brand: #3b82f6;
-  --brand-hover: #5b9bff;
+  --brand: #5b9bff;
+  --brand-hover: #7fb2ff;
   --brand-soft: #14263f;
   --electric: #4c8dff;
 
@@ -543,11 +555,11 @@
   --accent-soft: #14263f;
   --accent-ink: #91b8ff;
 
-  --success: #34c58c;
+  --success: #3ad49a;
   --success-soft: #0e2a20;
-  --warning: #f0a44c;
+  --warning: #f5b056;
   --warning-soft: #2e2011;
-  --danger: #ff6b78;
+  --danger: #ff7a85;
   --danger-soft: #2f1418;
   --offer: #3fc2b6;
   --offer-soft: #0f2926;
@@ -595,8 +607,8 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: #0b1728;
-  --nav-border: #1f3149;
+  --nav-surface: #081626;
+  --nav-border: #1d3350;
   --nav-text: #e8eef7;
   --nav-text-muted: #94a6bd;
   --nav-hover: #16263c;
@@ -623,7 +635,9 @@
   --glass-border: rgba(76, 141, 255, 0.2);
   --glass-nav: rgba(6, 20, 38, 0.82);
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
-  --page-glow-primary: transparent;
+  /* One cold light from above the header, on the canvas only. Panels are
+     opaque, so nothing a figure sits on is tinted. */
+  --page-glow-primary: rgba(64, 132, 255, 0.11);
   --page-glow-secondary: transparent;
 }
 
@@ -647,7 +661,10 @@
   body {
     /* Flat. The two fixed radial washes tinted every white panel on the page
        and made a dense report look permanently slightly out of focus. */
-    background: var(--bg);
+    background:
+      radial-gradient(1100px 520px at 50% -180px, var(--page-glow-primary), transparent 70%)
+        no-repeat,
+      var(--bg);
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 15px;
@@ -1252,7 +1269,12 @@
   inset-inline-start: -45%;
   width: 32%;
   content: "";
-  background: linear-gradient(90deg, transparent, color-mix(in oklab, white 42%, transparent), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 42%, transparent),
+    transparent
+  );
   transform: skewX(-18deg);
   pointer-events: none;
   animation: global-search-sheen 5.5s ease-in-out infinite;
@@ -1507,4 +1529,13 @@
   padding: 0.25rem 0.5rem;
   text-align: start;
   border-bottom: 1px solid var(--border);
+}
+
+/* The headline figure on a KPI card: the one thing a reader came for. */
+.kpi-figure {
+  font-family: var(--font-figure);
+  font-feature-settings:
+    "tnum" 1,
+    "lnum" 1;
+  letter-spacing: -0.005em;
 }

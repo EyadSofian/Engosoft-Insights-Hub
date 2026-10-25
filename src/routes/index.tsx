@@ -579,7 +579,7 @@ function Overview() {
             </Notice>
           )}
           {data.prevComparable && data.prevRange && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border bg-surface-2/55 px-3 py-2 text-[11px] text-text-muted">
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border bg-surface-2/55 px-3 py-2 text-[12px] text-text-muted">
               <span className="font-semibold text-text">
                 {lang === "ar" ? "المقارنة المعتمدة" : "Comparison basis"}
               </span>
@@ -739,7 +739,7 @@ function GrainToggle({
           key={grain}
           type="button"
           onClick={() => onChange(grain)}
-          className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+          className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[12px] font-semibold transition-colors ${
             value === grain ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"
           }`}
           aria-pressed={value === grain}
@@ -781,7 +781,7 @@ function DisplayCurrencyToggle({
             key={currency}
             type="button"
             onClick={() => onChange(currency)}
-            className={`min-h-7 cursor-pointer rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+            className={`min-h-7 cursor-pointer rounded-md px-2.5 text-[12px] font-semibold transition-colors ${
               value === currency
                 ? "bg-surface text-brand shadow-sm"
                 : "text-text-muted hover:text-text"
@@ -792,7 +792,7 @@ function DisplayCurrencyToggle({
           </button>
         ))}
       </div>
-      <span className="num whitespace-nowrap text-[9px] text-text-subtle">
+      <span className="num whitespace-nowrap text-[12px] text-text-subtle">
         1 USD = {sarRate.toLocaleString("en-US", { maximumFractionDigits: 4 })} SAR
       </span>
     </div>

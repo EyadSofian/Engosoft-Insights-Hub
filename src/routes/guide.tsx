@@ -327,7 +327,7 @@ function SourceNode({
     <div className="rounded-2xl border border-border bg-surface p-4">
       <span className={`grid h-9 w-9 place-items-center rounded-xl ${colors[tone]}`}>{icon}</span>
       <h3 className="mt-3 text-sm font-semibold text-text">{title}</h3>
-      <p className="mt-1 text-[11px] text-text-muted">{source}</p>
+      <p className="mt-1 text-[12px] text-text-muted">{source}</p>
       <p className="mt-3 border-t border-border pt-3 text-xs font-semibold text-text">{metric}</p>
     </div>
   );
@@ -451,7 +451,7 @@ function MockFunnel({ ar }: { ar: boolean }) {
           className="relative rounded-xl border border-border bg-surface p-3 text-center"
         >
           <div className="num text-lg font-bold text-text">{value}</div>
-          <div className="mt-1 text-[11px] text-text-muted">{label}</div>
+          <div className="mt-1 text-[12px] text-text-muted">{label}</div>
           {index < steps.length - 1 && (
             <span className="absolute -end-2 top-1/2 z-10 h-px w-2 bg-border" />
           )}
@@ -499,7 +499,7 @@ function MockCohort({ ar }: { ar: boolean }) {
           </div>
         </div>
       ))}
-      <p className="pt-1 text-[11px] text-text-muted">
+      <p className="pt-1 text-[12px] text-text-muted">
         {ar ? "أرقام توضيحية فقط." : "Illustrative figures only."}
       </p>
     </div>
@@ -512,7 +512,7 @@ function MockCourse({ ar }: { ar: boolean }) {
       <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
         <div>
           <div className="font-semibold text-text">PMP</div>
-          <div className="text-[11px] text-text-muted">Professional Certificate</div>
+          <div className="text-[12px] text-text-muted">Professional Certificate</div>
         </div>
         <Pill tone="brand">$295</Pill>
       </div>
@@ -541,7 +541,7 @@ function MockInvoice({ ar }: { ar: boolean }) {
         <MiniStat label="Invoice Date" value="26/07/2026" />
         <MiniStat label={ar ? "المحصل" : "Collected"} value="$534" />
       </div>
-      <p className="mt-3 rounded-lg bg-warning-soft px-3 py-2 text-[11px] leading-5 text-warning">
+      <p className="mt-3 rounded-lg bg-warning-soft px-3 py-2 text-[12px] leading-5 text-warning">
         {ar
           ? "دفع مقدّم مثبت في حركة Odoo — مش Due Date."
           : "Prepayment verified in the Odoo payment movement—not Due Date."}
@@ -570,7 +570,7 @@ function MockAssistant({ ar }: { ar: boolean }) {
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="truncate text-[10px] text-text-muted">{label}</div>
+      <div className="truncate text-[12px] text-text-muted">{label}</div>
       <div className="num mt-1 whitespace-nowrap text-sm font-semibold text-text">{value}</div>
     </div>
   );

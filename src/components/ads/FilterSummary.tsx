@@ -102,12 +102,12 @@ export function FilterSummary({ className = "" }: { className?: string }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span className="inline-flex items-center gap-1.5 text-[11px] text-text-muted me-0.5">
+      <span className="inline-flex items-center gap-1.5 text-[12px] text-text-muted me-0.5">
         <Filter size={12} />
         {lang === "ar" ? "المعروض دلوقتي" : "Currently showing"}
       </span>
 
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium bg-brand-soft text-brand whitespace-nowrap">
+      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[12px] font-medium bg-brand-soft text-brand whitespace-nowrap">
         <span className="opacity-70">{t("date_range")}:</span>
         <span className="num">{period}</span>
       </span>
@@ -115,7 +115,7 @@ export function FilterSummary({ className = "" }: { className?: string }) {
       {chips.map((c) => (
         <span
           key={c.key}
-          className="inline-flex items-center gap-1 ps-2 pe-1 py-1 rounded-full text-[11px] font-medium bg-surface-2 border border-border text-text max-w-[16rem]"
+          className="inline-flex items-center gap-1 ps-2 pe-1 py-1 rounded-full text-[12px] font-medium bg-surface-2 border border-border text-text max-w-[16rem]"
         >
           <span className="text-text-muted shrink-0">{c.label}:</span>
           <span className="truncate" title={c.value}>
@@ -136,7 +136,7 @@ export function FilterSummary({ className = "" }: { className?: string }) {
       {chips.length > 0 && (
         <button
           onClick={() => filterStore.resetDimensions()}
-          className="text-[11px] px-2 py-1 rounded-full border border-border text-text-muted hover:bg-surface-2 transition-colors cursor-pointer"
+          className="text-[12px] px-2 py-1 rounded-full border border-border text-text-muted hover:bg-surface-2 transition-colors cursor-pointer"
         >
           {lang === "ar" ? "امسح الكل" : "Clear all"}
         </button>

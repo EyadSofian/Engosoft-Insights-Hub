@@ -72,7 +72,7 @@ export function CampaignCard({
           <LtrText>{campaign.name}</LtrText>
         </h4>
         {campaign.platform ? (
-          <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-text-muted">
+          <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[12px] font-medium text-text-muted">
             <LtrText>{campaign.platform}</LtrText>
           </span>
         ) : null}
@@ -81,7 +81,7 @@ export function CampaignCard({
       <dl className="mt-2 grid grid-cols-4 gap-2">
         {figures.map(([label, value]) => (
           <div key={label} className="min-w-0">
-            <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+            <dt className="truncate text-[12px] text-text-muted">{label}</dt>
             <dd
               className={`num text-sm font-semibold ${
                 value === NOT_MEASURABLE ? "text-text-muted" : "text-text"
@@ -102,7 +102,7 @@ export function CampaignCard({
               lang === "ar" ? `حلل حملة ${campaign.name}` : `Analyse campaign ${campaign.name}`,
             )
           }
-          className="rounded border border-border px-2 py-1 text-[11px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
           {t.analyse}
         </button>
@@ -114,7 +114,7 @@ export function CampaignCard({
               lang === "ar" ? `حملة ${campaign.name} باعت إيه؟` : `What did ${campaign.name} sell?`,
             )
           }
-          className="rounded border border-border px-2 py-1 text-[11px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
           {t.sold}
         </button>

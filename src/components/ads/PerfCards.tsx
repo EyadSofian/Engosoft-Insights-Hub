@@ -96,7 +96,7 @@ export function PerfCards({
                     r.platforms.map((p) => (
                       <span
                         key={p}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-medium"
                         style={{
                           background: `color-mix(in oklab, ${PLATFORM_COLOR[p]} 14%, transparent)`,
                           color: PLATFORM_COLOR[p],
@@ -110,19 +110,19 @@ export function PerfCards({
                       </span>
                     ))
                   ) : (
-                    <span className="text-[10px] text-text-subtle">
+                    <span className="text-[12px] text-text-subtle">
                       {lang === "ar" ? "بدون منصة مسجّلة" : "No platform recorded"}
                     </span>
                   )}
                   {grain === "adset" && <AdSetOriginBadge origin={r.adsetOrigin} />}
                   {websiteConversion && (
-                    <span className="inline-flex items-center rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand whitespace-nowrap">
+                    <span className="inline-flex items-center rounded-full bg-brand-soft px-1.5 py-0.5 text-[12px] font-semibold text-brand whitespace-nowrap">
                       {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
                     </span>
                   )}
                   {showLivePerformance && running && (
                     <span
-                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-semibold whitespace-nowrap"
                       style={{ background: "var(--success-soft)", color: "var(--success)" }}
                     >
                       <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
@@ -165,7 +165,7 @@ export function PerfCards({
                 </h3>
                 {parent && (
                   <p
-                    className="text-[10.5px] text-text-subtle truncate mt-0.5"
+                    className="text-[12px] text-text-subtle truncate mt-0.5"
                     dir="auto"
                     title={parent}
                   >
@@ -173,14 +173,14 @@ export function PerfCards({
                   </p>
                 )}
                 {r.course && (
-                  <p className="text-[10.5px] text-text-muted mt-0.5">
+                  <p className="text-[12px] text-text-muted mt-0.5">
                     <InferredCourse course={r.course} inferred={r.courseInferred} />
                   </p>
                 )}
               </div>
 
               {ownerMode && ownerVerdict && (
-                <p className="min-h-9 text-[10.5px] leading-[1.15rem] text-text-muted line-clamp-2">
+                <p className="min-h-9 text-[12px] leading-[1.15rem] text-text-muted line-clamp-2">
                   {ownerVerdict.reason[lang]}
                 </p>
               )}
@@ -277,7 +277,7 @@ export function PerfCards({
                       value={
                         <>
                           {fmtNum(r.won)}
-                          <span className="text-text-subtle text-[10px] ms-1">
+                          <span className="text-text-subtle text-[12px] ms-1">
                             ({fmtPct(r.conversionRate, 1)})
                           </span>
                         </>
@@ -297,7 +297,7 @@ export function PerfCards({
               </dl>
 
               {ownerMode && ownerVerdict && (
-                <p className="text-[9.5px] text-text-subtle">
+                <p className="text-[12px] text-text-subtle">
                   {ownerVerdict.benchmark.relatedCampaigns > 0
                     ? lang === "ar"
                       ? `${fmtNum(ownerVerdict.benchmark.relatedCampaigns)} حملات مرتبطة بنفس الدورة — اضغط للتفاصيل`
@@ -309,7 +309,7 @@ export function PerfCards({
               )}
 
               {r.partialSpend && (
-                <p className="text-[10px] leading-snug" style={{ color: "var(--warning)" }}>
+                <p className="text-[12px] leading-snug" style={{ color: "var(--warning)" }}>
                   {lang === "ar"
                     ? "بيانات الإنفاق بتغطي جزء من الفترة بس — العائد هنا مش قابل للمقارنة."
                     : "Spend data covers only part of the period — this return is not comparable."}
@@ -332,7 +332,7 @@ function OwnerVerdictChip({ verdict }: { verdict: OwnerCampaignVerdict }) {
   const label = ownerStatusLabel(verdict.status, lang);
   if (verdict.status === "early") {
     return (
-      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-1 text-[10px] font-semibold text-text-muted whitespace-nowrap">
+      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-1 text-[12px] font-semibold text-text-muted whitespace-nowrap">
         {label}
       </span>
     );
@@ -352,7 +352,7 @@ function Fact({ metric, value }: { metric: MetricKey; value: React.ReactNode }) 
   const { lang } = useI18n();
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] text-text-muted truncate">{METRICS[metric][lang].short}</dt>
+      <dt className="text-[12px] text-text-muted truncate">{METRICS[metric][lang].short}</dt>
       <dd className="num text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );
@@ -361,7 +361,7 @@ function Fact({ metric, value }: { metric: MetricKey; value: React.ReactNode }) 
 function SimpleFact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+      <dt className="truncate text-[12px] text-text-muted">{label}</dt>
       <dd className="num text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );

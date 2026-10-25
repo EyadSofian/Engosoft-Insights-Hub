@@ -340,7 +340,7 @@ export function ClosedLoopCoverage({
       render: (row: CoverageNumbers & { type: string }) => (
         <span>
           {fmtNum(row[key])}{" "}
-          <span className="text-[11px] text-text-muted">{share(row[key], row.total)}</span>
+          <span className="text-[12px] text-text-muted">{share(row[key], row.total)}</span>
         </span>
       ),
       sortValue: (row: CoverageNumbers & { type: string }) => row[key],
@@ -655,7 +655,7 @@ export function ClosedLoopFunnel({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {(data?.funnel ?? []).map((step) => (
             <Card key={step.key} padded>
-              <div className="text-[11px] font-semibold text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? FUNNEL_LABEL[step.key]?.ar : FUNNEL_LABEL[step.key]?.en}
               </div>
               <div className="text-lg font-bold text-text">
@@ -665,7 +665,7 @@ export function ClosedLoopFunnel({
                     ? fmtUSD(step.value)
                     : fmtNum(step.value)}
               </div>
-              <div className="text-[11px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {step.rateFromPrevious == null
                   ? " "
                   : `${pct(step.rateFromPrevious)} ${A ? "من السابق" : "of previous"}`}
@@ -922,7 +922,7 @@ function identityColumns(
                 event.stopPropagation();
                 onOpenCreative(row.creativeId);
               }}
-              className="mt-0.5 block text-[11.5px] font-semibold text-brand hover:underline"
+              className="mt-0.5 block text-[12px] font-semibold text-brand hover:underline"
             >
               {A ? "عرض المادة الإعلانية ←" : "View creative →"}
             </button>
@@ -985,7 +985,7 @@ export function CreativeAdsTable({
                 {row.adName}
               </bdi>
             </span>
-            <span className="mt-1 block text-[10px] text-text-muted">
+            <span className="mt-1 block text-[12px] text-text-muted">
               {A
                 ? `${fmtNum(row.variants.length)} إعلان · اضغط للتفاصيل`
                 : `${fmtNum(row.variants.length)} ads · open breakdown`}
@@ -1176,7 +1176,7 @@ export function GrainPerformance({
               >
                 {nameWithId(row.creativeName, row.creativeId)}
                 {row.mediaType ? (
-                  <div className="text-[11px] text-text-muted">{row.mediaType}</div>
+                  <div className="text-[12px] text-text-muted">{row.mediaType}</div>
                 ) : null}
               </button>
             ),
@@ -1199,7 +1199,7 @@ export function GrainPerformance({
       header: A ? "معرّف Meta" : "Meta ID",
       hideByDefault: true,
       render: (row) => (
-        <span className="font-mono text-[11px] text-text-muted">
+        <span className="font-mono text-[12px] text-text-muted">
           {grain === "creative"
             ? row.creativeId
             : grain === "ad"
@@ -1380,7 +1380,7 @@ export function AssetPerformance({
       key: "assetId",
       header: A ? "معرّف الأصل" : "Asset ID",
       hideByDefault: true,
-      render: (row) => <span className="font-mono text-[11px]">{row.assetId}</span>,
+      render: (row) => <span className="font-mono text-[12px]">{row.assetId}</span>,
     },
     {
       key: "spend",
@@ -1533,7 +1533,7 @@ export function LeadQuality({
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Card padded>
-            <div className="text-[11px] font-semibold text-text-muted">
+            <div className="text-[12px] font-semibold text-text-muted">
               {A ? "أرخص عملاء (20 عميلًا على الأقل)" : "Cheapest leads (20+ leads)"}
             </div>
             <div className="truncate text-sm font-semibold text-text">{name(cheapest)}</div>
@@ -1543,7 +1543,7 @@ export function LeadQuality({
             </div>
           </Card>
           <Card padded>
-            <div className="text-[11px] font-semibold text-text-muted">
+            <div className="text-[12px] font-semibold text-text-muted">
               {A ? "أفضل عملاء (جودة المبيعات)" : "Best leads (sales quality)"}
             </div>
             <div className="truncate text-sm font-semibold text-text">{name(bestQuality)}</div>
@@ -1777,7 +1777,7 @@ export function outcomeColumns(
       render: (row) => (
         <div>
           <div className="font-mono text-xs">#{row.crmLeadId}</div>
-          <div className="text-[11px] text-text-muted">
+          <div className="text-[12px] text-text-muted">
             {(A ? MATCH_METHOD[row.matchMethod]?.ar : MATCH_METHOD[row.matchMethod]?.en) ??
               row.matchMethod}
           </div>
@@ -1991,7 +1991,7 @@ export function CreativeDetail({
   const m = d?.metrics;
   const stat = (label: string, value: string) => (
     <div className="rounded-lg border border-border bg-surface-2/60 px-3 py-2">
-      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="text-sm font-semibold text-text">{value}</div>
     </div>
   );
@@ -2060,7 +2060,7 @@ export function CreativeDetail({
               {(d.hierarchy ?? []).map((row) => (
                 <div
                   key={row.adId}
-                  className="rounded-md border border-border px-2 py-1 text-[11.5px] text-text"
+                  className="rounded-md border border-border px-2 py-1 text-[12px] text-text"
                 >
                   {row.campaignName} → {row.adsetName} → {row.adName}
                 </div>
@@ -2074,7 +2074,7 @@ export function CreativeDetail({
             <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-text-muted [&::-webkit-details-marker]:hidden">
               {A ? "تفاصيل تقنية" : "Technical details"}
             </summary>
-            <div className="space-y-1 border-t border-border px-3 py-2 font-mono text-[11px] text-text-muted">
+            <div className="space-y-1 border-t border-border px-3 py-2 font-mono text-[12px] text-text-muted">
               <div>creative {creativeId}</div>
               {d.creative?.videoId ? <div>video {d.creative.videoId}</div> : null}
               {(d.hierarchy ?? []).map((row) => (
@@ -2145,7 +2145,7 @@ export function CreativeDetail({
               {stat(A ? "الإيراد المدفوع" : "Paid revenue", fmtUSD(m?.revenue))}
               {stat("ROAS", m?.roas == null ? "—" : `${m.roas.toFixed(2)}×`)}
             </div>
-            <div className="mt-1 text-[11px] text-text-muted">
+            <div className="mt-1 text-[12px] text-text-muted">
               {A
                 ? "كل الوقت (عملاء CRM بمعرّف Meta لإعلانات هذه المادة): "
                 : "All time (CRM leads with a Meta lead ID on this creative's ads): "}

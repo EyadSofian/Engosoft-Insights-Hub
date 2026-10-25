@@ -151,7 +151,7 @@ export function CreativeGallery({
                       >
                         {row.adName}
                       </div>
-                      <div className="min-w-0 text-[10px] text-text-muted">
+                      <div className="min-w-0 text-[12px] text-text-muted">
                         {A
                           ? `${fmtNum(row.variants.length)} إعلان ضمن الاسم`
                           : `${fmtNum(row.variants.length)} ads under this name`}

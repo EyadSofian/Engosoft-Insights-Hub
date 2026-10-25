@@ -156,7 +156,7 @@ export function FloatingChat() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-text truncate">{t("ai_assistant")}</div>
-                <div className="flex items-center gap-1.5 text-[11px] text-text-muted truncate">
+                <div className="flex items-center gap-1.5 text-[12px] text-text-muted truncate">
                   <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
                   <span className="truncate">
                     {filters.from && filters.to
@@ -256,7 +256,7 @@ export function FloatingChat() {
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="text-[11px] px-2.5 py-1.5 rounded-full border border-border text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer"
+                      className="text-[12px] px-2.5 py-1.5 rounded-full border border-border text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer"
                     >
                       {s}
                     </button>

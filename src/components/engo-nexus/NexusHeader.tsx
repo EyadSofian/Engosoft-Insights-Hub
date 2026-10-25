@@ -58,7 +58,7 @@ export function NexusHeader({
       <Mascot variant="avatar" className="size-9 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-text">ENGO Nexus</p>
-        <p className="flex items-center gap-1.5 text-[11px] text-text-muted">
+        <p className="flex items-center gap-1.5 text-[12px] text-text-muted">
           <span className={`size-1.5 rounded-full ${dot}`} aria-hidden />
           <span data-testid="nexus-status">{label[status]}</span>
         </p>

@@ -145,7 +145,7 @@ function LeadSourcesPage() {
                 onClick={() => open(row.source)}
                 className="group rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
               >
-                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-800">
+                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[12px] font-bold text-rose-800">
                   {row.source}
                 </span>
                 <span className="num mt-3 block text-2xl font-bold text-rose-950">

@@ -676,7 +676,7 @@ function CourseWorkspaceTabs({
           {tab.icon}
           <span>{tab.label}</span>
           {tab.badge ? (
-            <span className="num rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
+            <span className="num rounded-full bg-white/20 px-1.5 py-0.5 text-[12px]">
               {tab.badge}
             </span>
           ) : null}
@@ -706,7 +706,7 @@ function CourseSnapshotCards({
     <section className="rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand">
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-brand">
             {lang === "ar" ? "نظرة سريعة" : "Quick glance"}
           </p>
           <h2 className="text-base font-bold text-text">
@@ -730,14 +730,14 @@ function CourseSnapshotCards({
               <h3 className="truncate text-sm font-bold text-text" title={course.name}>
                 {course.name}
               </h3>
-              <span className="num grid h-6 w-6 place-items-center rounded-lg bg-brand-soft text-[10px] font-bold text-brand">
+              <span className="num grid h-6 w-6 place-items-center rounded-lg bg-brand-soft text-[12px] font-bold text-brand">
                 {index + 1}
               </span>
             </div>
             <div className="num mt-3 text-lg font-bold text-text">
               {mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-text-muted">
+            <div className="mt-1 flex items-center justify-between text-[12px] text-text-muted">
               <span>{mode === "ads" ? (lang === "ar" ? "الليدز" : "Leads") : "Won"}</span>
               <span className="num font-semibold text-text">
                 {fmtNum(mode === "ads" ? course.crmLeads : course.won)}
@@ -832,7 +832,7 @@ function CoursePortfolioNavigator({
                 <LayoutGrid size={20} />
               </span>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand">
                   {lang === "ar" ? "Course command center" : "Course command center"}
                 </p>
                 <h2 className="text-lg font-bold text-text sm:text-xl">
@@ -866,7 +866,7 @@ function CoursePortfolioNavigator({
                 placeholder={lang === "ar" ? "ابحث: CFM، PMP، BIM…" : "Search CFM, PMP, BIM…"}
                 className="min-w-0 flex-1 bg-transparent text-xs text-text outline-none placeholder:text-text-subtle"
               />
-              <span className="num text-[10px] text-text-subtle">{fmtNum(totalCourses)}</span>
+              <span className="num text-[12px] text-text-subtle">{fmtNum(totalCourses)}</span>
             </label>
             <div className="flex overflow-x-auto rounded-xl border border-border bg-surface/90 p-1 shadow-sm">
               {(Object.keys(COURSE_RANKS) as CourseRank[]).map((key) => (
@@ -875,7 +875,7 @@ function CoursePortfolioNavigator({
                   key={key}
                   onClick={() => setRank(key)}
                   aria-pressed={rank === key}
-                  className={`min-h-8 shrink-0 rounded-lg px-2.5 text-[10px] font-bold transition-colors ${
+                  className={`min-h-8 shrink-0 rounded-lg px-2.5 text-[12px] font-bold transition-colors ${
                     rank === key
                       ? "bg-brand text-white"
                       : "text-text-muted hover:bg-surface-2 hover:text-text"
@@ -911,7 +911,7 @@ function CoursePortfolioNavigator({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <span
-                      className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[11px] font-bold ${
+                      className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[12px] font-bold ${
                         rankPosition === 1
                           ? "bg-amber-400 text-amber-950"
                           : "bg-surface-2 text-text-muted"
@@ -924,7 +924,7 @@ function CoursePortfolioNavigator({
                         {course.name}
                       </h3>
                       <p
-                        className="truncate text-[10px] text-text-muted"
+                        className="truncate text-[12px] text-text-muted"
                         title={course.mainCategory}
                       >
                         {course.mainCategory || (lang === "ar" ? "غير مصنف" : "Uncategorised")}
@@ -932,7 +932,7 @@ function CoursePortfolioNavigator({
                     </div>
                   </div>
                   <span
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold ${
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[12px] font-bold ${
                       course.spend > 0
                         ? "bg-emerald-500/10 text-emerald-700"
                         : "bg-surface-2 text-text-subtle"
@@ -989,7 +989,7 @@ function CoursePortfolioNavigator({
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
                   <span className="font-semibold text-text-muted">
                     {COURSE_RANKS[rank][lang]}: {formatCourseRankValue(course, rank)}
                   </span>
@@ -1052,7 +1052,7 @@ function CourseCardMetric({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-[9.5px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div
         className={`num mt-0.5 truncate text-sm text-text ${strong ? "font-bold" : "font-semibold"}`}
       >
@@ -1163,7 +1163,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
               type="button"
               onClick={() => setView("campaigns")}
               aria-pressed={view === "campaigns"}
-              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+              className={`min-h-8 rounded-md px-3 text-[12px] font-semibold transition-colors ${
                 view === "campaigns" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
               }`}
             >
@@ -1173,7 +1173,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
               type="button"
               onClick={() => setView("alerts")}
               aria-pressed={view === "alerts"}
-              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+              className={`min-h-8 rounded-md px-3 text-[12px] font-semibold transition-colors ${
                 view === "alerts" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
               }`}
             >
@@ -1183,7 +1183,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
               type="button"
               onClick={() => setView("all")}
               aria-pressed={view === "all"}
-              className={`min-h-8 rounded-md px-3 text-[11px] font-semibold transition-colors ${
+              className={`min-h-8 rounded-md px-3 text-[12px] font-semibold transition-colors ${
                 view === "all" ? "bg-surface text-brand shadow-sm" : "text-text-muted"
               }`}
             >
@@ -1237,7 +1237,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[1120px] text-start text-xs">
-              <thead className="bg-surface-2/75 text-[10.5px] font-semibold text-text-muted">
+              <thead className="bg-surface-2/75 text-[12px] font-semibold text-text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start">{lang === "ar" ? "الدورة" : "Course"}</th>
                   <th className="px-3 py-3 text-center">
@@ -1343,7 +1343,7 @@ function MonitorStat({
   }[tone];
   return (
     <div className="rounded-xl border border-border px-3 py-2.5" style={colors}>
-      <div className="flex items-center justify-between gap-2 text-[10.5px] font-medium">
+      <div className="flex items-center justify-between gap-2 text-[12px] font-medium">
         <span>{label}</span>
         {icon}
       </div>
@@ -1359,7 +1359,7 @@ function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: 
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-text">{row.course}</h3>
-          <p className="mt-0.5 text-[10.5px] text-text-muted">
+          <p className="mt-0.5 text-[12px] text-text-muted">
             {lang === "ar" ? "مقارنة بمتوسط الفترة المختارة" : "Compared with period average"}
           </p>
         </div>
@@ -1375,7 +1375,7 @@ function CourseLeadMobileCard({ row, paused }: { row: CourseLeadSignal; paused: 
           value={`${fmtNum(row.current.leads)} / ${row.baseline.leadsPerDay.toFixed(1)}`}
         />
         <div>
-          <dt className="text-[11px] text-text-muted">{lang === "ar" ? "التغيّر" : "Change"}</dt>
+          <dt className="text-[12px] text-text-muted">{lang === "ar" ? "التغيّر" : "Change"}</dt>
           <dd className="mt-0.5">
             <DeltaBadge value={row.leadDeltaPct ?? undefined} />
           </dd>
@@ -1537,7 +1537,7 @@ function CourseDetailPanel({
               <GraduationCap size={21} />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                 {mode === "ads"
                   ? lang === "ar"
                     ? "تفاصيل إعلانات الكورس"
@@ -1627,7 +1627,7 @@ function CourseDetailPanel({
               key={tab.key}
               onClick={() => setDetailTab(tab.key)}
               aria-pressed={detailTab === tab.key}
-              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold ${
+              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-bold ${
                 detailTab === tab.key
                   ? "bg-brand text-white"
                   : "text-text-muted hover:bg-surface hover:text-text"
@@ -1653,7 +1653,7 @@ function CourseDetailPanel({
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 {sourceRows.map(([source, spend]) => (
                   <div key={source} className="rounded-xl border border-border bg-surface-2/60 p-3">
-                    <div className="text-[11px] text-text-muted">{sourceLabel(source, lang)}</div>
+                    <div className="text-[12px] text-text-muted">{sourceLabel(source, lang)}</div>
                     <div className="num mt-1 text-base font-semibold text-text">
                       {fmtUSD(spend)}
                     </div>
@@ -1907,7 +1907,7 @@ function CampaignCard({
           <div className="mb-2 flex flex-wrap gap-1.5">
             {organic ? (
               <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold"
                 style={{ background: "var(--success-soft)", color: "var(--success)" }}
               >
                 <Leaf size={11} />
@@ -1917,7 +1917,7 @@ function CampaignCard({
               campaign.platforms.map((platform) => (
                 <span
                   key={platform}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold"
                   style={{
                     background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
                     color: PLATFORM_COLOR[platform],
@@ -2017,7 +2017,7 @@ function CampaignCard({
         {!organic && <MobileMetric label="ROAS" value={fmtRoas(campaign.roas)} />}
       </dl>
 
-      <div className="mt-auto border-t border-border pt-3 text-[11px] leading-5 text-text-muted">
+      <div className="mt-auto border-t border-border pt-3 text-[12px] leading-5 text-text-muted">
         {organic ? (
           <div>
             {lang === "ar" ? "نوع التجميع: " : "Grouping basis: "}
@@ -2096,7 +2096,7 @@ function MonthSelect({
   const { lang } = useI18n();
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-medium text-text-muted">{label}</span>
+      <span className="mb-1 block text-[12px] font-medium text-text-muted">{label}</span>
       <span className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-2.5">
         <CalendarDays size={14} className="shrink-0 text-text-subtle" />
         <select
@@ -2137,12 +2137,12 @@ function MonthMetricCard({
   return (
     <div className="rounded-xl border border-border bg-surface-2/45 p-3">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-medium text-text-muted">{label}</span>
+        <span className="text-[12px] font-medium text-text-muted">{label}</span>
         <DeltaBadge value={delta} invert={invert} />
       </div>
-      <div className="mt-2 text-[10px] text-text-subtle">{secondLabel}</div>
+      <div className="mt-2 text-[12px] text-text-subtle">{secondLabel}</div>
       <div className="num text-base font-semibold text-text">{format(second)}</div>
-      <div className="mt-2 border-t border-border pt-2 text-[10px] text-text-subtle">
+      <div className="mt-2 border-t border-border pt-2 text-[12px] text-text-subtle">
         {firstLabel}: <span className="num font-medium text-text-muted">{format(first)}</span>
       </div>
     </div>
@@ -2152,7 +2152,7 @@ function MonthMetricCard({
 function HeaderStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-[100px] rounded-xl border border-border bg-surface-2/60 px-3 py-2.5">
-      <div className="text-[10px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-1 text-sm font-semibold text-text">{value}</div>
     </div>
   );
@@ -2161,7 +2161,7 @@ function HeaderStat({ label, value }: { label: string; value: string }) {
 function MobileMetric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] text-text-muted">{label}</dt>
+      <dt className="text-[12px] text-text-muted">{label}</dt>
       <dd className="num mt-0.5 text-sm font-semibold text-text">{value}</dd>
     </div>
   );

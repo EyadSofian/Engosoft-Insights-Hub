@@ -145,7 +145,7 @@ export function MetaDestinationMixSection() {
       render: (row) => (
         <div>
           <div className="font-semibold text-text">{t(TYPE_COPY[row.type].label)}</div>
-          <div className="mt-0.5 text-[11px] text-text-muted">
+          <div className="mt-0.5 text-[12px] text-text-muted">
             {Object.keys(row.messagingDestinations).length
               ? Object.entries(row.messagingDestinations)
                   .map(([name, ads]) => `${name} (${fmtNum(ads)})`)
@@ -170,7 +170,7 @@ export function MetaDestinationMixSection() {
         <div>
           <div>{fmtNum(row.ads)}</div>
           {row.mixedDestinationAds > 0 ? (
-            <div className="text-[11px] text-text-muted">
+            <div className="text-[12px] text-text-muted">
               {fmtNum(row.mixedDestinationAds)}{" "}
               {A ? "مختلطة (موقع + نموذج)" : "mixed website + form"}
             </div>
@@ -194,7 +194,7 @@ export function MetaDestinationMixSection() {
         row.primaryResult ? (
           <div>
             <div>{fmtNum(row.results[row.primaryResult])}</div>
-            <div className="text-[11px] text-text-muted">{t(RESULT_COPY[row.primaryResult])}</div>
+            <div className="text-[12px] text-text-muted">{t(RESULT_COPY[row.primaryResult])}</div>
           </div>
         ) : (
           "—"
@@ -209,7 +209,7 @@ export function MetaDestinationMixSection() {
           ([key, value]) => key !== row.primaryResult && value > 0,
         );
         return others.length ? (
-          <div className="space-y-0.5 text-[11px] text-text-muted">
+          <div className="space-y-0.5 text-[12px] text-text-muted">
             {others.map(([key, value]) => (
               <div key={key}>
                 {fmtNum(value)} {t(RESULT_COPY[key])}
@@ -229,7 +229,7 @@ export function MetaDestinationMixSection() {
           <Pill tone={INGESTION_PILL[row.ingestion].tone}>
             {t(INGESTION_PILL[row.ingestion].label)}
           </Pill>
-          <div className="text-[11px] text-text-muted">{t(INGESTION_COPY[row.type].system)}</div>
+          <div className="text-[12px] text-text-muted">{t(INGESTION_COPY[row.type].system)}</div>
         </div>
       ),
       sortValue: (row) => row.ingestion,
@@ -238,7 +238,7 @@ export function MetaDestinationMixSection() {
       key: "gap",
       header: A ? "الناقص" : "Missing ingestion",
       render: (row) => (
-        <div className="max-w-xs text-[11px] leading-relaxed text-text-muted">
+        <div className="max-w-xs text-[12px] leading-relaxed text-text-muted">
           {t(INGESTION_COPY[row.type].gap)}
         </div>
       ),
@@ -280,7 +280,7 @@ export function MetaDestinationMixSection() {
           rowKey={(row) => row.type}
           csvFilename="engosoft-meta-destination-mix.csv"
         />
-        <p className="text-[11px] leading-relaxed text-text-muted">
+        <p className="text-[12px] leading-relaxed text-text-muted">
           {mix.isError
             ? A
               ? "تعذّر تحميل تقارير Meta الإجمالية."

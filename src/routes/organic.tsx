@@ -696,7 +696,7 @@ function Organic() {
             <div className="truncate font-semibold text-text" title={row.name}>
               {row.name}
             </div>
-            <div className="num text-[11px] text-text-subtle">
+            <div className="num text-[12px] text-text-subtle">
               {fmtPct(row.leadShare, 1)} من الليدز
             </div>
           </div>
@@ -799,7 +799,7 @@ function Organic() {
           <div className="truncate font-semibold text-text" title={row.name}>
             {row.name}
           </div>
-          <div className="truncate text-[11px] text-text-subtle">{row.mainCategory || "—"}</div>
+          <div className="truncate text-[12px] text-text-subtle">{row.mainCategory || "—"}</div>
         </div>
       ),
     },
@@ -981,7 +981,7 @@ function Organic() {
       render: (row) => (
         <div>
           <div className="font-semibold text-text">{row.name}</div>
-          <div className="text-[11px] text-text-subtle">{row.parent || "—"}</div>
+          <div className="text-[12px] text-text-subtle">{row.parent || "—"}</div>
         </div>
       ),
     },
@@ -1088,7 +1088,7 @@ function Organic() {
                     <Sprout size={22} />
                   </span>
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-success">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-success">
                       Organic pulse
                     </div>
                     <div className="text-xs text-text-muted">
@@ -1151,7 +1151,7 @@ function Organic() {
                     className="rounded-2xl border border-border p-3.5"
                     style={{ background: "var(--surface-2)" }}
                   >
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-text-subtle">
+                    <div className="text-[12px] font-medium uppercase tracking-wide text-text-subtle">
                       {item.label}
                     </div>
                     <div className="num mt-2 text-xl font-semibold text-text">{item.value}</div>

@@ -343,7 +343,7 @@ function Accounting() {
       render: (row) => (
         <span className="num whitespace-nowrap">
           {row.untaxedTotal.toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
-          <span className="text-[11px] text-text-muted">{row.companyCurrency || "—"}</span>
+          <span className="text-[12px] text-text-muted">{row.companyCurrency || "—"}</span>
         </span>
       ),
     },
@@ -355,7 +355,7 @@ function Accounting() {
       render: (row) => (
         <span className="num whitespace-nowrap">
           {row.totalInCurrency.toLocaleString("en-US", { maximumFractionDigits: 2 })}{" "}
-          <span className="text-[11px] text-text-muted">{row.currency}</span>
+          <span className="text-[12px] text-text-muted">{row.currency}</span>
         </span>
       ),
     },
@@ -455,7 +455,7 @@ function Accounting() {
             <CalendarDays size={16} className="text-brand" />
             {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
           </span>
-          <span className="text-[11.5px] text-text-muted">
+          <span className="text-[12px] text-text-muted">
             {view === "net-sales" || view === "profitability"
               ? lang === "ar"
                 ? "تاريخ القيد المرحّل"
@@ -638,7 +638,7 @@ function Accounting() {
                         ? "إشعارات الخصم المنشورة في Odoo"
                         : "Posted Odoo credit notes"}
                     </span>
-                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[12px] font-semibold text-amber-700">
                       {fmtNum(data.creditNoteReconciliation.documents.length)}
                     </span>
                     <ChevronDown
@@ -648,7 +648,7 @@ function Accounting() {
                     />
                   </summary>
                   <div className="border-t border-border px-4 pb-4 sm:px-5">
-                    <p className="py-3 text-[11.5px] text-text-muted">
+                    <p className="py-3 text-[12px] text-text-muted">
                       {lang === "ar"
                         ? "الإشعارات الملغاة مستبعدة. كل مبلغ معروض بعملة المستند ويُخصم من الإيراد في تاريخ إشعار الخصم."
                         : "Cancelled notes are excluded. Amounts use each document's currency and reduce revenue on the credit-note date."}
@@ -692,7 +692,7 @@ function Accounting() {
                     <BadgeDollarSign size={16} className="text-brand" />
                     {lang === "ar" ? "أسعار التحويل والتصدير" : "Conversion rates and export"}
                   </span>
-                  <span className="num text-[11.5px] text-text-muted">
+                  <span className="num text-[12px] text-text-muted">
                     1 USD = {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
                   </span>
                   <span className="ms-auto flex items-center gap-2">
@@ -730,7 +730,7 @@ function Accounting() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:min-w-[520px]">
-                      <label className="text-[11px] font-medium text-text-muted sm:text-xs">
+                      <label className="text-[12px] font-medium text-text-muted sm:text-xs">
                         <span className="mb-1.5 block">
                           {lang === "ar" ? "1 دولار = جنيه مصري" : "1 USD = EGP"}
                         </span>
@@ -744,7 +744,7 @@ function Accounting() {
                           className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-end font-mono text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
                         />
                       </label>
-                      <label className="text-[11px] font-medium text-text-muted sm:text-xs">
+                      <label className="text-[12px] font-medium text-text-muted sm:text-xs">
                         <span className="mb-1.5 block">
                           {lang === "ar" ? "1 دولار = ريال سعودي" : "1 USD = SAR"}
                         </span>
@@ -774,7 +774,7 @@ function Accounting() {
                           <RotateCcw size={15} />
                           {lang === "ar" ? "استرجاع 50.5 و3.7453" : "Restore 50.5 and 3.7453"}
                         </button>
-                        <span className="w-full text-[10.5px] text-text-muted sm:w-auto sm:text-xs">
+                        <span className="w-full text-[12px] text-text-muted sm:w-auto sm:text-xs">
                           {lang === "ar" ? "المطبّق الآن:" : "Applied now:"} 1 USD ={" "}
                           {data.fxRates.EGP} EGP · {data.fxRates.SAR} SAR
                         </span>
@@ -1036,7 +1036,9 @@ function accountingMetrics(
   const average: MetricDetail = {
     id: "accounting.average",
     title: A ? "متوسط الفاتورة" : "Average invoice",
-    value: fmtUSDExact(S.averageInvoice),
+    // A quotient, not a source amount: cents are its real precision. The exact
+    // value stays in the formula below.
+    value: fmtUSDFull(S.averageInvoice),
     tone: "violet",
     icon: <Calculator size={16} />,
     definition: A
@@ -1181,7 +1183,7 @@ function Money({ title, rows }: { title: string; rows: Grouped[] }) {
           meta: (
             <span>
               <span className="num">{fmtUSDExact(row.value)}</span>
-              <span className="num ms-1.5 text-[11px] text-text-muted">
+              <span className="num ms-1.5 text-[12px] text-text-muted">
                 ({fmtPct(row.share, 1)})
               </span>
             </span>
@@ -1304,7 +1306,7 @@ function AccountingExportDialog({
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
           <div>
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-semibold text-success">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[12px] font-semibold text-success">
               <ShieldCheck size={14} />
               {lang === "ar" ? "الفواتير المدفوعة فقط" : "Paid invoices only"}
             </div>

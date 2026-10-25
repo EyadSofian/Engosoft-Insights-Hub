@@ -321,7 +321,7 @@ function LandingPages() {
       render: (row) => (
         <div>
           <div className="font-semibold text-text">{row.landingPageName}</div>
-          <div className="mt-0.5 text-[11px] text-text-muted">
+          <div className="mt-0.5 text-[12px] text-text-muted">
             {row.landingPageSlug || row.landingPageId}
           </div>
         </div>
@@ -399,7 +399,7 @@ function LandingPages() {
       >
         <Card className="space-y-3" padded>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="grid gap-1 text-[11px] font-semibold text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "من" : "From"}
               <input
                 type="date"
@@ -408,7 +408,7 @@ function LandingPages() {
                 className="min-h-10 rounded-xl border border-border bg-surface px-3 text-xs text-text outline-none focus:border-brand"
               />
             </label>
-            <label className="grid gap-1 text-[11px] font-semibold text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "إلى" : "To"}
               <input
                 type="date"
@@ -417,7 +417,7 @@ function LandingPages() {
                 className="min-h-10 rounded-xl border border-border bg-surface px-3 text-xs text-text outline-none focus:border-brand"
               />
             </label>
-            <label className="grid gap-1 text-[11px] font-semibold text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "منظور اللمسة" : "Touch view"}
               <select
                 value={touch}
@@ -428,7 +428,7 @@ function LandingPages() {
                 <option value="latest">{A ? "آخر لمسة" : "Latest touch"}</option>
               </select>
             </label>
-            <div className="grid gap-1 text-[11px] font-semibold text-text-muted">
+            <div className="grid gap-1 text-[12px] font-semibold text-text-muted">
               <span>{A ? "معرّف الصفحة" : "Page ID"}</span>
               {filterInput(
                 landingPageId,
@@ -444,7 +444,7 @@ function LandingPages() {
             {filterInput(campaign, setCampaign, "utm_campaign", A ? "الحملة" : "Campaign")}
             {filterInput(content, setContent, "utm_content", A ? "المحتوى" : "Content")}
           </div>
-          <p className="text-[11px] leading-relaxed text-text-muted">
+          <p className="text-[12px] leading-relaxed text-text-muted">
             {A
               ? "المصدر fb وig فقط يُوحّدان إلى facebook وinstagram. الحقول الناقصة تبقى غير محددة ولا تُخمن."
               : "Only fb→facebook and ig→instagram are normalized. Missing fields stay unset; they are never guessed."}

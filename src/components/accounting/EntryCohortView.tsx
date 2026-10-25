@@ -77,7 +77,7 @@ export function EntryCohortView() {
         <div className="table-wrap scroll-hint-x">
           <table className="w-full min-w-[980px] text-sm">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+              <tr className="text-[12px] uppercase tracking-wide text-text-muted">
                 <th className="px-3 py-2 text-start">{A ? "شهر الدخول" : "Entry month"}</th>
                 <th className="px-3 py-2 text-end">
                   {A ? "ليدز/عملاء CRM فريدة" : "Unique CRM leads"}

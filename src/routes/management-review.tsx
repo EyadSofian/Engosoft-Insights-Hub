@@ -45,12 +45,30 @@ interface ReviewRow {
     number | null
   >;
   actual: Record<
-    "revenue" | "spend" | "leads" | "conversion" | "freshConversion" | "oldConversion" | "certificateRevenue" | "revenueIncludingCertificates" | "crmLeads",
+    | "revenue"
+    | "spend"
+    | "leads"
+    | "conversion"
+    | "freshConversion"
+    | "oldConversion"
+    | "certificateRevenue"
+    | "revenueIncludingCertificates"
+    | "crmLeads",
     number | null
   >;
   achievement: Record<"revenue" | "spend" | "leads", number | null>;
-  budget: { actualRevenueAllowance: number | null; actualRevenueUtilization: number | null; actualGrossAllowance: number | null; targetRate: number | null };
-  lostMovement: { closedInMonth: number | null; createdAndClosedInMonth: number | null; olderCreatedClosedInMonth: number | null; undatedCreatedClosedInMonth: number | null };
+  budget: {
+    actualRevenueAllowance: number | null;
+    actualRevenueUtilization: number | null;
+    actualGrossAllowance: number | null;
+    targetRate: number | null;
+  };
+  lostMovement: {
+    closedInMonth: number | null;
+    createdAndClosedInMonth: number | null;
+    olderCreatedClosedInMonth: number | null;
+    undatedCreatedClosedInMonth: number | null;
+  };
   funnel: {
     leads: number;
     won: number;
@@ -118,7 +136,7 @@ function SummaryMetric({
     <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
       <div className="text-xs font-semibold opacity-80">{label}</div>
       <div className="num mt-2 text-2xl font-bold tracking-tight">{value}</div>
-      <div className="mt-1 text-[11px] leading-relaxed opacity-75">{detail}</div>
+      <div className="mt-1 text-[12px] leading-relaxed opacity-75">{detail}</div>
     </div>
   );
 }
@@ -199,7 +217,7 @@ function ManagementReviewPage() {
           <h2 className="text-lg font-bold text-text">
             {ar ? "قرار الإدارة قبل خطة الشهر القادم" : "Management baseline for next month"}
           </h2>
-          <span className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold text-text-muted">
+          <span className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-text-muted">
             {row.planStatus === "approved"
               ? ar
                 ? "خطة معتمدة"
@@ -229,7 +247,11 @@ function ManagementReviewPage() {
           <SummaryMetric
             label={ar ? "ليدز Odoo المنشأة في الشهر" : "CRM leads created this month"}
             value={number(row.actual.crmLeads)}
-            detail={ar ? "كل الدورات والمصادر، غير عدد منصة الإعلانات" : "All CRM sources; distinct from platform leads"}
+            detail={
+              ar
+                ? "كل الدورات والمصادر، غير عدد منصة الإعلانات"
+                : "All CRM sources; distinct from platform leads"
+            }
           />
           <SummaryMetric
             label={ar ? "تحقيق تارجت ليدز الإعلانات" : "Paid-lead target achievement"}
@@ -301,7 +323,7 @@ function ManagementReviewPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
             {ar
               ? `لا نختلق تارجت لمعدل التحويل أو لأشهر بلا خطة. التحصيل من Odoo بتاريخ الدفع، والصرف من كل الحسابات المتصلة. تارجت الليدز للمنصات فقط (${row.leadBasis === "mixed_platform_crm" ? "منصات + بديل CRM عند غياب بيانات المنصة" : "بيانات المنصات"})؛ جميع ليدز Odoo معروضة منفصلة. ميزانية سبتمبر الثابتة = 135,000 × 17%، وسقف 17% من التحصيل الفعلي مقارنة مستقلة.`
               : "No inferred targets. Paid accounting and connected ad accounts. Paid course leads match plan courses; CRM funnel is separate."}
@@ -324,9 +346,11 @@ function ManagementReviewPage() {
             <SummaryMetric
               label={ar ? "Lost اتقفلت خلال الشهر · كل الليدز" : "All leads closed Lost this month"}
               value={number(row.lostMovement.closedInMonth)}
-              detail={ar
-                ? `${number(row.lostMovement.createdAndClosedInMonth)} من ليدز الشهر + ${number(row.lostMovement.olderCreatedClosedInMonth)} أقدم + ${number(row.lostMovement.undatedCreatedClosedInMonth)} تاريخها غير صالح`
-                : `${number(row.lostMovement.createdAndClosedInMonth)} new + ${number(row.lostMovement.olderCreatedClosedInMonth)} older + ${number(row.lostMovement.undatedCreatedClosedInMonth)} undated`}
+              detail={
+                ar
+                  ? `${number(row.lostMovement.createdAndClosedInMonth)} من ليدز الشهر + ${number(row.lostMovement.olderCreatedClosedInMonth)} أقدم + ${number(row.lostMovement.undatedCreatedClosedInMonth)} تاريخها غير صالح`
+                  : `${number(row.lostMovement.createdAndClosedInMonth)} new + ${number(row.lostMovement.olderCreatedClosedInMonth)} older + ${number(row.lostMovement.undatedCreatedClosedInMonth)} undated`
+              }
               tone="red"
             />
             <SummaryMetric
@@ -414,7 +438,7 @@ function ManagementReviewPage() {
           <h2 className="mb-1 text-base font-bold text-text">
             {ar ? "أي دورة تحول أفضل؟" : "Which courses convert best?"}
           </h2>
-          <p className="mb-3 text-[11px] text-text-muted">
+          <p className="mb-3 text-[12px] text-text-muted">
             {ar
               ? "الترتيب الأعلى يتطلب 20 ليد على الأقل حتى لا يتصدر كورس بليد واحد."
               : "Top ranking requires at least 20 leads."}

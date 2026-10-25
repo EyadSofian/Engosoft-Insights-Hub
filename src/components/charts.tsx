@@ -35,7 +35,7 @@ export function useIsNarrow(breakpoint = 640) {
   return narrow;
 }
 
-const axisTick = { fill: "var(--text-subtle)", fontSize: 11 };
+const axisTick = { fill: "var(--text-subtle)", fontSize: 12 };
 const gridStroke = "var(--border)";
 
 /** Shared tooltip so every chart reads the same. */
@@ -608,7 +608,7 @@ export function DonutChart({
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="num text-xl font-bold text-text sm:text-2xl">{format(total)}</span>
           {centerCaption && (
-            <span className="mt-0.5 max-w-[9rem] text-center text-[11px] leading-tight text-text-muted">
+            <span className="mt-0.5 max-w-[9rem] text-center text-[12px] leading-tight text-text-muted">
               {centerCaption}
             </span>
           )}

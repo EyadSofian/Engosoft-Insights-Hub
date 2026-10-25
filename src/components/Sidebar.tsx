@@ -50,7 +50,7 @@ export function Sidebar() {
             <div className="truncate text-[15px] font-bold tracking-tight text-nav-text">
               ENGOSOFT
             </div>
-            <div className="truncate text-[11px] text-nav-text-muted">{t("app_sub")}</div>
+            <div className="truncate text-[12px] text-nav-text-muted">{t("app_sub")}</div>
           </div>
         </Link>
         <NavigationToggle />
@@ -93,7 +93,7 @@ export function Sidebar() {
           <BookOpen size={16} />
           <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>
         </Link>
-        <div className="px-3 text-[11px] text-text-subtle">
+        <div className="px-3 text-[12px] text-text-subtle">
           © {new Date().getFullYear()} Engosoft
         </div>
       </div>
@@ -160,7 +160,7 @@ function MoreMenuRow({ section, active }: { section: NavigationSection; active: 
         className="w-80 max-h-[80dvh] overflow-y-auto rounded-xl p-2"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
-        <div className="px-2.5 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide text-text-subtle">
+        <div className="px-2.5 pb-1.5 pt-1 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
           {lang === "ar" ? "تقارير متخصصة" : "Specialist reports"}
         </div>
         <MoreReportsList onNavigate={() => setOpen(false)} />

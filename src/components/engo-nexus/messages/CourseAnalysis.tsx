@@ -117,7 +117,7 @@ export function CourseAnalysis({
                     type="button"
                     onClick={() => setFilter(value)}
                     aria-pressed={filter === value}
-                    className={`rounded border px-1.5 py-0.5 text-[11px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    className={`rounded border px-1.5 py-0.5 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                       filter === value
                         ? "border-accent bg-accent/10 text-accent"
                         : "border-border text-text-muted hover:bg-surface-muted"

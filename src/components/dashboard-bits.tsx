@@ -12,7 +12,14 @@ import {
   Trophy,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { toneOf, toneVars, TONE, type AnyTone, type Tone } from "@/lib/dashboard-tone";
+import {
+  calloutStyle,
+  cardToneVars,
+  toneOf,
+  TONE,
+  type AnyTone,
+  type Tone,
+} from "@/lib/dashboard-tone";
 import { Card, EmptyState } from "./ui-bits";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 
@@ -95,7 +102,7 @@ export function DashboardPageHeader({
 
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-[11.5px] font-semibold text-text-muted">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-text-muted">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
               <bdi className="num truncate">{period}</bdi>
             </span>
@@ -119,10 +126,7 @@ export function SyncStatus({ label, tone = "mint" }: { label?: string; tone?: An
   if (!label) return null;
   const t = toneOf(tone);
   return (
-    <span
-      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11.5px] font-medium"
-      style={{ background: t.surface, color: t.ink }}
-    >
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-text">
       <span
         className="size-1.5 shrink-0 rounded-full"
         style={{ background: t.strong }}
@@ -225,7 +229,7 @@ export function PageSection({
               {title}
             </h2>
           )}
-          {hint && <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{hint}</p>}
+          {hint && <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{hint}</p>}
         </div>
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -279,7 +283,7 @@ export function MoreDetails({
           <span className="block text-[13.5px] font-semibold text-text">
             {label ?? (lang === "ar" ? "تفاصيل أكثر" : "More details")}
           </span>
-          {hint && <span className="mt-0.5 block text-[11.5px] text-text-muted">{hint}</span>}
+          {hint && <span className="mt-0.5 block text-[12px] text-text-muted">{hint}</span>}
         </span>
         <ChevronDownGlyph open={open} />
       </button>
@@ -320,11 +324,14 @@ export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
           to={link.to}
           search={link.search as never}
           className="tone-surface lift group flex min-w-0 items-center gap-3 p-[var(--pad-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]"
-          style={toneVars(link.tone)}
+          style={cardToneVars(link.tone)}
         >
           <span
-            className="grid size-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
-            style={{ background: "var(--tone-strong)" }}
+            className="grid size-9 shrink-0 place-items-center rounded-xl"
+            style={{
+              background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
+              color: "var(--tone-strong)",
+            }}
             aria-hidden="true"
           >
             {link.icon}
@@ -336,7 +343,7 @@ export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
             >
               {link.title}
             </span>
-            <span className="mt-0.5 block truncate text-[11.5px] text-text-muted">
+            <span className="mt-0.5 block truncate text-[12px] text-text-muted">
               {link.description}
             </span>
             {link.figure && (
@@ -507,7 +514,7 @@ export function SecondaryMetrics({
         <LayoutGrid size={15} className="shrink-0 text-text-subtle" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{heading}</span>
         {count !== undefined && (
-          <span className="num rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-text-muted">
+          <span className="num rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-bold text-text-muted">
             {count}
           </span>
         )}
@@ -611,12 +618,15 @@ export function InsightCard({
     <>
       <div className="flex items-center justify-between gap-3">
         <span
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide"
+          className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide"
           style={{ color: "var(--tone-strong)" }}
         >
           <span
-            className="grid size-6 shrink-0 place-items-center rounded-lg text-white"
-            style={{ background: "var(--tone-strong)" }}
+            className="grid size-6 shrink-0 place-items-center rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
+              color: "var(--tone-strong)",
+            }}
           >
             <Icon size={13} strokeWidth={2.6} aria-hidden="true" />
           </span>
@@ -635,7 +645,7 @@ export function InsightCard({
 
       {value != null && (
         <div
-          className="num mt-2.5 text-[24px] font-bold leading-none tracking-[-0.03em]"
+          className="num kpi-figure mt-2.5 text-[30px] font-bold leading-none"
           style={{ color: "var(--tone-ink)" }}
         >
           {value}
@@ -651,8 +661,8 @@ export function InsightCard({
 
       {detail != null && (
         <p
-          className="mt-1 line-clamp-2 text-[11.5px] leading-relaxed"
-          style={{ color: "var(--tone-ink)", opacity: 0.7 }}
+          className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed"
+          style={{ color: "var(--text-muted)" }}
         >
           {detail}
         </p>
@@ -661,8 +671,8 @@ export function InsightCard({
         /* `mt-auto` pins the cue to the foot of the card, so a row of readings
            lines up along the bottom however long each explanation runs. */
         <span
-          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[11.5px] font-bold"
-          style={{ color: "var(--tone-strong)" }}
+          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[12px] font-bold"
+          style={{ color: "var(--brand)" }}
         >
           {actionLabel}
         </span>
@@ -680,7 +690,11 @@ export function InsightCard({
     (interactive
       ? "kpi-card lift cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       : "");
-  const style = { ...toneVars(tone), "--i": index } as React.CSSProperties;
+  const style = {
+    ...cardToneVars(tone),
+    "--i": index,
+    boxShadow: "var(--shadow-xs)",
+  } as React.CSSProperties;
 
   if (to) {
     return (
@@ -791,7 +805,7 @@ export function DashboardPanel({
               <h2 className="text-[15px] font-bold leading-snug tracking-[-0.01em] text-text">
                 {title}
               </h2>
-              {hint && <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{hint}</p>}
+              {hint && <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{hint}</p>}
             </div>
           </div>
           {action && <div className="shrink-0">{action}</div>}
@@ -799,7 +813,7 @@ export function DashboardPanel({
       )}
       <div className={`min-w-0 flex-1 px-4 pb-4 sm:px-5 sm:pb-5 ${bodyClassName}`}>{children}</div>
       {footer && (
-        <div className="border-t border-border bg-surface-2 px-4 py-2.5 text-[11.5px] text-text-muted sm:px-5">
+        <div className="border-t border-border bg-surface-2 px-4 py-2.5 text-[12px] text-text-muted sm:px-5">
           {footer}
         </div>
       )}
@@ -881,7 +895,7 @@ export function RankingPanel({
             const row = (
               <>
                 <span
-                  className="num grid size-6 shrink-0 place-items-center rounded-lg text-[11px] font-bold"
+                  className="num grid size-6 shrink-0 place-items-center rounded-lg text-[12px] font-bold"
                   style={
                     i === 0
                       ? { background: t.strong, color: "#fff" }
@@ -906,7 +920,7 @@ export function RankingPanel({
                     />
                   </span>
                   {item.meta && (
-                    <span className="mt-1 block truncate text-[10.5px] text-text-muted">
+                    <span className="mt-1 block truncate text-[12px] text-text-muted">
                       {item.meta}
                     </span>
                   )}
@@ -957,9 +971,7 @@ export function CompactTable({
     <div className={`table-wrap scroll-hint-x -mx-1 px-1 ${className}`}>
       <table className="w-full text-sm" style={{ minWidth }}>
         <thead>
-          <tr className="text-[10.5px] font-bold uppercase tracking-wide text-text-subtle">
-            {head}
-          </tr>
+          <tr className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">{head}</tr>
         </thead>
         <tbody className="[&>tr]:border-t [&>tr]:border-border [&>tr:hover]:bg-surface-2">
           {children}
@@ -1044,19 +1056,22 @@ export function DataHealthButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-start transition-colors ${className}`}
-        style={{ background: t.surface, borderColor: t.border, color: t.ink }}
+        className={`inline-flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-start transition-colors ${className}`}
+        style={calloutStyle(t.strong)}
         aria-haspopup="dialog"
       >
         <span
-          className="grid size-8 shrink-0 place-items-center rounded-xl text-white"
-          style={{ background: t.strong }}
+          className="grid size-8 shrink-0 place-items-center rounded-xl"
+          style={{
+            background: `color-mix(in srgb, ${t.strong} 12%, transparent)`,
+            color: t.strong,
+          }}
         >
           <StatusIcon size={16} aria-hidden="true" />
         </span>
         <span className="min-w-0">
           <span className="block text-[12.5px] font-bold leading-tight">{headline}</span>
-          <span className="block text-[11px] leading-tight opacity-70">
+          <span className="block text-[12px] leading-tight text-text-muted">
             {issues.length > 0
               ? lang === "ar"
                 ? `${arabicNotes(issues.length)} · اضغط للتفاصيل`
@@ -1092,7 +1107,7 @@ export function DataHealthButton({
           </div>
 
           {syncedLabel && (
-            <p className="num border-b border-border px-5 py-2.5 text-[11.5px] text-text-muted">
+            <p className="num border-b border-border px-5 py-2.5 text-[12px] text-text-muted">
               {syncedLabel}
             </p>
           )}
@@ -1136,7 +1151,7 @@ export function DataHealthButton({
 
           {technical.length > 0 && (
             <details className="group border-t border-border">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-5 py-2.5 text-[11.5px] font-semibold text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-5 py-2.5 text-[12px] font-semibold text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
                 <span className="flex-1">
                   {lang === "ar" ? "تفاصيل تقنية" : "Technical details"}
                 </span>
@@ -1144,7 +1159,7 @@ export function DataHealthButton({
               </summary>
               <ul className="space-y-2 px-5 pb-5">
                 {technical.map((issue, i) => (
-                  <li key={i} className="text-[11px] leading-relaxed text-text-subtle">
+                  <li key={i} className="text-[12px] leading-relaxed text-text-subtle">
                     <bdi className="nexus-ltr">{issue.technical}</bdi>
                   </li>
                 ))}
@@ -1194,7 +1209,7 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
       <details className="group card overflow-hidden sm:hidden">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
           <span className="text-[13px] font-semibold text-text">{title}</span>
-          <span className="flex items-center gap-2 text-[10.5px] text-text-muted">
+          <span className="flex items-center gap-2 text-[12px] text-text-muted">
             {lang === "ar" ? "اضغط للقراءة" : "Tap to read"}
             <ChevronDownGlyph />
           </span>
@@ -1216,7 +1231,7 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
               {children}
             </span>
           </span>
-          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-brand">
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-brand">
             <span className="group-open:hidden">{lang === "ar" ? "اقرأ الكل" : "Read all"}</span>
             <span className="hidden group-open:inline">{lang === "ar" ? "طيّ" : "Collapse"}</span>
             <ChevronDownGlyph />
@@ -1265,9 +1280,14 @@ export function SourceErrorNotice({
     <div
       role="status"
       className="flex flex-wrap items-start gap-2.5 rounded-xl px-3 py-2.5 text-[13px] sm:px-4 sm:py-3"
-      style={{ background: TONE.warning.bg, color: TONE.warning.fg }}
+      style={calloutStyle(TONE.warning.fg)}
     >
-      <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <AlertTriangle
+        size={16}
+        className="mt-0.5 shrink-0"
+        style={{ color: TONE.warning.fg }}
+        aria-hidden="true"
+      />
       <div className="min-w-0 flex-1 leading-relaxed">
         <span>
           {lang === "ar"
@@ -1276,12 +1296,12 @@ export function SourceErrorNotice({
         </span>
         {import.meta.env.DEV && (
           <details className="mt-1.5">
-            <summary className="cursor-pointer text-[11px] font-medium opacity-80">
+            <summary className="cursor-pointer text-[12px] font-medium text-text-muted">
               {lang === "ar"
                 ? "تفاصيل تقنية (تظهر في التطوير فقط)"
                 : "Technical details (dev only)"}
             </summary>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] opacity-90">
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[12px] text-text-muted">
               {error}
             </pre>
           </details>
@@ -1291,7 +1311,7 @@ export function SourceErrorNotice({
         <button
           type="button"
           onClick={onRetry}
-          className="shrink-0 rounded-lg border border-current/30 px-2.5 py-1 text-[11.5px] font-semibold"
+          className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-[12px] font-semibold"
         >
           {lang === "ar" ? "إعادة المحاولة" : "Try again"}
         </button>
@@ -1325,8 +1345,8 @@ export function AlertBar({
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border px-4 py-2.5"
-      style={{ background: t.surface, borderColor: t.border, color: t.ink }}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-4 py-2.5"
+      style={calloutStyle(t.strong)}
     >
       {/* The icon is the only thing that may not shrink. The title itself wraps:
           `shrink-0` on the whole span pushed a 56-character English heading
@@ -1344,7 +1364,7 @@ export function AlertBar({
           column one word wide on a phone. It claims the full row below `sm`
           and only shares the line once there is room for one. */}
       {children && (
-        <span className="w-full min-w-0 text-[11.5px] leading-snug opacity-80 sm:w-auto sm:flex-1">
+        <span className="w-full min-w-0 text-[12.5px] leading-snug text-text-muted sm:w-auto sm:flex-1">
           {children}
         </span>
       )}
@@ -1387,14 +1407,14 @@ export function SupportingFacts({ items }: { items: SupportingFactItem[] }) {
               {item.icon}
             </span>
             <div className="min-w-0">
-              <div className="text-[10.5px] font-semibold uppercase tracking-wide text-text-subtle">
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
                 {item.label}
               </div>
               <div className="truncate text-[14px] font-bold text-text" title={item.value}>
                 {item.value}
               </div>
               {item.detail && (
-                <div className="truncate text-[11px] text-text-muted" title={item.detail}>
+                <div className="truncate text-[12px] text-text-muted" title={item.detail}>
                   {item.detail}
                 </div>
               )}
@@ -1417,7 +1437,7 @@ export function InfoDot({ text }: { text: string }) {
   const { lang } = useI18n();
   return (
     <span
-      className="grid size-4 shrink-0 cursor-help place-items-center rounded-full text-[9px] font-bold opacity-55"
+      className="grid size-4 shrink-0 cursor-help place-items-center rounded-full text-[12px] font-bold opacity-55"
       style={{ background: "var(--tone-strong)", color: "#fff" }}
       title={text}
       role="note"
