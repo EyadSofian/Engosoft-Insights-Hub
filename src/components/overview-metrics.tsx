@@ -528,17 +528,17 @@ export function overviewMetrics({
   /* ----- won ----- */
   const won: MetricDetail = {
     id: "overview.won",
-    title: A ? "الصفقات المغلقة" : "Won deals",
+    title: A ? "Won في CRM" : "CRM Won deals",
     value: fmtNum(T.won),
     tone: "violet",
     icon: <Award size={16} />,
     delta: D.won,
     definition: A
-      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة الربح خلال الفترة."
-      : "How many leads reached the won stage during the period.",
+      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM خلال الفترة. البيعة المدفوعة تُعد من الفواتير في تقرير CRM."
+      : "How many leads reached the CRM Won stage during the period. Paid sales are counted from invoices on the CRM report.",
     formula: A
-      ? `${fmtNum(T.won)} صفقة رابحة ÷ ${fmtNum(T.totalLeads)} عميل في الفترة = ${fmtPct(T.conversionRate, 2)} معدل تحويل.`
-      : `${fmtNum(T.won)} won ÷ ${fmtNum(T.totalLeads)} leads in the period = ${fmtPct(T.conversionRate, 2)} conversion.`,
+      ? `${fmtNum(T.won)} Won ÷ ${fmtNum(T.totalLeads)} عميل في الفترة = ${fmtPct(T.conversionRate, 2)} معدل Won.`
+      : `${fmtNum(T.won)} won ÷ ${fmtNum(T.totalLeads)} leads in the period = ${fmtPct(T.conversionRate, 2)} Won rate.`,
     trend: {
       points: series(data.trend, "won"),
       label: A ? "حركة إغلاق الصفقات" : "Deals closing over the period",
@@ -547,7 +547,7 @@ export function overviewMetrics({
     supporting: [
       {
         key: "rate",
-        label: A ? "معدل التحويل" : "Conversion rate",
+        label: A ? "معدل Won في CRM" : "CRM Won rate",
         value: fmtPct(T.conversionRate, 2),
         hint: A
           ? `المقام: ${fmtNum(T.totalLeads)} عميل`
@@ -590,7 +590,7 @@ export function overviewMetrics({
         emptyLabel: A ? "لا توجد حملة أغلقت صفقة" : "No campaign closed a deal",
       },
     ],
-    report: { to: "/sales", label: A ? "فتح تقرير المبيعات" : "Open the sales report" },
+    report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the CRM report" },
   };
 
   /* ----- return on ad spend ----- */
@@ -1022,7 +1022,7 @@ export function overviewEfficiencyMetrics({
         hint: `${fmtNum(cohort.closeSample)} ${A ? "صفقة" : "deals"}`,
       })),
     ],
-    report: { to: "/sales", label: A ? "فتح تقرير المبيعات" : "Open the sales report" },
+    report: { to: "/leads", label: A ? "فتح تقرير العملاء" : "Open the CRM report" },
   };
 
   const cpa: MetricDetail = {
@@ -1048,7 +1048,7 @@ export function overviewEfficiencyMetrics({
       },
       { key: "cpl", label: "CPL", value: fmtUSDFull(T.cpl) },
     ],
-    report: { to: "/sales", label: A ? "فتح تقرير المبيعات" : "Open the sales report" },
+    report: { to: "/campaigns", label: A ? "فتح تقرير الحملات" : "Open the campaigns report" },
   };
 
   return { lost, conversion, lostRate, closeTime, acos, cpl, cpa };

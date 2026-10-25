@@ -41,6 +41,8 @@
     "purge:chatwoot-attribution": "vite-node scripts/purge-chatwoot-attribution.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
+    "baseline:capture": "node scripts/baseline-metrics.mjs",
+    "baseline:compare": "node scripts/baseline-metrics.mjs --compare",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

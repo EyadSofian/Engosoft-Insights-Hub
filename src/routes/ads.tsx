@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
-import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import {
   Card,
   EmptyState,
@@ -530,15 +530,15 @@ function Ads() {
                     metric: "roas",
                     index: 4,
                     icon: <TrendingUp size={14} />,
-                    value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
+                    value: ratioCell(totals.attributedRoas, spend, (v) => `${v.toFixed(2)}×`),
                     unavailableReason,
                     note:
                       spendNote ??
                       (lang === "ar"
-                        ? `البسط هنا هو كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}) — ده تعريف الإدارة المعتمد.`
-                        : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}) — that is the approved definition.`),
-                    verdict: roasVerdict(totals.roas, spend) ?? undefined,
-                    verdictLabel: verdictWord(roasVerdict(totals.roas, spend), lang),
+                        ? `البسط هو الإيراد المربوط بحملات (${fmtUSD(totals.attributedRevenue)}). كل التحصيل ÷ الإنفاق = ${fmtRoas(totals.roas)}، وده مش ROAS إعلاني.`
+                        : `The numerator is campaign-linked revenue (${fmtUSD(totals.attributedRevenue)}). All revenue ÷ spend is ${fmtRoas(totals.roas)}, which is not advertising ROAS.`),
+                    verdict: roasVerdict(totals.attributedRoas, spend) ?? undefined,
+                    verdictLabel: verdictWord(roasVerdict(totals.attributedRoas, spend), lang),
                   }}
                 />
                 <MetricCardDetailTrigger

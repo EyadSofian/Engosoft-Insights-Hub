@@ -211,8 +211,8 @@ function Campaigns() {
             label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
           },
           won: {
-            to: "/sales",
-            label: lang === "ar" ? "فتح تقرير المبيعات" : "Open the sales report",
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the CRM report",
           },
         },
       })
@@ -306,19 +306,19 @@ function Campaigns() {
                   metric: "roas",
                   index: 4,
                   icon: <TrendingUp size={14} />,
-                  value: ratioCell(totals.roas, spend, (v) => `${v.toFixed(2)}×`),
+                  value: ratioCell(totals.attributedRoas, spend, (v) => `${v.toFixed(2)}×`),
                   unavailableReason:
                     spend <= 0
                       ? lang === "ar"
                         ? "مفيش إنفاق مسجّل في الفترة المختارة."
                         : "No recorded spend in the selected period."
                       : undefined,
-                  verdict: roasVerdict(totals.roas, spend) ?? undefined,
-                  verdictLabel: verdictWord(roasVerdict(totals.roas, spend), lang),
+                  verdict: roasVerdict(totals.attributedRoas, spend) ?? undefined,
+                  verdictLabel: verdictWord(roasVerdict(totals.attributedRoas, spend), lang),
                   note:
                     lang === "ar"
-                      ? `البسط هنا كل التحصيل في الفترة (${fmtUSD(totals.revenue)})، مش الجزء المربوط بحملات (${fmtUSD(totals.attributedRevenue)}).`
-                      : `The numerator is all revenue collected in the window (${fmtUSD(totals.revenue)}), not only the campaign-linked share (${fmtUSD(totals.attributedRevenue)}).`,
+                      ? `البسط هو الإيراد المربوط بحملات (${fmtUSD(totals.attributedRevenue)}). كل التحصيل ÷ الإنفاق = ${fmtRoas(totals.roas)}، وده مش ROAS إعلاني.`
+                      : `The numerator is campaign-linked revenue (${fmtUSD(totals.attributedRevenue)}). All revenue ÷ spend is ${fmtRoas(totals.roas)}, which is not advertising ROAS.`,
                 }}
               />
             </KpiRow>

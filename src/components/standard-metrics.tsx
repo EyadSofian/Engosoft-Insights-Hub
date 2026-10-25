@@ -300,17 +300,17 @@ export function standardMetrics({
 
   const won: MetricDetail = {
     id: `${surface}.won`,
-    title: title("won", A ? "الصفقات المغلقة" : "Won deals"),
+    title: title("won", A ? "Won في CRM" : "CRM Won deals"),
     value: fmtNum(T.won),
     tone: "violet",
     icon: <Award size={16} />,
     delta: deltas.won,
     definition: A
-      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة الربح خلال الفترة."
-      : "How many leads reached the won stage during the period.",
+      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM خلال الفترة. البيعة المدفوعة تُعد من الفواتير في تقرير CRM."
+      : "How many leads reached the CRM Won stage during the period. Paid sales are counted from invoices on the CRM report.",
     formula: A
-      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل تحويل.`
-      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} conversion.`,
+      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل Won.`
+      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} Won rate.`,
     caveat: caveats.won,
     trend: trendFor("won", A ? "حركة إغلاق الصفقات" : "Deals closing over the period", fmtNum),
     supporting: [
@@ -340,31 +340,44 @@ export function standardMetrics({
     report: reports.won,
   };
 
+  // Advertising ROAS is campaign-attributed revenue ÷ spend on every surface,
+  // the same figure the executive summary and the Telegram report carry. All
+  // collected revenue ÷ spend stays in the detail as context only: it includes
+  // revenue no campaign produced, so on the Campaigns and Ads pages it read
+  // several times higher than the Overview for the same window.
   const roas: MetricDetail = {
     id: `${surface}.roas`,
-    title: title("roas", A ? "العائد على الإنفاق" : "Return on ad spend"),
-    value: fmtRoas(T.roas),
-    tone: T.roas !== null && isFinite(T.roas) && T.roas < 1 ? "rose" : "amber",
+    title: title("roas", A ? "العائد الإعلاني المنسوب" : "Attributed ad ROAS"),
+    value: fmtRoas(T.attributedRoas),
+    tone:
+      T.attributedRoas !== null && isFinite(T.attributedRoas) && T.attributedRoas < 1
+        ? "rose"
+        : "amber",
     icon: <Target size={16} />,
-    delta: deltas.roas,
+    delta: deltas.attributedRoas,
     definition: A
-      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل قابله في الفترة."
-      : "For every dollar spent on ads, how many dollars of collected revenue came back in the period.",
+      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
+      : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
     formula: A
-      ? `الإيراد ÷ الإنفاق: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`
-      : `Revenue ÷ spend: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`,
+      ? `الإيراد المرتبط بحملة ÷ الإنفاق: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`
+      : `Campaign-attributed revenue ÷ spend: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`,
     caveat:
       caveats.roas ??
       (A
-        ? `هذا هو العائد الإجمالي: كل التحصيل مقابل كل الإنفاق. العائد المرتبط — ${fmtRoas(T.attributedRoas)} — يحسب فقط الإيراد الذي يحمل حملة، وهما رقمان مختلفان لا يصح خلطهما.`
-        : `This is the total return: all collection against all spend. The attributed return — ${fmtRoas(T.attributedRoas)} — counts only revenue that carries a campaign. They must not be mixed.`),
+        ? `إجمالي التحصيل ÷ الإنفاق يساوي ${fmtRoas(T.roas)}، لكنه ليس ROAS إعلانيًا لأنه يشمل إيرادًا غير منسوب إلى حملة.`
+        : `All collected revenue ÷ spend is ${fmtRoas(T.roas)}, but it is not advertising ROAS because it includes revenue not attributed to a campaign.`),
     supporting: [
-      { key: "revenue", label: A ? "الإيراد المستخدم" : "Revenue used", value: fmtUSD(T.revenue) },
+      {
+        key: "attributed_revenue",
+        label: A ? "الإيراد المنسوب المستخدم" : "Attributed revenue used",
+        value: fmtUSD(T.attributedRevenue),
+      },
       { key: "spend", label: A ? "الإنفاق المستخدم" : "Spend used", value: fmtUSD(T.spend) },
       {
-        key: "attributed",
-        label: A ? "العائد المرتبط" : "Attributed return",
-        value: fmtRoas(T.attributedRoas),
+        key: "all_revenue_ratio",
+        label: A ? "إجمالي التحصيل ÷ الإنفاق" : "All revenue ÷ spend",
+        value: fmtRoas(T.roas),
+        hint: A ? "ليس ROAS إعلانيًا" : "Not advertising ROAS",
       },
       { key: "acos", label: "ACOS", value: fmtPct(T.acos, 1) },
     ],
@@ -416,14 +429,14 @@ export function standardMetrics({
 
   const conversion: MetricDetail = {
     id: `${surface}.conversion`,
-    title: title("conversion", A ? "معدل التحويل" : "Conversion rate"),
+    title: title("conversion", A ? "معدل Won في CRM" : "CRM Won rate"),
     value: fmtPct(T.conversionRate, 2),
     tone: "violet",
     icon: <Percent size={14} />,
     delta: deltas.conversionRate,
     definition: A
-      ? "نسبة العملاء المحتملين الذين تحوّلوا إلى صفقات رابحة داخل الفترة."
-      : "The share of leads that became won deals inside the period.",
+      ? "نسبة العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM داخل الفترة. التحويل المدفوع (فواتير ÷ ليدز) في تقرير CRM."
+      : "The share of leads that reached the CRM Won stage inside the period. Paid conversion (invoices ÷ leads) is on the CRM report.",
     formula: A
       ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`
       : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`,
