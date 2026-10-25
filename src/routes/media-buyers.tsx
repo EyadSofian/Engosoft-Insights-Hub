@@ -54,9 +54,8 @@ interface Buyer {
   ctrAll: number | null;
   cpl: number | null;
   cpa: number | null;
-  /** Revenue that can be paired with spend: `revenue` minus `uncostedRevenue`. */
+  /** Revenue ÷ (window spend + earlier spend of campaigns paid in the window). */
   roas: number | null;
-  roasRevenue: number;
   /** Window spend plus the earlier spend of campaigns paid in the window. */
   roasSpend: number;
   earlierSpend: number;
@@ -71,17 +70,16 @@ interface Buyer {
 /**
  * The ROAS sum, spelled out. A campaign paid inside the window but last spent
  * before it is credited to its buyer, so its earlier spend sits in the
- * denominator; revenue whose campaign has no recorded spend at all is shown
- * beside the ratio rather than inside it.
+ * denominator. All credited revenue is the numerator.
  */
 function roasFormula(
-  figures: { roasRevenue: number; spend: number; earlierSpend: number; roas: number | null },
+  figures: { revenue: number; spend: number; earlierSpend: number; roas: number | null },
   A: boolean,
 ): string {
   const ratio = figures.roas === null ? "—" : `${figures.roas.toFixed(2)}×`;
   if (figures.earlierSpend <= 0)
-    return `${fmtUSDFull(figures.roasRevenue)} ÷ ${fmtUSDFull(figures.spend)} = ${ratio}`;
-  return `${fmtUSDFull(figures.roasRevenue)} ÷ (${fmtUSDFull(figures.spend)} + ${fmtUSDFull(figures.earlierSpend)} ${A ? "إنفاق سابق" : "earlier spend"}) = ${ratio}`;
+    return `${fmtUSDFull(figures.revenue)} ÷ ${fmtUSDFull(figures.spend)} = ${ratio}`;
+  return `${fmtUSDFull(figures.revenue)} ÷ (${fmtUSDFull(figures.spend)} + ${fmtUSDFull(figures.earlierSpend)} ${A ? "إنفاق سابق" : "earlier spend"}) = ${ratio}`;
 }
 
 /** Supporting rows that explain the delayed-revenue adjustment, when there is one. */
@@ -111,12 +109,10 @@ function roasSupporting(
           {
             key: "uncosted_revenue",
             label: A
-              ? "إيراد بدون إنفاق مسجّل (خارج العائد)"
-              : "Revenue with no recorded spend (outside ROAS)",
+              ? "منها إيراد حملات بدون إنفاق مسجّل"
+              : "Of which, revenue from campaigns with no recorded spend",
             value: fmtUSDFull(figures.uncostedRevenue),
-            hint: A
-              ? "منسوب للميديا باير لكن مالوش تكلفة"
-              : "Credited, but has no cost to divide by",
+            hint: A ? "محسوب في العائد" : "Included in ROAS",
           },
         ]
       : []),
@@ -496,7 +492,6 @@ function buyerMetrics(
     won: number;
     invoices: number;
     campaigns: number;
-    roasRevenue: number;
     earlierSpend: number;
     delayedRevenue: number;
     uncostedRevenue: number;
@@ -649,7 +644,7 @@ function buyerMetrics(
         {
           key: "revenue",
           label: A ? "البسط · الإيراد" : "Numerator · revenue",
-          value: fmtUSDFull(totals.roasRevenue),
+          value: fmtUSDFull(totals.revenue),
         },
         {
           key: "spend",
@@ -815,13 +810,12 @@ function MediaBuyers() {
     won: sum((b) => b.won),
     invoices: sum((b) => b.invoices),
     campaigns: sum((b) => b.campaigns),
-    roasRevenue: sum((b) => b.roasRevenue),
     earlierSpend: sum((b) => b.earlierSpend),
     delayedRevenue: sum((b) => b.delayedRevenue),
     uncostedRevenue: sum((b) => b.uncostedRevenue),
     get roas() {
       const denominator = this.spend + this.earlierSpend;
-      return denominator > 0 ? this.roasRevenue / denominator : null;
+      return denominator > 0 ? this.revenue / denominator : null;
     },
   };
   const totalCampaigns = data.coverage.assignedCampaigns + data.coverage.unassignedCampaigns;
@@ -921,8 +915,8 @@ function MediaBuyers() {
             value: bestBuyer?.roas != null ? `${bestBuyer.roas.toFixed(2)}×` : undefined,
             detail: bestBuyer
               ? lang === "ar"
-                ? `${fmtUSDFull(bestBuyer.roasRevenue)} إيراد من ${fmtUSDFull(bestBuyer.roasSpend)} إنفاق عبر ${fmtNum(bestBuyer.campaigns)} حملة`
-                : `${fmtUSDFull(bestBuyer.roasRevenue)} from ${fmtUSDFull(bestBuyer.roasSpend)} of spend across ${fmtNum(bestBuyer.campaigns)} campaigns`
+                ? `${fmtUSDFull(bestBuyer.revenue)} إيراد من ${fmtUSDFull(bestBuyer.roasSpend)} إنفاق عبر ${fmtNum(bestBuyer.campaigns)} حملة`
+                : `${fmtUSDFull(bestBuyer.revenue)} from ${fmtUSDFull(bestBuyer.roasSpend)} of spend across ${fmtNum(bestBuyer.campaigns)} campaigns`
               : undefined,
             actionLabel: lang === "ar" ? "لماذا هو الأفضل؟" : "Why them?",
           }}

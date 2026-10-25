@@ -17,7 +17,7 @@ describe("media buyer return credits delayed revenue with its own cost", () => {
     expect(result.roas).toBe(1);
   });
 
-  it("keeps revenue with no recorded spend credited but outside the ratio", () => {
+  it("keeps revenue with no recorded spend in the ratio and reports it", () => {
     const result = buyerReturn(
       [
         { key: "live", spend: 100, revenue: 300 },
@@ -27,8 +27,8 @@ describe("media buyer return credits delayed revenue with its own cost", () => {
     );
     expect(result.revenue).toBe(1200);
     expect(result.uncostedRevenue).toBe(900);
-    expect(result.roasRevenue).toBe(300);
-    expect(result.roas).toBe(3);
+    expect(result.roasSpend).toBe(100);
+    expect(result.roas).toBe(12);
   });
 
   it("ignores earlier spend for campaigns that also spent in the window", () => {

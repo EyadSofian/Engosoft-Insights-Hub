@@ -52,9 +52,12 @@ export interface BuyerReturn {
   delayedRevenue: number;
   /** What those campaigns spent before the window. */
   earlierSpend: number;
-  /** Delayed revenue whose campaign has no recorded spend in any window. */
+  /**
+   * Delayed revenue whose campaign has no recorded spend in any window. It is
+   * part of `revenue` and of the ROAS numerator; it is reported only so a
+   * reader can see which revenue arrived without a matching cost.
+   */
   uncostedRevenue: number;
-  roasRevenue: number;
   roasSpend: number;
   roas: number | null;
 }
@@ -68,10 +71,9 @@ export interface BuyerReturn {
  * the denominator. Dividing it by window spend alone priced it at zero and
  * made a buyer's return read far higher than any campaign earned.
  *
- * Revenue from a campaign with no recorded spend anywhere (an organic-named
- * campaign, or spend older than the ad feeds reach) cannot be priced. It stays
- * in `revenue` and is reported as `uncostedRevenue`, but it is not divided by
- * somebody else's spend.
+ * Every credited dollar stays in the numerator. A campaign with no recorded
+ * spend anywhere simply adds nothing to the denominator, and its revenue is
+ * also reported as `uncostedRevenue`.
  */
 export function buyerReturn(
   rows: ReadonlyArray<{ key: string; spend: number; revenue: number }>,
@@ -93,7 +95,6 @@ export function buyerReturn(
     if (earlier > 0) earlierSpend += earlier;
     else uncostedRevenue += row.revenue;
   }
-  const roasRevenue = revenue - uncostedRevenue;
   const roasSpend = spend + earlierSpend;
   return {
     spend,
@@ -102,9 +103,8 @@ export function buyerReturn(
     delayedRevenue,
     earlierSpend,
     uncostedRevenue,
-    roasRevenue,
     roasSpend,
-    roas: roasSpend > 0 ? roasRevenue / roasSpend : null,
+    roas: roasSpend > 0 ? revenue / roasSpend : null,
   };
 }
 

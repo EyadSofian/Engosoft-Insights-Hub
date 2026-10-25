@@ -87,7 +87,6 @@ export const Route = createFileRoute("/api/media-buyers")({
             cpl: platformLeads === null ? null : div(spend, platformLeads),
             cpa: div(spend, invoices),
             roas: ret.roas,
-            roasRevenue: ret.roasRevenue,
             roasSpend: ret.roasSpend,
             earlierSpend: ret.earlierSpend,
             delayedRevenue: ret.delayedRevenue,
