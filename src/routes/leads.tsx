@@ -51,17 +51,21 @@ import { CrmSourceDistribution } from "@/components/leads/CrmSourceDistribution"
 import { SixMonthPerformance } from "@/components/leads/SixMonthPerformance";
 import { SalesChannelReport } from "@/components/leads/SalesChannelReport";
 import { LostCohortReport } from "@/components/leads/LostCohortReport";
+import { LostQualityAudit } from "@/components/leads/LostQualityAudit";
 import type { SourceDistributionRow } from "@/lib/crm-source-distribution";
 
 export const Route = createFileRoute("/leads")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { view?: "crm" | "intelligence" | "weekly" | "performance" | "channels" | "lost" } =>
+  ): {
+    view?: "crm" | "intelligence" | "weekly" | "performance" | "channels" | "lost" | "quality";
+  } =>
     search.view === "intelligence" ||
     search.view === "weekly" ||
     search.view === "performance" ||
     search.view === "channels" ||
-    search.view === "lost"
+    search.view === "lost" ||
+    search.view === "quality"
       ? { view: search.view }
       : {},
   component: LeadsPage,
@@ -125,6 +129,14 @@ function LeadsPage() {
         >
           {lang === "ar" ? "اللوست" : "Lost"}
         </Link>
+        <Link
+          to="/leads"
+          search={{ view: "quality" }}
+          aria-current={workspace === "quality" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "quality" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "جودة الليدز واللوست" : "Lead quality & Lost"}
+        </Link>
       </nav>
       {workspace === "crm" ? (
         <CrmWorkspace />
@@ -136,6 +148,8 @@ function LeadsPage() {
         <SalesChannelReport />
       ) : workspace === "lost" ? (
         <LostCohortReport />
+      ) : workspace === "quality" ? (
+        <LostQualityAudit />
       ) : (
         <>
           <DashboardPageHeader

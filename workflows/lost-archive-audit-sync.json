@@ -1,0 +1,135 @@
+{
+  "name": "Engosoft — Lost Archive quality audit → Dashboard",
+  "nodes": [
+    {
+      "id": "da0efba0-019a-4d7e-a342-caa86a4973f1",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } }
+    },
+    {
+      "id": "9e89d694-4aa4-4a4f-a435-45fd1870538e",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [224, 0],
+      "parameters": {
+        "assignments": { "assignments": [
+          { "id": "a1", "name": "sheetUrl", "value": "https://docs.google.com/spreadsheets/d/1r_KWVc-uUpj0xiNsq9hQgfyh83C52k3diDhsq6rrxWw/edit", "type": "string" }
+        ] },
+        "options": {}
+      }
+    },
+    {
+      "id": "86b0e3e7-0af4-47ac-9d12-4dce90d1465e",
+      "name": "Read Aug",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [448, 0],
+      "parameters": {
+        "documentId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1r_KWVc-uUpj0xiNsq9hQgfyh83C52k3diDhsq6rrxWw/edit", "mode": "url" },
+        "sheetName": { "__rl": true, "value": "Aug", "mode": "name" },
+        "options": {}
+      },
+      "credentials": { "googleSheetsOAuth2Api": { "id": "ZXa2IX134lVjdbGk", "name": "Google Sheets account" } }
+    },
+    {
+      "id": "b3346512-1a97-4de6-a75d-416af0f27bb8",
+      "name": "Continue after Aug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, 0],
+      "parameters": { "jsCode": "if ($input.all().length < 100) throw new Error('Aug tab returned too few rows'); return [{json:{ready:true}}];" }
+    },
+    {
+      "id": "4fc5c404-4a3b-4e37-a7bf-671c15e3e371",
+      "name": "Read Sep",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [896, 0],
+      "parameters": {
+        "documentId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1r_KWVc-uUpj0xiNsq9hQgfyh83C52k3diDhsq6rrxWw/edit", "mode": "url" },
+        "sheetName": { "__rl": true, "value": "Sep", "mode": "name" },
+        "options": {}
+      },
+      "credentials": { "googleSheetsOAuth2Api": { "id": "ZXa2IX134lVjdbGk", "name": "Google Sheets account" } }
+    },
+    {
+      "id": "f67d9a96-2202-4d9d-8949-0603a994af74",
+      "name": "Continue after Sep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 0],
+      "parameters": { "jsCode": "if ($input.all().length < 100) throw new Error('Sep tab returned too few rows'); return [{json:{ready:true}}];" }
+    },
+    {
+      "id": "9d05d520-ad5e-4782-b4fd-d0b2b5425e1d",
+      "name": "Read Oct",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1344, 0],
+      "parameters": {
+        "documentId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1r_KWVc-uUpj0xiNsq9hQgfyh83C52k3diDhsq6rrxWw/edit", "mode": "url" },
+        "sheetName": { "__rl": true, "value": "Oct", "mode": "name" },
+        "options": {}
+      },
+      "credentials": { "googleSheetsOAuth2Api": { "id": "ZXa2IX134lVjdbGk", "name": "Google Sheets account" } }
+    },
+    {
+      "id": "909e8c50-c3cf-44bf-975f-5704cd17136d",
+      "name": "Build audited snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, 0],
+      "parameters": {
+        "jsCode": "const columns=['Contact Name','Salesperson','Mobile','Phone','Course Categories','Closed Date','Lost Reason','Validate','Note','Modify By','Created on','Campaign Name']; const all=[]; const counts={}; for(const month of ['Aug','Sep','Oct']){ const source=$('Read '+month).all().map(item=>item.json); const rows=source.map((raw,index)=>{ const verdict=String(raw.Validate||'').trim().toLowerCase(); if(!['yes','no'].includes(verdict)) return null; const row={__sheet_month:month,__stable_key:'2026-'+month+':'+String(raw.row_number||index+2)}; for(const column of columns) row[column]=String(raw[column]??''); return row; }).filter(Boolean); if(rows.length<100) throw new Error(month+' primary tab incomplete: '+rows.length); counts[month]=rows.length; all.push(...rows); } const unique=new Set(all.map(row=>row.__stable_key)); if(unique.size!==all.length) throw new Error('Duplicate sheet row keys'); return [{json:{payload:{dataset:'lost_archive_audit',mode:'replace',rows:all,syncedAt:new Date().toISOString(),metadata:{source:'Lost Archive Google Sheet',sheetId:'1r_KWVc-uUpj0xiNsq9hQgfyh83C52k3diDhsq6rrxWw',primaryTabs:['Aug','Sep','Oct'],counts,validationTabsExcluded:true}}}}];"
+      }
+    },
+    {
+      "id": "28f127b8-ad11-4bb0-b239-a45ff8626447",
+      "name": "Replace Lost Archive in Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1792, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://engosoft-insights-hub-production.up.railway.app/api/ingest/dataset",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "x-ingest-secret", "value": "__INGEST_SECRET__" },
+          { "name": "Content-Type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.payload) }}",
+        "options": { "timeout": 180000 }
+      }
+    },
+    {
+      "id": "ed46704e-e1d9-4a1b-94f7-3805ec53c3ec",
+      "name": "Verify complete ingest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2016, 0],
+      "parameters": { "jsCode": "const result=$input.first().json; const sent=$('Build audited snapshot').first().json.payload.rows.length; if(result.ok!==true||Number(result.rowCount)!==sent) throw new Error('Dashboard Lost Archive ingest count mismatch: sent '+sent+', stored '+result.rowCount); return [{json:{ok:true,receivedRows:sent,syncedAt:result.syncedAt}}];" }
+    }
+  ],
+  "connections": {
+    "Every hour": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Config": { "main": [[{ "node": "Read Aug", "type": "main", "index": 0 }]] },
+    "Read Aug": { "main": [[{ "node": "Continue after Aug", "type": "main", "index": 0 }]] },
+    "Continue after Aug": { "main": [[{ "node": "Read Sep", "type": "main", "index": 0 }]] },
+    "Read Sep": { "main": [[{ "node": "Continue after Sep", "type": "main", "index": 0 }]] },
+    "Continue after Sep": { "main": [[{ "node": "Read Oct", "type": "main", "index": 0 }]] },
+    "Read Oct": { "main": [[{ "node": "Build audited snapshot", "type": "main", "index": 0 }]] },
+    "Build audited snapshot": { "main": [[{ "node": "Replace Lost Archive in Dashboard", "type": "main", "index": 0 }]] },
+    "Replace Lost Archive in Dashboard": { "main": [[{ "node": "Verify complete ingest", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "Africa/Cairo", "availableInMCP": false },
+  "tags": []
+}

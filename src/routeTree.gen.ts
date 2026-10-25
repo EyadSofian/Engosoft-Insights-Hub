@@ -66,6 +66,7 @@ import { Route as ApiLeadQaRouteImport } from './routes/api/lead-qa'
 import { Route as ApiLeadSourceMatrixRouteImport } from './routes/api/lead-source-matrix'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLostRouteImport } from './routes/api/lost'
+import { Route as ApiLostArchiveAuditRouteImport } from './routes/api/lost-archive-audit'
 import { Route as ApiLostChatterRouteImport } from './routes/api/lost-chatter'
 import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
@@ -426,6 +427,11 @@ const ApiLeadsRoute = ApiLeadsRouteImport.update({
 const ApiLostRoute = ApiLostRouteImport.update({
   id: '/api/lost',
   path: '/api/lost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLostArchiveAuditRoute = ApiLostArchiveAuditRouteImport.update({
+  id: '/api/lost-archive-audit',
+  path: '/api/lost-archive-audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLostChatterRoute = ApiLostChatterRouteImport.update({
@@ -864,6 +870,7 @@ export interface FileRoutesByFullPath {
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -995,6 +1002,7 @@ export interface FileRoutesByTo {
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -1127,6 +1135,7 @@ export interface FileRoutesById {
   '/api/lead-source-matrix': typeof ApiLeadSourceMatrixRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/lost': typeof ApiLostRoute
+  '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
@@ -1260,6 +1269,7 @@ export interface FileRouteTypes {
     | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/media-buyers'
@@ -1391,6 +1401,7 @@ export interface FileRouteTypes {
     | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/media-buyers'
@@ -1522,6 +1533,7 @@ export interface FileRouteTypes {
     | '/api/lead-source-matrix'
     | '/api/leads'
     | '/api/lost'
+    | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/media-buyers'
@@ -1654,6 +1666,7 @@ export interface RootRouteChildren {
   ApiLeadSourceMatrixRoute: typeof ApiLeadSourceMatrixRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLostRoute: typeof ApiLostRoute
+  ApiLostArchiveAuditRoute: typeof ApiLostArchiveAuditRoute
   ApiLostChatterRoute: typeof ApiLostChatterRoute
   ApiManagementReviewRoute: typeof ApiManagementReviewRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
@@ -2127,6 +2140,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lost'
       fullPath: '/api/lost'
       preLoaderRoute: typeof ApiLostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lost-archive-audit': {
+      id: '/api/lost-archive-audit'
+      path: '/api/lost-archive-audit'
+      fullPath: '/api/lost-archive-audit'
+      preLoaderRoute: typeof ApiLostArchiveAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/lost-chatter': {
@@ -2694,6 +2714,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadSourceMatrixRoute: ApiLeadSourceMatrixRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLostRoute: ApiLostRoute,
+  ApiLostArchiveAuditRoute: ApiLostArchiveAuditRoute,
   ApiLostChatterRoute: ApiLostChatterRoute,
   ApiManagementReviewRoute: ApiManagementReviewRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,

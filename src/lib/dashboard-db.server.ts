@@ -31,7 +31,9 @@ export type DashboardDataset =
   /** Phone → Chatwoot conversation evidence maintained by backfill + webhook. */
   | "chatwoot_phone_evidence"
   /** Odoo's monthly operational sales report, one row per salesperson-month. */
-  | "sales_summary";
+  | "sales_summary"
+  /** Auditor-reviewed Lost Archive Google Sheet; never merged into CRM cohort metrics. */
+  | "lost_archive_audit";
 
 export type DashboardRow = Record<string, string>;
 
@@ -85,6 +87,7 @@ const DATASETS = new Set<DashboardDataset>([
   "media_plans",
   "chatwoot_phone_evidence",
   "sales_summary",
+  "lost_archive_audit",
 ]);
 
 let schemaPromise: Promise<void> | null = null;
