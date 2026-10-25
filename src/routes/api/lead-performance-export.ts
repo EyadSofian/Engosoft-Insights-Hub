@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           ar ? "شهر الدخول" : "Entry month",
           ar ? "سجلات جديدة" : "New records",
           ar ? "موسوم Fresh حاليًا" : "Currently tagged Fresh",
-          ar ? "تصنيف أودو فارغ" : "Missing Odoo segment",
+          ar ? "حقل Lead Segment فارغ" : "Blank Lead Segment field",
           ar ? "تكرار داخل الشهر" : "Duplicate same month",
           ar ? "تكرار من شهر سابق" : "Duplicate prior month",
           ar ? "تكرار مؤكد في أودو" : "Confirmed Odoo duplicate",
@@ -143,7 +143,7 @@ export const Route = createFileRoute("/api/lead-performance-export")({
             label,
             ar ? "ليدز" : "Leads",
             ar ? "موسوم Fresh حاليًا" : "Currently tagged Fresh",
-            ar ? "تصنيف أودو فارغ" : "Missing Odoo segment",
+            ar ? "حقل Lead Segment فارغ" : "Blank Lead Segment field",
             ar ? "تكرار محتمل" : "Potential duplicates",
             ar ? "غير مؤهل" : "Unqualified",
             ar ? "لا يرد" : "No answer",
@@ -263,8 +263,8 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           [
             ar ? "معنى Fresh" : "Fresh definition",
             ar
-              ? "عدد الدخول هو كل سجلات أودو المنشأة في الشهر، لا يساوي Fresh المؤكد. Lead Segment حقل حالي؛ التحديد التاريخي عند الدخول غير متاح، وبعض السجلات بلا تصنيف."
-              : "Entry count covers all Odoo records created in the month, not a confirmed Fresh total. Lead Segment is current-state only; historical entry status is unavailable and some records are blank.",
+              ? "عدد الدخول هو كل سجلات أودو المنشأة في الشهر، لا يساوي Fresh المؤكد. Lead Segment حقل تصنيف حالي منفصل عن Stage الفرصة؛ فراغه لا يعني غياب مراحل البيع. التحديد التاريخي عند الدخول غير متاح."
+              : "Entry count covers all Odoo records created in the month, not a confirmed Fresh total. Lead Segment is a current classification field separate from opportunity Stage; a blank value does not mean missing sales stages. Historical entry status is unavailable.",
           ],
           [ar ? "فلتر الكورس" : "Course filter", params.get("course") || (ar ? "الكل" : "All")],
           [ar ? "مزامنة CRM" : "CRM synced at", availability.crmSyncedAt],

@@ -80,7 +80,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
   months: MONTHS,
   selectedMonth: "2026-09",
   rows: MONTHS.map((month) => group(month)),
-  selected: group("2026-09"),
+  selected: group("2026-09", { freshTagged: 0, segmentMissing: 1 }),
   records: [
     {
       id: "153853",
@@ -93,7 +93,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
       closer: "Closer A",
       recordType: "opportunity",
       status: "lost",
-      leadSegment: "Fresh",
+      leadSegment: "",
       duplicate: "same",
       unqualifiedCategory: null,
       lossReasonAr: "لا يرد",
@@ -198,8 +198,11 @@ describe("the six-month lead-to-paid report", () => {
     await waitFor(() => expect(screen.getByText(/Read this report at a glance/i)).toBeTruthy());
     const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
     expect(within(summary).getByText(/Tagged Fresh in Odoo now/i)).toBeTruthy();
-    expect(within(summary).getByText(/No current Lead Segment/i)).toBeTruthy();
+    expect(within(summary).getByText(/Lead Segment field is blank/i)).toBeTruthy();
     expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
+    expect(within(summary).getByText(/not an Odoo sales stage/i)).toBeTruthy();
+    expect(within(summary).getByText(/Includes: 1 opportunities · 0 leads/i)).toBeTruthy();
+    expect(within(summary).getByText(/Current broad CRM status: 0 open · 1 lost/i)).toBeTruthy();
     const audit = screen.getByText(/Audit individual leads/i).closest("section")!;
     expect(within(audit).getByText("153853").closest("a")?.getAttribute("href")).toContain(
       "model=crm.lead",

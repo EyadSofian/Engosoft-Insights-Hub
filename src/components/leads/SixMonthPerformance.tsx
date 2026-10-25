@@ -147,14 +147,24 @@ const copy = {
       "مش نفس المؤشر: الفواتير حسب تاريخ الدفع تشمل ليدز من شهور سابقة وقد تشمل فواتير بلا ربط مؤكد. التسجيلات المثبتة أعلاه تُنسب لشهر دخول الليد، ولا تضم إلا الربط المباشر بأمر البيع. لا يصح اعتبار الفرق ليدز مفقودة أو نسبة تحويل.",
     paymentRevenue: "تحصيل فواتير الشهر",
     freshNow: "موسومة Fresh حاليًا في أودو",
-    segmentUnknown: "بلا تصنيف Fresh / غيره",
+    segmentUnknown: "حقل Lead Segment فارغ",
+    segmentExplanation:
+      "ده حقل تصنيف منفصل عن مراحل أودو. السجلات دي لها نوع وحالة في CRM، والفرص لها مراحل بيع.",
+    blankTypes: "منهم",
+    blankOpportunity: "فرصة بيعية",
+    blankLead: "ليد",
+    blankStatuses: "حالتهم العامة الآن",
+    blankOpen: "مفتوح",
+    blankLost: "مفقود",
+    blankWon: "مغلق بنجاح",
+    blankActiveLead: "ليد نشط",
     quickRead: "ملخص واضح قبل التفاصيل",
     quickReadHint: "الأساس، ما ثبت، وما يحتاج استكمالًا — بدون خلط بينهم.",
     enteredBasis: "دخلت في شهر الاختيار",
     verifiedOutcome: "تسجيلات مدفوعة مؤكدة",
     evidenceGap: "حدود البيانات المهمة",
     freshGap:
-      "Fresh التاريخي غير مثبت: حقل Lead Segment يعرض قيمته الحالية فقط، وسجلات كثيرة بلا تصنيف. لذلك عدد الدخول ليس عدد Fresh المؤكد.",
+      "Fresh التاريخي غير مثبت: Lead Segment يعرض قيمته الحالية فقط، وحقلُه فارغ في سجلات كثيرة. ده لا يعني غياب Stage البيع؛ لذلك عدد الدخول ليس عدد Fresh المؤكد.",
     paidGap:
       "الفواتير التي لا نعرف ليدها ليست صفر مبيعات؛ التحويل المعروض حد أدنى من الربط المباشر فقط.",
     funnelGap:
@@ -259,14 +269,24 @@ const copy = {
       "These are different measures: payment-month invoices can belong to older leads or lack an exact link. Verified enrollments above are credited to the lead entry month only after a direct sale-order link. The difference is not missing leads or a conversion rate.",
     paymentRevenue: "Payment-month collections",
     freshNow: "Tagged Fresh in Odoo now",
-    segmentUnknown: "No current Lead Segment",
+    segmentUnknown: "Lead Segment field is blank",
+    segmentExplanation:
+      "This is a separate classification field, not an Odoo sales stage. These records have CRM types and statuses; opportunities have sales stages.",
+    blankTypes: "Includes",
+    blankOpportunity: "opportunities",
+    blankLead: "leads",
+    blankStatuses: "Current broad CRM status",
+    blankOpen: "open",
+    blankLost: "lost",
+    blankWon: "won",
+    blankActiveLead: "active lead",
     quickRead: "Read this report at a glance",
     quickReadHint: "The denominator, verified outcome and evidence gaps are kept separate.",
     enteredBasis: "Entered in selected month",
     verifiedOutcome: "Verified paid enrollments",
     evidenceGap: "Important evidence gaps",
     freshGap:
-      "Historical Fresh status is unverified: Lead Segment is its current value and many records are blank. Entry count is not a confirmed Fresh count.",
+      "Historical Fresh status is unverified: Lead Segment shows its current value and is blank on many records. That does not mean their sales Stage is missing; entry count is not a confirmed Fresh count.",
     paidGap:
       "Invoices without an exact lead link are not zero sales. Conversion shown is a lower bound from direct links only.",
     funnelGap:
@@ -316,7 +336,7 @@ const extra = {
     within24: "أول اتصال خلال ٢٤ ساعة (بتوقيت إنشاء دقيق)",
     groupColumns: {
       fresh: "Fresh الآن",
-      segmentMissing: "تصنيف ناقص",
+      segmentMissing: "Lead Segment فارغ",
       duplicates: "تكرار",
       dupSame: "تكرار داخل الشهر",
       dupPrev: "تكرار من شهر سابق",
@@ -357,7 +377,7 @@ const extra = {
     within24: "First call within 24 hours (exact creation time)",
     groupColumns: {
       fresh: "Fresh now",
-      segmentMissing: "Missing segment",
+      segmentMissing: "Blank Lead Segment",
       duplicates: "Duplicates",
       dupSame: "Duplicate, same month",
       dupPrev: "Duplicate, prior month",
@@ -980,6 +1000,17 @@ export function SixMonthPerformance() {
   if (!data) return null;
 
   const selected = data.selected;
+  const blankSegment = data.records.reduce(
+    (counts, row) => {
+      if (row.leadSegment.trim()) return counts;
+      if (row.recordType === "opportunity") counts.opportunityType++;
+      else counts.leadType++;
+      if (row.status === "lead") counts.activeLead++;
+      else counts[row.status]++;
+      return counts;
+    },
+    { leadType: 0, opportunityType: 0, activeLead: 0, open: 0, won: 0, lost: 0 },
+  );
   const selectedCollections = data.collectionsByMonth.find(
     (row) => row.month === data.selectedMonth,
   );
@@ -1212,6 +1243,18 @@ export function SixMonthPerformance() {
                 <span className="text-text-muted">{t.segmentUnknown}</span>
                 <b className="num mt-1 block text-base text-text">{n(selected.segmentMissing)}</b>
               </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
+              <p>{t.segmentExplanation}</p>
+              <p className="mt-1.5">
+                {t.blankTypes}: {n(blankSegment.opportunityType)} {t.blankOpportunity} ·{" "}
+                {n(blankSegment.leadType)} {t.blankLead}
+              </p>
+              <p className="mt-1">
+                {t.blankStatuses}: {n(blankSegment.open)} {t.blankOpen} · {n(blankSegment.lost)}{" "}
+                {t.blankLost} · {n(blankSegment.won)} {t.blankWon} · {n(blankSegment.activeLead)}{" "}
+                {t.blankActiveLead}
+              </p>
             </div>
           </Card>
           <Card className="border-mint-strong/20 bg-mint-surface/50">
