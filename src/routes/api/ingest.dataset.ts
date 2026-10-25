@@ -139,45 +139,6 @@ export const Route = createFileRoute("/api/ingest/dataset")({
             { status: 400 },
           );
         }
-        if (body.dataset === "lost_archive_audit") {
-          const monthCounts = new Map<string, number>();
-          const keys = new Set<string>();
-          for (const raw of body.rows as Record<string, unknown>[]) {
-            const month = String(raw.__sheet_month ?? "");
-            const key = String(raw.__stable_key ?? "");
-            const verdict = String(raw.Validate ?? "")
-              .trim()
-              .toLowerCase();
-            if (
-              !["Aug", "Sep", "Oct"].includes(month) ||
-              !/^20\d{2}-(Aug|Sep|Oct):\d+$/.test(key) ||
-              !["yes", "no"].includes(verdict) ||
-              keys.has(key)
-            ) {
-              return Response.json(
-                { ok: false, error: "Invalid Lost Archive row or duplicate key." },
-                { status: 400 },
-              );
-            }
-            keys.add(key);
-            monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1);
-          }
-          if (["Aug", "Sep", "Oct"].some((month) => (monthCounts.get(month) ?? 0) < 100)) {
-            return Response.json(
-              {
-                ok: false,
-                error: "Lost Archive snapshot must contain all three primary month tabs.",
-              },
-              { status: 400 },
-            );
-          }
-          if (body.mode !== "replace") {
-            return Response.json(
-              { ok: false, error: "Lost Archive requires an atomic replace." },
-              { status: 400 },
-            );
-          }
-        }
         const mode = body.mode === "replace" ? "replace" : "upsert";
         const metadata =
           body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)

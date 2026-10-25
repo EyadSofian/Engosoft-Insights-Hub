@@ -4,16 +4,33 @@ export const Route = createFileRoute("/api/lost-archive-audit")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { readDashboardDataset } = await import("@/lib/dashboard-db.server");
         const { buildLostArchiveAudit } = await import("@/lib/lost-archive-audit");
-        const snapshot = await readDashboardDataset("lost_archive_audit");
+        const { lostArchiveGoogleConfigured, readLostArchiveGoogle } =
+          await import("@/lib/lost-archive-google.server");
         const params = new URL(request.url).searchParams;
-        const report = buildLostArchiveAudit(snapshot.rows, {
+        let rows = [];
+        let status: "success" | "failed" | "never" = "never";
+        let syncedAt = "";
+        if (lostArchiveGoogleConfigured()) {
+          try {
+            const snapshot = await readLostArchiveGoogle();
+            rows = snapshot.rows;
+            syncedAt = snapshot.readAt;
+            status = "success";
+          } catch (error) {
+            console.error(
+              "Lost Archive read-only Google Sheets request failed:",
+              error instanceof Error ? error.message : "unknown error",
+            );
+            status = "failed";
+          }
+        }
+        const report = buildLostArchiveAudit(rows, {
           month: params.get("month") ?? undefined,
           course: params.get("course") ?? undefined,
           salesperson: params.get("salesperson") ?? undefined,
-          status: snapshot.status,
-          syncedAt: snapshot.syncedAt,
+          status,
+          syncedAt,
         });
         return Response.json(report, { headers: { "cache-control": "private, no-store" } });
       },

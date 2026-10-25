@@ -158,11 +158,11 @@ export function LostQualityAudit() {
           >
             {ready
               ? ar
-                ? "آخر نسخة متزامنة"
-                : "Last synced copy"
+                ? "قراءة مباشرة من Google Sheets"
+                : "Direct Google Sheets read"
               : ar
-                ? "الربط لم يُكمل بعد"
-                : "Awaiting sync"}
+                ? "القراءة المباشرة غير متاحة"
+                : "Direct read unavailable"}
           </span>
           {data.syncedAt && (
             <span className="text-slate-300">
@@ -185,13 +185,13 @@ export function LostQualityAudit() {
         <section className="rounded-[28px] border border-amber-200 bg-amber-50 px-7 py-8 text-amber-950">
           <h2 className="text-xl font-black">
             {ar
-              ? "الشيت اتفحص، لكن المزامنة الحية لم تكتمل"
-              : "Sheet analyzed; live sync is not ready"}
+              ? "الشيت اتفحص، لكن صلاحية القراءة المباشرة لم تكتمل"
+              : "Sheet analyzed; direct read-only access is not ready"}
           </h2>
           <p className="mt-2 text-sm leading-7">
             {ar
-              ? "لن نعرض أصفارًا وكأنها نتيجة فعلية. يحتاج المصدر الخاص Google Sheets إلى تفعيل القراءة الآمنة وجدولة إرسال آخر نسخة، وبعدها ستظهر الأرقام هنا تلقائيًا."
-              : "We won't present zeros as business results. The private Google Sheet still needs an authenticated scheduled sync."}
+              ? "لن نعرض أصفارًا وكأنها نتيجة فعلية. يحتاج الشيت الخاص إلى تفويض Google للقراءة فقط؛ بعدها سيقرأه الداشبورد مباشرة من دون n8n أو حفظ صفوفه في قاعدة البيانات."
+              : "We won't present zeros as business results. The private sheet needs read-only Google authorization; the dashboard then reads it directly without n8n or storing its rows in the database."}
           </p>
         </section>
       ) : (

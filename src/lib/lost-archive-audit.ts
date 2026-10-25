@@ -1,7 +1,7 @@
 /**
  * Lost Archive is a human audit of Lost records, not a CRM acquisition cohort.
  * The three Validation tabs repeat the No rows from the primary month tabs;
- * the ingest workflow reads Aug/Sep/Oct only. No phone or name leaves this
+ * the direct read-only Google Sheets request reads Aug/Sep/Oct only. No phone or name leaves this
  * module in the API response.
  */
 export type ArchiveRow = Record<string, string>;
