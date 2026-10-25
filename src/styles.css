@@ -487,6 +487,12 @@
     grid-column: span 3;
   }
 
+  /* Three is a full row of thirds. Without this the odd-count rule above
+     shrank the third card to a quarter and left a hole beside it. */
+  .kpi-grid[data-count="3"] > *:last-child {
+    grid-column: span 4;
+  }
+
   .kpi-grid[data-count="4"] > * {
     grid-column: span 3;
   }
