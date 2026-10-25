@@ -37,11 +37,8 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 /**
  * The one heading a page owns.
  *
- * Deliberately short: a tinted icon tile, a strong title, one line of context,
- * and the window and freshness as small type on the same row. The top bar
- * carries controls and never repeats a title, so this is the only place a
- * reader is told which report they are on — and it must not cost more than
- * about 70px of the first screen.
+ * A glass identity panel with a tinted icon, strong title, context, reporting
+ * window and freshness. The top bar carries controls and never repeats a title.
  */
 export function DashboardPageHeader({
   icon,
@@ -74,32 +71,28 @@ export function DashboardPageHeader({
   /** Sub-navigation, rendered under the heading rule. */
   children?: ReactNode;
 }) {
-  // The page's identity band: royal blue, white type. `tone` stays in the API
-  // for callers, but every page now opens on the same band so the reader
-  // always knows where the page starts and where its figures begin.
-  void tone;
+  const accent = toneOf(tone);
   return (
     <header className={flush ? "" : "mb-4"}>
       <div
-        className="page-band flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[22px] px-4 py-4 sm:px-6 sm:py-5"
-        style={{ background: "var(--brand-band)" }}
+        className="page-band flex flex-wrap items-center gap-x-5 gap-y-3 rounded-[26px] px-5 py-5 sm:px-7 sm:py-6"
+        style={{ "--page-accent": accent.strong } as React.CSSProperties}
       >
         <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
           {icon && (
             <span
-              className="grid size-11 shrink-0 place-items-center rounded-2xl text-white"
-              style={{ background: "rgba(255, 255, 255, 0.18)" }}
+              className="page-band-icon grid size-12 shrink-0 place-items-center rounded-2xl"
               aria-hidden="true"
             >
               {icon}
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="text-balance text-[21px] font-bold leading-tight tracking-[-0.02em] text-white sm:text-[26px]">
+            <h1 className="text-balance text-[23px] font-bold leading-tight tracking-[-0.02em] text-text sm:text-[30px]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-white sm:text-[13.5px]">
+              <p className="mt-1 max-w-[65ch] text-[13px] leading-relaxed text-text-muted sm:text-[14px]">
                 {subtitle}
               </p>
             )}
@@ -108,7 +101,7 @@ export function DashboardPageHeader({
 
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-white/35 bg-white/15 px-3 py-1.5 text-[12px] font-semibold text-white">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-text">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
               <bdi className="num truncate">{period}</bdi>
             </span>

@@ -5,7 +5,7 @@
 
 /* ---------------------------------------------------------------------------
    Engosoft Insights Hub — design tokens
-   Navy + blue brand, one orange accent reserved for the hero metric.
+   Midnight teal, warm analytical accents and legible glass surfaces.
    Every surface has a light and a dark value; nothing is hardcoded in a
    component. Spacing follows a 4px rhythm, radii a 4-step scale.
 --------------------------------------------------------------------------- */
@@ -158,13 +158,15 @@
      (1.17:1, against 1.07:1 before), with hairlines that can actually be seen
      (1.56:1). On the old values a card and the page were the same sheet of
      white, and the eye had no edge to rest on. */
-  --bg: #eef2fb;
-  --bg-subtle: #e6ecf8;
-  --surface: #ffffff;
-  --surface-2: #f5f7fd;
-  --surface-3: #e9eefa;
-  --border: #c9d4ee;
-  --border-strong: #a9b9e0;
+  --bg: #e9f0f5;
+  --bg-subtle: #e0eaf1;
+  --surface: rgba(255, 255, 255, 0.93);
+  --surface-2: rgba(240, 247, 250, 0.9);
+  --surface-3: #e5f0f5;
+  --border: #c6d7df;
+  --border-strong: #9dbbc8;
+  --glass-card: rgba(255, 255, 255, 0.77);
+  --glass-card-border: rgba(255, 255, 255, 0.95);
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -218,22 +220,22 @@
   /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
      even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
      for body text and is a large part of why the dashboard tired the eyes. */
-  --text: #0b1533;
-  --text-muted: #46557a;
-  --text-subtle: #56658a;
+  --text: #102b3b;
+  --text-muted: #496473;
+  --text-subtle: #58717e;
   --text-inverse: #ffffff;
 
   /* Royal blue: the page band, the active tab, links and the collection
      card. White text on it is 5.25:1. */
-  --brand: #1f5bff;
-  --brand-hover: #1648d6;
-  --brand-soft: #e8eeff;
-  --electric: #1f5bff;
-  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
+  --brand: #087487;
+  --brand-hover: #075c6d;
+  --brand-soft: #dceff1;
+  --electric: #00a6b3;
+  --brand-band: linear-gradient(120deg, #07374d 0%, #087487 100%);
 
-  --accent: #1f5bff;
-  --accent-soft: #e8eeff;
-  --accent-ink: #1440c9;
+  --accent: #087487;
+  --accent-soft: #dceff1;
+  --accent-ink: #075c6d;
 
   --success: #159a67;
   --success-soft: #e8f7f0;
@@ -262,13 +264,13 @@
   /* The rail is the page's colour anchor: a violet column, white type, and
      a white pill for the section the reader is in. White on the lightest
      stop is 5.15:1. */
-  --nav-surface: linear-gradient(180deg, #6d4aff 0%, #5b3ff0 48%, #4f2fd6 100%);
-  --nav-border: rgba(255, 255, 255, 0.18);
+  --nav-surface: linear-gradient(160deg, rgba(7, 33, 51, 0.97), rgba(6, 49, 62, 0.94));
+  --nav-border: rgba(190, 234, 240, 0.19);
   --nav-text: #ffffff;
   --nav-text-muted: #ffffff;
-  --nav-hover: rgba(255, 255, 255, 0.14);
-  --nav-active-bg: #ffffff;
-  --nav-active-text: #4f2fd6;
+  --nav-hover: rgba(137, 225, 231, 0.12);
+  --nav-active-bg: #b9f0ef;
+  --nav-active-text: #093848;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -293,14 +295,14 @@
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
   --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
 
-  --glass-surface: rgba(255, 255, 255, 0.72);
+  --glass-surface: rgba(255, 255, 255, 0.82);
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
   /* The colour the glass chrome blurs: royal blue from the top, violet from
      the trailing corner. Canvas only — every panel is opaque. */
-  --page-glow-primary: rgba(31, 91, 255, 0.16);
-  --page-glow-secondary: rgba(109, 74, 255, 0.12);
+  --page-glow-primary: rgba(0, 166, 179, 0.22);
+  --page-glow-secondary: rgba(236, 174, 93, 0.16);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -558,28 +560,30 @@
 
   /* Navy canvas, panels one step forward. Secondary text is 9:1 and the
      faintest text 6.6:1 on a panel. */
-  --bg: #050d18;
-  --bg-subtle: #08131f;
-  --surface: #0d1c30;
-  --surface-2: #13253d;
-  --surface-3: #1a3050;
-  --border: #26405f;
-  --border-strong: #375a84;
+  --bg: #081820;
+  --bg-subtle: #0b202a;
+  --surface: rgba(16, 38, 51, 0.94);
+  --surface-2: rgba(25, 53, 66, 0.93);
+  --surface-3: #244250;
+  --border: #31505c;
+  --border-strong: #4a7784;
+  --glass-card: rgba(17, 42, 55, 0.82);
+  --glass-card-border: rgba(158, 219, 222, 0.16);
 
-  --text: #f2f6fc;
-  --text-muted: #aebdd1;
-  --text-subtle: #8fa2bb;
+  --text: #f2fbfc;
+  --text-muted: #bad0d8;
+  --text-subtle: #9dbbc5;
   --text-inverse: #06111f;
 
-  --brand: #5b9bff;
-  --brand-hover: #7fb2ff;
-  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
-  --brand-soft: #14263f;
-  --electric: #4c8dff;
+  --brand: #78dce2;
+  --brand-hover: #a4eef1;
+  --brand-band: linear-gradient(120deg, #0b3b4b 0%, #087487 100%);
+  --brand-soft: #173d47;
+  --electric: #78dce2;
 
-  --accent: #4c8dff;
-  --accent-soft: #14263f;
-  --accent-ink: #91b8ff;
+  --accent: #78dce2;
+  --accent-soft: #173d47;
+  --accent-ink: #a4eef1;
 
   --success: #3ad49a;
   --success-soft: #0e2a20;
@@ -633,13 +637,13 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: linear-gradient(180deg, #3a2a9c 0%, #2a1f78 50%, #1c1556 100%);
+  --nav-surface: linear-gradient(160deg, rgba(4, 24, 36, 0.97), rgba(6, 47, 57, 0.94));
   --nav-border: rgba(255, 255, 255, 0.14);
   --nav-text: #ffffff;
   --nav-text-muted: #ffffff;
-  --nav-hover: rgba(255, 255, 255, 0.12);
-  --nav-active-bg: #ffffff;
-  --nav-active-text: #3a2a9c;
+  --nav-hover: rgba(137, 225, 231, 0.13);
+  --nav-active-bg: #b9f0ef;
+  --nav-active-text: #093848;
 
   --chart-1: #4d94ff;
   --chart-2: #f0a44c;
@@ -657,14 +661,14 @@
   --shadow-lg: 0 14px 36px -10px rgba(0, 0, 0, 0.65);
   --shadow-xl: 0 26px 60px -14px rgba(0, 0, 0, 0.7);
 
-  --glass-surface: rgba(15, 28, 47, 0.72);
-  --glass-border: rgba(76, 141, 255, 0.2);
+  --glass-surface: rgba(17, 42, 55, 0.86);
+  --glass-border: rgba(154, 221, 224, 0.22);
   --glass-nav: rgba(6, 20, 38, 0.82);
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
   /* One cold light from above the header, on the canvas only. Panels are
      opaque, so nothing a figure sits on is tinted. */
-  --page-glow-primary: rgba(64, 132, 255, 0.11);
-  --page-glow-secondary: rgba(109, 74, 255, 0.1);
+  --page-glow-primary: rgba(30, 170, 181, 0.15);
+  --page-glow-secondary: rgba(238, 161, 93, 0.08);
 }
 
 @layer base {
@@ -884,12 +888,14 @@
 /* --- surfaces ------------------------------------------------------------ */
 
 @utility card {
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: var(--glass-card);
+  border: 1px solid var(--glass-card-border);
   border-radius: 24px;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   box-shadow:
-    0 1px 2px rgba(15, 40, 120, 0.04),
-    0 10px 28px -14px rgba(31, 91, 255, 0.18);
+    0 18px 42px -26px rgba(7, 36, 52, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 /* --- the spatial system, as utilities ------------------------------------
@@ -1008,6 +1014,8 @@
   border: 1px solid var(--tone-border, var(--border));
   border-radius: 22px;
   color: var(--tone-ink, var(--text));
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
 /* Lifts 2px and deepens its shadow. Nothing else moves. */
@@ -1262,11 +1270,11 @@
    dense figures remain legible while the blue page glow can still show
    through at the edges. */
 @utility chrome-bar {
-  background: color-mix(in oklab, var(--surface) 70%, transparent);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(11, 31, 56, 0.04);
+  background: color-mix(in srgb, var(--surface) 87%, transparent);
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  border-bottom: 1px solid var(--glass-card-border);
+  box-shadow: 0 10px 26px -22px rgba(7, 36, 52, 0.38);
 }
 
 /* Give the one global entry point a quiet pulse so it is discoverable on a
@@ -1334,10 +1342,10 @@
    never the strip that carries no data. */
 @utility chrome-sidebar {
   background: var(--nav-surface);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(155%);
+  -webkit-backdrop-filter: blur(28px) saturate(155%);
   border-inline-end: 1px solid var(--nav-border);
-  box-shadow: none;
+  box-shadow: 14px 0 40px -32px rgba(1, 20, 32, 0.7);
 }
 
 /* Header auto-hide. header-auto-hide.ts writes `data-chrome-header` on <html>;
@@ -1572,54 +1580,208 @@
   letter-spacing: -0.005em;
 }
 
-/* --- solid KPI cards --------------------------------------------------------
-   A headline card is painted in its family's saturated fill (solidCardVars)
-   and everything on it is white. The few shared pieces that bring their own
-   colour — the period delta, muted helper text, the "not available" dash —
-   are turned white here so nothing grey or red sits on a coloured ground.
-   The delta keeps its meaning by shape: arrow and sign, on a light pill when
-   the move is good and a dark pill when it is not. */
+/* KPI glass keeps the number neutral and gives each metric a distinct accent. */
 .kpi-solid {
-  color: #ffffff;
-  border-color: transparent;
-  /* The fill deepens toward the text and lightens only toward the corner
-     the sparkline and cue sit in, so every word stays on the full-strength
-     colour. */
-  background: linear-gradient(
-    to bottom right,
-    var(--tone-fill) 40%,
-    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
-  );
-  box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--tone-fill) 80%, transparent);
+  color: var(--text);
+  border-color: var(--glass-card-border);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--tone-strong) 16%, transparent),
+      transparent 50%
+    ),
+    var(--glass-card);
+  box-shadow:
+    0 20px 46px -28px rgba(7, 36, 52, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 [dir="rtl"] .kpi-solid {
-  background: linear-gradient(
-    to bottom left,
-    var(--tone-fill) 40%,
-    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
-  );
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      color-mix(in srgb, var(--tone-strong) 16%, transparent),
+      transparent 50%
+    ),
+    var(--glass-card);
 }
 
 .kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
-  color: #ffffff;
+  color: var(--text-muted);
 }
 
 .kpi-solid .delta-badge {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
   border-radius: 999px;
-  padding: 0 6px;
+  padding: 2px 8px;
 }
 
 .kpi-solid .delta-badge[data-good="false"] {
-  background: rgba(0, 0, 0, 0.24);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .kpi-solid.kpi-card:hover {
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: color-mix(in srgb, var(--tone-strong) 58%, var(--glass-card-border));
+  box-shadow: 0 26px 52px -26px color-mix(in srgb, var(--tone-strong) 27%, transparent);
 }
 
 .kpi-solid.kpi-card:focus-visible {
   outline-color: var(--brand);
+}
+
+/* A quiet aurora behind the glass. The washes are fixed, so long reports do not
+   repaint their data surfaces while scrolling. */
+.app-canvas {
+  position: relative;
+  background:
+    radial-gradient(ellipse 54rem 42rem at 82% -9%, var(--page-glow-primary), transparent 70%),
+    radial-gradient(ellipse 44rem 36rem at 6% 52%, var(--page-glow-secondary), transparent 75%),
+    linear-gradient(160deg, var(--bg), var(--bg-subtle));
+}
+
+.page-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--glass-card-border);
+  background:
+    radial-gradient(
+      circle at 95% 0%,
+      color-mix(in srgb, var(--page-accent) 13%, transparent),
+      transparent 42%
+    ),
+    var(--glass-card);
+  box-shadow:
+    0 24px 52px -34px rgba(7, 36, 52, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  animation: engo-fade-up 520ms var(--ease-out) both;
+}
+
+.page-band::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--page-accent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--page-accent) 40%, transparent);
+}
+
+.page-band-icon {
+  color: var(--page-accent);
+  background: color-mix(in srgb, var(--page-accent) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--page-accent) 25%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.page-sections > .section-stack,
+.page-sections > .card-grid,
+.page-sections > .card,
+.page-sections > .kpi-scope {
+  animation: engo-fade-up 560ms var(--ease-out) both;
+}
+
+.page-sections > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.page-sections > :nth-child(3) {
+  animation-delay: 110ms;
+}
+.page-sections > :nth-child(4) {
+  animation-delay: 160ms;
+}
+.page-sections > :nth-child(n + 5) {
+  animation-delay: 200ms;
+}
+
+.kpi-solid::before {
+  position: absolute;
+  inset-block: 16px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 999px;
+  content: "";
+  background: var(--tone-strong);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--tone-strong) 40%, transparent);
+}
+
+.kpi-solid .kpi-figure {
+  color: var(--text);
+  letter-spacing: -0.035em;
+}
+
+.data-table-shell {
+  border-color: var(--glass-card-border);
+}
+
+.data-table-toolbar {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+.data-table-shell table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table-shell thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  box-shadow: inset 0 -1px 0 var(--border);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.data-table-shell thead th.sticky-col {
+  z-index: 3;
+}
+
+.data-table-shell tbody td {
+  padding-block: 0.8rem;
+  line-height: 1.5;
+}
+
+.data-table-shell tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+}
+
+.data-table-shell tbody tr:hover td,
+.data-table-shell tbody tr:focus-visible td {
+  background: var(--brand-soft);
+}
+
+.data-table-shell tbody td.sticky-col {
+  box-shadow: inset -1px 0 0 var(--border);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.dark .bg-brand.text-white {
+  color: #062c36;
+}
+
+/* Hand-built report tables get the same reading rhythm as DataTable. */
+main .table-wrap > table:not(.data-table-shell table) th {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
+  background: var(--brand-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-band,
+  .page-sections > .section-stack,
+  .page-sections > .card-grid,
+  .page-sections > .card,
+  .page-sections > .kpi-scope {
+    animation: none;
+  }
 }

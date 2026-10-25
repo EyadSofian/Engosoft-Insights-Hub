@@ -141,18 +141,12 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * A single headline figure, as a coloured card.
- *
- * The whole card takes its family: pastel ground, matching hairline, the
- * figure in the family's ink, a solid icon chip in the family's strong tone,
- * and — when the caller hands over a real series — a filled sparkline in the
- * same colour. That is deliberate and it is the point: a row of five KPIs has
- * to read as five different things from across a desk, and five white cards
- * with five small coloured icons read as one grey block.
+ * A headline figure on a glass surface. The accent rail, icon and optional
+ * sparkline carry the metric family; the number keeps the page's text colour.
  *
  * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
- * is `--pad-card`, the label sits 11px above the figure, the figure 8px above
- * its explanation, and the "view detail" cue is pinned to the bottom edge by
+ * is `--pad-card`, the label sits above the figure, context and definition, and
+ * the "view detail" cue is pinned to the bottom edge by
  * `mt-auto` so every card in a row ends on the same line however long its
  * explanation runs.
  *
@@ -170,6 +164,7 @@ export function KpiCard({
   label,
   value,
   sub,
+  description,
   delta,
   deltaInvert,
   hero = false,
@@ -190,6 +185,8 @@ export function KpiCard({
   label: string;
   value: ReactNode;
   sub?: ReactNode;
+  /** Plain-language meaning of the figure, separate from its period-specific context. */
+  description?: string;
   delta?: number;
   deltaInvert?: boolean;
   /** Emphasis for the page's single most important figure. */
@@ -222,7 +219,7 @@ export function KpiCard({
     return (
       <div
         className={`tone-surface kpi-solid @container pad-card relative h-full overflow-hidden ${
-          compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"
+          compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"
         }`}
         style={solidCardVars(tone)}
         aria-busy="true"
@@ -250,7 +247,7 @@ export function KpiCard({
       data-testid={testId}
       className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
-      } ${compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"}`}
+      } ${compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"}`}
       style={
         {
           ...solidCardVars(tone),
@@ -317,8 +314,9 @@ export function KpiCard({
           <DeltaBadge value={delta} invert={deltaInvert} />
           {sub != null && (
             <span
-              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12px]"} ${
-                subWrap ? "leading-relaxed" : "line-clamp-2"
+              title={typeof sub === "string" ? sub : undefined}
+              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
+                subWrap ? "leading-relaxed" : "line-clamp-3"
               }`}
               style={{ color: "var(--tone-ink)" }}
             >
@@ -326,6 +324,15 @@ export function KpiCard({
             </span>
           )}
         </div>
+      )}
+
+      {description && !compact && (
+        <p
+          className="relative mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
+          title={description}
+        >
+          {description}
+        </p>
       )}
 
       {/* The foot of the card. `mt-auto` is what makes a row of cards line up

@@ -197,9 +197,18 @@ export function MetricCard({
           style={{ color: "var(--tone-ink)" }}
           dir="auto"
         >
-          {sub ?? (unavailable ? unavailableReason : copy.formula)}
+          {unavailable ? unavailableReason : (sub ?? copy.what)}
         </span>
       </div>
+
+      {sub != null && !unavailable && (
+        <p
+          className="relative mt-2 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
+          title={copy.what}
+        >
+          {copy.what}
+        </p>
+      )}
 
       {interactive && (
         <div className="relative mt-auto pt-2.5">

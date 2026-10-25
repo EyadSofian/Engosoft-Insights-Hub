@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useAutoHideChrome();
 
   return (
-    <div className="min-h-dvh bg-bg overflow-x-clip">
+    <div className="app-canvas min-h-dvh overflow-x-clip">
       <Sidebar />
 
       <div className="chrome-inset flex min-h-dvh min-w-0 flex-col">

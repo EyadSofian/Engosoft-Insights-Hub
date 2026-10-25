@@ -109,38 +109,14 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-/** The solid fill a KPI card is painted with, per family. */
-const FILL: Record<Tone, string> = {
-  mint: "var(--mint-fill)",
-  rose: "var(--rose-fill)",
-  sky: "var(--sky-fill)",
-  violet: "var(--violet-fill)",
-  amber: "var(--amber-fill)",
-  cyan: "var(--cyan-fill)",
-  slate: "var(--slate-fill)",
-};
-
-function familyOf(tone: AnyTone | undefined): Tone {
-  if (!tone) return "slate";
-  if (tone in TONES) return tone as Tone;
-  return SEMANTIC[tone as SemanticTone] ?? "slate";
-}
-
-/**
- * A headline KPI card: a solid, saturated family fill with everything on it
- * in white — label, figure, sub-line, icon, sparkline and cue. White text is
- * at least 4.6:1 on every fill, so the colour can be loud without costing
- * legibility. Pair with the `kpi-solid` class, which turns deltas, verdict
- * chips and info buttons inside the card white too.
- */
+/** A restrained glass KPI: the accent identifies its family, the figure stays legible. */
 export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
-  const fill = FILL[familyOf(tone)];
+  const t = toneOf(tone);
   return {
-    "--tone-fill": fill,
-    "--tone-surface": fill,
-    "--tone-border": fill,
-    "--tone-ink": "#ffffff",
-    "--tone-strong": "#ffffff",
+    "--tone-surface": "var(--glass-card)",
+    "--tone-border": "var(--glass-card-border)",
+    "--tone-ink": "var(--text)",
+    "--tone-strong": t.strong,
   } as React.CSSProperties;
 }
 
