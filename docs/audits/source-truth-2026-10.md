@@ -94,6 +94,18 @@ whichever one it actually filled in, so both this schema and a mirrored one reso
 `tests/unit/crm-custom-fields.test.ts` pins the real schema, a real row, and the mirrored
 case.
 
+**Verified after the fix**, running the application's own resolver against live Odoo
+metadata on 2026-10-26. It resolves `adsetId` to `["adset_id", "ad_set_id"]` and
+`adsetName` to `["adset_name", "ad_set_name"]`, and over 3,536 October leads:
+
+| column | before | after |
+| --- | --- | --- |
+| "Ad Set ID" | 0 (0%) | **2,864 (81.0%)** |
+| "Ad Set Name" | 0 (0%) | **2,736 (77.4%)** |
+
+A resolved row reads `adSetId 120250480142330718`, `adSetName "CFM - 2 - Copy"`,
+`adId 120250688219100718` — an exact key where there used to be a name-only guess.
+
 ### B. Google's "leads" are YouTube channel subscriptions — HIGH, fixed
 
 September 2026 Google conversions, by action:
