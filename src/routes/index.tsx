@@ -77,7 +77,7 @@ const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
   clicks: { ar: "النقرات", en: "Clicks" },
   platform_leads: { ar: "عملاء من المنصات", en: "Platform leads" },
   crm_leads: { ar: "العملاء المحتملون", en: "CRM leads" },
-  won: { ar: "الصفقات الرابحة", en: "Won deals" },
+  won: { ar: "Won في CRM", en: "CRM Won deals" },
 };
 
 function sundayWeekStart(value: string): string {
@@ -557,7 +557,7 @@ function Overview() {
               card={{
                 index: 6,
                 spark: seriesOf("won"),
-                sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`,
+                sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل Won" : "Won rate"}`,
               }}
             />
             <MetricDetailTrigger

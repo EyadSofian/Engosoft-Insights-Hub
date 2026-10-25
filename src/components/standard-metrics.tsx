@@ -300,17 +300,17 @@ export function standardMetrics({
 
   const won: MetricDetail = {
     id: `${surface}.won`,
-    title: title("won", A ? "الصفقات المغلقة" : "Won deals"),
+    title: title("won", A ? "Won في CRM" : "CRM Won deals"),
     value: fmtNum(T.won),
     tone: "violet",
     icon: <Award size={16} />,
     delta: deltas.won,
     definition: A
-      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة الربح خلال الفترة."
-      : "How many leads reached the won stage during the period.",
+      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM خلال الفترة. البيعة المدفوعة تُعد من الفواتير في تقرير CRM."
+      : "How many leads reached the CRM Won stage during the period. Paid sales are counted from invoices on the CRM report.",
     formula: A
-      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل تحويل.`
-      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} conversion.`,
+      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل Won.`
+      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} Won rate.`,
     caveat: caveats.won,
     trend: trendFor("won", A ? "حركة إغلاق الصفقات" : "Deals closing over the period", fmtNum),
     supporting: [
@@ -417,14 +417,14 @@ export function standardMetrics({
 
   const conversion: MetricDetail = {
     id: `${surface}.conversion`,
-    title: title("conversion", A ? "معدل التحويل" : "Conversion rate"),
+    title: title("conversion", A ? "معدل Won في CRM" : "CRM Won rate"),
     value: fmtPct(T.conversionRate, 2),
     tone: "violet",
     icon: <Percent size={14} />,
     delta: deltas.conversionRate,
     definition: A
-      ? "نسبة العملاء المحتملين الذين تحوّلوا إلى صفقات رابحة داخل الفترة."
-      : "The share of leads that became won deals inside the period.",
+      ? "نسبة العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM داخل الفترة. التحويل المدفوع (فواتير ÷ ليدز) في تقرير CRM."
+      : "The share of leads that reached the CRM Won stage inside the period. Paid conversion (invoices ÷ leads) is on the CRM report.",
     formula: A
       ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`
       : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`,

@@ -296,8 +296,8 @@ function Campaigns() {
             label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
           },
           won: {
-            to: "/sales",
-            label: lang === "ar" ? "فتح تقرير المبيعات" : "Open the sales report",
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the CRM report",
           },
         },
       })
