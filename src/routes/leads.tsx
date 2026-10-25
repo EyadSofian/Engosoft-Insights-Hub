@@ -49,13 +49,19 @@ import { LeadIntelligence } from "@/components/leads/LeadIntelligence";
 import { WeeklyLeadsReport } from "@/components/leads/WeeklyLeadsReport";
 import { CrmSourceDistribution } from "@/components/leads/CrmSourceDistribution";
 import { SixMonthPerformance } from "@/components/leads/SixMonthPerformance";
+import { SalesChannelReport } from "@/components/leads/SalesChannelReport";
+import { LostCohortReport } from "@/components/leads/LostCohortReport";
 import type { SourceDistributionRow } from "@/lib/crm-source-distribution";
 
 export const Route = createFileRoute("/leads")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { view?: "crm" | "intelligence" | "weekly" | "performance" } =>
-    search.view === "intelligence" || search.view === "weekly" || search.view === "performance"
+  ): { view?: "crm" | "intelligence" | "weekly" | "performance" | "channels" | "lost" } =>
+    search.view === "intelligence" ||
+    search.view === "weekly" ||
+    search.view === "performance" ||
+    search.view === "channels" ||
+    search.view === "lost"
       ? { view: search.view }
       : {},
   component: LeadsPage,
@@ -103,6 +109,22 @@ function LeadsPage() {
         >
           {lang === "ar" ? "أداء الليدز والمبيعات · ٦ أشهر" : "Leads & sales · 6 months"}
         </Link>
+        <Link
+          to="/leads"
+          search={{ view: "channels" }}
+          aria-current={workspace === "channels" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "channels" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "قنوات إغلاق البيع" : "Sales closing channels"}
+        </Link>
+        <Link
+          to="/leads"
+          search={{ view: "lost" }}
+          aria-current={workspace === "lost" ? "page" : undefined}
+          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "lost" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
+        >
+          {lang === "ar" ? "اللوست" : "Lost"}
+        </Link>
       </nav>
       {workspace === "crm" ? (
         <CrmWorkspace />
@@ -110,6 +132,10 @@ function LeadsPage() {
         <WeeklyLeadsReport />
       ) : workspace === "performance" ? (
         <SixMonthPerformance />
+      ) : workspace === "channels" ? (
+        <SalesChannelReport />
+      ) : workspace === "lost" ? (
+        <LostCohortReport />
       ) : (
         <>
           <DashboardPageHeader

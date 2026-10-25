@@ -97,6 +97,7 @@ export async function loadLeadPerformanceReport(input: {
     course: string;
     campaignName: string;
     salesperson: string;
+    closingChannel?: string;
     phone: string;
     mobile: string;
     email: string;
@@ -114,6 +115,7 @@ export async function loadLeadPerformanceReport(input: {
     course: row.course,
     campaign: row.campaignName,
     salesperson: row.salesperson,
+    closingChannel: row.closingChannel,
     phone: row.phone,
     mobile: row.mobile,
     email: row.email,

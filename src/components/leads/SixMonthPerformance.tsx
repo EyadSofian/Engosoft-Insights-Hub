@@ -39,6 +39,7 @@ import { DataTable, type Col } from "@/components/DataTable";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { LeadClassificationAudit } from "@/components/leads/LeadClassificationAudit";
 import {
   performanceStages,
   type PerformanceGroup,
@@ -155,6 +156,11 @@ const copy = {
     freshUnmatched: "تعذرت مطابقة الهاتف",
     freshCallCaveat:
       "غياب مكالمة PBX لا يثبت أن السيلز لم يتعامل مع الليد؛ قد توجد متابعة في Chatter أو واتساب.",
+    leadRecordsNow: "سجلات Lead الآن (نشط أو Lost)",
+    opportunityNow: "سجلات Opportunity الآن",
+    preCrmUnavailable: "قبل CRM: غير متاح",
+    classificationPrompt:
+      "راجع تابات حالة CRM والتصنيف والاتصال أدناه؛ Fresh ليس مرادفًا لليد الذي لم يُتصل به.",
     segmentUnknown: "حقل Lead Segment فارغ",
     segmentExplanation:
       "ده حقل تصنيف منفصل عن مراحل أودو. السجلات دي لها نوع وحالة في CRM، والفرص لها مراحل بيع.",
@@ -284,6 +290,11 @@ const copy = {
     freshUnmatched: "Phone not safely matchable",
     freshCallCaveat:
       "No PBX call does not prove Sales did not work the lead; Chatter or WhatsApp follow-up may exist.",
+    leadRecordsNow: "Lead records now (active or Lost)",
+    opportunityNow: "Opportunity records now",
+    preCrmUnavailable: "Before CRM: unavailable",
+    classificationPrompt:
+      "Use the CRM state, classification and contact tabs below. Fresh does not mean untouched.",
     segmentUnknown: "Lead Segment field is blank",
     segmentExplanation:
       "This is a separate classification field, not an Odoo sales stage. These records have CRM types and statuses; opportunities have sales stages.",
@@ -1030,17 +1041,7 @@ export function SixMonthPerformance() {
   if (!data) return null;
 
   const selected = data.selected;
-  const blankSegment = data.records.reduce(
-    (counts, row) => {
-      if (row.leadSegment.trim()) return counts;
-      if (row.recordType === "opportunity") counts.opportunityType++;
-      else counts.leadType++;
-      if (row.status === "lead") counts.activeLead++;
-      else counts[row.status]++;
-      return counts;
-    },
-    { leadType: 0, opportunityType: 0, activeLead: 0, open: 0, won: 0, lost: 0 },
-  );
+  const leadRecordsNow = data.records.filter((row) => row.recordType === "lead").length;
   const selectedCollections = data.collectionsByMonth.find(
     (row) => row.month === data.selectedMonth,
   );
@@ -1279,40 +1280,23 @@ export function SixMonthPerformance() {
             <div className="num mt-2 text-3xl font-bold text-text">{n(selected.leads)}</div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-text-muted">{t.freshNow}</span>
-                <b className="num mt-1 block text-base text-text">{n(selected.freshTagged)}</b>
+                <span className="text-text-muted">{t.leadRecordsNow}</span>
+                <b className="num mt-1 block text-base text-text">{n(leadRecordsNow)}</b>
               </div>
               <div>
-                <span className="text-text-muted">{t.segmentUnknown}</span>
-                <b className="num mt-1 block text-base text-text">{n(selected.segmentMissing)}</b>
+                <span className="text-text-muted">{t.opportunityNow}</span>
+                <b className="num mt-1 block text-base text-text">{n(selected.opportunities)}</b>
               </div>
             </div>
             <div className="mt-3 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
-              <p>{t.freshMeaning}</p>
-              <div className="mt-2 grid gap-1 sm:grid-cols-3">
-                <span>
-                  {t.freshCalled}: <b className="num text-text">{n(selected.freshPbxCalled)}</b>
-                </span>
-                <span>
-                  {t.freshNoPbx}: <b className="num text-text">{n(selected.freshPbxNoCall)}</b>
-                </span>
-                <span>
-                  {t.freshUnmatched}:{" "}
-                  <b className="num text-text">{n(selected.freshPbxUnmatchable)}</b>
-                </span>
-              </div>
-              <p className="mt-2">{t.freshCallCaveat}</p>
-            </div>
-            <div className="mt-4 rounded-xl border border-sky-strong/15 bg-surface/70 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
-              <p>{t.segmentExplanation}</p>
-              <p className="mt-1.5">
-                {t.blankTypes}: {n(blankSegment.opportunityType)} {t.blankOpportunity} ·{" "}
-                {n(blankSegment.leadType)} {t.blankLead}
+              <p>
+                <b className="text-text">
+                  {t.freshNow}: {n(selected.freshTagged)}
+                </b>{" "}
+                · {t.freshMeaning}
               </p>
-              <p className="mt-1">
-                {t.blankStatuses}: {n(blankSegment.open)} {t.blankOpen} · {n(blankSegment.lost)}{" "}
-                {t.blankLost} · {n(blankSegment.won)} {t.blankWon} · {n(blankSegment.activeLead)}{" "}
-                {t.blankActiveLead}
+              <p className="mt-2">
+                {t.preCrmUnavailable}. {t.classificationPrompt}
               </p>
             </div>
           </Card>
@@ -1338,6 +1322,12 @@ export function SixMonthPerformance() {
           </Card>
         </div>
       </PageSection>
+
+      <LeadClassificationAudit
+        records={data.records}
+        lang={lang}
+        callsAvailable={data.coverage.callsAvailable}
+      />
 
       {notices.length > 0 && (
         <div className="space-y-2">

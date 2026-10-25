@@ -153,6 +153,7 @@ export const Route = createFileRoute("/api/lead-performance-export")({
           [ar ? "الميديا باير" : "Media buyer", result.byMediaBuyer],
           [ar ? "مسؤول الليد" : "Lead owner", result.bySalesOwner],
           [ar ? "السيلز المغلق" : "Paid closer", paidReady ? result.bySalesCloser : []],
+          [ar ? "قناة إغلاق البيع" : "Sales closing channel", result.byClosingChannel],
         ];
         for (const [label, rows] of dimensions) {
           const sheet = workbook.addWorksheet(label.slice(0, 31));

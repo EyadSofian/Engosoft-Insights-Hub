@@ -159,6 +159,34 @@ describe("six-month lead performance", () => {
     expect("email" in result.records[0]!).toBe(false);
   });
 
+  it("does not equate Fresh segment with an active untouched lead and reports the closing channel separately", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [
+        lead("fresh-open", "2026-05-02", {
+          recordType: "opportunity",
+          status: "open",
+          leadSegment: "Fresh",
+        }),
+        lead("fresh-won", "2026-05-03", {
+          recordType: "opportunity",
+          status: "won",
+          leadSegment: "Fresh",
+          closingChannel: "Phone",
+        }),
+        lead("active-lead", "2026-05-04", { leadSegment: "" }),
+      ],
+      invoices: [],
+      links: [],
+      calls: null,
+    });
+    expect(result.selected.freshTagged).toBe(2);
+    expect(
+      result.records.filter((row) => row.recordType === "lead" && row.status === "lead"),
+    ).toHaveLength(1);
+    expect(result.byClosingChannel.map((row) => [row.name, row.crmWon])).toEqual([["Phone", 1]]);
+  });
+
   it("counts only positive-net exact-linked orders and attributes later payments to the entry month", () => {
     const result = buildLeadPerformance(base());
     expect(result.selected.paidLeads).toBe(1);

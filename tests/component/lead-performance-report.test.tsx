@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 /**
@@ -33,6 +33,8 @@ vi.mock("@tanstack/react-router", () => ({
 
 const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
 const { SixMonthPerformance } = await import("@/components/leads/SixMonthPerformance");
+const { SalesChannelReport } = await import("@/components/leads/SalesChannelReport");
+const { LostCohortReport } = await import("@/components/leads/LostCohortReport");
 const { I18nProvider } = await import("@/lib/i18n");
 const { filterStore } = await import("@/lib/filter-store");
 const { clearNexusView, getNexusView } =
@@ -103,6 +105,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
       campaign: "cfm-sayed",
       mediaBuyer: "Sayed",
       salesperson: "Sales A",
+      closingChannel: "Phone",
       closer: "Closer A",
       recordType: "opportunity",
       status: "lost",
@@ -130,6 +133,7 @@ const response = (patch: Record<string, unknown> = {}) => ({
     group("Slow Caller", { averageHoursToFirstCall: 72, averageAttempts: 1.1 }),
   ],
   bySalesCloser: [group("Closer A", { conversionRate: null, lostRate: null })],
+  byClosingChannel: [group("Phone", { leads: 1, crmWon: 1, paidLeads: 1 })],
   lossReasons: [{ key: "not_reached", ar: "لا يرد", en: "No answer", count: 11 }],
   unqualifiedReasons: [
     { category: "customer_data", count: 5 },
@@ -196,6 +200,27 @@ function mount(payload: Record<string, unknown>) {
   );
 }
 
+function mountFocusedReport(payload: Record<string, unknown>, report: "channels" | "lost") {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    ),
+  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <I18nProvider>
+        {report === "channels" ? <SalesChannelReport /> : <LostCohortReport />}
+      </I18nProvider>
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   window.innerWidth = 1600;
   filterStore.reset();
@@ -214,11 +239,18 @@ describe("the six-month lead-to-paid report", () => {
     const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
     expect(within(summary).getByText(/Lead Segment = Fresh now/i)).toBeTruthy();
     expect(within(summary).getByText(/Fresh is the current Odoo classification/i)).toBeTruthy();
-    expect(within(summary).getByText(/Lead Segment field is blank/i)).toBeTruthy();
     expect(within(summary).getByText(/Historical Fresh status is unverified/i)).toBeTruthy();
-    expect(within(summary).getByText(/not an Odoo sales stage/i)).toBeTruthy();
-    expect(within(summary).getByText(/Includes: 1 opportunities · 0 leads/i)).toBeTruthy();
-    expect(within(summary).getByText(/Current broad CRM status: 0 open · 1 lost/i)).toBeTruthy();
+    expect(within(summary).getByText(/Before CRM: unavailable/i)).toBeTruthy();
+    const classification = screen
+      .getByText(/Keep classification, sales state and contact evidence separate/i)
+      .closest("section")!;
+    expect(within(classification).getByText(/Lost Opportunity/i)).toBeTruthy();
+    fireEvent.click(within(classification).getByRole("tab", { name: "Lead Segment tag" }));
+    expect(within(classification).getByText(/Blank field/i)).toBeTruthy();
+    fireEvent.click(within(classification).getByRole("tab", { name: "Contact evidence" }));
+    expect(within(classification).getByText(/No PBX attempt visible/i)).toBeTruthy();
+    fireEvent.click(within(classification).getByRole("tab", { name: "Before CRM" }));
+    expect(within(classification).getByText(/Not measurable from Odoo alone/i)).toBeTruthy();
     const audit = screen.getByText(/Audit individual leads/i).closest("section")!;
     expect(within(audit).getByText("153853").closest("a")?.getAttribute("href")).toContain(
       "model=crm.lead",
@@ -315,5 +347,59 @@ describe("the six-month lead-to-paid report", () => {
     );
     await waitFor(() => expect(screen.getByText(/CRM data is stale/i)).toBeTruthy());
     expect(screen.queryByText(/From lead to paid enrollment/i)).toBeNull();
+  });
+});
+
+describe("sales closing channel", () => {
+  it("shows missing channels separately and withholds paid measures without exact links", async () => {
+    mountFocusedReport(
+      response({
+        byClosingChannel: [
+          group("Phone", { leads: 2, crmWon: 1, paidLeads: 1 }),
+          group("—", { leads: 1, crmWon: 1, paidLeads: 0 }),
+        ],
+        coverage: {
+          ...response().coverage,
+          linksAvailable: false,
+        },
+      }),
+      "channels",
+    );
+    await waitFor(() => expect(screen.getByText(/How were sales closed/i)).toBeTruthy());
+    expect(screen.getAllByText(/Closing channel missing/i)).toHaveLength(2);
+    expect(screen.getByText(/Payment data or exact order links are unavailable/i)).toBeTruthy();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Phone")).toBeTruthy();
+    expect(within(table).getAllByText("—").length).toBeGreaterThan(0);
+  });
+});
+
+describe("monthly Lost cohort tab", () => {
+  it("keeps Lost Leads and Lost Opportunities separate across channel and media buyer", async () => {
+    mountFocusedReport(
+      response({
+        selected: group("2026-09", {
+          leads: 100,
+          lostLeads: 10,
+          lostOpportunities: 30,
+          lostRate: 40,
+        }),
+        byPlatform: [group("meta", { leads: 50, lostLeads: 7, lostOpportunities: 13, lost: 20 })],
+        byMediaBuyer: [group("Sayed", { leads: 25, lostLeads: 2, lostOpportunities: 8, lost: 10 })],
+      }),
+      "lost",
+    );
+    await waitFor(() => expect(screen.getByText(/Records currently Lost/i)).toBeTruthy());
+    expect(screen.getByText(/not just losses closed during the month/i)).toBeTruthy();
+    const platformTable = screen.getByRole("table");
+    expect(within(platformTable).getByText("meta")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Media buyer" }));
+    expect(within(screen.getByRole("table")).getByText("Sayed")).toBeTruthy();
+    expect(
+      screen
+        .getByText(/Open detailed Lost analysis/i)
+        .closest("a")
+        ?.getAttribute("href"),
+    ).toBe("/lost");
   });
 });

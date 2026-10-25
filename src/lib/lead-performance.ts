@@ -15,6 +15,7 @@ export interface PerformanceLead {
   course: string;
   campaign: string;
   salesperson: string;
+  closingChannel?: string;
   phone: string;
   mobile: string;
   email: string;
@@ -111,6 +112,7 @@ export interface PerformanceRecord {
   campaign: string;
   mediaBuyer: string;
   salesperson: string;
+  closingChannel: string;
   closer: string;
   recordType: "lead" | "opportunity";
   status: "lead" | "open" | "won" | "lost";
@@ -164,6 +166,7 @@ export interface PerformanceResult {
   byMediaBuyer: PerformanceGroup[];
   bySalesOwner: PerformanceGroup[];
   bySalesCloser: PerformanceGroup[];
+  byClosingChannel: PerformanceGroup[];
   lossReasons: { key: string; ar: string; en: string; count: number }[];
   unqualifiedReasons: { category: "customer_data" | "course_fit" | "unspecified"; count: number }[];
   coverage: {
@@ -688,6 +691,7 @@ export function buildLeadPerformance(input: {
         campaign: row.campaign,
         mediaBuyer: buyer && buyer !== "ambiguous" ? MEDIA_BUYERS[buyer].name : "",
         salesperson: row.salesperson,
+        closingChannel: row.closingChannel ?? "",
         closer: row.closer,
         recordType: row.recordType,
         status: row.status,
@@ -744,6 +748,11 @@ export function buildLeadPerformance(input: {
         category,
         count: selectedRecords.filter((row) => row.unqualifiedCategory === category).length,
       }),
+    ),
+    byClosingChannel: groups(
+      selectedRecords.filter((row) => row.status === "won" || row.paidOrders.size > 0),
+      (row) => row.closingChannel?.trim() || "—",
+      coverage.callsAvailable,
     ),
     coverage,
   };
