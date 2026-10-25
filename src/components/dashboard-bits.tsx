@@ -1221,7 +1221,9 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
           </span>
         </summary>
         <div className="max-h-[58dvh] overflow-y-auto border-t border-border px-3.5 py-3">
-          <p className="text-[12px] leading-relaxed text-text-muted">{children}</p>
+          <p className="text-[12px] whitespace-pre-line leading-relaxed text-text-muted">
+            {children}
+          </p>
         </div>
       </details>
 
@@ -1233,7 +1235,7 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
         <summary className="flex cursor-pointer list-none items-start gap-3 p-3.5 sm:p-5 [&::-webkit-details-marker]:hidden">
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold text-text">{title}</span>
-            <span className="mt-1.5 line-clamp-4 block text-[13px] leading-relaxed text-text-muted group-open:hidden sm:text-sm">
+            <span className="mt-1.5 line-clamp-4 block text-[13px] whitespace-pre-line leading-relaxed text-text-muted group-open:hidden sm:text-sm">
               {children}
             </span>
           </span>
@@ -1243,7 +1245,7 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
             <ChevronDownGlyph />
           </span>
         </summary>
-        <p className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-text-muted sm:px-5 sm:pb-5 sm:text-sm">
+        <p className="px-3.5 pb-3.5 text-[13px] whitespace-pre-line leading-relaxed text-text-muted sm:px-5 sm:pb-5 sm:text-sm">
           {children}
         </p>
       </details>
