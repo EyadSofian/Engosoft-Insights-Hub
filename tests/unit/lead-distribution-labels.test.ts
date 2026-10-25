@@ -59,7 +59,7 @@ describe("lead distribution language consistency", () => {
   });
 
   it("keeps navigation, lifecycle and record-type labels in the chosen language", () => {
-    const nav = NAVIGATION_SECTIONS.find((section) => section.id === "sales-crm")!;
+    const nav = NAVIGATION_SECTIONS.find((section) => section.id === "leads")!;
     expect(hasLatin(nav.label.ar)).toBe(false);
     expect(hasArabic(nav.label.en)).toBe(false);
     for (const item of nav.items) {

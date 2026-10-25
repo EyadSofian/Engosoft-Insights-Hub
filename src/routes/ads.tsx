@@ -904,7 +904,7 @@ function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }
                           ? "حملات الويبنار"
                           : "Webinar campaigns"}
                     </h3>
-                    <p className="mt-0.5 text-[10.5px] text-text-muted">
+                    <p className="mt-0.5 text-[12px] text-text-muted">
                       {website
                         ? lang === "ar"
                           ? "صرف زيارات وتحويلات الموقع"
@@ -918,7 +918,7 @@ function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }
                 {website && (
                   <Link
                     to="/website"
-                    className="shrink-0 text-[11px] font-semibold text-brand hover:underline"
+                    className="shrink-0 text-[12px] font-semibold text-brand hover:underline"
                   >
                     {lang === "ar" ? "تفاصيل الموقع" : "Website detail"}
                   </Link>
@@ -974,7 +974,7 @@ function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }
 function PurposeFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface/75 p-2.5">
-      <div className="text-[9.5px] leading-tight text-text-muted">{label}</div>
+      <div className="text-[12px] leading-tight text-text-muted">{label}</div>
       <div className="num mt-1 text-sm font-semibold text-text">{value}</div>
     </div>
   );
@@ -1234,7 +1234,7 @@ function PlatformBlockCard({ block }: { block: PlatformBlock }) {
               {PLATFORM_LABEL[block.platform][lang]}
             </span>
           </span>
-          <p className="text-[11px] text-text-muted mt-0.5 num">
+          <p className="text-[12px] text-text-muted mt-0.5 num">
             {block.dateMin} → {block.dateMax} · {fmtNum(block.rows)} {lang === "ar" ? "صف" : "rows"}
           </p>
         </div>
@@ -1253,13 +1253,13 @@ function PlatformBlockCard({ block }: { block: PlatformBlock }) {
       </dl>
 
       {block.viewCompletions !== null && (
-        <p className="text-[11px] text-text-muted mt-2">
+        <p className="text-[12px] text-text-muted mt-2">
           {lang === "ar" ? "مشاهدات مكتملة" : "View completions"}:{" "}
           <span className="num">{fmtNum(block.viewCompletions)}</span>
         </p>
       )}
 
-      <p className="mt-3 text-[11px] text-text-subtle leading-relaxed">
+      <p className="mt-3 text-[12px] text-text-subtle leading-relaxed">
         {lang === "ar" ? "الحسابات الإعلانية" : "Ad accounts"}: {block.accounts.join(" · ")}
       </p>
     </div>

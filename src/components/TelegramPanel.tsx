@@ -193,7 +193,10 @@ export function TelegramPanel() {
 
       <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px] mt-4">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-baseline justify-between gap-3 py-1 border-b border-border/60">
+          <div
+            key={r.label}
+            className="flex items-baseline justify-between gap-3 py-1 border-b border-border/60"
+          >
             <span className="text-text-muted">{r.label}</span>
             <span className="inline-flex items-center gap-1.5 shrink-0">
               <span
@@ -232,8 +235,12 @@ export function TelegramPanel() {
         >
           <Link2 size={14} />
           {busy === "register"
-            ? ar ? "جارٍ التسجيل…" : "Registering…"
-            : ar ? "تسجيل الويبهوك" : "Register webhook"}
+            ? ar
+              ? "جارٍ التسجيل…"
+              : "Registering…"
+            : ar
+              ? "تسجيل الويبهوك"
+              : "Register webhook"}
         </button>
 
         <button
@@ -266,7 +273,7 @@ export function TelegramPanel() {
 
       {preview !== null && (
         <pre
-          className="mt-3 p-3 rounded-lg bg-surface-2 border border-border text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap"
+          className="mt-3 p-3 rounded-lg bg-surface-2 border border-border text-[12px] leading-relaxed overflow-x-auto whitespace-pre-wrap"
           dir="rtl"
         >
           {preview}

@@ -357,8 +357,14 @@ export function overviewMetrics({
     icon: <TrendingUp size={16} />,
     delta: D.revenue,
     definition: A
-      ? "المبالغ المدفوعة فعليًا خلال الفترة، محسوبة بتاريخ الدفع من فواتير الحسابات. الفاتورة التي صدرت ولم تُدفع بعد لا تدخل هنا."
+      ? "الفلوس اللي دخلت فعلًا في الفترة دي من فواتير اتدفعت."
       : "Money actually collected in the period, counted on payment date from Accounting invoices. An invoice raised but not yet paid is not in this figure.",
+    source: A
+      ? "من الحسابات في Odoo: كل فاتورة اتدفعت، ومحسوبة بيوم الدفع."
+      : "From Odoo Accounting: every paid invoice, counted on the day it was paid.",
+    why: A
+      ? "ده الرقم اللي بيقول الشركة كسبت كام بجد، مش اتفقت على كام."
+      : "It is what the company actually earned, not what was only agreed.",
     formula: A
       ? "مجموع قيمة الفواتير المدفوعة (Accounting · USD Paid) التي يقع تاريخ دفعها داخل الفترة المحددة."
       : "Sum of paid invoice value (Accounting · USD Paid) whose payment date falls inside the selected window.",
@@ -457,8 +463,14 @@ export function overviewMetrics({
     delta: data.spendCoverage?.complete === false ? undefined : D.spend,
     deltaInvert: true,
     definition: A
-      ? "ما أُنفق فعليًا على الإعلانات خلال الفترة، بتاريخ ظهور الإعلان، من كل المنصات المتصلة."
+      ? "الفلوس اللي اتصرفت على الإعلانات في الفترة دي."
       : "What was actually spent on ads during the period, on ad date, across every connected platform.",
+    source: A
+      ? "من حسابات الإعلانات نفسها: ميتا وسناب وتيك توك وجوجل وChatGPT Ads، بيوم ظهور الإعلان."
+      : "From the ad accounts themselves (Meta, Snapchat, TikTok, Google, ChatGPT Ads), on the day the ad ran.",
+    why: A
+      ? "من غيره مانقدرش نعرف كل ليد أو كل بيعة كلّفتنا كام."
+      : "Without it there is no cost per lead or per sale.",
     formula: A
       ? "مجموع الإنفاق اليومي لكل إعلان في كل المنصات داخل الفترة، بما فيه حسابات الزيارات."
       : "Sum of daily spend for every ad on every platform inside the window, traffic accounts included.",
@@ -559,8 +571,14 @@ export function overviewMetrics({
     icon: <Users size={16} />,
     delta: D.totalLeads,
     definition: A
-      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد، بعد استبعاد مصادر التوصية وواتساب برودكاست."
+      ? "كل عميل محتمل دخل السيستم في الفترة دي."
       : "Every lead that entered the system in the period: active CRM rows plus approved losses, excluding Recommendation and WhatsApp Broadcast sources.",
+    source: A
+      ? "من Odoo CRM: الليدز اللي اتفتحت في الفترة، ومعاها اللي اتقفلت Lost."
+      : "From Odoo CRM: leads opened in the period, including those later closed as Lost.",
+    why: A
+      ? "ده أول السلسلة كلها: لو الليدز قلّت، المبيعات هتقل بعدها."
+      : "It is the start of the chain: fewer leads now means fewer sales later.",
     formula: A
       ? `عملاء CRM (${fmtNum(T.crmLeads)}) + الصفقات الضائعة المعتمدة (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`
       : `CRM leads (${fmtNum(T.crmLeads)}) + approved losses (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`,
@@ -693,8 +711,14 @@ export function overviewMetrics({
     icon: <Award size={16} />,
     delta: D.won,
     definition: A
-      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة Won في الـCRM خلال الفترة. البيعة المدفوعة تُعد من الفواتير في تقرير CRM."
+      ? "عدد الليدز اللي السيلز قفلها Won في Odoo."
       : "How many leads reached the CRM Won stage during the period. Paid sales are counted from invoices on the CRM report.",
+    source: A
+      ? "من مراحل الـCRM في Odoo، على الليدز اللي اتفتحت في الفترة."
+      : "From the CRM stages in Odoo, for leads opened in the period.",
+    why: A
+      ? "بيقيس شغل السيلز في القفل. البيعة المدفوعة نفسها بتتعد من الفواتير."
+      : "It measures how sales close; the paid sale itself is counted from invoices.",
     formula: A
       ? `${fmtNum(T.won)} Won ÷ ${fmtNum(T.totalLeads)} عميل في الفترة = ${fmtPct(T.conversionRate, 2)} معدل Won.`
       : `${fmtNum(T.won)} won ÷ ${fmtNum(T.totalLeads)} leads in the period = ${fmtPct(T.conversionRate, 2)} Won rate.`,
@@ -795,8 +819,14 @@ export function overviewMetrics({
     icon: <Target size={16} />,
     delta: data.spendCoverage?.complete === false ? undefined : D.attributedRoas,
     definition: A
-      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل المرتبط بحملة رجع في الفترة."
+      ? "كل دولار اتصرف على الإعلانات، رجّع كام دولار من فلوس جت من حملات."
       : "For every dollar spent on ads, how much campaign-attributed collected revenue came back in the period.",
+    source: A
+      ? "الفلوس من فواتير Odoo اللي عليها اسم حملة، والصرف من حسابات الإعلانات."
+      : "Revenue from Odoo invoices that carry a campaign; spend from the ad accounts.",
+    why: A
+      ? "ده العائد الحقيقي للإعلانات: فوق 1× يعني الإعلان رجّع أكتر من تمنه."
+      : "It is the real return on ads: above 1× the ads paid for themselves.",
     formula: A
       ? `الإيراد المرتبط بحملة ÷ الإنفاق: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`
       : `Campaign-attributed revenue ÷ spend: ${fmtUSD(T.attributedRevenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.attributedRoas)}.`,
@@ -924,8 +954,14 @@ export function overviewEfficiencyMetrics({
     delta: D.lost,
     deltaInvert: true,
     definition: A
-      ? "الصفقات التي أُغلقت خاسرة، من مصدر الخسائر المعتمد وحده. صفوف الـCRM التي حالتها «خسارة» مستبعدة تمامًا حتى لا تُحسب الخسارة مرتين."
+      ? "الليدز اللي اتقفلت خسارة."
       : "Deals closed as lost, from the approved Lost source only. CRM rows whose stage is Lost are excluded entirely so a loss is never counted twice.",
+    source: A
+      ? "من سجل الخسارة المعتمد في Odoo بس، عشان ماتتعدّش نفس الليد مرتين."
+      : "From the approved Lost record in Odoo only, so no lead is counted twice.",
+    why: A
+      ? "بيوريك بنخسر العملاء فين، وأسباب الخسارة في التفاصيل بتقول نعمل إيه."
+      : "It shows where customers are lost; the reasons tell you what to fix.",
     formula: A
       ? `${fmtNum(T.lost)} صفقة ضائعة ÷ ${fmtNum(T.totalLeads)} عميل = ${fmtPct(T.lostRate, 2)}.`
       : `${fmtNum(T.lost)} lost ÷ ${fmtNum(T.totalLeads)} leads = ${fmtPct(T.lostRate, 2)}.`,
@@ -970,8 +1006,12 @@ export function overviewEfficiencyMetrics({
     icon: <Percent size={14} />,
     delta: D.conversionRate,
     definition: A
-      ? "نسبة العملاء المحتملين الذين تحوّلوا إلى صفقات رابحة داخل الفترة."
+      ? "من كل 100 ليد، كام واحد اتقفل Won."
       : "The share of leads that became won deals inside the period.",
+    source: A ? "عدد الـWon ÷ كل الليدز، من Odoo CRM." : "Won count ÷ all leads, from Odoo CRM.",
+    why: A
+      ? "بيقولك جودة الليدز وشغل السيلز مع بعض: ليدز كتير ونسبة قليلة يبقى فيه حاجة غلط."
+      : "It reads lead quality and sales work together: many leads at a low rate means something is off.",
     formula: A
       ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`
       : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`,
@@ -1050,8 +1090,14 @@ export function overviewEfficiencyMetrics({
     delta: D.cpl,
     deltaInvert: true,
     definition: A
-      ? "كم كلّف كل عميل محتمل أبلغت عنه المنصات الإعلانية. المقام هنا هو ليدز المنصات، لا عملاء الـCRM."
+      ? "كل ليد من المنصات الإعلانية كلّفنا كام."
       : "What each platform-reported lead cost. The denominator is platform leads, not CRM leads.",
+    source: A
+      ? "الصرف من حسابات الإعلانات ÷ عدد الليدز اللي المنصة نفسها بلّغت عنه."
+      : "Ad spend ÷ the leads the platforms themselves reported.",
+    why: A
+      ? "لو زاد، يبقى الإعلانات غليت أو ضعفت، ومحتاجين نراجع الحملات."
+      : "When it rises, ads got pricier or weaker and campaigns need a review.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ليد إعلانية = ${fmtUSDFull(T.cpl)}.`
       : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} platform leads = ${fmtUSDFull(T.cpl)}.`,
@@ -1142,8 +1188,12 @@ export function overviewEfficiencyMetrics({
     delta: D.lostRate,
     icon: <Percent size={14} />,
     definition: A
-      ? "نسبة العملاء المحتملين الذين انتهت صفقتهم بالخسارة داخل الفترة، من مصدر الخسائر المعتمد وحده."
+      ? "من كل 100 ليد، كام واحد اتقفل خسارة."
       : "The share of leads whose deal ended as lost inside the period, from the approved Lost source only.",
+    source: A ? "عدد الخسارة من السجل المعتمد ÷ كل الليدز." : "Approved losses ÷ all leads.",
+    why: A
+      ? "لو عالية، يبقى فيه مشكلة في جودة الليدز أو في المتابعة."
+      : "If it is high, lead quality or follow-up has a problem.",
   };
 
   const acos: MetricDetail = {
@@ -1155,8 +1205,12 @@ export function overviewEfficiencyMetrics({
     delta: D.acos,
     deltaInvert: true,
     definition: A
-      ? "نسبة الإنفاق الإعلاني من الإيراد المحصّل. كلما انخفضت كان الإعلان أرخص مقابل ما أعاده."
+      ? "الإعلانات خدت كام في المية من الفلوس اللي دخلت."
       : "Ad spend as a share of collected revenue. The lower it is, the cheaper the advertising was for what it returned.",
+    source: A ? "الصرف ÷ التحصيل × 100." : "Spend ÷ collections × 100.",
+    why: A
+      ? "كل ما قلّ كان أحسن: معناه الإعلان أرخص قصاد اللي رجّعه."
+      : "Lower is better: the ads cost less for what they brought back.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtUSD(T.revenue)} = ${fmtPct(T.acos, 1)}. وهي مقلوب العائد على الإنفاق.`
       : `${fmtUSD(T.spend)} ÷ ${fmtUSD(T.revenue)} = ${fmtPct(T.acos, 1)}. It is the inverse of the return on ad spend.`,
@@ -1180,8 +1234,14 @@ export function overviewEfficiencyMetrics({
     tone: "slate",
     icon: <Timer size={14} />,
     definition: A
-      ? "متوسط عدد الأيام بين دخول العميل المحتمل وإغلاق صفقته، محسوبًا على الصفقات المغلقة فقط."
+      ? "الصفقة بتاخد كام يوم في المتوسط من أول ما الليد يدخل لحد ما تتقفل."
       : "The average number of days between a lead arriving and its deal closing, over closed deals only.",
+    source: A
+      ? "من تاريخ دخول الليد وتاريخ القفل في Odoo، على الصفقات المقفولة بس."
+      : "From the lead's arrival and close dates in Odoo, over closed deals only.",
+    why: A
+      ? "كل ما المدة قصرت، الفلوس بتدخل أسرع والسيلز بيلحق ليدز أكتر."
+      : "The shorter it is, the sooner money arrives and the more leads sales can handle.",
     formula: A
       ? `محسوب على ${fmtNum(T.closeSample)} صفقة مغلقة يمكن قياس زمنها.`
       : `Measured over ${fmtNum(T.closeSample)} closed deals whose timing is measurable.`,
@@ -1215,8 +1275,12 @@ export function overviewEfficiencyMetrics({
     tone: "violet",
     icon: <Target size={14} />,
     definition: A
-      ? "كم كلّف الإعلان مقابل كل صفقة رابحة في الفترة."
+      ? "كل بيعة Won كلّفتنا كام إعلانات."
       : "What advertising cost for each won deal in the period.",
+    source: A ? "الصرف ÷ عدد الـWon في الفترة." : "Spend ÷ won deals in the period.",
+    why: A
+      ? "بيقارن تمن الإعلان بتمن الكورس: لو قرّب منه، الحملة مش جايبة همّها."
+      : "It sets ad cost against course price: if it gets close, the campaign does not pay off.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.won)} صفقة = ${fmtUSDFull(T.cpa)}.`
       : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.won)} won = ${fmtUSDFull(T.cpa)}.`,

@@ -228,7 +228,7 @@ export function PriceCourseSummaryTab({
             role="group"
             aria-label={ar ? "التخصص" : "Specialization"}
           >
-            <span className="pe-1 text-[10.5px] font-semibold uppercase tracking-wide text-text-subtle">
+            <span className="pe-1 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
               {ar ? "التخصص" : "Specialization"}
             </span>
             {["all", ...specializations].map((value) => (
@@ -239,7 +239,7 @@ export function PriceCourseSummaryTab({
                 onClick={() =>
                   onFilters({ ...filters, q: "", specialization: value, subcategory: "all" })
                 }
-                className={`min-h-8 cursor-pointer rounded-lg border px-3 text-[11.5px] font-semibold transition-colors ${
+                className={`min-h-8 cursor-pointer rounded-lg border px-3 text-[12px] font-semibold transition-colors ${
                   filters.specialization === value
                     ? "border-brand bg-brand text-white"
                     : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
@@ -264,7 +264,7 @@ export function PriceCourseSummaryTab({
                   key={item.value}
                   aria-pressed={kind === item.value}
                   onClick={() => onKind(item.value)}
-                  className={`min-h-8 cursor-pointer rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
+                  className={`min-h-8 cursor-pointer rounded-lg px-2.5 text-[12px] font-semibold transition-colors ${
                     kind === item.value
                       ? "bg-brand-soft text-brand ring-1 ring-brand/25"
                       : "bg-surface-2 text-text-muted hover:text-text"
@@ -277,13 +277,13 @@ export function PriceCourseSummaryTab({
           </div>
 
           {!!deliveryTypes.length && (
-            <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-text-muted">
+            <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-text-muted">
               <Filter size={13} aria-hidden="true" />
               <span className="sr-only sm:not-sr-only">{ar ? "طريقة الحضور" : "Delivery"}</span>
               <select
                 value={filters.deliveryType}
                 onChange={(event) => onFilters({ ...filters, deliveryType: event.target.value })}
-                className="min-h-8 cursor-pointer rounded-lg border border-border bg-surface px-2 text-[11.5px] text-text"
+                className="min-h-8 cursor-pointer rounded-lg border border-border bg-surface px-2 text-[12px] text-text"
               >
                 <option value="all">{ar ? "كل الأنواع" : "All types"}</option>
                 {deliveryTypes.map((value) => (
@@ -304,7 +304,7 @@ export function PriceCourseSummaryTab({
               type="button"
               aria-pressed={demandOnly}
               onClick={() => onDemandOnly(true)}
-              className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
+              className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[12px] font-semibold transition-colors ${
                 demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
               }`}
             >
@@ -315,7 +315,7 @@ export function PriceCourseSummaryTab({
               type="button"
               aria-pressed={!demandOnly}
               onClick={() => onDemandOnly(false)}
-              className={`min-h-7 cursor-pointer rounded-md px-2 text-[10.5px] font-semibold transition-colors ${
+              className={`min-h-7 cursor-pointer rounded-md px-2 text-[12px] font-semibold transition-colors ${
                 !demandOnly ? "bg-surface text-brand shadow-xs" : "text-text-muted hover:text-text"
               }`}
             >
@@ -326,7 +326,7 @@ export function PriceCourseSummaryTab({
 
         {!!activeFilters.length && (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-2.5 py-2">
-            <span className="text-[10.5px] font-semibold text-text-subtle">
+            <span className="text-[12px] font-semibold text-text-subtle">
               {ar ? "الفلاتر الفعّالة" : "Active filters"}
             </span>
             {activeFilters.map((chip) => (
@@ -334,7 +334,7 @@ export function PriceCourseSummaryTab({
                 key={chip.key}
                 type="button"
                 onClick={chip.clear}
-                className="inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-2.5 text-[11px] font-semibold text-brand"
+                className="inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-2.5 text-[12px] font-semibold text-brand"
               >
                 <bdi className="max-w-[160px] truncate">{chip.label}</bdi>
                 <X size={12} aria-hidden="true" />
@@ -347,7 +347,7 @@ export function PriceCourseSummaryTab({
       <SourceErrorNotice error={data?.error} what={ar ? "قائمة الأسعار" : "the price list"} />
 
       {!loading && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/15 bg-brand-soft/55 px-3 py-2 text-[11px] text-text-muted sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/15 bg-brand-soft/55 px-3 py-2 text-[12px] text-text-muted sm:px-4">
           <span className="inline-flex items-center gap-1.5 font-semibold text-brand">
             <TrendingUp size={14} aria-hidden="true" />
             {ar
@@ -445,14 +445,14 @@ export function PriceCourseSummaryTab({
                 </h2>
                 {specialization === PRIORITY_GROUP && (
                   <p
-                    className="num mt-0.5 truncate text-[10px] font-medium text-text-muted"
+                    className="num mt-0.5 truncate text-[12px] font-medium text-text-muted"
                     dir="ltr"
                   >
                     {PRIORITY_LABEL}
                   </p>
                 )}
               </div>
-              <span className="num text-[10.5px] text-text-subtle">
+              <span className="num text-[12px] text-text-subtle">
                 {fmtNum(entries.length)} {ar ? "دورة" : "courses"} ·{" "}
                 {fmtNum(entries.reduce((sum, entry) => sum + (entry.demand?.orders ?? 0), 0))}{" "}
                 {ar ? "مبيعات" : "sales"}
@@ -471,7 +471,7 @@ export function PriceCourseSummaryTab({
               ].map((heading) => (
                 <span
                   key={heading}
-                  className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle"
+                  className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle"
                 >
                   {heading}
                 </span>

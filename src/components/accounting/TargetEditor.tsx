@@ -225,7 +225,7 @@ export function TargetEditor({
                 <div className="text-sm font-semibold text-text">
                   {lang === "ar" ? "اختيار فترة التارجت" : "Choose target period"}
                 </div>
-                <div className="mt-0.5 text-[11px] text-text-muted">
+                <div className="mt-0.5 text-[12px] text-text-muted">
                   {lang === "ar"
                     ? "اعمل سبتمبر اليوم، وبعدها أكتوبر من نفس الزر؛ كل شهر يظل محفوظًا وحده."
                     : "Create September now and October later; every month remains independent."}
@@ -318,7 +318,7 @@ export function TargetEditor({
           {!loading && !!data && (
             <div className="table-wrap scroll-hint-x rounded-2xl border border-border">
               <table className="w-full min-w-[560px] text-sm">
-                <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-text-muted">
+                <thead className="bg-surface-2 text-[12px] uppercase tracking-wide text-text-muted">
                   <tr>
                     <th className="px-3 py-2.5 text-start">
                       {lang === "ar" ? "الموظف" : "Employee"}
@@ -332,7 +332,7 @@ export function TargetEditor({
                     <tr key={row.employeeId} className="border-t border-border">
                       <td className="px-3 py-2.5">
                         <div className="font-medium text-text">{row.name}</div>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-text-muted">
                           <span>#{row.employeeId}</span>
                           {row.source === "edited" && (
                             <Pill tone="brand">{lang === "ar" ? "معدّل" : "edited"}</Pill>
@@ -340,7 +340,7 @@ export function TargetEditor({
                           {!!row.note && <span className="truncate">· {row.note}</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-text-muted">{row.teamLeader}</td>
+                      <td className="px-3 py-2.5 text-[12px] text-text-muted">{row.teamLeader}</td>
                       <td className="px-3 py-2.5 text-end">
                         <input
                           type="number"

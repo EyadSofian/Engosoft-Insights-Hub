@@ -67,13 +67,21 @@ export function CountPct({ count, pct }: { count: number; pct: Maybe }) {
   return (
     <span className="whitespace-nowrap">
       <span className="num font-medium">{fmtNum(count)}</span>
-      <span className="num text-text-muted text-[11px] ms-1.5">({fmtPct(pct, 1)})</span>
+      <span className="num text-text-muted text-[12px] ms-1.5">({fmtPct(pct, 1)})</span>
     </span>
   );
 }
 
 /** Close time is meaningless without its sample size, so they render as one unit. */
-export function CloseTime({ days, sample, inline = false }: { days: Maybe; sample: number; inline?: boolean }) {
+export function CloseTime({
+  days,
+  sample,
+  inline = false,
+}: {
+  days: Maybe;
+  sample: number;
+  inline?: boolean;
+}) {
   const { t } = useI18n();
   if (days === null || !isFinite(days) || sample === 0)
     return <span className="text-text-subtle">{EM}</span>;
@@ -82,7 +90,7 @@ export function CloseTime({ days, sample, inline = false }: { days: Maybe; sampl
       <span className="num font-medium">
         {days.toFixed(1)} {t("days")}
       </span>
-      <span className="text-[11px] text-text-muted ms-1.5">
+      <span className="text-[12px] text-text-muted ms-1.5">
         · {t("based_on")} <span className="num">{fmtNum(sample)}</span> {t("closed_leads")}
       </span>
     </span>
@@ -165,9 +173,9 @@ export function Metric({
 }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wide text-text-muted">{label}</div>
+      <div className="text-[12px] uppercase tracking-wide text-text-muted">{label}</div>
       <div className="num text-lg font-semibold text-text mt-0.5">{children}</div>
-      {hint && <div className="text-[11px] text-text-muted mt-0.5">{hint}</div>}
+      {hint && <div className="text-[12px] text-text-muted mt-0.5">{hint}</div>}
     </div>
   );
 }

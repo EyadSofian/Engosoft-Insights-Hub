@@ -228,7 +228,7 @@ export function PriceManageTab({
       {needsCode && canWrite && (
         <Card>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "كود الإدارة" : "Admin code"}
             </span>
             <input
@@ -360,18 +360,18 @@ export function PriceManageTab({
                   >
                     {row.name}
                   </button>
-                  <p className="mt-1 text-[11px] text-text-subtle">{row.sourceName}</p>
+                  <p className="mt-1 text-[12px] text-text-subtle">{row.sourceName}</p>
                 </div>
                 <div className="text-end">
                   <div className="text-[20px] font-black tabular-nums text-brand">
                     {row.itemCount}
                   </div>
-                  <div className="text-[10px] text-text-subtle">
+                  <div className="text-[12px] text-text-subtle">
                     {lang === "ar" ? "قاعدة" : "rules"}
                   </div>
                 </div>
               </div>
-              <div className="mt-4 rounded-xl bg-surface p-3 text-[11px] tabular-nums text-text-muted">
+              <div className="mt-4 rounded-xl bg-surface p-3 text-[12px] tabular-nums text-text-muted">
                 {row.effectiveFrom || "—"} → {row.effectiveTo || "—"}
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -501,7 +501,7 @@ export function PriceManageTab({
                 </div>
                 {!!entry.reason && <p className="mt-0.5 text-text-muted">{entry.reason}</p>}
                 {!!entry.newValue && (
-                  <pre className="mt-1 overflow-x-auto rounded-lg bg-surface-2 p-2 text-[11px] text-text-muted">
+                  <pre className="mt-1 overflow-x-auto rounded-lg bg-surface-2 p-2 text-[12px] text-text-muted">
                     {JSON.stringify(entry.newValue)}
                   </pre>
                 )}
@@ -520,7 +520,7 @@ export function PriceManageTab({
               : undefined
           }
           action={
-            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 text-[12px]">
               <Pill tone={unlinked ? "warning" : "success"}>
                 <Link2Off size={11} className="me-1" aria-hidden="true" />
                 {lang === "ar" ? `${unlinked} غير مربوط` : `${unlinked} unlinked`}
@@ -555,7 +555,7 @@ export function PriceManageTab({
                 ? "اكتب كود الدورة بالأعلى لفتح أسعارها"
                 : "Enter a course code above to open its prices"}
             </p>
-            <p className="mt-1 text-[11px] text-text-muted">
+            <p className="mt-1 text-[12px] text-text-muted">
               {lang === "ar"
                 ? "لن نعرض مئات الصفوف بدون طلبك."
                 : "Hundreds of rows stay hidden until you ask for one."}
@@ -596,7 +596,7 @@ export function PriceManageTab({
                             <Pill tone="neutral">{deliveryLabel(first.deliveryType, lang)}</Pill>
                           </div>
                           <h3 className="text-[14px] font-bold text-text">{first.courseName}</h3>
-                          <p className="mt-1 text-[11px] text-text-muted">
+                          <p className="mt-1 text-[12px] text-text-muted">
                             {rows.length}{" "}
                             {lang === "ar" ? "قاعدة سعر داخل الكرت" : "pricing rules in this card"}
                           </p>
@@ -638,7 +638,7 @@ export function PriceManageTab({
                                   lang,
                                 )}
                               </div>
-                              <div className="mt-0.5 text-[10px] text-text-subtle">
+                              <div className="mt-0.5 text-[12px] text-text-subtle">
                                 {item.sourceSheet}:{item.sourceRow}
                                 {item.country ? ` · ${item.country}` : ""}
                               </div>
@@ -834,7 +834,7 @@ function ImportPanel({
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-text-muted">Google Sheet URL</span>
+            <span className="text-[12px] font-medium text-text-muted">Google Sheet URL</span>
             <input
               value={sheetUrl}
               onChange={(event) => setSheetUrl(event.target.value)}
@@ -843,7 +843,7 @@ function ImportPanel({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "أسماء التبويبات (مفصولة بفاصلة)" : "Tab names (comma separated)"}
             </span>
             <input
@@ -857,7 +857,7 @@ function ImportPanel({
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "اسم النسخة" : "Version name"}
           </span>
           <input
@@ -868,7 +868,7 @@ function ImportPanel({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "سارية من" : "Effective from"}
           </span>
           <input
@@ -879,7 +879,7 @@ function ImportPanel({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "سارية حتى" : "Effective to"}
           </span>
           <input
@@ -890,7 +890,7 @@ function ImportPanel({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "الأسعار شاملة الضريبة؟" : "Prices include tax?"}
           </span>
           <select
@@ -939,7 +939,7 @@ function ImportPanel({
               [lang === "ar" ? "تنبيهات" : "Warnings", preview.summary.warnings],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-lg bg-surface p-2">
-                <div className="text-[11px] text-text-muted">{label}</div>
+                <div className="text-[12px] text-text-muted">{label}</div>
                 <div className="text-[16px] font-semibold tabular-nums text-text">{value}</div>
               </div>
             ))}
@@ -956,7 +956,7 @@ function ImportPanel({
                 ))}
               </ul>
               <label className="mt-2 flex flex-col gap-1">
-                <span className="text-[11px] font-medium">
+                <span className="text-[12px] font-medium">
                   {lang === "ar" ? "اقرأ التاريخ كـ" : "Read the date as"}
                 </span>
                 <select
@@ -977,7 +977,7 @@ function ImportPanel({
                   </option>
                 </select>
               </label>
-              <p className="mt-1 text-[11px]">
+              <p className="mt-1 text-[12px]">
                 {lang === "ar"
                   ? "اختر ثم اضغط معاينة مرة أخرى. العروض لا تُنشر تلقائيًا بتاريخ مخمّن."
                   : "Choose, then preview again. An offer is never published on a guessed date."}
@@ -1015,7 +1015,7 @@ function ImportPanel({
                   ? `ملاحظات الاستيراد (${preview.issues.length})`
                   : `Import notes (${preview.issues.length})`}
               </summary>
-              <ul className="mt-2 space-y-1 text-[11px] text-text-muted">
+              <ul className="mt-2 space-y-1 text-[12px] text-text-muted">
                 {preview.issues.slice(0, 60).map((issue, index) => (
                   <li key={`${issue.code}${issue.row}${index}`}>
                     <Pill tone={issue.severity === "warning" ? "warning" : "neutral"}>
@@ -1071,7 +1071,7 @@ function EditDialog({
 
   const numberField = (label: string, key: "exactPrice" | "minimumPrice" | "maximumPrice") => (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      <span className="text-[12px] font-medium text-text-muted">{label}</span>
       <input
         type="number"
         inputMode="decimal"
@@ -1148,7 +1148,7 @@ function EditDialog({
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "سارٍ من" : "Valid from"}
             </span>
             <input
@@ -1159,7 +1159,7 @@ function EditDialog({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "سارٍ حتى" : "Valid to"}
             </span>
             <input
@@ -1195,7 +1195,7 @@ function EditDialog({
         </div>
 
         <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "ملاحظة" : "Note"}
           </span>
           <textarea
@@ -1207,7 +1207,7 @@ function EditDialog({
         </label>
 
         <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-text-muted">
+          <span className="text-[12px] font-medium text-text-muted">
             {lang === "ar" ? "سبب التعديل (يُحفظ في السجل)" : "Reason (recorded in the log)"}
           </span>
           <input

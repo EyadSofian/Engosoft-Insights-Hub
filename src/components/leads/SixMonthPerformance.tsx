@@ -1328,7 +1328,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
                 </p>
               </div>
             </div>
-            <div className="mt-3 rounded-xl border border-amber-strong/20 bg-amber-surface/40 px-3 py-2.5 text-[11.5px] leading-5 text-text-muted">
+            <div className="mt-3 rounded-xl border border-amber-strong/20 bg-amber-surface/40 px-3 py-2.5 text-[12px] leading-5 text-text-muted">
               <p className="font-semibold text-text">
                 {t.freshNow}: <span className="num">{n(selected.freshTagged)}</span>
               </p>
@@ -1410,7 +1410,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
                     {stageLabel[stage.key]}
                     {!stage.evidenced && (
                       <span
-                        className="ms-1.5 align-middle text-[11px] font-medium text-text-muted"
+                        className="ms-1.5 align-middle text-[12px] font-medium text-text-muted"
                         title={stage.count === null ? x.stageWithheld : x.stageProxy}
                       >
                         *
@@ -1443,7 +1443,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[11.5px] leading-relaxed text-text-muted">
+          <p className="mt-4 text-[12px] leading-relaxed text-text-muted">
             {x.stageProxy} · {t.wonCaveat}
           </p>
         </Card>
@@ -1471,8 +1471,8 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
             >
               <span className="text-xs font-semibold text-text">{monthLabel(row.name, lang)}</span>
               <span className="num mt-2 block text-2xl font-bold text-text">{n(row.leads)}</span>
-              <span className="text-[11px] text-text-muted">{t.leads}</span>
-              <span className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+              <span className="text-[12px] text-text-muted">{t.leads}</span>
+              <span className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
                 <span className="text-rose-strong">
                   {x.calendarLost}
                   <b className="num mt-0.5 block text-sm">{n(row.calendarLost)}</b>
@@ -1488,7 +1488,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
                   </b>
                 </span>
               </span>
-              <span className="mt-2 block text-[11px] text-text-muted">
+              <span className="mt-2 block text-[12px] text-text-muted">
                 {x.sameMonthLost}: {n(row.lostSameEntryMonth)} · {x.calendarPaid}:{" "}
                 {paidReady ? n(row.calendarPaid) : "—"}
               </span>
@@ -1611,7 +1611,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
                 {t.coverage}: {n(selected.callMatchable)} / {n(selected.leads)}
               </Pill>
             </div>
-            <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
+            <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
               {data.coverage.callsAvailable
                 ? selected.exactLagSample
                   ? `${n(selected.exactLagSample)} ${lang === "ar" ? "سجل بتوقيت إنشاء دقيق" : "records with an exact creation time"}`
@@ -1644,7 +1644,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
                 )}
               />
             </div>
-            <p className="mt-3 text-[11.5px] leading-5 text-text-muted">
+            <p className="mt-3 text-[12px] leading-5 text-text-muted">
               {x.duplicateBasis} {n(selected.duplicateSameMonth + selected.duplicateEarlierMonth)} ÷{" "}
               {n(selected.leads)} ={" "}
               {pct(
@@ -1656,7 +1656,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
               )}
               .
             </p>
-            <p className="mt-1 text-[11.5px] leading-5 text-text-muted">
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">
               {x.declaredDuplicateBasis}: {n(selected.confirmedDuplicate)} ÷ {n(selected.lost)} ={" "}
               {pct(selected.lost ? (selected.confirmedDuplicate / selected.lost) * 100 : null)}.
             </p>
@@ -1716,21 +1716,19 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
           <Card>
             <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
               <div>
-                <div className="text-[11.5px] text-text-muted">{t.paymentMonth}</div>
+                <div className="text-[12px] text-text-muted">{t.paymentMonth}</div>
                 <div className="num mt-1 text-3xl font-bold text-text">
                   {data.availability.accounting ? n(selectedCollections?.paidInvoices) : "—"}
                 </div>
               </div>
               <div>
-                <div className="text-[11.5px] text-text-muted">{t.paymentRevenue}</div>
+                <div className="text-[12px] text-text-muted">{t.paymentRevenue}</div>
                 <div className="num mt-1 text-xl font-bold text-text">
                   {data.availability.accounting ? money(selectedCollections?.paidUsd ?? 0) : "—"}
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
-              {t.cohortVsPayment}
-            </p>
+            <p className="mt-3 text-[12px] leading-relaxed text-text-muted">{t.cohortVsPayment}</p>
           </Card>
         </PageSection>
       </div>
@@ -1861,7 +1859,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
 function SmallStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-3">
-      <div className="text-[11.5px] leading-snug text-text-muted">{label}</div>
+      <div className="text-[12px] leading-snug text-text-muted">{label}</div>
       <div className="num mt-1.5 text-lg font-bold text-text">{value}</div>
     </div>
   );

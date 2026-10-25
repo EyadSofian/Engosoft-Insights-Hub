@@ -76,14 +76,14 @@ export function CampaignTable({
   return (
     <div data-testid="nexus-campaign-table">
       <div className="mb-1.5 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] text-text-muted">{t.sortBy}</span>
+        <span className="text-[12px] text-text-muted">{t.sortBy}</span>
         {sorts.map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => setSort(sort === key ? null : key)}
             aria-pressed={sort === key}
-            className={`rounded border px-1.5 py-0.5 text-[11px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            className={`rounded border px-1.5 py-0.5 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               sort === key
                 ? "border-accent bg-accent/10 text-accent"
                 : "border-border text-text-muted hover:bg-surface-muted"
@@ -167,7 +167,7 @@ export function CampaignTable({
               <span className="block truncate text-xs font-medium text-text">
                 <LtrText>{campaign.name}</LtrText>
               </span>
-              <span className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-text-muted">
+              <span className="mt-0.5 flex flex-wrap gap-x-3 text-[12px] text-text-muted">
                 <span className="num">
                   {t.revenue} {formatMoney(campaign.revenue, "USD")}
                 </span>

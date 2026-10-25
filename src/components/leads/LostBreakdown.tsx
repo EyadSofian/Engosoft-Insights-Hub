@@ -126,10 +126,10 @@ export function LostBreakdown({
           <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.85fr)] lg:items-end">
             <div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-[11px] font-bold tracking-[0.12em] text-[#ffadb4]">
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#ffadb4]">
                   {t.eyebrow}
                 </p>
-                <span className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-medium text-white/70">
+                <span className="rounded-full border border-white/15 px-2.5 py-1 text-[12px] font-medium text-white/70">
                   {t.entryMonth} <bdi className="num text-white">{month}</bdi>
                 </span>
               </div>
@@ -161,7 +161,7 @@ export function LostBreakdown({
               </div>
             </div>
           </div>
-          <p className="relative mt-5 border-t border-white/10 pt-3 text-[11.5px] text-white/65">
+          <p className="relative mt-5 border-t border-white/10 pt-3 text-[12px] text-white/65">
             {t.formula}
           </p>
         </div>
@@ -259,7 +259,7 @@ export function LostBreakdown({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="num grid size-8 shrink-0 place-items-center rounded-xl bg-rose-surface text-[11px] font-bold text-rose-ink">
+                      <span className="num grid size-8 shrink-0 place-items-center rounded-xl bg-rose-surface text-[12px] font-bold text-rose-ink">
                         {String(index + 1).padStart(2, "0")}
                       </span>
                       <h3 className="min-w-0 break-words text-[16px] font-bold leading-tight text-text">
@@ -270,7 +270,7 @@ export function LostBreakdown({
                       <strong className="num block text-[25px] font-black leading-none tracking-[-0.04em] text-rose-ink">
                         {row.lostRate === null ? "—" : fmtPct(row.lostRate, 1)}
                       </strong>
-                      <span className="mt-1 block text-[10px] text-text-muted">{t.rateBasis}</span>
+                      <span className="mt-1 block text-[12px] text-text-muted">{t.rateBasis}</span>
                     </div>
                   </div>
                   <div className="mt-4 flex items-baseline gap-1.5 text-[12px] text-text-muted">
@@ -290,17 +290,17 @@ export function LostBreakdown({
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-rose-surface px-3 py-2 text-rose-ink">
-                      <span className="text-[11.5px] font-semibold">{t.lostLeads}</span>
+                      <span className="text-[12px] font-semibold">{t.lostLeads}</span>
                       <bdi className="num text-base font-bold">{fmtNum(row.lostLeads)}</bdi>
                     </div>
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-violet-surface px-3 py-2 text-violet-ink">
-                      <span className="text-[11.5px] font-semibold">{t.lostOpportunities}</span>
+                      <span className="text-[12px] font-semibold">{t.lostOpportunities}</span>
                       <bdi className="num text-base font-bold">{fmtNum(row.lostOpportunities)}</bdi>
                     </div>
                   </div>
                   <div className="mt-3 border-t border-border pt-2.5">
-                    <p className="text-[10.5px] font-semibold text-text-muted">{t.reasons}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-text-muted">
+                    <p className="text-[12px] font-semibold text-text-muted">{t.reasons}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-muted">
                       <span>
                         {t.noAnswer}{" "}
                         <bdi className="num font-bold text-text">{fmtNum(row.noAnswer)}</bdi>

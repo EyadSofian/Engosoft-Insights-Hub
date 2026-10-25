@@ -92,19 +92,19 @@ export function DecisionCard({
     >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span
-          className={`rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide ${tone}`}
+          className={`rounded-md px-2 py-0.5 text-[12px] font-bold tracking-wide ${tone}`}
           data-testid="nexus-decision-badge"
         >
           {message.decision}
         </span>
         {message.priority && (
-          <span className="text-[10px] font-semibold uppercase text-text-subtle">
+          <span className="text-[12px] font-semibold uppercase text-text-subtle">
             {message.priority}
           </span>
         )}
         {message.confidence && (
           <span
-            className={`ms-auto text-[11px] font-medium ${CONFIDENCE_TONE[message.confidence] ?? ""}`}
+            className={`ms-auto text-[12px] font-medium ${CONFIDENCE_TONE[message.confidence] ?? ""}`}
             data-testid="nexus-decision-confidence"
           >
             {t.confidence}: {message.confidence}
@@ -117,7 +117,7 @@ export function DecisionCard({
 
         {message.actionBand && (
           <div className="rounded-lg border border-brand/30 bg-brand-soft/40 px-2.5 py-2">
-            <p className="text-[11px] font-semibold text-brand">{t.band}</p>
+            <p className="text-[12px] font-semibold text-brand">{t.band}</p>
             <p
               className="num mt-0.5 text-sm font-semibold text-text"
               data-testid="nexus-action-band"
@@ -125,7 +125,7 @@ export function DecisionCard({
               {message.actionBand.display}
             </p>
             {message.actionBand.provenance && (
-              <p className="mt-1 text-[11px] leading-snug text-text-muted">
+              <p className="mt-1 text-[12px] leading-snug text-text-muted">
                 {message.actionBand.provenance}
               </p>
             )}
@@ -137,13 +137,13 @@ export function DecisionCard({
             className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2"
             data-testid="nexus-missing-evidence"
           >
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-400">
               <AlertTriangle className="size-3" aria-hidden />
               {t.missing}
             </p>
             <ul className="mt-1 space-y-0.5">
               {message.missingEvidence.map((item) => (
-                <li key={item} className="text-[11px] leading-snug text-text-muted">
+                <li key={item} className="text-[12px] leading-snug text-text-muted">
                   {item}
                 </li>
               ))}
@@ -151,7 +151,7 @@ export function DecisionCard({
           </div>
         )}
 
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
           {message.owner && <Field icon={User} label={t.owner} value={message.owner} />}
           {message.reviewWindowDays !== null && message.reviewWindowDays !== undefined && (
             <Field
@@ -183,7 +183,7 @@ export function DecisionCard({
             type="button"
             onClick={() => setExpanded((value) => !value)}
             aria-expanded={expanded}
-            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             {t.details}
             <ChevronDown
@@ -205,7 +205,7 @@ export function DecisionCard({
                 )
               }
               data-testid="nexus-decision-send"
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send className="size-3" aria-hidden />
               {t.send}
@@ -235,10 +235,10 @@ function Section({ title, items }: { title: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="text-[11px] font-semibold text-text">{title}</p>
+      <p className="text-[12px] font-semibold text-text">{title}</p>
       <ul className="mt-0.5 space-y-0.5">
         {items.map((item) => (
-          <li key={item} className="text-[11px] leading-snug text-text-muted">
+          <li key={item} className="text-[12px] leading-snug text-text-muted">
             {item}
           </li>
         ))}

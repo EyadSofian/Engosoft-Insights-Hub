@@ -34,13 +34,13 @@ export function ChartBody({ message }: { message: ChartMessageType }) {
       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
       <XAxis
         dataKey={message.xKey}
-        tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+        tick={{ fontSize: 12, fill: "var(--text-muted)" }}
         tickLine={false}
         axisLine={{ stroke: "var(--border)" }}
         minTickGap={16}
       />
       <YAxis
-        tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+        tick={{ fontSize: 12, fill: "var(--text-muted)" }}
         tickLine={false}
         axisLine={false}
         width={48}
@@ -53,7 +53,7 @@ export function ChartBody({ message }: { message: ChartMessageType }) {
           background: "var(--bg)",
           border: "1px solid var(--border)",
           borderRadius: 10,
-          fontSize: 11,
+          fontSize: 12,
         }}
         labelStyle={{ color: "var(--text-muted)" }}
         formatter={(value: unknown, name: unknown) => {

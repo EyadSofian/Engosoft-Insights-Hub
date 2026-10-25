@@ -548,7 +548,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
             loading="lazy"
             className="aspect-[3/2] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
           />
-          <span className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-[11px] font-semibold text-brand">
+          <span className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-[12px] font-semibold text-brand">
             <ImageIcon size={13} />
             {A ? "افتح الصورة الأصلية" : "Open original image"}
           </span>
@@ -569,7 +569,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="text-[10px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {A
                   ? `ليدز الدورات · ${fmtNum(source.dailyCourseLeads)} يوميًا × ${fmtNum(source.workingDays)} يوم`
                   : `Course leads · ${fmtNum(source.dailyCourseLeads)} daily × ${fmtNum(source.workingDays)} days`}
@@ -579,7 +579,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="text-[10px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {A ? "ليدز الموقع" : "Website leads"}
               </div>
               <div className="num mt-1 text-lg font-bold text-text">
@@ -587,7 +587,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="text-[10px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {A ? "يوتيوب · الوحدة غير مذكورة" : "YouTube · unit unspecified"}
               </div>
               <div className="num mt-1 text-lg font-bold text-text">
@@ -595,7 +595,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="text-[10px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {A ? "براندينج · الوحدة غير مذكورة" : "Branding · unit unspecified"}
               </div>
               <div className="num mt-1 text-lg font-bold text-text">
@@ -603,7 +603,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-surface p-3">
-              <div className="text-[10px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {A ? "إجمالي الصورة المعلن" : "Total stated in image"}
               </div>
               <div className="num mt-1 text-lg font-bold text-text">
@@ -612,7 +612,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
             </div>
           </div>
 
-          <p className="mt-3 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-warning">
+          <p className="mt-3 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-[12px] leading-relaxed text-warning">
             {A
               ? `ليدز الدورات والموقع = ${fmtNum(confirmedLeadGoals)}. جمع كل الأرقام الظاهرة حسابيًا = ${fmtNum(numericListed)}، لكن لا يصح اعتباره «إجمالي ليدز» لأن وحدة يوتيوب والبراندينج غير مذكورة وقد تتداخل القنوات. لذلك يبقى الفرق ${fmtNum(leadGap)} عن إجمالي ${fmtNum(source.statedTotalLeads)} ليد غير مفسّر. أيضًا ${fmtUSDFull(source.marketingBudgetUsd)} = ${fmtPct(budgetPercent, 1)} من هدف ${fmtUSDFull(source.salesTargetUsd)}، لا 17% بالضبط.`
               : `Course and website lead goals total ${fmtNum(confirmedLeadGoals)}. All visible numbers sum arithmetically to ${fmtNum(numericListed)}, but that is not a valid lead total: YouTube and branding units are unspecified and channels may overlap. The ${fmtNum(leadGap)} gap to the stated ${fmtNum(source.statedTotalLeads)} leads is unresolved. Also ${fmtUSDFull(source.marketingBudgetUsd)} is ${fmtPct(budgetPercent, 1)} of the ${fmtUSDFull(source.salesTargetUsd)} revenue goal, not exactly 17%.`}
@@ -716,7 +716,7 @@ function MediaPlanPage() {
                     : "Approved monthly targets compared with actual delivery."
             }
             action={
-              <label className="block min-w-44 text-[11px] font-semibold text-text-muted">
+              <label className="block min-w-44 text-[12px] font-semibold text-text-muted">
                 {lang === "ar" ? "شهر الخطة" : "Plan month"}
                 <select
                   value={month}
@@ -1035,7 +1035,7 @@ function MediaPlanPage() {
                     key={activity.key}
                     className="rounded-2xl border border-border bg-surface-2 p-3"
                   >
-                    <div className="text-[11px] leading-snug text-text-muted">{activity.label}</div>
+                    <div className="text-[12px] leading-snug text-text-muted">{activity.label}</div>
                     <div className="num mt-2 text-lg font-bold text-text">
                       {data.plan.overallMarketingBudgetUsd !== undefined && activity.budgetUsd === 0
                         ? lang === "ar"
@@ -1102,7 +1102,7 @@ function MediaPlanPage() {
                 {data.sources.map((source) => (
                   <p
                     key={source}
-                    className="border-t border-border pt-2 text-[11px] text-text-subtle"
+                    className="border-t border-border pt-2 text-[12px] text-text-subtle"
                   >
                     {source}
                   </p>
@@ -1175,7 +1175,7 @@ function ProgressRail({
       </div>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="num text-xl font-bold text-text">{actual}</span>
-        <span className="text-[11px] text-text-subtle">/ {target}</span>
+        <span className="text-[12px] text-text-subtle">/ {target}</span>
       </div>
       <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
         <div
@@ -1188,7 +1188,7 @@ function ProgressRail({
           title={lang === "ar" ? "المطلوب حتى اليوم" : "Expected to date"}
         />
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-text-subtle">
+      <div className="mt-2 flex items-center justify-between text-[12px] text-text-subtle">
         <span>{lang === "ar" ? "المتحقق" : "Actual"}</span>
         <span>
           {lang === "ar" ? "المطلوب حتى اليوم" : "Expected today"}: {ratioPct(expected)}
@@ -1235,7 +1235,7 @@ function PlanDeliverySection({
       >
         {lang === "ar" ? "تنفيذ خطة الشهر" : "Monthly Plan Delivery"}
       </SectionTitle>
-      <p className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/30 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-text-muted">
+      <p className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/30 px-3.5 py-2.5 text-[12px] leading-relaxed text-text-muted">
         {lang === "ar"
           ? `الرقم الفعلي ونسبة الإنجاز وحالة «متأخر/على المسار/متقدم» تُحسب من الفرص البيعية في أودو فقط مقارنةً بتارجت الليدز في الخطة، وليست معدل تحويل. الليد النشط والمفقود يظهران منفصلين ولا يدخلان في الإنجاز. الفرص المفقودة ضمن الفرص. مستبعد Recommendation (${fmtNum(excludedLeads.recommendation)}) وWhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) وAutoDialer Broadcast (${fmtNum(excludedLeads.autodialerBroadcast)}). رقم المنصة للمقارنة فقط.`
           : `The main figure, achievement and Behind/On track/Ahead status use current Odoo opportunities only against the plan's lead target; this is not a conversion rate. Active and Lost leads are shown separately and excluded from attainment. Lost opportunities remain within opportunities. Recommendation (${fmtNum(excludedLeads.recommendation)}), WhatsApp Broadcast (${fmtNum(excludedLeads.whatsappBroadcast)}) and AutoDialer Broadcast (${fmtNum(excludedLeads.autodialerBroadcast)}) are excluded. Platform figures are comparison-only.`}
@@ -1307,11 +1307,11 @@ function NeedsAttention({
               <>
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-xs font-bold text-text">{row.label}</span>
-                  <span className="shrink-0 text-[10px] font-bold text-amber-ink">
+                  <span className="shrink-0 text-[12px] font-bold text-amber-ink">
                     {deliverableStatusLabel(status, lang)}
                   </span>
                 </div>
-                <div className="mt-1 text-[11px] text-text-muted">
+                <div className="mt-1 text-[12px] text-text-muted">
                   {row.actual === null || !row.connected
                     ? lang === "ar"
                       ? isManual
@@ -1392,7 +1392,7 @@ function MediaPlanLeadsPanel({
       title={row.label}
       subtitle={`${month} · ${ar ? "المطلوب" : "Target"} ${fmtNum(row.target)} · ${ar ? "الفعلي" : "Actual"} ${row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}`}
       eyebrow={
-        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold text-brand">
+        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-bold text-brand">
           {ar ? "تفاصيل تنفيذ خطة الميديا" : "Media plan delivery details"}
         </span>
       }
@@ -1408,17 +1408,17 @@ function MediaPlanLeadsPanel({
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <div className="text-[11px] text-text-muted">{ar ? "المطلوب" : "Target"}</div>
+              <div className="text-[12px] text-text-muted">{ar ? "المطلوب" : "Target"}</div>
               <div className="num mt-1 text-xl font-bold text-text">{fmtNum(row.target)}</div>
             </div>
             <div className="rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
-              <div className="text-[11px] text-text-muted">{sourceLabel}</div>
+              <div className="text-[12px] text-text-muted">{sourceLabel}</div>
               <div className="num mt-1 text-xl font-bold text-brand">
                 {row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}
               </div>
             </div>
             <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <div className="text-[11px] text-text-muted">
+              <div className="text-[12px] text-text-muted">
                 {row.platformActual !== undefined
                   ? ar
                     ? "رقم المنصة للمقارنة"
@@ -1501,7 +1501,7 @@ function MediaPlanLeadsPanel({
                         }}
                         className={`rounded-xl border p-3 text-start transition-colors ${active ? "border-brand bg-brand-soft/50" : "border-border bg-surface-2/40 hover:border-brand/40"}`}
                       >
-                        <span className="block text-[11px] text-text-muted">
+                        <span className="block text-[12px] text-text-muted">
                           {ar ? item.ar : item.en}
                         </span>
                         <strong className="num mt-1 block text-lg text-text">
@@ -1588,7 +1588,7 @@ function MediaPlanLeadsPanel({
                         {ar ? "فتح في أودو" : "Open in Odoo"}
                       </a>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-text-muted">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-text-muted">
                       <span className="rounded-md bg-surface-3 px-2 py-1">
                         {lead.course} · {lead.specialty}
                       </span>
@@ -1715,7 +1715,7 @@ function DeliverableCard({
       <div className="pointer-events-none relative flex items-start justify-between gap-3">
         <div>
           <div
-            className="text-[11px] font-bold uppercase tracking-[0.08em]"
+            className="text-[12px] font-bold uppercase tracking-[0.08em]"
             style={{ color: tone.ink }}
           >
             {label}
@@ -1727,7 +1727,7 @@ function DeliverableCard({
           </div>
         </div>
         <span
-          className="rounded-full px-2 py-1 text-[10px] font-bold"
+          className="rounded-full px-2 py-1 text-[12px] font-bold"
           style={{ background: tone.surface, color: tone.ink }}
         >
           {deliverableStatusLabel(status, lang)}
@@ -1750,7 +1750,7 @@ function DeliverableCard({
       </div>
 
       {row.actualSource === "Odoo CRM · Course Categories" && row.lifecycle && (
-        <div className="pointer-events-none relative mt-3 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[11px] leading-5 text-text-muted">
+        <div className="pointer-events-none relative mt-3 rounded-xl border border-border bg-surface-2/50 px-3 py-2 text-[12px] leading-5 text-text-muted">
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             <span>
               {lang === "ar" ? "ليد نشط" : "Active leads"}{" "}
@@ -1771,7 +1771,7 @@ function DeliverableCard({
               </span>
             )}
           </div>
-          <div className="mt-1 text-[10px] text-text-subtle">
+          <div className="mt-1 text-[12px] text-text-subtle">
             {lang === "ar"
               ? "الفرص المفقودة ضمن الفرص: "
               : "Lost opportunities within opportunities: "}
@@ -1781,7 +1781,7 @@ function DeliverableCard({
       )}
 
       {row.platformActual !== undefined && (
-        <p className="pointer-events-none relative mt-1.5 text-[11px] text-text-muted">
+        <p className="pointer-events-none relative mt-1.5 text-[12px] text-text-muted">
           {lang === "ar" ? "رقم المنصة للمقارنة فقط:" : "Platform comparison only:"}{" "}
           <span className="num font-semibold">
             {row.platformActual === null ? "—" : fmtNum(row.platformActual)}
@@ -1795,7 +1795,7 @@ function DeliverableCard({
           style={{ width: barWidth(achievement), background: tone.strong }}
         />
       </div>
-      <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-2 text-[10px] text-text-subtle">
+      <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-2 text-[12px] text-text-subtle">
         <span>
           {remaining === null
             ? lang === "ar"
@@ -1835,7 +1835,7 @@ function DeliverableCard({
           </span>
         )}
       </div>
-      <p className="pointer-events-none relative mt-2 border-t border-border/70 pt-2 text-[10px] text-text-muted">
+      <p className="pointer-events-none relative mt-2 border-t border-border/70 pt-2 text-[12px] text-text-muted">
         {isManual
           ? lang === "ar"
             ? "المصدر: إدخال يدوي غير متحقق آليًا"
@@ -1871,7 +1871,7 @@ function CourseTableRow({
       <td className="num px-3 py-3.5">{row.targetCpl > 0 ? fmtUSDFull(row.targetCpl) : "—"}</td>
       <td className="px-3 py-3.5">
         <div className="num font-semibold text-text">{fmtNum(row.actual.actualLeads)}</div>
-        <div className="mt-0.5 text-[10px] text-text-subtle">
+        <div className="mt-0.5 text-[12px] text-text-subtle">
           {lang === "ar" ? "المنصة للمقارنة" : "Platform comparison"}{" "}
           {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
         </div>
@@ -1879,7 +1879,7 @@ function CourseTableRow({
       <td className="num px-3 py-3.5">{fmtUSDFull(row.actual.actualCpl)}</td>
       <td className="num px-3 py-3.5">{fmtUSDFull(row.actual.spend)}</td>
       <td className="min-w-32 px-3 py-3.5">
-        <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-text-muted">
+        <div className="mb-1 flex items-center justify-between gap-2 text-[12px] text-text-muted">
           <span>{ratioPct(row.actual.achievement)}</span>
           <span>{fmtNum(Math.round(row.actual.expectedLeads))}</span>
         </div>
@@ -1941,7 +1941,7 @@ function CourseMobileCard({
           value={fmtUSDFull(row.actual.spend)}
         />
       </div>
-      <p className="mt-2 text-[11px] text-text-muted">
+      <p className="mt-2 text-[12px] text-text-muted">
         {lang === "ar" ? "المنصة للمقارنة فقط" : "Platform comparison only"}:{" "}
         {row.actual.platformLeads === null ? "—" : fmtNum(row.actual.platformLeads)}
       </p>
@@ -1951,7 +1951,7 @@ function CourseMobileCard({
           style={{ width: barWidth(row.actual.achievement) }}
         />
       </div>
-      <div className="mt-1.5 flex justify-between text-[10px] text-text-subtle">
+      <div className="mt-1.5 flex justify-between text-[12px] text-text-subtle">
         <span>{ratioPct(row.actual.achievement)}</span>
         <span>
           {lang === "ar" ? "المطلوب حتى اليوم" : "Expected today"}:{" "}
@@ -1968,7 +1968,7 @@ function OwnerList({ owners }: { owners: string[] }) {
       {owners.map((owner) => (
         <span
           key={owner}
-          className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
+          className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-semibold text-brand"
         >
           {owner}
         </span>
@@ -1980,7 +1980,7 @@ function OwnerList({ owners }: { owners: string[] }) {
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-2">
-      <div className="text-[9px] leading-snug text-text-subtle">{label}</div>
+      <div className="text-[12px] leading-snug text-text-subtle">{label}</div>
       <div className="num mt-1 truncate text-xs font-bold text-text">{value}</div>
     </div>
   );

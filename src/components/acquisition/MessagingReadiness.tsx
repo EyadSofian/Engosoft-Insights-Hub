@@ -128,7 +128,7 @@ export function MessagingReadinessPanel() {
                         : "Not connected"}
                 </Pill>
               </div>
-              <div className="mb-2 text-[11px] text-text-muted">
+              <div className="mb-2 text-[12px] text-text-muted">
                 {channel?.lastSelfTest
                   ? `${A ? "آخر اختبار بنية" : "Last infrastructure self-test"}: ${channel.lastSelfTest.passed ? (A ? "نجح" : "passed") : A ? "فشل" : "failed"} · ${String(channel.lastSelfTest.ranAt).replace("T", " ").slice(0, 16)}`
                   : A
@@ -148,7 +148,7 @@ export function MessagingReadinessPanel() {
                           {A ? STATE_LABEL[check.state].ar : STATE_LABEL[check.state].en}
                         </span>
                       </div>
-                      <div className="text-[11px] text-text-muted">{check.detail}</div>
+                      <div className="text-[12px] text-text-muted">{check.detail}</div>
                     </div>
                   </li>
                 ))}

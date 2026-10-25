@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { METRICS, type MetricKey } from "@/lib/metric-catalog";
 import { MetricInfo } from "./MetricInfo";
 import { VERDICT_STYLE, type Verdict } from "./verdict";
-import { toneVars, type AnyTone } from "@/lib/dashboard-tone";
+import { solidCardVars, type AnyTone } from "@/lib/dashboard-tone";
 
 const EM = "—";
 
@@ -17,7 +17,7 @@ export function VerdictChip({ verdict, label }: { verdict: Verdict; label: strin
   const Icon = v.icon;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap"
       style={{ background: v.soft, color: v.color }}
     >
       <Icon size={11} strokeWidth={2.5} />
@@ -43,7 +43,7 @@ export function Unavailable({ reason, compact = false }: { reason?: string; comp
     >
       <span className="num">{EM}</span>
       {!compact && (
-        <span className="text-[10px] font-medium">{lang === "ar" ? "غير متاح" : "N/A"}</span>
+        <span className="text-[12px] font-medium">{lang === "ar" ? "غير متاح" : "N/A"}</span>
       )}
     </span>
   );
@@ -125,14 +125,19 @@ export function MetricCard({
   const unavailable = !!unavailableReason;
   const family = tone ?? METRIC_TONE[metric] ?? "slate";
   const interactive = Boolean(onClick);
-  const cue = actionLabel ?? (lang === "ar" ? "عرض التفاصيل" : "View detail");
+  const cue = actionLabel ?? (lang === "ar" ? "شوف التفاصيل" : "View detail");
 
   return (
     <div
-      className={`tone-surface stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+      className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       }`}
-      style={{ ...toneVars(family), "--i": index } as React.CSSProperties}
+      style={
+        {
+          ...solidCardVars(family),
+          "--i": index,
+        } as React.CSSProperties
+      }
       onClick={onClick}
       onKeyDown={
         interactive
@@ -152,25 +157,22 @@ export function MetricCard({
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-8 h-24 w-24 rounded-full opacity-[0.13]"
-        style={{ background: "var(--tone-strong)", insetInlineEnd: "-1.25rem" }}
-      />
-
       <div className="relative flex items-start justify-between gap-1.5">
         <span className="flex min-w-0 items-center gap-2">
           {icon && (
             <span
-              className="grid size-7 shrink-0 place-items-center rounded-lg text-white"
-              style={{ background: "var(--tone-strong)" }}
+              className="grid size-7 shrink-0 place-items-center rounded-lg"
+              style={{
+                background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
+                color: "var(--tone-strong)",
+              }}
             >
               {icon}
             </span>
           )}
           <span
-            className="line-clamp-2 text-[11.5px] font-semibold leading-snug"
-            style={{ color: "var(--tone-ink)", opacity: 0.78 }}
+            className="line-clamp-2 text-[12.5px] font-semibold leading-snug"
+            style={{ color: "var(--tone-ink)" }}
             title={copy.label}
           >
             {copy.label}
@@ -180,7 +182,7 @@ export function MetricCard({
       </div>
 
       <div
-        className="num relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,16cqi,1.6rem)] font-bold leading-none tracking-[-0.03em]"
+        className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-bold leading-none"
         style={{ color: "var(--tone-ink)" }}
       >
         {unavailable ? <Unavailable reason={unavailableReason} /> : value}
@@ -191,8 +193,8 @@ export function MetricCard({
           <VerdictChip verdict={verdict} label={verdictLabel} />
         )}
         <span
-          className="line-clamp-2 min-w-0 text-[10.5px] leading-snug"
-          style={{ color: "var(--tone-ink)", opacity: 0.68 }}
+          className="line-clamp-2 min-w-0 text-[12px] leading-snug"
+          style={{ color: "var(--tone-ink)" }}
           dir="auto"
         >
           {sub ?? (unavailable ? unavailableReason : copy.formula)}
@@ -202,8 +204,8 @@ export function MetricCard({
       {interactive && (
         <div className="relative mt-auto pt-2.5">
           <span
-            className="kpi-cue inline-flex items-center gap-0.5 text-[10.5px] font-bold"
-            style={{ color: "var(--tone-strong)" }}
+            className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
+            style={{ color: "var(--tone-ink)" }}
           >
             {cue}
             <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
@@ -219,7 +221,7 @@ export function MetricCard({
 /** Small inline banner for a whole platform that reports nothing at all. */
 export function NoSourceBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-text-muted">
+    <span className="inline-flex items-center gap-1.5 text-[12px] text-text-muted">
       <Ban size={12} className="text-text-subtle" />
       {label}
     </span>

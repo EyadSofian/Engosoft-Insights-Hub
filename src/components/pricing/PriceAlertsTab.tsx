@@ -191,7 +191,7 @@ export function PriceAlertsTab({
           <h2 className="text-[16px] font-bold text-text">
             {lang === "ar" ? "نظرة سريعة على تنبيهات الأسعار" : "Price alerts overview"}
           </h2>
-          <p className="mt-1 text-[11px] text-text-muted">
+          <p className="mt-1 text-[12px] text-text-muted">
             {lang === "ar"
               ? "اختر نوع التنبيه، ثم افتح كرت الدورة لعرض التفاصيل."
               : "Choose an alert type, then open only the course you need."}
@@ -246,7 +246,7 @@ export function PriceAlertsTab({
                 <div className="text-[28px] font-black tabular-nums">{fmtNum(count)}</div>
               </div>
               <div className="text-[12px] font-bold">{severityLabel(severity, lang)}</div>
-              <div className="mt-1 text-[10px] leading-relaxed opacity-80">
+              <div className="mt-1 text-[12px] leading-relaxed opacity-80">
                 {SEVERITY_MEANING[severity]?.[lang]}
               </div>
             </button>
@@ -294,13 +294,13 @@ export function PriceAlertsTab({
                       <h3 className="line-clamp-2 text-[14px] font-bold text-text">
                         {first.productName || "—"}
                       </h3>
-                      <p className="mt-1 text-[11px] text-text-muted">
+                      <p className="mt-1 text-[12px] text-text-muted">
                         {rows.length}{" "}
                         {lang === "ar" ? "حالة على هذا الكورس" : "cases for this course"}
                       </p>
                     </div>
                     <div className="text-end">
-                      <div className="text-[10px] font-semibold text-text-muted">
+                      <div className="text-[12px] font-semibold text-text-muted">
                         {lang === "ar" ? "بيع فعلي / أقل مسموح" : "Actual / floor"}
                       </div>
                       <div className="mt-1 text-[13px] font-black tabular-nums text-text">
@@ -328,7 +328,7 @@ export function PriceAlertsTab({
                               <div className="text-[12px] font-bold text-text">
                                 {row.invoiceNumber}
                               </div>
-                              <div className="mt-1 text-[10px] text-text-muted">
+                              <div className="mt-1 text-[12px] text-text-muted">
                                 {row.salesperson || "—"} · {methodLabel(row.paymentMethod, lang)} ·{" "}
                                 {row.paymentDate || row.invoiceDate || "—"}
                               </div>
@@ -338,13 +338,13 @@ export function PriceAlertsTab({
                                 {statusLabel(row.complianceStatus, lang)}
                               </Pill>
                               {row.variancePercent !== null && row.variancePercent > 0 && (
-                                <div className="mt-1 text-[11px] font-bold tabular-nums text-danger">
+                                <div className="mt-1 text-[12px] font-bold tabular-nums text-danger">
                                   −{fmtPct(row.variancePercent * 100, 1)}
                                 </div>
                               )}
                             </div>
                           </div>
-                          <p className="mt-2 text-[11px] leading-snug text-text-muted">
+                          <p className="mt-2 text-[12px] leading-snug text-text-muted">
                             {row.reason}
                           </p>
                         </div>
@@ -423,7 +423,7 @@ export function PriceAlertsTab({
                       {items.length} {lang === "ar" ? "قاعدة سعر" : "price rules"}
                     </Pill>
                   </div>
-                  <p className="mt-2 text-[11px] text-text-subtle">
+                  <p className="mt-2 text-[12px] text-text-subtle">
                     {sourceLabel(item.sourceSheet, lang === "ar")} · {lang === "ar" ? "صف" : "row"}{" "}
                     {item.sourceRow}
                   </p>
@@ -463,7 +463,7 @@ export function PriceAlertsTab({
                 : `Enter the Odoo product id. This link will apply to ${linking.length} price rules and be recorded in the audit log.`}
             </p>
             <label className="mt-3 flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-text-muted">Odoo product id</span>
+              <span className="text-[12px] font-medium text-text-muted">Odoo product id</span>
               <input
                 type="number"
                 inputMode="numeric"

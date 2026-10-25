@@ -50,7 +50,7 @@ export function Sidebar() {
             <div className="truncate text-[15px] font-bold tracking-tight text-nav-text">
               ENGOSOFT
             </div>
-            <div className="truncate text-[11px] text-nav-text-muted">{t("app_sub")}</div>
+            <div className="truncate text-[12px] text-nav-text-muted">{t("app_sub")}</div>
           </div>
         </Link>
         <NavigationToggle />
@@ -88,12 +88,12 @@ export function Sidebar() {
       <div className="mt-auto space-y-3 px-1 pt-6">
         <Link
           to="/guide"
-          className="flex min-h-10 items-center gap-2.5 rounded-xl bg-surface-2 px-3 text-[12px] font-semibold text-nav-text-muted transition-colors hover:bg-surface-3 hover:text-nav-text"
+          className="flex min-h-10 items-center gap-2.5 rounded-xl bg-white/15 px-3 text-[12px] font-semibold text-nav-text transition-colors hover:bg-white/25"
         >
           <BookOpen size={16} />
           <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>
         </Link>
-        <div className="px-3 text-[11px] text-text-subtle">
+        <div className="px-3 text-[12px] text-nav-text-muted">
           © {new Date().getFullYear()} Engosoft
         </div>
       </div>
@@ -108,7 +108,11 @@ const railRowClass = (active: boolean) =>
 
 const railRowStyle = (active: boolean) =>
   active
-    ? { background: "var(--brand-soft)", color: "var(--brand)" }
+    ? {
+        background: "var(--nav-active-bg)",
+        color: "var(--nav-active-text)",
+        boxShadow: "0 8px 20px -10px rgba(20, 10, 80, 0.55)",
+      }
     : { color: "var(--nav-text)" };
 
 function RailIcon({ section, active }: { section: NavigationSection; active: boolean }) {
@@ -118,8 +122,8 @@ function RailIcon({ section, active }: { section: NavigationSection; active: boo
       className="grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
       style={
         active
-          ? { background: "var(--brand)", color: "#fff" }
-          : { background: "var(--surface-2)", color: "var(--nav-text-muted)" }
+          ? { background: "var(--nav-active-text)", color: "#fff" }
+          : { background: "rgba(255, 255, 255, 0.14)", color: "var(--nav-text)" }
       }
       aria-hidden="true"
     >
@@ -160,7 +164,7 @@ function MoreMenuRow({ section, active }: { section: NavigationSection; active: 
         className="w-80 max-h-[80dvh] overflow-y-auto rounded-xl p-2"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
-        <div className="px-2.5 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide text-text-subtle">
+        <div className="px-2.5 pb-1.5 pt-1 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
           {lang === "ar" ? "تقارير متخصصة" : "Specialist reports"}
         </div>
         <MoreReportsList onNavigate={() => setOpen(false)} />

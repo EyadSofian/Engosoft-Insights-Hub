@@ -83,13 +83,13 @@ export function TextMessage({
             img: () => null,
             table: ({ children }) => (
               <div className="-mx-1 overflow-x-auto px-1">
-                <table className="w-full min-w-max text-[11px]">{children}</table>
+                <table className="w-full min-w-max text-[12px]">{children}</table>
               </div>
             ),
             code: ({ children }) => (
               <code
                 dir={ARABIC.test(directText(children)) ? "rtl" : "ltr"}
-                className="rounded bg-bg-subtle px-1 py-0.5 text-[11px]"
+                className="rounded bg-bg-subtle px-1 py-0.5 text-[12px]"
               >
                 {children}
               </code>
@@ -127,7 +127,7 @@ export function ComparisonCard({
       <div className="grid grid-cols-2 gap-3">
         {[message.left, message.right].map((side, index) => (
           <div key={index} className="min-w-0 space-y-2">
-            <p className="truncate text-[11px] font-semibold text-text-muted">{side.label}</p>
+            <p className="truncate text-[12px] font-semibold text-text-muted">{side.label}</p>
             {side.metrics.map((metric) => (
               <Metric key={`${index}:${metric.key}`} metric={metric} lang={lang} />
             ))}

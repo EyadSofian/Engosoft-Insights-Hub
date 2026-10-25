@@ -309,7 +309,7 @@ function LedgerPanel({
                         {entry.date} · {entry.company}
                         {entry.partner ? ` · ${entry.partner}` : ""}
                       </div>
-                      <div className="mt-1 text-[11px] text-text-muted">
+                      <div className="mt-1 text-[12px] text-text-muted">
                         {[entry.reference, entry.moveName].filter(Boolean).join(" · ")}
                       </div>
                     </div>
@@ -317,7 +317,7 @@ function LedgerPanel({
                       <div className="num text-sm font-bold text-text">
                         {nativeMoney(entry.balance, entry.companyCurrency)}
                       </div>
-                      <div className="mt-1 text-[11px] text-text-muted">
+                      <div className="mt-1 text-[12px] text-text-muted">
                         {lang === "ar" ? "مدين" : "Debit"}{" "}
                         {nativeMoney(entry.debit, entry.companyCurrency)} ·{" "}
                         {lang === "ar" ? "دائن" : "Credit"}{" "}
@@ -501,7 +501,7 @@ function ProfitabilityComparison({
         />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-[#aee6db]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[12px] font-semibold text-[#aee6db]">
               <GitCompareArrows size={14} />
               {lang === "ar" ? "مقارنة محاسبية" : "Accounting comparison"}
             </span>
@@ -516,7 +516,7 @@ function ProfitabilityComparison({
                 : "Compare income, expenses, and profit, then inspect the accounts behind each change."}
             </p>
           </div>
-          <span className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[11px] text-white/75">
+          <span className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[12px] text-white/75">
             Odoo · USD · {lang === "ar" ? "قيود مرحلة" : "Posted entries"}
           </span>
         </div>
@@ -656,12 +656,12 @@ function ProfitabilityComparison({
                   >
                     <div className="text-xs font-semibold text-text-muted">{metric.label}</div>
                     {"help" in metric && (
-                      <div className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                      <div className="mt-1 text-[12px] leading-relaxed text-text-muted">
                         {metric.help}
                       </div>
                     )}
                     <div className="num mt-2 text-xl font-extrabold text-text">{usd(current)}</div>
-                    <div className="mt-1 text-[11px] text-text-muted">
+                    <div className="mt-1 text-[12px] text-text-muted">
                       {lang === "ar" ? "مقابل" : "vs"} <span className="num">{usd(past)}</span>
                     </div>
                     <div
@@ -688,7 +688,7 @@ function ProfitabilityComparison({
                 <h4 className="text-sm font-bold text-text">
                   {lang === "ar" ? "الصورة المالية للشهرين" : "Financial picture of both months"}
                 </h4>
-                <p className="mt-0.5 text-[11px] text-text-muted">
+                <p className="mt-0.5 text-[12px] text-text-muted">
                   {lang === "ar"
                     ? "طول العمود حسب القيمة المطلقة، والإشارة السالبة تظهر في الرقم."
                     : "Bars use absolute magnitude; losses retain their negative sign in the value."}
@@ -713,7 +713,7 @@ function ProfitabilityComparison({
                               ] as const
                             ).map(([value, color, month]) => (
                               <div key={month} className="flex items-center gap-2">
-                                <span className="num w-14 shrink-0 text-[10px] text-text-muted">
+                                <span className="num w-14 shrink-0 text-[12px] text-text-muted">
                                   {month}
                                 </span>
                                 <div className="h-5 min-w-0 flex-1 overflow-hidden rounded-md bg-surface-2">
@@ -725,7 +725,7 @@ function ProfitabilityComparison({
                                     }}
                                   />
                                 </div>
-                                <span className="num w-24 shrink-0 text-end text-[11px] font-bold text-text">
+                                <span className="num w-24 shrink-0 text-end text-[12px] font-bold text-text">
                                   {usd(value)}
                                 </span>
                               </div>
@@ -754,14 +754,14 @@ function ProfitabilityComparison({
                         key={month as string}
                         className="rounded-xl bg-surface-2/65 p-3 text-center"
                       >
-                        <div className="num text-[11px] text-text-muted">{month as string}</div>
+                        <div className="num text-[12px] text-text-muted">{month as string}</div>
                         <div
                           className="num mt-2 text-2xl font-extrabold"
                           style={{ color: color as string }}
                         >
                           {fmtPct(margin, 1)}
                         </div>
-                        <div className="mt-1 text-[10px] text-text-muted">
+                        <div className="mt-1 text-[12px] text-text-muted">
                           {lang === "ar" ? "من الإيراد" : "of income"}
                         </div>
                       </div>
@@ -782,7 +782,7 @@ function ProfitabilityComparison({
                   <h4 className="text-sm font-bold text-text">
                     {lang === "ar" ? "البنود التي صنعت الفرق" : "What drove the difference"}
                   </h4>
-                  <p className="mt-0.5 text-[11px] text-text-muted">
+                  <p className="mt-0.5 text-[12px] text-text-muted">
                     {lang === "ar"
                       ? "أكبر 8 فروق بين بنود الحسابات في الشهرين"
                       : "The 8 largest changes in account groups"}
@@ -819,7 +819,7 @@ function ProfitabilityComparison({
                         <div className="truncate text-xs font-semibold text-text" title={row.name}>
                           {row.name}
                         </div>
-                        <div className="num mt-1 text-[11px] text-text-muted" dir="ltr">
+                        <div className="num mt-1 text-[12px] text-text-muted" dir="ltr">
                           {roundedUsd(row.current - row.past) > 0 ? "+" : ""}
                           {usd(roundedUsd(row.current - row.past))}
                         </div>
@@ -832,7 +832,7 @@ function ProfitabilityComparison({
                           ] as const
                         ).map(([value, color], index) => (
                           <div key={index} className="flex items-center gap-2">
-                            <span className="w-10 shrink-0 text-[10px] text-text-muted">
+                            <span className="w-10 shrink-0 text-[12px] text-text-muted">
                               {index === 0
                                 ? lang === "ar"
                                   ? "حالي"
@@ -850,7 +850,7 @@ function ProfitabilityComparison({
                                 }}
                               />
                             </div>
-                            <span className="num w-24 shrink-0 text-end text-[11px] font-bold text-text">
+                            <span className="num w-24 shrink-0 text-end text-[12px] font-bold text-text">
                               {usd(value)}
                             </span>
                           </div>
@@ -1065,7 +1065,7 @@ export function ProfitAndLossView() {
         />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-semibold">
               <BadgeDollarSign size={14} />
               {lang === "ar" ? "التقرير المحاسبي" : "Accounting report"}
             </div>
@@ -1085,17 +1085,17 @@ export function ProfitAndLossView() {
           <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-start backdrop-blur-sm">
             {activeTab === "report" ? (
               <>
-                <div className="text-[11px] text-white/70">
+                <div className="text-[12px] text-white/70">
                   {lang === "ar" ? "هامش صافي الربح" : "Net margin"}
                 </div>
                 <div className="num mt-1 text-2xl font-bold">{fmtPct(netMargin, 1)}</div>
-                <div className="mt-1 text-[11px] text-white/70">
+                <div className="mt-1 text-[12px] text-white/70">
                   {report.from} → {report.to}
                 </div>
               </>
             ) : (
               <>
-                <div className="text-[11px] text-white/70">
+                <div className="text-[12px] text-white/70">
                   {lang === "ar" ? "المقارنة" : "Comparison"}
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-lg font-bold">
@@ -1163,7 +1163,7 @@ export function ProfitAndLossView() {
                     {usd(card.value)}
                   </strong>
                   <span
-                    className="mt-2 flex items-center gap-1 text-[11px] font-medium"
+                    className="mt-2 flex items-center gap-1 text-[12px] font-medium"
                     style={{ color: card.color }}
                   >
                     {card.hint}

@@ -151,7 +151,7 @@ function Tab({
         <span className="text-[13px] font-semibold text-text truncate">{title}</span>
         {warn && <TriangleAlert size={12} style={{ color: "var(--warning)" }} />}
       </span>
-      <span className="block text-[10.5px] text-text-muted mt-0.5 num truncate">{line}</span>
+      <span className="block text-[12px] text-text-muted mt-0.5 num truncate">{line}</span>
     </button>
   );
 }

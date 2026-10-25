@@ -268,7 +268,7 @@ export function MediaPlanEditor({
                 onChange={(value) => setDraft((current) => ({ ...current, salesTargetUsd: value }))}
               />
               <div className="rounded-xl border border-border bg-surface-2 px-3 py-2.5">
-                <div className="text-[11px] text-text-muted">
+                <div className="text-[12px] text-text-muted">
                   {lang === "ar" ? "إجمالي تارجت الليدز" : "Total lead target"}
                 </div>
                 <div className="num mt-1 text-lg font-bold text-text">
@@ -389,7 +389,7 @@ export function MediaPlanEditor({
                   >
                     <Trash2 size={16} />
                   </button>
-                  <div className="text-[10px] text-text-subtle sm:col-span-2 lg:col-span-6">
+                  <div className="text-[12px] text-text-subtle sm:col-span-2 lg:col-span-6">
                     {lang === "ar" ? "ميزانية الدورة المحسوبة" : "Calculated course budget"}:{" "}
                     <strong className="num text-text">
                       {fmtUSDFull(plannedCourseBudget(row))}
@@ -682,7 +682,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 flex items-center gap-1 text-[11px] font-medium text-text-muted">
+      <span className="mb-1.5 flex items-center gap-1 text-[12px] font-medium text-text-muted">
         {icon}
         {label}
       </span>
@@ -721,7 +721,7 @@ function NumberField({
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[.06] p-3">
-      <div className="text-[10px] text-white/55">{label}</div>
+      <div className="text-[12px] text-white/55">{label}</div>
       <div className="num mt-1 text-base font-bold">{value}</div>
     </div>
   );

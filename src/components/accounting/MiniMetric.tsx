@@ -21,7 +21,7 @@ export function MiniMetric({
   const body = (
     <>
       <div
-        className="truncate text-[10px] text-text-muted"
+        className="truncate text-[12px] text-text-muted"
         title={hint ? `${label} — ${hint}` : label}
       >
         {label}

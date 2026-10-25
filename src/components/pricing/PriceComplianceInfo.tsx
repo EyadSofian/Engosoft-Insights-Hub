@@ -54,14 +54,14 @@ export function PriceComplianceInfo({
           <div className="text-[13px] font-black">
             {ar ? "ماذا تعني نسبة الالتزام؟" : "What does compliance mean?"}
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-white/65">
+          <p className="mt-1 text-[12px] leading-relaxed text-white/65">
             {ar
               ? "تقيس البنود التي بيعت داخل السعر المعتمد من البنود التي أمكن الحكم عليها فقط."
               : "It measures judged invoice lines sold within the approved price."}
           </p>
         </div>
 
-        <div className="space-y-3 p-4 text-[11px] leading-relaxed">
+        <div className="space-y-3 p-4 text-[12px] leading-relaxed">
           <div className="rounded-xl border border-danger/20 bg-danger-soft/45 p-3">
             <div className="flex items-center gap-2 font-bold text-danger">
               <Calculator size={14} aria-hidden="true" />
@@ -95,7 +95,7 @@ export function PriceComplianceInfo({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-border p-2.5">
-              <div className="text-[9px] font-bold text-text-subtle">
+              <div className="text-[12px] font-bold text-text-subtle">
                 {ar ? "يدخل في النسبة" : "Included"}
               </div>
               <div className="mt-1 text-text-muted">
@@ -103,7 +103,7 @@ export function PriceComplianceInfo({
               </div>
             </div>
             <div className="rounded-xl border border-border p-2.5">
-              <div className="text-[9px] font-bold text-text-subtle">
+              <div className="text-[12px] font-bold text-text-subtle">
                 {ar ? "لا يدخل في النسبة" : "Not included"}
               </div>
               <div className="mt-1 text-text-muted">
@@ -112,7 +112,7 @@ export function PriceComplianceInfo({
             </div>
           </div>
 
-          <p className="border-t border-border pt-2 text-[10px] font-semibold text-text-muted">
+          <p className="border-t border-border pt-2 text-[12px] font-semibold text-text-muted">
             {ar
               ? "هذه النسبة لا تعني كل مبيعات الشركة؛ هي تخص فترة التاريخ الظاهرة أعلى الداشبورد. فلتر القنوات الإعلانية لا يؤثر على تقرير الأسعار."
               : "This is not all company sales. It follows the top date period; advertising-channel filters do not affect pricing compliance."}

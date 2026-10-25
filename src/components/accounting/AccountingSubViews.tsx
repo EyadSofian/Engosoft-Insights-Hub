@@ -1524,13 +1524,13 @@ export function AccountingAgentsView() {
                 value={formatCallDuration(data.summary.chatAverageFirstResponseSeconds, lang)}
               />
             </div>
-            <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
+            <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
               {lang === "ar"
                 ? "التوزيع حسب الموظف المسجل على الليد في Odoo. لمعرفة من غيّر التوزيع نحتاج سجل التعديلات من Odoo."
                 : "This is the current distribution by the salesperson assigned in Odoo. Identifying which admin changed an assignment requires Odoo tracking history; a normal last edit is not mislabeled as a distribution event."}
             </p>
             {!data.chatwoot.ok && data.chatwoot.error && (
-              <p className="mt-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[10px] leading-relaxed text-text-muted">
+              <p className="mt-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[12px] leading-relaxed text-text-muted">
                 {lang === "ar"
                   ? `سبب تعذّر Chatwoot: ${data.chatwoot.error}`
                   : `Chatwoot error: ${data.chatwoot.error}`}
@@ -1597,7 +1597,7 @@ export function AccountingAgentsView() {
                       : []),
                   ]}
                 />
-                <p className="mt-1.5 text-[10px] text-text-subtle">
+                <p className="mt-1.5 text-[12px] text-text-subtle">
                   {lang === "ar"
                     ? "يغيّر ترتيب الموظفين فقط."
                     : "Changes card order and emphasis, not period totals."}
@@ -1781,7 +1781,7 @@ function TeamSalesOverview({
             tone="mint"
           />
         </div>
-        <p className="mt-3 text-[11px] leading-5 text-text-muted">
+        <p className="mt-3 text-[12px] leading-5 text-text-muted">
           {lang === "ar"
             ? "نسبة الرد تخص الليدز المفتوحة التي أُنشئت في الفترة، مع استبعاد الصفقات المقفولة. التواصل المثبت يُطابق مكالمة أو ردًا مع المسؤول، وليست معدل الرد على المكالمات الواردة. تفاصيل واتساب والشات موجودة في ملف كل موظف."
             : "Response coverage is for open leads created in this period; closed deals are excluded. Verified contact matches a call or reply with the owner, not an inbound-call answer rate. Each employee profile includes WhatsApp/chat detail."}
@@ -1918,7 +1918,7 @@ function TeamSalesOverview({
                     >
                       {agent.displayName}
                     </button>
-                    <div className="mt-0.5 text-[11px] text-text-muted">{agent.team}</div>
+                    <div className="mt-0.5 text-[12px] text-text-muted">{agent.team}</div>
                   </td>
                   <td className="num px-4 py-3 text-end">{fmtNum(agent.cleanLeads)}</td>
                   <td className="num px-4 py-3 text-end font-semibold">
@@ -1929,7 +1929,7 @@ function TeamSalesOverview({
                   </td>
                   <td className="num px-4 py-3 text-end">
                     {fmtPct(agent.leadOwnerCallCoverageRate, 1)}
-                    <span className="ms-1 text-[10px] text-text-muted">
+                    <span className="ms-1 text-[12px] text-text-muted">
                       ({fmtNum(agent.ownerCalledDistributedLeads ?? 0)}/
                       {fmtNum(agent.distributedLeads)})
                     </span>
@@ -2021,7 +2021,7 @@ function OverviewMetric({
       <div className="mt-2 truncate text-xl font-bold text-text" title={value}>
         {value}
       </div>
-      <p className="mt-1 min-h-8 text-[11px] leading-4 text-text-muted">{sub}</p>
+      <p className="mt-1 min-h-8 text-[12px] leading-4 text-text-muted">{sub}</p>
     </div>
   );
 }
@@ -2252,14 +2252,14 @@ function TargetHeadlineMetric({
       className={`min-w-0 px-3 py-4 text-center ${onOpen ? "group w-full cursor-pointer transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand" : "w-full"} sm:px-5`}
       aria-label={onOpen ? `${label} — عرض التفاصيل` : undefined}
     >
-      <p className="text-[10px] font-bold text-text-muted sm:text-xs">{label}</p>
+      <p className="text-[12px] font-bold text-text-muted sm:text-xs">{label}</p>
       <p
         className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}
       >
         {value}
       </p>
       {onOpen && (
-        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand opacity-80 group-hover:opacity-100">
+        <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-brand opacity-80 group-hover:opacity-100">
           <Info size={11} aria-hidden="true" />
           اضغط للتوضيح
         </span>
@@ -2293,7 +2293,7 @@ function TargetUnitCard({
         <div className={`absolute inset-y-0 start-0 w-1.5 ${accent}`} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-text-subtle">
+            <p className="text-[12px] font-bold uppercase tracking-[.18em] text-text-subtle">
               {lang === "ar" ? "وحدة مبيعات" : "Sales unit"}
             </p>
             <h3 className="mt-1 text-xl font-black text-text">{unitName}</h3>
@@ -2371,14 +2371,14 @@ function TargetLeaderCard({
           <p className="truncate text-sm font-black text-text">
             {lang === "ar" ? leader.nameAr : leader.nameEn}
           </p>
-          <p className="mt-0.5 text-[10px] text-text-muted">
+          <p className="mt-0.5 text-[12px] text-text-muted">
             {fmtNum(leader.members.length)} {lang === "ar" ? "موظف" : "employees"} ·{" "}
             {lang === "ar" ? "تارجت" : "target"} {fmtUSDFull(leader.target)}
           </p>
         </div>
         <div className="shrink-0 text-end">
           <p className="text-sm font-black text-brand">{fmtPct(leader.achievement, 1)}</p>
-          <p className="text-[9px] text-text-subtle">{fmtUSDFull(leader.paidRevenue)}</p>
+          <p className="text-[12px] text-text-subtle">{fmtUSDFull(leader.paidRevenue)}</p>
         </div>
         <ChevronDown
           size={17}
@@ -2411,7 +2411,7 @@ function TargetLeaderCard({
             >
               <span className="min-w-0">
                 <span className="block truncate text-xs font-bold text-text">{member.name}</span>
-                <span className="mt-0.5 block text-[9px] text-text-subtle">
+                <span className="mt-0.5 block text-[12px] text-text-subtle">
                   {lang === "ar" ? "افتح أداء الموظف" : "Open employee performance"}
                 </span>
               </span>
@@ -2419,7 +2419,7 @@ function TargetLeaderCard({
                 <span className="block text-xs font-black text-text">
                   {fmtUSDFull(member.paidRevenue)}
                 </span>
-                <span className="block text-[9px] text-text-subtle">
+                <span className="block text-[12px] text-text-subtle">
                   {member.target === null
                     ? lang === "ar"
                       ? "بدون تارجت منشور"
@@ -2465,7 +2465,7 @@ function TargetMemberCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-text">{member.name}</p>
-          <p className="mt-1 text-[10px] text-text-muted">
+          <p className="mt-1 text-[12px] text-text-muted">
             {lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}
           </p>
         </div>
@@ -2502,7 +2502,7 @@ function TargetCompactMetric({
 }) {
   return (
     <div className="min-w-0">
-      <p className="truncate text-[9px] font-semibold text-text-subtle">{label}</p>
+      <p className="truncate text-[12px] font-semibold text-text-subtle">{label}</p>
       <p
         className={`mt-0.5 truncate text-xs font-black sm:text-sm ${strong ? "text-brand" : "text-text"}`}
       >
@@ -2618,7 +2618,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
           <Target size={16} />
           <span>{lang === "ar" ? "تارجت الفترة" : "Target for this period"}</span>
         </div>
-        <div className="text-[11px] text-text-muted">
+        <div className="text-[12px] text-text-muted">
           {[target.teamLeader, target.branch, target.note].filter(Boolean).join(" · ")}
         </div>
       </div>
@@ -2686,7 +2686,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
             />
           </div>
           {!target.complete && (
-            <p className="mt-3 text-[11px] text-text-muted">
+            <p className="mt-3 text-[12px] text-text-muted">
               {lang === "ar"
                 ? `التارجت منشور لـ ${target.monthsCovered.map((month) => monthLabel(month, lang)).join("، ")} فقط، والفترة المختارة أطول من كده — النسبة جزئية.`
                 : `A target exists only for ${target.monthsCovered.join(", ")}, while the window is longer — the percentage is partial.`}
@@ -2694,7 +2694,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
           )}
           <div
             id="employee-target-evidence"
-            className="mt-3 scroll-mt-24 rounded-xl border border-brand/15 bg-surface/75 px-3 py-2 text-[10px] leading-relaxed text-text-muted"
+            className="mt-3 scroll-mt-24 rounded-xl border border-brand/15 bg-surface/75 px-3 py-2 text-[12px] leading-relaxed text-text-muted"
           >
             <b className="text-text">
               {lang === "ar" ? "دليل التارجت المنشور:" : "Published target evidence:"}
@@ -2725,7 +2725,7 @@ function EvidenceLink({ href }: { href: string }) {
       <button
         type="button"
         onClick={() => evidence.openEvidence(kind)}
-        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[10px] font-semibold text-brand transition-colors hover:bg-brand-soft"
+        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[12px] font-semibold text-brand transition-colors hover:bg-brand-soft"
       >
         {labels[kind][lang]}
         <ArrowUpRight size={12} aria-hidden="true" />
@@ -2735,7 +2735,7 @@ function EvidenceLink({ href }: { href: string }) {
   return (
     <a
       href={href}
-      className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline"
+      className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand underline-offset-4 hover:underline"
     >
       {lang === "ar" ? "عرض الدليل" : "View evidence"}
       <ArrowUpRight size={12} aria-hidden="true" />
@@ -2759,7 +2759,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
           <h3 className="mt-0.5 text-lg font-bold text-text">
             {lang === "ar" ? "النتيجة أولًا، ثم الدليل" : "Score first, evidence next"}
           </h3>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
               ? "25 نقطة للمكالمات + 30 للتواصل والبيع + 20 لمتابعة Chatwoot + 25 لتحقيق التارجت. الجزء الذي لا توجد له بيانات يأخذ صفرًا ولا يرفع باقي الأجزاء."
               : "25 points for calls + 30 for lead execution + 20 for Chatwoot follow-up + 25 for target attainment. Missing evidence earns zero and never inflates the other areas."}
@@ -2767,10 +2767,10 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
         </div>
         <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
           <div className="num text-3xl font-bold text-brand">{fmtQuality(score.overall)}</div>
-          <small className="block text-[10px] text-text-muted">
+          <small className="block text-[12px] text-text-muted">
             {lang === "ar" ? "نقطة مكتسبة من 100" : "Earned points out of 100"}
           </small>
-          <small className="mt-0.5 block text-[10px] font-medium text-brand">
+          <small className="mt-0.5 block text-[12px] font-medium text-brand">
             {lang === "ar"
               ? `تغطية البيانات ${fmtPct(score.dataCoverage, 0)}`
               : `${fmtPct(score.dataCoverage, 0)} evidence coverage`}
@@ -2787,7 +2787,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
             </b>
             <span className="num font-bold text-brand">{fmtQuality(score.callQuality)}</span>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
               ? `${fmtNum(score.evidence.analyzedCalls)} محللة من ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} مكالمة · ${fmtScorePoints(score.earnedPoints.callQuality)} نقطة مكتسبة`
               : `${fmtNum(score.evidence.analyzedCalls)} analyzed of ${score.evidence.answeredCalls === null ? "—" : fmtNum(score.evidence.answeredCalls)} calls · ${fmtScorePoints(score.earnedPoints.callQuality)} pts earned`}
@@ -2805,7 +2805,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
             </b>
             <span className="num font-bold text-brand">{fmtQuality(score.salesExecution)}</span>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
               ? `اتصل بنفسه بـ ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} من ${fmtNum(score.evidence.distributedLeads)} ليد · تغطية ${fmtPct(score.evidence.leadCoverageRate, 1)} · ${fmtScorePoints(score.earnedPoints.salesExecution)} نقطة مكتسبة`
               : `Personally called ${score.evidence.ownerCalledDistributedLeads === null ? "—" : fmtNum(score.evidence.ownerCalledDistributedLeads)} of ${fmtNum(score.evidence.distributedLeads)} leads · ${fmtPct(score.evidence.leadCoverageRate, 1)} coverage · ${fmtScorePoints(score.earnedPoints.salesExecution)} pts earned`}
@@ -2823,7 +2823,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
             </b>
             <span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
               ? `${fmtNum(score.evidence.chatConversations)} محادثة مفتوحة الآن · ${fmtNum(score.evidence.chatRepliedConversations)} لا تنتظر ردًا · ${fmtNum(score.evidence.chatAwaitingReply)} ينتظرون الرد · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} نقطة مكتسبة`
               : `${fmtNum(score.evidence.chatConversations)} open now · ${fmtNum(score.evidence.chatRepliedConversations)} not awaiting · ${fmtNum(score.evidence.chatAwaitingReply)} awaiting reply · ${fmtScorePoints(score.earnedPoints.chatFollowUp)} pts earned`}
@@ -2841,7 +2841,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
             </b>
             <span className="num font-bold text-brand">{fmtQuality(score.targetAttainment)}</span>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {score.evidence.targetBasis === "orders"
               ? lang === "ar"
                 ? "محسوب من أوامر البيع المؤكدة."
@@ -2863,7 +2863,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
         </div>
       </div>
       {score.missing.length > 0 && (
-        <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-text-muted">
+        <p className="mt-3 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2 text-[12px] leading-relaxed text-text-muted">
           {lang === "ar"
             ? "الدرجة محافظة: الجزء بلا بيانات كافية يأخذ صفرًا مؤقتًا."
             : "This is conservative: a component without enough evidence temporarily earns zero."}
@@ -2918,7 +2918,7 @@ function EmployeeEvidencePanel({
                 ? "محادثات الموظف في Chatwoot"
                 : "Employee Chatwoot conversations"}
         </h3>
-        <p className="mt-1 text-[11px] text-text-muted">
+        <p className="mt-1 text-[12px] text-text-muted">
           {lang === "ar"
             ? "هذه القائمة تخص الرقم الذي ضغطت عليه فقط، وكل زر يفتح السجل الأصلي مباشرة."
             : "This list only supports the KPI you opened, and every action opens the original record directly."}
@@ -2937,7 +2937,7 @@ function EmployeeEvidencePanel({
                   <b className="text-sm text-text">
                     {lang === "ar" ? "أوامر البيع والفواتير" : "Sale orders and invoices"}
                   </b>
-                  <p className="mt-0.5 text-[10px] text-text-muted">
+                  <p className="mt-0.5 text-[12px] text-text-muted">
                     <bdi dir="ltr" className="num">
                       {fmtNum(data.orders.total)}
                     </bdi>{" "}
@@ -2946,7 +2946,7 @@ function EmployeeEvidencePanel({
                       {fmtUSDFull(data.orders.amount)}
                     </bdi>
                   </p>
-                  <p className="mt-0.5 text-[10px] text-text-muted">
+                  <p className="mt-0.5 text-[12px] text-text-muted">
                     <bdi dir="ltr" className="num">
                       {fmtNum(data.invoices.paidTotal)}
                     </bdi>{" "}
@@ -2978,7 +2978,7 @@ function EmployeeEvidencePanel({
                           {fmtUSDFull(order.usdSales)}
                         </strong>
                       </div>
-                      <p className="mt-1 truncate text-[10px] text-text-muted">
+                      <p className="mt-1 truncate text-[12px] text-text-muted">
                         {order.customer || order.course || "—"}
                       </p>
                     </div>
@@ -3000,7 +3000,7 @@ function EmployeeEvidencePanel({
                           >
                             {invoice.movement}
                           </bdi>
-                          <small className="mt-0.5 block truncate text-[10px] text-text-muted">
+                          <small className="mt-0.5 block truncate text-[12px] text-text-muted">
                             {invoice.partner || "—"} · {invoice.paymentDate}
                           </small>
                         </span>
@@ -3010,7 +3010,7 @@ function EmployeeEvidencePanel({
                           {fmtUSDFull(invoice.usdPaid)}
                         </strong>
                       </div>
-                      <small className="mt-1 block text-[10px] text-text-muted">
+                      <small className="mt-1 block text-[12px] text-text-muted">
                         {invoice.isCreditNote
                           ? lang === "ar"
                             ? "إشعار دائن مخصوم من الصافي"
@@ -3030,7 +3030,7 @@ function EmployeeEvidencePanel({
                   <b className="text-sm text-text">
                     {lang === "ar" ? "الليدز في Odoo" : "Odoo leads"}
                   </b>
-                  <p className="mt-0.5 text-[10px] text-text-muted">
+                  <p className="mt-0.5 text-[12px] text-text-muted">
                     <bdi dir="ltr" className="num">
                       {fmtNum(data.leads.total)}
                     </bdi>{" "}
@@ -3047,10 +3047,10 @@ function EmployeeEvidencePanel({
                         <b className="block truncate text-xs text-text">
                           {lead.contact || lead.phone || `#${lead.id}`}
                         </b>
-                        <small className="mt-0.5 block truncate text-[10px] text-text-muted">
+                        <small className="mt-0.5 block truncate text-[12px] text-text-muted">
                           {outcomeLabel(lead.outcome)} · {lead.course || lead.stage || "—"}
                         </small>
-                        <small className="mt-1 block text-[10px] text-text-muted">
+                        <small className="mt-1 block text-[12px] text-text-muted">
                           <bdi dir="ltr" className="num">
                             {fmtNum(lead.ownerCalls)}
                           </bdi>{" "}
@@ -3098,7 +3098,7 @@ function EmployeeEvidencePanel({
                             href={lead.latestCallUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                            className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                           >
                             {lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}
                             <ExternalLink size={11} className="ms-1 inline" />
@@ -3109,13 +3109,13 @@ function EmployeeEvidencePanel({
                             href={lead.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[10px] font-semibold text-brand hover:bg-brand-soft"
+                            className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                           >
                             {lang === "ar" ? "فتح الليد" : "Open lead"}
                             <ExternalLink size={11} className="ms-1 inline" />
                           </a>
                         ) : (
-                          <bdi dir="ltr" className="num text-[10px] text-text-muted">
+                          <bdi dir="ltr" className="num text-[12px] text-text-muted">
                             #{lead.id}
                           </bdi>
                         )}
@@ -3136,7 +3136,7 @@ function EmployeeEvidencePanel({
                   <b className="text-sm text-text">
                     {lang === "ar" ? "محادثات Chatwoot" : "Chatwoot conversations"}
                   </b>
-                  <p className="mt-0.5 text-[10px] text-text-muted">
+                  <p className="mt-0.5 text-[12px] text-text-muted">
                     {data.chatwoot ? (
                       <>
                         <bdi dir="ltr" className="num">
@@ -3164,7 +3164,7 @@ function EmployeeEvidencePanel({
                         <b className="block truncate text-xs text-text">
                           {conversation.contactName || `#${conversation.id}`}
                         </b>
-                        <small className="mt-0.5 block text-[10px] text-text-muted">
+                        <small className="mt-0.5 block text-[12px] text-text-muted">
                           {conversation.awaitingReply
                             ? lang === "ar"
                               ? "العميل ينتظر ردًا"
@@ -3323,7 +3323,7 @@ function AgentCards({
                   <h3 className="truncate text-sm font-semibold text-text" title={row.displayName}>
                     {row.displayName}
                   </h3>
-                  <p className="mt-0.5 truncate text-[11px] text-text-muted" title={row.team}>
+                  <p className="mt-0.5 truncate text-[12px] text-text-muted" title={row.team}>
                     {row.team}
                   </p>
                 </div>
@@ -3342,7 +3342,7 @@ function AgentCards({
           </div>
 
           <div className="mt-4 rounded-2xl bg-surface-2 p-3">
-            <div className="text-[11px] font-medium text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {sortBy === "closing"
                 ? lang === "ar"
                   ? "إغلاقات رابحة تمت في الفترة"
@@ -3466,7 +3466,7 @@ function AgentCards({
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-text-muted">
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[12px] text-text-muted">
             <span>
               {lang === "ar" ? "رابحة من ليدز الفترة" : "Cohort won"}:{" "}
               <b className="num text-text">{fmtNum(row.won)}</b>
@@ -3478,7 +3478,7 @@ function AgentCards({
               </b>
             </span>
           </div>
-          <div className="mt-3 flex items-center justify-end gap-1 text-[11px] font-semibold text-brand">
+          <div className="mt-3 flex items-center justify-end gap-1 text-[12px] font-semibold text-brand">
             {lang === "ar" ? "تحليل الكورسات والتخصصات" : "Course and specialization analysis"}
             <ArrowUpRight size={14} className="rtl:-rotate-90" />
           </div>
@@ -3508,7 +3508,7 @@ function AgentTable({
       <div className="max-h-[680px] overflow-auto">
         <table className="w-full min-w-[2380px] text-sm">
           <thead className="sticky top-0 z-10 bg-surface-2">
-            <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+            <tr className="text-[12px] uppercase tracking-wide text-text-muted">
               {[
                 lang === "ar" ? "الموظف" : "Employee",
                 lang === "ar" ? "التارجت" : "Target",
@@ -3561,7 +3561,7 @@ function AgentTable({
                     {row.displayName}
                   </button>
                   <div
-                    className="mt-0.5 max-w-[220px] truncate text-[11px] text-text-muted"
+                    className="mt-0.5 max-w-[220px] truncate text-[12px] text-text-muted"
                     title={row.team}
                   >
                     {row.team}
@@ -3573,7 +3573,7 @@ function AgentTable({
                       ? "—"
                       : fmtUSDFull(row.target.target)}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-text-muted">
+                  <div className="mt-0.5 text-[12px] text-text-muted">
                     {!row.target
                       ? lang === "ar"
                         ? "بدون تارجت"
@@ -3664,7 +3664,7 @@ function AgentTable({
                   <Pill tone={qualityTone(row.averageQualityScore)}>
                     {fmtQuality(row.averageQualityScore)}
                   </Pill>
-                  <div className="mt-0.5 text-[10px] text-text-muted">
+                  <div className="mt-0.5 text-[12px] text-text-muted">
                     {row.analyzedCalls === null
                       ? "—"
                       : `${fmtNum(row.analyzedCalls)} ${lang === "ar" ? "مكالمة محللة" : "analyzed calls"}`}
@@ -3672,7 +3672,7 @@ function AgentTable({
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.chatConversations === null ? "—" : fmtNum(row.chatConversations)}
-                  <div className="mt-1 flex flex-col gap-0.5 text-[10px] text-text-muted">
+                  <div className="mt-1 flex flex-col gap-0.5 text-[12px] text-text-muted">
                     <span>
                       {row.chatAwaitingReply === null
                         ? "—"
@@ -3694,7 +3694,7 @@ function AgentTable({
                   {row.operationalSales === null
                     ? "—"
                     : row.operationalSales.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                  <span className="ms-1 text-[10px] text-text-muted">
+                  <span className="ms-1 text-[12px] text-text-muted">
                     {lang === "ar" ? "عملة أودو" : "Odoo currency"}
                   </span>
                 </td>
@@ -3801,7 +3801,7 @@ function AgentPerformanceSheet({
           <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,var(--brand),color-mix(in_srgb,var(--brand)_72%,#08142e))] px-5 py-6 text-white sm:px-7">
             <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[34px] border-white/8" />
             <SheetHeader className="relative pe-8 text-start sm:text-start">
-              <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-white/70">
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-white/70">
                 <span className="rounded-full bg-white/12 px-2.5 py-1">
                   {lang === "ar" ? "ملف أداء الموظف" : "Employee performance profile"}
                 </span>
@@ -4094,7 +4094,7 @@ function AgentPerformanceSheet({
                 <button
                   type="button"
                   onClick={() => setUncalledScope("owner")}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[11px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[12px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
                 >
                   <PhoneCall size={13} />
                   {lang === "ar" ? "فلتر الليدز التي لم يتواصل معها" : "Filter leads not contacted"}
@@ -4237,7 +4237,7 @@ function AgentPerformanceSheet({
                       ? "المكالمات ووقت الحديث والجودة"
                       : "Calls, talk time, and quality"}
                   </h3>
-                  <p className="mt-1 text-[11px] text-text-muted">
+                  <p className="mt-1 text-[12px] text-text-muted">
                     {lang === "ar"
                       ? "كل الأرقام محسوبة على نفس الفترة المختارة أعلى الصفحة؛ وقت الكلام الفعلي لا يشمل الرنين والانتظار."
                       : "Every figure uses the selected page date range; actual talk time excludes ringing and waiting."}
@@ -4341,7 +4341,7 @@ function AgentPerformanceSheet({
                     value={formatCallDuration(row.chatAverageFirstResponseSeconds, lang)}
                   />
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+                <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
                   {lang === "ar"
                     ? "«كل محادثات الفترة» و«تم إغلاقها» حسب التاريخ المختار. أما «المفتوح الآن» و«تنتظر رد الموظف» فهي حالة Chatwoot الحالية. لأن الفريق لا يغلق كل المحادثات، فعدد المنتظرين هو المؤشر الأوضح لمن يحتاج ردًا الآن."
                     : "Period conversations and resolved conversations follow the selected dates. Open and awaiting-reply counts are the current Chatwoot workload. Because not every conversation is closed, awaiting reply is the clearest action metric."}
@@ -4377,7 +4377,7 @@ function AgentPerformanceSheet({
                   </h3>
                   {/* The population is stated on the section, not buried in a
                     footnote: all four cards below rank the same courses. */}
-                  <p className="mt-1 text-[11px] text-text-muted">
+                  <p className="mt-1 text-[12px] text-text-muted">
                     {lang === "ar"
                       ? `الأربع كروت دي كلها بتترتب على ${fmtNum(courseProfile.soldTotals.courses)} كورس دخل فيهم بيع أو قفل فيهم صفقة رابحة — الكورسات اللي جاتله ليدز ومحصلش فيها لا بيع ولا صفقة رابحة متحسبش عليه، وموضّحة تحت لوحدها. الكورس اللي قفل فيه صفقة لسه فاتورتها مجتش بيبان بـ$0، وده مش خطأ: الفلوس محسوبة بتاريخ الدفع.`
                       : `All four cards rank the same ${fmtNum(courseProfile.soldTotals.courses)} courses he has either sold or won a deal in. Courses that only received leads are never counted against him; they are reported separately below. A course he won but whose invoice has not landed yet shows $0 — collections are dated by payment, so that is timing, not an error.`}
@@ -4579,7 +4579,7 @@ function AgentPerformanceSheet({
               <div className="max-h-[620px] overflow-auto">
                 <table className="w-full min-w-[1180px] text-sm">
                   <thead className="sticky top-0 z-10 bg-surface-2">
-                    <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                    <tr className="text-[12px] uppercase tracking-wide text-text-muted">
                       {[
                         lang === "ar" ? "الكورس" : "Course",
                         lang === "ar" ? "التخصص" : "Specialization",
@@ -4688,7 +4688,7 @@ function AgentPerformanceSheet({
                         net of credit notes, so they do not add to a meaningful
                         total. Better blank than a 100% that is not true. */}
                       <td className="num px-3 py-3 text-end text-text-muted">—</td>
-                      <td className="px-3 py-3 text-end text-[11px] font-normal text-text-muted">
+                      <td className="px-3 py-3 text-end text-[12px] font-normal text-text-muted">
                         {lang === "ar"
                           ? `${fmtNum(courseProfile.soldTotals.courses)} فيها بيع`
                           : `${fmtNum(courseProfile.soldTotals.courses)} sold`}
@@ -4710,7 +4710,7 @@ function AgentPerformanceSheet({
                   <b className="text-sm text-text">
                     {lang === "ar" ? "السجلات التفصيلية" : "Detailed source records"}
                   </b>
-                  <p className="mt-1 text-[11px] text-text-muted">
+                  <p className="mt-1 text-[12px] text-text-muted">
                     {lang === "ar"
                       ? "افتح نوع الدليل الذي تحتاجه مباشرة؛ كل مصدر يظهر منفصلًا عن الآخر."
                       : "Open the exact evidence you need; every source is kept separate."}
@@ -4852,7 +4852,7 @@ function EmployeeCallsList({
             <SectionTitle className="mb-0">
               {lang === "ar" ? "دليل المكالمات وتقييمها" : "Call evidence and scores"}
             </SectionTitle>
-            <p className="mt-1 text-[11px] text-text-muted">
+            <p className="mt-1 text-[12px] text-text-muted">
               {lang === "ar"
                 ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
                 : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
@@ -4919,7 +4919,7 @@ function EmployeeCallsList({
                             <b className="block truncate text-sm text-text">
                               {call.customerNumber || "—"}
                             </b>
-                            <small className="mt-0.5 block text-[11px] text-text-muted">
+                            <small className="mt-0.5 block text-[12px] text-text-muted">
                               {formatCallDate(call.startedAt, lang)} ·{" "}
                               {call.callType === "inbound"
                                 ? lang === "ar"
@@ -4934,7 +4934,7 @@ function EmployeeCallsList({
                             <b className="block truncate text-xs text-text">
                               {call.intent || (lang === "ar" ? "غير مصنفة" : "Unclassified")}
                             </b>
-                            <small className="mt-0.5 block truncate text-[11px] text-text-muted">
+                            <small className="mt-0.5 block truncate text-[12px] text-text-muted">
                               {call.summary || call.recordingState}
                             </small>
                           </span>
@@ -5022,7 +5022,7 @@ function EmployeeCallDetail({
               <FileAudio size={16} className="text-brand" />
               {lang === "ar" ? "تسجيل المكالمة" : "Call recording"}
             </b>
-            <span className="text-[10px] text-text-muted">
+            <span className="text-[12px] text-text-muted">
               {call.recordingPlayable
                 ? "WAV · Private stream"
                 : lang === "ar"
@@ -5052,7 +5052,7 @@ function EmployeeCallDetail({
               {classification}
             </Pill>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {audit?.call_classification?.reasoning ||
               (lang === "ar"
                 ? "لم يكتمل تحليل هذه المكالمة بعد."
@@ -5081,7 +5081,7 @@ function EmployeeCallDetail({
             ).map((criterion) => (
               <span
                 key={criterion}
-                className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[10px] text-text-muted"
+                className="rounded-lg border border-border bg-surface-2 px-2 py-1 text-[12px] text-text-muted"
               >
                 {criterion}
               </span>
@@ -5111,11 +5111,11 @@ function EmployeeCallDetail({
                       finding.criterion || (lang === "ar" ? "معيار جودة" : "Quality criterion"),
                     )}
                   </b>
-                  <span className="num text-[10px] font-semibold text-danger">
+                  <span className="num text-[12px] font-semibold text-danger">
                     {String(finding.penalty || "")}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
+                <p className="mt-1.5 text-[12px] leading-relaxed text-text-muted">
                   {String(finding.evidence || "")}
                 </p>
               </div>
@@ -5129,7 +5129,7 @@ function EmployeeCallDetail({
           <b className="text-sm text-text">
             {lang === "ar" ? "النص المصحح" : "Corrected transcript"}
           </b>
-          <span className="text-[10px] text-text-muted">
+          <span className="text-[12px] text-text-muted">
             Deepgram Nova-3 · Arabic dialect-aware correction
           </span>
         </div>
@@ -5144,7 +5144,7 @@ function EmployeeCallDetail({
                 return (
                   <span key={segment.id}>
                     {index > 0 && " "}
-                    <b className="me-1 text-[10px] text-brand">
+                    <b className="me-1 text-[12px] text-brand">
                       {agent
                         ? lang === "ar"
                           ? "الموظف:"
@@ -5171,7 +5171,7 @@ function EmployeeCallDetail({
                 );
               })}
             </p>
-            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[10px] text-text-muted">
+            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-[12px] text-text-muted">
               <span className="h-2.5 w-2.5 rounded-sm bg-warning-soft" />
               {lang === "ar"
                 ? "الكلام المظلل مشتبه به ولا يستخدم كدليل خصم."
@@ -5186,7 +5186,7 @@ function EmployeeCallDetail({
           </p>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] text-text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-[12px] text-text-muted">
         <span className="inline-flex items-center gap-1.5">
           <CheckCircle2 size={13} className="text-success" />
           {lang === "ar"
@@ -5250,11 +5250,11 @@ function ProfileMetric({
         <span className="text-brand">{icon}</span>
       </div>
       <div className="num mt-2 text-xl font-bold text-text sm:text-2xl">{value}</div>
-      <div className="mt-1 text-[11px] text-text-muted">{sub}</div>
+      <div className="mt-1 text-[12px] text-text-muted">{sub}</div>
       {evidenceHref && (
         <a
           href={evidenceHref}
-          className="mt-3 inline-flex items-center gap-1 text-[10px] font-semibold text-brand underline-offset-4 hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-brand underline-offset-4 hover:underline"
         >
           {lang === "ar" ? "عرض الدليل" : "View evidence"}
           <ArrowUpRight size={12} aria-hidden="true" />
@@ -5304,7 +5304,7 @@ function CourseInsight({
   }[tone];
   return (
     <article className={`rounded-2xl border p-4 ${styles}`}>
-      <div className="flex items-center gap-2 text-[11px] font-semibold">
+      <div className="flex items-center gap-2 text-[12px] font-semibold">
         {icon}
         <span>{eyebrow}</span>
         {explain && <EmployeeMetricInfo metric={explain} align="end" />}
@@ -5333,9 +5333,9 @@ function CourseInsight({
             </div>
           )}
           <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
-          <div className="mt-1 text-[11px] text-text-muted">{sub(course)}</div>
+          <div className="mt-1 text-[12px] text-text-muted">{sub(course)}</div>
           {foot && (
-            <div className="num mt-2 border-t border-current/12 pt-2 text-[11px] text-text-muted">
+            <div className="num mt-2 border-t border-current/12 pt-2 text-[12px] text-text-muted">
               {foot(course)}
             </div>
           )}
@@ -5528,7 +5528,7 @@ function UnsoldCoursesNotice({ profile }: { profile: AgentRow["courseProfile"] }
       </p>
       <ul className="mt-2 space-y-1">
         {courses.slice(0, 6).map((course) => (
-          <li key={course.key} className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
+          <li key={course.key} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
             <b className="text-text" title={dimensionNote(course.label, lang)}>
               {displayDimension(course.label, lang)}
             </b>
@@ -5541,7 +5541,7 @@ function UnsoldCoursesNotice({ profile }: { profile: AgentRow["courseProfile"] }
         ))}
       </ul>
       {courses.length > 6 && (
-        <p className="mt-1 text-[11px] text-text-muted">
+        <p className="mt-1 text-[12px] text-text-muted">
           {lang === "ar"
             ? `و${fmtNum(courses.length - 6)} كورس تاني — التفاصيل في جدول الكورسات تحت.`
             : `and ${fmtNum(courses.length - 6)} more — see the course table below.`}
@@ -5657,7 +5657,7 @@ function CourseInvoicesDialog({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-text-muted">
+                  <tr className="text-[12px] uppercase tracking-wide text-text-muted">
                     <th className="px-3 py-2 text-start">{ar ? "رقم الفاتورة" : "Invoice no."}</th>
                     <th className="px-3 py-2 text-start">{ar ? "تاريخ الدفع" : "Payment date"}</th>
                     <th className="px-3 py-2 text-start">{ar ? "العميل" : "Customer"}</th>
@@ -5721,7 +5721,7 @@ function NonCourseLine({ profile }: { profile: AgentRow["courseProfile"] }) {
     .join(lang === "ar" ? "، " : ", ");
 
   return (
-    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border pt-3 text-[11px] leading-relaxed text-text-muted">
+    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border pt-3 text-[12px] leading-relaxed text-text-muted">
       <Info size={13} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" />
       <span>
         {lang === "ar"
@@ -5755,7 +5755,7 @@ function SpecializationCard({
           <h4 className="font-semibold text-text" title={dimensionNote(item.label, lang)}>
             {displayDimension(item.label, lang)}
           </h4>
-          <p className="mt-0.5 text-[11px] text-text-muted">
+          <p className="mt-0.5 text-[12px] text-text-muted">
             {fmtPct(item.leadShare, 1)} {lang === "ar" ? "من ليدز الموظف" : "of employee leads"}
           </p>
         </div>
@@ -6012,7 +6012,7 @@ function ProgressMetric({
   const safe = value === null ? 0 : Math.max(0, Math.min(100, value));
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+      <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
         <span className="text-text-muted" title={hint ? `${label} — ${hint}` : undefined}>
           {label}
         </span>
@@ -6330,7 +6330,7 @@ export function AccountingProfitabilityView() {
         </p>
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full min-w-[760px] border-collapse text-sm">
-            <thead className="bg-surface-2 text-[11px] text-text-muted">
+            <thead className="bg-surface-2 text-[12px] text-text-muted">
               <tr>
                 {[
                   lang === "ar" ? "الشهر" : "Month",
@@ -6378,12 +6378,12 @@ export function AccountingProfitabilityView() {
                         {monthLabel}
                       </button>
                       {item.status === "loading" && (
-                        <span className="ms-2 text-[10px] text-text-muted">
+                        <span className="ms-2 text-[12px] text-text-muted">
                           {lang === "ar" ? "جارٍ التحميل" : "Loading"}
                         </span>
                       )}
                       {item.status === "error" && (
-                        <span className="ms-2 text-[10px] text-danger" title={item.error}>
+                        <span className="ms-2 text-[12px] text-danger" title={item.error}>
                           {lang === "ar" ? "تعذّر" : "Unavailable"}
                         </span>
                       )}
@@ -6473,7 +6473,7 @@ export function AccountingProfitabilityView() {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-text-muted">
+        <div className="mt-4 flex flex-wrap gap-2 text-[12px] text-text-muted">
           <span className="inline-flex items-center gap-1">
             <Users size={13} />
             {p.companies.map((company) => company.name).join(" · ")}

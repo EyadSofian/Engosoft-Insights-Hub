@@ -125,7 +125,7 @@ function Stage({
           style={{ width: `${Math.max(width > 0 ? 3 : 0, width)}%`, background: color }}
         />
       </div>
-      {note && <p className="text-[10.5px] text-text-subtle mt-1 leading-snug">{note}</p>}
+      {note && <p className="text-[12px] text-text-subtle mt-1 leading-snug">{note}</p>}
     </div>
   );
 }
@@ -147,12 +147,12 @@ function Outcome({
 }) {
   return (
     <div className="rounded-xl px-3 py-2" style={{ background: soft }}>
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color }}>
+      <span className="inline-flex items-center gap-1 text-[12px] font-medium" style={{ color }}>
         {label}
         <MetricInfo metric={metric} size={11} />
       </span>
       <div className="num text-[17px] font-semibold text-text mt-0.5">{fmtNum(count)}</div>
-      <div className="num text-[11px] text-text-muted">{fmtPct(rate, 1)}</div>
+      <div className="num text-[12px] text-text-muted">{fmtPct(rate, 1)}</div>
     </div>
   );
 }

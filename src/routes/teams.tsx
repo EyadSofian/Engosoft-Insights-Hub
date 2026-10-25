@@ -109,7 +109,7 @@ function Teams() {
                     ].map((h, i) => (
                       <th
                         key={h}
-                        className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap text-text-muted ${
+                        className={`px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap text-text-muted ${
                           i === 0 ? "text-start sticky-col z-20" : "text-end"
                         }`}
                         style={i === 0 ? { background: "var(--surface-2)", width: 200 } : undefined}
@@ -232,12 +232,12 @@ function PeopleList({ rows, tone }: { rows: TeamAgg[]; tone: "success" | "danger
           className="flex items-center justify-between gap-3 py-1.5 border-b border-border/60 last:border-0"
         >
           <span className="flex items-center gap-2.5 min-w-0">
-            <span className="num text-[11px] text-text-subtle w-4 shrink-0">{i + 1}</span>
+            <span className="num text-[12px] text-text-subtle w-4 shrink-0">{i + 1}</span>
             <span className="min-w-0">
               <span className="block text-[13px] truncate" title={p.displayName ?? p.name}>
                 {p.displayName ?? p.name}
               </span>
-              <span className="block text-[11px] text-text-muted">
+              <span className="block text-[12px] text-text-muted">
                 {p.parent} · {fmtNum(p.crmLeads)} {lang === "ar" ? "عميل" : "leads"}
               </span>
             </span>

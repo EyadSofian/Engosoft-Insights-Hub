@@ -132,7 +132,7 @@ export function NexusProactivePopup({ suppressed }: { suppressed?: boolean }) {
           <p className="text-sm font-semibold text-text">
             {ar ? "محتاج مساعدة سريعة؟" : "Need a quick hand?"}
           </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
+          <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
             {entityLabel
               ? ar
                 ? `أقدر أحلل ${entityLabel} هنا، أو تجاوبني عن أي جزء تاني في الداشبورد.`
@@ -152,7 +152,7 @@ export function NexusProactivePopup({ suppressed }: { suppressed?: boolean }) {
             onClick={() => start(action.prompt)}
             title={action.prompt}
             data-testid="nexus-proactive-action"
-            className="max-w-full truncate rounded-full border border-border bg-bg-subtle px-2.5 py-1 text-[11px] font-medium text-text transition hover:border-brand hover:bg-brand-soft/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+            className="max-w-full truncate rounded-full border border-border bg-bg-subtle px-2.5 py-1 text-[12px] font-medium text-text transition hover:border-brand hover:bg-brand-soft/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
           >
             {action.label}
           </button>

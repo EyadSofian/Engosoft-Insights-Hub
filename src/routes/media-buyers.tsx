@@ -1165,7 +1165,7 @@ function MediaBuyers() {
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-1 text-base font-semibold text-text">{value}</div>
     </div>
   );

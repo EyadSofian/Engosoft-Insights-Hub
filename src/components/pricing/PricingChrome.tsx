@@ -52,11 +52,11 @@ export function PricingPageHeader({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5 sm:px-5">
         <div className="min-w-[200px] flex-1">
           <h1 className="text-[17px] font-bold tracking-tight text-text sm:text-[19px]">{title}</h1>
-          <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{description}</p>
+          <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{description}</p>
         </div>
 
         {period && (
-          <div className="text-[11px] leading-snug text-text-muted md:text-end">{period}</div>
+          <div className="text-[12px] leading-snug text-text-muted md:text-end">{period}</div>
         )}
 
         <form onSubmit={onSearchSubmit} className="relative w-full sm:w-[280px]" role="search">
@@ -174,7 +174,7 @@ export function PricingKpiStrip({
                   {item.Icon && (
                     <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
                   )}
-                  <span className="truncate text-[10.5px] font-semibold text-text-muted">
+                  <span className="truncate text-[12px] font-semibold text-text-muted">
                     {item.label}
                   </span>
                   {item.info && (
@@ -185,7 +185,7 @@ export function PricingKpiStrip({
                   {item.onSelect && (
                     <span
                       aria-hidden="true"
-                      className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                      className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-bold transition-colors ${
                         active
                           ? "bg-brand text-white"
                           : "bg-surface-2 text-text-subtle group-hover:bg-brand-soft group-hover:text-brand"
@@ -221,7 +221,7 @@ export function PricingKpiStrip({
                 )}
 
                 {item.question && (
-                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-text-subtle">
+                  <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-text-subtle">
                     {item.question}
                   </p>
                 )}
@@ -265,12 +265,12 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-brand">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-brand">
               {ar ? "تعرض الآن" : "Showing now"}
             </span>
             <strong className="text-[12.5px] text-text">{item.label}</strong>
           </div>
-          <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
+          <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
             {item.resultDescription ?? item.question}
           </p>
         </div>
@@ -282,7 +282,7 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[11.5px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
         >
           <X size={13} aria-hidden="true" />
           <span className="hidden sm:inline">{ar ? "إلغاء التحديد" : "Clear selection"}</span>
@@ -311,7 +311,7 @@ function KpiDelta({ value, invert }: { value?: number; invert?: boolean }) {
   const color = flat ? "var(--text-subtle)" : good ? "var(--success)" : "var(--danger)";
   return (
     <span
-      className="num inline-flex shrink-0 items-center gap-0.5 text-[10.5px] font-semibold"
+      className="num inline-flex shrink-0 items-center gap-0.5 text-[12px] font-semibold"
       style={{ color }}
       title={lang === "ar" ? "مقارنة بالفترة السابقة" : "vs the previous period"}
     >
@@ -394,7 +394,7 @@ export function PricingTabBar<T extends string>({
               <span className="whitespace-nowrap">{tabLabel}</span>
               {!!badge && (
                 <span
-                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold text-white"
+                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[12px] font-bold text-white"
                   style={{ background: "var(--danger)" }}
                 >
                   {badge}

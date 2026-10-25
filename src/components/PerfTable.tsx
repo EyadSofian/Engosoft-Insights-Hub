@@ -30,8 +30,7 @@ export function PerfTable({
 }) {
   const { t, lang } = useI18n();
 
-  const nameOf = (r: PerfRow) =>
-    r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM;
+  const nameOf = (r: PerfRow) => (r.key === unknownAdsetKey ? t("unknown_adset") : r.name || EM);
 
   const cols: Col<PerfRow>[] = [
     {
@@ -51,8 +50,10 @@ export function PerfTable({
             </div>
             {grain !== "campaign" && r.key !== unknownAdsetKey && (
               <div
-                className="mt-0.5 max-w-[220px] truncate text-[10px] text-text-subtle"
-                title={[r.campaignName, grain === "ad" ? r.adsetName : ""].filter(Boolean).join(" › ")}
+                className="mt-0.5 max-w-[220px] truncate text-[12px] text-text-subtle"
+                title={[r.campaignName, grain === "ad" ? r.adsetName : ""]
+                  .filter(Boolean)
+                  .join(" › ")}
               >
                 {[r.campaignName, grain === "ad" ? r.adsetName : ""].filter(Boolean).join(" › ")}
               </div>
@@ -76,7 +77,13 @@ export function PerfTable({
       sortValue: (r) => r.course,
       render: (r) => <InferredCourse course={r.course} inferred={r.courseInferred} />,
     },
-    { key: "spend", header: t("spend"), align: "right", sortValue: (r) => r.spend, render: (r) => fmtUSD(r.spend) },
+    {
+      key: "spend",
+      header: t("spend"),
+      align: "right",
+      sortValue: (r) => r.spend,
+      render: (r) => fmtUSD(r.spend),
+    },
     {
       key: "impressions",
       header: t("impressions"),
@@ -84,7 +91,13 @@ export function PerfTable({
       sortValue: (r) => r.impressions,
       render: (r) => fmtNum(r.impressions),
     },
-    { key: "clicks", header: t("clicks"), align: "right", sortValue: (r) => r.clicksAll, render: (r) => fmtNum(r.clicksAll) },
+    {
+      key: "clicks",
+      header: t("clicks"),
+      align: "right",
+      sortValue: (r) => r.clicksAll,
+      render: (r) => fmtNum(r.clicksAll),
+    },
     {
       key: "ctrAll",
       header: t("ctr_all"),
@@ -107,7 +120,13 @@ export function PerfTable({
       sortValue: (r) => sortMaybe(r.platformLeads),
       render: (r) => maybeNum(r.platformLeads, fmtNum),
     },
-    { key: "crmLeads", header: t("crm_leads"), align: "right", sortValue: (r) => r.crmLeads, render: (r) => fmtNum(r.crmLeads) },
+    {
+      key: "crmLeads",
+      header: t("crm_leads"),
+      align: "right",
+      sortValue: (r) => r.crmLeads,
+      render: (r) => fmtNum(r.crmLeads),
+    },
     {
       key: "won",
       header: t("won"),
@@ -136,7 +155,13 @@ export function PerfTable({
       sortValue: (r) => sortMaybe(r.lostRate),
       render: (r) => maybeNum(r.lostRate, (v) => fmtPct(v, 2)),
     },
-    { key: "revenue", header: t("revenue"), align: "right", sortValue: (r) => r.revenue, render: (r) => fmtUSD(r.revenue) },
+    {
+      key: "revenue",
+      header: t("revenue"),
+      align: "right",
+      sortValue: (r) => r.revenue,
+      render: (r) => fmtUSD(r.revenue),
+    },
     {
       key: "revenuePerLead",
       header: t("revenue_per_lead"),

@@ -49,7 +49,7 @@ export function EmployeeMetricInfo({
       >
         <div className="border-b border-border bg-surface-2 px-3.5 py-2.5">
           <div className="text-[13px] font-semibold leading-snug text-text">{copy.label}</div>
-          <div className="num mt-0.5 text-[11px] text-brand" dir="auto">
+          <div className="num mt-0.5 text-[12px] text-brand" dir="auto">
             {copy.formula}
           </div>
         </div>
@@ -68,7 +68,7 @@ export function EmployeeMetricInfo({
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+      <dt className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
         {label}
       </dt>
       <dd className="mt-0.5 text-text-muted">{children}</dd>

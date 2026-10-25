@@ -76,7 +76,7 @@ export function SectionTabs() {
       data-app-chrome=""
       aria-label={
         lang === "ar"
-          ? section.id === "sales-crm"
+          ? section.id === "leads"
             ? "تقارير العملاء المحتملين"
             : `تقارير ${label}`
           : `${label} reports`
@@ -160,7 +160,7 @@ export function SectionTabs() {
                     search={item.search as never}
                     activeOptions={{ exact: true, includeSearch: true }}
                     aria-current={active ? "page" : undefined}
-                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-semibold transition-colors duration-150 sm:px-3 sm:text-sm ${
+                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors duration-150 sm:px-4 sm:text-sm ${
                       active
                         ? "border-brand bg-brand text-white shadow-sm"
                         : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"

@@ -41,7 +41,7 @@ export function Metric({ metric, lang }: { metric: NexusMetric; lang: "ar" | "en
 
   return (
     <div className="min-w-0" data-testid={`nexus-metric-${metric.key}`}>
-      <div className="truncate text-[11px] font-medium uppercase tracking-wide text-text-muted">
+      <div className="truncate text-[12px] font-medium uppercase tracking-wide text-text-muted">
         {metric.label}
       </div>
       <div className="mt-0.5 flex items-baseline gap-2">
@@ -63,7 +63,7 @@ export function Metric({ metric, lang }: { metric: NexusMetric; lang: "ar" | "en
         )}
       </div>
       {unmeasured && metric.unavailable && (
-        <p className="mt-1 text-[11px] leading-snug text-text-subtle">{metric.unavailable}</p>
+        <p className="mt-1 text-[12px] leading-snug text-text-subtle">{metric.unavailable}</p>
       )}
     </div>
   );
@@ -73,7 +73,7 @@ export function KpiCard({ message, lang }: { message: KpiCardMessage; lang: "ar"
   return (
     <div className="rounded-xl border border-border bg-bg-subtle p-3" data-testid="nexus-kpi-card">
       <Metric metric={message.metric} lang={lang} />
-      {message.period && <p className="mt-2 text-[11px] text-text-subtle num">{message.period}</p>}
+      {message.period && <p className="mt-2 text-[12px] text-text-subtle num">{message.period}</p>}
       <SourceBadges sources={message.sources} lang={lang} />
     </div>
   );
@@ -88,7 +88,7 @@ export function KpiGroup({ message, lang }: { message: KpiGroupMessage; lang: "a
           <Metric key={metric.key} metric={metric} lang={lang} />
         ))}
       </div>
-      {message.period && <p className="mt-2 text-[11px] text-text-subtle num">{message.period}</p>}
+      {message.period && <p className="mt-2 text-[12px] text-text-subtle num">{message.period}</p>}
       <SourceBadges sources={message.sources} lang={lang} />
     </div>
   );

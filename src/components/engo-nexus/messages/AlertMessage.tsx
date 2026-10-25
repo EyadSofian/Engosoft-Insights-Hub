@@ -25,7 +25,7 @@ export function AlertMessage({ message, lang }: { message: AlertMessageType; lan
         {message.title}
       </p>
       {message.body && (
-        <p className="mt-1 text-[11px] leading-snug text-text-muted">{message.body}</p>
+        <p className="mt-1 text-[12px] leading-snug text-text-muted">{message.body}</p>
       )}
       <SourceBadges sources={message.sources} lang={lang} />
     </div>
@@ -57,14 +57,14 @@ export function ErrorBubble({
         {message.title}
       </p>
       {message.body && (
-        <p className="mt-1 text-[11px] leading-snug text-text-muted">{message.body}</p>
+        <p className="mt-1 text-[12px] leading-snug text-text-muted">{message.body}</p>
       )}
       {message.retryable !== false && onRetry && (
         <button
           type="button"
           onClick={onRetry}
           data-testid="nexus-retry"
-          className="mt-2 inline-flex items-center gap-1 rounded-lg border border-border bg-bg px-2.5 py-1 text-[11px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className="mt-2 inline-flex items-center gap-1 rounded-lg border border-border bg-bg px-2.5 py-1 text-[12px] font-medium text-text transition hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <RotateCcw className="size-3" aria-hidden />
           {lang === "ar" ? "حاول تاني" : "Try again"}

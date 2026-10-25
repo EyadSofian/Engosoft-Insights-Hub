@@ -23,7 +23,7 @@ export function CourseLostMovement({
               <BookOpen size={20} />
             </span>
             <div>
-              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-danger/20 bg-surface/80 px-2.5 py-1 text-[10px] font-bold text-danger">
+              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-danger/20 bg-surface/80 px-2.5 py-1 text-[12px] font-bold text-danger">
                 <CalendarClock size={12} />
                 {A ? "حسب تاريخ الإغلاق" : "By close date"}
               </div>
@@ -51,7 +51,7 @@ export function CourseLostMovement({
                 key={String(label)}
                 className="rounded-2xl border border-border bg-surface/90 p-3"
               >
-                <p className="text-[9px] font-semibold leading-4 text-text-muted">{label}</p>
+                <p className="text-[12px] font-semibold leading-4 text-text-muted">{label}</p>
                 <p className={`num mt-1 text-lg font-bold ${tone}`}>{fmtNum(Number(value))}</p>
               </div>
             ))}
@@ -70,18 +70,18 @@ export function CourseLostMovement({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="num text-[10px] font-bold text-text-subtle">#{index + 1}</span>
+                  <span className="num text-[12px] font-bold text-text-subtle">#{index + 1}</span>
                   <h3 className="truncate font-bold text-text" title={row.label}>
                     {row.label}
                   </h3>
                 </div>
                 {row.course !== row.label && (
-                  <p className="mt-0.5 text-[10px] text-text-subtle">Odoo: {row.course}</p>
+                  <p className="mt-0.5 text-[12px] text-text-subtle">Odoo: {row.course}</p>
                 )}
               </div>
               <div className="text-end">
                 <p className="num text-2xl font-bold text-danger">{fmtNum(row.lost)}</p>
-                <p className="num text-[10px] font-semibold text-danger/75">
+                <p className="num text-[12px] font-semibold text-danger/75">
                   {fmtPct(row.share, 1)}
                 </p>
               </div>
@@ -92,7 +92,7 @@ export function CourseLostMovement({
                 style={{ width: `${Math.max(2, (row.lost / peak) * 100)}%` }}
               />
             </div>
-            <div className="mt-3 flex items-center gap-3 text-[10px] text-text-muted">
+            <div className="mt-3 flex items-center gap-3 text-[12px] text-text-muted">
               <span className="inline-flex items-center gap-1">
                 <UserRound size={12} /> {fmtNum(row.lostLeads)} {A ? "ليد" : "Leads"}
               </span>

@@ -14,7 +14,7 @@ export function TableMessage({ message, lang }: { message: TableMessageType; lan
     <div className="rounded-xl border border-border bg-bg-subtle p-3" data-testid="nexus-table">
       {message.title && <h4 className="mb-2 text-xs font-semibold text-text">{message.title}</h4>}
       <div className="-mx-1 overflow-x-auto px-1">
-        <table className="w-full min-w-max text-[11px]">
+        <table className="w-full min-w-max text-[12px]">
           <thead>
             <tr className="border-b border-border">
               {message.columns.map((column) => (
@@ -44,7 +44,7 @@ export function TableMessage({ message, lang }: { message: TableMessageType; lan
         </table>
       </div>
       {message.truncated && (
-        <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">
+        <p className="mt-2 text-[12px] text-amber-700 dark:text-amber-400">
           {lang === "ar"
             ? "النتائج مقصوصة — دي مش كل الصفوف."
             : "Results are truncated — these are not all the rows."}

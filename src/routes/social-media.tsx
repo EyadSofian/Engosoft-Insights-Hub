@@ -1285,7 +1285,7 @@ function SocialMedia() {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10.5px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-0.5 font-semibold text-text">{value}</div>
     </div>
   );

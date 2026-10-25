@@ -71,7 +71,7 @@ export function CourseSelector({
                   {candidate.name}
                 </span>
                 {descriptor && (
-                  <span className="block truncate text-[11px] text-text-muted num">
+                  <span className="block truncate text-[12px] text-text-muted num">
                     {descriptor}
                   </span>
                 )}

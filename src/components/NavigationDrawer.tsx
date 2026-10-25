@@ -74,7 +74,7 @@ export function NavigationDrawer() {
                 <Dialog.Title className="truncate text-[15px] font-bold tracking-tight text-text">
                   ENGOSOFT
                 </Dialog.Title>
-                <span className="block truncate text-[11px] text-text-muted">{t("app_sub")}</span>
+                <span className="block truncate text-[12px] text-text-muted">{t("app_sub")}</span>
               </div>
             </div>
             <Dialog.Close

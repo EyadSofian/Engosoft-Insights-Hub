@@ -29,7 +29,7 @@ function Delta({ row }: { row: Pick<CourseLeadLossRow, "leadDelta" | "leadDeltaR
       <Icon size={13} />
       {row.leadDelta > 0 ? "+" : ""}
       {fmtNum(row.leadDelta)}
-      <span className="text-[10px] font-normal opacity-75">({fmtPct(row.leadDeltaRate, 1)})</span>
+      <span className="text-[12px] font-normal opacity-75">({fmtPct(row.leadDeltaRate, 1)})</span>
     </span>
   );
 }
@@ -55,7 +55,7 @@ export function CourseLeadLossComparison({
                 <BookOpenCheck size={20} />
               </span>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand">
                   {A ? "تحليل الكوهورت" : "Course cohort"}
                 </p>
                 <h2 className="text-lg font-bold text-text sm:text-xl">
@@ -72,7 +72,7 @@ export function CourseLeadLossComparison({
 
           <div className="grid grid-cols-2 gap-2 xl:min-w-[560px] xl:grid-cols-4">
             <div className="rounded-2xl border border-brand/15 bg-surface/90 px-4 py-3">
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-text-muted">
                 <Users size={12} />
                 {A ? "ليدز الفترة" : "Period leads"}
               </div>
@@ -81,7 +81,7 @@ export function CourseLeadLossComparison({
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[10px] font-semibold text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "إجمالي Lost" : "Total Lost"}
               </div>
               <div className="num mt-1 text-xl font-bold text-danger">
@@ -89,7 +89,7 @@ export function CourseLeadLossComparison({
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[10px] font-semibold text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "Lost Leads" : "Lost Leads"}
               </div>
               <div className="num mt-1 text-xl font-bold text-danger">
@@ -97,7 +97,7 @@ export function CourseLeadLossComparison({
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[10px] font-semibold text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "Lost Opportunities" : "Lost Opportunities"}
               </div>
               <div className="num mt-1 text-xl font-bold text-danger">
@@ -117,7 +117,7 @@ export function CourseLeadLossComparison({
             <col className="w-[24%]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-border bg-surface-2/55 text-[10px] uppercase tracking-wide text-text-muted">
+            <tr className="border-b border-border bg-surface-2/55 text-[12px] uppercase tracking-wide text-text-muted">
               <th className="px-5 py-3.5 text-start lg:px-7">{A ? "الكورس" : "Course"}</th>
               <th className="px-4 py-3.5 text-start">
                 <span className="block">{A ? "ليدز الفترة" : "Period leads"}</span>
@@ -158,10 +158,10 @@ export function CourseLeadLossComparison({
                 <td className="px-5 py-4 lg:px-7">
                   <div className="font-semibold text-text">{row.label}</div>
                   {row.course !== row.label && (
-                    <div className="mt-0.5 text-[10px] text-text-subtle">Odoo: {row.course}</div>
+                    <div className="mt-0.5 text-[12px] text-text-subtle">Odoo: {row.course}</div>
                   )}
                   {onSelect && (
-                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand">
+                    <div className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-brand">
                       {A ? "عرض الليدز" : "View leads"} <ExternalLink size={10} />
                     </div>
                   )}
@@ -184,7 +184,7 @@ export function CourseLeadLossComparison({
                       }}
                     />
                   </div>
-                  <div className="mt-1.5 whitespace-nowrap text-[10px] text-text-subtle">
+                  <div className="mt-1.5 whitespace-nowrap text-[12px] text-text-subtle">
                     {fmtNum(row.lostLeads)} {A ? "ليد" : "Lead"} · {fmtNum(row.lostOpportunities)}{" "}
                     {A ? "فرصة" : "Opportunity"}
                   </div>
@@ -211,7 +211,7 @@ export function CourseLeadLossComparison({
                     {fmtPct(report.totals.lostRate, 1)}
                   </span>
                 </div>
-                <div className="mt-1 text-[10px] font-normal text-text-subtle">
+                <div className="mt-1 text-[12px] font-normal text-text-subtle">
                   {fmtNum(report.totals.lostLeads)} {A ? "ليد" : "Lead"} ·{" "}
                   {fmtNum(report.totals.lostOpportunities)} {A ? "فرصة" : "Opportunity"}
                 </div>
@@ -238,28 +238,30 @@ export function CourseLeadLossComparison({
               <div>
                 <h3 className="font-bold text-text">{row.label}</h3>
                 {row.course !== row.label && (
-                  <p className="mt-0.5 text-[10px] text-text-subtle">Odoo: {row.course}</p>
+                  <p className="mt-0.5 text-[12px] text-text-subtle">Odoo: {row.course}</p>
                 )}
               </div>
               <Delta row={row} />
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="rounded-xl bg-brand-soft/55 p-2.5">
-                <p className="text-[9px] font-semibold text-text-muted">
+                <p className="text-[12px] font-semibold text-text-muted">
                   {A ? "ليدز الفترة" : "Leads"}
                 </p>
                 <p className="num mt-1 text-base font-bold text-brand">{fmtNum(row.leads)}</p>
               </div>
               <div className="rounded-xl bg-danger-soft/60 p-2.5">
-                <p className="text-[9px] font-semibold text-text-muted">{A ? "الخسائر" : "Lost"}</p>
+                <p className="text-[12px] font-semibold text-text-muted">
+                  {A ? "الخسائر" : "Lost"}
+                </p>
                 <p className="num mt-1 text-base font-bold text-danger">{fmtNum(row.lost)}</p>
               </div>
               <div className="rounded-xl bg-surface-2 p-2.5">
-                <p className="text-[9px] font-semibold text-text-muted">{A ? "النسبة" : "Rate"}</p>
+                <p className="text-[12px] font-semibold text-text-muted">{A ? "النسبة" : "Rate"}</p>
                 <p className="num mt-1 text-base font-bold text-text">{fmtPct(row.lostRate, 1)}</p>
               </div>
             </div>
-            <p className="mt-2 text-[10px] text-text-subtle">
+            <p className="mt-2 text-[12px] text-text-subtle">
               {A ? "الفترة السابقة" : "Previous"}: {fmtNum(row.previousLeads)} ·{" "}
               {fmtNum(row.lostLeads)} {A ? "ليد Lost" : "lost leads"} ·{" "}
               {fmtNum(row.lostOpportunities)} {A ? "فرصة Lost" : "lost opportunities"}
@@ -268,7 +270,7 @@ export function CourseLeadLossComparison({
         ))}
       </div>
 
-      <div className="border-t border-border bg-surface-2/35 px-4 py-3 text-[11px] leading-5 text-text-muted sm:px-6">
+      <div className="border-t border-border bg-surface-2/35 px-4 py-3 text-[12px] leading-5 text-text-muted sm:px-6">
         {A
           ? "ملاحظة المطابقة: FMP يُوحَّد مع CFM / Facility Management حسب taxonomy الـCRM المعتمدة، والسجلات بلا كورس تظهر كسطر Unclassified بدل اختفائها من الإجمالي."
           : "Reconciliation note: FMP is consolidated into CFM / Facility Management by the approved CRM taxonomy, and records without a course appear as Unclassified instead of disappearing from the total."}

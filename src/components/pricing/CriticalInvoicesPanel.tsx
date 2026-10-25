@@ -98,7 +98,7 @@ export function CriticalInvoicesPanel({
           <TriangleAlert size={16} style={{ color: "var(--danger)" }} aria-hidden="true" />
           {ar ? "فواتير تحتاج تدخّلًا اليوم" : "Invoices needing action today"}
         </h2>
-        <p className="text-[11px] text-text-muted">
+        <p className="text-[12px] text-text-muted">
           {ar
             ? `أكبر ${invoices.length} حالة بيع تحت الحد الأدنى من ${total} بندًا مخالفًا`
             : `The ${invoices.length} worst of ${total} lines sold below the floor`}
@@ -122,7 +122,7 @@ export function CriticalInvoicesPanel({
                 <div className="truncate text-[12.5px] font-semibold text-text">
                   <bdi>{row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}</bdi>
                 </div>
-                <div className="num text-[10.5px] text-text-subtle">
+                <div className="num text-[12px] text-text-subtle">
                   <bdi>{row.invoiceNumber}</bdi> · <bdi>{invoiceDate(row) || "—"}</bdi>
                 </div>
               </div>
@@ -156,7 +156,7 @@ export function CriticalInvoicesPanel({
                 <button
                   type="button"
                   onClick={() => setOpenInvoice(row.invoiceNumber)}
-                  className="inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-border px-2.5 text-[11.5px] font-semibold text-text transition-colors hover:bg-surface-2"
+                  className="inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-surface-2"
                 >
                   {ar ? "التفاصيل" : "Details"}
                 </button>
@@ -164,7 +164,7 @@ export function CriticalInvoicesPanel({
                   type="button"
                   onClick={() => void openInOdoo(row.invoiceNumber)}
                   disabled={openingOdoo === row.invoiceNumber}
-                  className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-semibold text-white transition-opacity disabled:opacity-55"
+                  className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold text-white transition-opacity disabled:opacity-55"
                   style={{ background: "var(--ink)" }}
                 >
                   <ExternalLink size={12} aria-hidden="true" />
@@ -184,7 +184,7 @@ export function CriticalInvoicesPanel({
 
       {!!openError && (
         <p
-          className="border-t border-border px-4 py-2 text-[11px]"
+          className="border-t border-border px-4 py-2 text-[12px]"
           style={{ color: "var(--danger)" }}
         >
           {openError}

@@ -141,7 +141,7 @@ function Select({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      <span className="text-[12px] font-medium text-text-muted">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -195,14 +195,14 @@ function PriceRow({ price }: { price: CatalogPrice }) {
           {bandText(price, lang)}
         </span>
         {price.minimum !== null && price.maximum !== null && price.minimum !== price.maximum && (
-          <span className="text-[11px] text-text-muted">
+          <span className="text-[12px] text-text-muted">
             {lang === "ar"
               ? `أقل سعر ${fmtMoney(price.minimum, price.currency, lang)}`
               : `floor ${fmtMoney(price.minimum, price.currency, lang)}`}
           </span>
         )}
         {!!price.validTo && (
-          <span className="text-[11px] text-warning">
+          <span className="text-[12px] text-warning">
             {lang === "ar"
               ? `ساري حتى ${dateLabel(price.validTo, lang)}`
               : `valid until ${dateLabel(price.validTo, lang)}`}
@@ -210,16 +210,16 @@ function PriceRow({ price }: { price: CatalogPrice }) {
         )}
       </div>
       {!!price.bundleName && (
-        <p className="w-full text-[11px] text-text-muted">{price.bundleName}</p>
+        <p className="w-full text-[12px] text-text-muted">{price.bundleName}</p>
       )}
       {price.scope === "offer" && (
-        <p className="w-full text-[10px] leading-relaxed text-text-subtle">
+        <p className="w-full text-[12px] leading-relaxed text-text-subtle">
           {lang === "ar" ? "المصدر: قائمة الأسعار" : "Source: price list"} ·{" "}
           {sourceLabel(price.sourceSheet, lang)} · {lang === "ar" ? "صف" : "row"} {price.sourceRow}
         </p>
       )}
       {!!price.note && price.scope !== "individual" && (
-        <p className="w-full text-[11px] leading-snug text-text-subtle">{price.note}</p>
+        <p className="w-full text-[12px] leading-snug text-text-subtle">{price.note}</p>
       )}
     </div>
   );
@@ -265,7 +265,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
               <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-text">
                 {entry.courseName}
               </h3>
-              <p className="mt-1 text-[11px] text-text-muted">
+              <p className="mt-1 text-[12px] text-text-muted">
                 {specializationLabel(entry.specialization || entry.subcategory, lang)}
                 {!!entry.level && ` · ${entry.level}`}
               </p>
@@ -275,7 +275,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-            <div className="text-[10px] font-semibold text-text-muted">
+            <div className="text-[12px] font-semibold text-text-muted">
               {lang === "ar" ? "كاش" : "Cash"}
             </div>
             <div className="mt-1 text-[14px] font-bold tabular-nums text-text">
@@ -283,7 +283,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
             </div>
           </div>
           <div className="rounded-xl bg-brand-soft/45 px-3 py-2.5">
-            <div className="text-[10px] font-semibold text-text-muted">
+            <div className="text-[12px] font-semibold text-text-muted">
               {lang === "ar" ? "تابي / تمارا" : "Tabby / Tamara"}
             </div>
             <div className="mt-1 text-[14px] font-bold tabular-nums text-brand">
@@ -346,7 +346,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
           {groups.map((group) => (
             <div key={group.scope} className="rounded-xl bg-surface px-3 first:mt-0 [&+&]:mt-2">
               {group.scope !== "individual" && (
-                <p className="pt-2 text-[11px] font-semibold uppercase tracking-wide text-text-subtle">
+                <p className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
                   {scopeLabel(group.scope, lang)}
                 </p>
               )}
@@ -457,7 +457,7 @@ export function PriceSearchTab({
             {lang === "ar" ? "فلترة متقدمة" : "Advanced filters"}
             {showFilters ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
-          <span className="text-[11px] text-text-muted">
+          <span className="text-[12px] text-text-muted">
             {lang === "ar" ? "ابحث بالكود أو اسم الدورة أولًا" : "Start with a code or course name"}
           </span>
         </div>
@@ -553,7 +553,7 @@ export function PriceSearchTab({
           <section key={specialization} className="space-y-2">
             <h2 className="flex items-center gap-2 text-[13px] font-semibold text-text-muted">
               {specializationLabel(specialization, lang)}
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold tabular-nums text-text-subtle">
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-bold tabular-nums text-text-subtle">
                 {entries.length}
               </span>
             </h2>

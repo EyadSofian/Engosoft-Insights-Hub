@@ -61,7 +61,7 @@ export function ProductVariantCard({
         <LtrText>{product.displayName}</LtrText>
       </h4>
       {product.productCode ? (
-        <p className="mt-0.5 text-[11px] text-text-muted">
+        <p className="mt-0.5 text-[12px] text-text-muted">
           {t.code} <LtrText className="num">{product.productCode}</LtrText>
         </p>
       ) : null}
@@ -69,7 +69,7 @@ export function ProductVariantCard({
       <dl className="mt-2 grid grid-cols-3 gap-2">
         {figures.map(([label, value]) => (
           <div key={label} className="min-w-0">
-            <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+            <dt className="truncate text-[12px] text-text-muted">{label}</dt>
             <dd className="num text-sm font-semibold text-text">{value}</dd>
           </div>
         ))}
@@ -86,7 +86,7 @@ export function ProductVariantCard({
                 : `Current Saudi cash price for ${product.displayName}?`,
             )
           }
-          className="rounded border border-border px-2 py-1 text-[11px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
           {t.price}
         </button>
@@ -100,7 +100,7 @@ export function ProductVariantCard({
                 : `Which campaigns sold ${product.displayName}?`,
             )
           }
-          className="rounded border border-border px-2 py-1 text-[11px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+          className="rounded border border-border px-2 py-1 text-[12px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
           {t.campaigns}
         </button>
@@ -209,7 +209,7 @@ export function ProductTable({
               <span className="block truncate text-xs font-medium text-text">
                 <LtrText>{product.displayName}</LtrText>
               </span>
-              <span className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-text-muted">
+              <span className="mt-0.5 flex flex-wrap gap-x-3 text-[12px] text-text-muted">
                 <span className="num">
                   {t.revenue} {formatMoney(product.revenue, "USD")}
                 </span>

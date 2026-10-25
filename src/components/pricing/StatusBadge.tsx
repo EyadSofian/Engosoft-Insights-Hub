@@ -183,7 +183,7 @@ export function StatusBadge({ verdict, size = "sm" }: { verdict: Verdict; size?:
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-md font-semibold ${
-        size === "md" ? "px-2.5 py-1 text-[12px]" : "px-2 py-0.5 text-[11px]"
+        size === "md" ? "px-2.5 py-1 text-[12px]" : "px-2 py-0.5 text-[12px]"
       }`}
       style={{
         background: `var(${spec.soft})`,

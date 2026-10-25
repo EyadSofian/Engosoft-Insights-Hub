@@ -48,7 +48,7 @@ export function DetailPanel({
         <div className="min-w-0">
           <h2 className="text-[16px] font-bold leading-snug text-text">{title}</h2>
           {subtitle && (
-            <p className="mt-1 text-[11.5px] leading-relaxed text-text-muted">{subtitle}</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">{subtitle}</p>
           )}
         </div>
         {!isMobile && (
@@ -78,7 +78,7 @@ export function DetailPanel({
                   {title}
                 </DrawerTitle>
                 {subtitle && (
-                  <p className="mt-1 text-start text-[11.5px] leading-relaxed text-text-muted">
+                  <p className="mt-1 text-start text-[12px] leading-relaxed text-text-muted">
                     {subtitle}
                   </p>
                 )}
@@ -145,7 +145,7 @@ export function DetailStat({
 }) {
   return (
     <div className="rounded-lg border border-border bg-surface-2/60 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
         {label}
       </div>
       <div
@@ -171,7 +171,7 @@ export function DetailStat({
 export function DetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-4 first:mt-0">
-      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-text-subtle">
+      <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
         {title}
       </h3>
       {children}
