@@ -1,4 +1,4 @@
-import { Children, useState, type ReactNode } from "react";
+import { Children, useId, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -267,7 +267,7 @@ export function MoreDetails({
 }) {
   const { lang } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
-  const id = `more-details-${(label ?? "details").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  const id = useId();
   return (
     <section className="section-stack" data-testid={testId}>
       <button

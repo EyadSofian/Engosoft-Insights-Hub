@@ -30,6 +30,7 @@ import {
 import {
   DashboardPageHeader,
   KpiRow,
+  MoreDetails,
   PageSection,
   PageSections,
   SyncStatus,
@@ -39,9 +40,9 @@ import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricBreakdownRow, type MetricDetail } from "@/lib/metric-detail";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { LeadClassificationAudit } from "@/components/leads/LeadClassificationAudit";
+import { LeadPerformanceFunnel } from "@/components/leads/LeadPerformanceFunnel";
 import { LostBreakdown, type LostDimension } from "@/components/leads/LostBreakdown";
 import {
-  performanceStages,
   type PerformanceGroup,
   type PerformanceRecord,
   type PerformanceResult,
@@ -1046,35 +1047,12 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
   if (!data) return null;
 
   const selected = data.selected;
-  const leadRecordsNow = data.records.filter((row) => row.recordType === "lead").length;
-  const activeLeadsNow = data.records.filter(
-    (row) => row.recordType === "lead" && row.status === "lead",
-  ).length;
-  const freshLeadsNow = data.records.filter(
-    (row) => row.recordType === "lead" && row.leadSegment.trim().toLowerCase() === "fresh",
-  ).length;
-  const freshOpportunitiesNow = data.records.filter(
-    (row) => row.recordType === "opportunity" && row.leadSegment.trim().toLowerCase() === "fresh",
-  ).length;
   const selectedCollections = data.collectionsByMonth.find(
     (row) => row.month === data.selectedMonth,
   );
   const linkedLines = data.coverage.linkedAccountingLines;
   const totalLines = linkedLines + data.coverage.unlinkedAccountingLines;
   const linkCoverage = totalLines ? (linkedLines / totalLines) * 100 : null;
-  const stages = performanceStages(selected, paidReady);
-  const stageLabel: Record<string, string> = {
-    entered: t.funnelLead,
-    contacted: x.contactedStage,
-    opportunity: t.funnelOpp,
-    paid: t.funnelPaid,
-  };
-  const stageTone: Record<string, string> = {
-    entered: "var(--sky-strong)",
-    contacted: "var(--violet-strong)",
-    opportunity: "var(--amber-strong)",
-    paid: "var(--mint-strong)",
-  };
   const dimensions: { id: Dimension; label: string; rows: PerformanceGroup[] }[] = [
     { id: "course", label: t.course, rows: data.byCourse },
     { id: "source", label: t.source, rows: data.bySource },
@@ -1285,308 +1263,198 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
         tone="sky"
         id="performance-summary"
       >
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Card className="border-sky-strong/20 bg-sky-surface/50">
-            <div className="text-xs font-semibold text-text-muted">{t.enteredBasis}</div>
-            <div className="num mt-2 text-3xl font-bold text-text">{n(selected.leads)}</div>
-            <div className="mt-3 space-y-2 text-xs">
-              <div className="rounded-xl border border-sky-strong/20 bg-surface/80 px-3 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-text">{t.leadRecordsNow}</span>
-                  <b className="num text-lg text-text">{n(leadRecordsNow)}</b>
-                </div>
-                <p className="mt-1 text-text-muted">
-                  <span className="num font-semibold text-mint-strong">{n(activeLeadsNow)}</span>{" "}
-                  {t.activeLeadCount}
-                  <span className="mx-1.5">·</span>
-                  <span className="num font-semibold text-rose-strong">
-                    {n(selected.lostLeads)}
-                  </span>{" "}
-                  {t.lostLeadCount}
-                </p>
-              </div>
-              <div className="rounded-xl border border-brand/20 bg-surface/80 px-3 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-text">{t.opportunityNow}</span>
-                  <b className="num text-lg text-text">{n(selected.opportunities)}</b>
-                </div>
-                <p className="mt-1 text-text-muted">
-                  <span className="num font-semibold text-brand">
-                    {n(selected.opportunities - selected.lostOpportunities - selected.crmWon)}
-                  </span>{" "}
-                  {t.openOpportunityCount}
-                  <span className="mx-1.5">·</span>
-                  <span className="num font-semibold text-mint-strong">
-                    {n(selected.crmWon)}
-                  </span>{" "}
-                  {t.wonOpportunityCount}
-                  <span className="mx-1.5">·</span>
-                  <span className="num font-semibold text-rose-strong">
-                    {n(selected.lostOpportunities)}
-                  </span>{" "}
-                  {t.lostLeadCount}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl border border-amber-strong/20 bg-amber-surface/40 px-3 py-2.5 text-[12px] leading-5 text-text-muted">
-              <p className="font-semibold text-text">
-                {t.freshNow}: <span className="num">{n(selected.freshTagged)}</span>
-              </p>
-              <p className="mt-1">
-                {t.freshLeadTag}: <b className="num text-text">{n(freshLeadsNow)}</b>
-                <span className="mx-1.5">·</span>
-                {t.freshOpportunityTag}: <b className="num text-text">{n(freshOpportunitiesNow)}</b>
-              </p>
-              <p className="mt-1.5">{t.freshTagNote}</p>
-              <p className="mt-1.5">
-                {t.preCrmUnavailable}. {t.classificationPrompt}
-              </p>
-            </div>
-          </Card>
-          <Card className="border-mint-strong/20 bg-mint-surface/50">
-            <div className="text-xs font-semibold text-text-muted">{t.verifiedOutcome}</div>
-            <div className="num mt-2 text-3xl font-bold text-text">
-              {paidReady ? n(selected.paidLeads) : "—"}
-            </div>
-            <div className="mt-3 text-xs leading-6 text-text-muted">
-              {t.rate}:{" "}
-              <b className="text-text">{paidReady ? pct(selected.conversionRate) : "—"}</b> ·{" "}
-              {t.later}: <b className="text-text">{paidReady ? n(selected.paidLater) : "—"}</b>
-            </div>
-          </Card>
-        </div>
-      </PageSection>
-
-      <LeadClassificationAudit
-        records={data.records}
-        lang={lang}
-        callsAvailable={data.coverage.callsAvailable}
-      />
-
-      {notices.length > 0 && (
-        <div className="space-y-2">
-          {notices.map((text) => (
-            <Notice key={text} tone="warning" icon={<AlertTriangle size={15} />}>
-              {text}
-            </Notice>
-          ))}
-        </div>
-      )}
-
-      <PageSection level="headline" aria-label={t.title}>
         <KpiRow>
-          <MetricDetailTrigger detail={figures.leads!} card={{ index: 0 }} />
-          <MetricDetailTrigger
-            detail={figures.lost!}
-            card={{ index: 1, sub: pct(selected.lostRate) }}
-          />
+          <MetricDetailTrigger detail={figures.leads!} card={{ index: 0, hero: true }} />
           <MetricDetailTrigger
             detail={figures.paid!}
-            card={{ index: 2, sub: t.wonCaveat, subWrap: true }}
+            card={{ index: 1, sub: t.wonCaveat, subWrap: true }}
           />
           <MetricDetailTrigger
             detail={figures.rate!}
-            card={{
-              index: 3,
-              sub: paidReady ? `${n(selected.paidLater)} ${t.later}` : undefined,
-            }}
+            card={{ index: 2, sub: paidReady ? `${n(selected.paidLater)} ${t.later}` : undefined }}
+          />
+          <MetricDetailTrigger
+            detail={figures.lost!}
+            card={{ index: 3, sub: pct(selected.lostRate) }}
           />
         </KpiRow>
       </PageSection>
 
       <PageSection
         title={t.funnel}
-        hint={t.trendSub}
+        hint={
+          lang === "ar"
+            ? "الدخول والدفع هما طرفا التحويل المثبت. الاتصال وحالة Opportunity دلائل مستقلة، وليسا انتقالات تاريخية."
+            : "CRM entry and paid enrollment form the verified conversion. Calls and current Opportunity status are separate signals, not historical transitions."
+        }
         icon={<Filter size={16} />}
         tone="violet"
         id="performance-funnel"
       >
-        <Card>
-          <div className="space-y-4">
-            {stages.map((stage) => (
-              <div key={stage.key}>
-                <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <span className="text-[13px] font-semibold text-text">
-                    {stageLabel[stage.key]}
-                    {!stage.evidenced && (
-                      <span
-                        className="ms-1.5 align-middle text-[12px] font-medium text-text-muted"
-                        title={stage.count === null ? x.stageWithheld : x.stageProxy}
-                      >
-                        *
-                      </span>
-                    )}
-                  </span>
-                  <span className="num flex items-baseline gap-2 text-[13px]">
-                    <b className="text-text">{n(stage.count)}</b>
-                    {stage.stepRate !== null && (
-                      <span className="text-text-muted">
-                        {pct(stage.stepRate)} {x.stageStep}
-                      </span>
-                    )}
-                    {stage.key !== "entered" && stage.shareOfEntries !== null && (
-                      <span className="text-text-subtle">
-                        {pct(stage.shareOfEntries)} {x.stageShare}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-surface-3">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500"
-                    style={{
-                      width: `${stage.shareOfEntries === null ? 0 : Math.min(100, stage.shareOfEntries)}%`,
-                      background: stageTone[stage.key],
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-4 text-[12px] leading-relaxed text-text-muted">
-            {x.stageProxy} · {t.wonCaveat}
-          </p>
-        </Card>
+        <LeadPerformanceFunnel group={selected} paidReady={paidReady} />
+        {notices.length > 0 && (
+          <details className="lead-performance-notices rounded-2xl border border-amber-strong/25 bg-amber-surface/40">
+            <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[12px] font-semibold text-text">
+              <AlertTriangle size={15} className="text-amber-strong" aria-hidden="true" />
+              {lang === "ar"
+                ? `${n(notices.length)} ملاحظات تؤثر على قراءة البيانات`
+                : `${n(notices.length)} data-coverage notes to review`}
+            </summary>
+            <div className="space-y-2 border-t border-amber-strong/20 px-4 py-3">
+              {notices.map((text) => (
+                <Notice key={text} tone="warning" icon={<AlertTriangle size={15} />}>
+                  {text}
+                </Notice>
+              ))}
+            </div>
+          </details>
+        )}
       </PageSection>
 
       <PageSection
-        title={x.monthlyTable}
-        hint={x.monthlyTableHint}
+        title={t.trend}
+        hint={t.trendSub}
         icon={<CalendarRange size={16} />}
         tone="sky"
         id="performance-trend"
       >
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="lead-cohort-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {data.rows.map((row) => (
             <button
               key={row.name}
               type="button"
               aria-pressed={row.name === data.selectedMonth}
               onClick={() => setMonth(row.name)}
-              className={`rounded-2xl border p-3 text-start transition-colors hover:border-sky-strong ${
-                row.name === data.selectedMonth
-                  ? "border-sky-strong bg-sky-surface shadow-sm"
-                  : "border-border bg-surface"
-              }`}
+              className="lead-cohort-card min-w-0 rounded-2xl border p-4 text-start transition-[transform,border-color,box-shadow] hover:-translate-y-0.5"
+              data-selected={row.name === data.selectedMonth ? "" : undefined}
             >
-              <span className="text-xs font-semibold text-text">{monthLabel(row.name, lang)}</span>
-              <span className="num mt-2 block text-2xl font-bold text-text">{n(row.leads)}</span>
-              <span className="text-[12px] text-text-muted">{t.leads}</span>
-              <span className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
-                <span className="text-rose-strong">
-                  {x.calendarLost}
-                  <b className="num mt-0.5 block text-sm">{n(row.calendarLost)}</b>
-                  <span className="block text-text-muted">
-                    {x.calendarLostOlderEntry}: {n(row.calendarLostOlderEntry)}
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-bold text-text">
+                  {monthLabel(row.name, lang)}
+                </span>
+                {row.name === data.selectedMonth && (
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-bold text-brand">
+                    {lang === "ar" ? "المجموعة المختارة" : "Selected cohort"}
+                  </span>
+                )}
+              </span>
+              <span className="num mt-3 block text-[28px] font-bold leading-none text-text">
+                {n(row.leads)}
+              </span>
+              <span className="mt-1 block text-[12px] text-text-muted">{t.leads}</span>
+              <span className="mt-4 grid grid-cols-2 gap-3 border-t border-border/70 pt-3">
+                <span className="min-w-0">
+                  <span className="block text-[12px] text-text-muted">{t.paid}</span>
+                  <strong className="num mt-1 block text-lg text-mint-strong">
+                    {paidReady ? n(row.paidLeads) : "—"}
+                  </strong>
+                  <span className="num block text-[12px] text-text-muted">
+                    {paidReady ? pct(row.conversionRate) : "—"}
                   </span>
                 </span>
-                <span className="text-mint-strong">
-                  {x.sameMonthPaid}
-                  <b className="num mt-0.5 block text-sm">
-                    {paidReady ? n(row.paidSameEntryMonth) : "—"} ·{" "}
-                    {paidReady ? pct(row.paidSameEntryMonthRate) : "—"}
-                  </b>
+                <span className="min-w-0">
+                  <span className="block text-[12px] text-text-muted">{t.lost}</span>
+                  <strong className="num mt-1 block text-lg text-rose-strong">{n(row.lost)}</strong>
+                  <span className="num block text-[12px] text-text-muted">{pct(row.lostRate)}</span>
                 </span>
-              </span>
-              <span className="mt-2 block text-[12px] text-text-muted">
-                {x.sameMonthLost}: {n(row.lostSameEntryMonth)} · {x.calendarPaid}:{" "}
-                {paidReady ? n(row.calendarPaid) : "—"}
               </span>
             </button>
           ))}
         </div>
-        <Card padded={false} className="overflow-hidden">
-          <DataTable<MonthRow>
-            rows={monthRows}
-            cols={[
-              ...(groupCols(t.month, false, true) as Col<MonthRow>[]),
-              {
-                key: "calendarLost",
-                header: x.calendarLost,
-                group: "outcome",
-                align: "right",
-                always: true,
-                render: (row) => n(row.calendarLost),
-                sortValue: (row) => row.calendarLost,
-              },
-              {
-                key: "calendarLostOlderEntry",
-                header: x.calendarLostOlderEntry,
-                group: "outcome",
-                align: "right",
-                render: (row) => n(row.calendarLostOlderEntry),
-                sortValue: (row) => row.calendarLostOlderEntry,
-              },
-              {
-                key: "lostSameEntryMonth",
-                header: x.sameMonthLost,
-                group: "outcome",
-                align: "right",
-                always: true,
-                render: (row) =>
-                  `${n(row.lostSameEntryMonth)} · ${pct(row.leads ? (row.lostSameEntryMonth / row.leads) * 100 : null)}`,
-                sortValue: (row) => row.lostSameEntryMonth,
-              },
-              {
-                key: "paidSameEntryMonth",
-                header: x.sameMonthPaid,
-                group: "outcome",
-                align: "right",
-                always: true,
-                render: (row) =>
-                  paidReady
-                    ? `${n(row.paidSameEntryMonth)} · ${pct(row.paidSameEntryMonthRate)}`
-                    : "—",
-                sortValue: (row) => row.paidSameEntryMonth,
-              },
-              {
-                key: "calendarPaid",
-                header: x.calendarPaid,
-                group: "payment",
-                align: "right",
-                render: (row) => (paidReady ? n(row.calendarPaid) : "—"),
-                sortValue: (row) => row.calendarPaid,
-              },
-              {
-                key: "lostTimingUnverified",
-                header: x.lossUnverified,
-                group: "outcome",
-                align: "right",
-                hideByDefault: true,
-                render: (row) => n(row.lostTimingUnverified),
-                sortValue: (row) => row.lostTimingUnverified,
-              },
-              {
-                key: "paidInvoices",
-                header: x.groupColumns.invoices,
-                group: "payment",
-                align: "right",
-                headerTitle: t.cohortVsPayment,
-                render: (row) => n(row.paidInvoices),
-                sortValue: (row) => row.paidInvoices ?? -1,
-              },
-              {
-                key: "paidUsd",
-                header: x.groupColumns.collected,
-                group: "payment",
-                align: "right",
-                hideByDefault: true,
-                headerTitle: t.cohortVsPayment,
-                render: (row) => money(row.paidUsd),
-                sortValue: (row) => row.paidUsd ?? -1,
-              },
-            ]}
-            groupLabels={bandLabels}
-            columnChooser
-            defaultVisibleLimit={15}
-            pageSize={6}
-            initialSort={{ key: "name", dir: 1 }}
-            onRowClick={(row) => setMonth(row.name)}
-            rowKey={(row) => row.name}
-            csvFilename={`engosoft-lead-cohorts-${data.asOf}`}
-            csvRow={csvRow}
-          />
-        </Card>
+        <MoreDetails label={x.monthlyTable} hint={x.monthlyTableHint}>
+          <Card padded={false} className="overflow-hidden">
+            <DataTable<MonthRow>
+              rows={monthRows}
+              cols={[
+                ...(groupCols(t.month, false, true) as Col<MonthRow>[]),
+                {
+                  key: "calendarLost",
+                  header: x.calendarLost,
+                  group: "outcome",
+                  align: "right",
+                  always: true,
+                  render: (row) => n(row.calendarLost),
+                  sortValue: (row) => row.calendarLost,
+                },
+                {
+                  key: "calendarLostOlderEntry",
+                  header: x.calendarLostOlderEntry,
+                  group: "outcome",
+                  align: "right",
+                  render: (row) => n(row.calendarLostOlderEntry),
+                  sortValue: (row) => row.calendarLostOlderEntry,
+                },
+                {
+                  key: "lostSameEntryMonth",
+                  header: x.sameMonthLost,
+                  group: "outcome",
+                  align: "right",
+                  always: true,
+                  render: (row) =>
+                    `${n(row.lostSameEntryMonth)} · ${pct(row.leads ? (row.lostSameEntryMonth / row.leads) * 100 : null)}`,
+                  sortValue: (row) => row.lostSameEntryMonth,
+                },
+                {
+                  key: "paidSameEntryMonth",
+                  header: x.sameMonthPaid,
+                  group: "outcome",
+                  align: "right",
+                  always: true,
+                  render: (row) =>
+                    paidReady
+                      ? `${n(row.paidSameEntryMonth)} · ${pct(row.paidSameEntryMonthRate)}`
+                      : "—",
+                  sortValue: (row) => row.paidSameEntryMonth,
+                },
+                {
+                  key: "calendarPaid",
+                  header: x.calendarPaid,
+                  group: "payment",
+                  align: "right",
+                  render: (row) => (paidReady ? n(row.calendarPaid) : "—"),
+                  sortValue: (row) => row.calendarPaid,
+                },
+                {
+                  key: "lostTimingUnverified",
+                  header: x.lossUnverified,
+                  group: "outcome",
+                  align: "right",
+                  hideByDefault: true,
+                  render: (row) => n(row.lostTimingUnverified),
+                  sortValue: (row) => row.lostTimingUnverified,
+                },
+                {
+                  key: "paidInvoices",
+                  header: x.groupColumns.invoices,
+                  group: "payment",
+                  align: "right",
+                  headerTitle: t.cohortVsPayment,
+                  render: (row) => n(row.paidInvoices),
+                  sortValue: (row) => row.paidInvoices ?? -1,
+                },
+                {
+                  key: "paidUsd",
+                  header: x.groupColumns.collected,
+                  group: "payment",
+                  align: "right",
+                  hideByDefault: true,
+                  headerTitle: t.cohortVsPayment,
+                  render: (row) => money(row.paidUsd),
+                  sortValue: (row) => row.paidUsd ?? -1,
+                },
+              ]}
+              groupLabels={bandLabels}
+              columnChooser
+              defaultVisibleLimit={15}
+              pageSize={6}
+              initialSort={{ key: "name", dir: 1 }}
+              onRowClick={(row) => setMonth(row.name)}
+              rowKey={(row) => row.name}
+              csvFilename={`engosoft-lead-cohorts-${data.asOf}`}
+              csvRow={csvRow}
+            />
+          </Card>
+        </MoreDetails>
       </PageSection>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1733,124 +1601,155 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
         </PageSection>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs">
-        <span className="font-bold text-text">
-          {lang === "ar" ? "تقارير اللوست المرتبطة:" : "Related Lost reports:"}
-        </span>
-        <Link
-          to="/leads"
-          search={{ view: "quality", month: data.selectedMonth }}
-          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
-        >
-          {lang === "ar"
-            ? "جودة الليدز واللوست · مراجعة الشيت"
-            : "Lead quality & Lost · sheet audit"}
-        </Link>
-        <Link
-          to="/lost"
-          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
-        >
-          {lang === "ar" ? "لوست الداشبورد · أودو" : "Dashboard Lost · Odoo"}
-        </Link>
-      </div>
-      <LostBreakdown
-        cohort={selected}
-        rows={activeLostDimension.rows}
-        dimensions={lostDimensions.map((item) => ({ id: item.id, label: item.label }))}
-        dimension={lostDimension}
-        onDimensionChange={setLostDimension}
-        month={data.selectedMonth}
-      />
-
       <PageSection
-        title={t.breakdown}
-        hint={t.trendSub}
+        title={lang === "ar" ? "التفاصيل والمراجعة" : "Details and audit"}
+        hint={
+          lang === "ar"
+            ? "افتح القسم الذي تحتاجه فقط؛ كل الأرقام تخص مجموعة شهر الدخول المختارة."
+            : "Open only the evidence you need; every figure belongs to the selected entry cohort."
+        }
         icon={<Layers3 size={16} />}
-        tone="violet"
-        id="performance-breakdown"
-        action={
-          <Segmented
-            value={dimension}
-            onChange={setDimension}
-            options={dimensions.map((item) => ({ value: item.id, label: item.label }))}
-          />
-        }
-      >
-        <Card padded={false} className="overflow-hidden">
-          <DataTable<PerformanceGroup>
-            rows={activeDimension.rows}
-            cols={groupCols(activeDimension.label, dimension === "closer")}
-            groupLabels={bandLabels}
-            columnChooser
-            defaultVisibleLimit={15}
-            searchable={(row) => row.name}
-            initialSort={{ key: "leads", dir: -1 }}
-            rowKey={(row) => row.name}
-            csvFilename={`engosoft-lead-cohort-${dimension}-${data.selectedMonth}`}
-            csvRow={csvRow}
-            emptyState={
-              <p className="p-8 text-center text-sm text-text-muted">{x.noDimensionRows}</p>
-            }
-          />
-        </Card>
-      </PageSection>
-
-      <PageSection
-        title={t.recordList}
-        hint={`${monthLabel(data.selectedMonth, lang)} · ${n(displayedRecords.length)} / ${n(data.records.length)} ${t.rows}`}
-        icon={<Users size={16} />}
         tone="sky"
-        id="performance-records"
-        action={
-          <Segmented
-            value={recordScope}
-            onChange={setRecordScope}
-            options={[
-              { value: "all", label: x.duplicateAll },
-              { value: "duplicate", label: x.duplicateOnly },
-              { value: "nonduplicate", label: x.nonDuplicate },
-            ]}
-          />
-        }
       >
-        <Card padded={false} className="overflow-hidden">
-          <p className="px-4 pt-4 text-xs leading-6 text-text-muted">
-            {t.recordListHint} {t.recordCountHint} {x.duplicateBasis}
-          </p>
-          <DataTable<PerformanceRecord>
-            rows={displayedRecords}
-            cols={recordColumns}
-            searchable={(row) =>
-              [row.id, row.course, row.source, row.campaign, row.mediaBuyer, row.salesperson].join(
-                " ",
-              )
-            }
-            columnChooser
-            defaultVisibleLimit={11}
-            pageSize={20}
-            maxHeight={640}
-            initialSort={{ key: "createdAt", dir: -1 }}
-            rowKey={(row) => row.id}
-            csvFilename={`engosoft-lead-records-${data.selectedMonth}`}
-            csvRow={(row) => ({
-              id: row.id,
-              createdAt: row.createdAt,
-              course: row.course,
-              source: row.source,
-              campaign: row.campaign,
-              mediaBuyer: row.mediaBuyer,
-              salesperson: row.salesperson,
-              status: row.status,
-              leadSegment: row.leadSegment,
-              duplicate: row.duplicate ?? "",
-              attempts: row.attempts ?? "",
-              firstCallLagHours: row.firstCallLagHours ?? "",
-              lossReason: lang === "ar" ? row.lossReasonAr : row.lossReasonEn,
-              paidOrders: paidReady ? row.paidOrders : "",
-              paidUsd: paidReady ? row.paidRevenue : "",
-            })}
+        <MoreDetails
+          label={
+            lang === "ar" ? "حالة CRM والتصنيف والاتصال" : "CRM state, classification and calls"
+          }
+        >
+          <LeadClassificationAudit
+            records={data.records}
+            lang={lang}
+            callsAvailable={data.coverage.callsAvailable}
           />
-        </Card>
+        </MoreDetails>
+        <MoreDetails label={lang === "ar" ? "تفصيل Lost حسب المجموعة" : "Lost breakdown by group"}>
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs">
+            <span className="font-bold text-text">
+              {lang === "ar" ? "تقارير اللوست المرتبطة:" : "Related Lost reports:"}
+            </span>
+            <Link
+              to="/leads"
+              search={{ view: "quality", month: data.selectedMonth }}
+              className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+            >
+              {lang === "ar"
+                ? "جودة الليدز واللوست · مراجعة الشيت"
+                : "Lead quality & Lost · sheet audit"}
+            </Link>
+            <Link
+              to="/lost"
+              className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
+            >
+              {lang === "ar" ? "لوست الداشبورد · أودو" : "Dashboard Lost · Odoo"}
+            </Link>
+          </div>
+          <LostBreakdown
+            cohort={selected}
+            rows={activeLostDimension.rows}
+            dimensions={lostDimensions.map((item) => ({ id: item.id, label: item.label }))}
+            dimension={lostDimension}
+            onDimensionChange={setLostDimension}
+            month={data.selectedMonth}
+          />
+        </MoreDetails>
+        <MoreDetails label={t.breakdown}>
+          <PageSection
+            title={t.breakdown}
+            hint={t.trendSub}
+            icon={<Layers3 size={16} />}
+            tone="violet"
+            id="performance-breakdown"
+            action={
+              <Segmented
+                value={dimension}
+                onChange={setDimension}
+                options={dimensions.map((item) => ({ value: item.id, label: item.label }))}
+              />
+            }
+          >
+            <Card padded={false} className="overflow-hidden">
+              <DataTable<PerformanceGroup>
+                rows={activeDimension.rows}
+                cols={groupCols(activeDimension.label, dimension === "closer")}
+                groupLabels={bandLabels}
+                columnChooser
+                defaultVisibleLimit={15}
+                searchable={(row) => row.name}
+                initialSort={{ key: "leads", dir: -1 }}
+                rowKey={(row) => row.name}
+                csvFilename={`engosoft-lead-cohort-${dimension}-${data.selectedMonth}`}
+                csvRow={csvRow}
+                emptyState={
+                  <p className="p-8 text-center text-sm text-text-muted">{x.noDimensionRows}</p>
+                }
+              />
+            </Card>
+          </PageSection>
+        </MoreDetails>
+        <MoreDetails label={t.recordList} hint={`${n(displayedRecords.length)} ${t.rows}`}>
+          <PageSection
+            title={t.recordList}
+            hint={`${monthLabel(data.selectedMonth, lang)} · ${n(displayedRecords.length)} / ${n(data.records.length)} ${t.rows}`}
+            icon={<Users size={16} />}
+            tone="sky"
+            id="performance-records"
+            action={
+              <Segmented
+                value={recordScope}
+                onChange={setRecordScope}
+                options={[
+                  { value: "all", label: x.duplicateAll },
+                  { value: "duplicate", label: x.duplicateOnly },
+                  { value: "nonduplicate", label: x.nonDuplicate },
+                ]}
+              />
+            }
+          >
+            <Card padded={false} className="overflow-hidden">
+              <p className="px-4 pt-4 text-xs leading-6 text-text-muted">
+                {t.recordListHint} {t.recordCountHint} {x.duplicateBasis}
+              </p>
+              <DataTable<PerformanceRecord>
+                rows={displayedRecords}
+                cols={recordColumns}
+                searchable={(row) =>
+                  [
+                    row.id,
+                    row.course,
+                    row.source,
+                    row.campaign,
+                    row.mediaBuyer,
+                    row.salesperson,
+                  ].join(" ")
+                }
+                columnChooser
+                defaultVisibleLimit={11}
+                pageSize={20}
+                maxHeight={640}
+                initialSort={{ key: "createdAt", dir: -1 }}
+                rowKey={(row) => row.id}
+                csvFilename={`engosoft-lead-records-${data.selectedMonth}`}
+                csvRow={(row) => ({
+                  id: row.id,
+                  createdAt: row.createdAt,
+                  course: row.course,
+                  source: row.source,
+                  campaign: row.campaign,
+                  mediaBuyer: row.mediaBuyer,
+                  salesperson: row.salesperson,
+                  status: row.status,
+                  leadSegment: row.leadSegment,
+                  duplicate: row.duplicate ?? "",
+                  attempts: row.attempts ?? "",
+                  firstCallLagHours: row.firstCallLagHours ?? "",
+                  lossReason: lang === "ar" ? row.lossReasonAr : row.lossReasonEn,
+                  paidOrders: paidReady ? row.paidOrders : "",
+                  paidUsd: paidReady ? row.paidRevenue : "",
+                })}
+              />
+            </Card>
+          </PageSection>
+        </MoreDetails>
       </PageSection>
     </PageSections>
   );
