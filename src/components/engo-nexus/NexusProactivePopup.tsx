@@ -52,9 +52,12 @@ export function NexusProactivePopup({ suppressed }: { suppressed?: boolean }) {
   useEffect(() => {
     setVisible(false);
     if (suppressed) return;
+    // On phones this card covers the first KPI row. The launcher remains available.
+    if (window.matchMedia("(max-width: 767px)").matches) return;
     if (!canShowProactive({ surface })) return;
     const timer = window.setTimeout(() => {
       // Re-checked on fire: the user may have opened the panel while we waited.
+      if (window.matchMedia("(max-width: 767px)").matches) return;
       if (!canShowProactive({ surface })) return;
       rememberProactiveShown(surface);
       setVisible(true);

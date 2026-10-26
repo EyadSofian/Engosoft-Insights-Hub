@@ -659,7 +659,7 @@ function CourseWorkspaceTabs({
   return (
     <nav
       aria-label={lang === "ar" ? "أقسام تقرير الكورسات" : "Course report sections"}
-      className="flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface p-2 shadow-sm"
+      className="dashboard-tab-rail flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface p-2 shadow-sm"
     >
       {tabs.map((tab) => (
         <button
@@ -704,7 +704,7 @@ function CourseSnapshotCards({
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-brand">
             {lang === "ar" ? "نظرة سريعة" : "Quick glance"}
@@ -725,23 +725,47 @@ function CourseSnapshotCards({
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         {topCourses.map((course, index) => (
-          <article key={course.key} className="rounded-xl border border-border bg-surface-2/45 p-3">
-            <div className="flex items-center justify-between gap-2">
+          <article
+            key={course.key}
+            className="course-snapshot-card overflow-hidden rounded-2xl border"
+            data-featured={index === 0 ? "" : undefined}
+            data-tone={index === 1 ? "mint" : "violet"}
+          >
+            <div className="course-snapshot-head flex items-center justify-between gap-2 px-4 py-3">
               <h3 className="truncate text-sm font-bold text-text" title={course.name}>
                 {course.name}
               </h3>
-              <span className="num grid h-6 w-6 place-items-center rounded-lg bg-brand-soft text-[12px] font-bold text-brand">
+              <span className="course-snapshot-rank num grid h-7 w-7 place-items-center rounded-lg text-[12px] font-bold">
                 {index + 1}
               </span>
             </div>
-            <div className="num mt-3 text-lg font-bold text-text">
-              {mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[12px] text-text-muted">
-              <span>{mode === "ads" ? (lang === "ar" ? "الليدز" : "Leads") : "Won"}</span>
-              <span className="num font-semibold text-text">
-                {fmtNum(mode === "ads" ? course.crmLeads : course.won)}
-              </span>
+            <div className="course-snapshot-detail px-4 py-3">
+              <p className="text-[12px] font-medium text-text-muted">
+                {mode === "ads"
+                  ? lang === "ar"
+                    ? "إجمالي الإنفاق"
+                    : "Total spend"
+                  : lang === "ar"
+                    ? "إجمالي التحصيل"
+                    : "Total collections"}
+              </p>
+              <div className="num mt-1 truncate text-xl font-bold text-text">
+                {mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-border/65 pt-2 text-[12px] text-text-muted">
+                <span>
+                  {mode === "ads"
+                    ? lang === "ar"
+                      ? "الليدز"
+                      : "Leads"
+                    : lang === "ar"
+                      ? "الصفقات"
+                      : "Won deals"}
+                </span>
+                <span className="num font-semibold text-text">
+                  {fmtNum(mode === "ads" ? course.crmLeads : course.won)}
+                </span>
+              </div>
             </div>
           </article>
         ))}
@@ -891,7 +915,7 @@ function CoursePortfolioNavigator({
 
       {visible.length ? (
         <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3 sm:p-5">
-          {visible.map((course) => {
+          {visible.map((course, index) => {
             const selected = selectedKey === course.key;
             const rankPosition = ranked.findIndex((row) => row.key === course.key) + 1;
             const rankValue = COURSE_RANKS[rank].value(course);
@@ -902,13 +926,11 @@ function CoursePortfolioNavigator({
                 key={course.key}
                 onClick={() => selectCourse(course.key)}
                 aria-pressed={selected}
-                className={`group relative overflow-hidden rounded-2xl border p-4 text-start transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                  selected
-                    ? "border-brand bg-brand-soft/35 shadow-sm ring-1 ring-brand/15"
-                    : "border-border bg-surface hover:border-brand/30"
-                }`}
+                data-selected={selected ? "" : undefined}
+                data-tone={index % 3 === 0 ? "sky" : index % 3 === 1 ? "mint" : "violet"}
+                className="course-portfolio-card group relative overflow-hidden rounded-2xl border text-start transition-all duration-200 hover:-translate-y-0.5"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="course-card-head flex items-start justify-between gap-3 p-4">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <span
                       className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[12px] font-bold ${
@@ -949,7 +971,7 @@ function CoursePortfolioNavigator({
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="course-card-metrics grid grid-cols-2 gap-x-4 gap-y-3 px-4 pt-4">
                   <CourseCardMetric
                     label={
                       mode === "ads"
@@ -983,13 +1005,13 @@ function CoursePortfolioNavigator({
                   />
                 </div>
 
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="mx-4 mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
                   <span
                     className="block h-full rounded-full bg-brand transition-[width] duration-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
+                <div className="mx-4 mb-4 mt-2 flex items-center justify-between gap-2 text-[12px]">
                   <span className="font-semibold text-text-muted">
                     {COURSE_RANKS[rank][lang]}: {formatCourseRankValue(course, rank)}
                   </span>
@@ -1531,7 +1553,7 @@ function CourseDetailPanel({
   return (
     <section id="course-detail" className="space-y-5 scroll-mt-28">
       <div className="card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="course-detail-header flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
               <GraduationCap size={21} />
@@ -1580,7 +1602,7 @@ function CourseDetailPanel({
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto border-b border-border bg-surface-2/30 px-4 py-2 sm:px-5">
+        <div className="dashboard-tab-rail flex gap-2 overflow-x-auto border-b border-border bg-surface-2/30 px-4 py-2 sm:px-5">
           {(
             [
               {
@@ -1901,7 +1923,10 @@ function CampaignCard({
     .map((source) => sourceLabel(source, lang))
     .join("، ");
   return (
-    <article className="card flex min-h-[260px] flex-col overflow-hidden p-4">
+    <article
+      className="card course-campaign-card flex min-h-[260px] flex-col overflow-hidden p-4"
+      data-tone={organic ? "mint" : active ? "sky" : "slate"}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap gap-1.5">
@@ -2135,7 +2160,7 @@ function MonthMetricCard({
   const delta =
     first !== null && second !== null && first > 0 ? ((second - first) / first) * 100 : undefined;
   return (
-    <div className="rounded-xl border border-border bg-surface-2/45 p-3">
+    <div className="course-month-card rounded-xl border border-border bg-surface-2/45 p-3">
       <div className="flex items-start justify-between gap-2">
         <span className="text-[12px] font-medium text-text-muted">{label}</span>
         <DeltaBadge value={delta} invert={invert} />
@@ -2151,7 +2176,7 @@ function MonthMetricCard({
 
 function HeaderStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[100px] rounded-xl border border-border bg-surface-2/60 px-3 py-2.5">
+    <div className="course-header-stat min-w-[100px] rounded-xl border border-border bg-surface-2/60 px-3 py-2.5">
       <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-1 text-sm font-semibold text-text">{value}</div>
     </div>

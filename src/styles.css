@@ -5,7 +5,7 @@
 
 /* ---------------------------------------------------------------------------
    Engosoft Insights Hub — design tokens
-   Navy + blue brand, one orange accent reserved for the hero metric.
+   Engosoft cobalt, a restrained orange accent and legible report surfaces.
    Every surface has a light and a dark value; nothing is hardcoded in a
    component. Spacing follows a 4px rhythm, radii a 4-step scale.
 --------------------------------------------------------------------------- */
@@ -140,7 +140,7 @@
   --radius-3xl: 28px;
 
   --font-sans:
-    "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "SF Arabic", "Geeza Pro", "Alexandria", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   /* Headline figures stay in the UI sans: one family for every word and
      number on the page. */
@@ -154,17 +154,16 @@
   --ink: #001e3c;
   --ink-soft: #0b3158;
 
-  /* A cool canvas one clear step darker than the white panels that sit on it
-     (1.17:1, against 1.07:1 before), with hairlines that can actually be seen
-     (1.56:1). On the old values a card and the page were the same sheet of
-     white, and the eye had no edge to rest on. */
-  --bg: #eef2fb;
-  --bg-subtle: #e6ecf8;
+  /* Pale blue canvas behind crisp white data surfaces. */
+  --bg: #f2f5fc;
+  --bg-subtle: #eef2fb;
   --surface: #ffffff;
-  --surface-2: #f5f7fd;
-  --surface-3: #e9eefa;
-  --border: #c9d4ee;
-  --border-strong: #a9b9e0;
+  --surface-2: #f6f8fd;
+  --surface-3: #eaf0fc;
+  --border: #dce4f3;
+  --border-strong: #b9c9e8;
+  --glass-card: rgba(255, 255, 255, 0.94);
+  --glass-card-border: rgba(216, 227, 247, 0.95);
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -180,25 +179,25 @@
   --rose-ink: #a92f3b;
   --rose-strong: #e04452;
 
-  --sky-surface: #eaf3ff;
-  --sky-border: #c5ddfb;
-  --sky-ink: #1a56a8;
-  --sky-strong: #2d78df;
+  --sky-surface: #e9efff;
+  --sky-border: #c6d5ff;
+  --sky-ink: #003dcf;
+  --sky-strong: #0045fe;
 
   --violet-surface: #f1edff;
   --violet-border: #d9cffb;
   --violet-ink: #56409f;
   --violet-strong: #7659e8;
 
-  --amber-surface: #fff4e6;
-  --amber-border: #ffdfba;
-  --amber-ink: #a85e12;
-  --amber-strong: #e98623;
+  --amber-surface: #fff1e6;
+  --amber-border: #ffd8bd;
+  --amber-ink: #a74300;
+  --amber-strong: #ff6500;
 
-  --cyan-surface: #e6f7f9;
-  --cyan-border: #bce8ed;
-  --cyan-ink: #056d77;
-  --cyan-strong: #0797a4;
+  --cyan-surface: #e6f3ff;
+  --cyan-border: #c3e1fc;
+  --cyan-ink: #0862ac;
+  --cyan-strong: #1479ce;
 
   /* Solid card fills. Each carries white text at 4.6:1 or better, and the
      same fill is used in both themes so a family is one colour everywhere. */
@@ -206,7 +205,7 @@
   --rose-fill: #dc3545;
   --sky-fill: #1f5bff;
   --violet-fill: #6d4aff;
-  --amber-fill: #c8510b;
+  --amber-fill: #b84a00;
   --cyan-fill: #0e7490;
   --slate-fill: #334a75;
 
@@ -218,22 +217,21 @@
   /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
      even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
      for body text and is a large part of why the dashboard tired the eyes. */
-  --text: #0b1533;
-  --text-muted: #46557a;
-  --text-subtle: #56658a;
+  --text: #10204b;
+  --text-muted: #52617e;
+  --text-subtle: #61708d;
   --text-inverse: #ffffff;
 
-  /* Royal blue: the page band, the active tab, links and the collection
-     card. White text on it is 5.25:1. */
-  --brand: #1f5bff;
-  --brand-hover: #1648d6;
-  --brand-soft: #e8eeff;
-  --electric: #1f5bff;
-  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
+  /* The primary brand color is sampled from the supplied Engosoft logo. */
+  --brand: #0045fe;
+  --brand-hover: #0039db;
+  --brand-soft: #e9efff;
+  --electric: #0045fe;
+  --brand-band: #0045fe;
 
-  --accent: #1f5bff;
-  --accent-soft: #e8eeff;
-  --accent-ink: #1440c9;
+  --accent: #0045fe;
+  --accent-soft: #e9efff;
+  --accent-ink: #0039cf;
 
   --success: #159a67;
   --success-soft: #e8f7f0;
@@ -255,20 +253,14 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  /* --- navigation rail --------------------------------------------------
-     Light theme keeps the rail on the page's own surface. It used to be a
-     navy slab, which made the one persistently darkest region of a light
-     dashboard the part carrying no data. */
-  /* The rail is the page's colour anchor: a violet column, white type, and
-     a white pill for the section the reader is in. White on the lightest
-     stop is 5.15:1. */
-  --nav-surface: linear-gradient(180deg, #6d4aff 0%, #5b3ff0 48%, #4f2fd6 100%);
+  /* The cobalt navigation rail anchors the entire dashboard. */
+  --nav-surface: linear-gradient(165deg, #0037d3 0%, #0045fe 56%, #174eff 100%);
   --nav-border: rgba(255, 255, 255, 0.18);
   --nav-text: #ffffff;
-  --nav-text-muted: #ffffff;
-  --nav-hover: rgba(255, 255, 255, 0.14);
+  --nav-text-muted: rgba(255, 255, 255, 0.78);
+  --nav-hover: rgba(255, 255, 255, 0.12);
   --nav-active-bg: #ffffff;
-  --nav-active-text: #4f2fd6;
+  --nav-active-text: #003cdd;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -279,12 +271,12 @@
      the colour-blind (ΔE ≥ 9.2) and normal-vision (ΔE ≥ 19.6) floors. Slots
      3, 5 and 6 sit under 3:1 on white, so charts carry visible labels and a
      legend rather than relying on colour alone. */
-  --chart-1: #1f5bff;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #6d4aff;
-  --chart-5: #e87ba4;
-  --chart-6: #eda100;
+  --chart-1: #0045fe;
+  --chart-2: #ff6500;
+  --chart-3: #11a888;
+  --chart-4: #7855dc;
+  --chart-5: #e270a1;
+  --chart-6: #e6a719;
   --chart-muted: #a3b1c4;
 
   --shadow-xs: 0 1px 2px rgba(11, 31, 58, 0.04);
@@ -293,14 +285,13 @@
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
   --shadow-xl: 0 24px 56px -12px rgba(11, 31, 56, 0.22), 0 8px 20px -8px rgba(11, 31, 56, 0.1);
 
-  --glass-surface: rgba(255, 255, 255, 0.72);
+  --glass-surface: rgba(255, 255, 255, 0.82);
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  /* The colour the glass chrome blurs: royal blue from the top, violet from
-     the trailing corner. Canvas only — every panel is opaque. */
-  --page-glow-primary: rgba(31, 91, 255, 0.16);
-  --page-glow-secondary: rgba(109, 74, 255, 0.12);
+  /* Subtle canvas light; data surfaces stay stable and easy to read. */
+  --page-glow-primary: rgba(0, 69, 254, 0.075);
+  --page-glow-secondary: rgba(255, 101, 0, 0.045);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -558,28 +549,30 @@
 
   /* Navy canvas, panels one step forward. Secondary text is 9:1 and the
      faintest text 6.6:1 on a panel. */
-  --bg: #050d18;
-  --bg-subtle: #08131f;
-  --surface: #0d1c30;
-  --surface-2: #13253d;
-  --surface-3: #1a3050;
-  --border: #26405f;
-  --border-strong: #375a84;
+  --bg: #091634;
+  --bg-subtle: #0d1d42;
+  --surface: #13234a;
+  --surface-2: #1a2d59;
+  --surface-3: #223769;
+  --border: #2e4476;
+  --border-strong: #536ca8;
+  --glass-card: rgba(20, 38, 81, 0.94);
+  --glass-card-border: rgba(76, 105, 174, 0.45);
 
-  --text: #f2f6fc;
-  --text-muted: #aebdd1;
-  --text-subtle: #8fa2bb;
+  --text: #f5f8ff;
+  --text-muted: #c3cee8;
+  --text-subtle: #aabce2;
   --text-inverse: #06111f;
 
-  --brand: #5b9bff;
-  --brand-hover: #7fb2ff;
-  --brand-band: linear-gradient(120deg, #1f5bff 0%, #1849e0 55%, #3b2fd9 100%);
-  --brand-soft: #14263f;
-  --electric: #4c8dff;
+  --brand: #80a6ff;
+  --brand-hover: #afc7ff;
+  --brand-band: #0045fe;
+  --brand-soft: #183671;
+  --electric: #80a6ff;
 
-  --accent: #4c8dff;
-  --accent-soft: #14263f;
-  --accent-ink: #91b8ff;
+  --accent: #80a6ff;
+  --accent-soft: #183671;
+  --accent-ink: #d7e2ff;
 
   --success: #3ad49a;
   --success-soft: #0e2a20;
@@ -605,25 +598,25 @@
   --rose-ink: #ff97a1;
   --rose-strong: #ff6b78;
 
-  --sky-surface: #10243d;
-  --sky-border: #1f4471;
-  --sky-ink: #85b8ff;
-  --sky-strong: #4d94ff;
+  --sky-surface: #192d62;
+  --sky-border: #3359aa;
+  --sky-ink: #a9c1ff;
+  --sky-strong: #80a6ff;
 
   --violet-surface: #1d1836;
   --violet-border: #362c62;
   --violet-ink: #b7a3ff;
   --violet-strong: #9a80ff;
 
-  --amber-surface: #2e2011;
-  --amber-border: #573c1c;
-  --amber-ink: #ffc078;
-  --amber-strong: #f0a44c;
+  --amber-surface: #3b251a;
+  --amber-border: #774327;
+  --amber-ink: #ffbd8a;
+  --amber-strong: #ff8b3f;
 
-  --cyan-surface: #082a2e;
-  --cyan-border: #14515a;
-  --cyan-ink: #5fd6e2;
-  --cyan-strong: #2bb8c6;
+  --cyan-surface: #102a53;
+  --cyan-border: #2a528c;
+  --cyan-ink: #99ccff;
+  --cyan-strong: #69b2f1;
 
   --slate-surface: #16263c;
   --slate-border: #24384f;
@@ -633,22 +626,22 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: linear-gradient(180deg, #3a2a9c 0%, #2a1f78 50%, #1c1556 100%);
+  --nav-surface: linear-gradient(165deg, #002dba, #0045fe 65%, #194cff);
   --nav-border: rgba(255, 255, 255, 0.14);
   --nav-text: #ffffff;
   --nav-text-muted: #ffffff;
-  --nav-hover: rgba(255, 255, 255, 0.12);
+  --nav-hover: rgba(255, 255, 255, 0.15);
   --nav-active-bg: #ffffff;
-  --nav-active-text: #3a2a9c;
+  --nav-active-text: #003cdd;
 
-  --chart-1: #4d94ff;
-  --chart-2: #f0a44c;
-  --chart-3: #2bb8c6;
-  --chart-4: #9a80ff;
+  --chart-1: #7fa6ff;
+  --chart-2: #ff9758;
+  --chart-3: #4acbad;
+  --chart-4: #b29aff;
   /* Deliberately not --danger: an identical value made every fifth category
      render in the error colour. */
-  --chart-5: #ff8fa0;
-  --chart-6: #34c58c;
+  --chart-5: #f49ac1;
+  --chart-6: #efc75a;
   --chart-muted: #7085a0;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -657,14 +650,14 @@
   --shadow-lg: 0 14px 36px -10px rgba(0, 0, 0, 0.65);
   --shadow-xl: 0 26px 60px -14px rgba(0, 0, 0, 0.7);
 
-  --glass-surface: rgba(15, 28, 47, 0.72);
-  --glass-border: rgba(76, 141, 255, 0.2);
+  --glass-surface: rgba(17, 42, 55, 0.86);
+  --glass-border: rgba(154, 221, 224, 0.22);
   --glass-nav: rgba(6, 20, 38, 0.82);
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
   /* One cold light from above the header, on the canvas only. Panels are
      opaque, so nothing a figure sits on is tinted. */
-  --page-glow-primary: rgba(64, 132, 255, 0.11);
-  --page-glow-secondary: rgba(109, 74, 255, 0.1);
+  --page-glow-primary: rgba(0, 69, 254, 0.15);
+  --page-glow-secondary: rgba(255, 101, 0, 0.055);
 }
 
 @layer base {
@@ -884,12 +877,14 @@
 /* --- surfaces ------------------------------------------------------------ */
 
 @utility card {
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: var(--glass-card);
+  border: 1px solid var(--glass-card-border);
   border-radius: 24px;
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   box-shadow:
-    0 1px 2px rgba(15, 40, 120, 0.04),
-    0 10px 28px -14px rgba(31, 91, 255, 0.18);
+    0 18px 42px -26px rgba(7, 36, 52, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 /* --- the spatial system, as utilities ------------------------------------
@@ -1008,6 +1003,8 @@
   border: 1px solid var(--tone-border, var(--border));
   border-radius: 22px;
   color: var(--tone-ink, var(--text));
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
 /* Lifts 2px and deepens its shadow. Nothing else moves. */
@@ -1262,11 +1259,11 @@
    dense figures remain legible while the blue page glow can still show
    through at the edges. */
 @utility chrome-bar {
-  background: color-mix(in oklab, var(--surface) 70%, transparent);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(11, 31, 56, 0.04);
+  background: color-mix(in srgb, var(--surface) 87%, transparent);
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  border-bottom: 1px solid var(--glass-card-border);
+  box-shadow: 0 10px 26px -22px rgba(7, 36, 52, 0.38);
 }
 
 /* Give the one global entry point a quiet pulse so it is discoverable on a
@@ -1334,10 +1331,10 @@
    never the strip that carries no data. */
 @utility chrome-sidebar {
   background: var(--nav-surface);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(155%);
+  -webkit-backdrop-filter: blur(28px) saturate(155%);
   border-inline-end: 1px solid var(--nav-border);
-  box-shadow: none;
+  box-shadow: 14px 0 40px -32px rgba(1, 20, 32, 0.7);
 }
 
 /* Header auto-hide. header-auto-hide.ts writes `data-chrome-header` on <html>;
@@ -1572,54 +1569,795 @@
   letter-spacing: -0.005em;
 }
 
-/* --- solid KPI cards --------------------------------------------------------
-   A headline card is painted in its family's saturated fill (solidCardVars)
-   and everything on it is white. The few shared pieces that bring their own
-   colour — the period delta, muted helper text, the "not available" dash —
-   are turned white here so nothing grey or red sits on a coloured ground.
-   The delta keeps its meaning by shape: arrow and sign, on a light pill when
-   the move is good and a dark pill when it is not. */
+/* Base KPI glass; the brand treatment below adds each metric's hue. */
 .kpi-solid {
-  color: #ffffff;
-  border-color: transparent;
-  /* The fill deepens toward the text and lightens only toward the corner
-     the sparkline and cue sit in, so every word stays on the full-strength
-     colour. */
-  background: linear-gradient(
-    to bottom right,
-    var(--tone-fill) 40%,
-    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
-  );
-  box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--tone-fill) 80%, transparent);
+  color: var(--text);
+  border-color: var(--glass-card-border);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--tone-strong) 16%, transparent),
+      transparent 50%
+    ),
+    var(--glass-card);
+  box-shadow:
+    0 20px 46px -28px rgba(7, 36, 52, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 [dir="rtl"] .kpi-solid {
-  background: linear-gradient(
-    to bottom left,
-    var(--tone-fill) 40%,
-    color-mix(in srgb, var(--tone-fill) 74%, #ffffff) 100%
-  );
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      color-mix(in srgb, var(--tone-strong) 16%, transparent),
+      transparent 50%
+    ),
+    var(--glass-card);
 }
 
 .kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
-  color: #ffffff;
+  color: var(--text-muted);
 }
 
 .kpi-solid .delta-badge {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
   border-radius: 999px;
-  padding: 0 6px;
+  padding: 2px 8px;
 }
 
 .kpi-solid .delta-badge[data-good="false"] {
-  background: rgba(0, 0, 0, 0.24);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .kpi-solid.kpi-card:hover {
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: color-mix(in srgb, var(--tone-strong) 58%, var(--glass-card-border));
+  box-shadow: 0 26px 52px -26px color-mix(in srgb, var(--tone-strong) 27%, transparent);
 }
 
 .kpi-solid.kpi-card:focus-visible {
   outline-color: var(--brand);
+}
+
+/* A quiet aurora behind the glass. The washes are fixed, so long reports do not
+   repaint their data surfaces while scrolling. */
+.app-canvas {
+  position: relative;
+  background:
+    radial-gradient(ellipse 54rem 42rem at 82% -9%, var(--page-glow-primary), transparent 70%),
+    radial-gradient(ellipse 44rem 36rem at 6% 52%, var(--page-glow-secondary), transparent 75%),
+    linear-gradient(160deg, var(--bg), var(--bg-subtle));
+}
+
+.page-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--glass-card-border);
+  background:
+    radial-gradient(
+      circle at 95% 0%,
+      color-mix(in srgb, var(--page-accent) 13%, transparent),
+      transparent 42%
+    ),
+    var(--glass-card);
+  box-shadow:
+    0 24px 52px -34px rgba(7, 36, 52, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  animation: engo-fade-up 520ms var(--ease-out) both;
+}
+
+.page-band::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--page-accent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--page-accent) 40%, transparent);
+}
+
+.page-band-icon {
+  color: var(--page-accent);
+  background: color-mix(in srgb, var(--page-accent) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--page-accent) 25%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.page-sections > .section-stack,
+.page-sections > .card-grid,
+.page-sections > .card,
+.page-sections > .kpi-scope {
+  animation: engo-fade-up 560ms var(--ease-out) both;
+}
+
+.page-sections > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.page-sections > :nth-child(3) {
+  animation-delay: 110ms;
+}
+.page-sections > :nth-child(4) {
+  animation-delay: 160ms;
+}
+.page-sections > :nth-child(n + 5) {
+  animation-delay: 200ms;
+}
+
+.kpi-solid::before {
+  position: absolute;
+  inset-block: 16px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 999px;
+  content: "";
+  background: var(--tone-strong);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--tone-strong) 40%, transparent);
+}
+
+.kpi-solid .kpi-figure {
+  color: var(--text);
+  letter-spacing: -0.035em;
+}
+
+.data-table-shell {
+  border-color: var(--glass-card-border);
+}
+
+.data-table-toolbar {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+.data-table-shell table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table-shell thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  box-shadow: inset 0 -1px 0 var(--border);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.data-table-shell thead th.sticky-col {
+  z-index: 3;
+}
+
+.data-table-shell tbody td {
+  padding-block: 0.8rem;
+  line-height: 1.5;
+}
+
+.data-table-shell tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+}
+
+.data-table-shell tbody tr:hover td,
+.data-table-shell tbody tr:focus-visible td {
+  background: var(--brand-soft);
+}
+
+.data-table-shell tbody td.sticky-col {
+  box-shadow: inset -1px 0 0 var(--border);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.dark .bg-brand.text-white {
+  color: #062c36;
+}
+
+/* Hand-built report tables get the same reading rhythm as DataTable. */
+main .table-wrap > table:not(.data-table-shell table) th {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
+  background: var(--brand-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-band,
+  .page-sections > .section-stack,
+  .page-sections > .card-grid,
+  .page-sections > .card,
+  .page-sections > .kpi-scope {
+    animation: none;
+  }
+}
+
+/* Engosoft identity: cobalt, white and the orange point from the logo. */
+.engosoft-wordmark {
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.065em;
+  line-height: 1.05;
+}
+
+.app-canvas {
+  background:
+    radial-gradient(52rem 28rem at 70% -8%, var(--page-glow-primary), transparent 75%),
+    radial-gradient(36rem 29rem at 4% 48%, var(--page-glow-secondary), transparent 76%), var(--bg);
+}
+
+.page-band {
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(112deg, #003bdc, #0045fe 60%, #1257ff);
+  box-shadow:
+    0 22px 42px -24px rgba(0, 53, 185, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.page-band::before {
+  background: #ff6500;
+  box-shadow: 0 0 24px rgba(255, 101, 0, 0.45);
+}
+
+.page-band::after {
+  content: "";
+  position: absolute;
+  width: 20rem;
+  aspect-ratio: 1;
+  inset-inline-end: -7rem;
+  inset-block-start: -13rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 0 4rem rgba(255, 255, 255, 0.035),
+    0 0 0 8rem rgba(255, 255, 255, 0.025);
+  pointer-events: none;
+}
+
+.page-band > * {
+  position: relative;
+  z-index: 1;
+}
+.page-band :is(h1, .text-text) {
+  color: #ffffff;
+}
+.page-band .text-text-muted {
+  color: rgba(255, 255, 255, 0.81);
+}
+.page-band-icon {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.23);
+}
+.page-band span.border-border {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+.page-band button {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0039cf !important;
+}
+.page-band button .text-text-muted {
+  color: #52617e !important;
+}
+
+/* The KPI has two calm reading zones: a tinted value field and a white glass
+   explanation field. Only a designated hero receives the cobalt brand fill. */
+.kpi-solid,
+[dir="rtl"] .kpi-solid {
+  isolation: isolate;
+  color: var(--text);
+  background: var(--glass-card);
+  border: 1px solid color-mix(in srgb, var(--tone-strong) 22%, var(--glass-card-border));
+  box-shadow:
+    0 18px 34px -25px rgba(13, 34, 80, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+.kpi-solid::before,
+.kpi-solid::after {
+  display: none;
+}
+.kpi-visual {
+  padding: 18px 18px 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tone-surface) 84%, var(--surface)),
+    color-mix(in srgb, var(--tone-surface) 43%, var(--surface))
+  );
+}
+.kpi-explainer {
+  padding: 8px 18px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--tone-strong) 15%, var(--border));
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.kpi-solid .kpi-label {
+  color: var(--text);
+}
+.kpi-solid .kpi-figure {
+  color: var(--tone-ink);
+  letter-spacing: -0.035em;
+  text-shadow: none;
+}
+.kpi-solid .kpi-context {
+  color: var(--text-muted);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.kpi-solid .kpi-icon {
+  color: var(--tone-strong);
+  border: 1px solid color-mix(in srgb, var(--tone-strong) 22%, var(--border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  transition: transform 220ms var(--ease-out);
+}
+.kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
+  color: var(--text-muted);
+}
+.kpi-solid .delta-badge {
+  border: 0;
+  background: color-mix(in srgb, var(--success) 11%, var(--surface));
+  padding: 0.2rem 0.5rem;
+}
+.kpi-solid .delta-badge[data-good="false"] {
+  background: color-mix(in srgb, var(--danger) 11%, var(--surface));
+}
+.kpi-solid .metric-info-trigger {
+  color: var(--text-subtle);
+  background: transparent;
+}
+.kpi-solid .metric-info-trigger:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+.kpi-solid.kpi-card:hover {
+  border-color: color-mix(in srgb, var(--tone-strong) 50%, var(--border));
+  box-shadow: 0 24px 42px -25px color-mix(in srgb, var(--tone-strong) 28%, #10204b);
+}
+.kpi-solid.kpi-card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+.kpi-card:hover .kpi-icon {
+  transform: translateY(-2px);
+}
+.kpi-solid[data-hero] {
+  border-color: #7194ff;
+  box-shadow: 0 22px 38px -22px rgba(0, 69, 254, 0.32);
+}
+.kpi-solid[data-hero] .kpi-visual {
+  background: linear-gradient(112deg, #003bd9, #0045fe 66%, #1e60ff);
+}
+.kpi-solid[data-hero] .kpi-label,
+.kpi-solid[data-hero] .kpi-figure {
+  color: #ffffff !important;
+}
+.kpi-solid[data-hero] .kpi-icon {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.29);
+}
+.kpi-solid[data-hero] .metric-info-trigger,
+.kpi-solid[data-hero] .metric-info-trigger:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+}
+.kpi-solid[data-hero] .kpi-visual::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 5px;
+  height: 100%;
+  background: #ff6500;
+}
+.kpi-solid[data-compact] .kpi-visual {
+  padding: 14px 16px 12px;
+}
+.kpi-solid[data-compact] .kpi-explainer {
+  padding: 7px 16px 12px;
+}
+
+/* Course cards use the same reading order: identity, headline value, context. */
+.course-snapshot-card,
+.course-portfolio-card {
+  --course-tint: var(--sky-surface);
+  border-color: color-mix(in srgb, var(--brand) 17%, var(--border));
+  background: var(--glass-card);
+  box-shadow: 0 16px 32px -25px rgba(13, 34, 80, 0.3);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+.course-snapshot-card[data-tone="mint"],
+.course-portfolio-card[data-tone="mint"] {
+  --course-tint: var(--mint-surface);
+}
+.course-snapshot-card[data-tone="violet"],
+.course-portfolio-card[data-tone="violet"] {
+  --course-tint: var(--violet-surface);
+}
+.course-snapshot-head,
+.course-card-head {
+  background: linear-gradient(
+    125deg,
+    var(--course-tint),
+    color-mix(in srgb, var(--course-tint) 45%, var(--surface))
+  );
+  border-bottom: 1px solid var(--border);
+}
+.course-snapshot-rank {
+  color: var(--brand);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 15%, var(--border));
+}
+.course-snapshot-detail,
+.course-card-metrics {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+.course-card-metrics > :first-child .num {
+  color: var(--brand);
+  font-size: 1.125rem;
+  line-height: 1.25;
+  font-weight: 750;
+}
+.course-snapshot-card[data-featured] .course-snapshot-head,
+.course-portfolio-card[data-selected] .course-card-head {
+  background: linear-gradient(112deg, #003bd9, #0045fe 70%, #1e60ff);
+  border-bottom-color: rgba(255, 255, 255, 0.22);
+}
+.course-snapshot-card[data-featured] .course-snapshot-head h3,
+.course-portfolio-card[data-selected] .course-card-head h3,
+.course-portfolio-card[data-selected] .course-card-head p {
+  color: #fff;
+}
+.course-snapshot-card[data-featured] .course-snapshot-rank {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.17);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.course-portfolio-card[data-selected] .course-card-head > div > span,
+.course-portfolio-card[data-selected] .course-card-head > span {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.17);
+}
+.course-portfolio-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
+  box-shadow: 0 22px 36px -25px rgba(0, 69, 254, 0.3);
+}
+.course-portfolio-card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+.course-detail-header {
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--brand) 9%, var(--surface)),
+    color-mix(in srgb, var(--surface) 89%, transparent)
+  );
+}
+.course-header-stat {
+  border-color: color-mix(in srgb, var(--brand) 16%, var(--border));
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.course-campaign-card {
+  --campaign-accent: var(--slate-strong);
+  --campaign-tint: var(--slate-surface);
+  border-color: color-mix(in srgb, var(--campaign-accent) 20%, var(--border));
+  background: linear-gradient(
+    180deg,
+    var(--campaign-tint),
+    color-mix(in srgb, var(--surface) 92%, transparent) 42%
+  );
+}
+.course-campaign-card[data-tone="sky"] {
+  --campaign-accent: var(--sky-strong);
+  --campaign-tint: var(--sky-surface);
+}
+.course-campaign-card[data-tone="mint"] {
+  --campaign-accent: var(--mint-strong);
+  --campaign-tint: var(--mint-surface);
+}
+.course-campaign-card::before {
+  content: "";
+  display: block;
+  height: 3px;
+  margin: -16px -16px 16px;
+  background: var(--campaign-accent);
+}
+.course-month-card {
+  border-color: color-mix(in srgb, var(--brand) 16%, var(--border));
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--brand) 7%, var(--surface)),
+    color-mix(in srgb, var(--surface) 91%, transparent)
+  );
+  box-shadow: 0 14px 28px -25px rgba(13, 34, 80, 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi-solid .kpi-icon {
+    transition: none;
+  }
+  .kpi-card:hover .kpi-icon {
+    transform: none;
+  }
+}
+
+.dashboard-panel {
+  position: relative;
+  background:
+    radial-gradient(
+      circle at 95% -14%,
+      color-mix(in srgb, var(--panel-accent) 11%, transparent),
+      transparent 43%
+    ),
+    var(--glass-card);
+  border-color: color-mix(in srgb, var(--panel-accent) 17%, var(--glass-card-border));
+  transition:
+    border-color 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+}
+.dashboard-panel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--panel-accent), transparent 58%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.dashboard-panel:hover {
+  border-color: color-mix(in srgb, var(--panel-accent) 33%, var(--glass-card-border));
+  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--panel-accent) 28%, #10204b);
+}
+.data-table-shell {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.data-table-toolbar {
+  background: var(--surface-2);
+}
+.data-table-shell tbody tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+.dark .bg-brand.text-white {
+  color: #ffffff;
+  background: #0045fe;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-solid::after {
+    display: none;
+  }
+  .kpi-solid .kpi-icon {
+    transition: none;
+  }
+  .kpi-card:hover .kpi-icon {
+    transform: none;
+  }
+}
+
+@container kpis (min-width: 560px) and (max-width: 899px) {
+  .kpi-grid[data-count="3"] > :first-child,
+  .kpi-grid[data-count="5"] > :first-child {
+    grid-column: span 12;
+  }
+  .kpi-grid[data-count="3"] > :nth-child(n + 2),
+  .kpi-grid[data-count="5"] > :nth-child(n + 2) {
+    grid-column: span 6;
+  }
+}
+
+/* Shared report finish. These selectors cover the reusable surfaces across
+   route tabs while leaving semantic warning and success cards intact. */
+.app-canvas main .card:not(.kpi-solid):not(.course-campaign-card):not([class*="bg-"]),
+.app-canvas main :is(section, article, div).rounded-2xl.border-border.bg-surface,
+.app-canvas main :is(section, article, div).rounded-3xl.border-border.bg-surface {
+  border-color: var(--glass-card-border);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow:
+    0 18px 36px -28px rgba(13, 34, 80, 0.3),
+    inset 0 1px 0 color-mix(in srgb, var(--surface) 75%, transparent);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+.app-canvas main .dashboard-panel > div:first-child:has(h2) {
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-accent) 12%, var(--border));
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--panel-accent) 8%, var(--surface)),
+    color-mix(in srgb, var(--surface) 92%, transparent)
+  );
+  margin-bottom: 14px;
+}
+.dashboard-chart-frame {
+  min-width: 0;
+  padding-block: 4px 8px;
+}
+.dashboard-chart-frame .recharts-cartesian-grid-horizontal line {
+  opacity: 0.65;
+}
+.dashboard-chart-frame .recharts-default-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+}
+.dashboard-tab-rail,
+.app-canvas main [role="tablist"] {
+  border-color: var(--glass-card-border);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  box-shadow: 0 13px 28px -23px rgba(13, 34, 80, 0.32);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+.app-canvas main [role="tablist"] [role="tab"][aria-selected="true"] {
+  background: var(--brand-band) !important;
+  color: #fff !important;
+  box-shadow: 0 9px 18px -11px rgba(0, 69, 254, 0.65);
+}
+.app-canvas main [role="tablist"] [role="tab"][aria-selected="true"] svg {
+  color: #fff;
+}
+.app-canvas main [role="tablist"] [role="tab"]:focus-visible,
+.dashboard-tab-rail button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.dashboard-tab-rail button[aria-pressed="true"],
+.dashboard-tab-rail button[aria-current="page"] {
+  background: var(--brand-band);
+  color: #fff;
+  box-shadow: 0 9px 18px -11px rgba(0, 69, 254, 0.65);
+}
+.dashboard-tab-rail button[aria-current="page"] svg {
+  color: #fff;
+}
+.dashboard-tab-rail button[aria-pressed="false"]:hover,
+.dashboard-tab-rail button:not([aria-current]):not([aria-pressed="true"]):hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.app-canvas main .data-table-shell {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--brand) 14%, var(--border));
+}
+.app-canvas main .data-table-toolbar {
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--brand) 5%, var(--surface)),
+    var(--surface)
+  );
+}
+.app-canvas main .data-table-shell thead th {
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.app-canvas main .data-table-shell tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.app-canvas main .data-table-shell tbody tr:hover td,
+.app-canvas main .data-table-shell tbody tr:focus-visible td {
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+}
+.app-canvas main .table-wrap > table:not(.data-table-shell table) th {
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
+  color: var(--text);
+  font-weight: 700;
+}
+.app-canvas main .table-wrap > table:not(.data-table-shell table) tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
+}
+
+.pricing-page-header {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(112deg, #003bd9, #0045fe 65%, #1e60ff);
+  box-shadow: 0 20px 38px -23px rgba(0, 53, 185, 0.42);
+}
+.pricing-page-header::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: #ff6500;
+}
+.pricing-page-header input {
+  background: #fff;
+  color: #10204b;
+  border-color: rgba(255, 255, 255, 0.58);
+}
+.pricing-page-header input::placeholder {
+  color: #52617e;
+}
+.pricing-page-header form > svg {
+  color: #52617e;
+}
+
+.pricing-kpi-card {
+  --pricing-tint: var(--slate-surface);
+  --pricing-accent: var(--slate-strong);
+  border-color: color-mix(in srgb, var(--pricing-accent) 20%, var(--border));
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 18px 34px -25px rgba(13, 34, 80, 0.32);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+.pricing-kpi-card[data-tone="success"] {
+  --pricing-tint: var(--mint-surface);
+  --pricing-accent: var(--mint-strong);
+}
+.pricing-kpi-card[data-tone="danger"] {
+  --pricing-tint: var(--rose-surface);
+  --pricing-accent: var(--rose-strong);
+}
+.pricing-kpi-card[data-tone="warning"] {
+  --pricing-tint: var(--amber-surface);
+  --pricing-accent: var(--amber-strong);
+}
+.pricing-kpi-head {
+  flex: 1;
+  background: linear-gradient(
+    145deg,
+    var(--pricing-tint),
+    color-mix(in srgb, var(--pricing-tint) 45%, var(--surface))
+  );
+}
+.pricing-kpi-explainer {
+  border-top: 1px solid color-mix(in srgb, var(--pricing-accent) 16%, var(--border));
+  background: color-mix(in srgb, var(--surface) 89%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.pricing-kpi-card:hover,
+.pricing-kpi-card[data-active] {
+  border-color: color-mix(in srgb, var(--pricing-accent) 55%, var(--border));
+  box-shadow: 0 23px 40px -25px color-mix(in srgb, var(--pricing-accent) 28%, #10204b);
+}
+.pricing-kpi-card:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.pricing-kpi-card[data-hero] {
+  border-color: #7194ff;
+}
+.pricing-kpi-card[data-hero] .pricing-kpi-head {
+  background: linear-gradient(112deg, #003bd9, #0045fe 68%, #1e60ff);
+}
+.pricing-kpi-card[data-hero] .pricing-kpi-head :is(.text-text-muted, .text-text-subtle),
+.pricing-kpi-card[data-hero] .pricing-kpi-head .num,
+.pricing-kpi-card[data-hero] .pricing-kpi-head svg {
+  color: #fff !important;
+}
+.pricing-kpi-card[data-hero] .pricing-kpi-explainer {
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--brand) 17%, var(--border));
+}
+.pricing-kpi-card[data-hero] .pricing-kpi-head > div:first-child > span[aria-hidden="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pricing-kpi-card:hover {
+    transform: none;
+  }
 }

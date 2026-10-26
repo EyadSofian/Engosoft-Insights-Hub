@@ -907,12 +907,13 @@ function CrmWorkspace() {
           icon={<Layers3 size={17} />}
         >
           <Card padded={false} className="overflow-hidden">
-            <div className="hscroll flex gap-1 border-b border-border bg-surface-2/75 p-2">
+            <div className="dashboard-tab-rail hscroll flex gap-1 border-b border-border bg-surface-2/75 p-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => selectView(tab.key)}
+                  aria-pressed={view === tab.key}
                   className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-all ${view === tab.key ? "bg-text text-surface shadow-sm" : "text-text-muted hover:bg-surface hover:text-text"}`}
                 >
                   {tab.icon}

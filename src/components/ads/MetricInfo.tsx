@@ -37,7 +37,7 @@ export function MetricInfo({
           aria-label={`${copy.label} — ${lang === "ar" ? "تفاصيل الحساب" : "how this is calculated"}`}
           // The icon stays 20px so it does not shout, but the pseudo-element
           // gives it a 36px tap target on a phone without moving any layout.
-          className="relative inline-grid place-items-center w-5 h-5 rounded-full text-text-subtle hover:text-brand hover:bg-brand-soft transition-colors cursor-pointer shrink-0 align-middle touch-manipulation after:absolute after:-inset-2 after:content-['']"
+          className="metric-info-trigger relative inline-grid place-items-center w-5 h-5 rounded-full text-text-subtle hover:text-brand hover:bg-brand-soft transition-colors cursor-pointer shrink-0 align-middle touch-manipulation after:absolute after:-inset-2 after:content-['']"
         >
           <Info size={size} strokeWidth={2} />
         </button>

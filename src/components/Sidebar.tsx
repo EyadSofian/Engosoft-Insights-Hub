@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { NAVIGATION_SECTIONS, sectionIsActive, type NavigationSection } from "@/lib/navigation";
 import { MoreReportsList, useLocationSearch } from "./MoreReports";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import logoImg from "@/assets/engosoft-logo.png";
+import { EngosoftMark } from "./EngosoftMark";
 
 /**
  * The desktop navigation rail.
@@ -43,12 +43,12 @@ export function Sidebar() {
     >
       <div className="mb-5 flex items-center gap-2">
         <Link to="/" className="group flex min-w-0 flex-1 items-center gap-2.5 px-1">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-border bg-white shadow-xs transition-transform duration-200 group-hover:scale-105">
-            <img src={logoImg} alt="" className="h-7 w-7 object-contain" />
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/14 text-white transition-transform duration-200 group-hover:scale-105">
+            <EngosoftMark className="h-7 w-7" />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[15px] font-bold tracking-tight text-nav-text">
-              ENGOSOFT
+            <div className="engosoft-wordmark truncate text-[18px] text-nav-text">
+              engosoft
             </div>
             <div className="truncate text-[12px] text-nav-text-muted">{t("app_sub")}</div>
           </div>

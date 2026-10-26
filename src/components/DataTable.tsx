@@ -46,7 +46,7 @@ export interface Col<T> {
 }
 
 /** Columns a table shows before the reader asks for more. */
-export const DEFAULT_VISIBLE_COLUMNS = 8;
+export const DEFAULT_VISIBLE_COLUMNS = 6;
 
 /**
  * Which columns start hidden: the ones flagged `hideByDefault`, then — if more
@@ -231,11 +231,11 @@ export function DataTable<T>({
   const hiddenCount = cols.filter((c) => !c.always && hidden.has(c.key)).length;
   // A table wider than the default always offers the chooser, so the columns
   // the default tucked away can never become unreachable.
-  const showChooser = columnChooser || cols.length > DEFAULT_VISIBLE_COLUMNS;
+  const showChooser = columnChooser || hiddenCount > 0 || cols.length > DEFAULT_VISIBLE_COLUMNS;
 
   return (
-    <div className={`card overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3 border-b border-border">
+    <div className={`card data-table-shell overflow-hidden ${className}`}>
+      <div className="data-table-toolbar flex flex-wrap items-center gap-2 p-3 sm:p-4 border-b border-border">
         {searchable && (
           <div className="flex min-h-11 items-center gap-2 flex-1 min-w-[160px] max-w-[340px] px-2.5 rounded-xl sm:rounded-lg bg-surface-2 border border-border focus-within:border-brand transition-colors">
             <Search size={15} className="text-text-subtle shrink-0" />
@@ -252,6 +252,12 @@ export function DataTable<T>({
         <div className="ms-auto flex items-center gap-2">
           <span className="text-xs text-text-muted num whitespace-nowrap">
             {rowTotal.toLocaleString("en-US")} {t("rows")}
+            {hiddenCount > 0 && (
+              <span className="ms-2 text-text-subtle">
+                · {visibleCols.length}/{cols.length}{" "}
+                {lang === "ar" ? "أعمدة ظاهرة" : "columns shown"}
+              </span>
+            )}
           </span>
 
           {showChooser && (

@@ -821,6 +821,8 @@ export function MetricDetailTrigger({
           {...card}
           label={detail.title}
           value={detail.value}
+          sub={card?.sub}
+          description={detail.definition}
           tone={detail.tone}
           icon={detail.icon}
           delta={detail.delta}

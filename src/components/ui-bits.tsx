@@ -141,18 +141,12 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * A single headline figure, as a coloured card.
- *
- * The whole card takes its family: pastel ground, matching hairline, the
- * figure in the family's ink, a solid icon chip in the family's strong tone,
- * and — when the caller hands over a real series — a filled sparkline in the
- * same colour. That is deliberate and it is the point: a row of five KPIs has
- * to read as five different things from across a desk, and five white cards
- * with five small coloured icons read as one grey block.
+ * A headline figure on a saturated family surface. Translucent controls and
+ * a compact explanation panel give the colour room without losing legibility.
  *
  * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
- * is `--pad-card`, the label sits 11px above the figure, the figure 8px above
- * its explanation, and the "view detail" cue is pinned to the bottom edge by
+ * is `--pad-card`, the label sits above the figure, context and definition, and
+ * the "view detail" cue is pinned to the bottom edge by
  * `mt-auto` so every card in a row ends on the same line however long its
  * explanation runs.
  *
@@ -170,6 +164,7 @@ export function KpiCard({
   label,
   value,
   sub,
+  description,
   delta,
   deltaInvert,
   hero = false,
@@ -190,6 +185,8 @@ export function KpiCard({
   label: string;
   value: ReactNode;
   sub?: ReactNode;
+  /** Plain-language meaning of the figure, separate from its period-specific context. */
+  description?: string;
   delta?: number;
   deltaInvert?: boolean;
   /** Emphasis for the page's single most important figure. */
@@ -222,7 +219,7 @@ export function KpiCard({
     return (
       <div
         className={`tone-surface kpi-solid @container pad-card relative h-full overflow-hidden ${
-          compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"
+          compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"
         }`}
         style={solidCardVars(tone)}
         aria-busy="true"
@@ -248,9 +245,11 @@ export function KpiCard({
       aria-label={interactive ? ariaLabel : undefined}
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
-      className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+      data-hero={hero ? "" : undefined}
+      data-compact={compact ? "" : undefined}
+      className={`tone-surface kpi-solid stagger @container relative flex h-full w-full flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
-      } ${compact ? "min-h-[104px]" : "min-h-[152px] sm:min-h-[168px]"}`}
+      } ${compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"}`}
       style={
         {
           ...solidCardVars(tone),
@@ -258,97 +257,100 @@ export function KpiCard({
         } as React.CSSProperties
       }
     >
-      {/* The page's primary figure gets a solid rule in its own family along
-          the top edge. `hero` used to change only the shadow, which at a
-          glance was no emphasis at all. */}
-      {hero && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-1"
-          style={{ background: "var(--tone-strong)" }}
-        />
-      )}
-
-      <div className="relative flex items-start justify-between gap-3">
-        <span className="inline-flex min-w-0 items-start gap-1.5">
-          <span
-            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
-            style={{ color: "var(--tone-ink)" }}
-          >
-            {label}
-          </span>
-          {info}
-        </span>
-        {icon && (
-          <span
-            className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
-            style={{
-              background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
-              color: "var(--tone-strong)",
-            }}
-          >
-            {icon}
-          </span>
-        )}
-      </div>
-
-      {/* Label to figure: 11px. Close enough to read as one unit, far enough
-          that the figure is the thing the eye lands on. */}
-      <div
-        className={`num kpi-figure relative max-w-full min-w-0 font-bold ${
-          compact ? "mt-1.5" : "mt-[11px]"
-        } ${
-          valueWrap
-            ? "overflow-visible whitespace-normal text-[clamp(0.8rem,12cqi,1.9rem)] leading-[1.15]"
-            : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,13cqi,2.4rem)] leading-none"
-        }`}
-        style={{ color: "var(--tone-ink)" }}
-      >
-        {value}
-      </div>
-
-      {/* Figure to explanation: 8px; between the parts of the explanation: 6. */}
-      {(delta !== undefined || sub != null) && (
-        <div
-          className={`relative flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${
-            compact ? "mt-1.5" : "mt-2"
-          }`}
-        >
-          <DeltaBadge value={delta} invert={deltaInvert} />
-          {sub != null && (
+      <div className="kpi-visual relative">
+        <div className="relative flex items-start justify-between gap-3">
+          <span className="inline-flex min-w-0 items-start gap-1.5">
             <span
-              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12px]"} ${
-                subWrap ? "leading-relaxed" : "line-clamp-2"
-              }`}
+              className={`kpi-label font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
               style={{ color: "var(--tone-ink)" }}
             >
-              {sub}
+              {label}
+            </span>
+            {info}
+          </span>
+          {icon && (
+            <span
+              className={`kpi-icon grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
+              style={{
+                background: "color-mix(in srgb, var(--tone-strong) 13%, var(--surface))",
+                color: "var(--tone-strong)",
+              }}
+            >
+              {icon}
             </span>
           )}
         </div>
-      )}
 
-      {/* The foot of the card. `mt-auto` is what makes a row of cards line up
+        {/* Label to figure: 11px. Close enough to read as one unit, far enough
+          that the figure is the thing the eye lands on. */}
+        <div
+          className={`num kpi-figure relative max-w-full min-w-0 font-bold ${
+            compact ? "mt-1.5" : "mt-[11px]"
+          } ${
+            valueWrap
+              ? "overflow-visible whitespace-normal text-[clamp(0.8rem,12cqi,1.9rem)] leading-[1.15]"
+              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,13cqi,2.4rem)] leading-none"
+          }`}
+          style={{ color: "var(--tone-ink)" }}
+        >
+          {value}
+        </div>
+      </div>
+
+      <div className="kpi-explainer relative flex min-h-0 flex-1 flex-col">
+        {/* Figure to explanation: 8px; between the parts of the explanation: 6. */}
+        {(delta !== undefined || sub != null) && (
+          <div
+            className={`relative flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${
+              compact ? "mt-1.5" : "mt-2"
+            }`}
+          >
+            <DeltaBadge value={delta} invert={deltaInvert} />
+            {sub != null && (
+              <span
+                title={typeof sub === "string" ? sub : undefined}
+                className={`kpi-context min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
+                  subWrap ? "leading-relaxed" : "line-clamp-3"
+                }`}
+                style={{ color: "var(--text-muted)" }}
+              >
+                {sub}
+              </span>
+            )}
+          </div>
+        )}
+
+        {description && !compact && (
+          <p
+            className="relative mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
+            title={description}
+          >
+            {description}
+          </p>
+        )}
+
+        {/* The foot of the card. `mt-auto` is what makes a row of cards line up
           along the bottom as well as the top, whatever length of explanation
           each one carries. */}
-      {(interactive || (!compact && spark)) && (
-        <div className="relative mt-auto flex items-end justify-between gap-2 pt-2.5">
-          {interactive ? (
-            <span
-              className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
-              style={{ color: "var(--tone-ink)" }}
-            >
-              {cue}
-              <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
-                {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+        {(interactive || (!compact && spark)) && (
+          <div className="relative mt-auto flex items-end justify-between gap-2 pt-2.5">
+            {interactive ? (
+              <span
+                className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
+                style={{ color: "var(--tone-ink)" }}
+              >
+                {cue}
+                <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
+                  {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+                </span>
               </span>
-            </span>
-          ) : (
-            <span />
-          )}
-          {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
-        </div>
-      )}
+            ) : (
+              <span />
+            )}
+            {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
+          </div>
+        )}
+      </div>
     </Tag>
   );
 }
