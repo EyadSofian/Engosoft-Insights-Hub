@@ -5,7 +5,7 @@
 
 /* ---------------------------------------------------------------------------
    Engosoft Insights Hub — design tokens
-   Midnight teal, warm analytical accents and legible glass surfaces.
+   Engosoft cobalt, a restrained orange accent and legible report surfaces.
    Every surface has a light and a dark value; nothing is hardcoded in a
    component. Spacing follows a 4px rhythm, radii a 4-step scale.
 --------------------------------------------------------------------------- */
@@ -140,7 +140,7 @@
   --radius-3xl: 28px;
 
   --font-sans:
-    "IBM Plex Sans Arabic", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "SF Arabic", "Geeza Pro", "Alexandria", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   /* Headline figures stay in the UI sans: one family for every word and
      number on the page. */
@@ -154,19 +154,16 @@
   --ink: #001e3c;
   --ink-soft: #0b3158;
 
-  /* A cool canvas one clear step darker than the white panels that sit on it
-     (1.17:1, against 1.07:1 before), with hairlines that can actually be seen
-     (1.56:1). On the old values a card and the page were the same sheet of
-     white, and the eye had no edge to rest on. */
-  --bg: #e9f0f5;
-  --bg-subtle: #e0eaf1;
-  --surface: rgba(255, 255, 255, 0.93);
-  --surface-2: rgba(240, 247, 250, 0.9);
-  --surface-3: #e5f0f5;
-  --border: #c6d7df;
-  --border-strong: #9dbbc8;
-  --glass-card: rgba(255, 255, 255, 0.77);
-  --glass-card-border: rgba(255, 255, 255, 0.95);
+  /* Pale blue canvas behind crisp white data surfaces. */
+  --bg: #f2f5fc;
+  --bg-subtle: #eef2fb;
+  --surface: #ffffff;
+  --surface-2: #f6f8fd;
+  --surface-3: #eaf0fc;
+  --border: #dce4f3;
+  --border-strong: #b9c9e8;
+  --glass-card: rgba(255, 255, 255, 0.94);
+  --glass-card-border: rgba(216, 227, 247, 0.95);
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -182,25 +179,25 @@
   --rose-ink: #a92f3b;
   --rose-strong: #e04452;
 
-  --sky-surface: #eaf3ff;
-  --sky-border: #c5ddfb;
-  --sky-ink: #1a56a8;
-  --sky-strong: #2d78df;
+  --sky-surface: #e9efff;
+  --sky-border: #c6d5ff;
+  --sky-ink: #003dcf;
+  --sky-strong: #0045fe;
 
   --violet-surface: #f1edff;
   --violet-border: #d9cffb;
   --violet-ink: #56409f;
   --violet-strong: #7659e8;
 
-  --amber-surface: #fff4e6;
-  --amber-border: #ffdfba;
-  --amber-ink: #a85e12;
-  --amber-strong: #e98623;
+  --amber-surface: #fff1e6;
+  --amber-border: #ffd8bd;
+  --amber-ink: #a74300;
+  --amber-strong: #ff6500;
 
-  --cyan-surface: #e6f7f9;
-  --cyan-border: #bce8ed;
-  --cyan-ink: #056d77;
-  --cyan-strong: #0797a4;
+  --cyan-surface: #e6f3ff;
+  --cyan-border: #c3e1fc;
+  --cyan-ink: #0862ac;
+  --cyan-strong: #1479ce;
 
   /* Solid card fills. Each carries white text at 4.6:1 or better, and the
      same fill is used in both themes so a family is one colour everywhere. */
@@ -208,7 +205,7 @@
   --rose-fill: #dc3545;
   --sky-fill: #1f5bff;
   --violet-fill: #6d4aff;
-  --amber-fill: #c8510b;
+  --amber-fill: #dc5700;
   --cyan-fill: #0e7490;
   --slate-fill: #334a75;
 
@@ -220,22 +217,21 @@
   /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
      even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
      for body text and is a large part of why the dashboard tired the eyes. */
-  --text: #102b3b;
-  --text-muted: #496473;
-  --text-subtle: #58717e;
+  --text: #10204b;
+  --text-muted: #52617e;
+  --text-subtle: #61708d;
   --text-inverse: #ffffff;
 
-  /* Royal blue: the page band, the active tab, links and the collection
-     card. White text on it is 5.25:1. */
-  --brand: #087487;
-  --brand-hover: #075c6d;
-  --brand-soft: #dceff1;
-  --electric: #00a6b3;
-  --brand-band: linear-gradient(120deg, #07374d 0%, #087487 100%);
+  /* The primary brand color is sampled from the supplied Engosoft logo. */
+  --brand: #0045fe;
+  --brand-hover: #0039db;
+  --brand-soft: #e9efff;
+  --electric: #0045fe;
+  --brand-band: #0045fe;
 
-  --accent: #087487;
-  --accent-soft: #dceff1;
-  --accent-ink: #075c6d;
+  --accent: #0045fe;
+  --accent-soft: #e9efff;
+  --accent-ink: #0039cf;
 
   --success: #159a67;
   --success-soft: #e8f7f0;
@@ -257,20 +253,14 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  /* --- navigation rail --------------------------------------------------
-     Light theme keeps the rail on the page's own surface. It used to be a
-     navy slab, which made the one persistently darkest region of a light
-     dashboard the part carrying no data. */
-  /* The rail is the page's colour anchor: a violet column, white type, and
-     a white pill for the section the reader is in. White on the lightest
-     stop is 5.15:1. */
-  --nav-surface: linear-gradient(160deg, rgba(7, 33, 51, 0.97), rgba(6, 49, 62, 0.94));
-  --nav-border: rgba(190, 234, 240, 0.19);
+  /* The cobalt navigation rail anchors the entire dashboard. */
+  --nav-surface: linear-gradient(165deg, #0037d3 0%, #0045fe 56%, #174eff 100%);
+  --nav-border: rgba(255, 255, 255, 0.18);
   --nav-text: #ffffff;
-  --nav-text-muted: #ffffff;
-  --nav-hover: rgba(137, 225, 231, 0.12);
-  --nav-active-bg: #b9f0ef;
-  --nav-active-text: #093848;
+  --nav-text-muted: rgba(255, 255, 255, 0.78);
+  --nav-hover: rgba(255, 255, 255, 0.12);
+  --nav-active-bg: #ffffff;
+  --nav-active-text: #003cdd;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -281,12 +271,12 @@
      the colour-blind (ΔE ≥ 9.2) and normal-vision (ΔE ≥ 19.6) floors. Slots
      3, 5 and 6 sit under 3:1 on white, so charts carry visible labels and a
      legend rather than relying on colour alone. */
-  --chart-1: #1f5bff;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #6d4aff;
-  --chart-5: #e87ba4;
-  --chart-6: #eda100;
+  --chart-1: #0045fe;
+  --chart-2: #ff6500;
+  --chart-3: #11a888;
+  --chart-4: #7855dc;
+  --chart-5: #e270a1;
+  --chart-6: #e6a719;
   --chart-muted: #a3b1c4;
 
   --shadow-xs: 0 1px 2px rgba(11, 31, 58, 0.04);
@@ -299,10 +289,9 @@
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  /* The colour the glass chrome blurs: royal blue from the top, violet from
-     the trailing corner. Canvas only — every panel is opaque. */
-  --page-glow-primary: rgba(0, 166, 179, 0.22);
-  --page-glow-secondary: rgba(236, 174, 93, 0.16);
+  /* Subtle canvas light; data surfaces stay stable and easy to read. */
+  --page-glow-primary: rgba(0, 69, 254, 0.075);
+  --page-glow-secondary: rgba(255, 101, 0, 0.045);
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -560,30 +549,30 @@
 
   /* Navy canvas, panels one step forward. Secondary text is 9:1 and the
      faintest text 6.6:1 on a panel. */
-  --bg: #081820;
-  --bg-subtle: #0b202a;
-  --surface: rgba(16, 38, 51, 0.94);
-  --surface-2: rgba(25, 53, 66, 0.93);
-  --surface-3: #244250;
-  --border: #31505c;
-  --border-strong: #4a7784;
-  --glass-card: rgba(17, 42, 55, 0.82);
-  --glass-card-border: rgba(158, 219, 222, 0.16);
+  --bg: #091634;
+  --bg-subtle: #0d1d42;
+  --surface: #13234a;
+  --surface-2: #1a2d59;
+  --surface-3: #223769;
+  --border: #2e4476;
+  --border-strong: #536ca8;
+  --glass-card: rgba(20, 38, 81, 0.94);
+  --glass-card-border: rgba(76, 105, 174, 0.45);
 
-  --text: #f2fbfc;
-  --text-muted: #bad0d8;
-  --text-subtle: #9dbbc5;
+  --text: #f5f8ff;
+  --text-muted: #c3cee8;
+  --text-subtle: #aabce2;
   --text-inverse: #06111f;
 
-  --brand: #78dce2;
-  --brand-hover: #a4eef1;
-  --brand-band: linear-gradient(120deg, #0b3b4b 0%, #087487 100%);
-  --brand-soft: #173d47;
-  --electric: #78dce2;
+  --brand: #80a6ff;
+  --brand-hover: #afc7ff;
+  --brand-band: #0045fe;
+  --brand-soft: #183671;
+  --electric: #80a6ff;
 
-  --accent: #78dce2;
-  --accent-soft: #173d47;
-  --accent-ink: #a4eef1;
+  --accent: #80a6ff;
+  --accent-soft: #183671;
+  --accent-ink: #d7e2ff;
 
   --success: #3ad49a;
   --success-soft: #0e2a20;
@@ -609,25 +598,25 @@
   --rose-ink: #ff97a1;
   --rose-strong: #ff6b78;
 
-  --sky-surface: #10243d;
-  --sky-border: #1f4471;
-  --sky-ink: #85b8ff;
-  --sky-strong: #4d94ff;
+  --sky-surface: #192d62;
+  --sky-border: #3359aa;
+  --sky-ink: #a9c1ff;
+  --sky-strong: #80a6ff;
 
   --violet-surface: #1d1836;
   --violet-border: #362c62;
   --violet-ink: #b7a3ff;
   --violet-strong: #9a80ff;
 
-  --amber-surface: #2e2011;
-  --amber-border: #573c1c;
-  --amber-ink: #ffc078;
-  --amber-strong: #f0a44c;
+  --amber-surface: #3b251a;
+  --amber-border: #774327;
+  --amber-ink: #ffbd8a;
+  --amber-strong: #ff8b3f;
 
-  --cyan-surface: #082a2e;
-  --cyan-border: #14515a;
-  --cyan-ink: #5fd6e2;
-  --cyan-strong: #2bb8c6;
+  --cyan-surface: #102a53;
+  --cyan-border: #2a528c;
+  --cyan-ink: #99ccff;
+  --cyan-strong: #69b2f1;
 
   --slate-surface: #16263c;
   --slate-border: #24384f;
@@ -637,22 +626,22 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: linear-gradient(160deg, rgba(4, 24, 36, 0.97), rgba(6, 47, 57, 0.94));
+  --nav-surface: linear-gradient(165deg, #002dba, #0045fe 65%, #194cff);
   --nav-border: rgba(255, 255, 255, 0.14);
   --nav-text: #ffffff;
   --nav-text-muted: #ffffff;
-  --nav-hover: rgba(137, 225, 231, 0.13);
-  --nav-active-bg: #b9f0ef;
-  --nav-active-text: #093848;
+  --nav-hover: rgba(255, 255, 255, 0.15);
+  --nav-active-bg: #ffffff;
+  --nav-active-text: #003cdd;
 
-  --chart-1: #4d94ff;
-  --chart-2: #f0a44c;
-  --chart-3: #2bb8c6;
-  --chart-4: #9a80ff;
+  --chart-1: #7fa6ff;
+  --chart-2: #ff9758;
+  --chart-3: #4acbad;
+  --chart-4: #b29aff;
   /* Deliberately not --danger: an identical value made every fifth category
      render in the error colour. */
-  --chart-5: #ff8fa0;
-  --chart-6: #34c58c;
+  --chart-5: #f49ac1;
+  --chart-6: #efc75a;
   --chart-muted: #7085a0;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -667,8 +656,8 @@
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
   /* One cold light from above the header, on the canvas only. Panels are
      opaque, so nothing a figure sits on is tinted. */
-  --page-glow-primary: rgba(30, 170, 181, 0.15);
-  --page-glow-secondary: rgba(238, 161, 93, 0.08);
+  --page-glow-primary: rgba(0, 69, 254, 0.15);
+  --page-glow-secondary: rgba(255, 101, 0, 0.055);
 }
 
 @layer base {
@@ -1580,7 +1569,7 @@
   letter-spacing: -0.005em;
 }
 
-/* KPI glass keeps the number neutral and gives each metric a distinct accent. */
+/* Base KPI glass; the brand treatment below adds each metric's hue. */
 .kpi-solid {
   color: var(--text);
   border-color: var(--glass-card-border);
@@ -1784,4 +1773,171 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   .page-sections > .kpi-scope {
     animation: none;
   }
+}
+
+/* Engosoft identity: cobalt, white and the orange point from the logo. */
+.engosoft-wordmark {
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.065em;
+  line-height: 1.05;
+}
+
+.app-canvas {
+  background:
+    radial-gradient(52rem 28rem at 70% -8%, var(--page-glow-primary), transparent 75%),
+    radial-gradient(36rem 29rem at 4% 48%, var(--page-glow-secondary), transparent 76%),
+    var(--bg);
+}
+
+.page-band {
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(112deg, #003bdc, #0045fe 60%, #1257ff);
+  box-shadow: 0 22px 42px -24px rgba(0, 53, 185, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.page-band::before {
+  background: #ff6500;
+  box-shadow: 0 0 24px rgba(255, 101, 0, 0.45);
+}
+
+.page-band::after {
+  content: "";
+  position: absolute;
+  width: 20rem;
+  aspect-ratio: 1;
+  inset-inline-end: -7rem;
+  inset-block-start: -13rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 4rem rgba(255, 255, 255, 0.035), 0 0 0 8rem rgba(255, 255, 255, 0.025);
+  pointer-events: none;
+}
+
+.page-band > * { position: relative; z-index: 1; }
+.page-band :is(h1, .text-text) { color: #ffffff; }
+.page-band .text-text-muted { color: rgba(255, 255, 255, 0.81); }
+.page-band-icon {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.23);
+}
+.page-band span.border-border {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+.page-band button {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0039cf !important;
+}
+.page-band button .text-text-muted { color: #52617e !important; }
+
+.kpi-solid,
+[dir="rtl"] .kpi-solid {
+  isolation: isolate;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 95% -16%, color-mix(in srgb, var(--tone-strong) 27%, transparent), transparent 55%),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--tone-strong) 20%, var(--glass-card)),
+      color-mix(in srgb, var(--tone-strong) 8%, var(--glass-card)) 57%,
+      var(--glass-card));
+  border: 1px solid color-mix(in srgb, var(--tone-strong) 34%, var(--glass-card-border));
+  box-shadow:
+    0 20px 44px -28px color-mix(in srgb, var(--tone-strong) 36%, #12275c),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -1px 0 color-mix(in srgb, var(--tone-strong) 13%, transparent);
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+}
+.kpi-solid::before { width: 4px; box-shadow: none; }
+.kpi-solid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.25) 48%, transparent 67%);
+  transform: translateX(130%);
+  transition: transform 720ms var(--ease-out);
+}
+.kpi-card:hover::after,
+.kpi-card:focus-visible::after { transform: translateX(-130%); }
+.kpi-solid .kpi-figure {
+  color: var(--tone-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.kpi-solid .kpi-icon {
+  border: 1px solid color-mix(in srgb, var(--tone-strong) 27%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 7px 17px -12px var(--tone-strong);
+  transition: transform 240ms var(--ease-out), box-shadow 240ms var(--ease-out);
+}
+.kpi-card:hover .kpi-icon { transform: translateY(-2px) rotate(-5deg); }
+.kpi-grid > :first-child.kpi-solid {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.22), transparent 45%),
+    linear-gradient(135deg, #003bdc 0%, #0045fe 70%, #286aff 100%);
+  border-color: #0045fe;
+  box-shadow: 0 19px 36px -20px rgba(0, 69, 254, 0.45);
+}
+.kpi-grid > :first-child.kpi-solid::before { background: #ff6500; }
+.kpi-grid > :first-child.kpi-solid :is(.kpi-figure, .kpi-label, .kpi-context, .text-text, .text-text-muted, .text-text-subtle),
+.kpi-grid > :first-child.kpi-solid [style*="--tone-ink"] { color: #ffffff !important; }
+.kpi-grid > :first-child.kpi-solid .kpi-icon {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.kpi-grid > :first-child.kpi-solid .delta-badge {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+}
+.kpi-grid > :first-child.kpi-solid .kpi-cue { color: #ffffff; }
+.kpi-grid > :first-child.kpi-solid .kpi-figure { letter-spacing: -0.045em; }
+.kpi-grid > :first-child.kpi-solid:hover {
+  border-color: #ff6500;
+  box-shadow: 0 25px 48px -23px rgba(0, 69, 254, 0.58);
+}
+.dashboard-panel {
+  position: relative;
+  background:
+    radial-gradient(circle at 95% -14%, color-mix(in srgb, var(--panel-accent) 11%, transparent), transparent 43%),
+    var(--glass-card);
+  border-color: color-mix(in srgb, var(--panel-accent) 17%, var(--glass-card-border));
+  transition: border-color 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
+}
+.dashboard-panel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--panel-accent), transparent 58%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.dashboard-panel:hover {
+  border-color: color-mix(in srgb, var(--panel-accent) 33%, var(--glass-card-border));
+  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--panel-accent) 28%, #10204b);
+}
+.data-table-shell { border-color: var(--border); background: var(--surface); }
+.data-table-toolbar { background: var(--surface-2); }
+.data-table-shell tbody tr:nth-child(even) td { background: var(--surface-2); }
+.dark .bg-brand.text-white { color: #ffffff; background: #0045fe; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-solid::after { display: none; }
+  .kpi-solid .kpi-icon { transition: none; }
+  .kpi-card:hover .kpi-icon { transform: none; }
+}
+
+@container kpis (min-width: 560px) and (max-width: 899px) {
+  .kpi-grid[data-count="3"] > :first-child,
+  .kpi-grid[data-count="5"] > :first-child { grid-column: span 12; }
+  .kpi-grid[data-count="3"] > :nth-child(n + 2),
+  .kpi-grid[data-count="5"] > :nth-child(n + 2) { grid-column: span 6; }
 }

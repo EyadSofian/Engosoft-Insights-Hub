@@ -109,13 +109,13 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-/** A restrained glass KPI: the accent identifies its family, the figure stays legible. */
+/** Each KPI carries its own hue while the explanation retains neutral contrast. */
 export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
   const t = toneOf(tone);
   return {
-    "--tone-surface": "var(--glass-card)",
-    "--tone-border": "var(--glass-card-border)",
-    "--tone-ink": "var(--text)",
+    "--tone-surface": t.surface,
+    "--tone-border": t.border,
+    "--tone-ink": t.ink,
     "--tone-strong": t.strong,
   } as React.CSSProperties;
 }
@@ -123,12 +123,9 @@ export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
 /**
  * The tone of a card: KPI cards, readings, workspace links.
  *
- * The card itself is neutral — white surface, the shared hairline, figures in
- * the page's own text colour — and the family survives only where it carries
- * meaning: the icon, the sparkline, the hero rule and the "view detail" cue.
- * A full pastel surface per card put five or six colours side by side on every
- * screen, none of which meant good or bad, and that noise is what tired the
- * eye. Semantic colour still comes from deltas, verdict pills and charts.
+ * Reading and workspace cards remain quieter than the KPI row. The metric
+ * family is used for the icon and detail cue; semantic colour still comes
+ * from deltas, verdict pills and charts.
  */
 export function cardToneVars(tone: AnyTone | undefined): React.CSSProperties {
   const t = toneOf(tone);

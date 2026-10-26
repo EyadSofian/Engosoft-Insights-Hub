@@ -37,7 +37,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 /**
  * The one heading a page owns.
  *
- * A glass identity panel with a tinted icon, strong title, context, reporting
+ * A branded cobalt panel with a translucent icon, strong title, context, reporting
  * window and freshness. The top bar carries controls and never repeats a title.
  */
 export function DashboardPageHeader({
@@ -787,7 +787,10 @@ export function DashboardPanel({
 }) {
   const t = toneOf(tone);
   return (
-    <section className={`card flex min-w-0 flex-col overflow-hidden ${className}`}>
+    <section
+      className={`card dashboard-panel flex min-w-0 flex-col overflow-hidden ${className}`}
+      style={{ "--panel-accent": t.strong } as React.CSSProperties}
+    >
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3.5 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">

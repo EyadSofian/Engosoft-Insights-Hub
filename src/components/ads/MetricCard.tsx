@@ -161,9 +161,9 @@ export function MetricCard({
         <span className="flex min-w-0 items-center gap-2">
           {icon && (
             <span
-              className="grid size-7 shrink-0 place-items-center rounded-lg"
+              className="kpi-icon grid size-7 shrink-0 place-items-center rounded-lg"
               style={{
-                background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
+                background: "color-mix(in srgb, var(--tone-strong) 18%, var(--surface))",
                 color: "var(--tone-strong)",
               }}
             >
@@ -171,8 +171,8 @@ export function MetricCard({
             </span>
           )}
           <span
-            className="line-clamp-2 text-[12.5px] font-semibold leading-snug"
-            style={{ color: "var(--tone-ink)" }}
+            className="kpi-label line-clamp-2 text-[12.5px] font-semibold leading-snug"
+            style={{ color: "var(--text)" }}
             title={copy.label}
           >
             {copy.label}
@@ -193,8 +193,8 @@ export function MetricCard({
           <VerdictChip verdict={verdict} label={verdictLabel} />
         )}
         <span
-          className="line-clamp-2 min-w-0 text-[12px] leading-snug"
-          style={{ color: "var(--tone-ink)" }}
+          className="kpi-context line-clamp-2 min-w-0 text-[12px] leading-snug"
+          style={{ color: "var(--text-muted)" }}
           dir="auto"
         >
           {unavailable ? unavailableReason : (sub ?? copy.what)}

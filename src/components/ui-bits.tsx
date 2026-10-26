@@ -141,8 +141,8 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * A headline figure on a glass surface. The accent rail, icon and optional
- * sparkline carry the metric family; the number keeps the page's text colour.
+ * A headline figure on a tinted glass surface. The accent rail, icon, number
+ * and optional sparkline carry its family; the explanation stays neutral.
  *
  * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
  * is `--pad-card`, the label sits above the figure, context and definition, and
@@ -269,8 +269,8 @@ export function KpiCard({
       <div className="relative flex items-start justify-between gap-3">
         <span className="inline-flex min-w-0 items-start gap-1.5">
           <span
-            className={`font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
-            style={{ color: "var(--tone-ink)" }}
+            className={`kpi-label font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
+            style={{ color: "var(--text)" }}
           >
             {label}
           </span>
@@ -278,9 +278,9 @@ export function KpiCard({
         </span>
         {icon && (
           <span
-            className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
+            className={`kpi-icon grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
             style={{
-              background: "color-mix(in srgb, var(--tone-strong) 12%, transparent)",
+              background: "color-mix(in srgb, var(--tone-strong) 18%, var(--surface))",
               color: "var(--tone-strong)",
             }}
           >
@@ -315,10 +315,10 @@ export function KpiCard({
           {sub != null && (
             <span
               title={typeof sub === "string" ? sub : undefined}
-              className={`min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
+              className={`kpi-context min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
                 subWrap ? "leading-relaxed" : "line-clamp-3"
               }`}
-              style={{ color: "var(--tone-ink)" }}
+              style={{ color: "var(--text-muted)" }}
             >
               {sub}
             </span>

@@ -39,7 +39,7 @@ import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { NavigationDrawer } from "./NavigationDrawer";
 import { GlobalSearch } from "./GlobalSearch";
-import logoImg from "@/assets/engosoft-logo.png";
+import { EngosoftMark } from "./EngosoftMark";
 
 export interface FiltersResp {
   accounts: {
@@ -319,10 +319,10 @@ export function TopBar({ title }: { title?: string }) {
               aria-label="ENGOSOFT"
             >
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border bg-white">
-                <img src={logoImg} alt="" className="h-5 w-5 object-contain" />
+                <EngosoftMark className="h-5 w-5 text-brand" />
               </span>
-              <span className="hidden font-semibold text-[14px] tracking-tight text-text min-[360px]:inline sm:text-[15px]">
-                ENGOSOFT
+              <span className="engosoft-wordmark hidden text-[16px] text-text min-[360px]:inline sm:text-[18px]">
+                engosoft
               </span>
             </Link>
             {title && (
