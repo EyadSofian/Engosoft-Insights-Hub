@@ -141,8 +141,8 @@ export function Pill({
 /* --- KPI ----------------------------------------------------------------- */
 
 /**
- * A headline figure on a tinted glass surface. The accent rail, icon, number
- * and optional sparkline carry its family; the explanation stays neutral.
+ * A headline figure on a saturated family surface. Translucent controls and
+ * a compact explanation panel give the colour room without losing legibility.
  *
  * THE INTERNAL RHYTHM IS FIXED, and it is the same on every page: the padding
  * is `--pad-card`, the label sits above the figure, context and definition, and
@@ -255,14 +255,12 @@ export function KpiCard({
         } as React.CSSProperties
       }
     >
-      {/* The page's primary figure gets a solid rule in its own family along
-          the top edge. `hero` used to change only the shadow, which at a
-          glance was no emphasis at all. */}
+      {/* The branded orange edge identifies a featured metric. */}
       {hero && (
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-1"
-          style={{ background: "var(--tone-strong)" }}
+          style={{ background: "#ff6500" }}
         />
       )}
 
@@ -270,7 +268,7 @@ export function KpiCard({
         <span className="inline-flex min-w-0 items-start gap-1.5">
           <span
             className={`kpi-label font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
-            style={{ color: "var(--text)" }}
+            style={{ color: "var(--tone-ink)" }}
           >
             {label}
           </span>
@@ -280,8 +278,8 @@ export function KpiCard({
           <span
             className={`kpi-icon grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
             style={{
-              background: "color-mix(in srgb, var(--tone-strong) 18%, var(--surface))",
-              color: "var(--tone-strong)",
+              background: "rgba(255, 255, 255, 0.16)",
+              color: "#ffffff",
             }}
           >
             {icon}
@@ -318,7 +316,7 @@ export function KpiCard({
               className={`kpi-context min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
                 subWrap ? "leading-relaxed" : "line-clamp-3"
               }`}
-              style={{ color: "var(--text-muted)" }}
+              style={{ color: "rgba(255, 255, 255, 0.86)" }}
             >
               {sub}
             </span>
@@ -353,7 +351,7 @@ export function KpiCard({
           ) : (
             <span />
           )}
-          {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
+          {!compact && <Sparkline points={spark} color="rgba(255, 255, 255, 0.94)" />}
         </div>
       )}
     </Tag>

@@ -205,7 +205,7 @@
   --rose-fill: #dc3545;
   --sky-fill: #1f5bff;
   --violet-fill: #6d4aff;
-  --amber-fill: #dc5700;
+  --amber-fill: #b84a00;
   --cyan-fill: #0e7490;
   --slate-fill: #334a75;
 
@@ -1840,67 +1840,96 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .kpi-solid,
 [dir="rtl"] .kpi-solid {
   isolation: isolate;
-  color: var(--text);
+  color: #ffffff;
   background:
-    radial-gradient(circle at 95% -16%, color-mix(in srgb, var(--tone-strong) 27%, transparent), transparent 55%),
+    radial-gradient(circle at 92% -8%, rgba(255, 255, 255, 0.24), transparent 48%),
     linear-gradient(145deg,
-      color-mix(in srgb, var(--tone-strong) 20%, var(--glass-card)),
-      color-mix(in srgb, var(--tone-strong) 8%, var(--glass-card)) 57%,
-      var(--glass-card));
-  border: 1px solid color-mix(in srgb, var(--tone-strong) 34%, var(--glass-card-border));
+      color-mix(in srgb, var(--tone-fill) 83%, #071331),
+      var(--tone-fill) 64%,
+      color-mix(in srgb, var(--tone-fill) 88%, #09142d));
+  border: 1px solid rgba(255, 255, 255, 0.26);
   box-shadow:
-    0 20px 44px -28px color-mix(in srgb, var(--tone-strong) 36%, #12275c),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    inset 0 -1px 0 color-mix(in srgb, var(--tone-strong) 13%, transparent);
-  backdrop-filter: blur(24px) saturate(165%);
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
+    0 23px 42px -22px color-mix(in srgb, var(--tone-fill) 48%, #0c1834),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
-.kpi-solid::before { width: 4px; box-shadow: none; }
+.kpi-solid::before {
+  width: 11rem;
+  height: 11rem;
+  inset-block: auto;
+  inset-block-start: -6.2rem;
+  inset-inline-start: auto;
+  inset-inline-end: -3.5rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 2.2rem rgba(255, 255, 255, 0.04);
+}
 .kpi-solid::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.25) 48%, transparent 67%);
+  background: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.18) 48%, transparent 67%);
   transform: translateX(130%);
   transition: transform 720ms var(--ease-out);
 }
 .kpi-card:hover::after,
 .kpi-card:focus-visible::after { transform: translateX(-130%); }
 .kpi-solid .kpi-figure {
-  color: var(--tone-ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  letter-spacing: -0.045em;
+}
+.kpi-solid .kpi-label,
+.kpi-solid .kpi-cue { color: #ffffff; }
+.kpi-solid .kpi-context {
+  color: rgba(255, 255, 255, 0.9);
+  padding: 0.3rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .kpi-solid .kpi-icon {
-  border: 1px solid color-mix(in srgb, var(--tone-strong) 27%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 7px 17px -12px var(--tone-strong);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 9px 20px -14px rgba(0, 0, 0, 0.3);
   transition: transform 240ms var(--ease-out), box-shadow 240ms var(--ease-out);
 }
 .kpi-card:hover .kpi-icon { transform: translateY(-2px) rotate(-5deg); }
-.kpi-grid > :first-child.kpi-solid {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.22), transparent 45%),
-    linear-gradient(135deg, #003bdc 0%, #0045fe 70%, #286aff 100%);
-  border-color: #0045fe;
-  box-shadow: 0 19px 36px -20px rgba(0, 69, 254, 0.45);
+.kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
+  color: rgba(255, 255, 255, 0.82);
 }
-.kpi-grid > :first-child.kpi-solid::before { background: #ff6500; }
-.kpi-grid > :first-child.kpi-solid :is(.kpi-figure, .kpi-label, .kpi-context, .text-text, .text-text-muted, .text-text-subtle),
-.kpi-grid > :first-child.kpi-solid [style*="--tone-ink"] { color: #ffffff !important; }
-.kpi-grid > :first-child.kpi-solid .kpi-icon {
+.kpi-solid .delta-badge,
+.kpi-solid .verdict-chip {
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.17) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.2rem 0.5rem;
 }
-.kpi-grid > :first-child.kpi-solid .delta-badge {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
+.kpi-solid .metric-info-trigger,
+.kpi-solid .metric-info-trigger:hover {
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.12);
 }
-.kpi-grid > :first-child.kpi-solid .kpi-cue { color: #ffffff; }
-.kpi-grid > :first-child.kpi-solid .kpi-figure { letter-spacing: -0.045em; }
-.kpi-grid > :first-child.kpi-solid:hover {
-  border-color: #ff6500;
-  box-shadow: 0 25px 48px -23px rgba(0, 69, 254, 0.58);
+.kpi-solid.kpi-card:hover {
+  border-color: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    0 30px 54px -25px color-mix(in srgb, var(--tone-fill) 60%, #0c1834),
+    inset 0 1px 0 rgba(255, 255, 255, 0.33);
+}
+.kpi-solid.kpi-card:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+.kpi-grid > :first-child.kpi-solid {
+  box-shadow:
+    0 27px 48px -23px color-mix(in srgb, var(--tone-fill) 56%, #0c1834),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .dashboard-panel {
   position: relative;

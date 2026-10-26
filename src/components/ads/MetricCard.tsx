@@ -17,7 +17,7 @@ export function VerdictChip({ verdict, label }: { verdict: Verdict; label: strin
   const Icon = v.icon;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap"
+      className="verdict-chip inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap"
       style={{ background: v.soft, color: v.color }}
     >
       <Icon size={11} strokeWidth={2.5} />
@@ -157,14 +157,15 @@ export function MetricCard({
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
     >
+      {hero && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[#FF6500]" />}
       <div className="relative flex items-start justify-between gap-1.5">
         <span className="flex min-w-0 items-center gap-2">
           {icon && (
             <span
               className="kpi-icon grid size-7 shrink-0 place-items-center rounded-lg"
               style={{
-                background: "color-mix(in srgb, var(--tone-strong) 18%, var(--surface))",
-                color: "var(--tone-strong)",
+                background: "rgba(255, 255, 255, 0.16)",
+                color: "#ffffff",
               }}
             >
               {icon}
@@ -172,7 +173,7 @@ export function MetricCard({
           )}
           <span
             className="kpi-label line-clamp-2 text-[12.5px] font-semibold leading-snug"
-            style={{ color: "var(--text)" }}
+            style={{ color: "var(--tone-ink)" }}
             title={copy.label}
           >
             {copy.label}
@@ -194,7 +195,7 @@ export function MetricCard({
         )}
         <span
           className="kpi-context line-clamp-2 min-w-0 text-[12px] leading-snug"
-          style={{ color: "var(--text-muted)" }}
+          style={{ color: "rgba(255, 255, 255, 0.86)" }}
           dir="auto"
         >
           {unavailable ? unavailableReason : (sub ?? copy.what)}
