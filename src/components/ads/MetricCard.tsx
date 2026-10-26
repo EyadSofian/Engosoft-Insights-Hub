@@ -129,7 +129,8 @@ export function MetricCard({
 
   return (
     <div
-      className={`tone-surface kpi-solid stagger @container pad-card relative flex h-full w-full flex-col overflow-hidden text-start ${
+      data-hero={hero ? "" : undefined}
+      className={`tone-surface kpi-solid stagger @container relative flex h-full w-full min-h-[208px] flex-col overflow-hidden text-start ${
         interactive ? "kpi-card lift cursor-pointer" : ""
       }`}
       style={
@@ -157,73 +158,76 @@ export function MetricCard({
       data-metric-trigger={interactive ? "" : undefined}
       data-testid={testId}
     >
-      {hero && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[#FF6500]" />}
-      <div className="relative flex items-start justify-between gap-1.5">
-        <span className="flex min-w-0 items-center gap-2">
-          {icon && (
+      <div className="kpi-visual relative">
+        <div className="relative flex items-start justify-between gap-1.5">
+          <span className="flex min-w-0 items-center gap-2">
+            {icon && (
+              <span
+                className="kpi-icon grid size-7 shrink-0 place-items-center rounded-lg"
+                style={{
+                  background: "color-mix(in srgb, var(--tone-strong) 13%, var(--surface))",
+                  color: "var(--tone-strong)",
+                }}
+              >
+                {icon}
+              </span>
+            )}
             <span
-              className="kpi-icon grid size-7 shrink-0 place-items-center rounded-lg"
-              style={{
-                background: "rgba(255, 255, 255, 0.16)",
-                color: "#ffffff",
-              }}
+              className="kpi-label line-clamp-2 text-[12.5px] font-semibold leading-snug"
+              style={{ color: "var(--tone-ink)" }}
+              title={copy.label}
             >
-              {icon}
+              {copy.label}
             </span>
+          </span>
+          <MetricInfo metric={metric} note={note} align="end" />
+        </div>
+
+        <div
+          className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-bold leading-none"
+          style={{ color: "var(--tone-ink)" }}
+        >
+          {unavailable ? <Unavailable reason={unavailableReason} /> : value}
+        </div>
+      </div>
+
+      <div className="kpi-explainer relative flex min-h-0 flex-1 flex-col">
+        <div className="relative mt-2 flex min-h-[20px] flex-wrap items-center gap-x-2 gap-y-1">
+          {verdict && verdictLabel && !unavailable && (
+            <VerdictChip verdict={verdict} label={verdictLabel} />
           )}
           <span
-            className="kpi-label line-clamp-2 text-[12.5px] font-semibold leading-snug"
-            style={{ color: "var(--tone-ink)" }}
-            title={copy.label}
+            className="kpi-context line-clamp-2 min-w-0 text-[12px] leading-snug"
+            style={{ color: "var(--text-muted)" }}
+            dir="auto"
           >
-            {copy.label}
-          </span>
-        </span>
-        <MetricInfo metric={metric} note={note} align="end" />
-      </div>
-
-      <div
-        className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-bold leading-none"
-        style={{ color: "var(--tone-ink)" }}
-      >
-        {unavailable ? <Unavailable reason={unavailableReason} /> : value}
-      </div>
-
-      <div className="relative mt-2 flex min-h-[20px] flex-wrap items-center gap-x-2 gap-y-1">
-        {verdict && verdictLabel && !unavailable && (
-          <VerdictChip verdict={verdict} label={verdictLabel} />
-        )}
-        <span
-          className="kpi-context line-clamp-2 min-w-0 text-[12px] leading-snug"
-          style={{ color: "rgba(255, 255, 255, 0.86)" }}
-          dir="auto"
-        >
-          {unavailable ? unavailableReason : (sub ?? copy.what)}
-        </span>
-      </div>
-
-      {sub != null && !unavailable && (
-        <p
-          className="relative mt-2 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
-          title={copy.what}
-        >
-          {copy.what}
-        </p>
-      )}
-
-      {interactive && (
-        <div className="relative mt-auto pt-2.5">
-          <span
-            className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
-            style={{ color: "var(--tone-ink)" }}
-          >
-            {cue}
-            <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
-              {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
-            </span>
+            {unavailable ? unavailableReason : (sub ?? copy.what)}
           </span>
         </div>
-      )}
+
+        {sub != null && !unavailable && (
+          <p
+            className="relative mt-2 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
+            title={copy.what}
+          >
+            {copy.what}
+          </p>
+        )}
+
+        {interactive && (
+          <div className="relative mt-auto pt-2.5">
+            <span
+              className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
+              style={{ color: "var(--tone-ink)" }}
+            >
+              {cue}
+              <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
+                {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

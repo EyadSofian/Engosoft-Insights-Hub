@@ -87,7 +87,7 @@ function ChartTooltip({
 
 export function ChartFrame({ height = 260, children }: { height?: number; children: ReactNode }) {
   return (
-    <div style={{ height }} className="w-full">
+    <div style={{ height }} className="dashboard-chart-frame w-full">
       <ResponsiveContainer width="100%" height="100%">
         {children as React.ReactElement}
       </ResponsiveContainer>

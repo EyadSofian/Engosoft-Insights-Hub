@@ -30,8 +30,6 @@ export interface ToneStyle {
   ink: string;
   /** Saturated tone: icon chip, sparkline stroke, progress fill. */
   strong: string;
-  /** Deep fill with enough contrast for white KPI text. */
-  fill: string;
 }
 
 export const TONES: Record<Tone, ToneStyle> = {
@@ -40,49 +38,42 @@ export const TONES: Record<Tone, ToneStyle> = {
     border: "var(--mint-border)",
     ink: "var(--mint-ink)",
     strong: "var(--mint-strong)",
-    fill: "var(--mint-fill)",
   },
   rose: {
     surface: "var(--rose-surface)",
     border: "var(--rose-border)",
     ink: "var(--rose-ink)",
     strong: "var(--rose-strong)",
-    fill: "var(--rose-fill)",
   },
   sky: {
     surface: "var(--sky-surface)",
     border: "var(--sky-border)",
     ink: "var(--sky-ink)",
     strong: "var(--sky-strong)",
-    fill: "var(--sky-fill)",
   },
   violet: {
     surface: "var(--violet-surface)",
     border: "var(--violet-border)",
     ink: "var(--violet-ink)",
     strong: "var(--violet-strong)",
-    fill: "var(--violet-fill)",
   },
   amber: {
     surface: "var(--amber-surface)",
     border: "var(--amber-border)",
     ink: "var(--amber-ink)",
     strong: "var(--amber-strong)",
-    fill: "var(--amber-fill)",
   },
   cyan: {
     surface: "var(--cyan-surface)",
     border: "var(--cyan-border)",
     ink: "var(--cyan-ink)",
     strong: "var(--cyan-strong)",
-    fill: "var(--cyan-fill)",
   },
   slate: {
     surface: "var(--slate-surface)",
     border: "var(--slate-border)",
     ink: "var(--slate-ink)",
     strong: "var(--slate-strong)",
-    fill: "var(--slate-fill)",
   },
 };
 
@@ -118,15 +109,14 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-/** Deep cards keep every metric family distinct and all text high contrast. */
+/** Soft per-metric color with one dedicated cobalt featured state. */
 export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
   const t = toneOf(tone);
   return {
     "--tone-surface": t.surface,
     "--tone-border": t.border,
-    "--tone-ink": "#ffffff",
+    "--tone-ink": t.ink,
     "--tone-strong": t.strong,
-    "--tone-fill": t.fill,
   } as React.CSSProperties;
 }
 
