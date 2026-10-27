@@ -2387,22 +2387,26 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const accountingCandidates = accountingRaw.filter((r) => {
       const movement = accountingMovement(r);
       const id = accountingStableLineId(r);
-      return (
-        !!(movement || id) &&
-        !isExcludedFromDashboardProduct({
-          product:
-            str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]),
-          productCode:
-            str(r["Product Code"]) || str(r["Product Reference"]) || str(r["الرقم المرجعي"]),
-        })
-      );
+      return !!(movement || id);
     });
-    const accountingMissingPaymentDate = accountingCandidates.filter((r) => {
-      const paymentDate =
-        parseDate(r["Payment Date"]) || parseDate(r["Payment date"]) || parseDate(r["تاريخ الدفع"]);
-      const reversalDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
-      return isAccountingRefund(r) ? !(reversalDate || paymentDate) : !paymentDate;
-    }).length;
+    const accountingMissingPaymentDate = accountingCandidates
+      .filter(
+        (r) =>
+          !isExcludedFromDashboardProduct({
+            product:
+              str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]),
+            productCode:
+              str(r["Product Code"]) || str(r["Product Reference"]) || str(r["الرقم المرجعي"]),
+          }),
+      )
+      .filter((r) => {
+        const paymentDate =
+          parseDate(r["Payment Date"]) ||
+          parseDate(r["Payment date"]) ||
+          parseDate(r["تاريخ الدفع"]);
+        const reversalDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
+        return isAccountingRefund(r) ? !(reversalDate || paymentDate) : !paymentDate;
+      }).length;
     const accountingLines: AccountingRow[] = accountingCandidates
       .filter((r) => {
         // Paid invoices require Payment Date. Credit notes are recognised on
@@ -2531,7 +2535,11 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     // Anchor each credit note to its own Odoo document total. This runs over
     // the complete snapshot on purpose: the net of a date-filtered slice of a
     // document says nothing about which way the document points.
-    const accounting = normalizeCreditNoteDocuments(accountingLines);
+    // Normalise each entire credit-note document before removing a product line;
+    // otherwise an excluded line could change the sign of the remaining lines.
+    const accounting = normalizeCreditNoteDocuments(accountingLines).filter(
+      (row) => !isExcludedFromDashboardProduct(row),
+    );
 
     /* -- website sales (Odoo sale.order, never Meta attribution) ----------- */
     const websiteSales: WebsiteSaleRow[] = websiteSalesRaw
