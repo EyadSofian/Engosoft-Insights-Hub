@@ -44,6 +44,7 @@ import {
   normalizeSource,
   UNATTRIBUTED,
 } from "./product-taxonomy";
+import { isExcludedFromDashboardProduct } from "./sales-revenue-policy";
 
 /* --- shapes -------------------------------------------------------------- */
 
@@ -603,6 +604,8 @@ const inWindow = (date: string, from?: string, to?: string): boolean => {
 
 function selectLines(snapshot: ProductSnapshot, f: ProductFilters): SaleLine[] {
   return snapshot.lines.filter((l) => {
+    if (isExcludedFromDashboardProduct({ product: l.productName, productCode: l.productCode }))
+      return false;
     if (!inWindow(l.date, f.from, f.to)) return false;
     if (f.basis === "invoiced" && !l.invoiced) return false;
     if (f.companyId && l.companyId !== f.companyId) return false;

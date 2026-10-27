@@ -14,6 +14,7 @@ import {
   directAccountingPassesCompletenessGate,
 } from "./accounting-authority";
 import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
+import { isExcludedFromDashboardProduct } from "./sales-revenue-policy";
 import {
   legacyAdCourseValue,
   legacyAdLeadValue,
@@ -2249,6 +2250,13 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     /* -- invoiced ---------------------------------------------------------- */
     const invoiced: InvoicedRow[] = invRaw
       .filter((r) => str(r["__odoo_id"]))
+      .filter(
+        (r) =>
+          !isExcludedFromDashboardProduct({
+            product: str(r["بنود الطلب /المنتج"]),
+            productCode: str(r["Product Code"]) || str(r["Product Reference"]),
+          }),
+      )
       .map((r) => {
         const invoiceDate = parseDate(r["Invoice Date"]);
         // `Invoice Date` is populated on ~8% of rows; `Date` on 100%. Filtering on
@@ -2369,7 +2377,15 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     const accountingCandidates = accountingRaw.filter((r) => {
       const movement = accountingMovement(r);
       const id = accountingStableLineId(r);
-      return !!(movement || id);
+      return (
+        !!(movement || id) &&
+        !isExcludedFromDashboardProduct({
+          product:
+            str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]),
+          productCode:
+            str(r["Product Code"]) || str(r["Product Reference"]) || str(r["الرقم المرجعي"]),
+        })
+      );
     });
     const accountingMissingPaymentDate = accountingCandidates.filter((r) => {
       const paymentDate =
@@ -2509,6 +2525,13 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     /* -- website sales (Odoo sale.order, never Meta attribution) ----------- */
     const websiteSales: WebsiteSaleRow[] = websiteSalesRaw
       .filter((r) => str(r["__odoo_id"]))
+      .filter(
+        (r) =>
+          !isExcludedFromDashboardProduct({
+            product: str(r["Product"]),
+            productCode: str(r["Product Code"]) || str(r["Product Reference"]),
+          }),
+      )
       .map((r) => {
         const product = str(r["Product"]);
         const productCategory = str(r["Product Category"]);

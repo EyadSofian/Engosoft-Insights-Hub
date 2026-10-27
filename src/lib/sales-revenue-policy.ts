@@ -25,3 +25,14 @@ export function isExcludedFromSalesRevenue(
     excludedProductNames.has(unprefixedName)
   );
 }
+
+/** Exclude product code 1047 from dashboard sales populations, not from Odoo. */
+export function isExcludedFromDashboardProduct(row: {
+  product?: string;
+  productCode?: string;
+}): boolean {
+  const code = (row.productCode ?? "").trim();
+  if (code) return code === "1047";
+  const displayedCode = /^\[\s*([^\]]+)\s*\]/.exec((row.product ?? "").trim())?.[1]?.trim() ?? "";
+  return displayedCode === "1047";
+}
