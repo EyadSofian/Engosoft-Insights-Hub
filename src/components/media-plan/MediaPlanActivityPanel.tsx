@@ -195,7 +195,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
         <>
           <div className="hidden table-wrap scroll-hint-x lg:block">
             <table className="w-full min-w-[1120px] text-sm">
-              <thead className="bg-surface-2 text-[11px] text-text-muted">
+              <thead className="bg-surface-2 text-[12px] text-text-muted">
                 <tr>
                   {[
                     lang === "ar" ? "الحملة" : "Campaign",
@@ -221,7 +221,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
                       <div className="truncate font-semibold text-text" title={row.name}>
                         {row.name}
                       </div>
-                      <div className="mt-0.5 truncate text-[10px] text-text-subtle">
+                      <div className="mt-0.5 truncate text-[12px] text-text-subtle">
                         {row.account || "—"}
                       </div>
                     </td>
@@ -240,7 +240,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
                     </td>
                     <td className="px-3 py-3">
                       <Pill tone="success">Active</Pill>
-                      <div className="mt-1 text-[9px] text-text-subtle">
+                      <div className="mt-1 text-[12px] text-text-subtle">
                         {row.configuredStatus}
                         {row.servingStatus ? ` · ${row.servingStatus}` : ""}
                       </div>
@@ -323,7 +323,7 @@ function PlatformCard({
         <ShieldCheck size={15} className={health?.ok ? "text-success" : "text-warning"} />
       </div>
       <div className="num mt-2 text-xl font-bold text-text">{fmtNum(health?.active ?? 0)}</div>
-      <div className="mt-0.5 text-[10px] text-text-muted">
+      <div className="mt-0.5 text-[12px] text-text-muted">
         {health?.ok
           ? lang === "ar"
             ? "متصلة · Active رسمي"
@@ -337,7 +337,7 @@ function PlatformCard({
 }
 
 function OwnerPills({ owners }: { owners: string[] }) {
-  if (!owners.length) return <span className="text-[10px] text-text-subtle">—</span>;
+  if (!owners.length) return <span className="text-[12px] text-text-subtle">—</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {owners.map((owner) => (
@@ -352,7 +352,7 @@ function OwnerPills({ owners }: { owners: string[] }) {
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-2">
-      <div className="text-[9px] text-text-subtle">{label}</div>
+      <div className="text-[12px] text-text-subtle">{label}</div>
       <div className="num mt-1 text-xs font-bold text-text">{value}</div>
     </div>
   );

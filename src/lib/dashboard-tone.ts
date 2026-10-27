@@ -109,6 +109,34 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
   } as React.CSSProperties;
 }
 
+/** Soft per-metric color with one dedicated cobalt featured state. */
+export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
+  const t = toneOf(tone);
+  return {
+    "--tone-surface": t.surface,
+    "--tone-border": t.border,
+    "--tone-ink": t.ink,
+    "--tone-strong": t.strong,
+  } as React.CSSProperties;
+}
+
+/**
+ * The tone of a card: KPI cards, readings, workspace links.
+ *
+ * Reading and workspace cards remain quieter than the KPI row. The metric
+ * family is used for the icon and detail cue; semantic colour still comes
+ * from deltas, verdict pills and charts.
+ */
+export function cardToneVars(tone: AnyTone | undefined): React.CSSProperties {
+  const t = toneOf(tone);
+  return {
+    "--tone-surface": "var(--surface)",
+    "--tone-border": "var(--border)",
+    "--tone-ink": "var(--text)",
+    "--tone-strong": t.strong,
+  } as React.CSSProperties;
+}
+
 /**
  * The family a return figure belongs to, on the same bands the ROAS pill and
  * the campaign table already use — so a ratio can never be mint in one place
@@ -130,3 +158,23 @@ export const TONE = {
   danger: { fg: TONES.rose.strong, bg: TONES.rose.surface, border: TONES.rose.border },
   violet: { fg: TONES.violet.strong, bg: TONES.violet.surface, border: TONES.violet.border },
 };
+
+/**
+ * A note, warning or alert: every word stays on screen, in the page's own
+ * text colour on a white surface, with the meaning carried by a 3px edge in
+ * the inline-start and the icon.
+ *
+ * Notes used to fill the full width with a pink, orange or blue wash and set
+ * the whole paragraph in the warning colour itself — orange on pale orange is
+ * about 2.4:1, unreadable — and three or four of them stacked above the first
+ * figure made every page open on an alarm.
+ */
+export function calloutStyle(accent: string): React.CSSProperties {
+  return {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderInlineStartWidth: "3px",
+    borderInlineStartColor: accent,
+    color: "var(--text)",
+  };
+}

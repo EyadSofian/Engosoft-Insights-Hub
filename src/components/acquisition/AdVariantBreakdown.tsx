@@ -22,7 +22,7 @@ export function AdVariantBreakdown({
         {ads.map((ad) => (
           <div
             key={ad.key}
-            className="rounded-lg border border-border bg-surface-2 p-2 text-[10px] text-text-muted"
+            className="rounded-lg border border-border bg-surface-2 p-2 text-[12px] text-text-muted"
           >
             <p className="truncate font-semibold text-text" title={ad.campaignName}>
               {A ? "الحملة" : "Campaign"}: {ad.campaignName || "—"}
@@ -132,7 +132,7 @@ export function AdVariantBreakdown({
               <td className="max-w-[200px] truncate px-2.5 py-2" title={ad.adsetName}>
                 {ad.adsetName || "—"}
               </td>
-              <td className="px-2.5 py-2 font-mono text-[10px] text-text-muted">
+              <td className="px-2.5 py-2 font-mono text-[12px] text-text-muted">
                 {ad.adId || "—"}
               </td>
               <td className="num whitespace-nowrap px-2.5 py-2">

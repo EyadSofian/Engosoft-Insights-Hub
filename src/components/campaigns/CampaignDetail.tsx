@@ -286,7 +286,7 @@ export function CampaignDetail({
 
           <MoreDetails label={A ? "تفاصيل تقنية" : "Technical details"}>
             <Card>
-              <dl className="grid gap-2 font-mono text-[11.5px]">
+              <dl className="grid gap-2 font-mono text-[12px]">
                 <div className="flex justify-between gap-3">
                   <dt className="text-text-muted">campaign id</dt>
                   <dd className="break-all text-text">{campaignId || "—"}</dd>

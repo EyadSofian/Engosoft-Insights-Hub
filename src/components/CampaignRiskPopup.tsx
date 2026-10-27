@@ -197,7 +197,7 @@ export function CampaignRiskPopup() {
                 </a>
               </div>
             </div>
-            <p className="mt-2.5 text-[11px] leading-relaxed text-text-subtle">
+            <p className="mt-2.5 text-[12px] leading-relaxed text-text-subtle">
               {lang === "ar"
                 ? "«تم اتخاذ إجراء» يخفي الحملة من قائمة المراجعة 7 أيام ثم يفحصها من جديد لو ظلت Active بلا بيع. «لا تظهر مجددًا» يكتمها نهائيًا على هذا المتصفح."
                 : "“Action taken” removes a campaign from review for 7 days, then checks it again if it is still active with no sale. “Don't show again” permanently silences it in this browser."}
@@ -264,7 +264,7 @@ function RiskCard({
       </div>
 
       {lifetime?.firstSpendDate && (
-        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-text-muted">
+        <p className="mt-2.5 flex items-center gap-1.5 text-[12px] text-text-muted">
           <ShoppingCart size={12} aria-hidden="true" />
           {lang === "ar"
             ? `بتصرف من ${lifetime.firstSpendDate} بدون أي بيع مسجّل`
@@ -286,7 +286,7 @@ function RiskCard({
 function RiskMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-surface px-2.5 py-2">
-      <div className="flex items-start gap-1 text-[10px] leading-tight text-text-muted">
+      <div className="flex items-start gap-1 text-[12px] leading-tight text-text-muted">
         {icon}
         <span>{label}</span>
       </div>

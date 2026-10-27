@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useI18n } from "@/lib/i18n";
-import logoImg from "@/assets/engosoft-logo.png";
+import { EngosoftMark } from "./EngosoftMark";
 
 /**
  * A short footer in the document flow — never fixed, so it can only ever sit
@@ -24,11 +24,11 @@ export function AppFooter() {
       <div className="flex flex-col gap-3 border-t border-border pt-5 pe-16 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2 sm:pt-4 sm:pe-20">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border bg-white">
-            <img src={logoImg} alt="" className="h-5 w-5 object-contain" />
+            <EngosoftMark className="h-5 w-5 text-brand" />
           </span>
           <div className="min-w-0 leading-tight">
-            <div className="text-[13px] font-bold tracking-tight text-text">ENGOSOFT</div>
-            <div className="truncate text-[11px] text-text-muted">{t("app_sub")}</div>
+            <div className="engosoft-wordmark text-[16px] text-text">engosoft</div>
+            <div className="truncate text-[12px] text-text-muted">{t("app_sub")}</div>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export function AppFooter() {
           </ul>
         </nav>
 
-        <p className="text-[11.5px] text-text-subtle">© {new Date().getFullYear()} Engosoft</p>
+        <p className="text-[12px] text-text-subtle">© {new Date().getFullYear()} Engosoft</p>
       </div>
     </footer>
   );

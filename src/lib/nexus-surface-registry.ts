@@ -813,6 +813,56 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
   },
   {
+    id: "number_review",
+    route: "/number-review",
+    title: q("مراجعة الأرقام", "Number review"),
+    description: q(
+      "كل رقم مهم بنسأل عنه النظام اللي جاي منه — Odoo وMeta وTikTok وGoogle — ونقول مطابق ولا فيه فرق ولا محدش يقدر يتأكد منه.",
+      "Every key number is checked against the system it came from — Odoo, Meta, TikTok, Google Ads — and reported as matched, different, or impossible to verify.",
+    ),
+    tabs: [],
+    sections: [],
+    elements: [
+      {
+        id: "number_review.status",
+        type: "kpi",
+        title: q("حالة المراجعة", "Review status"),
+        meaning: q(
+          "هل الرقم اللي الداشبورد بيعرضه زي اللي في النظام الأصلي. الأخضر معناه سألنا المصدر نفسه، مش إن صفحتين في الداشبورد متفقين.",
+          "Whether the figure the dashboard shows equals the one in the originating system. Green means the source itself was asked, not that two dashboard pages agree.",
+        ),
+        sourceCapability: "number_review",
+        periodSensitive: true,
+        filterSensitive: false,
+        questions: [
+          q("فيه رقم مش مطابق؟", "Is any number failing to match?"),
+          q("إيه اللي محدش يقدر يتأكد منه؟", "What cannot be verified at all?"),
+        ],
+      },
+      {
+        id: "number_review.difference",
+        type: "kpi",
+        title: q("فرق الرقم", "Difference"),
+        meaning: q(
+          "الفرق بين رقم الداشبورد ورقم المصدر. السالب معناه الداشبورد ناقص.",
+          "The gap between the dashboard figure and the source figure. Negative means the dashboard is short.",
+        ),
+        sourceCapability: "number_review",
+        periodSensitive: true,
+        filterSensitive: false,
+        questions: [
+          q("أكبر فرق فين؟", "Where is the largest gap?"),
+          q("الفرق ده بيأثر على أنهي صفحات؟", "Which pages does this gap affect?"),
+        ],
+      },
+    ],
+    suggestedQuestions: [
+      q("الأرقام مظبوطة؟", "Are the numbers right?"),
+      q("إيه اللي محتاج مراجعة؟", "What needs review?"),
+      q("التحصيل مطابق لـOdoo؟", "Do collections match Odoo?"),
+    ],
+  },
+  {
     id: "yoy",
     route: "/yoy",
     title: q("سنة بسنة", "Year on year"),

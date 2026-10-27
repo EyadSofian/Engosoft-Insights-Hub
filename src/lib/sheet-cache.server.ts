@@ -13,7 +13,7 @@ import {
   authoritativeAccountingUsd,
   directAccountingPassesCompletenessGate,
 } from "./accounting-authority";
-import { accountingReportingDate, signedCreditAmount } from "./accounting-policy";
+import { accountingReportingDate, normalizeCreditNoteDocuments } from "./accounting-policy";
 import { isExcludedFromDashboardProduct } from "./sales-revenue-policy";
 import {
   legacyAdCourseValue,
@@ -1287,13 +1287,15 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       rows.reduce(
         (sum, row) =>
           sum +
-          signedCreditAmount(
-            usdValue(
-              authoritativeAccountingUsd(row),
-              firstPresent(row["Total in Currency"], row["Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø¨Ø§Ù„Ø¹Ù…Ù„Ø©"]),
-              firstPresent(row["Currency"], row["Ø§Ù„Ø¹Ù…Ù„Ø©"]),
-            ),
-            isAccountingRefund(row),
+          // A magnitude comparison between two candidate feeds, so each row's
+          // own sign is enough here. A credit note's direction is settled per
+          // document by normalizeCreditNoteDocuments once the rows are built.
+          // The Arabic header fallbacks below were double-encoded in the
+          // source and could never match a real Arabic column.
+          usdValue(
+            authoritativeAccountingUsd(row),
+            firstPresent(row["Total in Currency"], row["الإجمالي بالعملة"]),
+            firstPresent(row["Currency"], row["العملة"]),
           ),
         0,
       );
@@ -2034,8 +2036,12 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
     });
     const tiktok = tiktokApiUsable ? tiktokFromApi : tiktokFromSheet;
 
+    // A campaign counts as a lead campaign only when it produced a
+    // lead-category conversion. Keyed on all conversions, a YouTube awareness
+    // campaign qualified on channel subscriptions and its spend then entered
+    // the CPL and CPA denominators as lead spend.
     const googleLeadCampaigns = new Set(
-      googleResult.rows.filter((r) => r.conversions > 0).map((r) => r.campaignId || r.campaign),
+      googleResult.rows.filter((r) => r.leadConversions > 0).map((r) => r.campaignId || r.campaign),
     );
     const google: AdRow[] = googleResult.rows.map((r) => {
       // Google uses one website account for mixed campaign goals. A campaign
@@ -2067,7 +2073,11 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
         clicksAll: r.clicks,
         // Google reports clicks for this query, not the Meta-specific link-click metric.
         linkClicks: null,
-        platformLeads: r.conversions,
+        // Lead-category conversions only. `r.conversions` counts every
+        // conversion action, which on this account is overwhelmingly YouTube
+        // channel subscriptions; reporting those as leads put Google's cost
+        // per lead at $0.53 and flattered it against every other platform.
+        platformLeads: r.leadConversions,
         viewCompletions: null,
         syncedAt: r.syncedAt,
       };
@@ -2393,7 +2403,7 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
       const reversalDate = parseDate(r["Invoice Date"]) || parseDate(r["تاريخ الفاتورة"]);
       return isAccountingRefund(r) ? !(reversalDate || paymentDate) : !paymentDate;
     }).length;
-    const accounting: AccountingRow[] = accountingCandidates
+    const accountingLines: AccountingRow[] = accountingCandidates
       .filter((r) => {
         // Paid invoices require Payment Date. Credit notes are recognised on
         // their Odoo reversal (Invoice) Date and may have no payment event.
@@ -2444,22 +2454,18 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           str(r["Product"]) || str(r["المنتج"]) || str(r["Course Name"]) || str(r["Course"]);
         const productCategory =
           str(r["Product Category"]) || str(r["فئة المنتج"]) || str(r["Category"]);
-        const totalInCurrency = signedCreditAmount(
-          num(firstPresent(r["Total in Currency"], r["الإجمالي بالعملة"])),
-          isCreditNote,
-        );
+        // Each line keeps the sign Odoo gave it: a discount line on an
+        // ordinary invoice is negative, and a discount reversed by a credit
+        // note is positive. normalizeCreditNoteDocuments anchors the credit
+        // note's net below, over the whole snapshot.
+        const totalInCurrency = num(firstPresent(r["Total in Currency"], r["الإجمالي بالعملة"]));
         const currency = str(firstPresent(r["Currency"], r["العملة"]));
         const lockedLegacyUsd = str(r["__legacy_usd_locked"]);
-        const usdPaid = signedCreditAmount(
+        const usdPaid =
           lockedLegacyUsd !== ""
             ? num(lockedLegacyUsd)
-            : usdValue(authoritativeAccountingUsd(r), totalInCurrency, currency),
-          isCreditNote,
-        );
-        const untaxedTotal = signedCreditAmount(
-          num(firstPresent(r["Untaxed Total"], r["الإجمالي دون الضريبة"])),
-          isCreditNote,
-        );
+            : usdValue(authoritativeAccountingUsd(r), totalInCurrency, currency);
+        const untaxedTotal = num(firstPresent(r["Untaxed Total"], r["الإجمالي دون الضريبة"]));
         const course = canonicalCourse(
           str(r["Course Name"]) || str(r["Course"]),
           product,
@@ -2521,6 +2527,11 @@ async function refreshSnapshot(refreshRemoteSources: boolean): Promise<Snapshot>
           orderMatched: hasDirectAttribution || fallback.matched,
         };
       });
+
+    // Anchor each credit note to its own Odoo document total. This runs over
+    // the complete snapshot on purpose: the net of a date-filtered slice of a
+    // document says nothing about which way the document points.
+    const accounting = normalizeCreditNoteDocuments(accountingLines);
 
     /* -- website sales (Odoo sale.order, never Meta attribution) ----------- */
     const websiteSales: WebsiteSaleRow[] = websiteSalesRaw

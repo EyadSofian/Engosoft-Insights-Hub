@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
 import { useFilters } from "@/lib/filter-store";
-import { fmtCompact, fmtDateTime, fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
-import { ErrorState, FunnelBars, KpiSkeletonGrid, Notice, Skeleton } from "@/components/ui-bits";
+import { fmtDateTime, fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
+import { ErrorState, KpiSkeletonGrid, Notice, Skeleton } from "@/components/ui-bits";
 import {
   AlertBar,
   DashboardPageHeader,
@@ -32,18 +32,16 @@ import {
   type WorkspaceLink,
 } from "@/components/dashboard-bits";
 import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
+import type { MetricDetail } from "@/lib/metric-detail";
 import {
   businessSignals,
   insightDetails,
-  overviewEfficiencyMetrics,
   overviewLeadTargetMetrics,
   overviewMetrics,
   type BusinessSignals,
   type OverviewResp,
 } from "@/components/overview-metrics";
 import { MultiLineChart } from "@/components/charts";
-import { useClosedLoop } from "@/components/acquisition/ClosedLoop";
-import { KpiFigure } from "@/components/acquisition/ManagementOverview";
 import {
   formatDisplayMoney,
   usdToDisplayCurrency,
@@ -63,22 +61,6 @@ interface MoneyPoint extends Record<string, string | number> {
   date: string;
   value: number;
 }
-
-/**
- * The funnel stages, named the way the rest of the dashboard names them.
- *
- * Only the stages `/api/overview` actually returns are listed. There is no
- * "qualified" step in that response, so there is no label for one here: a
- * stage nobody measures cannot be drawn, however much a funnel picture wants
- * a middle.
- */
-const FUNNEL_LABELS: Record<string, { ar: string; en: string }> = {
-  impressions: { ar: "مرات الظهور", en: "Impressions" },
-  clicks: { ar: "النقرات", en: "Clicks" },
-  platform_leads: { ar: "عملاء من المنصات", en: "Platform leads" },
-  crm_leads: { ar: "العملاء المحتملون", en: "CRM leads" },
-  won: { ar: "الصفقات الرابحة", en: "Won deals" },
-};
 
 function sundayWeekStart(value: string): string {
   const date = new Date(`${value}T00:00:00Z`);
@@ -186,9 +168,6 @@ function Overview() {
   const filters = useFilters();
   const { data, isLoading, error, refetch } = useApi<OverviewResp>("/api/overview");
   const workforce = useApi<AgentAnalyticsResult>("/api/teams");
-  // The one headline figure /api/overview does not carry: qualified leads, from
-  // the exact-attribution closed loop, shown with that scope in its own words.
-  const closedLoop = useClosedLoop();
   const [spendGrain, setSpendGrain] = useState<TrendGrain>("week");
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>("USD");
   const business = useMemo(
@@ -199,10 +178,6 @@ function Overview() {
   // so opening a card costs a render and never a request.
   const metrics = useMemo(
     () => (data ? overviewMetrics({ data, workforce: workforce.data, lang }) : null),
-    [data, workforce.data, lang],
-  );
-  const efficiency = useMemo(
-    () => (data ? overviewEfficiencyMetrics({ data, workforce: workforce.data, lang }) : null),
     [data, workforce.data, lang],
   );
   const leadGoals = useMemo(
@@ -216,7 +191,7 @@ function Overview() {
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
-  if (isLoading || !data || !metrics || !efficiency || !leadGoals || !insights || !business) {
+  if (isLoading || !data || !metrics || !leadGoals || !insights || !business) {
     return (
       <div className="page-sections">
         <Skeleton className="h-28" />
@@ -377,39 +352,81 @@ function Overview() {
   const totalSpendShown = combinedTrend.reduce((sum, row) => sum + row.spend, 0);
   const totalRevenueShown = combinedTrend.reduce((sum, row) => sum + row.revenue, 0);
 
+  // The provisional-today warning joins the rest of the data notes, so every
+  // caveat lives in one place: the data-health panel in the header.
+  if (data.spendCoverage?.complete && data.spendCoverage.provisionalToday) {
+    healthIssues.push({
+      tone: "info",
+      message: lang === "ar" ? "صرف النهارده لسه أولي" : "Today's spend is provisional",
+      impact:
+        lang === "ar"
+          ? "النهارده لسه ماخلصش، فأرقامه لحد آخر مزامنة بس. الأيام اللي قبله اتراجعت."
+          : "Today is not over, so its figures run to the latest sync only. Earlier days passed the coverage check.",
+    });
+  }
+
+  // The meaning-changing notes, named in one line. Every one of them is also
+  // in the data-health panel in full, with its technical detail.
+  const dataNotes: string[] = [];
+  if (health.platformsWithoutSpendTab?.length) {
+    dataNotes.push(
+      lang === "ar"
+        ? `${health.platformsWithoutSpendTab.map((p) => p.platform).join(" و")} جابوا ليدز من غير ما صرفهم يتسجل، فالعائد هنا أعلى من الحقيقة`
+        : `${health.platformsWithoutSpendTab.map((p) => p.platform).join(", ")} brought leads with no recorded spend, so returns read higher than reality`,
+    );
+  }
+  if (data.spendCoverage?.complete === false) {
+    dataNotes.push(
+      lang === "ar"
+        ? "صرف بعض الحسابات لسه بيتراجع، فأرقام الصرف والعائد مستخبية لحد ما تكمل"
+        : "Some accounts' spend is still being verified, so spend and return are held back until it completes",
+    );
+  }
+
+  const targets = workforce.data?.targets;
+  const salesTarget = salesTargetMetric(targets, filters.from, filters.to, lang);
+
   const links: WorkspaceLink[] = [
     {
       to: "/acquisition",
       title: lang === "ar" ? "التسويق" : "Marketing",
       description:
         lang === "ar"
-          ? "الحملات والمواد الإعلانية ومصادر العملاء"
-          : "Campaigns, creatives and where leads came from",
+          ? "الحملات والمواد الإعلانية وخطة الميديا والميديا بايرز"
+          : "Campaigns, creatives, media plan and media buyers",
       icon: <Megaphone size={17} />,
       tone: "sky",
     },
     {
-      to: "/leads",
-      title: lang === "ar" ? "المبيعات والعملاء" : "Sales & CRM",
+      to: "/acquisition",
+      search: { section: "leads" },
+      title: lang === "ar" ? "العملاء المحتملون" : "Leads",
       description:
-        lang === "ar" ? "العملاء والمتابعة والصفقات المفقودة" : "Leads, follow-up and lost deals",
+        lang === "ar"
+          ? "الليدز جت منين ولأي كورس، ومين لسه مستني"
+          : "Where leads came from, for which course, and who is waiting",
       icon: <Users size={17} />,
       tone: "violet",
+    },
+    {
+      to: "/leads",
+      title: lang === "ar" ? "CRM والمبيعات" : "CRM and sales",
+      description:
+        lang === "ar"
+          ? "السجلات وفريق المبيعات والمفقودة"
+          : "Records, the sales team and lost deals",
+      icon: <UsersRound size={17} />,
+      tone: "amber",
     },
     {
       to: "/accounting",
       title: lang === "ar" ? "الإيرادات" : "Revenue",
       description:
-        lang === "ar" ? "التحصيل والفواتير والكورسات" : "Collection, invoices and courses",
+        lang === "ar"
+          ? "التحصيل ومبيعات الكورسات والأسعار"
+          : "Collection, course sales and pricing",
       icon: <Receipt size={17} />,
       tone: "mint",
-    },
-    {
-      to: "/teams",
-      title: lang === "ar" ? "أداء الفريق" : "Team",
-      description: lang === "ar" ? "فريق المبيعات والميديا بايرز" : "Sales team and media buyers",
-      icon: <UsersRound size={17} />,
-      tone: "amber",
     },
   ];
 
@@ -418,72 +435,101 @@ function Overview() {
       <DashboardPageHeader
         flush
         icon={<LayoutDashboard size={20} />}
-        title={lang === "ar" ? "نظرة عامة" : "Overview"}
+        title={lang === "ar" ? "نظرة الإدارة" : "Management overview"}
         subtitle={
           lang === "ar"
-            ? "أداء الشركة في الفترة: الإيراد والإنفاق والعملاء والمبيعات"
-            : "How the business performed this period: revenue, spend, leads and sales"
+            ? "الشهر ماشي إزاي: التارجت، الفلوس، العملاء، واللي محتاج قرار"
+            : "How the month is going: targets, money, customers, and what needs a decision"
         }
         period={period}
         sync={<SyncStatus label={syncLabel} tone={healthTone} />}
         actions={<DataHealthButton issues={healthIssues} syncedLabel={syncLabel} />}
       />
 
-      {/* Only the one class of problem that changes what the figures MEAN may
-          interrupt the page: spend that exists but is missing from the
-          workbook makes every efficiency ratio look better than it is. */}
-      {health.platformsWithoutSpendTab?.length > 0 && (
+      {dataNotes.length > 0 && (
         <div className="mt-3">
-          <AlertBar title={t("missing_spend_tab")}>
-            {health.platformsWithoutSpendTab
-              .map((p) => `${p.platform}: ${fmtNum(p.leads)} ${lang === "ar" ? "عميلاً" : "leads"}`)
-              .join(" · ")}
-            {" — "}
-            {t("missing_spend_tab_note")}
-          </AlertBar>
-        </div>
-      )}
-      {data.spendCoverage?.complete === false && (
-        <div className="mt-3">
-          <AlertBar title={lang === "ar" ? "صرف الإعلانات غير مكتمل" : "Incomplete ad spend"}>
+          <AlertBar
+            title={lang === "ar" ? "خلي بالك وانت بتقرا الأرقام" : "Read these figures with care"}
+          >
+            {dataNotes.join(lang === "ar" ? "، و" : "; ")}
             {lang === "ar"
-              ? "الفترة المختارة تتضمن أيامًا لم يُتحقق من كل حساباتها بعد؛ لذلك الصرف ومؤشرات التكلفة والعائد مخفية."
-              : "Some accounts have unverified days in this period; spend and cost/return KPIs are hidden."}{" "}
-            {data.spendCoverage.gaps
-              .slice(0, 3)
-              .map((gap) => `${gap.platform} / ${gap.account}: ${gap.from} → ${gap.to}`)
-              .join(" · ")}
-            {data.spendCoverage.gaps.length > 3 ? ` · +${data.spendCoverage.gaps.length - 3}` : ""}
-          </AlertBar>
-        </div>
-      )}
-      {data.spendCoverage?.complete && data.spendCoverage.provisionalToday && (
-        <div className="mt-3">
-          <AlertBar title={lang === "ar" ? "إنفاق اليوم أولي" : "Today's spend is provisional"}>
-            {lang === "ar"
-              ? "الفترة تشمل اليوم الجاري؛ أرقامه حتى آخر مزامنة وليست إجمالي يوم مكتمل. الأيام السابقة خضعت لفحص التغطية."
-              : "This range includes today. Its figures are current through the latest sync, not a completed-day total. Earlier days passed the coverage check."}
+              ? ". التفاصيل كلها في «ملاحظات الداتا» فوق."
+              : ". Every detail is in the data notes above."}
           </AlertBar>
         </div>
       )}
 
       <PageSections className="gap-after-header">
-        {/* LEVEL 1 — headline figures and the two independent lead promises. */}
+        {/* 1 — Are we on plan? The three promises the month was planned on. */}
         <PageSection
           level="headline"
-          aria-label={lang === "ar" ? "أهم الأرقام" : "Headline figures"}
+          icon={<Target size={16} />}
+          title={lang === "ar" ? "الشهر ماشي إزاي؟" : "Is the month on plan?"}
+        >
+          <KpiRow>
+            {salesTarget ? (
+              <MetricDetailTrigger
+                detail={salesTarget.detail}
+                card={{ index: 0, hero: true, sub: salesTarget.sub }}
+              />
+            ) : (
+              <MetricDetailTrigger
+                detail={{
+                  id: "overview.salesTarget",
+                  title: lang === "ar" ? "التحصيل مقابل التارجت" : "Collection against target",
+                  value: workforce.isLoading ? "…" : "—",
+                  tone: "mint",
+                  definition:
+                    lang === "ar"
+                      ? "مفيش تارجت مبيعات منشور للفترة دي، فمفيش نسبة نحسبها."
+                      : "No sales target is published for this period, so there is no percentage to compute.",
+                }}
+                card={{ index: 0, hero: true }}
+              />
+            )}
+            <MetricDetailTrigger
+              detail={leadGoals.courses}
+              card={{
+                index: 1,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.courses.actual ?? 0)} / ${fmtNum(data.leadTargets.courses.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "محتاج خطة الشهر وفلاتر عامة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={leadGoals.website}
+              card={{
+                index: 2,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.website.actual ?? 0)} / ${fmtNum(data.leadTargets.website.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "محتاج خطة الشهر وفلاتر عامة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
+          </KpiRow>
+        </PageSection>
+
+        {/* 2 — The money and the customers, five figures. */}
+        <PageSection
+          level="primary"
+          icon={<TrendingUp size={16} />}
+          title={lang === "ar" ? "الفلوس والعملاء" : "Money and customers"}
         >
           <KpiRow>
             <MetricDetailTrigger
               detail={metrics.revenue}
               card={{
                 index: 0,
-                hero: true,
                 spark: seriesOf("revenue"),
                 sub:
                   lang === "ar"
-                    ? `منه ${fmtUSD(T.attributedRevenue)} مرتبط بحملات`
-                    : `${fmtUSD(T.attributedRevenue)} campaign-linked`,
+                    ? `منه ${fmtUSD(T.attributedRevenue)} جه من حملات`
+                    : `${fmtUSD(T.attributedRevenue)} came from campaigns`,
               }}
             />
             <MetricDetailTrigger
@@ -494,8 +540,8 @@ function Overview() {
                 sub:
                   data.spendCoverage?.complete === false
                     ? lang === "ar"
-                      ? "جاري استرجاع بيانات الحسابات الناقصة"
-                      : "Restoring missing account history"
+                      ? "لسه بنراجع صرف بعض الحسابات"
+                      : "Some accounts are still being verified"
                     : PLATFORMS.map((platform) => ({
                         platform,
                         spend: spendByPlatform[platform],
@@ -509,190 +555,145 @@ function Overview() {
               }}
             />
             <MetricDetailTrigger
-              detail={metrics.leads}
+              detail={metrics.roas}
               card={{
                 index: 2,
+                sub: lang === "ar" ? "فلوس الحملات ÷ صرف الإعلانات" : "Campaign revenue ÷ ad spend",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={metrics.leads}
+              card={{
+                index: 3,
                 spark: seriesOf("leads"),
                 sub: `CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`,
               }}
             />
             <MetricDetailTrigger
-              detail={leadGoals.courses}
-              card={{
-                index: 3,
-                sub:
-                  data.leadTargets.reason === null
-                    ? `${fmtNum(data.leadTargets.courses.actual ?? 0)} / ${fmtNum(data.leadTargets.courses.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
-                    : lang === "ar"
-                      ? "يتطلب خطة شهرية وفلاتر غير مخصّصة"
-                      : "Requires a monthly plan and broad filters",
-              }}
-            />
-            <MetricDetailTrigger
-              detail={leadGoals.website}
-              card={{
-                index: 4,
-                sub:
-                  data.leadTargets.reason === null
-                    ? `${fmtNum(data.leadTargets.website.actual ?? 0)} / ${fmtNum(data.leadTargets.website.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
-                    : lang === "ar"
-                      ? "يتطلب خطة شهرية وفلاتر غير مخصّصة"
-                      : "Requires a monthly plan and broad filters",
-              }}
-            />
-            <KpiFigure
-              kpi={closedLoop.data?.kpis?.qualified}
-              index={5}
-              icon={<Target size={17} />}
-              tone="sky"
-              loading={closedLoop.isLoading}
-              sub={
-                lang === "ar"
-                  ? "من العملاء المعروف إعلانهم بالضبط"
-                  : "Of leads traced to their exact ad"
-              }
-            />
-            <MetricDetailTrigger
               detail={metrics.won}
               card={{
-                index: 6,
+                index: 4,
                 spark: seriesOf("won"),
-                sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "معدل التحويل" : "conversion"}`,
-              }}
-            />
-            <MetricDetailTrigger
-              detail={metrics.roas}
-              card={{
-                index: 7,
-                sub:
-                  lang === "ar"
-                    ? "إجمالي التحصيل ÷ الإنفاق (ليس ROAS إعلانيًا)"
-                    : "All revenue ÷ spend (not ad ROAS)",
+                sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "من الليدز" : "of leads"}`,
               }}
             />
           </KpiRow>
           {!data.prevComparable && data.prevRange && (
             <Notice tone="info" icon={<Info size={16} />}>
               {lang === "ar"
-                ? `لا تُعرض نسب التغيّر لأن الفترة السابقة (${data.prevRange.from} → ${data.prevRange.to}) تقع قبل بداية البيانات.`
+                ? `مفيش نسب تغيير، لأن الفترة اللي قبلها (${data.prevRange.from} → ${data.prevRange.to}) قبل ما الداتا تبدأ.`
                 : `Change percentages are hidden because the previous period (${data.prevRange.from} → ${data.prevRange.to}) falls before the data begins.`}
             </Notice>
           )}
           {data.prevComparable && data.prevRange && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border bg-surface-2/55 px-3 py-2 text-[11px] text-text-muted">
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border bg-surface-2/55 px-3 py-2 text-[12px] text-text-muted">
               <span className="font-semibold text-text">
-                {lang === "ar" ? "المقارنة المعتمدة" : "Comparison basis"}
+                {lang === "ar" ? "بنقارن بإيه؟" : "Compared with"}
               </span>
               <span className="num">
                 {data.prevRange.from} → {data.prevRange.to}
               </span>
               <span>
                 {lang === "ar"
-                  ? "كل نسب التغير في البطاقات تقارن نفس التواريخ من الشهر الماضي."
+                  ? "كل نسبة تغيير في الكروت بتقارن بنفس الأيام من الشهر اللي فات."
                   : "Every card delta compares the same calendar dates from last month."}
               </span>
             </div>
           )}
         </PageSection>
 
-        {/* LEVEL 2 — why: one trend and one funnel, side by side. */}
-        <PageSection
-          level="primary"
-          title={lang === "ar" ? "الأداء في الفترة" : "Performance this period"}
-        >
-          <div className="card-grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-            <DashboardPanel
-              icon={<TrendingUp size={16} />}
-              title={lang === "ar" ? "التحصيل مقابل الإنفاق" : "Collection against spend"}
-              hint={
-                lang === "ar"
-                  ? "التحصيل بتاريخ الدفع، والإنفاق بتاريخ الإعلان."
-                  : "Collection follows Payment Date; spend follows ad date."
-              }
-              action={
-                <div className="flex flex-wrap items-center gap-2">
-                  <GrainToggle value={spendGrain} onChange={setSpendGrain} lang={lang} />
-                  <DisplayCurrencyToggle
-                    value={displayCurrency}
-                    onChange={setDisplayCurrency}
-                    sarRate={sarRate}
-                    lang={lang}
-                  />
-                </div>
-              }
-              footer={
-                <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ background: "var(--mint-strong)" }}
-                      aria-hidden="true"
-                    />
-                    {lang === "ar" ? "التحصيل" : "Collection"}
-                    <b className="num text-text">{money(totalRevenueShown)}</b>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ background: "var(--rose-strong)" }}
-                      aria-hidden="true"
-                    />
-                    {lang === "ar" ? "الصرف" : "Spend"}
-                    <b className="num text-text">{money(totalSpendShown)}</b>
-                  </span>
-                </span>
-              }
-            >
-              <MultiLineChart
-                data={combinedTrend}
-                height={280}
-                format={money}
-                series={[
-                  {
-                    key: "revenue",
-                    name: lang === "ar" ? "التحصيل" : "Collection",
-                    color: "var(--mint-strong)",
-                  },
-                  {
-                    key: "spend",
-                    name: lang === "ar" ? "الصرف" : "Spend",
-                    color: "var(--rose-strong)",
-                  },
-                ]}
-              />
-            </DashboardPanel>
+        {/* 3 — What needs a decision. */}
 
-            <DashboardPanel
-              icon={<Users size={16} />}
-              title={lang === "ar" ? "مسار التحويل" : "Conversion funnel"}
-              hint={
-                lang === "ar" ? "من الظهور للصفقة المقفولة." : "From impression to closed deal."
-              }
-            >
-              <FunnelBars
-                steps={data.funnel.map((s) => ({
-                  label: FUNNEL_LABELS[s.key]?.[lang] ?? s.key,
-                  value: s.value ?? 0,
-                  display: s.value === null ? "—" : fmtCompact(s.value),
-                }))}
-              />
-            </DashboardPanel>
-          </div>
-        </PageSection>
-
-        {/* LEVEL 2 — what is going well and what needs attention. Three. */}
         <PageSection
           level="insight"
           icon={<Lightbulb size={16} />}
-          title={lang === "ar" ? "ما يحتاج انتباهك" : "What needs attention"}
+          title={lang === "ar" ? "محتاج قرار" : "Needs a decision"}
         >
           <TodaysInsights signals={business} details={insights} lang={lang} />
+        </PageSection>
+
+        {/* 4 — The team against its target: who is ahead, who needs help. */}
+        <PageSection
+          level="primary"
+          icon={<UsersRound size={16} />}
+          title={lang === "ar" ? "الفريق مقابل التارجت" : "The team against target"}
+        >
+          <TeamTargetBoard data={workforce.data} loading={workforce.isLoading} lang={lang} />
+        </PageSection>
+
+        {/* 5 — Money over time, and where it came from. */}
+        <PageSection
+          level="primary"
+          title={lang === "ar" ? "التحصيل مقابل الصرف" : "Collection against spend"}
+        >
+          <DashboardPanel
+            icon={<TrendingUp size={16} />}
+            title={
+              lang === "ar" ? "الفلوس اللي دخلت والفلوس اللي اتصرفت" : "Money in and money out"
+            }
+            hint={
+              lang === "ar"
+                ? "التحصيل بيوم الدفع، والصرف بيوم ظهور الإعلان."
+                : "Collection follows Payment Date; spend follows ad date."
+            }
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <GrainToggle value={spendGrain} onChange={setSpendGrain} lang={lang} />
+                <DisplayCurrencyToggle
+                  value={displayCurrency}
+                  onChange={setDisplayCurrency}
+                  sarRate={sarRate}
+                  lang={lang}
+                />
+              </div>
+            }
+            footer={
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: "var(--mint-strong)" }}
+                    aria-hidden="true"
+                  />
+                  {lang === "ar" ? "التحصيل" : "Collection"}
+                  <b className="num text-text">{money(totalRevenueShown)}</b>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: "var(--rose-strong)" }}
+                    aria-hidden="true"
+                  />
+                  {lang === "ar" ? "الصرف" : "Spend"}
+                  <b className="num text-text">{money(totalSpendShown)}</b>
+                </span>
+              </span>
+            }
+          >
+            <MultiLineChart
+              data={combinedTrend}
+              height={280}
+              format={money}
+              series={[
+                {
+                  key: "revenue",
+                  name: lang === "ar" ? "التحصيل" : "Collection",
+                  color: "var(--mint-strong)",
+                },
+                {
+                  key: "spend",
+                  name: lang === "ar" ? "الصرف" : "Spend",
+                  color: "var(--rose-strong)",
+                },
+              ]}
+            />
+          </DashboardPanel>
         </PageSection>
 
         {data.revenueLeadAttribution && (
           <PageSection
             level="primary"
-            title={lang === "ar" ? "من أين جاء التحصيل؟" : "Where did the collection come from?"}
+            title={lang === "ar" ? "التحصيل جه منين؟" : "Where did the collection come from?"}
           >
             <OverviewSalesAttribution
               attribution={data.revenueLeadAttribution}
@@ -703,18 +704,170 @@ function Overview() {
           </PageSection>
         )}
 
-        <PageSection level="records" title={lang === "ar" ? "اذهب للتفاصيل" : "Go deeper"}>
-          <WorkspaceLinks links={links} />
-        </PageSection>
-
-        {/* The period's written read. Three lines, and the last thing on the
-            page: everything heavier now lives in the report it belongs to —
-            campaign records under Campaigns, CRM efficiency under Leads,
-            course contribution under Courses, bot status under Data coverage. */}
-        <ExecutiveSummary title={t("exec_summary")}>
+        {/* The period's written read, in full, for whoever wants the prose. */}
+        <ExecutiveSummary title={lang === "ar" ? "الخلاصة" : t("exec_summary")}>
           {lang === "ar" ? data.summary.ar : data.summary.en}
         </ExecutiveSummary>
+
+        <PageSection level="records" title={lang === "ar" ? "روح للتفاصيل" : "Go deeper"}>
+          <WorkspaceLinks links={links} />
+        </PageSection>
       </PageSections>
+    </div>
+  );
+}
+
+/**
+ * Collection against the published sales target, with the pace the month
+ * should be at by the last selected day. The pace only applies when the
+ * window starts on the 1st and stays inside one month — otherwise there is no
+ * honest "should be at" and only the plain percentage is shown.
+ */
+function salesTargetMetric(
+  targets: AgentAnalyticsResult["targets"] | undefined,
+  from: string | undefined,
+  to: string | undefined,
+  lang: "ar" | "en",
+): { detail: MetricDetail; sub: string } | null {
+  if (!targets || targets.totalTarget === null || targets.totalTarget <= 0) return null;
+  const A = lang === "ar";
+  const paid = targets.totalPaidRevenue;
+  const target = targets.totalTarget;
+  const pct = targets.totalAchievementPaid;
+  let pace: number | null = null;
+  if (from && to && from.slice(0, 7) === to.slice(0, 7) && from.endsWith("-01")) {
+    const [y, m, d] = to.split("-").map(Number);
+    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    pace = (target * d) / days;
+  }
+  const remaining = Math.max(target - paid, 0);
+  const sub =
+    pace !== null
+      ? A
+        ? `${fmtUSD(paid)} من ${fmtUSD(target)} · المفروض لحد ${to}: ${fmtUSD(pace)}`
+        : `${fmtUSD(paid)} of ${fmtUSD(target)} · pace by ${to}: ${fmtUSD(pace)}`
+      : A
+        ? `${fmtUSD(paid)} من ${fmtUSD(target)}`
+        : `${fmtUSD(paid)} of ${fmtUSD(target)}`;
+  return {
+    sub,
+    detail: {
+      id: "overview.salesTarget",
+      title: A ? "التحصيل مقابل التارجت" : "Collection against target",
+      value: pct === null ? "—" : `${pct.toFixed(1)}%`,
+      tone: pace !== null && paid < pace ? "amber" : "mint",
+      icon: <Target size={16} />,
+      definition: A
+        ? "اتحصّل كام في المية من تارجت المبيعات بتاع الشهر."
+        : "How much of the month's sales target has been collected.",
+      source: A
+        ? "التحصيل من الفواتير المدفوعة لكل موظف في الفريق، والتارجت من خطة المبيعات المنشورة للشهر."
+        : "Collections from each employee's paid invoices; the target from the published monthly sales plan.",
+      why: A
+        ? "ده أهم سؤال للإدارة: إحنا ماشيين على الخطة ولا متأخرين، ومحتاجين نتحرك إمتى."
+        : "The first question management asks: are we on plan or behind, and when do we need to act.",
+      formula: A
+        ? `${fmtUSD(paid)} ÷ ${fmtUSD(target)} = ${pct === null ? "—" : `${pct.toFixed(1)}%`}${pace !== null ? `. المفروض لحد ${to} (${fmtUSD(pace)}) = التارجت × الأيام اللي فاتت ÷ أيام الشهر.` : "."}`
+        : `${fmtUSD(paid)} ÷ ${fmtUSD(target)} = ${pct === null ? "—" : `${pct.toFixed(1)}%`}${pace !== null ? `. Pace by ${to} (${fmtUSD(pace)}) = target × days elapsed ÷ days in month.` : "."}`,
+      caveat: !targets.complete
+        ? A
+          ? `الفترة فيها ${targets.monthsMissing.length} شهر من غير تارجت منشور، فالنسبة على جزء من المدة بس.`
+          : `The window spans ${targets.monthsMissing.length} month(s) with no published target, so the percentage covers part of the period only.`
+        : undefined,
+      supporting: [
+        { key: "paid", label: A ? "اتحصّل" : "Collected", value: fmtUSD(paid) },
+        { key: "target", label: A ? "التارجت" : "Target", value: fmtUSD(target) },
+        { key: "remaining", label: A ? "فاضل" : "Remaining", value: fmtUSD(remaining) },
+        ...(pace !== null
+          ? [{ key: "pace", label: A ? `المفروض لحد ${to}` : `Pace by ${to}`, value: fmtUSD(pace) }]
+          : []),
+      ],
+      report: {
+        to: "/teams",
+        label: A ? "افتح أداء فريق المبيعات" : "Open sales team performance",
+      },
+    },
+  };
+}
+
+/**
+ * Who is ahead of their quota and who needs help: the five highest and five
+ * lowest achievements among people with a published target, each with what
+ * they collected against what they owe. The full roster is one click away.
+ */
+function TeamTargetBoard({
+  data,
+  loading,
+  lang,
+}: {
+  data: AgentAnalyticsResult | undefined;
+  loading: boolean;
+  lang: "ar" | "en";
+}) {
+  const A = lang === "ar";
+  if (loading && !data) return <Skeleton className="h-64" />;
+  const rows = (data?.agents ?? [])
+    .filter((row) => row.target?.target && row.target.achievementPaid !== null)
+    .sort((a, b) => (b.target!.achievementPaid ?? 0) - (a.target!.achievementPaid ?? 0));
+  if (!rows.length)
+    return (
+      <Notice tone="info" icon={<Info size={16} />}>
+        {A
+          ? "مفيش تارجت منشور لحد في الفترة دي، فمفيش ترتيب نعرضه."
+          : "No one has a published target in this period, so there is no ranking to show."}
+      </Notice>
+    );
+  const top = rows.slice(0, 5);
+  const bottom = rows.length > 5 ? rows.slice(-5).reverse() : [];
+  const List = ({ title, items, tone }: { title: string; items: typeof rows; tone: string }) => (
+    <div className="card pad-card">
+      <div className="mb-3 text-[13px] font-bold text-text">{title}</div>
+      <ul className="space-y-3">
+        {items.map((row) => {
+          const pct = row.target!.achievementPaid ?? 0;
+          return (
+            <li key={row.name}>
+              <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                <span className="min-w-0 truncate font-semibold text-text" title={row.displayName}>
+                  {row.displayName}
+                </span>
+                <span className="num shrink-0 font-bold text-text">{pct.toFixed(0)}%</span>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${Math.min(pct, 100)}%`, background: tone }}
+                />
+              </div>
+              <div className="num mt-1 text-[12px] text-text-muted">
+                {fmtUSD(row.paidRevenue)} {A ? "من" : "of"} {fmtUSD(row.target!.target ?? 0)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+  return (
+    <div>
+      <div className="card-grid md:grid-cols-2">
+        <List
+          title={A ? "الأقرب للتارجت" : "Closest to target"}
+          items={top}
+          tone="var(--mint-fill)"
+        />
+        {bottom.length > 0 && (
+          <List title={A ? "محتاجين دعم" : "Need support"} items={bottom} tone="var(--rose-fill)" />
+        )}
+      </div>
+      <a
+        href="/teams"
+        className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"
+      >
+        {A
+          ? `شوف الفريق كله (${fmtNum(rows.length)} بتارجت)`
+          : `See the whole team (${fmtNum(rows.length)} with a target)`}
+      </a>
     </div>
   );
 }
@@ -739,7 +892,7 @@ function GrainToggle({
           key={grain}
           type="button"
           onClick={() => onChange(grain)}
-          className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+          className={`inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[12px] font-semibold transition-colors ${
             value === grain ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"
           }`}
           aria-pressed={value === grain}
@@ -781,7 +934,7 @@ function DisplayCurrencyToggle({
             key={currency}
             type="button"
             onClick={() => onChange(currency)}
-            className={`min-h-7 cursor-pointer rounded-md px-2.5 text-[10.5px] font-semibold transition-colors ${
+            className={`min-h-7 cursor-pointer rounded-md px-2.5 text-[12px] font-semibold transition-colors ${
               value === currency
                 ? "bg-surface text-brand shadow-sm"
                 : "text-text-muted hover:text-text"
@@ -792,7 +945,7 @@ function DisplayCurrencyToggle({
           </button>
         ))}
       </div>
-      <span className="num whitespace-nowrap text-[9px] text-text-subtle">
+      <span className="num whitespace-nowrap text-[12px] text-text-subtle">
         1 USD = {sarRate.toLocaleString("en-US", { maximumFractionDigits: 4 })} SAR
       </span>
     </div>

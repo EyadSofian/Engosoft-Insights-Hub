@@ -84,67 +84,9 @@ function LeadsPage() {
   const selectedMonth = Route.useSearch().month;
   return (
     <div>
-      <nav
-        aria-label={lang === "ar" ? "عرض العملاء المحتملين" : "Leads view"}
-        className="hscroll mb-4 flex gap-2 overflow-x-auto rounded-2xl border border-border bg-surface-2 p-1.5"
-      >
-        <Link
-          to="/leads"
-          search={{}}
-          aria-current={workspace === "crm" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "crm" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "سجل العملاء والـCRM" : "Leads and CRM"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "intelligence" }}
-          aria-current={workspace === "intelligence" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "intelligence" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "تحليل الليدز حسب الكورس" : "Course lead intelligence"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "weekly" }}
-          aria-current={workspace === "weekly" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "weekly" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "متابعة ليدز الأسبوع" : "Weekly lead follow-up"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "performance" }}
-          aria-current={workspace === "performance" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "performance" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "أداء الليدز والمبيعات · ٦ أشهر" : "Leads & sales · 6 months"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "channels" }}
-          aria-current={workspace === "channels" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "channels" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "قنوات إغلاق البيع" : "Sales closing channels"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "lost" }}
-          aria-current={workspace === "lost" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "lost" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "اللوست" : "Lost"}
-        </Link>
-        <Link
-          to="/leads"
-          search={{ view: "quality" }}
-          aria-current={workspace === "quality" ? "page" : undefined}
-          className={`min-h-10 shrink-0 rounded-xl px-4 text-[12px] font-bold transition-colors ${workspace === "quality" ? "bg-text text-surface" : "text-text-muted hover:bg-surface hover:text-text"}`}
-        >
-          {lang === "ar" ? "جودة الليدز واللوست" : "Lead quality & Lost"}
-        </Link>
-      </nav>
+      {/* Each view is a tab in its own navigation section — the CRM views under
+          CRM and sales, the weekly and course views under Leads — so the page
+          no longer repeats them as a second strip of its own. */}
       {workspace === "crm" ? (
         <CrmWorkspace />
       ) : workspace === "weekly" ? (
@@ -965,18 +907,19 @@ function CrmWorkspace() {
           icon={<Layers3 size={17} />}
         >
           <Card padded={false} className="overflow-hidden">
-            <div className="hscroll flex gap-1 border-b border-border bg-surface-2/75 p-2">
+            <div className="dashboard-tab-rail hscroll flex gap-1 border-b border-border bg-surface-2/75 p-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => selectView(tab.key)}
+                  aria-pressed={view === tab.key}
                   className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-all ${view === tab.key ? "bg-text text-surface shadow-sm" : "text-text-muted hover:bg-surface hover:text-text"}`}
                 >
                   {tab.icon}
                   {tab.label}
                   <span
-                    className={`num rounded-full px-1.5 py-0.5 text-[10px] ${view === tab.key ? "bg-white/15 text-white" : "bg-surface-3 text-text-muted"}`}
+                    className={`num rounded-full px-1.5 py-0.5 text-[12px] ${view === tab.key ? "bg-white/15 text-white" : "bg-surface-3 text-text-muted"}`}
                   >
                     {fmtNum(tab.count)}
                   </span>
@@ -1014,7 +957,7 @@ function CrmWorkspace() {
                     <span className="num mt-1 block text-[25px] font-bold leading-none text-text">
                       {fmtNum(value?.count ?? 0)}
                     </span>
-                    <span className="mt-2 block text-[10px] text-text-muted">
+                    <span className="mt-2 block text-[12px] text-text-muted">
                       {fmtNum(value?.leads ?? 0)} {A ? "Lead" : "leads"} ·{" "}
                       {fmtNum(value?.opportunities ?? 0)} {A ? "فرصة" : "opps"}
                     </span>
@@ -1060,7 +1003,7 @@ function CrmWorkspace() {
                   setView("all");
                   setStage(null);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] font-bold text-text-muted hover:text-text"
               >
                 <Filter size={12} /> {A ? "مسح التحديد" : "Clear selection"}
               </button>
@@ -1129,7 +1072,7 @@ function CrmWorkspace() {
                       {(selectedStage?.fields ?? stageCopy("lost", lang).fields).map((field) => (
                         <span
                           key={field}
-                          className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[10.5px] font-semibold text-text-muted"
+                          className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[12px] font-semibold text-text-muted"
                         >
                           {field}
                         </span>
@@ -1182,7 +1125,7 @@ function CrmWorkspace() {
           </PageSection>
         </MoreDetails>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3 text-[11.5px] text-text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2 px-4 py-3 text-[12px] text-text-muted">
           <span className="inline-flex items-center gap-2">
             <CircleDot size={13} className="text-mint-strong" />
             {A
@@ -1229,23 +1172,23 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
     <Card padded={false} className="overflow-hidden">
       <div className="grid gap-2 border-b border-border bg-surface-2/70 p-3 sm:grid-cols-3 sm:p-4">
         <div className="rounded-xl bg-surface px-3 py-2.5">
-          <div className="text-[11px] text-text-muted">
+          <div className="text-[12px] text-text-muted">
             {A ? "في مراحل الـSLA" : "In SLA stages"}
           </div>
           <div className="num text-xl font-bold text-text">{fmtNum(summary.total)}</div>
         </div>
         <div className="rounded-xl border border-danger/20 bg-danger/5 px-3 py-2.5">
-          <div className="text-[11px] text-danger">{A ? "متجاوزة للـSLA" : "Over SLA"}</div>
+          <div className="text-[12px] text-danger">{A ? "متجاوزة للـSLA" : "Over SLA"}</div>
           <div className="num text-xl font-bold text-danger">{fmtNum(summary.overdue)}</div>
         </div>
         <div className="rounded-xl bg-surface px-3 py-2.5">
-          <div className="text-[11px] text-text-muted">
+          <div className="text-[12px] text-text-muted">
             {A ? "وقت المرحلة غير متاح" : "Stage time unavailable"}
           </div>
           <div className="num text-xl font-bold text-text">{fmtNum(summary.unknown)}</div>
         </div>
       </div>
-      <p className="border-b border-border px-4 py-2.5 text-[11px] leading-5 text-text-muted">
+      <p className="border-b border-border px-4 py-2.5 text-[12px] leading-5 text-text-muted">
         {A
           ? "العدد حسب تاريخ إنشاء الليد في الفترة المختارة؛ الـSLA تُحسب من آخر دخول للمرحلة الحالية حتى الآن بتوقيت القاهرة. جديد: الساعة 7 مساءً في نفس يوم الدخول؛ مفتوح وعرض سعر: 30 يومًا؛ متابعة طويلة: 60 يومًا. اضغط أي خانة للتفاصيل."
           : "Counts use lead creation date in the selected period. SLA starts when the current stage was entered and is checked now (Cairo): New by 7pm that day; Open and Quotation Sent 30 days; Long Follow Up 60 days. Select a cell for records."}
@@ -1262,7 +1205,7 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
               {SLA_STAGES.map((stage) => (
                 <th key={stage} scope="col" className="w-[16%] px-2 py-3 text-center font-bold">
                   <span className="block">{stageLabels[stage]}</span>
-                  <span className="block text-[10px] font-normal text-text-subtle">
+                  <span className="block text-[12px] font-normal text-text-subtle">
                     {stage === "new"
                       ? A
                         ? "نفس اليوم 7م"
@@ -1302,12 +1245,12 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
                         >
                           <span className="num font-bold text-text">{fmtNum(cell.count)}</span>
                           <span
-                            className={`num text-[10px] ${cell.overdue ? "font-bold text-danger" : "text-text-muted"}`}
+                            className={`num text-[12px] ${cell.overdue ? "font-bold text-danger" : "text-text-muted"}`}
                           >
                             {fmtNum(cell.overdue)} {A ? "متجاوز" : "overdue"}
                           </span>
                           {cell.unknown > 0 && (
-                            <span className="num text-[10px] text-amber-strong">
+                            <span className="num text-[12px] text-amber-strong">
                               {fmtNum(cell.unknown)} {A ? "غير معروف" : "unknown"}
                             </span>
                           )}
@@ -1405,7 +1348,7 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-border bg-surface/85 px-3 py-2">
-      <div className="text-[9.5px] font-semibold text-text-muted">{label}</div>
+      <div className="text-[12px] font-semibold text-text-muted">{label}</div>
       <div className="num mt-1 text-lg font-bold text-text">{fmtNum(value)}</div>
     </div>
   );
@@ -1480,7 +1423,7 @@ function FacetCard({
           label: row.label === "—" ? empty : row.label,
           value: row.count,
           meta: (
-            <span className="num text-[10.5px] text-text-muted">
+            <span className="num text-[12px] text-text-muted">
               {fmtNum(row.count)} · {fmtPct(row.share, 0)}
             </span>
           ),
@@ -1575,7 +1518,7 @@ function CrmRecords({
             {row.stage || "—"}
           </span>
           {row.status === "lost" && row.recordType === "lead" && (
-            <span className="block text-[9.5px] text-danger">
+            <span className="block text-[12px] text-danger">
               {A ? "مرحلة محفوظة قبل الأرشفة" : "preserved before archive"}
             </span>
           )}

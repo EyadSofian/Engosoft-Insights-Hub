@@ -18,7 +18,7 @@ export function OdooPackageList({ packages }: { packages: TrainingPackageEntry[]
           </h2>
           <Pill tone="brand">Odoo</Pill>
         </div>
-        <span className="num text-[10.5px] text-text-subtle">
+        <span className="num text-[12px] text-text-subtle">
           {fmtNum(packages.length)} {ar ? "باقة" : "packages"} · {fmtNum(orders)}{" "}
           {ar ? "عملية بيع" : "sales"}
         </span>
@@ -34,7 +34,7 @@ export function OdooPackageList({ packages }: { packages: TrainingPackageEntry[]
         ].map((heading) => (
           <span
             key={heading}
-            className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle"
+            className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle"
           >
             {heading}
           </span>
@@ -55,14 +55,14 @@ export function OdooPackageList({ packages }: { packages: TrainingPackageEntry[]
           >
             <div className="min-w-0">
               <div className="flex items-start gap-2">
-                <span className="num mt-0.5 grid h-6 min-w-6 shrink-0 place-items-center rounded-md bg-brand-soft px-1 text-[10px] font-bold text-brand">
+                <span className="num mt-0.5 grid h-6 min-w-6 shrink-0 place-items-center rounded-md bg-brand-soft px-1 text-[12px] font-bold text-brand">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
                   <h3 className="text-[13px] font-bold leading-snug text-text">
                     <bdi>{item.name}</bdi>
                   </h3>
-                  <p className="mt-0.5 truncate text-[10.5px] text-text-subtle">
+                  <p className="mt-0.5 truncate text-[12px] text-text-subtle">
                     {item.companyName || (ar ? "كل الشركات" : "All companies")}
                   </p>
                 </div>
@@ -70,37 +70,37 @@ export function OdooPackageList({ packages }: { packages: TrainingPackageEntry[]
             </div>
 
             <div className="min-w-0">
-              <span className="xl:hidden text-[10px] font-semibold text-text-subtle">
+              <span className="xl:hidden text-[12px] font-semibold text-text-subtle">
                 {ar ? "الإقبال · " : "Demand · "}
               </span>
               {item.demand.orders > 0 ? (
-                <span className="num inline-flex items-center gap-1 rounded-md bg-brand-soft px-2 py-1 text-[11.5px] font-bold text-brand">
+                <span className="num inline-flex items-center gap-1 rounded-md bg-brand-soft px-2 py-1 text-[12px] font-bold text-brand">
                   <TrendingUp size={12} aria-hidden="true" />
                   {fmtNum(item.demand.orders)} {ar ? "مبيعات" : "sales"}
                 </span>
               ) : (
-                <span className="text-[10.5px] text-text-subtle">
+                <span className="text-[12px] text-text-subtle">
                   {ar ? "لا مبيعات في الفترة" : "No sales in period"}
                 </span>
               )}
             </div>
 
             <div className="min-w-0">
-              <div className="xl:hidden text-[10px] font-semibold text-text-subtle">
+              <div className="xl:hidden text-[12px] font-semibold text-text-subtle">
                 {ar ? "سعر Odoo" : "Odoo price"}
               </div>
               <div className="num text-[13px] font-bold text-text">
                 {price !== null ? fmtMoney(price, item.currency || "EGP", lang) : "—"}
               </div>
               {discounted && (
-                <div className="num text-[10px] text-text-subtle line-through">
+                <div className="num text-[12px] text-text-subtle line-through">
                   {fmtMoney(item.listPrice, item.currency || "EGP", lang)}
                 </div>
               )}
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-text-muted">
+              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-text-muted">
                 <BookOpenCheck size={12} aria-hidden="true" />
                 {fmtNum(item.courseCount)} {ar ? "دورات" : "courses"}
               </span>
@@ -117,7 +117,7 @@ export function OdooPackageList({ packages }: { packages: TrainingPackageEntry[]
               )}
             </div>
 
-            <div className="min-w-0 text-[10.5px] text-text-subtle">
+            <div className="min-w-0 text-[12px] text-text-subtle">
               <div className="flex items-center gap-1 font-semibold text-text-muted">
                 <Building2 size={12} aria-hidden="true" />
                 <span>training.package</span>

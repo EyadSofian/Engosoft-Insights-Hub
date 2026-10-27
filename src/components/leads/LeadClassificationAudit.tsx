@@ -196,7 +196,7 @@ export function LeadClassificationAudit({
                 className={`rounded-xl border-t-[3px] bg-surface-2/65 px-3 py-3 ${row.color}`}
               >
                 <div className="num text-2xl font-bold">{row.count.toLocaleString()}</div>
-                <div className="mt-1 text-[11px] font-semibold text-text">{row.label}</div>
+                <div className="mt-1 text-[12px] font-semibold text-text">{row.label}</div>
               </div>
             ))}
           </div>

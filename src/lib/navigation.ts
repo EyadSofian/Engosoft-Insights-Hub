@@ -3,6 +3,7 @@ import {
   BookMarked,
   CalendarClock,
   CalendarRange,
+  ClipboardCheck,
   GraduationCap,
   Globe2,
   Image,
@@ -52,7 +53,7 @@ export interface NavigationItem {
 }
 
 export interface NavigationSection {
-  id: "overview" | "marketing" | "sales-crm" | "revenue" | "team" | "more";
+  id: "overview" | "marketing" | "leads" | "crm" | "revenue" | "more";
   label: Record<Lang, string>;
   shortLabel: Record<Lang, string>;
   icon: LucideIcon;
@@ -84,15 +85,42 @@ const leadsView = (search: LocationSearch) =>
  * working. Specialist and technical reports live under More.
  */
 export const NAVIGATION_SECTIONS: NavigationSection[] = [
+  /**
+   * Management: the owners' view. The headline page, the monthly review
+   * against plan, and the year-on-year comparison — results, not mechanics.
+   */
   {
     id: "overview",
-    label: { ar: "نظرة عامة", en: "Overview" },
-    shortLabel: { ar: "نظرة عامة", en: "Overview" },
+    label: { ar: "الإدارة", en: "Management" },
+    shortLabel: { ar: "الإدارة", en: "Management" },
     icon: LayoutDashboard,
     defaultTo: "/",
-    contextual: "none",
-    items: [{ to: "/", key: "business_analytics", icon: LayoutDashboard }],
+    contextual: "tabs",
+    items: [
+      {
+        to: "/",
+        key: "business_analytics",
+        icon: LayoutDashboard,
+        tabLabel: { ar: "نظرة عامة", en: "Overview" },
+      },
+      {
+        to: "/management-review",
+        key: "business_analytics",
+        icon: ClipboardCheck,
+        tabLabel: { ar: "مراجعة الأداء والخطة", en: "Performance and plan review" },
+      },
+      {
+        to: "/yoy",
+        key: "yoy",
+        icon: CalendarRange,
+        tabLabel: { ar: "سنة بسنة", en: "Year on year" },
+      },
+    ],
   },
+  /**
+   * Marketing: the marketing manager and the media buyers. Where the money
+   * went, what it bought, against the plan and per owner.
+   */
   {
     id: "marketing",
     label: { ar: "التسويق", en: "Marketing" },
@@ -117,23 +145,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
       {
         to: "/acquisition",
         key: "acquisition_performance",
-        icon: Layers,
-        tabLabel: { ar: "Ad Sets", en: "Ad Sets" },
-        search: { section: "ads", view: "adset-compare" },
-        matches: (search) =>
-          acquisitionSection(search) === "ads" && search.view === "adset-compare",
-      },
-      {
-        to: "/courses",
-        key: "courses",
-        icon: GraduationCap,
-        tabLabel: { ar: "إعلانات الكورسات", en: "Course ads" },
-        search: { view: "ads" },
-        matches: (search) => courseView(search) === "ads",
-      },
-      {
-        to: "/acquisition",
-        key: "acquisition_performance",
         icon: Image,
         tabLabel: { ar: "المواد الإعلانية", en: "Creatives" },
         search: { section: "ads", view: "creatives" },
@@ -141,11 +152,39 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
           acquisitionSection(search) === "ads" && search.view !== "adset-compare",
       },
       {
+        to: "/media-plan",
+        key: "media_plan",
+        icon: CalendarRange,
+        tabLabel: { ar: "خطة الميديا", en: "Media plan" },
+      },
+      {
+        to: "/media-buyers",
+        key: "media_buyers",
+        icon: UserRoundSearch,
+        tabLabel: { ar: "الميديا بايرز", en: "Media buyers" },
+      },
+      {
         to: "/website",
         key: "website",
         icon: Globe2,
         tabLabel: { ar: "الموقع الإلكتروني", en: "Website" },
       },
+    ],
+    aliases: ["/creatives"],
+  },
+  /**
+   * Leads: whoever receives and distributes leads. How many came, from
+   * where, for which course and specialty, and who is still waiting.
+   */
+  {
+    id: "leads",
+    label: { ar: "العملاء المحتملون", en: "Leads" },
+    shortLabel: { ar: "العملاء المحتملون", en: "Leads" },
+    icon: Users,
+    defaultTo: "/acquisition",
+    defaultSearch: { section: "leads" },
+    contextual: "tabs",
+    items: [
       {
         to: "/acquisition",
         key: "acquisition_performance",
@@ -154,45 +193,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         search: { section: "leads" },
         matches: (search) => acquisitionSection(search) === "leads",
       },
-    ],
-    aliases: ["/attribution", "/landing-pages"],
-  },
-  {
-    id: "sales-crm",
-    label: { ar: "العملاء المحتملون", en: "Leads" },
-    shortLabel: { ar: "العملاء المحتملون", en: "Leads" },
-    icon: Users,
-    defaultTo: "/lead-distribution",
-    contextual: "tabs",
-    items: [
-      /**
-       * The six-month entry-cohort report leads the strip.
-       *
-       * It is the only report here that answers the management question the
-       * others feed — how many leads arrived, how good they were, how fast and
-       * how often sales chased them, and how many became a paid enrollment —
-       * and it shipped reachable only from a fourth in-page tab inside
-       * `/leads`, which no navigation surface named. A report nobody can find
-       * is a report nobody uses.
-       */
-      {
-        to: "/leads",
-        key: "leads",
-        icon: Target,
-        tabLabel: { ar: "أداء الليدز والمبيعات", en: "Leads & sales" },
-        search: { view: "performance" },
-        matches: (search) => leadsView(search) === "performance",
-        description: {
-          ar: "٦ مجموعات شهرية: الجودة والتكرار والمتابعة والتحويل لتسجيل مدفوع",
-          en: "Six monthly cohorts: quality, duplicates, follow-up and paid conversion",
-        },
-      },
-      {
-        to: "/lead-distribution",
-        key: "crm_leads",
-        icon: Layers,
-        tabLabel: { ar: "حسب التخصص والدورة", en: "Specialty & course" },
-      },
       {
         to: "/lead-sources",
         key: "lead_source_matrix",
@@ -200,15 +200,93 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         tabLabel: { ar: "المصادر حسب الدورة", en: "Sources by course" },
       },
       {
+        to: "/lead-distribution",
+        key: "crm_leads",
+        icon: Layers,
+        tabLabel: { ar: "حسب التخصص والدورة", en: "Specialty and course" },
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: CalendarClock,
+        tabLabel: { ar: "متابعة ليدز الأسبوع", en: "Weekly lead follow-up" },
+        search: { view: "weekly" },
+        matches: (search) => leadsView(search) === "weekly",
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: GraduationCap,
+        tabLabel: { ar: "تحليل الليدز حسب الكورس", en: "Course lead intelligence" },
+        search: { view: "intelligence" },
+        matches: (search) => leadsView(search) === "intelligence",
+      },
+    ],
+  },
+  /**
+   * CRM and sales: the sales managers. The pipeline record by record, lead to
+   * paid, how deals close, the team against target, and what was lost.
+   */
+  {
+    id: "crm",
+    label: { ar: "CRM والمبيعات", en: "CRM and sales" },
+    shortLabel: { ar: "CRM", en: "CRM" },
+    icon: Target,
+    defaultTo: "/leads",
+    contextual: "tabs",
+    items: [
+      {
         to: "/leads",
         key: "leads",
         icon: Users,
-        tabLabel: { ar: "سجلات العملاء", en: "CRM records" },
+        tabLabel: { ar: "سجلات CRM", en: "CRM records" },
         matches: (search) => leadsView(search) === undefined,
       },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Target,
+        tabLabel: { ar: "من الليد للدفع · ٦ شهور", en: "Lead to paid · 6 months" },
+        search: { view: "performance" },
+        matches: (search) => leadsView(search) === "performance",
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: Receipt,
+        tabLabel: { ar: "قنوات إغلاق البيع", en: "Sales closing channels" },
+        search: { view: "channels" },
+        matches: (search) => leadsView(search) === "channels",
+      },
+      {
+        to: "/teams",
+        key: "teams",
+        icon: UsersRound,
+        tabLabel: { ar: "فريق المبيعات", en: "Sales team" },
+      },
       { to: "/lost", key: "lost", icon: TrendingDown, tabLabel: { ar: "المفقودة", en: "Lost" } },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: CalendarRange,
+        tabLabel: { ar: "اللوست حسب الشهر", en: "Lost by month" },
+        search: { view: "lost" },
+        matches: (search) => leadsView(search) === "lost",
+      },
+      {
+        to: "/leads",
+        key: "leads",
+        icon: ShieldCheck,
+        tabLabel: { ar: "جودة مراجعة اللوست", en: "Lost review quality" },
+        search: { view: "quality" },
+        matches: (search) => leadsView(search) === "quality",
+      },
     ],
   },
+  /**
+   * Revenue: finance and management. What was collected, what marketing
+   * brought in, what each course sold, and whether prices were respected.
+   */
   {
     id: "revenue",
     label: { ar: "الإيرادات", en: "Revenue" },
@@ -241,34 +319,22 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         search: { view: "sales" },
         matches: (search) => courseView(search) !== "ads",
       },
-    ],
-  },
-  {
-    id: "team",
-    label: { ar: "أداء الفريق", en: "Team" },
-    shortLabel: { ar: "الفريق", en: "Team" },
-    icon: UsersRound,
-    defaultTo: "/teams",
-    contextual: "tabs",
-    items: [
       {
-        to: "/teams",
-        key: "teams",
-        icon: UsersRound,
-        tabLabel: { ar: "فريق المبيعات", en: "Sales team" },
-      },
-      {
-        to: "/media-buyers",
-        key: "media_buyers",
-        icon: UserRoundSearch,
-        tabLabel: { ar: "الميديا بايرز", en: "Media buyers" },
+        to: "/pricing",
+        key: "price_book",
+        icon: BookMarked,
+        tabLabel: { ar: "الأسعار والالتزام", en: "Pricing and compliance" },
       },
     ],
   },
+  /**
+   * Specialist and technical tools: deeper slices and data-quality views for
+   * the people who run the pipes. Every one stays one click from anywhere.
+   */
   {
     id: "more",
-    label: { ar: "المزيد", en: "More" },
-    shortLabel: { ar: "المزيد", en: "More" },
+    label: { ar: "أدوات متقدمة", en: "Advanced tools" },
+    shortLabel: { ar: "أدوات", en: "Tools" },
     icon: MoreHorizontal,
     defaultTo: "/ads",
     contextual: "menu",
@@ -283,34 +349,24 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
           en: "Every platform, every column and filter",
         },
       },
-      /**
-       * Two lead reports that existed only as in-page tabs. Listing them means
-       * every analytical view in the app is named by a navigation surface, so
-       * "where do I see X" has an answer that is not "scroll inside a page".
-       */
       {
-        to: "/leads",
-        key: "leads",
-        icon: GraduationCap,
-        tabLabel: { ar: "تحليل الليدز حسب الكورس", en: "Course lead intelligence" },
-        search: { view: "intelligence" },
-        matches: (search) => leadsView(search) === "intelligence",
-        description: {
-          ar: "الأهداف ودورة الإغلاق واقتصاديات الليد لكل كورس",
-          en: "Targets, close lifecycle and lead economics per course",
-        },
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: Layers,
+        tabLabel: { ar: "مقارنة الـAd Sets", en: "Ad Set comparison" },
+        search: { section: "ads", view: "adset-compare" },
+        matches: (search) =>
+          acquisitionSection(search) === "ads" && search.view === "adset-compare",
+        description: { ar: "المجموعات الإعلانية جنب بعض", en: "Ad sets side by side" },
       },
       {
-        to: "/leads",
-        key: "leads",
-        icon: CalendarClock,
-        tabLabel: { ar: "متابعة ليدز الأسبوع", en: "Weekly lead follow-up" },
-        search: { view: "weekly" },
-        matches: (search) => leadsView(search) === "weekly",
-        description: {
-          ar: "ليدز الأسبوع ومين لسه مستني متابعة",
-          en: "This week's leads and who is still waiting",
-        },
+        to: "/courses",
+        key: "courses",
+        icon: GraduationCap,
+        tabLabel: { ar: "إعلانات الكورسات", en: "Course ads" },
+        search: { view: "ads" },
+        matches: (search) => courseView(search) === "ads",
+        description: { ar: "إنفاق ونتائج كل كورس", en: "Spend and results per course" },
       },
       {
         to: "/attribution",
@@ -329,18 +385,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
       {
         to: "/acquisition",
         key: "acquisition_performance",
-        icon: ShieldCheck,
-        tabLabel: { ar: "تغطية البيانات", en: "Data coverage" },
-        search: { section: "coverage" },
-        matches: (search) => acquisitionSection(search) === "coverage",
-        description: {
-          ar: "دقة الربط وحالة المصادر التقنية",
-          en: "Attribution accuracy and source health",
-        },
-      },
-      {
-        to: "/acquisition",
-        key: "acquisition_performance",
         icon: Receipt,
         tabLabel: { ar: "سجلات المبيعات المرتبطة", en: "Linked sales records" },
         search: { section: "sales" },
@@ -351,18 +395,30 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         },
       },
       {
-        to: "/pricing",
-        key: "price_book",
-        icon: BookMarked,
-        tabLabel: { ar: "الأسعار والالتزام", en: "Pricing" },
-        description: { ar: "كتالوج الأسعار والعروض", en: "Price catalogue and offers" },
+        to: "/acquisition",
+        key: "acquisition_performance",
+        icon: ShieldCheck,
+        tabLabel: { ar: "تغطية البيانات", en: "Data coverage" },
+        search: { section: "coverage" },
+        matches: (search) => acquisitionSection(search) === "coverage",
+        description: {
+          ar: "دقة الربط وحالة المصادر التقنية",
+          en: "Attribution accuracy and source health",
+        },
       },
       {
-        to: "/media-plan",
-        key: "media_plan",
-        icon: CalendarRange,
-        tabLabel: { ar: "خطة الميديا", en: "Media Plan" },
-        description: { ar: "الميزانية المخططة مقابل الفعلي", en: "Planned budget against actual" },
+        // The one place that says whether a number was checked against the
+        // system it came from. It belongs near the top of the tools list, not
+        // buried under them: it is what somebody reaches for when a figure
+        // looks wrong.
+        to: "/number-review",
+        key: "number_review",
+        icon: ShieldCheck,
+        tabLabel: { ar: "مراجعة الأرقام", en: "Number review" },
+        description: {
+          ar: "كل رقم مهم: جاي منين، ومطابق للمصدر ولا لأ",
+          en: "Every key number: where it came from, and whether the source agrees",
+        },
       },
       {
         to: "/social-media",
@@ -384,13 +440,6 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         icon: CalendarClock,
         tabLabel: { ar: "مقارنة الويك إند", en: "Weekend comparison" },
         description: { ar: "الويك إند مقابل أيام الأسبوع", en: "Weekend against weekdays" },
-      },
-      {
-        to: "/yoy",
-        key: "yoy",
-        icon: CalendarRange,
-        tabLabel: { ar: "سنة بسنة", en: "Year on year" },
-        description: { ar: "نفس الفترة من السنة الماضية", en: "Same period last year" },
       },
     ],
   },

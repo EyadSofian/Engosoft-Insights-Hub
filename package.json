@@ -46,6 +46,8 @@
     "purge:chatwoot-attribution": "vite-node scripts/purge-chatwoot-attribution.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "validate:dashboard": "node scripts/validate-dashboard.mjs",
+    "baseline:capture": "node scripts/baseline-metrics.mjs",
+    "baseline:compare": "node scripts/baseline-metrics.mjs --compare",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -75,7 +77,8 @@
     "import:price-book": "node --experimental-strip-types scripts/import-price-book.mjs",
     "audit:agent-coverage": "node --experimental-strip-types scripts/audit-agent-coverage.mjs",
     "audit:agent-coverage:self-test": "node --experimental-strip-types scripts/audit-agent-coverage.mjs --self-test",
-    "audit:crm-lost": "vite-node scripts/audit-crm-lost.mjs",
+    "audit:sources": "vite-node scripts/audit-sources.mjs",
+  "audit:crm-lost": "vite-node scripts/audit-crm-lost.mjs",
     "audit:crm-inventory-scope": "vite-node scripts/audit-crm-inventory-scope.mjs",
     "audit:yearly-crm-history": "vite-node scripts/audit-yearly-crm-history.mjs"
   },

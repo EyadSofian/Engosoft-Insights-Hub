@@ -14,12 +14,15 @@ export const Route = createFileRoute("/api/accounting")({
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
         const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
-        // Credit notes are invoice-date accounting documents, not payment
-        // events. Only the Invoice Date view displays and deducts them.
-        let rows =
-          dateBasis === "invoice"
-            ? data.accounting
-            : data.accounting.filter((row) => !row.isCreditNote);
+        // Credit notes belong in both views.
+        //
+        // Dropping them on the Payment Date view made this page disagree with
+        // the management overview about the same labelled number over the same
+        // dates: February 2026 read $98,632.28 here and $95,472.72 there, a
+        // $3,159.56 gap, because metrics.server keeps them and this did not.
+        // `accountingReportingDate` already decides where a credit note lands,
+        // so both surfaces now net the same documents.
+        let rows = data.accounting;
         let creditNoteReconciliation: Awaited<
           ReturnType<typeof accountingCreditNotes>
         >["reconciliation"] = {
@@ -45,7 +48,11 @@ export const Route = createFileRoute("/api/accounting")({
           filters.salesTeam ||
           filters.salesperson,
         );
-        if (dateBasis === "invoice" && !hasAttributionFilter) {
+        // Credit notes are now reported on both bases, so the Odoo
+        // reconciliation that recovers the ones missing from the snapshot has
+        // to run on both too, or the Payment Date view would silently under-
+        // report exactly the documents the other view recovers.
+        if (!hasAttributionFilter) {
           try {
             const reconciled = await accountingCreditNotes(
               rows,

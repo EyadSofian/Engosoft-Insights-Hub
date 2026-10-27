@@ -226,7 +226,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
             <div className="hscroll scroll-hint-x">
               <div className="min-w-[860px]">
                 <div
-                  className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_repeat(5,104px)_28px] items-center gap-3 border-b border-border bg-surface-2 px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide text-text-subtle"
+                  className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_repeat(5,104px)_28px] items-center gap-3 border-b border-border bg-surface-2 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-text-subtle"
                   role="row"
                 >
                   <span>{lang === "ar" ? "الحملة" : "Campaign"}</span>
@@ -292,7 +292,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                           once, above the list, where a definition belongs. */}
                       <div className="border-t border-border bg-surface px-3 py-3">
                         <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-bold uppercase tracking-wide text-text-subtle">
+                          <span className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">
                             {lang === "ar" ? "إجمالي تاريخ الحملة" : "Lifetime"}
                           </span>
                           {sold ? (
@@ -419,7 +419,7 @@ function ActivitySpotlight({
       style={{ background: t.surface, borderColor: t.border }}
     >
       <div
-        className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide"
+        className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide"
         style={{ color: t.strong }}
       >
         <span
@@ -443,7 +443,7 @@ function ActivitySpotlight({
           return (
             <div key={stat.label} className="min-w-0">
               <div
-                className="truncate text-[10px] font-semibold"
+                className="truncate text-[12px] font-semibold"
                 style={{ color: t.ink, opacity: 0.6 }}
               >
                 {stat.label}
@@ -493,7 +493,7 @@ function LifetimeStat({ label, value, tone }: { label: string; value: string; to
       className="min-w-0 rounded-xl px-2.5 py-2"
       style={{ background: t.surface, border: `1px solid ${t.border}` }}
     >
-      <div className="truncate text-[10px] font-semibold" style={{ color: t.ink, opacity: 0.72 }}>
+      <div className="truncate text-[12px] font-semibold" style={{ color: t.ink, opacity: 0.72 }}>
         {label}
       </div>
       <div
@@ -538,7 +538,7 @@ function DeliveryDetail({ state }: { state: CampaignOperationalState }) {
 
   return (
     <div
-      className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2.5 text-[11px] text-text-muted"
+      className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2.5 text-[12px] text-text-muted"
       title={raw}
     >
       <span className="inline-flex items-center gap-1.5 font-semibold text-text">
@@ -595,7 +595,7 @@ function PlatformHealthCard({
       <div className="num mt-1.5 text-[22px] font-bold leading-none" style={{ color: t.ink }}>
         {ok ? fmtNum(health.active) : "—"}
       </div>
-      <div className="mt-1 text-[10.5px] leading-snug" style={{ color: t.ink, opacity: 0.68 }}>
+      <div className="mt-1 text-[12px] leading-snug" style={{ color: t.ink, opacity: 0.68 }}>
         {ok
           ? lang === "ar"
             ? health.enabled !== undefined && health.enabled !== health.active
@@ -639,7 +639,7 @@ function StatusCount({
       </span>
       <div className="min-w-0">
         <div className="num text-[17px] font-bold leading-none text-text">{fmtNum(value)}</div>
-        <div className="mt-0.5 truncate text-[10.5px] text-text-muted" title={label}>
+        <div className="mt-0.5 truncate text-[12px] text-text-muted" title={label}>
           {label}
         </div>
       </div>

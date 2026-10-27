@@ -30,7 +30,7 @@ export function PriceCard({ message, lang }: { message: PriceCardMessage; lang: 
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-text">{message.productName}</p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-text-muted">
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-text-muted">
             {message.deliveryMode && <span>{message.deliveryMode}</span>}
             {message.externalCode && <span className="num">#{message.externalCode}</span>}
             {message.market && <span>{message.market}</span>}
@@ -54,13 +54,13 @@ export function PriceCard({ message, lang }: { message: PriceCardMessage; lang: 
         )}
 
         {message.promotion?.campaign && (
-          <p className="mt-2 inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+          <p className="mt-2 inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
             {message.promotion.campaign}
           </p>
         )}
 
         {(message.validUntil || message.promotion?.validUntil) && (
-          <p className="mt-2 text-[11px] text-text-subtle">
+          <p className="mt-2 text-[12px] text-text-subtle">
             {ar ? "سارٍ حتى" : "Valid until"}{" "}
             <span className="num">
               {formatDate(message.validUntil ?? message.promotion?.validUntil, lang)}
@@ -73,7 +73,7 @@ export function PriceCard({ message, lang }: { message: PriceCardMessage; lang: 
             {message.warnings.map((warning) => (
               <li
                 key={warning}
-                className="flex items-start gap-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-400"
+                className="flex items-start gap-1.5 text-[12px] leading-snug text-amber-700 dark:text-amber-400"
               >
                 <AlertTriangle className="mt-px size-3 shrink-0" aria-hidden />
                 <span>{warning}</span>

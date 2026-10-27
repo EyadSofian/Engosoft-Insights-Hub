@@ -42,7 +42,7 @@ export function ChartMessage({ message, lang }: { message: ChartMessageType; lan
       </div>
       <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         {message.series.map((series, index) => (
-          <li key={series.key} className="flex items-center gap-1 text-[11px] text-text-muted">
+          <li key={series.key} className="flex items-center gap-1 text-[12px] text-text-muted">
             <span
               className="size-2 rounded-full"
               style={{ background: seriesColor(index) }}

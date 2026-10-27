@@ -248,7 +248,7 @@ export function GlobalSearch() {
             <span className="relative z-10 hidden min-w-0 truncate text-start md:inline">
               {placeholder}
             </span>
-            <kbd className="relative z-10 ms-auto hidden shrink-0 rounded-md border border-brand/25 bg-surface/80 px-1.5 py-0.5 text-[10px] font-bold text-brand shadow-sm lg:inline">
+            <kbd className="relative z-10 ms-auto hidden shrink-0 rounded-md border border-brand/25 bg-surface/80 px-1.5 py-0.5 text-[12px] font-bold text-brand shadow-sm lg:inline">
               ⌘K
             </kbd>
           </button>
@@ -306,7 +306,7 @@ export function GlobalSearch() {
             ) : (
               groups.map((group) => (
                 <section key={group.title} className="mb-1.5 last:mb-0">
-                  <h3 className="px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-text-subtle">
+                  <h3 className="px-2.5 pb-1 pt-2 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
                     {group.title}
                   </h3>
                   <ul>
@@ -331,7 +331,7 @@ export function GlobalSearch() {
                                 {row.label}
                               </span>
                               {row.meta && (
-                                <span className="block truncate text-[11px] text-text-muted">
+                                <span className="block truncate text-[12px] text-text-muted">
                                   {row.meta}
                                 </span>
                               )}

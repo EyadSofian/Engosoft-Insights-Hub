@@ -20,7 +20,7 @@ import { KpiRow, PageSection, SecondaryMetrics } from "@/components/dashboard-bi
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { Link } from "@tanstack/react-router";
 import { Card, Pill } from "@/components/ui-bits";
-import { toneVars } from "@/lib/dashboard-tone";
+import { cardToneVars } from "@/lib/dashboard-tone";
 import { PLATFORM_LABEL } from "@/lib/constants";
 import type { Kpi, KpiFormat, KpiStatus } from "@/lib/closed-loop-kpis";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
@@ -466,7 +466,7 @@ export function RevenueReconciliationCard({
   const block = (title: string, note: string, rec: NonNullable<typeof r>["paymentDate"]) => (
     <div className="rounded-xl bg-surface-2 p-3">
       <div className="text-xs font-semibold text-text">{title}</div>
-      <div className="mt-0.5 text-[11px] text-text-muted">{note}</div>
+      <div className="mt-0.5 text-[12px] text-text-muted">{note}</div>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         {(
           [
@@ -597,13 +597,13 @@ export function SimpleFunnel({ data, loading }: { data?: ClosedLoopResponse; loa
               step.count !== undefined && previous ? (step.count / previous) * 100 : null;
             return (
               <li key={step.key} className="relative rounded-xl bg-surface-2 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                   {step.label}
                 </div>
                 <div className="num mt-1 text-lg font-bold text-text">
                   {loading ? "…" : step.value}
                 </div>
-                <div className="mt-0.5 min-h-4 text-[11px] text-text-muted">
+                <div className="mt-0.5 min-h-4 text-[12px] text-text-muted">
                   {rate !== null && rate <= 100
                     ? A
                       ? `${fmtPct(rate, 1)} من السابق`
@@ -691,7 +691,7 @@ export function BestPerformers({
           )
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+          <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
             {props.icon}
             {props.eyebrow}
           </div>
@@ -799,7 +799,7 @@ export function CheapVersusQuality({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+        <div className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
           {title}
         </div>
         <div className="line-clamp-1 text-sm font-semibold text-text">
@@ -1171,7 +1171,7 @@ export function LeadSourceCards({
                 {loading ? "…" : fmtNum(total)}
               </div>
               <p
-                className="mt-1.5 text-[11.5px] leading-snug"
+                className="mt-1.5 text-[12px] leading-snug"
                 style={{ color: "var(--tone-ink)", opacity: 0.7 }}
               >
                 {total === 0
@@ -1190,7 +1190,7 @@ export function LeadSourceCards({
           );
           const className =
             "tone-surface lift pad-card flex h-full min-w-0 flex-col text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone-strong)]";
-          const style = toneVars(source.tone);
+          const style = cardToneVars(source.tone);
           return source.to ? (
             <Link key={source.type} to={source.to} className={className} style={style}>
               {card}

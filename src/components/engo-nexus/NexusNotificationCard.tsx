@@ -102,7 +102,7 @@ export function NexusNotificationCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className={`text-[11px] font-semibold ${presentation.eyebrow}`}>
+              <p className={`text-[12px] font-semibold ${presentation.eyebrow}`}>
                 {ar ? presentation.ar : presentation.en}
               </p>
               <h2 className="mt-0.5 text-sm font-bold text-text">{notice.title}</h2>
@@ -119,7 +119,7 @@ export function NexusNotificationCard({
           <p className="mt-2 text-[13px] leading-6 text-text" dir={ar ? "rtl" : "ltr"}>
             {notice.body}
           </p>
-          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-text-subtle">
+          <p className="mt-2 flex items-center gap-1.5 text-[12px] text-text-subtle">
             <CalendarRange className="size-3.5" aria-hidden />
             <span>{rangeLabel(notice.from, notice.to, lang)}</span>
           </p>
@@ -132,7 +132,7 @@ export function NexusNotificationCard({
             type="button"
             disabled={disabled}
             onClick={() => onSend(action.prompt)}
-            className="rounded-full border border-border bg-bg px-2.5 py-1.5 text-[11px] font-semibold text-text transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full border border-border bg-bg px-2.5 py-1.5 text-[12px] font-semibold text-text transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             {action.label}
           </button>

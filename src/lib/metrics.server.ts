@@ -2608,29 +2608,19 @@ export function execSummary(
   const window = range.from && range.to ? `${range.from} → ${range.to}` : "";
 
   const en: string[] = [];
-  const ar: string[] = [];
 
   en.push(
     `Between ${window} you spent ${money(t.spend)}. The reportable CRM population is ${t.totalLeads.toLocaleString("en-US")}: ${t.crmLeads.toLocaleString("en-US")} active non-Lost records plus ${t.lost.toLocaleString("en-US")} canonical losses under CRM 1.26. ${t.won.toLocaleString("en-US")} closed Won (${pctStr(t.conversionRate)}).`,
-  );
-  ar.push(
-    `خلال الفترة ${window} بلغ الإنفاق ${money(t.spend)}. سكان الـCRM القابلون للتقرير ${t.totalLeads.toLocaleString("en-US")}: عدد ${t.crmLeads.toLocaleString("en-US")} سجل نشط غير Lost، ومعهم ${t.lost.toLocaleString("en-US")} حالة خسارة حسب عقد CRM 1.26. أُغلق Won عدد ${t.won.toLocaleString("en-US")} بنسبة ${pctStr(t.conversionRate)}.`,
   );
 
   if (t.lostArchived > 0) {
     en.push(
       `All ${t.lostArchived.toLocaleString("en-US")} losses follow the CRM 1.26 split: archived Leads with a reason, current Opportunities in the Lost stage, and archived Opportunity history.`,
     );
-    ar.push(
-      `كل حالات الخسارة وعددها ${t.lostArchived.toLocaleString("en-US")} تتبع تقسيم CRM 1.26: Leads مؤرشفة بسبب، وOpportunities حالية داخل Lost stage، مع تاريخ الفرص المؤرشفة.`,
-    );
   }
 
   en.push(
     `Collected revenue was ${money(t.revenue)} from Accounting.USD Paid by Payment Date. ${money(t.attributedRevenue)} of it traces to a campaign, giving an attributed ad ROAS of ${roasStr(t.attributedRoas)} on ${money(t.spend)} spend. All collected revenue ÷ ad spend is ${roasStr(t.roas)}, but that is not advertising ROAS because it includes revenue not attributed to a campaign. Sales orders are not used as recognised revenue.`,
-  );
-  ar.push(
-    `الإيراد المحصَّل ${money(t.revenue)} من عمود USD Paid في تبويب Accounting حسب تاريخ الدفع. منه ${money(t.attributedRevenue)} مرتبط بحملة، ولذلك العائد الإعلاني المنسوب ${roasStr(t.attributedRoas)} على إنفاق ${money(t.spend)}. إجمالي التحصيل ÷ الإنفاق الإعلاني ${roasStr(t.roas)}، لكنه ليس ROAS إعلانيًا لأنه يشمل إيرادًا غير منسوب إلى حملة. أوامر البيع لا تُستخدم كإيراد محاسبي.`,
   );
 
   if (health.platformsWithoutSpendTab.length > 0) {
@@ -2640,24 +2630,15 @@ export function execSummary(
     en.push(
       `WARNING — spend is incomplete: ${list} produced leads in the CRM but have no spend tab in the workbook. Their cost is missing from CPL, CPA, ROAS and ACOS, so every one of those reads better than reality until the tab exists.`,
     );
-    ar.push(
-      `تحذير — الإنفاق ناقص: ${list} أنتجت عملاء في النظام ولا يوجد لها تبويب إنفاق في الملف. تكلفتها غائبة عن CPL و CPA و ROAS و ACOS، فكل هذه المؤشرات تبدو أفضل من الحقيقة إلى أن يُضاف التبويب.`,
-    );
   }
 
   en.push(
     `CPL is ${money2(t.cpl)} = total spend ÷ ${t.platformLeads?.toLocaleString("en-US") ?? "—"} platform-reported leads; CPA is ${money2(t.cpa)} = total spend ÷ won deals; ACOS is ${pctStr(t.acos)}.`,
   );
-  ar.push(
-    `تكلفة العميل المحتمل ${money2(t.cpl)} = إجمالي الإنفاق ÷ ${t.platformLeads?.toLocaleString("en-US") ?? "—"} lead من منصات الإعلانات، وتكلفة الصفقة ${money2(t.cpa)} = الإنفاق ÷ Won، ونسبة الإنفاق إلى الإيراد ${pctStr(t.acos)}.`,
-  );
 
   if (t.nonLeadSpend > 0) {
     en.push(
       `${money(t.nonLeadSpend)} ran on traffic or unnamed accounts. It remains included because management requested every efficiency formula to use total ad spend.`,
-    );
-    ar.push(
-      `من هذا الإنفاق ${money(t.nonLeadSpend)} على حسابات زيارات أو حسابات بلا اسم، لكنه يظل داخلاً في الحساب لأن معادلات الإدارة تستخدم إجمالي الإنفاق الإعلاني كاملاً.`,
     );
   }
 
@@ -2665,17 +2646,11 @@ export function execSummary(
     en.push(
       `Best campaign: ${best.name} — ${money(best.spend)} returned ${money(best.revenue)} (${roasStr(best.roas)}).`,
     );
-    ar.push(
-      `أفضل حملة: ${best.name} — أنفقت ${money(best.spend)} وأعادت ${money(best.revenue)} (${roasStr(best.roas)}).`,
-    );
   }
 
   if (leak && (leak.roas === null || leak.roas < 1)) {
     en.push(
       `Biggest leak: ${leak.name} — ${money(leak.spend)} spent for ${money(leak.revenue)} back (${roasStr(leak.roas)}). Worth pausing or reworking the creative.`,
-    );
-    ar.push(
-      `أكبر إهدار: ${leak.name} — أنفقت ${money(leak.spend)} ولم تُعد سوى ${money(leak.revenue)} (${roasStr(leak.roas)}). يُفضّل إيقافها أو تغيير الإعلان.`,
     );
   }
 
@@ -2683,17 +2658,11 @@ export function execSummary(
     en.push(
       `Cheapest platform-reported leads came from ${cheap.name} at ${money2(cheap.cpl)} across ${cheap.platformLeads ?? 0} leads.`,
     );
-    ar.push(
-      `أرخص leads المبلغ عنها من المنصة جاءت من ${cheap.name} بتكلفة ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} lead.`,
-    );
   }
 
   if (t.avgCloseDays !== null) {
     en.push(
       `Deals take ${t.avgCloseDays.toFixed(1)} days to close on average, measured over ${t.closeSample.toLocaleString("en-US")} closed leads.`,
-    );
-    ar.push(
-      `متوسط زمن إغلاق الصفقة ${t.avgCloseDays.toFixed(1)} يوماً، محسوباً على ${t.closeSample.toLocaleString("en-US")} صفقة مغلقة.`,
     );
   }
 
@@ -2705,17 +2674,72 @@ export function execSummary(
     en.push(
       `Note: ${health.leadsWithoutSpendSource.toLocaleString("en-US")} leads arrived from sources with no matching spend (${unpriced || "unclassified"}), so blended CPL can read cheaper than paid CPL alone.`,
     );
-    ar.push(
-      `ملاحظة: وصل ${health.leadsWithoutSpendSource.toLocaleString("en-US")} عميلاً من مصادر بلا إنفاق مطابق (${unpriced || "غير مصنفة"})، لذلك قد تظهر تكلفة العميل الإجمالية أقل من تكلفة العميل المدفوع.`,
-    );
   }
 
   if (typeof deltas.spend === "number") {
     en.push(`Spend is ${delta(deltas.spend)} versus the previous period.`);
-    ar.push(`الإنفاق ${delta(deltas.spend)} مقارنة بالفترة السابقة.`);
   }
 
-  return { en: en.join(" "), ar: ar.join(" ") };
+  // Arabic: four short lines in plain Egyptian — money, customers, cost,
+  // campaigns — carrying every figure the English states, nothing dropped.
+  const n = (x: number) => x.toLocaleString("en-US");
+  const fromTo = range.from && range.to ? `من ${range.from} لحد ${range.to}` : "في الفترة دي";
+
+  const moneyLine = [
+    `${fromTo}: دخل ${money(t.revenue)}، منه ${money(t.attributedRevenue)} من حملات، وصرفنا على الإعلانات ${money(t.spend)}`,
+    typeof deltas.spend === "number" ? ` (${delta(deltas.spend)} عن الفترة اللي فاتت)` : "",
+    t.nonLeadSpend > 0
+      ? `، منهم ${money(t.nonLeadSpend)} على حسابات زيارات أو من غير اسم ومحسوبين برضه`
+      : "",
+    `. العائد الإعلاني المنسوب ${roasStr(t.attributedRoas)}، وكل التحصيل ÷ صرف الإعلانات ${roasStr(t.roas)} (ده مش ROAS إعلاني، لإن فيه فلوس ماجتش من حملات).`,
+  ].join("");
+
+  const customersLine = [
+    `جالنا ${n(t.totalLeads)} ليد: ${n(t.crmLeads)} شغالين و${n(t.lost)} Lost`,
+    t.lostArchived > 0 ? ` (${n(t.lostArchived)} حالة Lost متقسمة بقواعد CRM 1.26)` : "",
+    `، واتقفل منهم ${n(t.won)} Won (${pctStr(t.conversionRate)})`,
+    t.avgCloseDays !== null
+      ? `، والصفقة بتاخد ${t.avgCloseDays.toFixed(1)} يوم في المتوسط (على ${n(t.closeSample)} صفقة)`
+      : "",
+    ".",
+  ].join("");
+
+  const costParts = [
+    `الليد من المنصات كلّفنا ${money2(t.cpl)} (${t.platformLeads === null ? "—" : n(t.platformLeads)} ليد)، والـWon كلّفنا ${money2(t.cpa)}، والإعلانات خدت ${pctStr(t.acos)} من التحصيل`,
+  ];
+  if (cheap)
+    costParts.push(
+      `أرخص ليدز جت من ${cheap.name}: ${money2(cheap.cpl)} على ${cheap.platformLeads ?? 0} ليد`,
+    );
+  if (health.platformsWithoutSpendTab.length > 0)
+    costParts.push(
+      `خلي بالك: ${health.platformsWithoutSpendTab.map((p) => `${p.platform} (${n(p.leads)})`).join(" و")} جابوا ليدز من غير صرف متسجل، فالتكاليف والعائد باينين أحسن من الحقيقة`,
+    );
+  if (health.leadsWithoutSpendSource > 0) {
+    const unpriced = health.unpricedSources
+      .slice(0, 6)
+      .map((source) => source.label)
+      .join("، ");
+    costParts.push(
+      `و${n(health.leadsWithoutSpendSource)} ليد جم من مصادر مالهاش صرف (${unpriced || "غير مصنفة"})، فتكلفة الليد الإجمالية ممكن تبان أرخص`,
+    );
+  }
+  const costLine = `${costParts.join(". ")}.`;
+
+  const campaignParts: string[] = [];
+  if (best)
+    campaignParts.push(
+      `أحسن حملة ${best.name}: صرفت ${money(best.spend)} ورجّعت ${money(best.revenue)} (${roasStr(best.roas)})`,
+    );
+  if (leak && (leak.roas === null || leak.roas < 1))
+    campaignParts.push(
+      `وأكبر خسارة ${leak.name}: صرفت ${money(leak.spend)} ورجّعت ${money(leak.revenue)} بس (${roasStr(leak.roas)}) — الأحسن توقفها أو تغيّر الإعلان`,
+    );
+
+  const ar = [moneyLine, customersLine, costLine];
+  if (campaignParts.length) ar.push(`${campaignParts.join("، ")}.`);
+
+  return { en: en.join(" "), ar: ar.join("\n") };
 }
 
 export function distinctValues<T>(rows: T[], key: (r: T) => string): string[] {

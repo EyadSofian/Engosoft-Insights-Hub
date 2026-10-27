@@ -187,7 +187,7 @@ export function SalesPerformance() {
               `${row.campaignName} ${row.adName} ${row.creativeName} ${row.salesperson} ${row.course} ${row.crmLeadId}`
             }
           />
-          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+          <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
             <BadgeDollarSign size={12} aria-hidden />
             {A
               ? "يعرض حتى 1,000 نتيجة مرتبة بالإيراد ثم الأحدث."

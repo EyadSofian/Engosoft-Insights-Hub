@@ -161,8 +161,14 @@ export function standardMetrics({
     icon: <TrendingUp size={16} />,
     delta: deltas.revenue,
     definition: A
-      ? "المبالغ المدفوعة فعليًا خلال الفترة، محسوبة بتاريخ الدفع من فواتير الحسابات."
+      ? "الفلوس اللي دخلت فعلًا في الفترة دي من فواتير اتدفعت."
       : "Money actually collected in the period, counted on payment date from Accounting invoices.",
+    source: A
+      ? "من الحسابات في Odoo: كل فاتورة اتدفعت، ومحسوبة بيوم الدفع."
+      : "From Odoo Accounting: every paid invoice, counted on the day it was paid.",
+    why: A
+      ? "ده الرقم اللي بيقول الشركة كسبت كام بجد، مش اتفقت على كام."
+      : "It is what the company actually earned, not what was only agreed.",
     formula: A
       ? "مجموع قيمة الفواتير المدفوعة التي يقع تاريخ دفعها داخل الفترة المحددة."
       : "Sum of paid invoice value whose payment date falls inside the selected window.",
@@ -208,8 +214,14 @@ export function standardMetrics({
     delta: deltas.spend,
     deltaInvert: true,
     definition: A
-      ? "ما أُنفق فعليًا على الإعلانات خلال الفترة، بتاريخ ظهور الإعلان، من كل المنصات المتصلة."
+      ? "الفلوس اللي اتصرفت على الإعلانات في الفترة دي."
       : "What was actually spent on ads during the period, on ad date, across every connected platform.",
+    source: A
+      ? "من حسابات الإعلانات نفسها: ميتا وسناب وتيك توك وجوجل وChatGPT Ads، بيوم ظهور الإعلان."
+      : "From the ad accounts themselves (Meta, Snapchat, TikTok, Google, ChatGPT Ads), on the day the ad ran.",
+    why: A
+      ? "من غيره مانقدرش نعرف كل ليد أو كل بيعة كلّفتنا كام."
+      : "Without it there is no cost per lead or per sale.",
     formula: A
       ? "مجموع الإنفاق اليومي لكل إعلان داخل الفترة، بما فيه حسابات الزيارات."
       : "Sum of daily spend for every ad inside the window, traffic accounts included.",
@@ -260,8 +272,14 @@ export function standardMetrics({
     icon: <Users size={16} />,
     delta: deltas.totalLeads,
     definition: A
-      ? "كل عميل محتمل دخل النظام في الفترة: صفوف الـCRM النشطة، بالإضافة إلى الصفقات الضائعة من مصدر الخسائر المعتمد."
+      ? "كل عميل محتمل دخل السيستم في الفترة دي."
       : "Every lead that entered the system in the period: active CRM rows plus the losses from the approved Lost source.",
+    source: A
+      ? "من Odoo CRM: الليدز اللي اتفتحت في الفترة، ومعاها اللي اتقفلت Lost."
+      : "From Odoo CRM: leads opened in the period, including those later closed as Lost.",
+    why: A
+      ? "ده أول السلسلة كلها: لو الليدز قلّت، المبيعات هتقل بعدها."
+      : "It is the start of the chain: fewer leads now means fewer sales later.",
     formula: A
       ? `عملاء CRM (${fmtNum(T.crmLeads)}) + الصفقات الضائعة (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`
       : `CRM leads (${fmtNum(T.crmLeads)}) + losses (${fmtNum(T.lost)}) = ${fmtNum(T.totalLeads)}.`,
@@ -300,17 +318,23 @@ export function standardMetrics({
 
   const won: MetricDetail = {
     id: `${surface}.won`,
-    title: title("won", A ? "الصفقات المغلقة" : "Won deals"),
+    title: title("won", A ? "Won في CRM" : "CRM Won deals"),
     value: fmtNum(T.won),
     tone: "violet",
     icon: <Award size={16} />,
     delta: deltas.won,
     definition: A
-      ? "عدد العملاء المحتملين الذين وصلوا إلى مرحلة الربح خلال الفترة."
-      : "How many leads reached the won stage during the period.",
+      ? "عدد الليدز اللي السيلز قفلها Won في Odoo."
+      : "How many leads reached the CRM Won stage during the period. Paid sales are counted from invoices on the CRM report.",
+    source: A
+      ? "من مراحل الـCRM في Odoo، على الليدز اللي اتفتحت في الفترة."
+      : "From the CRM stages in Odoo, for leads opened in the period.",
+    why: A
+      ? "بيقيس شغل السيلز في القفل. البيعة المدفوعة نفسها بتتعد من الفواتير."
+      : "It measures how sales close; the paid sale itself is counted from invoices.",
     formula: A
-      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل تحويل.`
-      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} conversion.`,
+      ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} معدل Won.`
+      : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)} Won rate.`,
     caveat: caveats.won,
     trend: trendFor("won", A ? "حركة إغلاق الصفقات" : "Deals closing over the period", fmtNum),
     supporting: [
@@ -349,8 +373,14 @@ export function standardMetrics({
     icon: <Target size={16} />,
     delta: deltas.roas,
     definition: A
-      ? "كل دولار أُنفق على الإعلانات، كم دولارًا من الإيراد المحصّل قابله في الفترة."
+      ? "كل دولار اتصرف على الإعلانات، قصاده كام دولار اتحصّل في نفس الفترة."
       : "For every dollar spent on ads, how many dollars of collected revenue came back in the period.",
+    source: A
+      ? "التحصيل من فواتير Odoo المدفوعة، والصرف من حسابات الإعلانات."
+      : "Collections from paid Odoo invoices; spend from the ad accounts.",
+    why: A
+      ? "فكرة عامة عن الصرف قصاد الفلوس اللي دخلت. مش كل الفلوس جت من إعلانات، فالعائد الإعلاني الحقيقي في كارت «العائد المنسوب»."
+      : "A broad read of spend against money in. Not all of it came from ads; the true ad return is the attributed card.",
     formula: A
       ? `الإيراد ÷ الإنفاق: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`
       : `Revenue ÷ spend: ${fmtUSD(T.revenue)} ÷ ${fmtUSD(T.spend)} = ${fmtRoas(T.roas)}.`,
@@ -417,14 +447,18 @@ export function standardMetrics({
 
   const conversion: MetricDetail = {
     id: `${surface}.conversion`,
-    title: title("conversion", A ? "معدل التحويل" : "Conversion rate"),
+    title: title("conversion", A ? "معدل Won في CRM" : "CRM Won rate"),
     value: fmtPct(T.conversionRate, 2),
     tone: "violet",
     icon: <Percent size={14} />,
     delta: deltas.conversionRate,
     definition: A
-      ? "نسبة العملاء المحتملين الذين تحوّلوا إلى صفقات رابحة داخل الفترة."
-      : "The share of leads that became won deals inside the period.",
+      ? "من كل 100 ليد، كام واحد اتقفل Won."
+      : "The share of leads that reached the CRM Won stage inside the period. Paid conversion (invoices ÷ leads) is on the CRM report.",
+    source: A ? "عدد الـWon ÷ كل الليدز، من Odoo CRM." : "Won count ÷ all leads, from Odoo CRM.",
+    why: A
+      ? "بيقولك جودة الليدز وشغل السيلز مع بعض: ليدز كتير ونسبة قليلة يبقى فيه حاجة غلط."
+      : "It reads lead quality and sales work together: many leads at a low rate means something is off.",
     formula: A
       ? `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`
       : `${fmtNum(T.won)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.conversionRate, 2)}.`,
@@ -480,8 +514,14 @@ export function standardMetrics({
     delta: deltas.cpl,
     deltaInvert: true,
     definition: A
-      ? "كم كلّف كل عميل محتمل أبلغت عنه المنصات الإعلانية. المقام هنا هو ليدز المنصات، لا عملاء الـCRM."
+      ? "كل ليد من المنصات الإعلانية كلّفنا كام."
       : "What each platform-reported lead cost. The denominator is platform leads, not CRM leads.",
+    source: A
+      ? "الصرف من حسابات الإعلانات ÷ عدد الليدز اللي المنصة نفسها بلّغت عنه."
+      : "Ad spend ÷ the leads the platforms themselves reported.",
+    why: A
+      ? "لو زاد، يبقى الإعلانات غليت أو ضعفت، ومحتاجين نراجع الحملات."
+      : "When it rises, ads got pricier or weaker and campaigns need a review.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} ليد إعلانية = ${fmtUSDFull(T.cpl)}.`
       : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.platformLeads ?? 0)} platform leads = ${fmtUSDFull(T.cpl)}.`,
@@ -550,8 +590,12 @@ export function standardMetrics({
     tone: "violet",
     icon: <Target size={14} />,
     definition: A
-      ? "كم كلّف الإعلان مقابل كل صفقة رابحة في الفترة."
+      ? "كل بيعة Won كلّفتنا كام إعلانات."
       : "What advertising cost for each won deal in the period.",
+    source: A ? "الصرف ÷ عدد الـWon في الفترة." : "Spend ÷ won deals in the period.",
+    why: A
+      ? "بيقارن تمن الإعلان بتمن الكورس: لو قرّب منه، الحملة مش جايبة همّها."
+      : "It sets ad cost against course price: if it gets close, the campaign does not pay off.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtNum(T.won)} صفقة = ${fmtUSDFull(T.cpa)}.`
       : `${fmtUSD(T.spend)} ÷ ${fmtNum(T.won)} won = ${fmtUSDFull(T.cpa)}.`,
@@ -578,8 +622,12 @@ export function standardMetrics({
     delta: deltas.acos,
     deltaInvert: true,
     definition: A
-      ? "نسبة الإنفاق الإعلاني من الإيراد المحصّل. كلما انخفضت كان الإعلان أرخص مقابل ما أعاده."
+      ? "الإعلانات خدت كام في المية من الفلوس اللي دخلت."
       : "Ad spend as a share of collected revenue. The lower it is, the cheaper the advertising was.",
+    source: A ? "الصرف ÷ التحصيل × 100." : "Spend ÷ collections × 100.",
+    why: A
+      ? "كل ما قلّ كان أحسن: معناه الإعلان أرخص قصاد اللي رجّعه."
+      : "Lower is better: the ads cost less for what they brought back.",
     formula: A
       ? `${fmtUSD(T.spend)} ÷ ${fmtUSD(T.revenue)} = ${fmtPct(T.acos, 1)}. وهي مقلوب العائد على الإنفاق.`
       : `${fmtUSD(T.spend)} ÷ ${fmtUSD(T.revenue)} = ${fmtPct(T.acos, 1)}. It is the inverse of the return on ad spend.`,
@@ -606,8 +654,14 @@ export function standardMetrics({
     delta: deltas.lost,
     deltaInvert: true,
     definition: A
-      ? "الصفقات التي أُغلقت خاسرة، من مصدر الخسائر المعتمد وحده. صفوف الـCRM التي حالتها «خسارة» مستبعدة حتى لا تُحسب الخسارة مرتين."
+      ? "الليدز اللي اتقفلت خسارة."
       : "Deals closed as lost, from the approved Lost source only. CRM rows whose stage is Lost are excluded so a loss is never counted twice.",
+    source: A
+      ? "من سجل الخسارة المعتمد في Odoo بس، عشان ماتتعدّش نفس الليد مرتين."
+      : "From the approved Lost record in Odoo only, so no lead is counted twice.",
+    why: A
+      ? "بيوريك بنخسر العملاء فين، وأسباب الخسارة في التفاصيل بتقول نعمل إيه."
+      : "It shows where customers are lost; the reasons tell you what to fix.",
     formula: A
       ? `${fmtNum(T.lost)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.lostRate, 2)}.`
       : `${fmtNum(T.lost)} ÷ ${fmtNum(T.totalLeads)} = ${fmtPct(T.lostRate, 2)}.`,

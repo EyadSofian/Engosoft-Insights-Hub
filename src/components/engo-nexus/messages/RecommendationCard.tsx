@@ -47,7 +47,7 @@ export function RecommendationCard({
 
       {recommendation.reasons.length > 0 ? (
         <>
-          <h5 className="mt-2 text-[11px] font-medium text-text-muted">{t.why}</h5>
+          <h5 className="mt-2 text-[12px] font-medium text-text-muted">{t.why}</h5>
           <ul className="mt-1 space-y-1">
             {recommendation.reasons.slice(0, 5).map((reason, index) => (
               <li key={index} className="flex gap-1.5 text-xs text-text">
@@ -74,7 +74,7 @@ export function RecommendationCard({
       ) : null}
 
       {recommendation.confidence ? (
-        <p className="mt-2 text-[11px] text-text-muted">
+        <p className="mt-2 text-[12px] text-text-muted">
           {t.confidence}: {CONFIDENCE_LABEL[lang][recommendation.confidence]}
         </p>
       ) : null}
@@ -84,7 +84,7 @@ export function RecommendationCard({
           type="button"
           disabled={disabled}
           onClick={() => onSend(lang === "ar" ? "ليه أكتر؟" : "Why, in more detail?")}
-          className="rounded border border-border bg-surface px-2 py-1 text-[11px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
+          className="rounded border border-border bg-surface px-2 py-1 text-[12px] font-medium text-text hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
           {lang === "ar" ? "ليه أكتر؟" : "Why, in more detail?"}
         </button>

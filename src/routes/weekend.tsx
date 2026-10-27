@@ -155,7 +155,7 @@ function Change({
   const Icon = flat ? null : value > 0 ? ArrowUpRight : ArrowDownRight;
   return (
     <span
-      className="num inline-flex items-center gap-1 text-[11px] font-semibold"
+      className="num inline-flex items-center gap-1 text-[12px] font-semibold"
       style={{
         color: good === null ? "var(--text-muted)" : good ? "var(--success)" : "var(--danger)",
       }}
@@ -693,7 +693,7 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
         <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Pill tone={copy.tone}>{lang === "ar" ? "قرار الويك إند" : "Weekend decision"}</Pill>
-            <span className="inline-flex flex-wrap items-center gap-x-1.5 rounded-lg border border-border bg-surface/75 px-2.5 py-1 text-[11px] text-text-muted">
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 rounded-lg border border-border bg-surface/75 px-2.5 py-1 text-[12px] text-text-muted">
               <span>
                 {lang === "ar"
                   ? "نافذة التحليل الكاملة، وتشمل أيام المقارنة:"
@@ -703,7 +703,7 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
                 {data.window.from} → {data.window.to}
               </bdi>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand">
               {lang === "ar"
                 ? `المحسوب كويك إند: الجمعة + السبت فقط · ${fmtNum(data.window.weekendDays)} يوم`
                 : `Weekend sample: Friday + Saturday only · ${fmtNum(data.window.weekendDays)} days`}
@@ -744,7 +744,7 @@ function SignalStat({ value, label }: { value: string; label: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface/85 p-3 text-center shadow-sm">
       <div className="num text-xl font-semibold text-text">{value}</div>
-      <div className="mt-1 text-[10px] leading-tight text-text-muted">{label}</div>
+      <div className="mt-1 text-[12px] leading-tight text-text-muted">{label}</div>
     </div>
   );
 }
@@ -807,12 +807,12 @@ function PeriodCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-text">{title}</h3>
-          <p className="mt-0.5 text-[11px] font-medium" style={{ color }}>
+          <p className="mt-0.5 text-[12px] font-medium" style={{ color }}>
             {daysLabel}
           </p>
         </div>
         <span
-          className="num rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          className="num rounded-full px-2.5 py-1 text-[12px] font-semibold"
           style={{ background: soft, color }}
         >
           {fmtNum(metrics.calendarDays)} {lang === "ar" ? "يوم" : "days"}
@@ -901,7 +901,7 @@ function PlatformDecisionCard({
           />
           <div>
             <h3 className="font-semibold text-text">{labelPlatform(row.platform, lang)}</h3>
-            <p className="num mt-0.5 text-[10px] text-text-muted">
+            <p className="num mt-0.5 text-[12px] text-text-muted">
               {row.overallRank
                 ? `#${row.overallRank} ${lang === "ar" ? "إجمالًا" : "overall"}`
                 : lang === "ar"
@@ -930,7 +930,7 @@ function PlatformDecisionCard({
         />
       </div>
       <div className="mt-5 border-t border-border pt-3">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-text-subtle">
+        <p className="text-[12px] font-medium uppercase tracking-wide text-text-subtle">
           {lang === "ar" ? "مقابل 5 أيام العمل" : "vs five workdays"}
         </p>
         <p className="num mt-1.5 text-xs text-text-muted">{evidence.join(" · ") || "—"}</p>
@@ -943,7 +943,7 @@ function PlatformDecisionCard({
 function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-0.5 text-sm font-semibold text-text">{value}</div>
     </div>
   );
@@ -1142,7 +1142,7 @@ function DayBreakdown({ rows, lang }: { rows: WeekendDayRow[]; lang: "ar" | "en"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="num text-[10px] text-text-subtle">#{index + 1}</span>
+                <span className="num text-[12px] text-text-subtle">#{index + 1}</span>
                 <span className="truncate text-xs font-semibold">
                   {labelPlatform(row.platform, lang)}
                 </span>
@@ -1150,7 +1150,7 @@ function DayBreakdown({ rows, lang }: { rows: WeekendDayRow[]; lang: "ar" | "en"
               </div>
               <span className="num text-sm font-semibold">{fmtUSDFull(row.cpl)}</span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-muted">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-text-muted">
               <span>
                 {fmtUSD(row.avgDailySpend)} {lang === "ar" ? "صرف/يوم" : "spend/day"}
               </span>
@@ -1184,7 +1184,7 @@ function Methodology({ data, lang }: { data: WeekendResponse; lang: "ar" | "en" 
               ? "الليد يُنسب ليوم إنشائه في Odoo حتى لو أُغلق لاحقًا. Lost مأخوذ من التصنيف المعتمد لعقد CRM 1.26 لنفس دفعة الإنشاء، ونسبة المبيعات هي Won ÷ إجمالي الليدز؛ لا يتم اختراع ربط محاسبي غير موجود بين الليد والفاتورة. متوسط الصرف اليومي يشمل أيام الصرف الصفري داخل العينة."
               : "A lead is attributed to its Odoo creation day even if it closes later. Lost follows the canonical CRM 1.26 classification for the same cohort, while sales rate is Won ÷ total leads; no unsupported lead-to-invoice link is invented. Average daily spend includes zero-spend days in the sample."}
           </p>
-          <p className="mt-2 text-[11px] leading-relaxed text-text-subtle">
+          <p className="mt-2 text-[12px] leading-relaxed text-text-subtle">
             {lang === "ar"
               ? "قاعدة Full: CPL لا يسوء بأكثر من 10%، المبيعات لا تنخفض بأكثر من نقطتين، وLost لا ترتفع بأكثر من 3 نقاط مقابل باقي الأسبوع؛ مع حد جودة مطلق لا يقل عن 2% مبيعات ولا يزيد عن 40% Lost."
               : "Full-budget rule: CPL worsens by no more than 10%, sales fall by no more than 2pp, and Lost rises by no more than 3pp versus the baseline; absolute quality must also reach 2% sales with Lost no higher than 40%."}

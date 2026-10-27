@@ -25,6 +25,7 @@ export const DICT = {
   business_analytics: { ar: "تحليلات البيزنس", en: "Business analytics" },
   overview: { ar: "نظرة عامة", en: "Overview" },
   campaigns: { ar: "الحملات", en: "Campaigns" },
+  number_review: { ar: "مراجعة الأرقام", en: "Number review" },
   weekend: { ar: "أداء الويك إند", en: "Weekend performance" },
   organic: { ar: "أورجانيك", en: "Organic" },
   media_buyers: { ar: "تقييم الميديا بايرز", en: "Media buyers" },
@@ -492,12 +493,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const storedLang = window.localStorage.getItem("engo_lang_v2") as Lang | null;
     if (storedLang === "ar" || storedLang === "en") setLangState(storedLang);
 
+    // Light is the default; a reader who picked the dark theme keeps it.
     const storedTheme = window.localStorage.getItem("engo_theme") as Theme | null;
-    if (storedTheme === "light" || storedTheme === "dark") {
-      setThemeState(storedTheme);
-    } else if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
-      setThemeState("dark");
-    }
+    setThemeState(storedTheme === "dark" ? "dark" : "light");
   }, []);
 
   useEffect(() => {

@@ -25,7 +25,7 @@ var l=localStorage.getItem('engo_lang')||'ar';
 document.documentElement.lang=l;
 document.documentElement.dir=l==='ar'?'rtl':'ltr';
 var t=localStorage.getItem('engo_theme');
-if(!t)t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+if(!t)t='light';
 if(t==='dark')document.documentElement.classList.add('dark');
 }catch(e){}})();`;
 
@@ -93,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "Full-funnel marketing and accounting intelligence dashboard for Engosoft.",
       },
-      { name: "theme-color", content: "#001E3C" },
+      { name: "theme-color", content: "#0045FE" },
       { property: "og:title", content: "Engosoft — Marketing & Sales Intelligence" },
       {
         property: "og:description",
@@ -103,12 +103,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700;800&display=swap",
       },
     ],
   }),

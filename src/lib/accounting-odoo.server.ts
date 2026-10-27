@@ -526,16 +526,20 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
 
     const product = productById.get(m2oId(report.product_id));
     const currency = m2oName(report.currency_id) || m2oName(move.currency_id);
-    const sign = isCreditNote ? -1 : 1;
-    const totalInCurrency = sign * Math.abs(number(report.price_total));
+    // `account.invoice.report` signs its own amounts, and both directions
+    // occur: a refund line is negative, a discount line on an ordinary invoice
+    // is negative, and a discount reversed by a credit note is positive.
+    // Forcing the sign with Math.abs() flipped 34 of 2026's discount lines
+    // positive -- $7,490.78 on January alone -- and over-subtracted every
+    // credit note that gave a discount back. The direction of a credit note as
+    // a whole is anchored per document by normalizeCreditNoteDocuments.
+    const totalInCurrency = number(report.price_total);
     const hasExplicitUsd = !!usdPaidReport && present(report[usdPaidReport]);
     const fx = FX_TO_USD[currency.toUpperCase()];
     if (!hasExplicitUsd && fx === undefined) missingCurrencyRate++;
-    const usdPaid =
-      sign *
-      Math.abs(
-        hasExplicitUsd ? number(report[usdPaidReport]) : Math.abs(totalInCurrency) * (fx ?? 0),
-      );
+    const usdPaid = hasExplicitUsd
+      ? number(report[usdPaidReport])
+      : totalInCurrency * (fx ?? 0);
     const teamValue = reportTeam ? report[reportTeam] : moveTeam ? move[moveTeam] : move.team_id;
     const teamId = m2oId(teamValue as M2O);
     const team = teamById.get(teamId);
@@ -564,7 +568,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
       "Company Currency": m2oName(report.company_currency_id),
       Partner: m2oName(report.partner_id) || m2oName(move.partner_id),
       Country: m2oName(report.country_id),
-      "Untaxed Total": String(sign * Math.abs(number(report.price_subtotal))),
+      "Untaxed Total": String(number(report.price_subtotal)),
       "Total in Currency": String(totalInCurrency),
       Currency: currency,
       "USD Paid": String(usdPaid),

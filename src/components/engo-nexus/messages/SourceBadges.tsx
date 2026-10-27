@@ -29,7 +29,7 @@ export function SourceBadges({ sources, lang }: { sources?: NexusSource[]; lang:
         return (
           <span
             key={source}
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-text-muted"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-[12px] font-medium text-text-muted"
           >
             <Icon className="size-3" aria-hidden />
             {meta.label[lang]}

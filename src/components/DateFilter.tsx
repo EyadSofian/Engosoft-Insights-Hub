@@ -173,7 +173,7 @@ function RangeCalendar({
           "inline-grid h-8 w-8 place-items-center rounded-lg text-text-muted transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40 cursor-pointer",
         month_grid: "w-full border-collapse",
         weekdays: "flex",
-        weekday: "grid h-8 flex-1 place-items-center text-[11px] font-medium text-text-subtle",
+        weekday: "grid h-8 flex-1 place-items-center text-[12px] font-medium text-text-subtle",
         week: "mt-0.5 flex w-full",
         day: "aspect-square flex-1 p-0",
       }}
@@ -274,7 +274,7 @@ export function DateRangePanel({
           </span>
           <span className="flex items-center gap-2">
             {active === null && filters.from && (
-              <span className="num text-[11px] text-text-muted">
+              <span className="num text-[12px] text-text-muted">
                 {shortDay(filters.from, lang)}
                 {filters.to ? ` – ${shortDay(filters.to, lang)}` : ""}
               </span>
@@ -286,7 +286,7 @@ export function DateRangePanel({
           </span>
         </button>
       ) : (
-        <div className="flex items-center gap-2 pt-1 text-[11px] font-medium uppercase tracking-wide text-text-subtle">
+        <div className="flex items-center gap-2 pt-1 text-[12px] font-medium uppercase tracking-wide text-text-subtle">
           <span className="h-px flex-1 bg-border" />
           {t("custom_range")}
           <span className="h-px flex-1 bg-border" />

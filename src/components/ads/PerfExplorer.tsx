@@ -594,7 +594,7 @@ export function PerfExplorer({
         onClick={() => setView(v.key)}
         title={v.hint[lang]}
         aria-pressed={active}
-        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11.5px] font-medium whitespace-nowrap transition-colors cursor-pointer touch-manipulation ${
+        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12px] font-medium whitespace-nowrap transition-colors cursor-pointer touch-manipulation ${
           active
             ? "border-transparent text-white"
             : "border-border text-text-muted hover:bg-surface-2"
@@ -631,7 +631,7 @@ export function PerfExplorer({
           <button
             type="button"
             onClick={() => setShowAdvancedViews((open) => !open)}
-            className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-[11.5px] font-medium text-text-muted transition-colors hover:bg-surface-2 cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-surface-2 cursor-pointer"
             aria-expanded={advancedOpen}
           >
             <SlidersHorizontal size={12} />
@@ -650,7 +650,7 @@ export function PerfExplorer({
       )}
       {decisionMode && !lostAvailable && (
         <p
-          className="rounded-lg px-2.5 py-1.5 text-[10.5px] leading-5"
+          className="rounded-lg px-2.5 py-1.5 text-[12px] leading-5"
           style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
         >
           {lang === "ar"
@@ -659,13 +659,13 @@ export function PerfExplorer({
         </p>
       )}
       {decisionMode && activePlatformCount > evaluatedLiveCount && (
-        <p className="text-[10.5px] leading-5 text-text-subtle">
+        <p className="text-[12px] leading-5 text-text-subtle">
           {lang === "ar"
             ? `${fmtNum(activePlatformCount - evaluatedLiveCount)} حملة Live ظاهرة في حالة المنصات فوق، لكن ملهاش صف أداء قابل للربط في الفترة؛ مش داخلة في الحكم.`
             : `${fmtNum(activePlatformCount - evaluatedLiveCount)} live campaigns appear in platform status above but have no linkable performance row in this period, so they are not classified.`}
         </p>
       )}
-      {view !== "all" && <p className="text-[11px] leading-5 text-text-muted">{quickViewHint}</p>}
+      {view !== "all" && <p className="text-[12px] leading-5 text-text-muted">{quickViewHint}</p>}
       {grain === "campaign" && spendAvailable && <CampaignReturnLegend />}
     </div>
   );
@@ -766,7 +766,7 @@ export function PerfExplorer({
             </div>
           </div>
           <div className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-start sm:min-w-[160px]">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+            <div className="text-[12px] font-medium uppercase tracking-wide text-text-muted">
               {lang === "ar"
                 ? `${fmtNum(shown.length)} حملات · مجموع الصفوف`
                 : `${fmtNum(shown.length)} campaigns · row total`}
@@ -1019,7 +1019,7 @@ function Breadcrumbs({
           )}
         </span>
       ))}
-      <span className="text-text-subtle text-[11px] ms-1">
+      <span className="text-text-subtle text-[12px] ms-1">
         · {grain === "campaign" ? t("campaign") : grain === "adset" ? t("ad_set") : t("ad_name")}
       </span>
     </nav>
@@ -1075,7 +1075,7 @@ function RowDrawer({
     });
     technical.push({
       label: lang === "ar" ? "معرّف الإعلان (Ad ID)" : "Ad ID",
-      value: adId ? <span className="num text-[11px] break-all">{adId}</span> : <Unavailable />,
+      value: adId ? <span className="num text-[12px] break-all">{adId}</span> : <Unavailable />,
     });
   }
   if (grain !== "campaign" && row.adsetName)
@@ -1083,18 +1083,18 @@ function RowDrawer({
   if (grain === "adset" && adsetId)
     technical.push({
       label: lang === "ar" ? "معرّف المجموعة" : "Ad set ID",
-      value: <span className="num text-[11px] break-all">{adsetId}</span>,
+      value: <span className="num text-[12px] break-all">{adsetId}</span>,
     });
   if (row.campaignName) facts.push({ label: t("campaign"), value: row.campaignName });
   if (campaignId)
     technical.push({
       label: lang === "ar" ? "معرّف الحملة" : "Campaign ID",
-      value: <span className="num text-[11px] break-all">{campaignId}</span>,
+      value: <span className="num text-[12px] break-all">{campaignId}</span>,
     });
   if (row.spendDateMin)
     technical.push({
       label: lang === "ar" ? "أيام الإنفاق المتاحة" : "Spend data covers",
-      value: <span className="num text-[11px]">{`${row.spendDateMin} → ${row.spendDateMax}`}</span>,
+      value: <span className="num text-[12px]">{`${row.spendDateMin} → ${row.spendDateMax}`}</span>,
     });
   facts.push({
     label: lang === "ar" ? "الفواتير المدفوعة" : "Paid invoices",
@@ -1190,14 +1190,14 @@ function RowDrawer({
             <div className="flex items-center gap-2 flex-wrap">
               <PlatformBadges platforms={row.platforms} />
               {row.objective === "website_conversion" && (
-                <span className="rounded-full bg-brand-soft px-2 py-1 text-[10px] font-semibold text-brand">
+                <span className="rounded-full bg-brand-soft px-2 py-1 text-[12px] font-semibold text-brand">
                   {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
                 </span>
               )}
               {row.adsetOrigin && <AdSetOriginBadge origin={row.adsetOrigin} />}
               {ownerVerdict ? (
                 ownerVerdict.status === "early" ? (
-                  <span className="rounded-full bg-surface-2 px-2 py-1 text-[10px] font-semibold text-text-muted">
+                  <span className="rounded-full bg-surface-2 px-2 py-1 text-[12px] font-semibold text-text-muted">
                     {ownerStatusLabel(ownerVerdict.status, lang)}
                   </span>
                 ) : (
@@ -1235,7 +1235,7 @@ function RowDrawer({
               {nameOf(row)}
             </h3>
             {row.course && (
-              <p className="text-[11px] text-text-muted mt-0.5">
+              <p className="text-[12px] text-text-muted mt-0.5">
                 <InferredCourse course={row.course} inferred={row.courseInferred} />
               </p>
             )}
@@ -1255,10 +1255,10 @@ function RowDrawer({
               <h4 className="text-[12px] font-semibold text-text">
                 {lang === "ar" ? "ليه أخدت الحكم ده؟" : "Why this verdict?"}
               </h4>
-              <p className="mt-1 text-[11.5px] leading-5 text-text-muted">
+              <p className="mt-1 text-[12px] leading-5 text-text-muted">
                 {ownerVerdict.reason[lang]}
               </p>
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-text-subtle">
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-subtle">
                 <span>
                   {lang === "ar"
                     ? row.objective === "website_conversion"
@@ -1281,7 +1281,7 @@ function RowDrawer({
 
           {row.partialSpend && (
             <p
-              className="text-[11.5px] leading-relaxed rounded-lg px-3 py-2"
+              className="text-[12px] leading-relaxed rounded-lg px-3 py-2"
               style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
             >
               {lang === "ar"
@@ -1360,7 +1360,7 @@ function RowDrawer({
 
           {groups.map((g) => (
             <section key={g.group}>
-              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5">
+              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5">
                 {METRIC_GROUP_LABEL[g.group][lang]}
               </h4>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12.5px]">
@@ -1413,7 +1413,7 @@ function RowDrawer({
                 {relatedRows.slice(0, 10).map((related) => (
                   <li
                     key={related.key}
-                    className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-2.5 py-2 text-[11px]"
+                    className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-2.5 py-2 text-[12px]"
                   >
                     <span className="min-w-0 truncate text-text" dir="auto" title={nameOf(related)}>
                       {nameOf(related)}
@@ -1465,7 +1465,7 @@ function ChildLevel({
 
   return (
     <section>
-      <h4 className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5 flex items-center gap-1.5">
+      <h4 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5 flex items-center gap-1.5">
         <PanelRightOpen size={12} />
         {childGrain === "adset"
           ? lang === "ar"
@@ -1479,7 +1479,7 @@ function ChildLevel({
       {isLoading ? (
         <Skeleton className="h-24" />
       ) : rows.length === 0 ? (
-        <p className="text-[11.5px] text-text-muted">
+        <p className="text-[12px] text-text-muted">
           {lang === "ar"
             ? "مفيش مستوى أعمق متاح للصف ده في الفترة المختارة."
             : "No deeper level available for this row in the selected period."}
@@ -1506,7 +1506,7 @@ function ChildLevel({
         </ul>
       )}
       {(data?.rows?.length ?? 0) > 25 && (
-        <p className="text-[10.5px] text-text-subtle mt-1">
+        <p className="text-[12px] text-text-subtle mt-1">
           {lang === "ar"
             ? `معروض ٢٥ من ${data!.rows.length} — افتح المستوى ده في الجدول لعرض الباقي.`
             : `Showing 25 of ${data!.rows.length} — open this level in the table to see the rest.`}
@@ -1578,7 +1578,7 @@ function buildColumns({
             {grain !== "campaign" && r.key !== unknownAdsetKey && (
               <bdi
                 dir="auto"
-                className="bidi-name mt-0.5 block max-w-[210px] truncate text-[10px] text-text-subtle"
+                className="bidi-name mt-0.5 block max-w-[210px] truncate text-[12px] text-text-subtle"
                 title={[r.campaignName, grain === "ad" ? r.adsetName : ""]
                   .filter(Boolean)
                   .join(" › ")}
@@ -1888,7 +1888,7 @@ function CampaignReturnLegend() {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-surface-2/55 px-3 py-2 text-[10.5px] text-text-muted">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-surface-2/55 px-3 py-2 text-[12px] text-text-muted">
       <span className="font-semibold text-text">
         {lang === "ar" ? "لون العائد:" : "Return color:"}
       </span>
@@ -1925,7 +1925,7 @@ function RoasBadge({ row }: { row: PerfRow }) {
       >
         <span className="num text-text-muted">{text}</span>
         <span
-          className="text-[9px] px-1 rounded"
+          className="text-[12px] px-1 rounded"
           style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
         >
           {lang === "ar" ? "جزئي" : "partial"}

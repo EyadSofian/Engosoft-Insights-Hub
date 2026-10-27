@@ -37,7 +37,7 @@ export function CompareBars({
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-3 text-[11px] text-text-muted">
+      <div className="flex items-center gap-4 mb-3 text-[12px] text-text-muted">
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
           {lang === "ar" ? "الإنفاق" : "Spend"}
@@ -81,7 +81,7 @@ export function CompareBars({
                     </span>
                   </span>
                   <span
-                    className="num text-[11px] shrink-0 font-medium"
+                    className="num text-[12px] shrink-0 font-medium"
                     style={{ color: recovered ? "var(--success)" : "var(--text-muted)" }}
                   >
                     {r.roas === null || r.spend <= 0 ? "—" : `${r.roas.toFixed(2)}×`}
@@ -108,7 +108,7 @@ function Bar({ value, width, color }: { value: number; width: string; color: str
           style={{ width, background: color }}
         />
       </div>
-      <span className="num text-[11px] text-text-muted w-[58px] text-end shrink-0">
+      <span className="num text-[12px] text-text-muted w-[58px] text-end shrink-0">
         {fmtUSD(value)}
       </span>
     </div>

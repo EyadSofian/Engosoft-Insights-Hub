@@ -183,7 +183,7 @@ export function PriceAdvisorTab({
             <h2 className="text-[13px] font-bold text-text">
               {ar ? "الحالة التي تبيع فيها" : "The sale in front of you"}
             </h2>
-            <p className="mt-0.5 text-[11px] text-text-muted">
+            <p className="mt-0.5 text-[12px] text-text-muted">
               {ar
                 ? "اختر الدورة والطريقة، وسيظهر السعر المناسب لهذه الحالة."
                 : "Pick the course and the route; the right price for the case appears beside it."}
@@ -192,7 +192,7 @@ export function PriceAdvisorTab({
 
           <div className="flex flex-col gap-1.5">
             <label
-              className="text-[11px] font-semibold text-text-muted"
+              className="text-[12px] font-semibold text-text-muted"
               htmlFor="advisor-course-search"
             >
               {ar ? "الدورة" : "Course"}
@@ -228,7 +228,7 @@ export function PriceAdvisorTab({
           </div>
 
           <fieldset>
-            <legend className="mb-1.5 text-[11px] font-semibold text-text-muted">
+            <legend className="mb-1.5 text-[12px] font-semibold text-text-muted">
               {ar ? "الدولة والعملة" : "Country and currency"}
             </legend>
             <div className="grid grid-cols-2 gap-1.5">
@@ -256,7 +256,7 @@ export function PriceAdvisorTab({
           </fieldset>
 
           <fieldset disabled={market === "eg"} className={market === "eg" ? "opacity-55" : ""}>
-            <legend className="mb-1.5 text-[11px] font-semibold text-text-muted">
+            <legend className="mb-1.5 text-[12px] font-semibold text-text-muted">
               {ar ? "طريقة الدفع" : "Payment method"}
             </legend>
             <div className="grid grid-cols-2 gap-1.5">
@@ -283,7 +283,7 @@ export function PriceAdvisorTab({
               ))}
             </div>
             {market === "eg" && (
-              <p className="mt-1.5 text-[10.5px] text-text-subtle">
+              <p className="mt-1.5 text-[12px] text-text-subtle">
                 {ar
                   ? "أسعار مصر منشورة بسعر واحد لكل طرق الدفع."
                   : "Egypt is published at one price for every payment method."}
@@ -292,7 +292,7 @@ export function PriceAdvisorTab({
           </fieldset>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-muted">
+            <span className="text-[12px] font-semibold text-text-muted">
               {ar ? "حالة العميل" : "Customer situation"}
             </span>
             <select
@@ -313,7 +313,7 @@ export function PriceAdvisorTab({
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-muted">
+            <span className="text-[12px] font-semibold text-text-muted">
               {ar ? "السعر الذي يطلبه العميل (اختياري)" : "Price the customer is asking (optional)"}
             </span>
             <input
@@ -357,7 +357,7 @@ export function PriceAdvisorTab({
               {/* 1 — the number */}
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-text-muted">
+                  <p className="text-[12px] font-semibold text-text-muted">
                     {askedValue !== null
                       ? ar
                         ? "السعر الذي يطلبه العميل"
@@ -369,7 +369,7 @@ export function PriceAdvisorTab({
                   <div className="num mt-0.5 text-[34px] font-bold leading-none tracking-tight text-text sm:text-[40px]">
                     {fmtMoney(priceInQuestion, currency, lang)}
                   </div>
-                  <p className="mt-1.5 truncate text-[11.5px] text-text-muted">
+                  <p className="mt-1.5 truncate text-[12px] text-text-muted">
                     <bdi className="font-medium text-text">{selected.courseName}</bdi> ·{" "}
                     <bdi className="num">{selected.rawCode || "—"}</bdi> ·{" "}
                     {deliveryLabel(selected.deliveryType, lang)}
@@ -479,21 +479,21 @@ export function PriceAdvisorTab({
                       {VERDICTS[verdict][lang]}
                     </p>
                     {verdict === "not_allowed" && floor !== null && (
-                      <p className="mt-0.5 text-[11.5px] leading-relaxed text-text">
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-text">
                         {ar
                           ? `هذا السعر أقل من الحد الأدنى بـ ${fmtMoney(floor - priceInQuestion, currency, lang)}، وسيظهر في تقرير الالتزام كمخالفة.`
                           : `That is ${fmtMoney(floor - priceInQuestion, currency, lang)} under the floor and will appear in compliance reporting as a breach.`}
                       </p>
                     )}
                     {verdict === "above_list" && (
-                      <p className="mt-0.5 text-[11.5px] leading-relaxed text-text">
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-text">
                         {ar
                           ? "البيع أعلى من السعر الرسمي مسموح، لكنه يُسجَّل للمراجعة."
                           : "Selling above list is allowed, but it is recorded for review."}
                       </p>
                     )}
                     {verdict === "needs_approval" && (
-                      <p className="mt-0.5 text-[11.5px] leading-relaxed text-text">
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-text">
                         {ar
                           ? "وثّق الموافقة قبل إصدار الفاتورة."
                           : "Record the approval before the invoice is raised."}
@@ -506,7 +506,7 @@ export function PriceAdvisorTab({
               {/* 5 — why */}
               {!!reasons.length && (
                 <section>
-                  <h3 className="text-[11px] font-bold uppercase tracking-wide text-text-subtle">
+                  <h3 className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">
                     {ar ? "سبب الاقتراح" : "Why this price"}
                   </h3>
                   <ul className="mt-1.5 space-y-1">
@@ -542,7 +542,7 @@ export function PriceAdvisorTab({
                       currency="SAR"
                     />
                     {floor !== null && otherBand.floor !== null && otherBand.floor !== floor && (
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
+                      <p className="mt-1.5 text-[12px] leading-relaxed text-text-muted">
                         {otherBand.floor > floor
                           ? ar
                             ? `الطريقة الأخرى ترفع الحد الأدنى بمقدار ${fmtMoney(otherBand.floor - floor, currency, lang)}.`
@@ -556,7 +556,7 @@ export function PriceAdvisorTab({
                 )}
 
                 <section className="rounded-lg border border-border p-3">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
                     {ar ? "العرض الساري" : "Live offer"}
                   </h3>
                   {offers.length ? (
@@ -580,18 +580,18 @@ export function PriceAdvisorTab({
                                 : "no end date"}
                           </span>
                           {offer.note && (
-                            <span className="block text-[11px] text-text-subtle">{offer.note}</span>
+                            <span className="block text-[12px] text-text-subtle">{offer.note}</span>
                           )}
                         </li>
                       ))}
-                      <li className="text-[11px] leading-relaxed text-text-muted">
+                      <li className="text-[12px] leading-relaxed text-text-muted">
                         {ar
                           ? "البيع بسعر العرض معتمد ولا يُحتسب مخالفة."
                           : "Selling at the offer price is approved and is not counted as a breach."}
                       </li>
                     </ul>
                   ) : (
-                    <p className="mt-1.5 text-[11.5px] text-text-subtle">
+                    <p className="mt-1.5 text-[12px] text-text-subtle">
                       {ar
                         ? `لا يوجد عرض ساري على هذه الدورة اليوم (${today()}).`
                         : `No offer is in force on this course today (${today()}).`}
@@ -603,7 +603,7 @@ export function PriceAdvisorTab({
               {/* 8 — the one warning worth interrupting for */}
               {band.requiresReview && (
                 <p
-                  className="rounded-lg px-3 py-2 text-[11.5px] leading-relaxed"
+                  className="rounded-lg px-3 py-2 text-[12px] leading-relaxed"
                   style={{ background: "var(--warning-soft)", color: "var(--text)" }}
                 >
                   {ar

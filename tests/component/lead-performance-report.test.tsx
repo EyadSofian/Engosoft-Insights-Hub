@@ -13,8 +13,8 @@ import type { ReactNode } from "react";
  *
  * 1. Withheld evidence renders as an em dash, never as zero. "Nobody called
  *    this lead" and "we cannot see the calls" must never look the same.
- * 2. Every funnel stage carries its own step conversion, because a funnel of
- *    bare counts does not say where the leak is.
+ * 2. The verified entry-to-paid conversion is separate from PBX evidence and
+ *    today's Opportunity status, which have different denominators.
  * 3. The follow-up columns reach every breakdown dimension, not only the month
  *    total. Judging a salesperson needs their attempts, not the company's.
  * 4. The export carries the cohort the reader is actually looking at.
@@ -273,12 +273,9 @@ describe("the six-month lead-to-paid report", () => {
     );
     await waitFor(() => expect(screen.getByText(/Read this report at a glance/i)).toBeTruthy());
     const summary = screen.getByText(/Read this report at a glance/i).closest("section")!;
-    expect(within(summary).getByText(/Lead Segment = Fresh now/i)).toBeTruthy();
-    expect(within(summary).getByText(/Current record type: Lead/i)).toBeTruthy();
-    expect(within(summary).getByText(/Lead tagged Fresh/i)).toBeTruthy();
-    expect(within(summary).getByText(/Opportunity tagged Fresh/i)).toBeTruthy();
-    expect(within(summary).getByText(/Fresh is a separate tag/i)).toBeTruthy();
-    expect(within(summary).getByText(/Before CRM: unavailable/i)).toBeTruthy();
+    expect(within(summary).getByText(/New CRM records/i)).toBeTruthy();
+    expect(screen.getByText(/Currently tagged Fresh: 1/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /CRM state, classification and calls/i }));
     const classification = screen
       .getByText(/Keep classification, sales state and contact evidence separate/i)
       .closest("section")!;
@@ -294,7 +291,10 @@ describe("the six-month lead-to-paid report", () => {
     expect(within(classification).getByText(/No PBX attempt visible/i)).toBeTruthy();
     fireEvent.click(within(classification).getByRole("tab", { name: "Before CRM" }));
     expect(within(classification).getByText(/Not measurable from Odoo alone/i)).toBeTruthy();
-    const audit = screen.getByText(/Audit individual leads/i).closest("section")!;
+    fireEvent.click(screen.getByRole("button", { name: /Audit individual leads/i }));
+    const audit = screen
+      .getByRole("heading", { name: /Audit individual leads/i })
+      .closest("section")!;
     expect(within(audit).getByText("153853").closest("a")?.getAttribute("href")).toContain(
       "model=crm.lead",
     );
@@ -304,12 +304,43 @@ describe("the six-month lead-to-paid report", () => {
     mount(response());
     await waitFor(() => expect(screen.getByText(/Evidence-backed funnel/i)).toBeTruthy());
     const funnel = screen.getByText(/Evidence-backed funnel/i).closest("section")!;
+    const verifiedPath = within(funnel).getByTestId("lead-conversion-funnel");
     // 70 contacted of 80 matchable leads — over entries it would read 70%,
     // which would blame follow-up for a phone-matching limit.
     expect(within(funnel).getByText(/87\.5%\s*of phone-matchable leads/)).toBeTruthy();
-    // Paid is shown only as a share of entries, not a made-up transition rate.
-    expect(within(funnel).getByText(/12\.0%\s*of all entries/)).toBeTruthy();
+    // Paid is shown as a share of entries; PBX and current status stay outside that path.
+    expect(within(verifiedPath).getByText("12.0%")).toBeTruthy();
+    expect(within(verifiedPath).queryByText(/PBX attempt/i)).toBeNull();
+    expect(within(verifiedPath).queryByText(/Currently an Opportunity/i)).toBeNull();
     expect(within(funnel).getByText(/current-status proxy/i)).toBeTruthy();
+  });
+
+  it("compares each entry cohort on the same basis and keeps payment-month figures in details", async () => {
+    mount(
+      response({
+        rows: MONTHS.map((month) =>
+          group(month, {
+            leads: 100,
+            paidLeads: 12,
+            conversionRate: 12,
+            lost: 40,
+            lostRate: 40,
+            calendarLost: 18,
+          }),
+        ),
+      }),
+    );
+    const trend = (await screen.findByText(/Entry-cohort comparison/i)).closest("section")!;
+    const cohort = within(trend).getByRole("button", { name: /May 2026/i });
+    expect(cohort.textContent).toContain("12.0%");
+    expect(cohort.textContent).toContain("40.0%");
+    expect(cohort.textContent).not.toContain("18");
+    expect(within(trend).queryByRole("table")).toBeNull();
+
+    fireEvent.click(within(trend).getByRole("button", { name: /Full monthly comparison/i }));
+    expect(within(trend).getByRole("table")).toBeTruthy();
+    fireEvent.click(cohort);
+    await waitFor(() => expect(requested.at(-1)).toContain("month=2026-05"));
   });
 
   it("shows withheld call evidence as an em dash rather than zero", async () => {
@@ -345,7 +376,10 @@ describe("the six-month lead-to-paid report", () => {
   it("carries follow-up figures into the per-salesperson breakdown", async () => {
     mount(response());
     await waitFor(() => expect(screen.getByText(/Where did the result come from\?/i)).toBeTruthy());
-    const breakdown = screen.getByText(/Where did the result come from\?/i).closest("section")!;
+    fireEvent.click(screen.getByRole("button", { name: /Where did the result come from\?/i }));
+    const breakdown = screen
+      .getByRole("heading", { name: /Where did the result come from\?/i })
+      .closest("section")!;
     // The dimension table must be able to answer "who is slow to call?", which
     // the month total never could.
     expect(within(breakdown).getByText(/Average attempts/i)).toBeTruthy();
@@ -362,7 +396,11 @@ describe("the six-month lead-to-paid report", () => {
         ],
       }),
     );
-    const breakdown = (await screen.findByText("Lost breakdown by filter")).closest("section")!;
+    await screen.findByRole("button", { name: "Lost breakdown by group" });
+    fireEvent.click(screen.getByRole("button", { name: "Lost breakdown by group" }));
+    const breakdown = screen
+      .getByRole("heading", { name: "Lost breakdown by filter" })
+      .closest("section")!;
     expect(
       within(breakdown).getByText(/Lost leads \+ lost opportunities = total lost/),
     ).toBeTruthy();

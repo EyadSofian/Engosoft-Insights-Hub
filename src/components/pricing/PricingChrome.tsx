@@ -44,19 +44,17 @@ export function PricingPageHeader({
   const ar = lang === "ar";
 
   return (
-    // The bar keeps its shape — identity, period, search, one action — but sits
-    // on the page's own surface. It was the last dark band left in the light
-    // theme, and the KPI strip directly under it is white, so the two read as
-    // two different applications stacked on one screen.
-    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+    <section className="pricing-page-header relative overflow-hidden rounded-2xl border">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5 sm:px-5">
         <div className="min-w-[200px] flex-1">
-          <h1 className="text-[17px] font-bold tracking-tight text-text sm:text-[19px]">{title}</h1>
-          <p className="mt-0.5 text-[11.5px] leading-snug text-text-muted">{description}</p>
+          <h1 className="text-[19px] font-bold tracking-tight text-white sm:text-[23px]">
+            {title}
+          </h1>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/85">{description}</p>
         </div>
 
         {period && (
-          <div className="text-[11px] leading-snug text-text-muted md:text-end">{period}</div>
+          <div className="text-[12px] leading-snug text-white/85 md:text-end">{period}</div>
         )}
 
         <form onSubmit={onSearchSubmit} className="relative w-full sm:w-[280px]" role="search">
@@ -104,11 +102,8 @@ export interface PricingKpi {
 }
 
 /**
- * Six figures at most, in one strip rather than six cards.
- *
- * Cards would put six borders, six shadows and six radii between the reader and
- * six numbers that are meant to be compared. Dividers do the same grouping job
- * and cost one pixel each.
+ * A featured blue figure and quiet coloured peers, matching the rest of the
+ * dashboard while keeping the value and its explanation in separate zones.
  */
 export function PricingKpiStrip({
   items,
@@ -125,111 +120,99 @@ export function PricingKpiStrip({
 
   return (
     <div
-      className="hscroll scroll-hint-x rounded-xl border border-border bg-surface"
-      style={{ ["--scroll-hint-bg" as string]: "var(--surface)" }}
+      className="pricing-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
       role="group"
       aria-label={ar ? "مؤشرات التسعير" : "Pricing indicators"}
     >
-      <div className="grid min-w-[640px] grid-cols-3 lg:min-w-0 lg:grid-cols-6">
-        {items.map((item, index) => {
-          const active = item.id === activeId;
-          return (
-            <div
-              key={item.id}
-              className={`group relative min-w-0 px-3.5 py-3 text-start transition-[background-color,box-shadow] ${
-                index ? "border-s border-border" : ""
-              } ${index > 2 ? "border-t border-border lg:border-t-0" : ""} ${
-                item.onSelect && !active ? "hover:bg-surface-2 focus-within:bg-surface-2" : ""
-              }`}
-              style={
-                active
-                  ? {
-                      background:
-                        "linear-gradient(180deg, color-mix(in oklab, var(--brand) 10%, var(--surface)), var(--surface))",
-                      boxShadow: "inset 0 -3px 0 var(--brand)",
-                    }
-                  : undefined
-              }
-            >
-              {item.onSelect && (
-                <button
-                  type="button"
-                  onClick={item.onSelect}
-                  title={item.selectHint}
-                  aria-pressed={active}
-                  aria-label={
-                    item.selectHint
-                      ? `${item.label}: ${item.value}. ${item.selectHint}`
-                      : `${item.label}: ${item.value}`
-                  }
-                  className="absolute inset-0 z-0 cursor-pointer rounded-[inherit]"
-                />
-              )}
+      {items.map((item, index) => {
+        const active = item.id === activeId;
+        return (
+          <div
+            key={item.id}
+            className="pricing-kpi-card group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border text-start transition-[transform,box-shadow,border-color] hover:-translate-y-0.5"
+            data-hero={index === 0 ? "" : undefined}
+            data-active={active ? "" : undefined}
+            data-tone={item.tone ?? "neutral"}
+          >
+            {item.onSelect && (
+              <button
+                type="button"
+                onClick={item.onSelect}
+                title={item.selectHint}
+                aria-pressed={active}
+                aria-label={
+                  item.selectHint
+                    ? `${item.label}: ${item.value}. ${item.selectHint}`
+                    : `${item.label}: ${item.value}`
+                }
+                className="absolute inset-0 z-0 cursor-pointer rounded-[inherit]"
+              />
+            )}
 
-              {/* The text sits above the full-cell button without receiving
+            {/* The text sits above the full-cell button without receiving
                   pointer events. The optional info popover opts back in, so it
                   remains a sibling control instead of invalid nested buttons. */}
-              <div className={`relative z-[1] ${item.onSelect ? "pointer-events-none" : ""}`}>
-                <div className="flex min-h-4 items-center gap-1.5">
-                  {item.Icon && (
-                    <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
-                  )}
-                  <span className="truncate text-[10.5px] font-semibold text-text-muted">
-                    {item.label}
-                  </span>
-                  {item.info && (
-                    <span className="pointer-events-auto relative z-10 inline-flex">
-                      {item.info}
-                    </span>
-                  )}
-                  {item.onSelect && (
-                    <span
-                      aria-hidden="true"
-                      className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
-                        active
-                          ? "bg-brand text-white"
-                          : "bg-surface-2 text-text-subtle group-hover:bg-brand-soft group-hover:text-brand"
-                      }`}
-                    >
-                      {active ? (ar ? "مفتوح" : "Open") : ar ? "عرض" : "View"}
-                      <ChevronDown size={9} strokeWidth={2.6} />
-                    </span>
-                  )}
-                </div>
-
-                {loading ? (
-                  <Skeleton className="mt-2 h-6 w-16 rounded-md" />
-                ) : (
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    {/* Leakage arrives as one figure per currency ("1,200 SAR +
-                        1,780 EGP"). Clipping it would hide money, so the type
-                        steps down instead and the figure stays whole. */}
-                    <span
-                      className={`num min-w-0 font-bold leading-tight tracking-tight ${
-                        item.value.length > 20
-                          ? "text-[12.5px]"
-                          : item.value.length > 13
-                            ? "text-[15px]"
-                            : "text-[19px]"
-                      }`}
-                      style={{ color: toneColor(item.tone) }}
-                    >
-                      {item.value}
-                    </span>
-                    <KpiDelta value={item.delta} invert={item.deltaInvert} />
-                  </div>
+            <div
+              className={`pricing-kpi-head relative z-[1] px-4 py-3.5 ${item.onSelect ? "pointer-events-none" : ""}`}
+            >
+              <div className="flex min-h-4 items-center gap-1.5">
+                {item.Icon && (
+                  <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
                 )}
-
-                {item.question && (
-                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-text-subtle">
-                    {item.question}
-                  </p>
+                <span className="truncate text-[12px] font-semibold text-text-muted">
+                  {item.label}
+                </span>
+                {item.info && (
+                  <span className="pointer-events-auto relative z-10 inline-flex">{item.info}</span>
+                )}
+                {item.onSelect && (
+                  <span
+                    aria-hidden="true"
+                    className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-bold transition-colors ${
+                      active
+                        ? "bg-brand text-white"
+                        : "bg-surface-2 text-text-subtle group-hover:bg-brand-soft group-hover:text-brand"
+                    }`}
+                  >
+                    {active ? (ar ? "مفتوح" : "Open") : ar ? "عرض" : "View"}
+                    <ChevronDown size={9} strokeWidth={2.6} />
+                  </span>
                 )}
               </div>
+
+              {loading ? (
+                <Skeleton className="mt-2 h-6 w-16 rounded-md" />
+              ) : (
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  {/* Leakage arrives as one figure per currency ("1,200 SAR +
+                        1,780 EGP"). Clipping it would hide money, so the type
+                        steps down instead and the figure stays whole. */}
+                  <span
+                    className={`num min-w-0 font-bold leading-tight tracking-tight ${
+                      item.value.length > 20
+                        ? "text-[12.5px]"
+                        : item.value.length > 13
+                          ? "text-[15px]"
+                          : "text-[19px]"
+                    }`}
+                    style={{ color: toneColor(item.tone) }}
+                  >
+                    {item.value}
+                  </span>
+                  <KpiDelta value={item.delta} invert={item.deltaInvert} />
+                </div>
+              )}
             </div>
-          );
-        })}
-      </div>
+            {item.question && (
+              <p
+                className={`pricing-kpi-explainer relative z-[1] min-h-14 px-4 py-3 text-[12px] leading-snug text-text-muted ${item.onSelect ? "pointer-events-none" : ""}`}
+              >
+                {item.question}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -265,12 +248,12 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-brand">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-brand">
               {ar ? "تعرض الآن" : "Showing now"}
             </span>
             <strong className="text-[12.5px] text-text">{item.label}</strong>
           </div>
-          <p className="mt-0.5 text-[11px] leading-snug text-text-muted">
+          <p className="mt-0.5 text-[12px] leading-snug text-text-muted">
             {item.resultDescription ?? item.question}
           </p>
         </div>
@@ -282,7 +265,7 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[11.5px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
         >
           <X size={13} aria-hidden="true" />
           <span className="hidden sm:inline">{ar ? "إلغاء التحديد" : "Clear selection"}</span>
@@ -311,7 +294,7 @@ function KpiDelta({ value, invert }: { value?: number; invert?: boolean }) {
   const color = flat ? "var(--text-subtle)" : good ? "var(--success)" : "var(--danger)";
   return (
     <span
-      className="num inline-flex shrink-0 items-center gap-0.5 text-[10.5px] font-semibold"
+      className="num inline-flex shrink-0 items-center gap-0.5 text-[12px] font-semibold"
       style={{ color }}
       title={lang === "ar" ? "مقارنة بالفترة السابقة" : "vs the previous period"}
     >
@@ -365,7 +348,7 @@ export function PricingTabBar<T extends string>({
     <nav
       ref={ref}
       aria-label={label}
-      className="hscroll scroll-hint-x sticky z-10 rounded-xl border border-border bg-surface"
+      className="dashboard-tab-rail hscroll scroll-hint-x sticky z-10 rounded-xl border border-border bg-surface"
       style={{
         top: "calc(var(--chrome-header-offset, 0px) + var(--chrome-sections-h, 0px))",
         transition: "top var(--dur-chrome) var(--ease-chrome)",
@@ -394,7 +377,7 @@ export function PricingTabBar<T extends string>({
               <span className="whitespace-nowrap">{tabLabel}</span>
               {!!badge && (
                 <span
-                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold text-white"
+                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[12px] font-bold text-white"
                   style={{ background: "var(--danger)" }}
                 >
                   {badge}

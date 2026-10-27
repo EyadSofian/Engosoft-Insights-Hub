@@ -119,17 +119,17 @@ function ChannelCard({
           >
             {icon}
           </span>
-          <span className="text-[11px] font-bold text-text-subtle">↗</span>
+          <span className="text-[12px] font-bold text-text-subtle">↗</span>
         </div>
         <p className="mt-3 truncate text-[12px] font-bold text-text" title={label}>
           {label}
         </p>
         <p className="mt-1 text-lg font-black tracking-tight text-text">{value}</p>
-        <p className={`mt-1 text-[10.5px] ${connected ? "text-text-muted" : "text-text-subtle"}`}>
+        <p className={`mt-1 text-[12px] ${connected ? "text-text-muted" : "text-text-subtle"}`}>
           {detail}
         </p>
         {!connected && (
-          <p className="mt-2 text-[10px] font-semibold text-text-subtle">
+          <p className="mt-2 text-[12px] font-semibold text-text-subtle">
             {lang === "ar" ? "المصدر غير متصل" : "Source not connected"}
           </p>
         )}
@@ -296,8 +296,8 @@ function Campaigns() {
             label: lang === "ar" ? "فتح تقرير العملاء" : "Open the leads report",
           },
           won: {
-            to: "/sales",
-            label: lang === "ar" ? "فتح تقرير المبيعات" : "Open the sales report",
+            to: "/leads",
+            label: lang === "ar" ? "فتح تقرير العملاء" : "Open the CRM report",
           },
         },
       })
@@ -804,7 +804,7 @@ function Campaigns() {
                     ]}
                   />
 
-                  <p className="text-[11px] text-text-subtle px-1">
+                  <p className="text-[12px] text-text-subtle px-1">
                     {lang === "ar"
                       ? `${fmtNum(data.rows.length)} صف في المستوى ده. متوسط تكلفة الصفقة ${fmtUSDFull(totals.cpa)} على أساس ${filters.cpaBasis === "invoices" ? "عدد الفواتير" : "الصفقات الرابحة"}.`
                       : `${fmtNum(data.rows.length)} rows at this level. Blended CPA is ${fmtUSDFull(totals.cpa)} on the ${filters.cpaBasis === "invoices" ? "invoice-count" : "won-deals"} basis.`}

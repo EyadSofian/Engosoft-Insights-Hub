@@ -26,7 +26,7 @@ export function MetricGrid({
         const unmeasured = rendered === NOT_MEASURABLE;
         return (
           <div key={metric.key} className="min-w-0">
-            <dt className="truncate text-[11px] font-medium text-text-muted">{metric.label}</dt>
+            <dt className="truncate text-[12px] font-medium text-text-muted">{metric.label}</dt>
             <dd
               className={`num text-base font-semibold ${
                 unmeasured ? "text-text-muted" : "text-text"

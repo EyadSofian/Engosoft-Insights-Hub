@@ -46,7 +46,7 @@ export interface Col<T> {
 }
 
 /** Columns a table shows before the reader asks for more. */
-export const DEFAULT_VISIBLE_COLUMNS = 8;
+export const DEFAULT_VISIBLE_COLUMNS = 6;
 
 /**
  * Which columns start hidden: the ones flagged `hideByDefault`, then — if more
@@ -231,11 +231,11 @@ export function DataTable<T>({
   const hiddenCount = cols.filter((c) => !c.always && hidden.has(c.key)).length;
   // A table wider than the default always offers the chooser, so the columns
   // the default tucked away can never become unreachable.
-  const showChooser = columnChooser || cols.length > DEFAULT_VISIBLE_COLUMNS;
+  const showChooser = columnChooser || hiddenCount > 0 || cols.length > DEFAULT_VISIBLE_COLUMNS;
 
   return (
-    <div className={`card overflow-hidden ${className}`}>
-      <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3 border-b border-border">
+    <div className={`card data-table-shell overflow-hidden ${className}`}>
+      <div className="data-table-toolbar flex flex-wrap items-center gap-2 p-3 sm:p-4 border-b border-border">
         {searchable && (
           <div className="flex min-h-11 items-center gap-2 flex-1 min-w-[160px] max-w-[340px] px-2.5 rounded-xl sm:rounded-lg bg-surface-2 border border-border focus-within:border-brand transition-colors">
             <Search size={15} className="text-text-subtle shrink-0" />
@@ -252,6 +252,12 @@ export function DataTable<T>({
         <div className="ms-auto flex items-center gap-2">
           <span className="text-xs text-text-muted num whitespace-nowrap">
             {rowTotal.toLocaleString("en-US")} {t("rows")}
+            {hiddenCount > 0 && (
+              <span className="ms-2 text-text-subtle">
+                · {visibleCols.length}/{cols.length}{" "}
+                {lang === "ar" ? "أعمدة ظاهرة" : "columns shown"}
+              </span>
+            )}
           </span>
 
           {showChooser && (
@@ -264,7 +270,7 @@ export function DataTable<T>({
                   <Columns3 size={14} />
                   <span className="hidden sm:inline">{t("columns")}</span>
                   {hiddenCount > 0 && (
-                    <span className="num text-[10px] text-text-muted">({hiddenCount})</span>
+                    <span className="num text-[12px] text-text-muted">({hiddenCount})</span>
                   )}
                 </button>
               </PopoverTrigger>
@@ -273,7 +279,7 @@ export function DataTable<T>({
                 className="w-64 max-h-[60dvh] overflow-y-auto p-2 rounded-xl"
                 style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               >
-                <p className="px-2 py-1.5 text-[11px] text-text-muted leading-relaxed">
+                <p className="px-2 py-1.5 text-[12px] text-text-muted leading-relaxed">
                   {t("columns_hint")}
                 </p>
                 {Object.entries(
@@ -285,7 +291,7 @@ export function DataTable<T>({
                 ).map(([group, groupCols]) => (
                   <div key={group} className="mb-1.5 last:mb-0">
                     {group && groupLabels?.[group] && (
-                      <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+                      <div className="px-2 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
                         {groupLabels[group]}
                       </div>
                     )}
@@ -341,12 +347,12 @@ export function DataTable<T>({
       {belowToolbar && <div className="px-3 py-2 border-b border-border">{belowToolbar}</div>}
 
       {truncatedNote && (
-        <div className="px-3 py-2 text-[11px] text-text-muted bg-warning-soft border-b border-border">
+        <div className="px-3 py-2 text-[12px] text-text-muted bg-warning-soft border-b border-border">
           {truncatedNote}
         </div>
       )}
 
-      <div className="sm:hidden border-b border-border bg-surface-2/60 px-3 py-1.5 text-[10.5px] text-text-muted">
+      <div className="sm:hidden border-b border-border bg-surface-2/60 px-3 py-1.5 text-[12px] text-text-muted">
         {lang === "ar"
           ? "اسحب الجدول يمينًا ويسارًا لعرض باقي الأعمدة"
           : "Swipe sideways to view the remaining columns"}
@@ -364,7 +370,7 @@ export function DataTable<T>({
                     key={i}
                     colSpan={b.span}
                     scope="colgroup"
-                    className={`px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide bg-surface-2 whitespace-nowrap text-start ${
+                    className={`px-3 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 whitespace-nowrap text-start ${
                       i === 0 && visibleCols[0]?.sticky ? "sticky-col z-20" : ""
                     }`}
                     style={{
@@ -388,7 +394,7 @@ export function DataTable<T>({
                     aria-sort={sorted ? (sortDir === 1 ? "ascending" : "descending") : undefined}
                     scope="col"
                     title={c.headerTitle}
-                    className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
+                    className={`px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
                       sortableBy(c) ? "cursor-pointer hover:text-text" : ""
                     } ${
                       c.align === "center"

@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { useModalGuard } from "@/lib/ui-store";
 import { itemLabel, navigationDrawerTree, type DrawerLink } from "@/lib/navigation";
 import { useLocationSearch } from "./MoreReports";
-import logoImg from "@/assets/engosoft-logo.png";
+import { EngosoftMark } from "./EngosoftMark";
 
 const DRAWER_ID = "app-navigation-drawer";
 
@@ -68,13 +68,13 @@ export function NavigationDrawer() {
           >
             <div className="flex min-w-0 flex-1 items-center gap-2.5 px-1">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-border bg-white">
-                <img src={logoImg} alt="" className="h-7 w-7 object-contain" />
+                <EngosoftMark className="h-7 w-7 text-brand" />
               </span>
               <div className="min-w-0 leading-tight">
-                <Dialog.Title className="truncate text-[15px] font-bold tracking-tight text-text">
-                  ENGOSOFT
+                <Dialog.Title className="engosoft-wordmark truncate text-[18px] text-text">
+                  engosoft
                 </Dialog.Title>
-                <span className="block truncate text-[11px] text-text-muted">{t("app_sub")}</span>
+                <span className="block truncate text-[12px] text-text-muted">{t("app_sub")}</span>
               </div>
             </div>
             <Dialog.Close

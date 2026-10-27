@@ -1,107 +1,124 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowUpLeft,
+  ArrowUpRight,
   CheckCircle2,
   CircleAlert,
   FileSpreadsheet,
   FilterX,
+  Layers3,
+  RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import {
+  DashboardPageHeader,
+  PageSection,
+  PageSections,
+  SyncStatus,
+} from "@/components/dashboard-bits";
+import { ErrorState, Skeleton } from "@/components/ui-bits";
 import { useApi } from "@/lib/use-api";
-import { useI18n } from "@/lib/i18n";
+import { fmtNum, useI18n } from "@/lib/i18n";
 import type { AuditGroup, LostArchiveAuditResult } from "@/lib/lost-archive-audit";
 
-const number = (value: number) => new Intl.NumberFormat("en-US").format(value);
+type Dimension = "courses" | "salespeople" | "campaigns";
 const percent = (value: number) => `${value.toFixed(1)}%`;
+const bounded = (value: number) => Math.max(0, Math.min(100, value));
 
-function GroupTable({
+function AuditGroupPanel({
   rows,
   title,
+  description,
   ar,
   otherReasons,
 }: {
   rows: AuditGroup[];
   title: string;
+  description: string;
   ar: boolean;
   otherReasons?: { name: string; count: number }[];
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? rows : rows.slice(0, 8);
   return (
-    <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,.045)]">
-      <div className="border-b border-slate-100 px-6 py-5">
-        <h3 className="text-lg font-black text-slate-900">{title}</h3>
+    <div className="quality-panel">
+      <div className="quality-panel-heading">
+        <h3 className="text-base font-bold text-text">{title}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-text-muted">{description}</p>
       </div>
-      <div className="divide-y divide-slate-100">
-        {rows.length ? (
-          rows.slice(0, 12).map((row) => (
-            <div
-              key={row.name}
-              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-6 py-4 hover:bg-slate-50/80"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-slate-800" title={row.name}>
+      {shown.length ? (
+        <div className="quality-group-list">
+          {shown.map((row) => (
+            <div key={row.name} className="quality-group-row">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span className="min-w-0 break-words text-[13px] font-semibold text-text">
                   {row.name}
-                </p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-rose-500"
-                    style={{ width: `${Math.max(1, Math.min(row.reviewPct, 100))}%` }}
-                  />
-                </div>
+                </span>
+                <span className="num shrink-0 text-[13px] font-bold text-rose-strong">
+                  {fmtNum(row.review)} {ar ? "أُعيدت" : "returned"}
+                </span>
               </div>
-              <div className="text-center">
-                <p className="text-[11px] font-semibold text-slate-500">
-                  {ar ? "كل الحالات" : "All cases"}
-                </p>
-                <p className="text-sm font-black tabular-nums text-slate-900">
-                  {number(row.total)}
-                </p>
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[12px] text-text-muted">
+                <span>
+                  {fmtNum(row.total)} {ar ? "قرارًا تمت مراجعته" : "audited decisions"}
+                </span>
+                <span className="num font-semibold">{percent(row.reviewPct)}</span>
               </div>
-              <div className="min-w-20 text-center">
-                <p className="text-[11px] font-semibold text-rose-600">
-                  {ar ? "أُعيدت للسيلز" : "Returned to sales"}
-                </p>
-                <p className="text-sm font-black tabular-nums text-rose-600">
-                  {number(row.review)}{" "}
-                  <span className="text-xs font-semibold text-slate-400">
-                    · {percent(row.reviewPct)}
-                  </span>
-                </p>
+              <div
+                className="quality-meter mt-2"
+                role="meter"
+                aria-label={ar ? `نسبة الإعادة: ${row.name}` : `Return rate: ${row.name}`}
+                aria-valuenow={bounded(row.reviewPct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <span style={{ width: `${bounded(row.reviewPct)}%` }} />
               </div>
             </div>
-          ))
-        ) : (
-          <p className="px-6 py-10 text-sm text-slate-500">
-            {ar ? "لا توجد حالات للفلاتر المختارة." : "No cases for these filters."}
-          </p>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="px-5 py-8 text-sm text-text-muted">
+          {ar ? "لا توجد حالات للفلاتر المختارة." : "No cases for these filters."}
+        </p>
+      )}
+      {rows.length > 8 && (
+        <button
+          type="button"
+          className="quality-show-more"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+        >
+          {expanded
+            ? ar
+              ? "عرض أقل"
+              : "Show fewer"
+            : ar
+              ? `عرض كل ${fmtNum(rows.length)} مجموعة`
+              : `Show all ${fmtNum(rows.length)} groups`}
+        </button>
+      )}
       {otherReasons && otherReasons.length > 0 && (
-        <details className="border-t border-slate-100 px-6 py-4">
-          <summary className="cursor-pointer text-sm font-bold text-[#176f62]">
-            {ar
-              ? "أسباب أخرى: اعرض المسميات المسجلة في الشيت"
-              : "Other reasons: show original sheet labels"}
+        <details className="quality-original-reasons">
+          <summary>
+            {ar ? "عرض المسميات الأصلية للأسباب الأخرى" : "Show original labels for other reasons"}
           </summary>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-relaxed text-text-muted">
             {ar
-              ? "هذه مسميات السبب الأصلية بعد تجميع المتطابق منها، وليست صفوف عملاء إضافية."
-              : "These are grouped original reason labels, not extra customer records."}
+              ? "هذه مسميات مجمعة من الشيت، وليست صفوف عملاء إضافية."
+              : "These are grouped sheet labels, not additional customer rows."}
           </p>
-          <div className="mt-3 grid max-h-72 gap-1.5 overflow-y-auto sm:grid-cols-2">
+          <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">
             {otherReasons.map((reason) => (
-              <div
-                key={reason.name}
-                className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"
-              >
-                <span className="min-w-0 break-words text-slate-700">{reason.name}</span>
-                <b className="shrink-0 tabular-nums text-slate-900">{number(reason.count)}</b>
+              <div key={reason.name} className="quality-original-reason">
+                <span className="min-w-0 break-words">{reason.name}</span>
+                <b className="num shrink-0">{fmtNum(reason.count)}</b>
               </div>
             ))}
           </div>
         </details>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -111,7 +128,7 @@ export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
   const [month, setMonth] = useState(initialMonth ?? "2026-10");
   const [course, setCourse] = useState("");
   const [salesperson, setSalesperson] = useState("");
-  const [dimension, setDimension] = useState<"courses" | "salespeople" | "campaigns">("courses");
+  const [dimension, setDimension] = useState<Dimension>("courses");
   const query = new URLSearchParams({ month });
   if (course) query.set("course", course);
   if (salesperson) query.set("salesperson", salesperson);
@@ -120,308 +137,337 @@ export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
     { refetchInterval: 60_000 },
   );
 
-  if (error)
-    return (
-      <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
-        {error.message}
-      </div>
-    );
+  if (error) return <ErrorState message={error.message} />;
   if (isLoading || !data)
     return (
-      <div className="animate-pulse rounded-[32px] bg-slate-100 p-14 text-slate-500">
-        {ar ? "تحميل مراجعة اللوست..." : "Loading Lost audit..."}
-      </div>
+      <PageSections>
+        <Skeleton className="h-28" />
+        <Skeleton className="h-48" />
+        <Skeleton className="h-72" />
+      </PageSections>
     );
 
   const ready = data.status === "success" && data.rowCount > 0;
   const selected = data.selected;
-  const groups =
-    dimension === "courses"
-      ? selected.courses
-      : dimension === "salespeople"
-        ? selected.salespeople
-        : selected.campaigns;
-  const title =
-    dimension === "courses"
-      ? ar
-        ? "الكورسات"
-        : "Courses"
-      : dimension === "salespeople"
-        ? ar
-          ? "فريق المبيعات"
-          : "Sales team"
-        : ar
-          ? "الحملات"
-          : "Campaigns";
+  const groups = [...selected[dimension]].sort(
+    (a, b) => b.review - a.review || b.total - a.total || a.name.localeCompare(b.name),
+  );
+  const dimensionNames = {
+    courses: ar ? "الكورسات" : "Courses",
+    salespeople: ar ? "فريق المبيعات" : "Sales team",
+    campaigns: ar ? "الحملات" : "Campaigns",
+  };
   const selectedLabel =
     data.months.find((item) => item.key === data.selectedMonth)?.label ?? data.selectedMonth;
+  const syncLabel = data.syncedAt
+    ? new Date(data.syncedAt).toLocaleString(ar ? "ar-EG" : "en-US", {
+        timeZone: "Africa/Cairo",
+      })
+    : undefined;
 
   return (
-    <div className="space-y-6" dir={ar ? "rtl" : "ltr"}>
-      <header className="relative overflow-hidden rounded-[32px] bg-[#102238] px-7 py-8 text-white shadow-[0_24px_50px_rgba(16,34,56,.18)] sm:px-9">
-        <div className="pointer-events-none absolute -left-14 -top-28 h-72 w-72 rounded-full bg-[#65d6ca]/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 right-10 h-60 w-60 rounded-full bg-[#fc8869]/10 blur-3xl" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
-          <div className="max-w-3xl">
-            <p className="mb-3 flex items-center gap-2 text-[11px] font-black tracking-[.18em] text-[#8dded5]">
-              {" "}
-              <ShieldCheck size={16} />{" "}
-              {ar ? "مراجعة مستقلة · Google Sheet" : "INDEPENDENT AUDIT · GOOGLE SHEET"}
-            </p>
-            <h1 className="text-3xl font-black leading-tight sm:text-4xl">
-              {ar ? "جودة الليدز واللوست" : "Lead quality & Lost audit"}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              {ar
-                ? "نتيجة مراجعة قرارات Lost في الشيت: ما تم اعتماده وما رجع للسيلز للمتابعة، حسب الشهر والكورس والبياع."
-                : "Sheet audit outcomes: Lost decisions accepted or returned to sales for follow-up, by month, course and salesperson."}
-            </p>
+    <PageSections>
+      <DashboardPageHeader
+        flush
+        tone="sky"
+        icon={<ShieldCheck size={21} />}
+        title={ar ? "جودة الليدز ومراجعة Lost" : "Lead quality and Lost audit"}
+        subtitle={
+          ar
+            ? "قرارات المراجعة في Google Sheet: ما اعتُمد، وما أُعيد للسيلز للمتابعة."
+            : "Google Sheet audit decisions: what was accepted and what returned to sales."
+        }
+        period={ready ? selectedLabel : undefined}
+        sync={<SyncStatus label={syncLabel} tone={ready ? "mint" : "amber"} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void refetch()} className="quality-header-action">
+              <RefreshCw size={14} aria-hidden="true" />
+              {ar ? "تحديث" : "Refresh"}
+            </button>
+            <a
+              href={data.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="quality-header-action"
+            >
+              <FileSpreadsheet size={14} aria-hidden="true" />
+              {ar ? "الشيت الأصلي" : "Source sheet"}
+              <ArrowUpRight size={13} aria-hidden="true" />
+            </a>
           </div>
-          <a
-            href={data.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/20"
-          >
-            <FileSpreadsheet size={16} /> {ar ? "فتح الشيت الأصلي" : "Open source sheet"}{" "}
-            <ArrowUpLeft size={14} />
-          </a>
-        </div>
-        <div className="relative mt-7 flex flex-wrap items-center gap-2 text-xs">
-          <span
-            className={`rounded-full px-3 py-1.5 font-bold ${ready ? "bg-emerald-300/15 text-emerald-200" : "bg-amber-300/15 text-amber-100"}`}
-          >
-            {ready
-              ? ar
-                ? "قراءة مباشرة من Google Sheets"
-                : "Direct Google Sheets read"
-              : ar
-                ? "القراءة المباشرة غير متاحة"
-                : "Direct read unavailable"}
-          </span>
-          {data.syncedAt && (
-            <span className="text-slate-300">
-              {new Date(data.syncedAt).toLocaleString(ar ? "ar-EG" : "en-US", {
-                timeZone: "Africa/Cairo",
-              })}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="rounded-full border border-white/20 px-3 py-1.5 font-semibold text-slate-200 hover:bg-white/10"
-          >
-            {ar ? "تحديث العرض" : "Refresh view"}
-          </button>
-        </div>
-      </header>
-
-      <nav
-        aria-label={ar ? "تقارير اللوست المرتبطة" : "Related Lost reports"}
-        className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
-      >
-        <span className="font-bold text-text">
-          {ar ? "افتح التقرير المرتبط:" : "Related report:"}
-        </span>
-        <Link
-          to="/leads"
-          search={{ view: "lost", month }}
-          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
-        >
-          {ar ? "لوست حسب شهر دخول الليد" : "Lost by lead entry month"}
-        </Link>
-        <Link
-          to="/lost"
-          className="rounded-lg border border-border px-3 py-2 font-semibold text-brand hover:bg-surface-2"
-        >
-          {ar ? "لوست الداشبورد وأسباب الفقدان" : "Dashboard Lost and reasons"}
-        </Link>
-        <span className="basis-full text-text-muted">
-          {ar
-            ? "مراجعة الشيت وحالة أودو تقريران مترابطان، لكن لا تُجمع أعدادهم: الشيت لا يحمل CRM ID، وقد يكون السجل عاد للمتابعة بعد المراجعة."
-            : "The sheet audit and Odoo status are linked reports, not additive totals: the sheet has no CRM ID and a record may have returned to follow-up."}
-        </span>
-      </nav>
+        }
+      />
 
       {!ready ? (
-        <section className="rounded-[28px] border border-amber-200 bg-amber-50 px-7 py-8 text-amber-950">
-          <h2 className="text-xl font-black">
-            {ar
-              ? "الشيت اتفحص، لكن صلاحية القراءة المباشرة لم تكتمل"
-              : "Sheet analyzed; direct read-only access is not ready"}
-          </h2>
-          <p className="mt-2 text-sm leading-7">
-            {ar
-              ? "لن نعرض أصفارًا وكأنها نتيجة فعلية. يحتاج الشيت الخاص إلى تفويض Google للقراءة فقط؛ بعدها سيقرأه الداشبورد مباشرة من دون n8n أو حفظ صفوفه في قاعدة البيانات."
-              : "We won't present zeros as business results. The private sheet needs read-only Google authorization; the dashboard then reads it directly without n8n or storing its rows in the database."}
-          </p>
+        <section className="quality-unavailable" role="status">
+          <CircleAlert size={20} aria-hidden="true" />
+          <div>
+            <h2 className="font-bold text-text">
+              {ar ? "القراءة المباشرة للشيت غير متاحة" : "Direct sheet read is unavailable"}
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+              {ar
+                ? "لن تُعرض الأصفار كنتيجة فعلية. يحتاج الشيت الخاص إلى صلاحية قراءة Google قبل عرض قرارات المراجعة."
+                : "Zeros are not shown as actual results. The private sheet needs Google read access before audit decisions can be displayed."}
+            </p>
+          </div>
         </section>
       ) : (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-4 rounded-[26px] border border-slate-200 bg-white px-5 py-5">
-            <div
-              className="flex flex-wrap gap-2"
-              role="tablist"
-              aria-label={ar ? "شهر المراجعة" : "Audit month"}
+          <PageSection
+            title={ar ? "حدد نطاق المراجعة" : "Set the audit scope"}
+            hint={
+              ar
+                ? "اختَر الشهر، ثم ضيّق النتائج بالكورس أو مسؤول المبيعات."
+                : "Choose a month, then narrow the results by course or salesperson."
+            }
+            icon={<Layers3 size={16} />}
+            tone="sky"
+          >
+            <div className="quality-filter-panel">
+              <div
+                className="quality-months"
+                role="group"
+                aria-label={ar ? "شهر المراجعة" : "Audit month"}
+              >
+                {data.months.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    aria-pressed={data.selectedMonth === item.key}
+                    onClick={() => {
+                      setMonth(item.key);
+                      setCourse("");
+                      setSalesperson("");
+                    }}
+                    className="quality-month"
+                    data-selected={data.selectedMonth === item.key ? "" : undefined}
+                  >
+                    <span>{ar ? item.label : item.key}</span>
+                    <span className="num quality-month-count">{fmtNum(item.total)}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="quality-filter-selects">
+                <label>
+                  <span>{ar ? "الكورس" : "Course"}</span>
+                  <select value={course} onChange={(event) => setCourse(event.target.value)}>
+                    <option value="">{ar ? "كل الكورسات" : "All courses"}</option>
+                    {data.courseOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{ar ? "مسؤول المبيعات" : "Salesperson"}</span>
+                  <select
+                    value={salesperson}
+                    onChange={(event) => setSalesperson(event.target.value)}
+                  >
+                    <option value="">{ar ? "كل الفريق" : "All salespeople"}</option>
+                    {data.salespersonOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {(course || salesperson) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCourse("");
+                      setSalesperson("");
+                    }}
+                    className="quality-clear-filters"
+                  >
+                    <FilterX size={15} aria-hidden="true" />
+                    {ar ? "مسح الفلاتر" : "Clear filters"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </PageSection>
+
+          <PageSection
+            title={ar ? "نتيجة قرارات المراجعة" : "Audit decision outcome"}
+            hint={
+              ar
+                ? "هذه صفوف الشيت في النطاق المحدد، وليست حالة السجلات الحالية في أودو."
+                : "These are sheet rows in the selected scope, not current Odoo record states."
+            }
+            icon={<ShieldCheck size={16} />}
+            tone="mint"
+            id="quality-outcome"
+          >
+            <div className="quality-outcome-grid">
+              <article className="quality-outcome-hero">
+                <p className="text-[12px] font-semibold text-white/80">
+                  {ar ? "إجمالي قرارات Lost المراجَعة" : "Audited Lost decisions"}
+                </p>
+                <strong className="num mt-3 block text-5xl font-bold leading-none text-white">
+                  {fmtNum(selected.total)}
+                </strong>
+                <div className="quality-outcome-meter mt-6" aria-hidden="true">
+                  <span style={{ width: `${bounded(100 - selected.reviewPct)}%` }} />
+                </div>
+                <p className="mt-3 text-[12px] leading-relaxed text-white/85">
+                  {ar
+                    ? "الجزء الفاتح لقرارات Lost المعتمدة؛ الباقي أُعيد للسيلز. لا توجد مرحلة «معلّق» ضمن هذين القرارين."
+                    : "The light segment shows accepted Lost decisions; the rest returned to sales. These decisions have no pending stage."}
+                </p>
+              </article>
+              <article className="quality-result-card" data-tone="rose">
+                <span className="quality-result-icon">
+                  <CircleAlert size={18} aria-hidden="true" />
+                </span>
+                <h3>{ar ? "لم يُعتمد Lost" : "Lost not accepted"}</h3>
+                <strong className="num">{fmtNum(selected.review)}</strong>
+                <p>
+                  {percent(selected.reviewPct)}{" "}
+                  {ar
+                    ? "من قرارات المراجعة؛ أُعيدت للسيلز للمتابعة."
+                    : "of audited decisions; returned to sales for follow-up."}
+                </p>
+              </article>
+              <article className="quality-result-card" data-tone="mint">
+                <span className="quality-result-icon">
+                  <CheckCircle2 size={18} aria-hidden="true" />
+                </span>
+                <h3>{ar ? "قرارات Lost المعتمدة" : "Accepted Lost decisions"}</h3>
+                <strong className="num">{fmtNum(selected.approved)}</strong>
+                <p>
+                  {ar
+                    ? "Validate = Yes في الشيت؛ لا يثبت أن السجل ما زال Lost في أودو."
+                    : "Validate = Yes in the sheet; current Odoo Lost status is not implied."}
+                </p>
+              </article>
+            </div>
+          </PageSection>
+
+          <div className="quality-analysis-grid">
+            <PageSection
+              title={ar ? "أسباب تسجيل Lost" : "Recorded Lost reasons"}
+              hint={
+                ar
+                  ? "توزيع الأسباب داخل قرارات المجموعة المختارة."
+                  : "Reason labels within the selected audited decisions."
+              }
+              icon={<CircleAlert size={16} />}
+              tone="rose"
             >
-              {data.months.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={month === item.key}
-                  onClick={() => {
-                    setMonth(item.key);
-                    setCourse("");
-                    setSalesperson("");
-                  }}
-                  className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${month === item.key ? "bg-[#102238] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-                >
-                  {ar ? item.label : item.key}{" "}
-                  <span className="ms-1 text-[11px] opacity-70">{number(item.total)}</span>
-                </button>
+              <AuditGroupPanel
+                rows={selected.reasons}
+                title={ar ? "السبب المسجل في الشيت" : "Sheet reason"}
+                description={
+                  ar
+                    ? "الشريط يوضح نسبة الحالات المُعادة للسيلز داخل كل سبب."
+                    : "The bar shows the returned share within each reason."
+                }
+                ar={ar}
+                otherReasons={selected.otherReasons}
+              />
+            </PageSection>
+            <PageSection
+              title={ar ? "أين تركزت الإعادة للسيلز؟" : "Where did returns concentrate?"}
+              hint={
+                ar
+                  ? "مرتب حسب عدد الحالات المُعادة؛ النسبة مقامها كل قرارات نفس المجموعة."
+                  : "Ranked by returned count; each rate uses that group's audited decisions."
+              }
+              icon={<Layers3 size={16} />}
+              tone="violet"
+            >
+              <div
+                className="quality-dimension-tabs"
+                role="group"
+                aria-label={ar ? "طريقة التقسيم" : "Breakdown dimension"}
+              >
+                {(["courses", "salespeople", "campaigns"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    aria-pressed={dimension === item}
+                    data-selected={dimension === item ? "" : undefined}
+                    onClick={() => setDimension(item)}
+                  >
+                    {dimensionNames[item]}
+                  </button>
+                ))}
+              </div>
+              <AuditGroupPanel
+                key={dimension}
+                rows={groups}
+                title={dimensionNames[dimension]}
+                description={
+                  ar
+                    ? "الأعلى أولًا حسب الحالات التي لم يُعتمد لها قرار Lost."
+                    : "Highest returned counts first."
+                }
+                ar={ar}
+              />
+            </PageSection>
+          </div>
+
+          <PageSection
+            title={ar ? "اكتمال البيانات وحدود القراءة" : "Data completeness and scope"}
+            hint={
+              ar
+                ? "حقول ناقصة في صفوف الشيت؛ لا تُضاف إلى أعداد Lost."
+                : "Missing fields in sheet rows; these are not additional Lost cases."
+            }
+            icon={<ShieldCheck size={16} />}
+            tone="amber"
+          >
+            <div className="quality-coverage-grid">
+              {[
+                {
+                  label: ar ? "بلا تاريخ إغلاق" : "Missing close date",
+                  value: selected.missingClosedDate,
+                },
+                {
+                  label: ar ? "بلا تاريخ إنشاء" : "Missing creation date",
+                  value: selected.missingCreatedDate,
+                },
+                {
+                  label: ar ? "بلا اسم حملة" : "Missing campaign",
+                  value: selected.missingCampaign,
+                },
+              ].map((item) => (
+                <div key={item.label} className="quality-coverage-card">
+                  <strong className="num">{fmtNum(item.value)}</strong>
+                  <span>{item.label}</span>
+                </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <select
-                aria-label={ar ? "فلتر الكورس" : "Filter course"}
-                value={course}
-                onChange={(event) => setCourse(event.target.value)}
-                className="max-w-56 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
-              >
-                <option value="">{ar ? "كل الكورسات" : "All courses"}</option>
-                {data.courseOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={ar ? "فلتر البياع" : "Filter salesperson"}
-                value={salesperson}
-                onChange={(event) => setSalesperson(event.target.value)}
-                className="max-w-56 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700"
-              >
-                <option value="">{ar ? "كل البياعين" : "All salespeople"}</option>
-                {data.salespersonOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              {(course || salesperson) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCourse("");
-                    setSalesperson("");
-                  }}
-                  aria-label={ar ? "مسح الفلاتر" : "Clear filters"}
-                  className="rounded-xl border border-slate-200 px-3 text-slate-500"
-                >
-                  <FilterX size={17} />
-                </button>
-              )}
-            </div>
-          </div>
+            <p className="quality-scope-note">
+              {ar
+                ? "مراجعة الشيت توثق قرار Lost وقت المراجعة فقط. لا يحتوي الشيت CRM ID أو نوع Lead/Opportunity؛ لا نجمع أعداده مع أودو ولا نستنتج منه الحالة الحالية."
+                : "The sheet records the audit decision, not today's CRM status. It has no CRM ID or Lead/Opportunity type, so its counts cannot be added to Odoo's Lost totals."}
+            </p>
+          </PageSection>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-[26px] border border-slate-200 bg-white p-6">
-              <div className="mb-6 flex items-center gap-2 text-xs font-bold text-slate-500">
-                <ShieldCheck size={16} />{" "}
-                {ar
-                  ? `قرارات Lost تمت مراجعتها في ${selectedLabel}`
-                  : `Lost decisions audited in ${selectedLabel}`}
-              </div>
-              <p className="text-5xl font-black tabular-nums tracking-tight text-slate-900">
-                {number(selected.total)}
-              </p>
-              <p className="mt-3 text-xs leading-6 text-slate-500">
-                {ar
-                  ? "صفوف مراجعة الشيت؛ قد تختلف حالتها الحالية في أودو."
-                  : "Sheet audit rows; their current Odoo state may differ."}
-              </p>
-            </div>
-            <div className="rounded-[26px] border border-[#f5c7bd] bg-[#fff4f0] p-6">
-              <div className="mb-6 flex items-center gap-2 text-xs font-bold text-[#bb533d]">
-                <CircleAlert size={17} />{" "}
-                {ar ? "لم يُعتمد Lost · عادت للسيلز" : "Lost not accepted · returned to sales"}
-              </div>
-              <p className="text-5xl font-black tabular-nums tracking-tight text-[#a93929]">
-                {number(selected.review)}
-              </p>
-              <p className="mt-3 text-xs font-bold text-[#bb533d]">
-                {percent(selected.reviewPct)}{" "}
-                {ar ? "من قرارات Lost التي تمت مراجعتها" : "of audited Lost decisions"}
-              </p>
-            </div>
-            <div className="rounded-[26px] border border-[#cae8e3] bg-[#edf9f5] p-6">
-              <div className="mb-6 flex items-center gap-2 text-xs font-bold text-[#297c70]">
-                <CheckCircle2 size={17} /> {ar ? "قرارات Lost المعتمدة" : "Accepted Lost decisions"}
-              </div>
-              <p className="text-5xl font-black tabular-nums tracking-tight text-[#176f62]">
-                {number(selected.approved)}
-              </p>
-              <p className="mt-3 text-xs leading-6 text-[#408b80]">
-                {ar
-                  ? "Validate = Yes في الشيت؛ لا يثبت وحده أن السجل ما زال Lost في أودو."
-                  : "Validate = Yes in the sheet; it does not prove the record is still Lost in Odoo."}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-            <GroupTable
-              rows={selected.reasons}
-              title={ar ? "لماذا سُجّلوا Lost؟" : "Recorded Lost reasons"}
-              ar={ar}
-              otherReasons={selected.otherReasons}
-            />
-            <div className="space-y-5">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(15,23,42,.045)]">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-[#b74d39]">
-                      {ar ? "أين تركزت العودة للسيلز؟" : "RETURNED TO SALES"}
-                    </p>
-                    <h2 className="mt-1 text-xl font-black text-slate-900">
-                      {ar ? "افتح زاوية واحدة، وشوف العدد والنسبة" : "One angle at a time"}
-                    </h2>
-                  </div>
-                  <div className="flex rounded-xl bg-slate-100 p-1">
-                    {(["courses", "salespeople", "campaigns"] as const).map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setDimension(item)}
-                        className={`rounded-lg px-3 py-2 text-xs font-bold ${dimension === item ? "bg-white text-[#102238] shadow-sm" : "text-slate-500"}`}
-                      >
-                        {item === "courses"
-                          ? ar
-                            ? "كورس"
-                            : "Course"
-                          : item === "salespeople"
-                            ? ar
-                              ? "بياع"
-                              : "Sales"
-                            : ar
-                              ? "حملة"
-                              : "Campaign"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <p className="mt-3 text-xs leading-6 text-slate-500">
-                  {ar
-                    ? "العدد الأحمر = Validate = No: تمت المراجعة ولم يُعتمد قرار Lost، ورجع السجل للسيلز. النسبة من صفوف المراجعة لنفس المجموعة."
-                    : "Red count = Validate = No: Lost was not accepted after review and the case returned to sales. Rate uses this group's audit rows."}
-                </p>
-              </section>
-              <GroupTable rows={groups} title={title} ar={ar} />
-            </div>
-          </div>
+          <nav
+            aria-label={ar ? "تقارير Lost المرتبطة" : "Related Lost reports"}
+            className="quality-related"
+          >
+            <span className="text-xs font-bold text-text-muted">
+              {ar ? "تقارير مرتبطة" : "Related reports"}
+            </span>
+            <Link to="/leads" search={{ view: "lost", month: data.selectedMonth }}>
+              {ar ? "Lost حسب شهر دخول الليد" : "Lost by lead entry month"}
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </Link>
+            <Link to="/lost">
+              {ar ? "لوست الداشبورد وأسباب الفقدان" : "Dashboard Lost and reasons"}
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </Link>
+          </nav>
         </>
       )}
-    </div>
+    </PageSections>
   );
 }

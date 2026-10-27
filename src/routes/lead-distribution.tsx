@@ -129,7 +129,7 @@ function LeadDistributionPage() {
               <div className="num mt-2 text-2xl font-bold text-violet-800">
                 {fmtNum(data.lifecycle.opportunities)}
               </div>
-              <div className="mt-1 text-[11px] text-text-muted">
+              <div className="mt-1 text-[12px] text-text-muted">
                 {ar
                   ? "يشمل الفرص المفقودة؛ لا يشمل الليد المفقود"
                   : "Includes lost opportunities, excludes lost leads"}
@@ -148,7 +148,7 @@ function LeadDistributionPage() {
               <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadLost)}
               </div>
-              <div className="mt-1 text-[11px] text-text-muted">
+              <div className="mt-1 text-[12px] text-text-muted">
                 {ar ? "نوعها ليد في أودو؛ ليست فرصًا بيعية" : "Odoo type Lead, not Opportunity"}
               </div>
             </Card>
@@ -157,7 +157,7 @@ function LeadDistributionPage() {
                 {ar ? "إجمالي سجلات الليد والفرص" : "All lead and opportunity records"}
               </div>
               <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(data.total)}</div>
-              <div className="mt-1 text-[11px] text-text-muted">
+              <div className="mt-1 text-[12px] text-text-muted">
                 {ar ? "ليس عدد الفرص وحدها" : "Not the opportunity count alone"}
               </div>
             </Card>
@@ -168,7 +168,7 @@ function LeadDistributionPage() {
               <div className="num mt-2 text-2xl font-bold text-fuchsia-800">
                 {fmtNum(data.lifecycle.opportunityLost)}
               </div>
-              <div className="mt-1 text-[11px] text-text-muted">
+              <div className="mt-1 text-[12px] text-text-muted">
                 {ar ? "جزء من جميع الفرص" : "Included in all opportunities"}
               </div>
             </Card>
@@ -302,7 +302,7 @@ function LeadDistributionPage() {
                             <span dir="ltr">{groupDisplayName(group.label, dimension, false)}</span>
                           </button>
                           {(group.hot > 0 || group.unverified > 0) && (
-                            <span className="mt-1 block text-[11px] font-normal text-text-muted">
+                            <span className="mt-1 block text-[12px] font-normal text-text-muted">
                               {group.hot > 0 && (
                                 <>
                                   {ar ? "عالي الأولوية" : "High priority"}: {fmtNum(group.hot)}
@@ -423,7 +423,7 @@ function LeadDistributionPage() {
                 </div>
               )}
             </div>
-            <div className="border-t border-border px-4 py-3 text-[11px] text-text-muted sm:px-5">
+            <div className="border-t border-border px-4 py-3 text-[12px] text-text-muted sm:px-5">
               {ar
                 ? "كل رقم قابل للضغط لعرض سجلاته. عمود الفرص المفقودة داخل إجمالي الفرص البيعية، ولا يُضاف مرة ثانية إلى الإجمالي."
                 : "Select any count to inspect records. Lost opportunities are included in all opportunities and must not be added again."}
@@ -475,7 +475,7 @@ function LeadDistributionPage() {
                     {ar ? "فتح في أودو" : "Open in Odoo"}
                   </a>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[12px]">
                   <span className="rounded-md bg-surface-3 px-2 py-1">
                     {ar ? "الدورة" : "Course"}: <bdi>{courseDisplayName(row.course, false)}</bdi>
                     {courseDisplayName(row.course, false) !==

@@ -39,7 +39,7 @@ import { DateFilter, DateRangePanel } from "./DateFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { NavigationDrawer } from "./NavigationDrawer";
 import { GlobalSearch } from "./GlobalSearch";
-import logoImg from "@/assets/engosoft-logo.png";
+import { EngosoftMark } from "./EngosoftMark";
 
 export interface FiltersResp {
   accounts: {
@@ -168,7 +168,7 @@ function ChannelPicker() {
             <div className="text-sm font-semibold text-text">
               {lang === "ar" ? "القنوات" : "Channels"}
             </div>
-            <div className="text-[11px] text-text-muted">
+            <div className="text-[12px] text-text-muted">
               {lang === "ar" ? "اختار نطاق الأرقام" : "Choose the reporting scope"}
             </div>
           </div>
@@ -319,10 +319,10 @@ export function TopBar({ title }: { title?: string }) {
               aria-label="ENGOSOFT"
             >
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border bg-white">
-                <img src={logoImg} alt="" className="h-5 w-5 object-contain" />
+                <EngosoftMark className="h-5 w-5 text-brand" />
               </span>
-              <span className="hidden font-semibold text-[14px] tracking-tight text-text min-[360px]:inline sm:text-[15px]">
-                ENGOSOFT
+              <span className="engosoft-wordmark hidden text-[16px] text-text min-[360px]:inline sm:text-[18px]">
+                engosoft
               </span>
             </Link>
             {title && (
@@ -477,7 +477,7 @@ function OverflowMenu({
           <MoreHorizontal size={18} />
           {activeCount > 0 && (
             <span
-              className="absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold text-white num"
+              className="absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full px-1 text-[12px] font-bold text-white num"
               style={{ background: "var(--accent)" }}
             >
               {activeCount}
@@ -494,7 +494,7 @@ function OverflowMenu({
           <div className="text-sm font-semibold text-text">
             {lang === "ar" ? "أدوات الهيدر" : "Header tools"}
           </div>
-          <div className="text-[11px] text-text-muted">
+          <div className="text-[12px] text-text-muted">
             {lang === "ar" ? "كل الأدوات في مكان واحد" : "Everything else, in one place"}
           </div>
         </div>
@@ -509,7 +509,7 @@ function OverflowMenu({
           <SlidersHorizontal size={16} className="text-brand" />
           <span className="flex-1 text-start">{t("filters")}</span>
           {activeCount > 0 && (
-            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-bold text-brand num">
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-bold text-brand num">
               {activeCount}
             </span>
           )}
@@ -557,7 +557,7 @@ function OverflowMenu({
         </Link>
         {data?.fetchedAt && (
           <div className="mt-1 border-t border-border px-2.5 pt-2 pb-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-text-subtle">
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
               {t("data_freshness")}
             </div>
             <div className="num mt-0.5 text-[12px] text-text-muted">
@@ -586,7 +586,8 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
   const danger = failed.length > 0;
   const count = danger ? failed.length : stale.length;
   const firstSourceKey = (danger ? failed[0] : stale[0])?.split(":")[0]?.trim();
-  const firstSourceLabel = data?.tabSyncs.find((tab) => tab.key === firstSourceKey)?.label || firstSourceKey;
+  const firstSourceLabel =
+    data?.tabSyncs.find((tab) => tab.key === firstSourceKey)?.label || firstSourceKey;
 
   // What the reader can act on: how many sources are affected, and what that
   // does to the figures. The source names themselves are internal worksheet
@@ -599,26 +600,24 @@ function DataHealthBar({ data }: { data?: FiltersResp }) {
     : lang === "ar"
       ? `يتم عرض آخر نسخة ناجحة لـ ${count} من المصادر — قد تنقص أحدث الصفوف.`
       : `Showing the last good copy for ${count} source${count === 1 ? "" : "s"} — the newest rows may be missing.`;
-  const namedText = count === 1 && firstSourceLabel
-    ? lang === "ar"
-      ? `${firstSourceLabel}: ${text}`
-      : `${firstSourceLabel}: ${text}`
-    : text;
+  const namedText =
+    count === 1 && firstSourceLabel
+      ? lang === "ar"
+        ? `${firstSourceLabel}: ${text}`
+        : `${firstSourceLabel}: ${text}`
+      : text;
 
   const detail = (danger ? failed : stale).join(" · ");
 
   return (
     <div
-      className="py-1.5 text-[11px] font-medium flex items-center gap-2 border-t border-border"
-      style={{
-        background: danger
-          ? "var(--danger-soft, rgba(220,38,38,.10))"
-          : "var(--warning-soft, rgba(217,119,6,.10))",
-        color: danger ? "var(--danger)" : "var(--warning)",
-      }}
+      className="py-1.5 text-[12px] font-medium flex items-center gap-2 border-t border-border text-text"
       role="status"
     >
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "currentColor" }} />
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ background: danger ? "var(--danger)" : "var(--warning)" }}
+      />
       <span className="truncate" title={`${namedText}\n\n${detail}`}>
         {namedText}
       </span>
@@ -688,7 +687,7 @@ function SyncBadge({ data }: { data?: FiltersResp }) {
   // sizes. It now gives up width before anything else on the bar does.
   return (
     <span
-      className="hidden h-9 min-w-0 max-w-[34vw] shrink items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-2.5 text-[11px] md:inline-flex xl:max-w-none"
+      className="hidden h-9 min-w-0 max-w-[34vw] shrink items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-2.5 text-[12px] md:inline-flex xl:max-w-none"
       title={tooltip}
     >
       <span
@@ -788,12 +787,12 @@ function FilterSheet({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-text">{t("filters")}</h2>
               {activeCount > 0 && (
-                <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+                <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-semibold text-brand">
                   {activeCount}
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-[11px] text-text-muted">
+            <p className="mt-0.5 text-[12px] text-text-muted">
               {lang === "ar"
                 ? "الاختيارات تُطبق مباشرة على كل التقارير"
                 : "Selections apply instantly across every report"}

@@ -50,6 +50,8 @@ export type NexusPageType =
   | "organic"
   | "attribution"
   | "guide"
+  /** The source-reconciliation report: is each number confirmed by its own system. */
+  | "number_review"
   | "other";
 
 export interface NexusPageContext {
@@ -101,6 +103,9 @@ export function pageTypeFor(path: string): NexusPageType {
     "media-buyers": "media_buyers",
     website: "website",
     yoy: "yoy",
+    // The monthly review sits beside the overview in the Management section
+    // and answers the same owners' questions, one month at a time.
+    "management-review": "overview",
     pricing: "pricing",
     weekend: "weekend",
     "media-plan": "media_plan",
@@ -113,6 +118,7 @@ export function pageTypeFor(path: string): NexusPageType {
     "landing-pages": "attribution",
     creatives: "ads",
     guide: "guide",
+    "number-review": "number_review",
     // Legacy bookmarks that redirect into Accounting.
     "full-invoiced": "accounting",
   };

@@ -119,7 +119,7 @@ function YearMetric({
       <div className="num mt-2 text-2xl font-black tracking-tight text-text">
         {currentAvailable ? moneyOrNumber(measure, current[measure]) : "—"}
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-[11px]">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-[12px]">
         <span className="text-text-muted">
           {previousYear}:{" "}
           {comparable && currentAvailable ? moneyOrNumber(measure, previous[measure]) : "—"}
@@ -216,7 +216,7 @@ function YearlyPage() {
           <Card className="border-brand/20 bg-brand-soft/20">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
+                <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-brand">
                   {A ? "نطاق المقارنة" : "Comparison window"}
                 </div>
                 <h2 className="mt-1 text-lg font-black text-text">
@@ -230,7 +230,7 @@ function YearlyPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-end gap-2">
-                <label className="text-[11px] font-semibold text-text-muted">
+                <label className="text-[12px] font-semibold text-text-muted">
                   {A ? "السنة" : "Year"}
                   <select
                     value={annual.year}
@@ -247,7 +247,7 @@ function YearlyPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-[11px] font-semibold text-text-muted">
+                <label className="text-[12px] font-semibold text-text-muted">
                   {A ? "حتى نهاية شهر" : "Through month"}
                   <select
                     value={annual.throughMonth}
@@ -270,7 +270,7 @@ function YearlyPage() {
                 </label>
               </div>
             </div>
-            <p className="mt-3 border-t border-brand/15 pt-3 text-[11px] leading-relaxed text-text-muted">
+            <p className="mt-3 border-t border-brand/15 pt-3 text-[12px] leading-relaxed text-text-muted">
               {A
                 ? "المقارنة تبدأ من 1 يناير في العامين وتتوقف عند نفس اليوم من الشهر المحدد إذا كان الشهر الحالي لم ينتهِ؛ الشهور التالية لا تدخل في الإجمالي."
                 : "Both years start on January 1. For an unfinished current month, both stop on the same calendar day; later months are excluded."}
@@ -294,7 +294,7 @@ function YearlyPage() {
                   {data.history.map((source) => (
                     <span
                       key={source.year}
-                      className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold text-text"
+                      className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-text"
                       title={
                         source.status === "ready"
                           ? `${source.year}: ${fmtNum(source.leads)} total Odoo leads · ${fmtNum(source.inventoryLeads)} Inventory · ${source.syncedAt}`
@@ -567,7 +567,7 @@ function YearlyPage() {
                             invert={monthlyMeasure === "spend" || monthlyMeasure === "lost"}
                           />
                         </td>
-                        <td className="num px-2 py-3 text-end text-[11px] text-text-muted">
+                        <td className="num px-2 py-3 text-end text-[12px] text-text-muted">
                           {row.month === annual.throughMonth && annual.partialMonth
                             ? `${row.throughDay} ${A ? "يوم" : "days"}`
                             : A
@@ -693,7 +693,7 @@ function YearlyPage() {
                 {fmtNum(annual.coverage.current.ads)}
               </div>
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+            <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
               {A
                 ? `آخر تواريخ المصدر: الإعلانات ${data.sourceDates.ads || "—"}، CRM ${data.sourceDates.crm || "—"}، التحصيل ${data.sourceDates.revenue || "—"}. نسب Won/Lost تخص مجموعة الليدز المنشأة في الفترة، والمبيعات تخص تاريخ الدفع؛ ليست نفس cohort البيعي.`
                 : `Source max dates: ads ${data.sourceDates.ads || "—"}, CRM ${data.sourceDates.crm || "—"}, collections ${data.sourceDates.revenue || "—"}. Won/Lost rates use the lead-creation cohort, while revenue uses payment date; these are not the same sales cohort.`}
@@ -708,7 +708,7 @@ function YearlyPage() {
 function Outcome({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface-2 p-3">
-      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className="num mt-1 text-lg font-black text-text">{value}</div>
     </div>
   );

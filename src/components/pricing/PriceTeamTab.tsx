@@ -165,7 +165,7 @@ export function PriceTeamTab({
               <UsersRound size={16} className="text-brand" aria-hidden="true" />
               {ar ? "من يحتاج متابعة" : "Who needs a conversation"}
             </h2>
-            <p className="mt-0.5 text-[11px] text-text-muted">
+            <p className="mt-0.5 text-[12px] text-text-muted">
               {ar
                 ? "الموظفون الذين باعوا تحت الحد الأدنى في هذه الفترة."
                 : "Salespeople who sold below the approved floor in this period."}
@@ -173,7 +173,7 @@ export function PriceTeamTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[11px] text-text-muted">
+            <label className="flex items-center gap-1.5 text-[12px] text-text-muted">
               <span className="hidden sm:inline">{ar ? "ترتيب حسب" : "Sort by"}</span>
               <select
                 value={sort}
@@ -258,7 +258,7 @@ export function PriceTeamTab({
                   <h3 className="truncate text-[13px] font-semibold text-text">
                     <bdi>{member.salesperson || (ar ? "بدون موظف" : "Unassigned")}</bdi>
                   </h3>
-                  <p className="num text-[10.5px] text-text-subtle">
+                  <p className="num text-[12px] text-text-subtle">
                     {fmtNum(member.lines)} {ar ? "بند" : "lines"} ·{" "}
                     <span style={{ color: "var(--danger)" }}>
                       {fmtNum(member.breaches)} {ar ? "مخالفة" : "breaches"}
@@ -278,7 +278,7 @@ export function PriceTeamTab({
                   >
                     {fmtPct(member.compliance * 100, 0)}
                   </span>
-                  <span className="text-[10.5px] text-text-subtle">
+                  <span className="text-[12px] text-text-subtle">
                     {ar ? "نسبة الالتزام" : "compliance"}
                   </span>
                   <Trend value={member.trend} />
@@ -306,11 +306,11 @@ export function PriceTeamTab({
                     ? fmtMoney(member.leakage, member.worst.currency, lang)
                     : fmtNum(Math.round(member.leakage))}
                 </div>
-                <div className="text-[10px] text-text-subtle">
+                <div className="text-[12px] text-text-subtle">
                   {ar ? "قيمة التجاوز في الفترة" : "value given away this period"}
                 </div>
                 {member.worst && (
-                  <p className="mt-1 truncate text-[10.5px] text-text-muted">
+                  <p className="mt-1 truncate text-[12px] text-text-muted">
                     {ar ? "أسوأ حالة:" : "Worst case:"}{" "}
                     <bdi className="font-medium text-text">
                       {member.worst.productName || member.worst.productCode}
@@ -372,13 +372,13 @@ export function PriceTeamTab({
             <h2 className="text-[13px] font-bold text-text">
               {ar ? "قواعد الحافز المنشورة" : "Published incentive rules"}
             </h2>
-            <p className="mt-0.5 text-[10.5px] text-text-muted">
+            <p className="mt-0.5 text-[12px] text-text-muted">
               {ar
                 ? "مرجع للحوافز المرتبطة بالبيع داخل السعر المعتمد."
                 : "Reference for incentives attached to selling inside the approved price."}
             </p>
           </div>
-          <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-text-muted">
+          <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-text-muted">
             <span className="num">{fmtNum(incentives.length)}</span>
             <ChevronDown
               size={16}
@@ -400,7 +400,7 @@ export function PriceTeamTab({
                     <div className="truncate text-[12px] font-medium text-text">
                       <bdi>{entry.courseName}</bdi>
                     </div>
-                    <div className="truncate text-[10.5px] text-text-muted">
+                    <div className="truncate text-[12px] text-text-muted">
                       {price.note || (ar ? "حافز بيع" : "Sales incentive")}
                     </div>
                   </div>
@@ -433,7 +433,7 @@ function Trend({ value }: { value?: number }) {
   const color = flat ? "var(--text-subtle)" : value > 0 ? "var(--success)" : "var(--danger)";
   return (
     <span
-      className="num inline-flex items-center gap-0.5 text-[11px] font-semibold"
+      className="num inline-flex items-center gap-0.5 text-[12px] font-semibold"
       style={{ color }}
       title={lang === "ar" ? "مقارنة بالفترة السابقة" : "vs the previous period"}
     >

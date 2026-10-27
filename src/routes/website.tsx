@@ -539,7 +539,7 @@ function WebsiteManagementSources({
                   : "Source not connected; no zero is implied."
             }
             action={
-              <Link to="/landing-pages" className="text-[10px] font-bold text-brand">
+              <Link to="/landing-pages" className="text-[12px] font-bold text-brand">
                 {lang === "ar" ? "فتح التقرير ↗" : "Open report ↗"}
               </Link>
             }
@@ -573,7 +573,7 @@ function WebsiteManagementSources({
                     <span className="num block text-sm font-bold text-text">
                       {fmtNum(row.value)}
                     </span>
-                    <span className="block text-[10px] text-text-subtle">{row.detail}</span>
+                    <span className="block text-[12px] text-text-subtle">{row.detail}</span>
                   </span>
                 </div>
               ))}
@@ -1054,7 +1054,7 @@ function Website() {
                     {tab.icon}
                     <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
                   </span>
-                  <span className="mt-1 hidden truncate text-[10.5px] text-text-muted sm:block">
+                  <span className="mt-1 hidden truncate text-[12px] text-text-muted sm:block">
                     {tab.hint}
                   </span>
                 </button>
@@ -1080,7 +1080,7 @@ function Website() {
 
               <div className="mb-4 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-xl border border-border bg-surface-2/50 p-3">
-                  <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <div className="flex items-center gap-2 text-[12px] text-text-muted">
                     <Gauge size={14} className="text-brand" />
                     {copy.campaignSpend}
                   </div>
@@ -1089,7 +1089,7 @@ function Website() {
                   </div>
                 </div>
                 <div className="rounded-xl border border-border bg-surface-2/50 p-3">
-                  <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <div className="flex items-center gap-2 text-[12px] text-text-muted">
                     <MousePointerClick size={14} className="text-brand" />
                     {copy.campaignConversions}
                   </div>
@@ -1098,7 +1098,7 @@ function Website() {
                   </div>
                 </div>
                 <div className="rounded-xl border border-border bg-surface-2/50 p-3">
-                  <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                  <div className="flex items-center gap-2 text-[12px] text-text-muted">
                     <ShoppingCart size={14} className="text-brand" />
                     {copy.campaignFieldCoverage}
                   </div>
@@ -1109,7 +1109,7 @@ function Website() {
                   </div>
                 </div>
               </div>
-              <p className="mb-4 rounded-lg bg-surface-2/60 px-3 py-2 text-[10.5px] leading-5 text-text-muted">
+              <p className="mb-4 rounded-lg bg-surface-2/60 px-3 py-2 text-[12px] leading-5 text-text-muted">
                 {copy.campaignDateBasis}
               </p>
 
@@ -1133,7 +1133,7 @@ function Website() {
                             {campaign.platforms.map((platform) => (
                               <span
                                 key={platform}
-                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-semibold"
                                 style={{
                                   background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
                                   color: PLATFORM_COLOR[platform],
@@ -1147,7 +1147,7 @@ function Website() {
                               </span>
                             ))}
                             <span
-                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                              className={`rounded-full px-1.5 py-0.5 text-[12px] font-semibold ${
                                 campaign.objective === "website_conversion"
                                   ? "bg-success-soft text-success"
                                   : "bg-brand-soft text-brand"
@@ -1193,7 +1193,7 @@ function Website() {
                       </dl>
 
                       <p
-                        className={`mt-3 text-[10.5px] leading-5 ${campaign.salesLinked ? "text-success" : "text-warning"}`}
+                        className={`mt-3 text-[12px] leading-5 ${campaign.salesLinked ? "text-success" : "text-warning"}`}
                       >
                         {campaign.salesLinked
                           ? `${copy.exactCampaignMatch} · ROAS ${campaign.websiteRoas === null ? "—" : `${campaign.websiteRoas.toFixed(2)}×`}`
@@ -1301,7 +1301,7 @@ function Website() {
                           : "border-warning/20 bg-warning-soft/45"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+                    <div className="flex items-center justify-between gap-2 text-[12px] text-text-muted">
                       <span className="truncate">{sheetChannelLabels[channel.channel]}</span>
                       <span className="num shrink-0">{fmtPct(channel.orderShare, 0)}</span>
                     </div>
@@ -1313,7 +1313,7 @@ function Website() {
                         {fmtUSDFull(channel.revenue)}
                       </div>
                     </div>
-                    <div className="mt-1 text-[10px] text-text-subtle">{copy.sourceShare}</div>
+                    <div className="mt-1 text-[12px] text-text-subtle">{copy.sourceShare}</div>
                   </div>
                 ))}
               </div>
@@ -1326,13 +1326,13 @@ function Website() {
                         <UsersRound size={16} className="text-brand" />
                         {copy.salesOwners}
                       </div>
-                      <div className="mt-1 text-[10.5px] text-text-muted">
+                      <div className="mt-1 text-[12px] text-text-muted">
                         {copy.reconciledSheetRevenue}:{" "}
                         {fmtUSDFull(data.sheetSalesAnalysis.totalRevenue)}
                       </div>
                     </div>
                     <div className="rounded-lg bg-surface px-2.5 py-1.5 text-end shadow-sm ring-1 ring-border">
-                      <div className="text-[9.5px] text-text-muted">{copy.averageSheetOrder}</div>
+                      <div className="text-[12px] text-text-muted">{copy.averageSheetOrder}</div>
                       <div className="num text-xs font-semibold text-text">
                         {fmtUSDFull(data.sheetSalesAnalysis.averageOrder)}
                       </div>
@@ -1342,7 +1342,7 @@ function Website() {
                   <div className="space-y-2.5">
                     {data.sheetSalesAnalysis.owners.slice(0, 7).map((owner) => (
                       <div key={`${owner.channel}:${owner.owner}`}>
-                        <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                        <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
                           <span className="min-w-0 truncate font-medium text-text" dir="auto">
                             {owner.owner}
                           </span>
@@ -1373,7 +1373,7 @@ function Website() {
                       <BookOpen size={16} className="text-brand" />
                       {copy.sheetCourses}
                     </div>
-                    <p className="mt-1 text-[10.5px] leading-5 text-text-muted">
+                    <p className="mt-1 text-[12px] leading-5 text-text-muted">
                       {copy.sheetCoursesHint}
                     </p>
                   </div>
@@ -1385,13 +1385,13 @@ function Website() {
                         className="min-w-0 rounded-xl border border-border/80 bg-surface px-3 py-2.5"
                       >
                         <div
-                          className="truncate text-[11.5px] font-semibold text-text"
+                          className="truncate text-[12px] font-semibold text-text"
                           dir="auto"
                           title={displayCourseLabel(course.label)}
                         >
                           {displayCourseLabel(course.label)}
                         </div>
-                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-text-muted">
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[12px] text-text-muted">
                           <span className="num font-semibold text-text">
                             {fmtNum(course.orders)} {copy.orders}
                           </span>
@@ -1468,7 +1468,7 @@ function Website() {
                       {fmtNum(data.reconciliation.discrepancyOrders)} {copy.discrepancyOrders}
                     </Pill>
                   </div>
-                  <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 text-[11px] text-text-muted">
+                  <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 text-[12px] text-text-muted">
                     <div>
                       <div>{copy.odooOnlyOrders}</div>
                       <div className="num mt-0.5 font-semibold text-text">
@@ -1488,7 +1488,7 @@ function Website() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2 text-[11px] text-text-subtle">{copy.reconciliationHint}</div>
+                  <div className="mt-2 text-[12px] text-text-subtle">{copy.reconciliationHint}</div>
                 </div>
               </div>
             </Card>
@@ -1664,7 +1664,7 @@ function Website() {
 function WebsiteCampaignFact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="truncate text-[10px] text-text-muted">{label}</dt>
+      <dt className="truncate text-[12px] text-text-muted">{label}</dt>
       <dd className="num mt-0.5 text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );

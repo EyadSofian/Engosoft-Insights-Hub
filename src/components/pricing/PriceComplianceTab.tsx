@@ -147,7 +147,7 @@ function QuickStatuses({ value, onChange }: { value: string; onChange: (next: st
               key={option.value}
               aria-pressed={active}
               onClick={() => onChange(option.value)}
-              className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-[11.5px] font-semibold transition-colors ${
+              className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-semibold transition-colors ${
                 active
                   ? "border-transparent text-white"
                   : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
@@ -304,7 +304,7 @@ export function PriceComplianceTab({
             <div className="truncate text-[12.5px] font-medium text-text">
               <bdi>{row.productName || "—"}</bdi>
             </div>
-            <div className="num text-[10.5px] text-text-subtle">
+            <div className="num text-[12px] text-text-subtle">
               <bdi>{row.productCode || (ar ? "بدون كود" : "no code")}</bdi>
             </div>
           </div>
@@ -456,7 +456,7 @@ export function PriceComplianceTab({
 
       {/* --- context strip -------------------------------------------------- */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-3.5 py-2.5">
-        <div className="min-w-0 text-[11.5px] text-text-muted">
+        <div className="min-w-0 text-[12px] text-text-muted">
           {data?.book ? (
             <>
               <span className="font-semibold text-text">
@@ -469,7 +469,7 @@ export function PriceComplianceTab({
           )}
         </div>
 
-        <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+        <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
           <div className="flex items-center gap-1.5">
             <dt className="text-text-subtle">{ar ? "التغطية" : "Coverage"}</dt>
             <dd className="num font-semibold text-text">
@@ -511,7 +511,7 @@ export function PriceComplianceTab({
             {ar ? "فلاتر" : "Filters"}
             {!!activeFilters.length && (
               <span
-                className="num grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[10px] font-bold text-white"
+                className="num grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[12px] font-bold text-white"
                 style={{ background: "var(--brand)" }}
               >
                 {activeFilters.length}
@@ -553,7 +553,7 @@ export function PriceComplianceTab({
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-text-muted">{label}</span>
+                <span className="text-[12px] font-medium text-text-muted">{label}</span>
                 <input
                   type="date"
                   value={filters[key]}
@@ -632,7 +632,7 @@ export function PriceComplianceTab({
               ] as const
             ).map(([key, label, options]) => (
               <label key={key} className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-text-muted">{label}</span>
+                <span className="text-[12px] font-medium text-text-muted">{label}</span>
                 <select
                   value={filters[key as keyof ComplianceFilters] as string}
                   onChange={(event) =>
@@ -786,7 +786,7 @@ function InvoiceCardList({
                 <div className="truncate text-[13px] font-semibold text-text">
                   <bdi>{row.productName || "—"}</bdi>
                 </div>
-                <div className="num mt-0.5 text-[10.5px] text-text-subtle">
+                <div className="num mt-0.5 text-[12px] text-text-subtle">
                   <bdi>{row.invoiceNumber}</bdi> · <bdi>{rowDate(row) || "—"}</bdi>
                 </div>
               </div>
@@ -816,7 +816,7 @@ function InvoiceCardList({
                 },
               ].map((cell) => (
                 <div key={cell.label}>
-                  <div className="text-[9.5px] text-text-subtle">{cell.label}</div>
+                  <div className="text-[12px] text-text-subtle">{cell.label}</div>
                   <div
                     className="num mt-0.5 truncate text-[12px] font-semibold"
                     style={{ color: cell.tone }}
@@ -827,7 +827,7 @@ function InvoiceCardList({
               ))}
             </div>
 
-            <div className="mt-2 truncate text-[10.5px] text-text-muted">
+            <div className="mt-2 truncate text-[12px] text-text-muted">
               <bdi>{row.salesperson || (ar ? "بدون موظف" : "No salesperson")}</bdi> ·{" "}
               {methodLabel(row.paymentMethod, lang)}
             </div>
