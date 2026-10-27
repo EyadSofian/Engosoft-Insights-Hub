@@ -464,6 +464,7 @@ const OCTOBER_PUBLISHED: SalesTarget[] = [
     0,
     "Asmaa Fathy",
     "Asmaa Fathy",
+    ["ahmed.salah@engosoft.com"],
   ),
   octoberRow(
     "workbook:abdelrahman-abdelhamid",
@@ -471,9 +472,15 @@ const OCTOBER_PUBLISHED: SalesTarget[] = [
     0,
     "Asmaa Fathy",
     "Asmaa Fathy",
+    ["abdelrahman.hamouda@engosoft.com"],
   ),
-  octoberRow("workbook:solaf-ali", "Solaf Ali Mostafa Kamal", 0, "Asmaa Fathy", "Asmaa Fathy"),
-  octoberRow("workbook:radwa-samah", "Radwa Samah Salem", 0, "Asmaa Fathy", "Asmaa Fathy"),
+  octoberRow("workbook:solaf-ali", "Solaf Ali Mostafa Kamal", 0, "Asmaa Fathy", "Asmaa Fathy", [
+    "solaf.ali@engosoft.com",
+  ]),
+  octoberRow("workbook:radwa-samah", "Radwa Samah Salem", 0, "Asmaa Fathy", "Asmaa Fathy", [
+    "RADWA SAMEH SALEM",
+    "radwa.sameh@engosoft.com",
+  ]),
 ];
 // Previously known staff absent from October's published plan remain visible
 // to sales analysis, but cannot inherit an old target.

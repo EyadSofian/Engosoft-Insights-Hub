@@ -160,6 +160,21 @@ assert.equal(
   3000,
 );
 assert.equal(october.find((row) => row.employeeId === "workbook:solaf-ali")?.target, 0);
+assert.equal(
+  targetIndexForMonth("2026-10").byName.get(normalizePersonName("RADWA SAMEH SALEM"))?.employeeId,
+  "workbook:radwa-samah",
+  "Radwa's current Odoo spelling resolves to her workbook row",
+);
+for (const [email, employeeId] of [
+  ["ahmed.salah@engosoft.com", "workbook:ahmed-salah-aboyazed"],
+  ["abdelrahman.hamouda@engosoft.com", "workbook:abdelrahman-abdelhamid"],
+  ["solaf.ali@engosoft.com", "workbook:solaf-ali"],
+  ["radwa.sameh@engosoft.com", "workbook:radwa-samah"],
+]) {
+  const row = targetIndexForMonth("2026-10").byName.get(normalizePersonName(email));
+  assert.equal(row?.employeeId, employeeId, `${email} resolves to its published October row`);
+  assert.equal(row?.target, 0, `${email} retains the published zero quota`);
+}
 assert.deepEqual(targetIndexForMonth("2026-10").duplicates, []);
 
 /* --- preparing the next monthly roster ------------------------------------ */

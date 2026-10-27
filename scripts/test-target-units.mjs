@@ -52,6 +52,35 @@ assert.equal(result.unassigned.length, 0);
 assert.equal(result.paidRevenue, 9000);
 assert.equal(result.achievement, (9000 / 162000) * 100);
 
+const newAsmaaIds = [
+  "workbook:ahmed-salah-aboyazed",
+  "workbook:abdelrahman-abdelhamid",
+  "workbook:solaf-ali",
+  "workbook:radwa-samah",
+];
+const withNewAsmaaMembers = buildTargetUnitRollup([
+  ...targets,
+  ...newAsmaaIds.map((employeeId) => ({
+    key: `employee-${employeeId}`,
+    employeeId,
+    name: employeeId,
+    target: 0,
+    paidRevenue: 0,
+    orderRevenue: 0,
+  })),
+]);
+const asmaaMemberIds = withNewAsmaaMembers.units[1].leaders[1].members.map(
+  (member) => member.employeeId,
+);
+for (const employeeId of newAsmaaIds)
+  assert.ok(asmaaMemberIds.includes(employeeId), `${employeeId} is nested in Asmaa's team`);
+assert.equal(withNewAsmaaMembers.unassigned.length, 0);
+assert.equal(
+  withNewAsmaaMembers.target,
+  result.target,
+  "zero-quota members do not change the target",
+);
+
 const withNewEmployee = buildTargetUnitRollup([
   ...targets,
   {

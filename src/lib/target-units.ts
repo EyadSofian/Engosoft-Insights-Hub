@@ -44,7 +44,16 @@ export const TARGET_UNIT_LAYOUT = [
         // Abdullah Mohsen (335) is a member of Asmaa's team, not an independent target.
         // Sara has sales but no published personal quota; her row is still
         // shown inside the team while excluded from target achievement totals.
-        employeeIds: ["235", "597", "335", "sara.abdullah@engosoft.com"],
+        employeeIds: [
+          "235",
+          "597",
+          "335",
+          "sara.abdullah@engosoft.com",
+          "workbook:ahmed-salah-aboyazed",
+          "workbook:abdelrahman-abdelhamid",
+          "workbook:solaf-ali",
+          "workbook:radwa-samah",
+        ],
       },
     ],
   },
