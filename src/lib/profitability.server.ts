@@ -6,6 +6,7 @@ import {
   odooConfigured,
 } from "./odoo.server";
 import { DEFAULT_FX_RATES } from "./fx-rates";
+import { aggregateProfitabilityMonths } from "./profitability-aggregate";
 
 export interface ProfitabilityLine {
   id: string;
@@ -33,6 +34,7 @@ export interface ProfitabilitySnapshot {
   depreciation: number | null;
   lines: ProfitabilityLine[];
   fetchedAt: string;
+  calculationBasis?: "odoo_period" | "sum_of_odoo_months";
 }
 
 export interface ProfitabilityResult {
@@ -71,7 +73,11 @@ interface OdooReportLine {
   id?: string;
   name?: string;
   level?: number;
-  columns?: { name?: string; no_format?: number | string | null; currency_symbol?: string | null }[];
+  columns?: {
+    name?: string;
+    no_format?: number | string | null;
+    currency_symbol?: string | null;
+  }[];
 }
 
 interface OdooReportInformation {
@@ -155,6 +161,7 @@ function startMonthlyRefresh(
         windows.slice(index, index + 2).map(async (window) => {
           const cachedMonth = monthlyCache.get(window.key);
           if (cachedMonth && cachedMonth.expiresAt > Date.now()) return;
+          monthlyErrors.delete(window.key);
           try {
             // Monthly trend cards only need report totals. The selected month
             // requests its account rows separately when opened.
@@ -335,7 +342,10 @@ async function fetchProfitability(
     needsCompanyDifference ? getReport(usdSelection) : Promise.resolve(null),
   ]);
   const usdBase = new Map(
-    (usdOnlyReport?.lines ?? []).map((line) => [String(line.id || line.name || ""), valueOf(line) ?? 0]),
+    (usdOnlyReport?.lines ?? []).map((line) => [
+      String(line.id || line.name || ""),
+      valueOf(line) ?? 0,
+    ]),
   );
   const lines = (report.lines ?? [])
     .map((line): ProfitabilityLine | null => {
@@ -343,7 +353,9 @@ async function fetchProfitability(
       if (value === null) return null;
       const symbol = line.columns?.find((column) => column.no_format != null)?.currency_symbol;
       if (symbol && symbol !== "$") {
-        throw new Error(`Odoo Profit and Loss returned ${symbol} instead of USD; report stopped to prevent incorrect figures.`);
+        throw new Error(
+          `Odoo Profit and Loss returned ${symbol} instead of USD; report stopped to prevent incorrect figures.`,
+        );
       }
       const id = String(line.id || line.name || "");
       return {
@@ -377,6 +389,7 @@ async function fetchProfitability(
     depreciation: findLine(lines, "Depreciation"),
     lines,
     fetchedAt: new Date().toISOString(),
+    calculationBasis: "odoo_period",
   };
 }
 
@@ -433,6 +446,21 @@ export async function getProfitability(
   fxSar: number = DEFAULT_FX_RATES.SAR,
 ): Promise<ProfitabilityResult> {
   const key = `${from}|${to}|${company || "all-configured-companies"}|${fxSar}`;
+  const windows = monthWindows(from, to, company, fxSar);
+  if (windows.length > 1) {
+    void startMonthlyRefresh(key, from, to, company, fxSar);
+    const months = monthlyState(from, to, company, fxSar);
+    const snapshot = aggregateProfitabilityMonths(months.monthly);
+    if (snapshot) return { status: "ready", snapshot, ...months };
+    return {
+      status: months.monthlyStatus === "error" ? "error" : "loading",
+      snapshot: null,
+      ...months,
+      ...(months.monthlyStatus === "error"
+        ? { error: "One or more Odoo months could not be loaded; the period total is unavailable." }
+        : {}),
+    };
+  }
   void startMonthlyRefresh(key, from, to, company, fxSar);
   const months = monthlyState(from, to, company, fxSar);
   const cached = cache.get(key);

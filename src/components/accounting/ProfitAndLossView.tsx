@@ -971,9 +971,13 @@ export function ProfitAndLossView() {
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-xs text-text-muted">
           {data.error ||
-            (lang === "ar"
-              ? "سيظهر التقرير تلقائيًا عند اكتمال الحساب."
-              : "The report will appear when Odoo finishes computing it.")}
+            (data.monthly.length > 1
+              ? lang === "ar"
+                ? `اكتمل ${data.monthly.filter((month) => month.snapshot).length} من ${data.monthly.length} شهور. لن يظهر إجمالي الفترة قبل اكتمال نتائج كل شهر من Odoo.`
+                : `${data.monthly.filter((month) => month.snapshot).length} of ${data.monthly.length} months loaded. The period total waits for every Odoo month.`
+              : lang === "ar"
+                ? "سيظهر التقرير تلقائيًا عند اكتمال الحساب."
+                : "The report will appear when Odoo finishes computing it.")}
         </p>
         <button
           type="button"
@@ -1224,13 +1228,21 @@ export function ProfitAndLossView() {
                 </div>
               ))}
             </div>
-            <AccountExplorer
-              key={`${report.from}-${report.to}-${section}`}
-              snapshot={report}
-              section={section}
-              lang={lang}
-              onOpenAccount={setAccount}
-            />
+            {report.calculationBasis === "sum_of_odoo_months" ? (
+              <Notice tone="info" icon={<FileText size={16} />}>
+                {lang === "ar"
+                  ? "إجمالي الفترة هو مجموع نتائج الشهور كما ظهرت في Odoo بسعر كل شهر. لعرض الحسابات والقيود المطابقة لهذا الأساس، اختر شهرًا من القسم التالي؛ لا نخلطها مع تفصيل تقرير سنوي بسعر صرف مختلف."
+                  : "The period total adds the monthly Odoo results at each month's rate. Select a month below for matching accounts and journal entries; an annual report's differently converted detail is not mixed in."}
+              </Notice>
+            ) : (
+              <AccountExplorer
+                key={`${report.from}-${report.to}-${section}`}
+                snapshot={report}
+                section={section}
+                lang={lang}
+                onOpenAccount={setAccount}
+              />
+            )}
           </Card>
 
           {data.monthly.length > 1 && (
@@ -1394,8 +1406,8 @@ export function ProfitAndLossView() {
         icon={<FileText size={16} />}
       >
         {lang === "ar"
-          ? `الأرقام مأخوذة من قائمة الأرباح والخسائر في Odoo للشركات: ${report.companies.map((item) => item.name).join("، ")}. القيود المرحلة فقط. ${activeTab === "report" ? `الفترة من ${report.from} إلى ${report.to}. ` : "تاريخ كل شهر ظاهر داخل المقارنة. "}التقرير محسوب بالدولار داخل Odoo باستخدام تحويل العملات الخاص به، بدون قسمة إضافية في الداشبورد.`
-          : `Figures come from Odoo Profit and Loss for ${report.companies.map((item) => item.name).join(", ")}, posted entries only. ${activeTab === "report" ? `Period ${report.from} to ${report.to}. ` : "Each compared month shows its exact dates. "}Odoo calculates this report in USD using its own currency conversion; the dashboard does not convert it again.`}
+          ? `الأرقام مأخوذة من قائمة الأرباح والخسائر في Odoo للشركات: ${report.companies.map((item) => item.name).join("، ")}. القيود المرحلة فقط. ${activeTab === "report" ? `الفترة من ${report.from} إلى ${report.to}. ` : "تاريخ كل شهر ظاهر داخل المقارنة. "}${report.calculationBasis === "sum_of_odoo_months" ? "كل شهر محسوب بالدولار داخل Odoo بسعره، وإجمالي الفترة مجموع نتائج الشهور بعد تقريب كل شهر للسنت؛ لا نستخدم إجمالي Odoo السنوي أو سعر اليوم." : "الشهر محسوب بالدولار داخل Odoo باستخدام تحويل العملات الخاص به، بدون قسمة إضافية في الداشبورد."}`
+          : `Figures come from Odoo Profit and Loss for ${report.companies.map((item) => item.name).join(", ")}, posted entries only. ${activeTab === "report" ? `Period ${report.from} to ${report.to}. ` : "Each compared month shows its exact dates. "}${report.calculationBasis === "sum_of_odoo_months" ? "Odoo converts each month to USD at that month's rate; the period total adds the monthly amounts rounded to cents, not Odoo's revalued annual total or today's rate." : "Odoo calculates this month in USD using its own currency conversion; the dashboard does not convert it again."}`}
       </Notice>
 
       {account && (
