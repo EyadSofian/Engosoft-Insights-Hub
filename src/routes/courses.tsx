@@ -34,8 +34,9 @@ import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
 import type { CourseLeadLossReport } from "@/lib/course-lead-loss";
+import { courseCrmCpl } from "@/lib/course-cpl";
 import { useFilters } from "@/lib/filter-store";
-import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, useI18n } from "@/lib/i18n";
+import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 import {
@@ -207,8 +208,8 @@ function courseMetrics(
         { key: "leads", label: A ? "الليدز" : "Leads", value: fmtNum(linked.leads) },
         {
           key: "cpl",
-          label: "CPL",
-          value: linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—",
+          label: A ? "تكلفة ليد CRM" : "CRM cost per lead",
+          value: fmtUSDFull(courseCrmCpl(linked.spend, linked.leads)),
         },
         { key: "courses", label: A ? "الدورات" : "Courses", value: fmtNum(courses.length) },
       ],
@@ -237,15 +238,18 @@ function courseMetrics(
       definition: A
         ? "العملاء المحتملون الذين تحمل صفوفهم دورة معروفة داخل الفترة."
         : "Leads whose rows carry a known course inside the period.",
+      caveat: A
+        ? "تكلفة ليد CRM = الصرف المنسوب للدورة ÷ سجلات CRM المحسوبة بعد استبعاد Recommendation وWhatsApp/AutoDialer Broadcast. عند عرض كل القنوات، قد يشمل المقام ليدز غير مدفوعة؛ الرقم ليس CPL المنصة."
+        : "CRM cost per lead = course-attributed spend ÷ counted CRM records after excluding Recommendation and WhatsApp/AutoDialer Broadcast. With all channels selected, the denominator can include non-paid leads; this is not platform CPL.",
       formula: A
-        ? `${fmtNum(linked.leads)} ليد عبر ${fmtNum(courses.length)} دورة، بتكلفة ${linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—"} لكل ليد.`
-        : `${fmtNum(linked.leads)} leads across ${fmtNum(courses.length)} courses, at ${linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—"} each.`,
+        ? `${fmtNum(linked.leads)} ليد عبر ${fmtNum(courses.length)} دورة؛ الصرف المنسوب ÷ ليدز CRM = ${fmtUSDFull(courseCrmCpl(linked.spend, linked.leads))}.`
+        : `${fmtNum(linked.leads)} leads across ${fmtNum(courses.length)} courses; attributed spend ÷ CRM leads = ${fmtUSDFull(courseCrmCpl(linked.spend, linked.leads))}.`,
       supporting: [
         { key: "spend", label: A ? "الإنفاق" : "Spend", value: fmtUSD(linked.spend) },
         {
           key: "cpl",
-          label: "CPL",
-          value: linked.leads > 0 ? fmtUSD(linked.spend / linked.leads) : "—",
+          label: A ? "تكلفة ليد CRM" : "CRM cost per lead",
+          value: fmtUSDFull(courseCrmCpl(linked.spend, linked.leads)),
         },
         { key: "invoices", label: A ? "الفواتير" : "Invoices", value: fmtNum(linked.invoices) },
         {
@@ -766,6 +770,17 @@ function CourseSnapshotCards({
                   {fmtNum(mode === "ads" ? course.crmLeads : course.won)}
                 </span>
               </div>
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-brand-soft px-2.5 py-2 text-[12px]">
+                <span className="font-semibold text-brand">
+                  {lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
+                </span>
+                <span className="num font-bold text-text">
+                  {fmtUSDFull(courseCrmCpl(course.spend, course.crmLeads))}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-text-subtle">
+                {lang === "ar" ? "الصرف ÷" : "Spend ÷"} {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد CRM" : "CRM leads"}
+              </p>
             </div>
           </article>
         ))}
@@ -990,19 +1005,25 @@ function CoursePortfolioNavigator({
                     value={mode === "ads" ? fmtNum(course.crmLeads) : fmtNum(course.won)}
                   />
                   <CourseCardMetric
-                    label={mode === "ads" ? "CPL" : lang === "ar" ? "أوامر البيع" : "Sales orders"}
-                    value={
-                      mode === "ads"
-                        ? course.crmLeads > 0
-                          ? fmtUSD(course.spend / course.crmLeads)
-                          : "—"
-                        : fmtNum(course.orders)
-                    }
+                    label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
+                    value={fmtNum(course.orders)}
                   />
                   <CourseCardMetric
                     label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
                     value={fmtRoas(course.roas)}
                   />
+                </div>
+
+                <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand/20 bg-brand-soft px-3 py-2.5">
+                  <span className="min-w-0 text-[12px] font-bold text-brand">
+                    {lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
+                    <span className="mt-0.5 block text-[11px] font-medium text-text-muted">
+                      {fmtUSD(course.spend)} ÷ {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد" : "leads"}
+                    </span>
+                  </span>
+                  <span className="num text-base font-bold text-text">
+                    {fmtUSDFull(courseCrmCpl(course.spend, course.crmLeads))}
+                  </span>
                 </div>
 
                 <div className="mx-4 mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -1580,7 +1601,7 @@ function CourseDetailPanel({
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
             <HeaderStat
               label={lang === "ar" ? "إنفاق الفترة" : "Period spend"}
               value={fmtUSD(course.spend)}
@@ -1588,6 +1609,10 @@ function CourseDetailPanel({
             <HeaderStat
               label={lang === "ar" ? "ليدز الفترة" : "Period leads"}
               value={fmtNum(course.crmLeads)}
+            />
+            <HeaderStat
+              label={lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
+              value={fmtUSDFull(courseCrmCpl(course.spend, course.crmLeads))}
             />
             <HeaderStat label="Lost" value={fmtNum(course.lost)} />
             <HeaderStat label="Won" value={fmtNum(course.won)} />
@@ -1825,7 +1850,7 @@ function CourseDetailPanel({
           </div>
 
           {compareA && compareB ? (
-            <div className="mt-4 card-grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+            <div className="mt-4 card-grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
               <MonthMetricCard
                 label={lang === "ar" ? "الإنفاق" : "Spend"}
                 first={compareA.spend}
@@ -1842,6 +1867,15 @@ function CourseDetailPanel({
                 firstLabel={formatMonth(monthA, lang)}
                 secondLabel={formatMonth(monthB, lang)}
                 format={fmtNum}
+              />
+              <MonthMetricCard
+                label={lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
+                first={courseCrmCpl(compareA.spend, compareA.leads)}
+                second={courseCrmCpl(compareB.spend, compareB.leads)}
+                firstLabel={formatMonth(monthA, lang)}
+                secondLabel={formatMonth(monthB, lang)}
+                format={fmtUSDFull}
+                invert
               />
               <MonthMetricCard
                 label="Lost"

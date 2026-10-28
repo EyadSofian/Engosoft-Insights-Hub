@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, Layers3, ReceiptText, X } from "lucide-react";
 import { BarList, Card, Pill, SectionTitle } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
+import { courseCrmCpl } from "@/lib/course-cpl";
 import { sourceLabel, variantLabel } from "@/lib/product-taxonomy";
+import type { CourseAgg } from "@/lib/types";
 import { useModalGuard } from "@/lib/ui-store";
+import { useApi } from "@/lib/use-api";
 
 export interface CourseBreakdown {
   key: string;
@@ -88,6 +91,91 @@ function VariantChips({
   );
 }
 
+function CourseCrmCostPanel() {
+  const { lang } = useI18n();
+  const { data, isLoading, error, refetch } = useApi<{ courses: CourseAgg[] }>("/api/courses");
+  const [showAll, setShowAll] = useState(false);
+  const courses = data?.courses ?? [];
+  const rows = showAll ? courses : courses.slice(0, 6);
+
+  return (
+    <Card>
+      <SectionTitle
+        hint={
+          lang === "ar"
+            ? "حسب اسم الكورس في CRM، وليس حسب كاتجوري المنتج المالية أسفلها. التكلفة = صرف الإعلانات المنسوب للكورس ÷ الليدز المحسوبة بعد استبعاد Recommendation وWhatsApp/AutoDialer Broadcast. فترة الصرف بتاريخ الإعلان والليدز بتاريخ إنشاء CRM."
+            : "Grouped by CRM course, not the financial product category below. Cost = course-attributed ad spend ÷ counted leads after excluding Recommendation and WhatsApp/AutoDialer Broadcast. Spend follows ad date and leads follow CRM creation date."
+        }
+      >
+        {lang === "ar" ? "تكلفة الليد حسب الكورس" : "Cost per lead by course"}
+      </SectionTitle>
+
+      {isLoading && !data ? (
+        <p className="py-6 text-sm text-text-muted">
+          {lang === "ar" ? "جارٍ حساب تكلفة الليد لكل كورس..." : "Calculating each course's lead cost..."}
+        </p>
+      ) : error ? (
+        <div className="flex flex-wrap items-center gap-3 py-4 text-sm text-text-muted">
+          <span>{lang === "ar" ? "تعذّر تحميل تكلفة الليد." : "Could not load course lead costs."}</span>
+          <button type="button" onClick={() => void refetch()} className="font-bold text-brand underline">
+            {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+          </button>
+        </div>
+      ) : courses.length ? (
+        <>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {rows.map((course) => {
+              const cpl = courseCrmCpl(course.spend, course.crmLeads);
+              return (
+                <article
+                  key={course.key}
+                  className="overflow-hidden rounded-2xl border border-border bg-surface-2/35 p-3.5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="min-w-0 truncate text-sm font-bold text-text" title={course.name}>
+                      {course.name}
+                    </h3>
+                    <span className="num shrink-0 rounded-lg bg-brand-soft px-2.5 py-1 text-base font-bold text-brand">
+                      {fmtUSDFull(cpl)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[12px] text-text-muted">
+                    <span>{lang === "ar" ? "الصرف المنسوب" : "Attributed spend"} <b className="num text-text">{fmtUSDFull(course.spend)}</b></span>
+                    <span>{lang === "ar" ? "ليدز CRM" : "CRM leads"} <b className="num text-text">{fmtNum(course.crmLeads)}</b></span>
+                  </div>
+                  {cpl === null && (
+                    <p className="mt-1.5 text-[11px] text-text-subtle">
+                      {lang === "ar"
+                        ? course.spend <= 0 ? "لا يوجد صرف منسوب؛ لا نعرض تكلفة صفرية." : "لا توجد ليدز CRM محسوبة؛ التكلفة غير قابلة للحساب."
+                        : course.spend <= 0 ? "No attributed spend; a zero cost is not assumed." : "No counted CRM leads; cost is not measurable."}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          {courses.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((value) => !value)}
+              className="mt-3 min-h-10 rounded-xl border border-border px-3 text-xs font-bold text-brand hover:bg-brand-soft"
+              aria-expanded={showAll}
+            >
+              {showAll
+                ? lang === "ar" ? "عرض أقل" : "Show fewer"
+                : lang === "ar" ? `عرض كل الكورسات (${fmtNum(courses.length)})` : `Show all courses (${fmtNum(courses.length)})`}
+            </button>
+          )}
+        </>
+      ) : (
+        <p className="py-6 text-sm text-text-muted">
+          {lang === "ar" ? "لا توجد بيانات كورسات في الفترة المختارة." : "No course data in the selected period."}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
   const { lang } = useI18n();
   const [open, setOpen] = useState<CourseFamily | null>(null);
@@ -97,6 +185,7 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
 
   return (
     <>
+      <CourseCrmCostPanel />
       <Card>
         <SectionTitle
           hint={
