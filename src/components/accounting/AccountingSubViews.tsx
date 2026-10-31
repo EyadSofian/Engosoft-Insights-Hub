@@ -897,13 +897,13 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
     },
     callTime: {
       id: "teams.callTime",
-      title: A ? "وقت المكالمات" : "Call hours",
-      value: formatCallHours(S.totalCallSeconds, lang),
+      title: A ? "ساعات التحدث" : "Talk hours",
+      value: formatCallHours(S.talkSeconds, lang),
       tone: "cyan",
       icon: <Clock3 size={16} />,
       definition: A
-        ? "إجمالي زمن المكالمات في الفترة. وقت التحدث هو الجزء الذي رُد فيه فعلًا؛ الفرق بينهما هو الرنين والانتظار."
-        : "Total call time in the period. Talk time is the part that was actually answered; the difference is ringing and waiting.",
+        ? "مجموع وقت الكلام الفعلي في سجلات Yeastar، بدون الرنين والانتظار. لا يحتاج تفريغًا صوتيًا أو تحليلًا للمكالمة."
+        : "Actual talk time from Yeastar call records, excluding ringing and waiting. No transcript or call analysis is required.",
       formula: A
         ? `وقت التحدث ${formatCallHours(S.talkSeconds, lang)} من إجمالي ${formatCallHours(S.totalCallSeconds, lang)}.`
         : `${formatCallHours(S.talkSeconds, lang)} of talk time within ${formatCallHours(S.totalCallSeconds, lang)} total.`,
@@ -1152,7 +1152,7 @@ export function AccountingAgentsView() {
               : "Accounting and CRM metrics remain available.")}
         </Notice>
       )}
-      {data.callsHub.ok && !data.callsHub.recordsAvailable && (
+      {data.callsHub.ok && data.summary.outboundCalls === 0 && (
         <Notice
           tone="warning"
           title={
@@ -1251,15 +1251,15 @@ export function AccountingAgentsView() {
             <MetricDetailTrigger
               detail={{
                 ...boardMetrics.callTime,
-                value: <CallHoursKpiValue seconds={data.summary.totalCallSeconds} lang={lang} />,
+                value: <CallHoursKpiValue seconds={data.summary.talkSeconds} lang={lang} />,
               }}
               card={{
                 index: 6,
                 valueWrap: true,
                 sub:
                   lang === "ar"
-                    ? `وقت التحدث: ${formatCallHours(data.summary.talkSeconds, lang)}`
-                    : `${formatCallHours(data.summary.talkSeconds, lang)} actual talk time`,
+                    ? "وقت الكلام الفعلي بدون الرنين والانتظار"
+                    : "Actual talk time, excluding ringing and waiting",
               }}
             />
             <MetricDetailTrigger

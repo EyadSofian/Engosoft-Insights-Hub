@@ -1086,7 +1086,7 @@ function mergeSlaRep(map: Map<string, MutableAgent>, rows: SlaRepMonthly[]) {
 }
 
 /**
- * The Calls Hub owns the call facts. The legacy SLA feed remains useful for
+ * The direct Yeastar CDR store owns call facts. The legacy SLA feed remains useful for
  * CRM timing, but its monthly call totals must never be added to the live PBX
  * totals or the employee would be counted twice.
  */
@@ -1119,14 +1119,15 @@ function mergeCallsHubEmployees(
         : null;
     const key = matched?.[0] ?? exactKey;
     const row = matched?.[1] ?? blank(key, source.name);
-    row.callExtension = source.extension;
-    row.totalCalls = source.totalCalls;
+    const alreadyMatched = row.callsHubMatched;
+    row.callExtension ||= source.extension;
+    row.totalCalls = (alreadyMatched ? row.totalCalls ?? 0 : 0) + source.totalCalls;
     // Kept for response compatibility; the UI labels this as all PBX calls.
-    row.outboundCalls = source.totalCalls;
-    row.answeredCalls = source.answeredCalls;
-    row.totalCallSeconds = source.periodCallSeconds;
-    row.talkSeconds = source.periodTalkSeconds;
-    row.averageCallSeconds = source.averageCallSeconds;
+    row.outboundCalls = row.totalCalls;
+    row.answeredCalls = (alreadyMatched ? row.answeredCalls ?? 0 : 0) + source.answeredCalls;
+    row.totalCallSeconds = (alreadyMatched ? row.totalCallSeconds ?? 0 : 0) + source.periodCallSeconds;
+    row.talkSeconds = (alreadyMatched ? row.talkSeconds ?? 0 : 0) + source.periodTalkSeconds;
+    row.averageCallSeconds = row.totalCalls ? row.totalCallSeconds / row.totalCalls : 0;
     row.analyzedCalls = source.analyzedCalls;
     row.averageQualityScore = source.averageScore;
     row.qualityNeedsReview = source.needsReview;
@@ -1695,7 +1696,7 @@ export async function buildAgentAnalytics(
       fetchedAt: callsSnapshot.fetchedAt,
       callsAvailable: callsSnapshot.employees.length > 0,
       qualityAvailable: analyzedCalls > 0,
-      recordsAvailable: totalCalls > 0,
+      recordsAvailable: callsSnapshot.recordsAvailable ?? totalCalls > 0,
       leadCoverageAvailable,
     };
     // Preserve the old response field for existing consumers while migrating

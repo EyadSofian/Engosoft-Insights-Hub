@@ -44,10 +44,12 @@ export const Route = createFileRoute("/api/crm-calls")({
             totals: {
               calls: totals.calls,
               answered: totals.answered,
+              unanswered: Math.max(0, totals.calls - totals.answered),
               answerRate: totals.calls > 0 ? (totals.answered / totals.calls) * 100 : null,
               analyzed: totals.analyzed,
               needsReview: totals.needsReview,
               talkSeconds: totals.talkSeconds,
+              talkHours: totals.talkSeconds / 3600,
               averageScore: totals.scoreSample > 0 ? totals.scoreTotal / totals.scoreSample : null,
             },
             topEmployees: [...summary.employees]

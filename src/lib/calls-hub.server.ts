@@ -44,6 +44,8 @@ export interface CallsHubSummary {
   fetchedAt: string;
   range: { from: string; to: string };
   employees: CallsHubEmployeeSummary[];
+  /** Call statistics can be available without audio/transcript access. */
+  recordsAvailable?: boolean;
   error?: string;
 }
 
@@ -232,18 +234,8 @@ export async function getCallsHubSummary(from: string, to: string): Promise<Call
   if (running) return running;
 
   const request = (async () => {
-    const url = new URL("/api/dashboard", `${baseUrl()}/`);
-    url.searchParams.set("from", from);
-    url.searchParams.set("to", to);
-    const body = (await fetchJson(url)) as Record<string, unknown>;
-    const rawEmployees = Array.isArray(body.employees) ? body.employees : [];
-    const result: CallsHubSummary = {
-      ok: true,
-      source: "Engosoft Calls Hub · Yeastar",
-      fetchedAt: safeText(body.generatedAt) || new Date().toISOString(),
-      range: { from, to },
-      employees: rawEmployees.map(employeeSummary).filter(Boolean) as CallsHubEmployeeSummary[],
-    };
+    const { readYeastarCallSummary } = await import("./yeastar-call-summary.server");
+    const result = await readYeastarCallSummary(from, to);
     summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value: result });
     return result;
   })().finally(() => summaryInFlight.delete(cacheKey));
