@@ -33,7 +33,7 @@ import { DashboardPageHeader, DashboardPanel, KpiRow } from "@/components/dashbo
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
-import { mediaPlanMonths, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
+import { mediaPlanMonths, mediaPlanBudgetSummary, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
 import { deliverableStatus } from "@/lib/media-plan-delivery";
 import type { MediaPlanLeadDetailResponse } from "@/lib/media-plan-lead-link";
 import type { MediaPlanLifecycle, MediaPlanLifecycleBucket } from "@/lib/media-plan-lifecycle";
@@ -899,8 +899,8 @@ function MediaPlanPage() {
                 sub:
                   data.plan.overallMarketingBudgetUsd !== undefined
                     ? lang === "ar"
-                      ? "إجمالي الصورة · التوزيع لم يُحدد"
-                      : "Image total · allocation pending"
+                      ? "إجمالي الخطة · راجع توزيع البنود"
+                      : "Plan total · see item allocations"
                     : `+ ${fmtUSDFull(data.plan.additionalBudgetUsd)} ${lang === "ar" ? "أنشطة إضافية" : "extra activities"}`,
               }}
             />
@@ -912,6 +912,29 @@ function MediaPlanPage() {
                 ? "الخطة دي مازالت مسودة. عدّل الأرقام واعتمدها من محرر الخطة قبل اتخاذ قرار زيادة أو خفض الميزانية."
                 : "This plan is still a draft. Edit and approve it before making budget allocation decisions."}
             </Notice>
+          )}
+          {data.plan.month === "2026-11" && (
+            <Card>
+              <SectionTitle>{lang === "ar" ? "خطة نوفمبر · توزيع الميزانية" : "November plan · budget ownership"}</SectionTitle>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {mediaPlanBudgetSummary(data.plan).owners.map((owner) => (
+                  <div key={owner.owner} className="rounded-2xl border border-border bg-surface-2 p-4">
+                    <b>{owner.owner}</b>
+                    <div className="num mt-2 text-xl font-bold">{fmtUSDFull(owner.budgetUsd)}</div>
+                    <small>{fmtPct((owner.share ?? 0) * 100, 2)}</small>
+                  </div>
+                ))}
+                <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
+                  <b>{lang === "ar" ? "فرق غير موزع" : "Unallocated difference"}</b>
+                  <div className="num mt-2 text-xl font-bold">{fmtUSDFull(mediaPlanBudgetSummary(data.plan).unallocated)}</div>
+                </div>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-text-muted">
+                {lang === "ar"
+                  ? "بنود الصورة مجموعها 22,500$، والإجمالي المكتوب 23,500$؛ الألف دولار الفرق غير مضافة لأي مسؤول أو بند. ميزانية Automotive محفوظة 1,000$ كما بالصورة، رغم أن 600 × 1.60$ = 960$. تكلفة الليد المجمعة محسوبة من الميزانيات: 19,200$ ÷ 3,400 = 5.65$، وليس 5.59$ المكتوبة بالصورة. هدف YouTube هو مبيعات 7,000$، وليس ليدز."
+                  : "Image line items total $22,500 against its stated $23,500 envelope; the $1,000 gap has no assigned owner or activity. Automotive retains its stated $1,000 budget although 600 × $1.60 = $960. Blended CPL is calculated as $19,200 ÷ 3,400 = $5.65, not the image’s $5.59. YouTube targets $7,000 in sales, not leads."}
+              </p>
+            </Card>
           )}
 
           {!!data.storeError && <Notice tone="warning">{data.storeError}</Notice>}
@@ -1018,7 +1041,7 @@ function MediaPlanPage() {
             <Card>
               <SectionTitle
                 hint={
-                  data.plan.overallMarketingBudgetUsd !== undefined
+                  data.plan.overallMarketingBudgetUsd !== undefined && data.plan.leadGenerationBudgetUsd === 0
                     ? lang === "ar"
                       ? `الصورة تحدد ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} للتسويق كله، لكنها لا تفصل ميزانية كل نشاط.`
                       : `The image specifies ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} overall, without activity allocations.`
@@ -1043,6 +1066,7 @@ function MediaPlanPage() {
                           : "Unallocated"
                         : fmtUSDFull(activity.budgetUsd)}
                     </div>
+                    {activity.owners?.length ? <div className="mt-2"><OwnerList owners={activity.owners} /></div> : null}
                   </div>
                 ))}
               </div>

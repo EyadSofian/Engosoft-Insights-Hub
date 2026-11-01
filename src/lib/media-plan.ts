@@ -32,6 +32,8 @@ export interface MediaPlanCourseTarget {
   label: string;
   targetLeads: number;
   targetCpl: number;
+  /** Explicit source allocation; may differ from the rounded target CPL. */
+  budgetUsd?: number;
   owners: string[];
   /** Extra campaign/course-name fragments used when linking live delivery. */
   matchTerms?: string[];
@@ -41,6 +43,7 @@ export interface MediaPlanActivityBudget {
   key: string;
   label: string;
   budgetUsd: number;
+  owners?: string[];
   /** Optional delivery promise; legacy budget-only activities remain valid. */
   category?: MediaPlanDeliverableCategory;
   metric?: MediaPlanDeliverableMetric;
@@ -226,6 +229,85 @@ export const MEDIA_PLANS: Record<string, MonthlyMediaPlan> = {
       },
     ],
   },
+  // November source image has an unresolved $1,000 gap between its envelope
+  // and line items. Keep it draft and unallocated, never invent a course split.
+  "2026-11": {
+    month: "2026-11",
+    status: "draft",
+    paidLeadTarget: 3_400,
+    organicWebinarLeadTarget: 0,
+    leadTarget: 3_400,
+    leadGenerationBudgetUsd: 19_200,
+    overallMarketingBudgetUsd: 23_500,
+    salesTargetUsd: 140_000,
+    courses: [
+      { key: "cfm", label: "CFM", targetLeads: 600, targetCpl: 9, owners: ["Sayed"] },
+      { key: "pmp", label: "PMP", targetLeads: 450, targetCpl: 7, owners: ["Sayed"] },
+      {
+        key: "interior",
+        label: "Interior Design",
+        targetLeads: 600,
+        targetCpl: 6,
+        owners: ["Sayed"],
+      },
+      {
+        key: "rmp-capm",
+        label: "RMP & CAPM — New Track",
+        targetLeads: 150,
+        targetCpl: 7,
+        owners: ["Shazly"],
+        matchTerms: ["rmp", "capm"],
+      },
+      { key: "cmrp", label: "CMRP", targetLeads: 300, targetCpl: 5, owners: ["Shazly"] },
+      {
+        key: "automotive",
+        label: "Automotive",
+        targetLeads: 600,
+        targetCpl: 1.6,
+        budgetUsd: 1_000,
+        owners: ["Shazly"],
+      },
+      { key: "bim", label: "BIM", targetLeads: 500, targetCpl: 5, owners: ["Sayed"] },
+      {
+        key: "membership",
+        label: "Membership",
+        targetLeads: 200,
+        targetCpl: 5,
+        owners: ["Shazly"],
+        matchTerms: ["membership"],
+      },
+    ],
+    additionalActivities: [
+      {
+        key: "website",
+        label: "Website Marketing",
+        budgetUsd: 2_000,
+        owners: ["Sayed"],
+        category: "website",
+        matchTerms: ["website", "web con", "web sign", "signup"],
+      },
+      {
+        key: "branding",
+        label: "Branding",
+        budgetUsd: 300,
+        owners: ["Sayed"],
+        category: "creative",
+        matchTerms: ["branding", "awareness"],
+      },
+      {
+        key: "youtube",
+        label: "YouTube",
+        budgetUsd: 1_000,
+        owners: ["Shazly"],
+        category: "paid_media",
+        metric: "custom",
+        target: 7_000,
+        unit: "USD sales",
+        actualSource: "manual_reported",
+        matchTerms: ["youtube"],
+      },
+    ],
+  },
 };
 
 export const OCTOBER_2026_SOURCE = {
@@ -263,7 +345,35 @@ export function mediaPlanForMonth(month?: string): MonthlyMediaPlan {
 }
 
 export function plannedCourseBudget(row: MediaPlanCourseTarget): number {
-  return row.targetLeads * row.targetCpl;
+  return row.budgetUsd ?? row.targetLeads * row.targetCpl;
+}
+
+export function mediaPlanBudgetSummary(plan: MonthlyMediaPlan) {
+  const courses = plan.courses.reduce((sum, row) => sum + plannedCourseBudget(row), 0);
+  const activities = plan.additionalActivities.reduce((sum, row) => sum + row.budgetUsd, 0);
+  const allocated = courses + activities;
+  const total = plan.overallMarketingBudgetUsd ?? plan.leadGenerationBudgetUsd + activities;
+  const owners = new Map<string, number>();
+  let sharedOrUnassigned = 0;
+  for (const row of [
+    ...plan.courses.map((course) => ({ ...course, budgetUsd: plannedCourseBudget(course) })),
+    ...plan.additionalActivities,
+  ]) {
+    if (row.owners?.length === 1)
+      owners.set(row.owners[0], (owners.get(row.owners[0]) ?? 0) + row.budgetUsd);
+    else sharedOrUnassigned += row.budgetUsd;
+  }
+  return {
+    allocated,
+    total,
+    unallocated: total - allocated,
+    sharedOrUnassigned,
+    owners: [...owners].map(([owner, budgetUsd]) => ({
+      owner,
+      budgetUsd,
+      share: total > 0 ? budgetUsd / total : null,
+    })),
+  };
 }
 
 const normalized = (value: string): string =>
@@ -411,6 +521,9 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
       label: shortText(row.label, `Course ${index + 1} label`, 100),
       targetLeads: boundedNumber(row.targetLeads, `Course ${index + 1} target leads`, 10_000_000),
       targetCpl: boundedNumber(row.targetCpl, `Course ${index + 1} target CPL`, 1_000_000),
+      ...(row.budgetUsd !== undefined
+        ? { budgetUsd: boundedNumber(row.budgetUsd, `Course ${index + 1} budget`, 100_000_000) }
+        : {}),
       owners: stringList(row.owners, `Course ${index + 1} owners`, 20),
       matchTerms: Array.isArray(row.matchTerms)
         ? stringList(row.matchTerms, `Course ${index + 1} match terms`, 20)
@@ -438,6 +551,9 @@ export function normalizeMonthlyMediaPlan(value: unknown): MonthlyMediaPlan {
         key,
         label: shortText(row.label, `Activity ${index + 1} label`, 100),
         budgetUsd: boundedNumber(row.budgetUsd, `Activity ${index + 1} budget`, 100_000_000),
+        ...(Array.isArray(row.owners)
+          ? { owners: stringList(row.owners, `Activity ${index + 1} owners`, 20) }
+          : {}),
         ...(typeof row.category === "string"
           ? { category: row.category as MediaPlanDeliverableCategory }
           : {}),

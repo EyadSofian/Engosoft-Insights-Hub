@@ -358,6 +358,29 @@ export function MediaPlanEditor({
                       className={inputClass}
                     />
                   </Field>
+                  <Field
+                    label={
+                      lang === "ar"
+                        ? "ميزانية محددة بالدولار (اختياري)"
+                        : "Explicit budget USD (optional)"
+                    }
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={inputClass}
+                      value={row.budgetUsd ?? ""}
+                      onChange={(event) =>
+                        patchCourse(row.key, {
+                          budgetUsd:
+                            event.target.value === ""
+                              ? undefined
+                              : Math.max(0, Number(event.target.value) || 0),
+                        })
+                      }
+                    />
+                  </Field>
                   <Field label={lang === "ar" ? "كلمات ربط الحملات" : "Campaign match terms"}>
                     <input
                       value={(row.matchTerms ?? []).join(", ")}
@@ -568,6 +591,20 @@ export function MediaPlanEditor({
                     value={row.budgetUsd}
                     onChange={(value) => patchActivity(row.key, { budgetUsd: value })}
                   />
+                  <Field label={lang === "ar" ? "المسؤولون" : "Owners"}>
+                    <input
+                      className={inputClass}
+                      value={(row.owners ?? []).join(", ")}
+                      onChange={(event) =>
+                        patchActivity(row.key, {
+                          owners: event.target.value
+                            .split(",")
+                            .map((owner) => owner.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                  </Field>
                   <button
                     type="button"
                     onClick={() =>

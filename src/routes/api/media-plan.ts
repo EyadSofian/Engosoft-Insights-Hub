@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   matchMediaPlanCourse,
   plannedCourseBudget,
+  mediaPlanBudgetSummary,
   type MediaPlanDeliverable,
 } from "@/lib/media-plan";
 import type { CourseAgg } from "@/lib/types";
@@ -84,7 +85,8 @@ export const Route = createFileRoute("/api/media-plan")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { authoritativeLostLeads, computeCourses, computeTotals, getFiltered } = await import("@/lib/metrics.server");
+        const { authoritativeLostLeads, computeCourses, computeTotals, getFiltered } =
+          await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { loadMediaPlanSource } = await import("@/lib/media-plans.server");
         const { loadAllData } = await import("@/lib/sheet-cache.server");
@@ -92,7 +94,8 @@ export const Route = createFileRoute("/api/media-plan")({
         const { accountingReportingDate } = await import("@/lib/accounting-policy");
         const { accountingUsdPaid, fxRatesFromFilters } = await import("@/lib/fx-rates");
         const { funnelFromLive, summarizeFunnel } = await import("@/lib/management-review");
-        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle, mediaPlanOpportunityActual } = await import("@/lib/media-plan-lifecycle");
+        const { addMediaPlanLifecycle, emptyMediaPlanLifecycle, mediaPlanOpportunityActual } =
+          await import("@/lib/media-plan-lifecycle");
         const { writesEnabled, ssoConfigured, adminCodeConfigured, authorizeWrite } =
           await import("@/lib/admin-auth.server");
 
@@ -135,23 +138,35 @@ export const Route = createFileRoute("/api/media-plan")({
           getFiltered({ ...scopedFilters, source: "Webinar" }),
           loadAllData(),
         ]);
-        const allCrmLeads = summarizeFunnel(funnelFromLive(
-          data.crm.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
-          data.lost.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
-        )).leads;
-        const certificateRows = allData.accounting
-          .filter((row) =>
+        const allCrmLeads = summarizeFunnel(
+          funnelFromLive(
+            data.crm.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+            data.lost.filter((row) => row.createdAt >= window.from && row.createdAt <= window.to),
+          ),
+        ).leads;
+        const certificateRows = allData.accounting.filter(
+          (row) =>
             accountingReportingDate(row, "payment") >= window.from &&
             accountingReportingDate(row, "payment") <= window.to &&
             isExcludedFromSalesRevenue(row),
-          );
+        );
         const rates = fxRatesFromFilters({});
-        const certificateRevenueUsd = certificateRows
-          .reduce((sum, row) => sum + accountingUsdPaid(row, rates), 0);
-        const companyRevenueMap = new Map<string, { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }>();
+        const certificateRevenueUsd = certificateRows.reduce(
+          (sum, row) => sum + accountingUsdPaid(row, rates),
+          0,
+        );
+        const companyRevenueMap = new Map<
+          string,
+          { company: string; salesUsd: number; certificateUsd: number; certificateLines: number }
+        >();
         const companyRow = (company: string) => {
           const key = company.trim() || "غير محدد";
-          const current = companyRevenueMap.get(key) ?? { company: key, salesUsd: 0, certificateUsd: 0, certificateLines: 0 };
+          const current = companyRevenueMap.get(key) ?? {
+            company: key,
+            salesUsd: 0,
+            certificateUsd: 0,
+            certificateLines: 0,
+          };
           companyRevenueMap.set(key, current);
           return current;
         };
@@ -359,7 +374,8 @@ export const Route = createFileRoute("/api/media-plan")({
               actualSource: "Odoo CRM · Course Categories",
               platformActual: row?.actual.platformLeads ?? null,
               dateScope,
-              matchingRule: "Current Odoo opportunities by lead Course Categories and creation month; fresh and Lost leads are separate, and platform delivery is comparison-only.",
+              matchingRule:
+                "Current Odoo opportunities by lead Course Categories and creation month; fresh and Lost leads are separate, and platform delivery is comparison-only.",
               reportTo: "/campaigns",
             };
           }),
@@ -389,6 +405,7 @@ export const Route = createFileRoute("/api/media-plan")({
         return json({
           plan: {
             ...plan,
+            budgetReconciliation: mediaPlanBudgetSummary(plan),
             targetCpl:
               plan.leadGenerationBudgetUsd > 0
                 ? divide(plan.leadGenerationBudgetUsd, plan.paidLeadTarget)
@@ -424,7 +441,8 @@ export const Route = createFileRoute("/api/media-plan")({
             revenueByCompany,
             revenueIncludingCertificatesUsd: totals.revenue + certificateRevenueUsd,
             actualSalesBudgetAllowanceUsd: plan.month === "2026-09" ? totals.revenue * 0.17 : null,
-            actualGrossBudgetAllowanceUsd: plan.month === "2026-09" ? (totals.revenue + certificateRevenueUsd) * 0.17 : null,
+            actualGrossBudgetAllowanceUsd:
+              plan.month === "2026-09" ? (totals.revenue + certificateRevenueUsd) * 0.17 : null,
             salesAchievement: divide(totals.revenue, plan.salesTargetUsd),
           },
           courses: courseRows,
@@ -442,6 +460,11 @@ export const Route = createFileRoute("/api/media-plan")({
           },
           storeError: source.error,
           sources: [
+            ...(plan.month === "2026-11"
+              ? [
+                  "November 2026 White Friday media-plan image supplied by management; $1,000 envelope gap remains unallocated, with no invented owner assignment.",
+                ]
+              : []),
             "ENGOSOFT Marketing Plan Aug 2026: lead, budget, sales and ownership targets",
             "July Media Plan and Media Buyers Plan: course CPL benchmarks",
             ...(plan.month === "2026-10"
@@ -450,7 +473,9 @@ export const Route = createFileRoute("/api/media-plan")({
                 ]
               : []),
             ...(plan.month === "2026-09"
-              ? ["Management correction, 2026-10-01: September sales target $135,000; marketing budget 17% of target ($22,950). August course/activity allocations remain a draft."]
+              ? [
+                  "Management correction, 2026-10-01: September sales target $135,000; marketing budget 17% of target ($22,950). August course/activity allocations remain a draft.",
+                ]
               : []),
           ],
           health: data.snapshot.health,
