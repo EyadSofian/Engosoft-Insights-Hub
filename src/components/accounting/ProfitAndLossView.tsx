@@ -1055,6 +1055,11 @@ export function ProfitAndLossView() {
 
   return (
     <div className="space-y-5">
+      <form action="/api/profitability-access/logout" method="post" className="flex justify-end">
+        <button type="submit" className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-text">
+          {lang === "ar" ? "قفل الأرباح والخسائر" : "Lock Profit and Loss"}
+        </button>
+      </form>
       <section
         className="relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-7"
         style={{ background: "linear-gradient(115deg, #09294e 0%, #0d4566 68%, #0b686d 100%)" }}

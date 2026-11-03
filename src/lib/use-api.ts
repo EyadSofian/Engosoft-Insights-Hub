@@ -33,6 +33,10 @@ export function useApi<T>(
           .json()
           .then((body: { code?: string }) => body?.code)
           .catch(() => undefined);
+        if (authError === "PNL_PASSWORD_REQUIRED") {
+          if (typeof window !== "undefined") window.location.assign("/accounting?view=profitability");
+          throw new Error("Profit and Loss requires its password.");
+        }
         if (authError === "REVENUE_PASSWORD_REQUIRED") {
           // A client-side route transition can skip the document request that
           // the server middleware uses to render the password screen. Reload

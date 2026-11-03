@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { negotiateCompression, parseContentLength } from "./lib/response-compression";
 import { startScheduler } from "./lib/scheduler.server";
+import { handlePnlAccess } from "./lib/profitability-access.server";
 
 // Registered once at module load. `startScheduler` is idempotent and returns
 // early unless both Telegram variables are present.
@@ -146,8 +147,14 @@ function compressResponse(request: Request, response: Response): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const pnlAccess = await handlePnlAccess(request);
+      if (pnlAccess) return pnlAccess;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
+      if (new URL(request.url).pathname.startsWith("/api/profitability")) {
+        response.headers.set("cache-control", "private, no-store");
+        response.headers.append("vary", "cookie");
+      }
       return compressResponse(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
