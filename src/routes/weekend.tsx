@@ -155,7 +155,7 @@ function Change({
   const Icon = flat ? null : value > 0 ? ArrowUpRight : ArrowDownRight;
   return (
     <span
-      className="num inline-flex items-center gap-1 text-[12px] font-semibold"
+      className="num inline-flex items-center gap-1 text-[12px] font-medium"
       style={{
         color: good === null ? "var(--text-muted)" : good ? "var(--success)" : "var(--danger)",
       }}
@@ -549,8 +549,8 @@ function WeekendPerformance() {
             </div>
           </section>
 
-          <div className="card-grid lg:grid-cols-2">
-            <Card>
+          <div className="dash-grid">
+            <Card className="col-7">
               <SectionTitle hint={lang === "ar" ? "الأقل أفضل" : "Lower is better"}>
                 {lang === "ar" ? "كفاءة الصرف — CPL" : "Spend efficiency — CPL"}
               </SectionTitle>
@@ -567,7 +567,7 @@ function WeekendPerformance() {
                 color="var(--warning)"
               />
             </Card>
-            <Card>
+            <Card className="col-5">
               <SectionTitle
                 hint={
                   lang === "ar" ? "Won من إجمالي ليدز الويك إند" : "Won as a share of weekend leads"
@@ -703,7 +703,7 @@ function BudgetSignal({ data, lang }: { data: WeekendResponse; lang: "ar" | "en"
                 {data.window.from} → {data.window.to}
               </bdi>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-2.5 py-1 text-[12px] font-medium text-brand">
               {lang === "ar"
                 ? `المحسوب كويك إند: الجمعة + السبت فقط · ${fmtNum(data.window.weekendDays)} يوم`
                 : `Weekend sample: Friday + Saturday only · ${fmtNum(data.window.weekendDays)} days`}
@@ -812,7 +812,7 @@ function PeriodCard({
           </p>
         </div>
         <span
-          className="num rounded-full px-2.5 py-1 text-[12px] font-semibold"
+          className="num rounded-full px-2.5 py-1 text-[12px] font-medium"
           style={{ background: soft, color }}
         >
           {fmtNum(metrics.calendarDays)} {lang === "ar" ? "يوم" : "days"}
@@ -930,7 +930,7 @@ function PlatformDecisionCard({
         />
       </div>
       <div className="mt-5 border-t border-border pt-3">
-        <p className="text-[12px] font-medium uppercase tracking-wide text-text-subtle">
+        <p className="text-[12px] font-medium text-text-subtle">
           {lang === "ar" ? "مقابل 5 أيام العمل" : "vs five workdays"}
         </p>
         <p className="num mt-1.5 text-xs text-text-muted">{evidence.join(" · ") || "—"}</p>
@@ -1143,7 +1143,7 @@ function DayBreakdown({ rows, lang }: { rows: WeekendDayRow[]; lang: "ar" | "en"
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="num text-[12px] text-text-subtle">#{index + 1}</span>
-                <span className="truncate text-xs font-semibold">
+                <span className="truncate text-xs font-medium">
                   {labelPlatform(row.platform, lang)}
                 </span>
                 <Pill>{DAY_LABEL[row.day][lang]}</Pill>

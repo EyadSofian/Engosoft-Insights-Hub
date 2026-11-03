@@ -27,7 +27,11 @@ export const Route = createFileRoute("/api/media-plan-leads")({
           page > 10000 ||
           stage.length > 100 ||
           (stage !== "" && bucket !== "opportunity") ||
-          (bucket !== "" && bucket !== "lead_active" && bucket !== "lead_lost" && bucket !== "lead_other" && bucket !== "opportunity") ||
+          (bucket !== "" &&
+            bucket !== "lead_active" &&
+            bucket !== "lead_lost" &&
+            bucket !== "lead_other" &&
+            bucket !== "opportunity") ||
           (opportunityLost && bucket !== "opportunity") ||
           (params.has("opportunityLost") && params.get("opportunityLost") !== "1")
         )
@@ -83,12 +87,13 @@ export const Route = createFileRoute("/api/media-plan-leads")({
             else if (row.stage === "Archived") lifecycle.leadOther++;
             else lifecycle.leadActive++;
           }
-          const filtered = linked.filter((row) =>
-            (!stage || row.stage === stage) &&
-            mediaPlanRecordMatches(row, bucket || undefined, opportunityLost),
-          ).sort(
-            (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
-          );
+          const filtered = linked
+            .filter(
+              (row) =>
+                (!stage || row.stage === stage) &&
+                mediaPlanRecordMatches(row, bucket || undefined, opportunityLost),
+            )
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
           const pageSize = 50;
           return json({
             match,

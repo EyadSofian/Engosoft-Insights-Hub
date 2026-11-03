@@ -30,7 +30,10 @@ export function weeklyCallEvidence(
 ): { status: WeeklyCallStatus; attempts: number; answeredCalls: number; retriedNoAnswer: boolean } {
   const phones = [lead.phone, lead.mobile]
     .map(normalizePhone)
-    .filter((phone, index, all) => phone.key && all.findIndex((other) => other.key === phone.key) === index);
+    .filter(
+      (phone, index, all) =>
+        phone.key && all.findIndex((other) => other.key === phone.key) === index,
+    );
   if (!callsAvailable || !phones.length) {
     return { status: "unknown", attempts: 0, answeredCalls: 0, retriedNoAnswer: false };
   }
@@ -45,13 +48,15 @@ export function weeklyCallEvidence(
   const calls = [...matched.values()];
   const attempts = calls.reduce((total, call) => total + call.totalCalls, 0);
   const answeredCalls = calls.reduce((total, call) => total + call.answeredCalls, 0);
-  const status: WeeklyCallStatus = answeredCalls > 0
-    ? "answered"
-    : attempts > 0
-      ? "attempted_no_answer"
-      : "no_pbx_record";
+  const status: WeeklyCallStatus =
+    answeredCalls > 0 ? "answered" : attempts > 0 ? "attempted_no_answer" : "no_pbx_record";
   // An aggregate proves repeated dial attempts, not the chronological order of individual calls.
-  return { status, attempts, answeredCalls, retriedNoAnswer: status === "attempted_no_answer" && attempts >= 2 };
+  return {
+    status,
+    attempts,
+    answeredCalls,
+    retriedNoAnswer: status === "attempted_no_answer" && attempts >= 2,
+  };
 }
 
 export { indexCallsByPhone };

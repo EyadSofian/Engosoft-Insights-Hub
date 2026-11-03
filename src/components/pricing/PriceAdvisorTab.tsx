@@ -180,7 +180,7 @@ export function PriceAdvisorTab({
         {/* --- what changes the answer ------------------------------------- */}
         <aside className="space-y-3.5 border-b border-border p-4 lg:border-b-0 lg:border-e">
           <div>
-            <h2 className="text-[13px] font-bold text-text">
+            <h2 className="text-[13px] font-medium text-text">
               {ar ? "الحالة التي تبيع فيها" : "The sale in front of you"}
             </h2>
             <p className="mt-0.5 text-[12px] text-text-muted">
@@ -192,7 +192,7 @@ export function PriceAdvisorTab({
 
           <div className="flex flex-col gap-1.5">
             <label
-              className="text-[12px] font-semibold text-text-muted"
+              className="text-[12px] font-medium text-text-muted"
               htmlFor="advisor-course-search"
             >
               {ar ? "الدورة" : "Course"}
@@ -228,7 +228,7 @@ export function PriceAdvisorTab({
           </div>
 
           <fieldset>
-            <legend className="mb-1.5 text-[12px] font-semibold text-text-muted">
+            <legend className="mb-1.5 text-[12px] font-medium text-text-muted">
               {ar ? "الدولة والعملة" : "Country and currency"}
             </legend>
             <div className="grid grid-cols-2 gap-1.5">
@@ -256,7 +256,7 @@ export function PriceAdvisorTab({
           </fieldset>
 
           <fieldset disabled={market === "eg"} className={market === "eg" ? "opacity-55" : ""}>
-            <legend className="mb-1.5 text-[12px] font-semibold text-text-muted">
+            <legend className="mb-1.5 text-[12px] font-medium text-text-muted">
               {ar ? "طريقة الدفع" : "Payment method"}
             </legend>
             <div className="grid grid-cols-2 gap-1.5">
@@ -292,7 +292,7 @@ export function PriceAdvisorTab({
           </fieldset>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {ar ? "حالة العميل" : "Customer situation"}
             </span>
             <select
@@ -313,7 +313,7 @@ export function PriceAdvisorTab({
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-text-muted">
+            <span className="text-[12px] font-medium text-text-muted">
               {ar ? "السعر الذي يطلبه العميل (اختياري)" : "Price the customer is asking (optional)"}
             </span>
             <input
@@ -357,7 +357,7 @@ export function PriceAdvisorTab({
               {/* 1 — the number */}
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[12px] font-semibold text-text-muted">
+                  <p className="text-[12px] font-medium text-text-muted">
                     {askedValue !== null
                       ? ar
                         ? "السعر الذي يطلبه العميل"
@@ -366,7 +366,7 @@ export function PriceAdvisorTab({
                         ? "السعر المناسب لهذه الحالة"
                         : "The right price for this case"}
                   </p>
-                  <div className="num mt-0.5 text-[34px] font-bold leading-none tracking-tight text-text sm:text-[40px]">
+                  <div className="num mt-0.5 text-[34px] font-medium leading-none tracking-tight text-text sm:text-[40px]">
                     {fmtMoney(priceInQuestion, currency, lang)}
                   </div>
                   <p className="mt-1.5 truncate text-[12px] text-text-muted">
@@ -379,7 +379,7 @@ export function PriceAdvisorTab({
                 <button
                   type="button"
                   onClick={() => void copyPrice()}
-                  className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+                  className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
                   style={{ background: "var(--brand)" }}
                 >
                   {copied ? (
@@ -473,7 +473,7 @@ export function PriceAdvisorTab({
                   )}
                   <div className="min-w-0">
                     <p
-                      className="text-[13px] font-bold"
+                      className="text-[13px] font-medium"
                       style={{ color: `var(${VERDICTS[verdict].color})` }}
                     >
                       {VERDICTS[verdict][lang]}
@@ -506,7 +506,7 @@ export function PriceAdvisorTab({
               {/* 5 — why */}
               {!!reasons.length && (
                 <section>
-                  <h3 className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">
+                  <h3 className="text-[12px] font-medium text-text-subtle">
                     {ar ? "سبب الاقتراح" : "Why this price"}
                   </h3>
                   <ul className="mt-1.5 space-y-1">
@@ -556,7 +556,7 @@ export function PriceAdvisorTab({
                 )}
 
                 <section className="rounded-lg border border-border p-3">
-                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
+                  <h3 className="text-[12px] font-medium text-text-subtle">
                     {ar ? "العرض الساري" : "Live offer"}
                   </h3>
                   {offers.length ? (

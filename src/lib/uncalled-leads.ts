@@ -238,8 +238,7 @@ export function uncalledLeadSeverity(facts: UncalledLeadFacts): UncalledLeadSeve
   );
   const warning = reasons.some(
     (reason) =>
-      reason === "fresh_window" ||
-      reason === "stalled_stage" || reason === "won_without_call",
+      reason === "fresh_window" || reason === "stalled_stage" || reason === "won_without_call",
   );
 
   return { status: critical ? "critical" : warning ? "warning" : "stable", reasons };

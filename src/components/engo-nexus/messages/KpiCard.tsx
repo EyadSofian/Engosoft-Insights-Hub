@@ -41,9 +41,7 @@ export function Metric({ metric, lang }: { metric: NexusMetric; lang: "ar" | "en
 
   return (
     <div className="min-w-0" data-testid={`nexus-metric-${metric.key}`}>
-      <div className="truncate text-[12px] font-medium uppercase tracking-wide text-text-muted">
-        {metric.label}
-      </div>
+      <div className="truncate text-[12px] font-medium text-text-muted">{metric.label}</div>
       <div className="mt-0.5 flex items-baseline gap-2">
         <span
           className={`num text-lg font-semibold ${unmeasured ? "text-text-muted" : "text-text"}`}
@@ -82,7 +80,7 @@ export function KpiCard({ message, lang }: { message: KpiCardMessage; lang: "ar"
 export function KpiGroup({ message, lang }: { message: KpiGroupMessage; lang: "ar" | "en" }) {
   return (
     <div className="rounded-xl border border-border bg-bg-subtle p-3" data-testid="nexus-kpi-group">
-      {message.title && <h4 className="mb-2 text-xs font-semibold text-text">{message.title}</h4>}
+      {message.title && <h4 className="mb-2 text-xs font-medium text-text">{message.title}</h4>}
       <div className="grid grid-cols-2 gap-3">
         {message.metrics.map((metric) => (
           <Metric key={metric.key} metric={metric} lang={lang} />

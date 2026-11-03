@@ -24,7 +24,7 @@ const ChartBody = lazy(() =>
 export function ChartMessage({ message, lang }: { message: ChartMessageType; lang: "ar" | "en" }) {
   return (
     <div className="rounded-xl border border-border bg-bg-subtle p-3" data-testid="nexus-chart">
-      {message.title && <h4 className="mb-2 text-xs font-semibold text-text">{message.title}</h4>}
+      {message.title && <h4 className="mb-2 text-xs font-medium text-text">{message.title}</h4>}
       <div className="h-40 w-full" dir="ltr">
         <Suspense
           fallback={

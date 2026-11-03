@@ -45,11 +45,11 @@ function GuidePage() {
       <section className="relative overflow-hidden rounded-3xl border border-brand/20 bg-[linear-gradient(135deg,var(--navy),color-mix(in_oklab,var(--brand)_76%,var(--navy)))] p-5 text-white shadow-sm sm:p-8">
         <div className="absolute -end-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
         <div className="relative max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium">
             <BookOpen size={14} />
             {ar ? "اقرأها في 5 دقايق" : "A five-minute walkthrough"}
           </span>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
+          <h2 className="mt-4 text-2xl font-medium tracking-tight sm:text-3xl">
             {ar
               ? "المختصر: اختار الفترة، افتح التقرير، واضغط الصف للتفاصيل"
               : "The short version: choose a period, open a report, and expand a row"}
@@ -297,7 +297,7 @@ function GuideLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
+      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/15"
     >
       {label}
       <ArrowLeft size={14} className="rtl:rotate-0 ltr:rotate-180" />
@@ -328,7 +328,7 @@ function SourceNode({
       <span className={`grid h-9 w-9 place-items-center rounded-xl ${colors[tone]}`}>{icon}</span>
       <h3 className="mt-3 text-sm font-semibold text-text">{title}</h3>
       <p className="mt-1 text-[12px] text-text-muted">{source}</p>
-      <p className="mt-3 border-t border-border pt-3 text-xs font-semibold text-text">{metric}</p>
+      <p className="mt-3 border-t border-border pt-3 text-xs font-medium text-text">{metric}</p>
     </div>
   );
 }
@@ -358,7 +358,7 @@ function GuideSection({
     <section className="card overflow-hidden">
       <div className="border-b border-border p-4 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="num text-xs font-bold text-brand">{number}</span>
+          <span className="num text-xs font-medium text-brand">{number}</span>
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
             {icon}
           </span>
@@ -372,7 +372,7 @@ function GuideSection({
                 <Link
                   to={to}
                   search={search}
-                  className="text-xs font-semibold text-brand hover:underline"
+                  className="text-xs font-medium text-brand hover:underline"
                 >
                   {lang === "ar" ? "فتح التقرير" : "Open report"}
                 </Link>
@@ -391,10 +391,10 @@ function MockToolbar({ ar }: { ar: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs font-semibold">
+        <span className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs font-medium">
           <CalendarRange size={14} /> {ar ? "هذا الشهر" : "This month"}
         </span>
-        <span className="rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white">
+        <span className="rounded-xl bg-brand px-3 py-2 text-xs font-medium text-white">
           {ar ? "كل المنصات" : "All platforms"}
         </span>
         <span className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs">
@@ -450,7 +450,7 @@ function MockFunnel({ ar }: { ar: boolean }) {
           key={label}
           className="relative rounded-xl border border-border bg-surface p-3 text-center"
         >
-          <div className="num text-lg font-bold text-text">{value}</div>
+          <div className="num text-lg font-medium text-text">{value}</div>
           <div className="mt-1 text-[12px] text-text-muted">{label}</div>
           {index < steps.length - 1 && (
             <span className="absolute -end-2 top-1/2 z-10 h-px w-2 bg-border" />

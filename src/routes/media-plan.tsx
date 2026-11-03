@@ -33,7 +33,12 @@ import { DashboardPageHeader, DashboardPanel, KpiRow } from "@/components/dashbo
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
-import { mediaPlanMonths, mediaPlanBudgetSummary, OCTOBER_2026_SOURCE, type MonthlyMediaPlan } from "@/lib/media-plan";
+import {
+  mediaPlanMonths,
+  mediaPlanBudgetSummary,
+  OCTOBER_2026_SOURCE,
+  type MonthlyMediaPlan,
+} from "@/lib/media-plan";
 import { deliverableStatus } from "@/lib/media-plan-delivery";
 import type { MediaPlanLeadDetailResponse } from "@/lib/media-plan-lead-link";
 import type { MediaPlanLifecycle, MediaPlanLifecycleBucket } from "@/lib/media-plan-lifecycle";
@@ -548,7 +553,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
             loading="lazy"
             className="aspect-[3/2] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
           />
-          <span className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-[12px] font-semibold text-brand">
+          <span className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-[12px] font-medium text-brand">
             <ImageIcon size={13} />
             {A ? "افتح الصورة الأصلية" : "Open original image"}
           </span>
@@ -556,7 +561,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold text-text">
+            <h2 className="text-base font-medium text-text">
               {A ? "مرجع خطة أكتوبر من الصورة" : "October plan image reference"}
             </h2>
             <Pill tone="warning">{A ? "مسودة للمراجعة" : "Draft for review"}</Pill>
@@ -574,7 +579,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
                   ? `ليدز الدورات · ${fmtNum(source.dailyCourseLeads)} يوميًا × ${fmtNum(source.workingDays)} يوم`
                   : `Course leads · ${fmtNum(source.dailyCourseLeads)} daily × ${fmtNum(source.workingDays)} days`}
               </div>
-              <div className="num mt-1 text-lg font-bold text-text">
+              <div className="num mt-1 text-lg font-medium text-text">
                 {fmtNum(source.courseLeads)}
               </div>
             </div>
@@ -582,7 +587,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               <div className="text-[12px] text-text-muted">
                 {A ? "ليدز الموقع" : "Website leads"}
               </div>
-              <div className="num mt-1 text-lg font-bold text-text">
+              <div className="num mt-1 text-lg font-medium text-text">
                 {fmtNum(source.websiteLeads)}
               </div>
             </div>
@@ -590,7 +595,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               <div className="text-[12px] text-text-muted">
                 {A ? "يوتيوب · الوحدة غير مذكورة" : "YouTube · unit unspecified"}
               </div>
-              <div className="num mt-1 text-lg font-bold text-text">
+              <div className="num mt-1 text-lg font-medium text-text">
                 {fmtNum(source.youtubeGoal)}
               </div>
             </div>
@@ -598,7 +603,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               <div className="text-[12px] text-text-muted">
                 {A ? "براندينج · الوحدة غير مذكورة" : "Branding · unit unspecified"}
               </div>
-              <div className="num mt-1 text-lg font-bold text-text">
+              <div className="num mt-1 text-lg font-medium text-text">
                 {fmtNum(source.brandingGoal)}
               </div>
             </div>
@@ -606,7 +611,7 @@ function OctoberSourcePanel({ lang }: { lang: "ar" | "en" }) {
               <div className="text-[12px] text-text-muted">
                 {A ? "إجمالي الصورة المعلن" : "Total stated in image"}
               </div>
-              <div className="num mt-1 text-lg font-bold text-text">
+              <div className="num mt-1 text-lg font-medium text-text">
                 {fmtNum(source.statedTotalLeads)}
               </div>
             </div>
@@ -658,7 +663,7 @@ function MediaPlanPage() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/management-review"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/5 px-3 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/5 px-3 text-xs font-medium text-brand transition-colors hover:bg-brand/10"
           >
             <Gauge size={14} />{" "}
             {lang === "ar" ? "مراجعة الخطة والـSales Funnel" : "Plan & sales funnel review"}
@@ -668,14 +673,14 @@ function MediaPlanPage() {
               <button
                 type="button"
                 onClick={() => setEditor("edit")}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-brand px-3 text-xs font-semibold text-white"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-brand px-3 text-xs font-medium text-white"
               >
                 <Pencil size={14} /> {lang === "ar" ? "تعديل الخطة" : "Edit plan"}
               </button>
               <button
                 type="button"
                 onClick={() => setEditor("create")}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand"
               >
                 <CopyPlus size={14} /> {lang === "ar" ? "خطة شهر جديد" : "New month"}
               </button>
@@ -683,7 +688,7 @@ function MediaPlanPage() {
           )}
           <Link
             to="/media-buyers"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand transition-colors hover:bg-surface-2"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand transition-colors hover:bg-surface-2"
           >
             {lang === "ar" ? "تقييم الميديا بايرز" : "Buyer evaluation"}
             <ArrowUpRight size={14} />
@@ -716,7 +721,7 @@ function MediaPlanPage() {
                     : "Approved monthly targets compared with actual delivery."
             }
             action={
-              <label className="block min-w-44 text-[12px] font-semibold text-text-muted">
+              <label className="block min-w-44 text-[12px] font-medium text-text-muted">
                 {lang === "ar" ? "شهر الخطة" : "Plan month"}
                 <select
                   value={month}
@@ -760,7 +765,7 @@ function MediaPlanPage() {
 
           {data.plan.month === "2026-09" && (
             <Card className="border-brand/20 bg-brand-soft/20 p-5">
-              <h2 className="text-sm font-bold text-text">
+              <h2 className="text-sm font-medium text-text">
                 {lang === "ar"
                   ? "تصحيح سبتمبر · الهدف والصرف والليدز"
                   : "September correction · target, spend and leads"}
@@ -770,7 +775,7 @@ function MediaPlanPage() {
                   <div className="text-text-muted">
                     {lang === "ar" ? "تارجت المبيعات" : "Sales target"}
                   </div>
-                  <div className="num mt-1 text-lg font-bold text-text">
+                  <div className="num mt-1 text-lg font-medium text-text">
                     {fmtUSDFull(data.plan.salesTargetUsd)}
                   </div>
                 </div>
@@ -780,7 +785,7 @@ function MediaPlanPage() {
                       ? "ميزانية ثابتة: 17% من التارجت"
                       : "Fixed budget: 17% of target"}
                   </div>
-                  <div className="num mt-1 text-lg font-bold text-text">
+                  <div className="num mt-1 text-lg font-medium text-text">
                     {fmtUSDFull(data.plan.totalMarketingBudgetUsd)}
                   </div>
                 </div>
@@ -788,7 +793,7 @@ function MediaPlanPage() {
                   <div className="text-text-muted">
                     {lang === "ar" ? "صرف فعلي / 17% من التحصيل" : "Spend / 17% of actual sales"}
                   </div>
-                  <div className="num mt-1 text-lg font-bold text-text">
+                  <div className="num mt-1 text-lg font-medium text-text">
                     {fmtUSDFull(data.actual.allSpend)} /{" "}
                     {fmtUSDFull(data.actual.actualSalesBudgetAllowanceUsd)}
                   </div>
@@ -799,7 +804,7 @@ function MediaPlanPage() {
                       ? "ليدز Odoo المنشأة / ليدز المنصات"
                       : "Created CRM / platform leads"}
                   </div>
-                  <div className="num mt-1 text-lg font-bold text-text">
+                  <div className="num mt-1 text-lg font-medium text-text">
                     {fmtNum(data.actual.allCrmLeads)} /{" "}
                     {data.actual.targetedPlatformLeads === null
                       ? "—"
@@ -915,18 +920,29 @@ function MediaPlanPage() {
           )}
           {data.plan.month === "2026-11" && (
             <Card>
-              <SectionTitle>{lang === "ar" ? "خطة نوفمبر · توزيع الميزانية" : "November plan · budget ownership"}</SectionTitle>
+              <SectionTitle>
+                {lang === "ar"
+                  ? "خطة نوفمبر · توزيع الميزانية"
+                  : "November plan · budget ownership"}
+              </SectionTitle>
               <div className="grid gap-3 sm:grid-cols-3">
                 {mediaPlanBudgetSummary(data.plan).owners.map((owner) => (
-                  <div key={owner.owner} className="rounded-2xl border border-border bg-surface-2 p-4">
+                  <div
+                    key={owner.owner}
+                    className="rounded-2xl border border-border bg-surface-2 p-4"
+                  >
                     <b>{owner.owner}</b>
-                    <div className="num mt-2 text-xl font-bold">{fmtUSDFull(owner.budgetUsd)}</div>
+                    <div className="num mt-2 text-xl font-medium">
+                      {fmtUSDFull(owner.budgetUsd)}
+                    </div>
                     <small>{fmtPct((owner.share ?? 0) * 100, 2)}</small>
                   </div>
                 ))}
                 <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
                   <b>{lang === "ar" ? "فرق غير موزع" : "Unallocated difference"}</b>
-                  <div className="num mt-2 text-xl font-bold">{fmtUSDFull(mediaPlanBudgetSummary(data.plan).unallocated)}</div>
+                  <div className="num mt-2 text-xl font-medium">
+                    {fmtUSDFull(mediaPlanBudgetSummary(data.plan).unallocated)}
+                  </div>
                 </div>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-text-muted">
@@ -959,7 +975,7 @@ function MediaPlanPage() {
           <Card className="border-dashed border-brand/25 bg-brand-soft/20">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-bold text-text">
+                <div className="text-sm font-medium text-text">
                   {lang === "ar" ? "تفاصيل تنفيذ الحملات" : "Detailed campaign delivery"}
                 </div>
                 <p className="mt-1 text-xs text-text-muted">
@@ -971,7 +987,7 @@ function MediaPlanPage() {
               <button
                 type="button"
                 onClick={() => setShowCampaignDelivery((open) => !open)}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-3 text-xs font-bold text-white"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-3 text-xs font-medium text-white"
               >
                 {showCampaignDelivery
                   ? lang === "ar"
@@ -1041,7 +1057,8 @@ function MediaPlanPage() {
             <Card>
               <SectionTitle
                 hint={
-                  data.plan.overallMarketingBudgetUsd !== undefined && data.plan.leadGenerationBudgetUsd === 0
+                  data.plan.overallMarketingBudgetUsd !== undefined &&
+                  data.plan.leadGenerationBudgetUsd === 0
                     ? lang === "ar"
                       ? `الصورة تحدد ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} للتسويق كله، لكنها لا تفصل ميزانية كل نشاط.`
                       : `The image specifies ${fmtUSDFull(data.plan.overallMarketingBudgetUsd)} overall, without activity allocations.`
@@ -1059,14 +1076,18 @@ function MediaPlanPage() {
                     className="rounded-2xl border border-border bg-surface-2 p-3"
                   >
                     <div className="text-[12px] leading-snug text-text-muted">{activity.label}</div>
-                    <div className="num mt-2 text-lg font-bold text-text">
+                    <div className="num mt-2 text-lg font-medium text-text">
                       {data.plan.overallMarketingBudgetUsd !== undefined && activity.budgetUsd === 0
                         ? lang === "ar"
                           ? "غير محددة"
                           : "Unallocated"
                         : fmtUSDFull(activity.budgetUsd)}
                     </div>
-                    {activity.owners?.length ? <div className="mt-2"><OwnerList owners={activity.owners} /></div> : null}
+                    {activity.owners?.length ? (
+                      <div className="mt-2">
+                        <OwnerList owners={activity.owners} />
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1192,13 +1213,13 @@ function ProgressRail({
   return (
     <div className="rounded-2xl border border-border bg-surface-2/55 p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold text-text">{label}</span>
-        <span className="num text-xs font-bold" style={{ color: accent }}>
+        <span className="text-xs font-medium text-text">{label}</span>
+        <span className="num text-xs font-medium" style={{ color: accent }}>
           {ratioPct(ratio)}
         </span>
       </div>
       <div className="mt-2 flex items-baseline gap-2">
-        <span className="num text-xl font-bold text-text">{actual}</span>
+        <span className="num text-xl font-medium text-text">{actual}</span>
         <span className="text-[12px] text-text-subtle">/ {target}</span>
       </div>
       <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
@@ -1330,8 +1351,8 @@ function NeedsAttention({
             const contents = (
               <>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-bold text-text">{row.label}</span>
-                  <span className="shrink-0 text-[12px] font-bold text-amber-ink">
+                  <span className="truncate text-xs font-medium text-text">{row.label}</span>
+                  <span className="shrink-0 text-[12px] font-medium text-amber-ink">
                     {deliverableStatusLabel(status, lang)}
                   </span>
                 </div>
@@ -1416,7 +1437,7 @@ function MediaPlanLeadsPanel({
       title={row.label}
       subtitle={`${month} · ${ar ? "المطلوب" : "Target"} ${fmtNum(row.target)} · ${ar ? "الفعلي" : "Actual"} ${row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}`}
       eyebrow={
-        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-bold text-brand">
+        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-medium text-brand">
           {ar ? "تفاصيل تنفيذ خطة الميديا" : "Media plan delivery details"}
         </span>
       }
@@ -1433,11 +1454,11 @@ function MediaPlanLeadsPanel({
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-border bg-surface-2/60 p-3">
               <div className="text-[12px] text-text-muted">{ar ? "المطلوب" : "Target"}</div>
-              <div className="num mt-1 text-xl font-bold text-text">{fmtNum(row.target)}</div>
+              <div className="num mt-1 text-xl font-medium text-text">{fmtNum(row.target)}</div>
             </div>
             <div className="rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
               <div className="text-[12px] text-text-muted">{sourceLabel}</div>
-              <div className="num mt-1 text-xl font-bold text-brand">
+              <div className="num mt-1 text-xl font-medium text-brand">
                 {row.actual === null || !row.connected ? "—" : fmtNum(row.actual)}
               </div>
             </div>
@@ -1451,7 +1472,7 @@ function MediaPlanLeadsPanel({
                     ? "سجلات Odoo القابلة للفتح"
                     : "Openable Odoo records"}
               </div>
-              <div className="num mt-1 text-xl font-bold text-text">
+              <div className="num mt-1 text-xl font-medium text-text">
                 {row.platformActual !== undefined
                   ? row.platformActual === null
                     ? "—"
@@ -1546,7 +1567,7 @@ function MediaPlanLeadsPanel({
                     setOpportunityLost(false);
                     setPage(1);
                   }}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!stage && (row.actualSource === "Odoo CRM · Course Categories" ? bucket === "opportunity" : !bucket) && !opportunityLost ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${!stage && (row.actualSource === "Odoo CRM · Course Categories" ? bucket === "opportunity" : !bucket) && !opportunityLost ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
                 >
                   {row.actualSource === "Odoo CRM · Course Categories"
                     ? ar
@@ -1572,14 +1593,14 @@ function MediaPlanLeadsPanel({
                       setOpportunityLost(false);
                       setPage(1);
                     }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${stage === name ? "bg-brand text-white" : "bg-surface-2 text-text-muted"}`}
                   >
                     {ar ? "فرصة · " : "Opportunity · "}
                     {stageDisplayName(name, ar)} · {fmtNum(count)}
                   </button>
                 ))}
               </div>
-              <div className="text-xs font-semibold text-text">
+              <div className="text-xs font-medium text-text">
                 {ar ? "سجلات Odoo القابلة للفتح" : "Openable Odoo records"} ·{" "}
                 {fmtNum(detail.data.filteredTotal)}
               </div>
@@ -1606,7 +1627,7 @@ function MediaPlanLeadsPanel({
                         href={lead.odooUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand/10"
                       >
                         <ExternalLink size={13} />
                         {ar ? "فتح في أودو" : "Open in Odoo"}
@@ -1726,7 +1747,7 @@ function DeliverableCard({
 
   return (
     <div
-      className="group relative rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/35"
+      className="group relative rounded-2xl border border-border bg-surface p-4 shadow-sm transition-colors hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/35"
       style={{ borderTopColor: tone.strong, borderTopWidth: 3 }}
       title={`${row.actualSource} · ${row.dateScope} · ${row.matchingRule}`}
     >
@@ -1738,20 +1759,16 @@ function DeliverableCard({
       />
       <div className="pointer-events-none relative flex items-start justify-between gap-3">
         <div>
-          <div
-            className="text-[12px] font-bold uppercase tracking-[0.08em]"
-            style={{ color: tone.ink }}
-          >
+          <div className="text-[12px] font-medium" style={{ color: tone.ink }}>
             {label}
           </div>
           <div className="mt-2 text-xs text-text-muted">{lang === "ar" ? "التارجت" : "Target"}</div>
-          <div className="num mt-0.5 text-2xl font-black tracking-tight text-text">
-            {fmtNum(row.target)}{" "}
-            <span className="text-xs font-semibold text-text-muted">{unit}</span>
+          <div className="num mt-0.5 text-2xl font-medium tracking-tight text-text">
+            {fmtNum(row.target)} <span className="text-xs font-medium text-text-muted">{unit}</span>
           </div>
         </div>
         <span
-          className="rounded-full px-2 py-1 text-[12px] font-bold"
+          className="rounded-full px-2 py-1 text-[12px] font-medium"
           style={{ background: tone.surface, color: tone.ink }}
         >
           {deliverableStatusLabel(status, lang)}
@@ -1761,13 +1778,13 @@ function DeliverableCard({
       <div className="pointer-events-none relative mt-4 flex items-end justify-between gap-3">
         <div>
           <div className="text-xs text-text-muted">{actualLabel}</div>
-          <div className="num mt-0.5 text-xl font-bold text-text">
+          <div className="num mt-0.5 text-xl font-medium text-text">
             {actual === null || !row.connected ? "—" : fmtNum(actual)}
           </div>
         </div>
         <div className="text-end">
           <div className="text-xs text-text-muted">{lang === "ar" ? "الإنجاز" : "Achievement"}</div>
-          <div className="num mt-0.5 text-lg font-bold" style={{ color: tone.ink }}>
+          <div className="num mt-0.5 text-lg font-medium" style={{ color: tone.ink }}>
             {achievement === null ? "—" : fmtPct(achievement * 100, 1)}
           </div>
         </div>
@@ -1884,7 +1901,7 @@ function CourseTableRow({
   const state = courseState(row, phase);
   return (
     <tr className="hover:bg-surface-2/55">
-      <td className="px-3 py-3.5 font-bold text-text">{row.label}</td>
+      <td className="px-3 py-3.5 font-medium text-text">{row.label}</td>
       <td className="px-3 py-3.5">
         <OwnerList owners={row.owners} />
       </td>
@@ -1935,7 +1952,7 @@ function CourseMobileCard({
     <article className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-bold text-text">{row.label}</h3>
+          <h3 className="font-medium text-text">{row.label}</h3>
           <div className="mt-1">
             <OwnerList owners={row.owners} />
           </div>
@@ -1992,7 +2009,7 @@ function OwnerList({ owners }: { owners: string[] }) {
       {owners.map((owner) => (
         <span
           key={owner}
-          className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-semibold text-brand"
+          className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-medium text-brand"
         >
           {owner}
         </span>
@@ -2005,7 +2022,7 @@ function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-2">
       <div className="text-[12px] leading-snug text-text-subtle">{label}</div>
-      <div className="num mt-1 truncate text-xs font-bold text-text">{value}</div>
+      <div className="num mt-1 truncate text-xs font-medium text-text">{value}</div>
     </div>
   );
 }

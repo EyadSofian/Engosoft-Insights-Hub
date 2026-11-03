@@ -139,8 +139,12 @@
   --radius-2xl: 24px;
   --radius-3xl: 28px;
 
+  /* Alexandria first.
+     It was third behind "SF Arabic" and "Geeza Pro", so on macOS the system
+     resolved SF Arabic and the six Alexandria weights the app downloads from
+     Google Fonts were never drawn once. */
   --font-sans:
-    "SF Arabic", "Geeza Pro", "Alexandria", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Alexandria", "SF Arabic", "Geeza Pro", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   /* Headline figures stay in the UI sans: one family for every word and
      number on the page. */
@@ -154,16 +158,18 @@
   --ink: #001e3c;
   --ink-soft: #0b3158;
 
-  /* Pale blue canvas behind crisp white data surfaces. */
-  --bg: #f2f5fc;
-  --bg-subtle: #eef2fb;
+  /* A near-neutral canvas. Backgrounds, surfaces, borders and text carry no
+     colour of their own, so the cobalt reads as an accent in the two or three
+     places it is actually used instead of tinting the whole report. */
+  --bg: #eef0f3;
+  --bg-subtle: #e8eaee;
   --surface: #ffffff;
-  --surface-2: #f6f8fd;
-  --surface-3: #eaf0fc;
-  --border: #dce4f3;
-  --border-strong: #b9c9e8;
-  --glass-card: rgba(255, 255, 255, 0.94);
-  --glass-card-border: rgba(216, 227, 247, 0.95);
+  --surface-2: #f4f5f7;
+  --surface-3: #e6e8ec;
+  --border: rgba(0, 0, 0, 0.075);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --glass-card: #ffffff;
+  --glass-card-border: rgba(0, 0, 0, 0.075);
 
   /* --- tonal families, light -------------------------------------------
      Each `surface` is light enough for --text to stay legible on it, and each
@@ -217,9 +223,9 @@
   /* Secondary text 6.2:1 on white. The faintest text stays at or above 4.5:1
      even on the page canvas; it was 2.9:1, which is below what WCAG AA allows
      for body text and is a large part of why the dashboard tired the eyes. */
-  --text: #10204b;
-  --text-muted: #52617e;
-  --text-subtle: #61708d;
+  --text: #17171a;
+  --text-muted: #48484d;
+  --text-subtle: #66666d;
   --text-inverse: #ffffff;
 
   /* The primary brand color is sampled from the supplied Engosoft logo. */
@@ -253,14 +259,18 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  /* The cobalt navigation rail anchors the entire dashboard. */
-  --nav-surface: linear-gradient(165deg, #0037d3 0%, #0045fe 56%, #174eff 100%);
-  --nav-border: rgba(255, 255, 255, 0.18);
-  --nav-text: #ffffff;
-  --nav-text-muted: rgba(255, 255, 255, 0.78);
-  --nav-hover: rgba(255, 255, 255, 0.12);
-  --nav-active-bg: #ffffff;
-  --nav-active-text: #003cdd;
+  /* The rail is the deepest surface on the screen and carries no colour of
+     its own. A strip with no data on it has no business being the brightest
+     thing in the room; the cobalt appears on it once, as the marker on the
+     row you are standing on. */
+  --nav-surface: #ffffff;
+  --nav-border: rgba(0, 0, 0, 0.075);
+  --nav-text: #17171a;
+  --nav-text-muted: #66666d;
+  --nav-hover: rgba(0, 0, 0, 0.04);
+  /* Selection is a soft tinted fill with a faint ring, never a filled slab. */
+  --nav-active-bg: color-mix(in srgb, var(--brand) 6%, transparent);
+  --nav-active-text: #17171a;
 
   /* Categorical only. No chart colour may equal a semantic one: a red slice
      next to a red error state reads as "this category is broken". --chart-5 is
@@ -279,7 +289,7 @@
   --chart-6: #e6a719;
   --chart-muted: #a3b1c4;
 
-  --shadow-xs: 0 1px 2px rgba(11, 31, 58, 0.04);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.02);
   --shadow-sm: 0 2px 6px -1px rgba(11, 31, 58, 0.06), 0 1px 2px rgba(11, 31, 58, 0.03);
   --shadow-md: 0 10px 24px -8px rgba(11, 31, 58, 0.14), 0 3px 8px -3px rgba(11, 31, 58, 0.06);
   --shadow-lg: 0 12px 32px -8px rgba(11, 31, 56, 0.16), 0 4px 12px -4px rgba(11, 31, 56, 0.08);
@@ -289,9 +299,10 @@
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-nav: rgba(0, 30, 60, 0.88);
   --glass-shadow: 0 12px 36px -18px rgba(0, 30, 60, 0.32);
-  /* Subtle canvas light; data surfaces stay stable and easy to read. */
-  --page-glow-primary: rgba(0, 69, 254, 0.075);
-  --page-glow-secondary: rgba(255, 101, 0, 0.045);
+  /* No canvas wash. Depth comes from surface steps and hairlines, and a
+     white panel stays white instead of picking up a blue cast. */
+  --page-glow-primary: transparent;
+  --page-glow-secondary: transparent;
 
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -399,18 +410,40 @@
   container-name: kpis;
 }
 
+/* One card, tiles divided by hairlines — not five floating boxes. A row of
+   separately bordered cards draws four extra rectangles across the screen and
+   makes a reader count containers instead of figures. */
 .kpi-grid {
   display: grid;
-  gap: var(--gap-card);
+  gap: 0;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Nested inside a panel that already has its own border, the strip keeps the
+   dividers and drops the card. Two borders around one row of figures is the
+   "everything is a box" problem in miniature. */
+.kpi-grid[data-flush] {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 
 /* Two up, and an odd card takes the full width rather than sitting half-empty
-   beside a hole. */
+   beside a hole. Every tile also carries the dividers; the card's own overflow
+   clips the ones that land on its outer edges, so no rule runs off a corner. */
 .kpi-grid > * {
   grid-column: span 6;
   min-width: 0;
+  box-shadow:
+    1px 0 0 0 var(--border),
+    0 1px 0 0 var(--border);
 }
 
 .kpi-grid[data-odd="true"] > *:last-child {
@@ -547,21 +580,21 @@
   --ink: #061426;
   --ink-soft: #0c2949;
 
-  /* Navy canvas, panels one step forward. Secondary text is 9:1 and the
-     faintest text 6.6:1 on a panel. */
-  --bg: #091634;
-  --bg-subtle: #0d1d42;
-  --surface: #13234a;
-  --surface-2: #1a2d59;
-  --surface-3: #223769;
-  --border: #2e4476;
-  --border-strong: #536ca8;
-  --glass-card: rgba(20, 38, 81, 0.94);
-  --glass-card-border: rgba(76, 105, 174, 0.45);
+  /* The same neutral ink, one step at a time: page, card, raised. Secondary
+     text is 8.6:1 and the faintest text 5.6:1 on a card. */
+  --bg: #0b0b0d;
+  --bg-subtle: #0f0f12;
+  --surface: #141417;
+  --surface-2: #1c1c20;
+  --surface-3: #24242a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --glass-card: #141417;
+  --glass-card-border: rgba(255, 255, 255, 0.08);
 
-  --text: #f5f8ff;
-  --text-muted: #c3cee8;
-  --text-subtle: #aabce2;
+  --text: #f3f3f5;
+  --text-muted: #c4c4ca;
+  --text-subtle: #8c8c95;
   --text-inverse: #06111f;
 
   --brand: #80a6ff;
@@ -626,13 +659,13 @@
   --violet: var(--violet-strong);
   --violet-soft: var(--violet-surface);
 
-  --nav-surface: linear-gradient(165deg, #002dba, #0045fe 65%, #194cff);
-  --nav-border: rgba(255, 255, 255, 0.14);
-  --nav-text: #ffffff;
-  --nav-text-muted: #ffffff;
-  --nav-hover: rgba(255, 255, 255, 0.15);
-  --nav-active-bg: #ffffff;
-  --nav-active-text: #003cdd;
+  --nav-surface: #101013;
+  --nav-border: rgba(255, 255, 255, 0.08);
+  --nav-text: #f3f3f5;
+  --nav-text-muted: #949bab;
+  --nav-hover: rgba(255, 255, 255, 0.06);
+  --nav-active-bg: #1e222d;
+  --nav-active-text: #ffffff;
 
   --chart-1: #7fa6ff;
   --chart-2: #ff9758;
@@ -654,10 +687,8 @@
   --glass-border: rgba(154, 221, 224, 0.22);
   --glass-nav: rgba(6, 20, 38, 0.82);
   --glass-shadow: 0 16px 44px -18px rgba(0, 0, 0, 0.72);
-  /* One cold light from above the header, on the canvas only. Panels are
-     opaque, so nothing a figure sits on is tinted. */
-  --page-glow-primary: rgba(0, 69, 254, 0.15);
-  --page-glow-secondary: rgba(255, 101, 0, 0.055);
+  --page-glow-primary: transparent;
+  --page-glow-secondary: transparent;
 }
 
 @layer base {
@@ -678,14 +709,7 @@
   }
 
   body {
-    /* Flat. The two fixed radial washes tinted every white panel on the page
-       and made a dense report look permanently slightly out of focus. */
-    background:
-      radial-gradient(1100px 560px at 70% -200px, var(--page-glow-primary), transparent 70%)
-        no-repeat,
-      radial-gradient(900px 600px at 0% 100%, var(--page-glow-secondary), transparent 70%) fixed
-        no-repeat,
-      var(--bg);
+    background: var(--bg);
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 15px;
@@ -877,14 +901,10 @@
 /* --- surfaces ------------------------------------------------------------ */
 
 @utility card {
-  background: var(--glass-card);
-  border: 1px solid var(--glass-card-border);
-  border-radius: 24px;
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
-  box-shadow:
-    0 18px 42px -26px rgba(7, 36, 52, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xs);
 }
 
 /* --- the spatial system, as utilities ------------------------------------
@@ -906,11 +926,98 @@
   gap: var(--gap-title);
 }
 
+/**
+ * The dashboard grid: twelve columns, blocks of different widths.
+ *
+ * A page of equal cards stacked in equal rows reads as a form, not a report —
+ * the eye has no path through it because nothing is bigger than anything else.
+ * Blocks declare a desktop span and collapse to full width on a phone.
+ */
+@utility dash-grid {
+  display: grid;
+  gap: var(--gap-card);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: stretch;
+}
+
 /** Any grid of peer cards. Never used for two different levels at once. */
 @utility card-grid {
   display: grid;
   gap: var(--gap-card);
   align-items: stretch;
+}
+
+/* Spans. Everything is full width until there is room for the layout. */
+.dash-grid > * {
+  grid-column: span 12;
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .dash-grid > [data-span="3"],
+  .dash-grid > .col-3 { grid-column: span 3; }
+  .dash-grid > [data-span="4"],
+  .dash-grid > .col-4 { grid-column: span 4; }
+  .dash-grid > [data-span="5"],
+  .dash-grid > .col-5 { grid-column: span 5; }
+  .dash-grid > [data-span="6"],
+  .dash-grid > .col-6 { grid-column: span 6; }
+  .dash-grid > [data-span="7"],
+  .dash-grid > .col-7 { grid-column: span 7; }
+  .dash-grid > [data-span="8"],
+  .dash-grid > .col-8 { grid-column: span 8; }
+}
+
+/**
+ * The one near-black block on the page.
+ *
+ * Redefining the tokens inside it is what makes every inline `var(--tone-ink)`
+ * and `var(--text-muted)` in the card adapt, instead of each one needing its
+ * own dark override.
+ */
+[data-variant="dark"] {
+  --tone-surface: #17171a;
+  --tone-border: transparent;
+  --tone-ink: #ffffff;
+  --tone-strong: #5fd39b;
+  --text-muted: #a5a5ad;
+  --brand: #93a9ff;
+  background: #17171a;
+  border-color: transparent;
+}
+
+/** A soft tint, for the block that proposes rather than reports. */
+[data-variant="fill"] {
+  background: color-mix(in srgb, var(--tone-strong) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--tone-strong) 22%, transparent);
+}
+
+/**
+ * The one block on the page that is filled rather than outlined.
+ *
+ * It holds the figure the whole month is judged on, so it is allowed to be the
+ * loudest thing on the screen — once. Nothing else gets a fill.
+ */
+.hero-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 20px 22px;
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+/** The track a target fills, with the pace tick riding on top. */
+.hero-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.hero-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
 }
 
 /** The one padding a card gets. 20 on a desktop, 16 on a phone. */
@@ -999,12 +1106,10 @@
    things from across a desk. What the redesign takes out is DENSITY — how many
    coloured objects a screen carries — not colour itself. */
 @utility tone-surface {
-  background: var(--tone-surface, var(--surface));
-  border: 1px solid var(--tone-border, var(--border));
-  border-radius: 22px;
-  color: var(--tone-ink, var(--text));
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
 }
 
 /* Lifts 2px and deepens its shadow. Nothing else moves. */
@@ -1031,17 +1136,13 @@
 }
 
 @utility glass {
-  background: var(--glass-surface);
-  backdrop-filter: blur(22px) saturate(155%);
-  -webkit-backdrop-filter: blur(22px) saturate(155%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
 }
 
 @utility glass-navy {
   background: var(--glass-nav);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: var(--glass-shadow);
 }
@@ -1108,18 +1209,6 @@
   }
 }
 
-@keyframes engo-pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 45%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 12px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
 @utility animate-fade-up {
   animation: engo-fade-up var(--dur-slow) var(--ease-out) both;
 }
@@ -1136,8 +1225,10 @@
   animation: engo-slide-up var(--dur-slow) var(--ease-out) both;
 }
 
+/* A live indicator is a dot, not a repeating ring. Kept as a no-op so the
+   call sites do not have to change. */
 @utility pulse-ring {
-  animation: engo-pulse-ring 2.4s var(--ease-out) infinite;
+  animation: none;
 }
 
 /* Entrance stagger — set --i on the child to order it. */
@@ -1259,70 +1350,16 @@
    dense figures remain legible while the blue page glow can still show
    through at the edges. */
 @utility chrome-bar {
-  background: color-mix(in srgb, var(--surface) 87%, transparent);
-  backdrop-filter: blur(24px) saturate(155%);
-  -webkit-backdrop-filter: blur(24px) saturate(155%);
-  border-bottom: 1px solid var(--glass-card-border);
-  box-shadow: 0 10px 26px -22px rgba(7, 36, 52, 0.38);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
-/* Give the one global entry point a quiet pulse so it is discoverable on a
-   busy dashboard. The ring sits outside the button and never changes layout. */
-@keyframes global-search-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: scale(0.98);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.025);
-  }
-}
-
+/* The search is discoverable because it is the widest control in the header
+   and carries its own shortcut keycap. It used to pulse a ring and sweep a
+   white sheen across itself every few seconds, which is motion that explains
+   nothing and sits in a manager's eye all day. */
 .global-search-ring {
-  position: absolute;
-  inset: -3px;
-  z-index: -1;
-  border: 1px solid color-mix(in oklab, var(--brand) 42%, transparent);
-  border-radius: 0.95rem;
-  pointer-events: none;
-  animation: global-search-pulse 2.8s ease-in-out infinite;
-}
-
-.global-search-trigger::after {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: -45%;
-  width: 32%;
-  content: "";
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklab, white 42%, transparent),
-    transparent
-  );
-  transform: skewX(-18deg);
-  pointer-events: none;
-  animation: global-search-sheen 5.5s ease-in-out infinite;
-}
-
-@keyframes global-search-sheen {
-  0%,
-  62%,
-  100% {
-    inset-inline-start: -45%;
-  }
-  78% {
-    inset-inline-start: 118%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .global-search-ring,
-  .global-search-trigger::after {
-    animation: none;
-  }
+  display: none;
 }
 
 /* The rail reads as part of the page, not as a separate dark application.
@@ -1331,10 +1368,7 @@
    never the strip that carries no data. */
 @utility chrome-sidebar {
   background: var(--nav-surface);
-  backdrop-filter: blur(28px) saturate(155%);
-  -webkit-backdrop-filter: blur(28px) saturate(155%);
   border-inline-end: 1px solid var(--nav-border);
-  box-shadow: 14px 0 40px -32px rgba(1, 20, 32, 0.7);
 }
 
 /* Header auto-hide. header-auto-hide.ts writes `data-chrome-header` on <html>;
@@ -1469,16 +1503,6 @@
    rest of the dashboard, in one place.
 ------------------------------------------------------------------------- */
 
-@keyframes nexus-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
 @keyframes nexus-rise {
   from {
     opacity: 0;
@@ -1490,16 +1514,10 @@
   }
 }
 
-/* A slow 4px drift, not a bounce: the launcher sits in a manager's peripheral
-   vision all day, and anything more insistent becomes an irritation. */
+/* The launcher is a fixed button in the corner. It used to drift up and down
+   forever; a thing that is not live does not move. */
 .nexus-float {
-  animation: nexus-float 4.5s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nexus-float {
-    animation: none;
-  }
+  animation: none;
 }
 
 /* Markdown inside a chat bubble. Deliberately tighter than page prose — the
@@ -1569,145 +1587,48 @@
   letter-spacing: -0.005em;
 }
 
-/* Base KPI glass; the brand treatment below adds each metric's hue. */
-.kpi-solid {
-  color: var(--text);
-  border-color: var(--glass-card-border);
-  background:
-    radial-gradient(
-      circle at 100% 0%,
-      color-mix(in srgb, var(--tone-strong) 16%, transparent),
-      transparent 50%
-    ),
-    var(--glass-card);
-  box-shadow:
-    0 20px 46px -28px rgba(7, 36, 52, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-[dir="rtl"] .kpi-solid {
-  background:
-    radial-gradient(
-      circle at 0% 0%,
-      color-mix(in srgb, var(--tone-strong) 16%, transparent),
-      transparent 50%
-    ),
-    var(--glass-card);
-}
-
-.kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
-  color: var(--text-muted);
-}
-
-.kpi-solid .delta-badge {
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.kpi-solid .delta-badge[data-good="false"] {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.kpi-solid.kpi-card:hover {
-  border-color: color-mix(in srgb, var(--tone-strong) 58%, var(--glass-card-border));
-  box-shadow: 0 26px 52px -26px color-mix(in srgb, var(--tone-strong) 27%, transparent);
-}
-
-.kpi-solid.kpi-card:focus-visible {
-  outline-color: var(--brand);
-}
-
-/* A quiet aurora behind the glass. The washes are fixed, so long reports do not
-   repaint their data surfaces while scrolling. */
+/* One flat canvas. Two radial washes and a diagonal gradient used to sit
+   under every report and tint each white panel that crossed them. */
 .app-canvas {
   position: relative;
-  background:
-    radial-gradient(ellipse 54rem 42rem at 82% -9%, var(--page-glow-primary), transparent 70%),
-    radial-gradient(ellipse 44rem 36rem at 6% 52%, var(--page-glow-secondary), transparent 75%),
-    linear-gradient(160deg, var(--bg), var(--bg-subtle));
+  background: var(--bg);
 }
 
 .page-band {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
-  border: 1px solid var(--glass-card-border);
-  background:
-    radial-gradient(
-      circle at 95% 0%,
-      color-mix(in srgb, var(--page-accent) 13%, transparent),
-      transparent 42%
-    ),
-    var(--glass-card);
-  box-shadow:
-    0 24px 52px -34px rgba(7, 36, 52, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  animation: engo-fade-up 520ms var(--ease-out) both;
-}
-
-.page-band::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  width: 4px;
-  background: var(--page-accent);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--page-accent) 40%, transparent);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: engo-fade-up 320ms var(--ease-out) both;
 }
 
 .page-band-icon {
-  color: var(--page-accent);
-  background: color-mix(in srgb, var(--page-accent) 13%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--page-accent) 25%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: var(--text-subtle);
 }
 
 .page-sections > .section-stack,
 .page-sections > .card-grid,
 .page-sections > .card,
 .page-sections > .kpi-scope {
-  animation: engo-fade-up 560ms var(--ease-out) both;
+  animation: engo-fade-up 320ms var(--ease-out) both;
 }
 
 .page-sections > :nth-child(2) {
-  animation-delay: 60ms;
+  animation-delay: 50ms;
 }
 .page-sections > :nth-child(3) {
-  animation-delay: 110ms;
+  animation-delay: 100ms;
 }
 .page-sections > :nth-child(4) {
-  animation-delay: 160ms;
+  animation-delay: 150ms;
 }
 .page-sections > :nth-child(n + 5) {
   animation-delay: 200ms;
 }
 
-.kpi-solid::before {
-  position: absolute;
-  inset-block: 16px;
-  inset-inline-start: 0;
-  width: 3px;
-  border-radius: 999px;
-  content: "";
-  background: var(--tone-strong);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--tone-strong) 40%, transparent);
-}
-
-.kpi-solid .kpi-figure {
-  color: var(--text);
-  letter-spacing: -0.035em;
-}
-
-.data-table-shell {
-  border-color: var(--glass-card-border);
-}
-
-.data-table-toolbar {
-  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
-}
 
 .data-table-shell table {
   border-collapse: separate;
@@ -1734,10 +1655,6 @@
   line-height: 1.5;
 }
 
-.data-table-shell tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
-}
-
 .data-table-shell tbody tr:hover td,
 .data-table-shell tbody tr:focus-visible td {
   background: var(--brand-soft);
@@ -1746,11 +1663,7 @@
 .data-table-shell tbody td.sticky-col {
   box-shadow: inset -1px 0 0 var(--border);
   color: var(--text);
-  font-weight: 650;
-}
-
-.dark .bg-brand.text-white {
-  color: #062c36;
+  font-weight: 500;
 }
 
 /* Hand-built report tables get the same reading rhythm as DataTable. */
@@ -1778,116 +1691,59 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 /* Engosoft identity: cobalt, white and the orange point from the logo. */
 .engosoft-wordmark {
   font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.065em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.05;
 }
 
-.app-canvas {
-  background:
-    radial-gradient(52rem 28rem at 70% -8%, var(--page-glow-primary), transparent 75%),
-    radial-gradient(36rem 29rem at 4% 48%, var(--page-glow-secondary), transparent 76%), var(--bg);
-}
 
-.page-band {
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: linear-gradient(112deg, #003bdc, #0045fe 60%, #1257ff);
-  box-shadow:
-    0 22px 42px -24px rgba(0, 53, 185, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.page-band::before {
-  background: #ff6500;
-  box-shadow: 0 0 24px rgba(255, 101, 0, 0.45);
-}
-
-.page-band::after {
-  content: "";
-  position: absolute;
-  width: 20rem;
-  aspect-ratio: 1;
-  inset-inline-end: -7rem;
-  inset-block-start: -13rem;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow:
-    0 0 0 4rem rgba(255, 255, 255, 0.035),
-    0 0 0 8rem rgba(255, 255, 255, 0.025);
-  pointer-events: none;
-}
-
+/* The page title is a title, not a billboard. It used to be a cobalt slab
+   with a white heading, an orange glowing rule and a decorative ring bleeding
+   off the corner — the same weight as the figures underneath it, on every
+   page, competing with the one number the reader came for. */
 .page-band > * {
   position: relative;
   z-index: 1;
 }
-.page-band :is(h1, .text-text) {
-  color: #ffffff;
-}
-.page-band .text-text-muted {
-  color: rgba(255, 255, 255, 0.81);
-}
-.page-band-icon {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.23);
-}
-.page-band span.border-border {
-  border-color: rgba(255, 255, 255, 0.26);
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-}
-.page-band button {
-  background: #ffffff !important;
-  border-color: #ffffff !important;
-  color: #0039cf !important;
-}
-.page-band button .text-text-muted {
-  color: #52617e !important;
-}
 
 /* The KPI has two calm reading zones: a tinted value field and a white glass
    explanation field. Only a designated hero receives the cobalt brand fill. */
+/* Every card used to carry its family's colour end to end — a tinted value
+   field, a tinted hairline, a tinted figure. Five cards in five pastels read
+   as five verdicts, and a reader scanning a row cannot tell which figure the
+   screen wants them to look at. The surfaces go quiet; what is left to carry
+   meaning is the figure itself. */
 .kpi-solid,
 [dir="rtl"] .kpi-solid {
   isolation: isolate;
   color: var(--text);
-  background: var(--glass-card);
-  border: 1px solid color-mix(in srgb, var(--tone-strong) 22%, var(--glass-card-border));
-  box-shadow:
-    0 18px 34px -25px rgba(13, 34, 80, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-xs);
 }
 .kpi-solid::before,
 .kpi-solid::after {
   display: none;
 }
+/* Transparent, so the tile's own fill (hover, or the one tile that leads)
+   shows through instead of being painted over in white. The rule that used to
+   separate the figure from its explanation is gone too: inside one tile there
+   is nothing to divide. */
 .kpi-visual {
-  padding: 18px 18px 16px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--tone-surface) 84%, var(--surface)),
-    color-mix(in srgb, var(--tone-surface) 43%, var(--surface))
-  );
+  padding: 16px 16px 10px;
+  background: none;
 }
 .kpi-explainer {
-  padding: 8px 18px 16px;
-  border-top: 1px solid color-mix(in srgb, var(--tone-strong) 15%, var(--border));
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  padding: 0 16px 16px;
+  background: none;
 }
 .kpi-solid .kpi-label {
-  color: var(--text);
+  color: var(--text-muted);
 }
 .kpi-solid .kpi-figure {
-  color: var(--tone-ink);
-  letter-spacing: -0.035em;
+  color: var(--text);
+  letter-spacing: -0.02em;
   text-shadow: none;
 }
 .kpi-solid .kpi-context {
@@ -1896,25 +1752,21 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   border-radius: 0;
   padding: 0;
   background: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 .kpi-solid .kpi-icon {
-  color: var(--tone-strong);
-  border: 1px solid color-mix(in srgb, var(--tone-strong) 22%, var(--border));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
-  transition: transform 220ms var(--ease-out);
+  color: var(--text-subtle);
+  border: 0;
+  background: none;
 }
 .kpi-solid :is(.text-text, .text-text-muted, .text-text-subtle) {
   color: var(--text-muted);
 }
+/* The colour of the pill is set on the component, per metric; the shape is
+   the card's, so every delta in a row is the same pill whatever it says. */
 .kpi-solid .delta-badge {
   border: 0;
-  background: color-mix(in srgb, var(--success) 11%, var(--surface));
-  padding: 0.2rem 0.5rem;
-}
-.kpi-solid .delta-badge[data-good="false"] {
-  background: color-mix(in srgb, var(--danger) 11%, var(--surface));
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 .kpi-solid .metric-info-trigger {
   color: var(--text-subtle);
@@ -1924,46 +1776,29 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   color: var(--brand);
   background: var(--brand-soft);
 }
+/* Hover and selection are a soft fill inside the cell, never a heavy edge. */
 .kpi-solid.kpi-card:hover {
-  border-color: color-mix(in srgb, var(--tone-strong) 50%, var(--border));
-  box-shadow: 0 24px 42px -25px color-mix(in srgb, var(--tone-strong) 28%, #10204b);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
 .kpi-solid.kpi-card:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
-.kpi-card:hover .kpi-icon {
-  transform: translateY(-2px);
-}
-.kpi-solid[data-hero] {
-  border-color: #7194ff;
-  box-shadow: 0 22px 38px -22px rgba(0, 69, 254, 0.32);
-}
-.kpi-solid[data-hero] .kpi-visual {
-  background: linear-gradient(112deg, #003bd9, #0045fe 66%, #1e60ff);
-}
-.kpi-solid[data-hero] .kpi-label,
+
+/* The one figure the screen wants you to read first. It is the only place in
+   the chrome that gets the cobalt, and it earns it by being a single number
+   rather than a filled card. */
 .kpi-solid[data-hero] .kpi-figure {
-  color: #ffffff !important;
+  color: var(--brand);
 }
-.kpi-solid[data-hero] .kpi-icon {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  border-color: rgba(255, 255, 255, 0.29);
-}
-.kpi-solid[data-hero] .metric-info-trigger,
-.kpi-solid[data-hero] .metric-info-trigger:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-}
-.kpi-solid[data-hero] .kpi-visual::before {
-  content: "";
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  width: 5px;
-  height: 100%;
-  background: #ff6500;
+/* The tile that leads is a tinted fill with a faint ring, floating inside its
+   cell — the skill's rule, because an edge marker reads as a heavy underline. */
+.kpi-solid[data-hero] {
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--brand) 20%, transparent),
+    1px 0 0 0 var(--border),
+    0 1px 0 0 var(--border);
 }
 .kpi-solid[data-compact] .kpi-visual {
   padding: 14px 16px 12px;
@@ -1979,8 +1814,6 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   border-color: color-mix(in srgb, var(--brand) 17%, var(--border));
   background: var(--glass-card);
   box-shadow: 0 16px 32px -25px rgba(13, 34, 80, 0.3);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 .course-snapshot-card[data-tone="mint"],
 .course-portfolio-card[data-tone="mint"] {
@@ -2006,17 +1839,17 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .course-snapshot-detail,
 .course-card-metrics {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface);
 }
 .course-card-metrics > :first-child .num {
   color: var(--brand);
   font-size: 1.125rem;
   line-height: 1.25;
-  font-weight: 750;
+  font-weight: 500;
 }
 .course-snapshot-card[data-featured] .course-snapshot-head,
 .course-portfolio-card[data-selected] .course-card-head {
-  background: linear-gradient(112deg, #003bd9, #0045fe 70%, #1e60ff);
+  background: #f3f3f1;
   border-bottom-color: rgba(255, 255, 255, 0.22);
 }
 .course-snapshot-card[data-featured] .course-snapshot-head h3,
@@ -2051,9 +1884,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .course-header-stat {
   border-color: color-mix(in srgb, var(--brand) 16%, var(--border));
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--surface);
 }
 .course-campaign-card {
   --campaign-accent: var(--slate-strong);
@@ -2089,42 +1920,11 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   );
   box-shadow: 0 14px 28px -25px rgba(13, 34, 80, 0.3);
 }
-@media (prefers-reduced-motion: reduce) {
-  .kpi-solid .kpi-icon {
-    transition: none;
-  }
-  .kpi-card:hover .kpi-icon {
-    transform: none;
-  }
-}
-
 .dashboard-panel {
   position: relative;
-  background:
-    radial-gradient(
-      circle at 95% -14%,
-      color-mix(in srgb, var(--panel-accent) 11%, transparent),
-      transparent 43%
-    ),
-    var(--glass-card);
-  border-color: color-mix(in srgb, var(--panel-accent) 17%, var(--glass-card-border));
-  transition:
-    border-color 220ms var(--ease-out),
-    box-shadow 220ms var(--ease-out);
-}
-.dashboard-panel::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  inset-block-start: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--panel-accent), transparent 58%);
-  opacity: 0.9;
-  pointer-events: none;
-}
-.dashboard-panel:hover {
-  border-color: color-mix(in srgb, var(--panel-accent) 33%, var(--glass-card-border));
-  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--panel-accent) 28%, #10204b);
+  background: var(--surface);
+  border-color: var(--border);
+  transition: border-color var(--dur-base) var(--ease-out);
 }
 .data-table-shell {
   border-color: var(--border);
@@ -2139,18 +1939,6 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .dark .bg-brand.text-white {
   color: #ffffff;
   background: #0045fe;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kpi-solid::after {
-    display: none;
-  }
-  .kpi-solid .kpi-icon {
-    transition: none;
-  }
-  .kpi-card:hover .kpi-icon {
-    transform: none;
-  }
 }
 
 @container kpis (min-width: 560px) and (max-width: 899px) {
@@ -2169,22 +1957,13 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .app-canvas main .card:not(.kpi-solid):not(.course-campaign-card):not([class*="bg-"]),
 .app-canvas main :is(section, article, div).rounded-2xl.border-border.bg-surface,
 .app-canvas main :is(section, article, div).rounded-3xl.border-border.bg-surface {
-  border-color: var(--glass-card-border);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  box-shadow:
-    0 18px 36px -28px rgba(13, 34, 80, 0.3),
-    inset 0 1px 0 color-mix(in srgb, var(--surface) 75%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
 }
 .app-canvas main .dashboard-panel > div:first-child:has(h2) {
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-accent) 12%, var(--border));
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--panel-accent) 8%, var(--surface)),
-    color-mix(in srgb, var(--surface) 92%, transparent)
-  );
-  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
 }
 .dashboard-chart-frame {
   min-width: 0;
@@ -2201,19 +1980,16 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .dashboard-tab-rail,
 .app-canvas main [role="tablist"] {
-  border-color: var(--glass-card-border);
-  background: color-mix(in srgb, var(--surface) 85%, transparent);
-  box-shadow: 0 13px 28px -23px rgba(13, 34, 80, 0.32);
-  backdrop-filter: blur(16px) saturate(125%);
-  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  border-color: var(--border);
+  background: var(--surface);
 }
 .app-canvas main [role="tablist"] [role="tab"][aria-selected="true"] {
-  background: var(--brand-band) !important;
-  color: #fff !important;
-  box-shadow: 0 9px 18px -11px rgba(0, 69, 254, 0.65);
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .app-canvas main [role="tablist"] [role="tab"][aria-selected="true"] svg {
-  color: #fff;
+  color: var(--brand);
 }
 .app-canvas main [role="tablist"] [role="tab"]:focus-visible,
 .dashboard-tab-rail button:focus-visible {
@@ -2222,33 +1998,29 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .dashboard-tab-rail button[aria-pressed="true"],
 .dashboard-tab-rail button[aria-current="page"] {
-  background: var(--brand-band);
-  color: #fff;
-  box-shadow: 0 9px 18px -11px rgba(0, 69, 254, 0.65);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .dashboard-tab-rail button[aria-current="page"] svg {
-  color: #fff;
+  color: var(--brand);
 }
 .dashboard-tab-rail button[aria-pressed="false"]:hover,
 .dashboard-tab-rail button:not([aria-current]):not([aria-pressed="true"]):hover {
-  background: var(--brand-soft);
-  color: var(--brand);
+  background: var(--surface-2);
+  color: var(--text);
 }
 .app-canvas main .data-table-shell {
   overflow: hidden;
-  border-color: color-mix(in srgb, var(--brand) 14%, var(--border));
+  border-color: var(--border);
 }
 .app-canvas main .data-table-toolbar {
-  background: linear-gradient(
-    110deg,
-    color-mix(in srgb, var(--brand) 5%, var(--surface)),
-    var(--surface)
-  );
+  background: var(--surface-2);
 }
 .app-canvas main .data-table-shell thead th {
-  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
-  color: var(--text);
-  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 500;
   box-shadow: inset 0 -1px 0 var(--border);
 }
 .app-canvas main .data-table-shell tbody tr:nth-child(even) td {
@@ -2256,12 +2028,12 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .app-canvas main .data-table-shell tbody tr:hover td,
 .app-canvas main .data-table-shell tbody tr:focus-visible td {
-  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  background: var(--surface-2);
 }
 .app-canvas main .table-wrap > table:not(.data-table-shell table) th {
-  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
-  color: var(--text);
-  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 500;
 }
 .app-canvas main .table-wrap > table:not(.data-table-shell table) tbody tr:nth-child(even) td {
   background: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
@@ -2270,7 +2042,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .pricing-page-header {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.22);
-  background: linear-gradient(112deg, #003bd9, #0045fe 65%, #1e60ff);
+  background: #f3f3f1;
   box-shadow: 0 20px 38px -23px rgba(0, 53, 185, 0.42);
 }
 .pricing-page-header::before {
@@ -2278,8 +2050,8 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  width: 4px;
-  background: #ff6500;
+  width: 2px;
+  background: var(--accent);
 }
 .pricing-page-header input {
   background: #fff;
@@ -2297,10 +2069,8 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   --pricing-tint: var(--slate-surface);
   --pricing-accent: var(--slate-strong);
   border-color: color-mix(in srgb, var(--pricing-accent) 20%, var(--border));
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--surface);
   box-shadow: 0 18px 34px -25px rgba(13, 34, 80, 0.32);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 .pricing-kpi-card[data-tone="success"] {
   --pricing-tint: var(--mint-surface);
@@ -2324,9 +2094,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 }
 .pricing-kpi-explainer {
   border-top: 1px solid color-mix(in srgb, var(--pricing-accent) 16%, var(--border));
-  background: color-mix(in srgb, var(--surface) 89%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--surface);
 }
 .pricing-kpi-card:hover,
 .pricing-kpi-card[data-active] {
@@ -2341,7 +2109,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   border-color: #7194ff;
 }
 .pricing-kpi-card[data-hero] .pricing-kpi-head {
-  background: linear-gradient(112deg, #003bd9, #0045fe 68%, #1e60ff);
+  background: #f3f3f1;
 }
 .pricing-kpi-card[data-hero] .pricing-kpi-head :is(.text-text-muted, .text-text-subtle),
 .pricing-kpi-card[data-hero] .pricing-kpi-head .num,
@@ -2356,8 +2124,11 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   color: #fff;
   background: rgba(255, 255, 255, 0.16);
 }
+/* Cards that lift on hover, all of them, in one place. */
 @media (prefers-reduced-motion: reduce) {
-  .pricing-kpi-card:hover {
+  .pricing-kpi-card:hover,
+  .lead-cohort-card:hover,
+  .quality-month:hover {
     transform: none;
   }
 }
@@ -2366,35 +2137,23 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
    today's CRM classification are adjacent evidence, never invented steps. */
 .lead-funnel-main {
   border-color: rgba(255, 255, 255, 0.25);
-  background: linear-gradient(122deg, #0038d1, #0045fe 56%, #1a61ff);
-  box-shadow: 0 24px 44px -27px rgba(0, 55, 191, 0.55);
+  background: #f3f3f1;
 }
 .lead-funnel-main::before {
   content: "";
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  width: 5px;
-  background: #ff6500;
+  width: 2px;
+  background: var(--accent);
 }
 .lead-funnel-main::after {
-  content: "";
-  position: absolute;
-  width: 23rem;
-  aspect-ratio: 1;
-  inset-block-start: -15rem;
-  inset-inline-end: -8rem;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 0 4rem rgba(255, 255, 255, 0.035);
-  pointer-events: none;
+  display: none;
 }
 .lead-funnel-evidence {
   border-color: var(--glass-card-border);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface);
   box-shadow: 0 18px 36px -28px rgba(13, 34, 80, 0.32);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 .lead-funnel-signal {
   border-color: var(--border);
@@ -2441,11 +2200,6 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .lead-cohort-card:hover {
-    transform: none;
-  }
-}
 
 /* Lost audit: one decision hierarchy with consistent, theme-aware surfaces. */
 .quality-header-action {
@@ -2459,7 +2213,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   background: var(--surface);
   color: var(--text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   transition:
     background 180ms ease,
     border-color 180ms ease;
@@ -2483,10 +2237,8 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .quality-related {
   border: 1px solid var(--glass-card-border);
   border-radius: 22px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--surface);
   box-shadow: 0 15px 30px -28px rgba(13, 34, 80, 0.3);
-  backdrop-filter: blur(16px) saturate(130%);
-  -webkit-backdrop-filter: blur(16px) saturate(130%);
 }
 .quality-filter-panel {
   display: grid;
@@ -2511,7 +2263,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   background: var(--surface-2);
   color: var(--text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   transition:
     border-color 180ms ease,
     background 180ms ease,
@@ -2535,7 +2287,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   gap: 5px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-filter-selects select {
   min-height: 42px;
@@ -2557,7 +2309,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   padding: 8px 12px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-outcome-grid {
   display: grid;
@@ -2567,21 +2319,12 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 24px;
-  background: linear-gradient(125deg, #0038d1, #0045fe 60%, #1b63ff);
-  box-shadow: 0 24px 42px -27px rgba(0, 55, 191, 0.55);
+  background: #f3f3f1;
 }
 .quality-outcome-hero::after {
-  content: "";
-  position: absolute;
-  width: 13rem;
-  aspect-ratio: 1;
-  inset-block-start: -8rem;
-  inset-inline-end: -4rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 50%;
-  pointer-events: none;
+  display: none;
 }
 .quality-outcome-meter {
   height: 10px;
@@ -2600,7 +2343,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   flex-direction: column;
   align-items: flex-start;
   border: 1px solid var(--rose-border);
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 22px;
   background: linear-gradient(145deg, var(--rose-surface), var(--surface) 74%);
   box-shadow: 0 16px 30px -26px rgba(13, 34, 80, 0.3);
@@ -2626,7 +2369,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   margin-top: 16px;
   color: var(--text);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-result-card strong {
   margin-top: 8px;
@@ -2684,7 +2427,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   padding: 13px 20px;
   color: var(--brand);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   text-align: start;
 }
 .quality-show-more:hover {
@@ -2718,7 +2461,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   padding: 6px 11px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-dimension-tabs button[data-selected] {
   background: var(--surface);
@@ -2746,7 +2489,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
 .quality-coverage-card span {
   color: var(--text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-scope-note {
   border-inline-start: 3px solid var(--amber-strong);
@@ -2771,7 +2514,7 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   padding: 8px 11px;
   color: var(--brand);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 .quality-related a:hover {
   background: var(--brand-soft);
@@ -2795,10 +2538,5 @@ main .table-wrap > table:not(.data-table-shell table) tbody tr:hover > td {
   }
   .quality-analysis-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .quality-month:hover {
-    transform: none;
   }
 }

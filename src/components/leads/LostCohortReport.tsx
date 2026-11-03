@@ -171,7 +171,7 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
           ].map((item) => (
             <Card key={item.label} className={`border-t-[3px] ${item.tone}`}>
               <div className="text-xs text-text-muted">{item.label}</div>
-              <div className="num mt-2 text-3xl font-bold text-text">
+              <div className="num mt-2 text-3xl font-medium text-text">
                 {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
               </div>
             </Card>
@@ -206,7 +206,7 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
         <p className="mt-4 text-xs leading-6 text-text-muted">{t.caveat}</p>
         <Link
           to="/lost"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
         >
           {t.details}
           <ExternalLink size={13} />
@@ -214,7 +214,7 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
         <Link
           to="/leads"
           search={{ view: "quality", month: data.selectedMonth }}
-          className="ms-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+          className="ms-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
         >
           {lang === "ar"
             ? "جودة الليدز واللوست · قرارات المراجعة"

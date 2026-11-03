@@ -188,7 +188,7 @@ export function PriceAlertsTab({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-[16px] font-bold text-text">
+          <h2 className="text-[16px] font-medium text-text">
             {lang === "ar" ? "نظرة سريعة على تنبيهات الأسعار" : "Price alerts overview"}
           </h2>
           <p className="mt-1 text-[12px] text-text-muted">
@@ -243,9 +243,9 @@ export function PriceAlertsTab({
                     <CircleAlert size={17} aria-hidden="true" />
                   )}
                 </span>
-                <div className="text-[28px] font-black tabular-nums">{fmtNum(count)}</div>
+                <div className="text-[28px] font-medium tabular-nums">{fmtNum(count)}</div>
               </div>
-              <div className="text-[12px] font-bold">{severityLabel(severity, lang)}</div>
+              <div className="text-[12px] font-medium">{severityLabel(severity, lang)}</div>
               <div className="mt-1 text-[12px] leading-relaxed opacity-80">
                 {SEVERITY_MEANING[severity]?.[lang]}
               </div>
@@ -291,7 +291,7 @@ export function PriceAlertsTab({
                         </Pill>
                         <Pill tone="neutral">#{first.productCode || "—"}</Pill>
                       </div>
-                      <h3 className="line-clamp-2 text-[14px] font-bold text-text">
+                      <h3 className="line-clamp-2 text-[14px] font-medium text-text">
                         {first.productName || "—"}
                       </h3>
                       <p className="mt-1 text-[12px] text-text-muted">
@@ -300,10 +300,10 @@ export function PriceAlertsTab({
                       </p>
                     </div>
                     <div className="text-end">
-                      <div className="text-[12px] font-semibold text-text-muted">
+                      <div className="text-[12px] font-medium text-text-muted">
                         {lang === "ar" ? "بيع فعلي / أقل مسموح" : "Actual / floor"}
                       </div>
-                      <div className="mt-1 text-[13px] font-black tabular-nums text-text">
+                      <div className="mt-1 text-[13px] font-medium tabular-nums text-text">
                         {fmtMoney(worst.actualUnitPrice, worst.currency, lang)}
                         <span className="mx-1 text-text-subtle">/</span>
                         {fmtMoney(worst.allowedMinimum, worst.currency, lang)}
@@ -325,7 +325,7 @@ export function PriceAlertsTab({
                         >
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
-                              <div className="text-[12px] font-bold text-text">
+                              <div className="text-[12px] font-medium text-text">
                                 {row.invoiceNumber}
                               </div>
                               <div className="mt-1 text-[12px] text-text-muted">
@@ -338,7 +338,7 @@ export function PriceAlertsTab({
                                 {statusLabel(row.complianceStatus, lang)}
                               </Pill>
                               {row.variancePercent !== null && row.variancePercent > 0 && (
-                                <div className="mt-1 text-[12px] font-bold tabular-nums text-danger">
+                                <div className="mt-1 text-[12px] font-medium tabular-nums text-danger">
                                   −{fmtPct(row.variancePercent * 100, 1)}
                                 </div>
                               )}
@@ -372,7 +372,7 @@ export function PriceAlertsTab({
                 type="button"
                 onClick={onResolveLinks}
                 disabled={!canWrite || resolvingLinks}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-semibold text-text transition hover:bg-surface-2 disabled:opacity-50"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-medium text-text transition hover:bg-surface-2 disabled:opacity-50"
               >
                 <RefreshCw
                   size={14}
@@ -415,7 +415,7 @@ export function PriceAlertsTab({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <Pill tone="neutral">{item.rawProductCode || "—"}</Pill>
-                      <h3 className="mt-2 line-clamp-2 text-[13px] font-semibold text-text">
+                      <h3 className="mt-2 line-clamp-2 text-[13px] font-medium text-text">
                         {item.courseName || (lang === "ar" ? "بدون اسم دورة" : "Unnamed course")}
                       </h3>
                     </div>
@@ -434,7 +434,7 @@ export function PriceAlertsTab({
                       setLinking(items);
                       setProductId("");
                     }}
-                    className="mt-3 min-h-10 w-full cursor-pointer rounded-xl border border-border px-3 text-[12px] font-semibold text-text transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-3 min-h-10 w-full cursor-pointer rounded-xl border border-border px-3 text-[12px] font-medium text-text transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {lang === "ar" ? "ربط الكود بمنتج أودو" : "Link code to an Odoo product"}
                   </button>
@@ -484,7 +484,7 @@ export function PriceAlertsTab({
                 type="button"
                 disabled={busy || !Number(productId)}
                 onClick={() => void link()}
-                className="min-h-11 cursor-pointer rounded-lg px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+                className="min-h-11 cursor-pointer rounded-lg px-4 text-[13px] font-medium text-white disabled:opacity-50"
                 style={{ background: "var(--brand)" }}
               >
                 {lang === "ar" ? "اعتماد الربط" : "Approve link"}

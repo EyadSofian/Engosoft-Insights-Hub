@@ -163,7 +163,7 @@ export function CampaignRiskPopup() {
                 <button
                   type="button"
                   onClick={snooze}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
                 >
                   <Clock size={15} aria-hidden="true" />
                   {lang === "ar" ? "ذكّرني بكرة" : "Remind me tomorrow"}
@@ -171,7 +171,7 @@ export function CampaignRiskPopup() {
                 <button
                   type="button"
                   onClick={mute}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-border px-3 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
                 >
                   <BellOff size={15} aria-hidden="true" />
                   {lang === "ar" ? "لا تظهر مجددًا" : "Don't show again"}
@@ -274,7 +274,7 @@ function RiskCard({
       <button
         type="button"
         onClick={onReviewed}
-        className="mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-success/30 bg-success-soft px-3 text-xs font-semibold text-success transition-[filter] hover:brightness-95"
+        className="mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-success/30 bg-success-soft px-3 text-xs font-medium text-success transition-[filter] hover:brightness-95"
       >
         <CircleCheck size={15} aria-hidden="true" />
         {lang === "ar" ? "تم اتخاذ إجراء" : "Action taken"}

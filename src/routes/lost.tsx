@@ -597,7 +597,7 @@ function Lost() {
         aria-label={lang === "ar" ? "تقارير اللوست المرتبطة" : "Related Lost reports"}
         className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs"
       >
-        <span className="font-bold text-text">
+        <span className="font-medium text-text">
           {lang === "ar" ? "كمّل تحليل اللوست:" : "Continue Lost analysis:"}
         </span>
         <Link
@@ -790,7 +790,7 @@ function Lost() {
                     role="tab"
                     aria-selected={courseReportView === "cohort"}
                     onClick={() => setCourseReportView("cohort")}
-                    className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "cohort" ? "bg-brand text-white shadow-md shadow-brand/20" : "text-text-muted hover:bg-surface-2"}`}
+                    className={`rounded-xl px-3 py-3 text-xs font-medium transition sm:text-sm ${courseReportView === "cohort" ? "bg-brand text-white shadow-md shadow-brand/20" : "text-text-muted hover:bg-surface-2"}`}
                   >
                     {lang === "ar"
                       ? "Lost حسب الكورس · Creation Date"
@@ -804,7 +804,7 @@ function Lost() {
                     role="tab"
                     aria-selected={courseReportView === "movement"}
                     onClick={() => setCourseReportView("movement")}
-                    className={`rounded-xl px-3 py-3 text-xs font-bold transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
+                    className={`rounded-xl px-3 py-3 text-xs font-medium transition sm:text-sm ${courseReportView === "movement" ? "bg-danger text-white shadow-md shadow-danger/20" : "text-text-muted hover:bg-surface-2"}`}
                   >
                     {lang === "ar" ? "حركة Lost · تاريخ الإغلاق" : "Lost movement · close date"}
                     <span className="num ms-2 rounded-full bg-white/15 px-2 py-0.5">
@@ -857,7 +857,7 @@ function Lost() {
                       key={key}
                       type="button"
                       onClick={() => setShareView(key)}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${shareView === key ? "border-danger bg-danger-soft text-danger" : "border-border text-text-muted hover:bg-surface-2"}`}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${shareView === key ? "border-danger bg-danger-soft text-danger" : "border-border text-text-muted hover:bg-surface-2"}`}
                     >
                       {label}
                     </button>
@@ -889,7 +889,7 @@ function Lost() {
                   <div className="table-wrap scroll-hint-x">
                     <table className="w-full min-w-[420px] text-sm">
                       <thead>
-                        <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+                        <tr className="text-[12px] text-text-muted">
                           <th className="py-2 text-start">{t("team")}</th>
                           <th className="py-2 text-end">{t("crm_leads")}</th>
                           <th className="py-2 text-end">{t("lost_count")}</th>
@@ -1193,10 +1193,10 @@ function ShareRows({
               style={{ "--i": index } as CSSProperties}
             >
               <span className="mb-1.5 flex items-baseline justify-between gap-3">
-                <span className="truncate text-[13px] font-semibold text-text" title={item.label}>
+                <span className="truncate text-[13px] font-medium text-text" title={item.label}>
                   {item.label}
                 </span>
-                <span className="num shrink-0 text-[13px] font-semibold text-text">
+                <span className="num shrink-0 text-[13px] font-medium text-text">
                   {fmtNum(item.count)}
                   <span className="ms-1.5 text-[12px] font-normal text-text-muted">
                     ({fmtPct(item.share, 1)})
@@ -1284,7 +1284,7 @@ function LostTimingPanel({
       header: A ? "بعد كام يوم" : "Days to loss",
       sortValue: (r) => snapshotAgeDays(r) ?? -1,
       render: (r) => (
-        <span className="num font-bold text-danger">
+        <span className="num font-medium text-danger">
           {snapshotAgeDays(r) === null
             ? "—"
             : `${fmtNum(snapshotAgeDays(r)!)} ${A ? "يوم" : "days"}`}
@@ -1325,11 +1325,11 @@ function LostTimingPanel({
         <div>
           <div className="mb-2 flex items-center gap-2 text-brand">
             <Clock3 size={20} />
-            <span className="text-xs font-bold tracking-wide">
+            <span className="text-xs font-medium">
               {A ? "رحلة العميل قبل الخسارة" : "Journey before loss"}
             </span>
           </div>
-          <h2 className="text-xl font-bold text-text">
+          <h2 className="text-xl font-medium text-text">
             {A ? "دخل إمتى، وخسرناه بعد قد إيه؟" : "When did they arrive, and how long until loss?"}
           </h2>
           <p className="mt-1 max-w-2xl text-xs leading-6 text-text-muted">
@@ -1354,7 +1354,7 @@ function LostTimingPanel({
           <div className="text-xs text-text-muted">
             {A ? "وسيط مدة الخسارة" : "Median time to loss"}
           </div>
-          <div className="num mt-2 text-2xl font-bold text-brand">
+          <div className="num mt-2 text-2xl font-medium text-brand">
             {median === null ? "—" : `${fmtNum(median)} ${A ? "يوم" : "days"}`}
           </div>
         </div>
@@ -1363,7 +1363,7 @@ function LostTimingPanel({
           return (
             <div key={band.key} className="rounded-xl border border-border bg-surface-2/45 p-4">
               <div className="text-xs text-text-muted">{band.label}</div>
-              <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(count)}</div>
+              <div className="num mt-2 text-2xl font-medium text-text">{fmtNum(count)}</div>
               <div className="mt-1 text-[12px] text-text-muted">
                 {fmtPct(dated.length ? (count / dated.length) * 100 : null, 1)}{" "}
                 {A ? "من المؤرخين" : "of dated losses"}
@@ -1499,7 +1499,7 @@ function LostRecordSheet({
 
               {(record.phone || record.mobile || record.email) && (
                 <div className="rounded-2xl border border-border bg-surface-2/45 p-4">
-                  <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                  <div className="mb-2 text-[12px] font-medium text-text-muted">
                     {lang === "ar" ? "بيانات التواصل" : "Contact details"}
                   </div>
                   <div className="space-y-1 text-sm text-text" dir="ltr">
@@ -1511,7 +1511,7 @@ function LostRecordSheet({
               )}
 
               <div className="rounded-2xl border border-brand/20 bg-brand-soft/30 p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-text">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-text">
                   <Clock3 size={17} className="text-brand" />
                   {lang === "ar"
                     ? "من الإنشاء للخسارة · دليل Odoo"
@@ -1545,7 +1545,7 @@ function LostRecordSheet({
                         </div>
                       </div>
                     </div>
-                    <div className="num mt-3 text-lg font-bold text-danger">
+                    <div className="num mt-3 text-lg font-medium text-danger">
                       {chatter.data.elapsedHours === null
                         ? "—"
                         : chatter.data.elapsedHours < 48
@@ -1560,7 +1560,7 @@ function LostRecordSheet({
                       </p>
                     )}
                     <div className="mt-4 border-t border-border pt-3">
-                      <div className="mb-2 text-xs font-bold text-text">
+                      <div className="mb-2 text-xs font-medium text-text">
                         {lang === "ar"
                           ? "آخر رسالة أو نشاط موثق قبل Lost"
                           : "Last documented message or activity before loss"}
@@ -1588,7 +1588,7 @@ function LostRecordSheet({
                       )}
                     </div>
                     <details className="mt-3 border-t border-border pt-3">
-                      <summary className="cursor-pointer text-xs font-semibold text-brand">
+                      <summary className="cursor-pointer text-xs font-medium text-brand">
                         {lang === "ar"
                           ? `عرض Chatter (${fmtNum(chatter.data.messages.length)} رسالة)`
                           : `Show chatter (${fmtNum(chatter.data.messages.length)} messages)`}
@@ -1633,7 +1633,7 @@ function LostRecordSheet({
                 href={record.odooUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand/40"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand/40"
               >
                 <ExternalLink size={17} />
                 {lang === "ar" ? "فتح وتعديل الـLead في Odoo" : "Open and edit the Lead in Odoo"}
@@ -1664,7 +1664,7 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
         <thead className="sticky top-0 z-10">
           <tr>
             <th
-              className="px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border text-start sticky-col z-20 text-text-muted"
+              className="px-3 py-2.5 text-[12px] font-medium bg-surface-2 border-b border-border text-start sticky-col z-20 text-text-muted"
               style={{ background: "var(--surface-2)", minWidth: 200 }}
             >
               {lang === "ar" ? "السبب" : "Reason"}
@@ -1672,13 +1672,13 @@ function MatrixTable({ matrix }: { matrix: Matrix }) {
             {matrix.cols.map((c) => (
               <th
                 key={c}
-                className="px-2 py-2.5 text-[12px] font-semibold bg-surface-2 border-b border-border text-end text-text-muted whitespace-nowrap"
+                className="px-2 py-2.5 text-[12px] font-medium bg-surface-2 border-b border-border text-end text-text-muted whitespace-nowrap"
                 title={c}
               >
                 <span className="block max-w-[110px] truncate">{c}</span>
               </th>
             ))}
-            <th className="px-3 py-2.5 text-[12px] font-semibold uppercase bg-surface-2 border-b border-border text-end text-text-muted">
+            <th className="px-3 py-2.5 text-[12px] font-medium bg-surface-2 border-b border-border text-end text-text-muted">
               {lang === "ar" ? "الإجمالي" : "Total"}
             </th>
           </tr>

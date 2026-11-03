@@ -92,15 +92,13 @@ export function DecisionCard({
     >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span
-          className={`rounded-md px-2 py-0.5 text-[12px] font-bold tracking-wide ${tone}`}
+          className={`rounded-md px-2 py-0.5 text-[12px] font-medium ${tone}`}
           data-testid="nexus-decision-badge"
         >
           {message.decision}
         </span>
         {message.priority && (
-          <span className="text-[12px] font-semibold uppercase text-text-subtle">
-            {message.priority}
-          </span>
+          <span className="text-[12px] font-medium text-text-subtle">{message.priority}</span>
         )}
         {message.confidence && (
           <span
@@ -117,7 +115,7 @@ export function DecisionCard({
 
         {message.actionBand && (
           <div className="rounded-lg border border-brand/30 bg-brand-soft/40 px-2.5 py-2">
-            <p className="text-[12px] font-semibold text-brand">{t.band}</p>
+            <p className="text-[12px] font-medium text-brand">{t.band}</p>
             <p
               className="num mt-0.5 text-sm font-semibold text-text"
               data-testid="nexus-action-band"
@@ -137,7 +135,7 @@ export function DecisionCard({
             className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2"
             data-testid="nexus-missing-evidence"
           >
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+            <p className="flex items-center gap-1.5 text-[12px] font-medium text-amber-700 dark:text-amber-400">
               <AlertTriangle className="size-3" aria-hidden />
               {t.missing}
             </p>
@@ -235,7 +233,7 @@ function Section({ title, items }: { title: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="text-[12px] font-semibold text-text">{title}</p>
+      <p className="text-[12px] font-medium text-text">{title}</p>
       <ul className="mt-0.5 space-y-0.5">
         {items.map((item) => (
           <li key={item} className="text-[12px] leading-snug text-text-muted">

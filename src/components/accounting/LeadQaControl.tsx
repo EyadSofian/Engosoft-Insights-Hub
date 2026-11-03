@@ -191,7 +191,7 @@ export function LeadQaControl({
           event.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[12px] font-semibold text-text hover:border-brand"
+        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[12px] font-medium text-text hover:border-brand"
         title={A ? "التحقق اليدوي من الليد" : "Manual lead QA"}
       >
         <ShieldCheck size={11} />
@@ -245,7 +245,7 @@ export function LeadQaControl({
                       href={String(href)}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg border border-brand/20 px-2 py-1 text-[12px] font-semibold text-brand hover:bg-brand-soft"
+                      className="rounded-lg border border-brand/20 px-2 py-1 text-[12px] font-medium text-brand hover:bg-brand-soft"
                     >
                       {text}
                       <ExternalLink size={10} className="ms-1 inline" />
@@ -365,7 +365,7 @@ export function LeadQaControl({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg border border-border px-3 py-2 text-xs font-semibold"
+                className="rounded-lg border border-border px-3 py-2 text-xs font-medium"
               >
                 {A ? "إلغاء" : "Cancel"}
               </button>
@@ -373,7 +373,7 @@ export function LeadQaControl({
                 type="button"
                 disabled={saving}
                 onClick={() => void save()}
-                className="rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-brand px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
               >
                 {saving ? (A ? "جارٍ الحفظ…" : "Saving…") : A ? "حفظ التحقق" : "Save verdict"}
               </button>

@@ -161,7 +161,7 @@ export function PriceTeamTab({
       <section className="overflow-hidden rounded-xl border border-border bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-[14px] font-bold text-text">
+            <h2 className="flex items-center gap-2 text-[14px] font-medium text-text">
               <UsersRound size={16} className="text-brand" aria-hidden="true" />
               {ar ? "من يحتاج متابعة" : "Who needs a conversation"}
             </h2>
@@ -200,7 +200,7 @@ export function PriceTeamTab({
                     ? "الإرسال يحتاج صلاحية مدير"
                     : "Sending needs manager access"
               }
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 text-[12px] font-semibold text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 text-[12px] font-medium text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <BellRing size={14} aria-hidden="true" />
               {sending
@@ -245,7 +245,7 @@ export function PriceTeamTab({
               <div className="flex min-w-0 items-center gap-2.5">
                 <span
                   aria-hidden="true"
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-[12px] font-bold"
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-[12px] font-medium"
                   style={{
                     background:
                       member.compliance < 0.75 ? "var(--danger-soft)" : "var(--warning-soft)",
@@ -255,7 +255,7 @@ export function PriceTeamTab({
                   {initialsOf(member.salesperson)}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-[13px] font-semibold text-text">
+                  <h3 className="truncate text-[13px] font-medium text-text">
                     <bdi>{member.salesperson || (ar ? "بدون موظف" : "Unassigned")}</bdi>
                   </h3>
                   <p className="num text-[12px] text-text-subtle">
@@ -271,7 +271,7 @@ export function PriceTeamTab({
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span
-                    className="num text-[17px] font-bold"
+                    className="num text-[17px] font-medium"
                     style={{
                       color: member.compliance < 0.75 ? "var(--danger)" : "var(--warning)",
                     }}
@@ -301,7 +301,7 @@ export function PriceTeamTab({
 
               {/* what it cost */}
               <div className="min-w-0">
-                <div className="num text-[13px] font-bold" style={{ color: "var(--danger)" }}>
+                <div className="num text-[13px] font-medium" style={{ color: "var(--danger)" }}>
                   {member.worst
                     ? fmtMoney(member.leakage, member.worst.currency, lang)
                     : fmtNum(Math.round(member.leakage))}
@@ -331,7 +331,7 @@ export function PriceTeamTab({
                 <button
                   type="button"
                   onClick={() => onOpenSalesperson(member.salesperson)}
-                  className="inline-flex min-h-9 cursor-pointer items-center rounded-lg px-3 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                  className="inline-flex min-h-9 cursor-pointer items-center rounded-lg px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
                   style={{ background: "var(--brand)" }}
                 >
                   {ar ? "عرض الحالات" : "View cases"}
@@ -369,7 +369,7 @@ export function PriceTeamTab({
           className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-start"
         >
           <div className="min-w-0">
-            <h2 className="text-[13px] font-bold text-text">
+            <h2 className="text-[13px] font-medium text-text">
               {ar ? "قواعد الحافز المنشورة" : "Published incentive rules"}
             </h2>
             <p className="mt-0.5 text-[12px] text-text-muted">
@@ -405,7 +405,7 @@ export function PriceTeamTab({
                     </div>
                   </div>
                   <span
-                    className="num shrink-0 text-[12px] font-semibold"
+                    className="num shrink-0 text-[12px] font-medium"
                     style={{ color: "var(--success)" }}
                   >
                     {bandText(price, lang)}
@@ -433,7 +433,7 @@ function Trend({ value }: { value?: number }) {
   const color = flat ? "var(--text-subtle)" : value > 0 ? "var(--success)" : "var(--danger)";
   return (
     <span
-      className="num inline-flex items-center gap-0.5 text-[12px] font-semibold"
+      className="num inline-flex items-center gap-0.5 text-[12px] font-medium"
       style={{ color }}
       title={lang === "ar" ? "مقارنة بالفترة السابقة" : "vs the previous period"}
     >

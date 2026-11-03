@@ -24,13 +24,22 @@ export interface SourceDistributionRow {
 }
 
 /** One current Odoo record contributes to one source and exactly one outcome. */
-export function crmSourceDistribution(records: readonly SourceDistributionRecord[]): SourceDistributionRow[] {
+export function crmSourceDistribution(
+  records: readonly SourceDistributionRecord[],
+): SourceDistributionRow[] {
   const groups = new Map<string, SourceDistributionRow>();
   for (const record of records) {
     const source = matrixSource(record.source);
     const row = groups.get(source) ?? {
-      source, total: 0, active: 0, won: 0, lost: 0,
-      share: 0, wonRate: 0, lostRate: 0, latestRecords: [],
+      source,
+      total: 0,
+      active: 0,
+      won: 0,
+      lost: 0,
+      share: 0,
+      wonRate: 0,
+      lostRate: 0,
+      latestRecords: [],
     };
     row.total++;
     if (record.status === "won") row.won++;
@@ -50,9 +59,9 @@ export function crmSourceDistribution(records: readonly SourceDistributionRecord
   return [...groups.values()]
     .map((row) => ({
       ...row,
-      share: records.length ? row.total / records.length * 100 : 0,
-      wonRate: row.total ? row.won / row.total * 100 : 0,
-      lostRate: row.total ? row.lost / row.total * 100 : 0,
+      share: records.length ? (row.total / records.length) * 100 : 0,
+      wonRate: row.total ? (row.won / row.total) * 100 : 0,
+      lostRate: row.total ? (row.lost / row.total) * 100 : 0,
       latestRecords: row.latestRecords
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
         .slice(0, 12),

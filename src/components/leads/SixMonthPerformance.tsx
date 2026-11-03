@@ -1233,7 +1233,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
         actions={
           <a
             href={`/api/lead-performance-export?${exportParams.toString()}`}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-text transition-colors hover:bg-surface-2"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3.5 text-xs font-medium text-text transition-colors hover:bg-surface-2"
             title={x.exportHint}
           >
             <Download size={15} />
@@ -1294,7 +1294,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
         <LeadPerformanceFunnel group={selected} paidReady={paidReady} />
         {notices.length > 0 && (
           <details className="lead-performance-notices rounded-2xl border border-amber-strong/25 bg-amber-surface/40">
-            <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[12px] font-semibold text-text">
+            <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-[12px] font-medium text-text">
               <AlertTriangle size={15} className="text-amber-strong" aria-hidden="true" />
               {lang === "ar"
                 ? `${n(notices.length)} ملاحظات تؤثر على قراءة البيانات`
@@ -1329,16 +1329,16 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
               data-selected={row.name === data.selectedMonth ? "" : undefined}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-bold text-text">
+                <span className="text-[13px] font-medium text-text">
                   {monthLabel(row.name, lang)}
                 </span>
                 {row.name === data.selectedMonth && (
-                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-bold text-brand">
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-medium text-brand">
                     {lang === "ar" ? "المجموعة المختارة" : "Selected cohort"}
                   </span>
                 )}
               </span>
-              <span className="num mt-3 block text-[28px] font-bold leading-none text-text">
+              <span className="num mt-3 block text-[28px] font-medium leading-none text-text">
                 {n(row.leads)}
               </span>
               <span className="mt-1 block text-[12px] text-text-muted">{t.leads}</span>
@@ -1585,13 +1585,13 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
             <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
               <div>
                 <div className="text-[12px] text-text-muted">{t.paymentMonth}</div>
-                <div className="num mt-1 text-3xl font-bold text-text">
+                <div className="num mt-1 text-3xl font-medium text-text">
                   {data.availability.accounting ? n(selectedCollections?.paidInvoices) : "—"}
                 </div>
               </div>
               <div>
                 <div className="text-[12px] text-text-muted">{t.paymentRevenue}</div>
-                <div className="num mt-1 text-xl font-bold text-text">
+                <div className="num mt-1 text-xl font-medium text-text">
                   {data.availability.accounting ? money(selectedCollections?.paidUsd ?? 0) : "—"}
                 </div>
               </div>
@@ -1624,7 +1624,7 @@ export function SixMonthPerformance({ initialMonth }: { initialMonth?: string })
         </MoreDetails>
         <MoreDetails label={lang === "ar" ? "تفصيل Lost حسب المجموعة" : "Lost breakdown by group"}>
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs">
-            <span className="font-bold text-text">
+            <span className="font-medium text-text">
               {lang === "ar" ? "تقارير اللوست المرتبطة:" : "Related Lost reports:"}
             </span>
             <Link
@@ -1759,7 +1759,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-3">
       <div className="text-[12px] leading-snug text-text-muted">{label}</div>
-      <div className="num mt-1.5 text-lg font-bold text-text">{value}</div>
+      <div className="num mt-1.5 text-lg font-medium text-text">{value}</div>
     </div>
   );
 }

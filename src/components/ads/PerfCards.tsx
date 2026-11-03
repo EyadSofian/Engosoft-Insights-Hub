@@ -116,13 +116,13 @@ export function PerfCards({
                   )}
                   {grain === "adset" && <AdSetOriginBadge origin={r.adsetOrigin} />}
                   {websiteConversion && (
-                    <span className="inline-flex items-center rounded-full bg-brand-soft px-1.5 py-0.5 text-[12px] font-semibold text-brand whitespace-nowrap">
+                    <span className="inline-flex items-center rounded-full bg-brand-soft px-1.5 py-0.5 text-[12px] font-medium text-brand whitespace-nowrap">
                       {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
                     </span>
                   )}
                   {showLivePerformance && running && (
                     <span
-                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-semibold whitespace-nowrap"
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-medium whitespace-nowrap"
                       style={{ background: "var(--success-soft)", color: "var(--success)" }}
                     >
                       <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
@@ -157,7 +157,7 @@ export function PerfCards({
 
               <div className="min-w-0">
                 <h3
-                  className="text-[13.5px] font-semibold text-text leading-snug line-clamp-2"
+                  className="text-[13.5px] font-medium text-text leading-snug line-clamp-2"
                   dir="auto"
                   title={nameOf(r)}
                 >
@@ -332,7 +332,7 @@ function OwnerVerdictChip({ verdict }: { verdict: OwnerCampaignVerdict }) {
   const label = ownerStatusLabel(verdict.status, lang);
   if (verdict.status === "early") {
     return (
-      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-1 text-[12px] font-semibold text-text-muted whitespace-nowrap">
+      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-1 text-[12px] font-medium text-text-muted whitespace-nowrap">
         {label}
       </span>
     );
@@ -353,7 +353,7 @@ function Fact({ metric, value }: { metric: MetricKey; value: React.ReactNode }) 
   return (
     <div className="min-w-0">
       <dt className="text-[12px] text-text-muted truncate">{METRICS[metric][lang].short}</dt>
-      <dd className="num text-[13px] font-semibold text-text">{value}</dd>
+      <dd className="num text-[13px] font-medium text-text">{value}</dd>
     </div>
   );
 }
@@ -362,7 +362,7 @@ function SimpleFact({ label, value }: { label: string; value: React.ReactNode })
   return (
     <div className="min-w-0">
       <dt className="truncate text-[12px] text-text-muted">{label}</dt>
-      <dd className="num text-[13px] font-semibold text-text">{value}</dd>
+      <dd className="num text-[13px] font-medium text-text">{value}</dd>
     </div>
   );
 }

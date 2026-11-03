@@ -766,7 +766,7 @@ export function PerfExplorer({
             </div>
           </div>
           <div className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-start sm:min-w-[160px]">
-            <div className="text-[12px] font-medium uppercase tracking-wide text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {lang === "ar"
                 ? `${fmtNum(shown.length)} حملات · مجموع الصفوف`
                 : `${fmtNum(shown.length)} campaigns · row total`}
@@ -1190,14 +1190,14 @@ function RowDrawer({
             <div className="flex items-center gap-2 flex-wrap">
               <PlatformBadges platforms={row.platforms} />
               {row.objective === "website_conversion" && (
-                <span className="rounded-full bg-brand-soft px-2 py-1 text-[12px] font-semibold text-brand">
+                <span className="rounded-full bg-brand-soft px-2 py-1 text-[12px] font-medium text-brand">
                   {lang === "ar" ? "تحويلات موقع" : "Website conversions"}
                 </span>
               )}
               {row.adsetOrigin && <AdSetOriginBadge origin={row.adsetOrigin} />}
               {ownerVerdict ? (
                 ownerVerdict.status === "early" ? (
-                  <span className="rounded-full bg-surface-2 px-2 py-1 text-[12px] font-semibold text-text-muted">
+                  <span className="rounded-full bg-surface-2 px-2 py-1 text-[12px] font-medium text-text-muted">
                     {ownerStatusLabel(ownerVerdict.status, lang)}
                   </span>
                 ) : (
@@ -1252,7 +1252,7 @@ function RowDrawer({
         <div className="p-4 space-y-4">
           {ownerVerdict && (
             <section className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <h4 className="text-[12px] font-semibold text-text">
+              <h4 className="text-[12px] font-medium text-text">
                 {lang === "ar" ? "ليه أخدت الحكم ده؟" : "Why this verdict?"}
               </h4>
               <p className="mt-1 text-[12px] leading-5 text-text-muted">
@@ -1341,7 +1341,7 @@ function RowDrawer({
 
           {technical.length > 0 && (
             <details className="group rounded-xl border border-border bg-surface">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-semibold text-text-muted">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-medium text-text-muted">
                 <span>{lang === "ar" ? "تفاصيل تقنية" : "Technical details"}</span>
                 <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
               </summary>
@@ -1360,7 +1360,7 @@ function RowDrawer({
 
           {groups.map((g) => (
             <section key={g.group}>
-              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5">
+              <h4 className="text-[12px] font-medium text-text-subtle mb-1.5">
                 {METRIC_GROUP_LABEL[g.group][lang]}
               </h4>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12.5px]">
@@ -1401,7 +1401,7 @@ function RowDrawer({
 
           {grain === "campaign" && relatedRows.length > 0 && (
             <details className="group rounded-xl border border-border bg-surface">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-semibold text-text">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-medium text-text">
                 <span>
                   {lang === "ar"
                     ? `حملات مرتبطة بنفس الدورة (${fmtNum(relatedRows.length)})`
@@ -1465,7 +1465,7 @@ function ChildLevel({
 
   return (
     <section>
-      <h4 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle mb-1.5 flex items-center gap-1.5">
+      <h4 className="text-[12px] font-medium text-text-subtle mb-1.5 flex items-center gap-1.5">
         <PanelRightOpen size={12} />
         {childGrain === "adset"
           ? lang === "ar"

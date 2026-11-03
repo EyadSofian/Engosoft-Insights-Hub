@@ -78,7 +78,7 @@ export function NetSalesView() {
               <BadgeCheck size={17} />
               {ar ? "الرقم البيعي الحقيقي من قيود Odoo" : "Company sales from posted Odoo entries"}
             </div>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl num">
+            <h2 className="mt-3 text-3xl font-medium tracking-tight sm:text-4xl num">
               {fmtUSDFull(data.total.netSalesUsd)}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">
@@ -113,7 +113,7 @@ export function NetSalesView() {
           </span>
           <span className="text-slate-300">{ar ? "رسوم التحصيل" : "Collection fees"}</span>
           <span className="text-slate-400">=</span>
-          <span className="num font-bold text-emerald-300">
+          <span className="num font-medium text-emerald-300">
             {fmtUSDFull(data.total.netSalesUsd)}
           </span>
         </div>
@@ -145,7 +145,7 @@ export function NetSalesView() {
 
       <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-base font-bold text-text">
+          <h3 className="flex items-center gap-2 text-base font-medium text-text">
             <BookOpenText size={18} className="text-brand" />
             {ar ? "تحليل شهري مفصل" : "Detailed monthly analysis"}
           </h3>
@@ -245,7 +245,7 @@ export function NetSalesView() {
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-2xl border border-border bg-surface p-4 text-sm leading-7 text-text-muted sm:p-5">
-          <h3 className="mb-2 flex items-center gap-2 font-bold text-text">
+          <h3 className="mb-2 flex items-center gap-2 font-medium text-text">
             <ReceiptText size={17} className="text-brand" />
             {ar ? "بنود لا تدخل في الصافي" : "Outside the net sales figure"}
           </h3>
@@ -264,7 +264,7 @@ export function NetSalesView() {
           </p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-950 sm:p-5">
-          <h3 className="mb-2 flex items-center gap-2 font-bold">
+          <h3 className="mb-2 flex items-center gap-2 font-medium">
             <ShieldAlert size={17} />
             {ar ? "تنبيه محاسبي بخصوص الـWaiver" : "Accounting note on waivers"}
           </h3>
@@ -297,7 +297,7 @@ function Metric({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+      <div className="flex items-center gap-2 text-xs font-medium text-text-muted">
         {warm ? (
           <ArrowDownRight size={15} className="text-amber-500" />
         ) : (
@@ -305,7 +305,7 @@ function Metric({
         )}
         {label}
       </div>
-      <div className="num mt-2 text-2xl font-bold text-text">{value}</div>
+      <div className="num mt-2 text-2xl font-medium text-text">{value}</div>
       <div className="mt-1 text-xs text-text-muted">{note}</div>
     </div>
   );
@@ -322,7 +322,7 @@ function MoneyCell({
 }) {
   return (
     <td
-      className={`num px-4 py-3.5 text-end tabular-nums ${strong ? "font-bold text-emerald-700" : warm ? "text-amber-700" : "text-text"}`}
+      className={`num px-4 py-3.5 text-end tabular-nums ${strong ? "font-medium text-emerald-700" : warm ? "text-amber-700" : "text-text"}`}
     >
       {fmtUSDFull(value)}
     </td>

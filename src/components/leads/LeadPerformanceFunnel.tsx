@@ -30,25 +30,25 @@ export function LeadPerformanceFunnel({
       >
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[12px] font-bold tracking-[0.12em] text-white/80">
+            <p className="text-[12px] font-medium text-white/80">
               {ar ? "مسار التحويل المؤكد" : "Verified conversion path"}
             </p>
-            <h3 className="mt-1 text-lg font-bold text-white sm:text-xl">
+            <h3 className="mt-1 text-lg font-medium text-white sm:text-xl">
               {ar ? "من دخول CRM إلى تسجيل مدفوع" : "From CRM entry to paid enrollment"}
             </h3>
           </div>
-          <span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[12px] font-semibold text-white">
+          <span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[12px] font-medium text-white">
             {ar ? "نفس مجموعة شهر الدخول" : "Same entry-month cohort"}
           </span>
         </div>
 
         <div className="relative mt-6 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-stretch">
           <div className="rounded-2xl border border-white/25 bg-white/14 p-4 backdrop-blur-xl">
-            <span className="flex items-center gap-2 text-[12px] font-semibold text-white/85">
+            <span className="flex items-center gap-2 text-[12px] font-medium text-white/85">
               <Users size={15} aria-hidden="true" />
               {ar ? "دخلت CRM" : "Entered CRM"}
             </span>
-            <strong className="num mt-2 block text-4xl font-bold leading-none text-white">
+            <strong className="num mt-2 block text-4xl font-medium leading-none text-white">
               {display(entry.count)}
             </strong>
             <p className="mt-2 text-[12px] leading-relaxed text-white/75">
@@ -64,11 +64,11 @@ export function LeadPerformanceFunnel({
           </div>
 
           <div className="rounded-2xl border border-white/25 bg-white/14 p-4 backdrop-blur-xl">
-            <span className="flex items-center gap-2 text-[12px] font-semibold text-white/85">
+            <span className="flex items-center gap-2 text-[12px] font-medium text-white/85">
               <BadgeCheck size={15} aria-hidden="true" />
               {ar ? "تسجيل مدفوع مرتبط مباشرة" : "Exactly linked paid enrollment"}
             </span>
-            <strong className="num mt-2 block text-4xl font-bold leading-none text-white">
+            <strong className="num mt-2 block text-4xl font-medium leading-none text-white">
               {display(paid.count)}
             </strong>
             <p className="mt-2 text-[12px] leading-relaxed text-white/75">
@@ -85,10 +85,10 @@ export function LeadPerformanceFunnel({
 
         <div className="relative mt-5 rounded-2xl border border-white/20 bg-white/12 px-4 py-3 backdrop-blur-xl">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-[12px] font-semibold text-white/85">
+            <span className="text-[12px] font-medium text-white/85">
               {ar ? "تحويل مدفوع مثبت من إجمالي الدخول" : "Verified paid share of all entries"}
             </span>
-            <strong className="num text-2xl font-bold text-white">
+            <strong className="num text-2xl font-medium text-white">
               {percent(paid.shareOfEntries)}
             </strong>
           </div>
@@ -107,21 +107,21 @@ export function LeadPerformanceFunnel({
       </article>
 
       <aside className="lead-funnel-evidence rounded-[26px] border p-5 sm:p-6">
-        <p className="text-[12px] font-bold tracking-[0.12em] text-brand">
+        <p className="text-[12px] font-medium text-brand">
           {ar ? "دلائل مساعدة" : "Supporting evidence"}
         </p>
-        <h3 className="mt-1 text-base font-bold text-text">
+        <h3 className="mt-1 text-base font-medium text-text">
           {ar ? "تُقرأ بجانب المسار، لا كمراحل داخله" : "Read alongside the path, not as its steps"}
         </h3>
 
         <div className="mt-4 space-y-2.5">
           <div className="lead-funnel-signal rounded-2xl border p-3.5" data-tone="violet">
             <div className="flex items-start justify-between gap-3">
-              <span className="flex items-center gap-2 text-[12px] font-semibold text-text-muted">
+              <span className="flex items-center gap-2 text-[12px] font-medium text-text-muted">
                 <PhoneCall size={15} className="text-violet-strong" aria-hidden="true" />
                 {ar ? "لها محاولة PBX موثقة" : "Documented PBX attempt"}
               </span>
-              <strong className="num text-xl font-bold text-text">{display(call.count)}</strong>
+              <strong className="num text-xl font-medium text-text">{display(call.count)}</strong>
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
               {percent(call.stepRate)}{" "}
@@ -136,10 +136,10 @@ export function LeadPerformanceFunnel({
 
           <div className="lead-funnel-signal rounded-2xl border p-3.5" data-tone="amber">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[12px] font-semibold text-text-muted">
+              <span className="text-[12px] font-medium text-text-muted">
                 {ar ? "مصنّفة Opportunity الآن" : "Currently an Opportunity"}
               </span>
-              <strong className="num text-xl font-bold text-text">
+              <strong className="num text-xl font-medium text-text">
                 {display(opportunity.count)}
               </strong>
             </div>
@@ -153,10 +153,10 @@ export function LeadPerformanceFunnel({
 
           <div className="lead-funnel-signal rounded-2xl border p-3.5" data-tone="rose">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[12px] font-semibold text-text-muted">
+              <span className="text-[12px] font-medium text-text-muted">
                 {ar ? "حالتها Lost الآن" : "Currently Lost"}
               </span>
-              <strong className="num text-xl font-bold text-text">{fmtNum(group.lost)}</strong>
+              <strong className="num text-xl font-medium text-text">{fmtNum(group.lost)}</strong>
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-text-muted">
               {ar

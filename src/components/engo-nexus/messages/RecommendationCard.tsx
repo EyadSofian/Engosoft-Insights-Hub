@@ -40,7 +40,7 @@ export function RecommendationCard({
       className="rounded-lg border border-accent/30 bg-accent/5 p-3"
       data-testid="nexus-recommendation-card"
     >
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-accent">{t.title}</h4>
+      <h4 className="text-xs font-medium text-accent">{t.title}</h4>
       <p className="mt-1 text-sm font-medium text-text">
         <IsolatedText text={recommendation.summary} />
       </p>

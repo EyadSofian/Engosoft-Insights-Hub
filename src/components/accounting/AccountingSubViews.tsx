@@ -1291,7 +1291,7 @@ export function AccountingAgentsView() {
             role="tab"
             aria-selected={section === "overview"}
             onClick={() => setSection("overview")}
-            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
               section === "overview"
                 ? "bg-brand text-white shadow-sm"
                 : "text-text-muted hover:bg-surface-muted hover:text-text"
@@ -1305,7 +1305,7 @@ export function AccountingAgentsView() {
             role="tab"
             aria-selected={section === "units"}
             onClick={() => setSection("units")}
-            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
               section === "units"
                 ? "bg-brand text-white shadow-sm"
                 : "text-text-muted hover:bg-surface-muted hover:text-text"
@@ -1319,7 +1319,7 @@ export function AccountingAgentsView() {
             role="tab"
             aria-selected={section === "employees"}
             onClick={() => setSection("employees")}
-            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
               section === "employees"
                 ? "bg-brand text-white shadow-sm"
                 : "text-text-muted hover:bg-surface-muted hover:text-text"
@@ -1843,7 +1843,7 @@ function TeamSalesOverview({
                     </td>
                   </tr>
                 )}
-                <tr className="border-t-2 border-border bg-surface-2 font-bold">
+                <tr className="border-t-2 border-border bg-surface-2 font-medium">
                   <td className="px-4 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
                   <td className="num px-4 py-3 text-end text-danger">
                     {fmtNum(summary.periodClosedLost)}
@@ -1870,7 +1870,7 @@ function TeamSalesOverview({
       <Card padded={false} className="overflow-hidden">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
           <div>
-            <h3 id="team-sales-overview-title" className="text-base font-bold text-text">
+            <h3 id="team-sales-overview-title" className="text-base font-medium text-text">
               {lang === "ar" ? "مقارنة الموظفين" : "Compare employees"}
             </h3>
             <p className="mt-1 text-xs text-text-muted">
@@ -2018,7 +2018,7 @@ function OverviewMetric({
           {icon}
         </span>
       </div>
-      <div className="mt-2 truncate text-xl font-bold text-text" title={value}>
+      <div className="mt-2 truncate text-xl font-medium text-text" title={value}>
         {value}
       </div>
       <p className="mt-1 min-h-8 text-[12px] leading-4 text-text-muted">{sub}</p>
@@ -2129,10 +2129,10 @@ function TargetUnitsDashboard({
             heaviest element on the page carrying the least information. */}
         <div className="grid gap-5 border-b border-border bg-surface-2 px-5 py-5 lg:grid-cols-[1fr_auto] lg:items-center lg:px-7">
           <div>
-            <p className="text-xs font-semibold text-text-muted">
+            <p className="text-xs font-medium text-text-muted">
               {lang === "ar" ? "متابعة التارجت من تحصيل Odoo" : "Odoo collections target tracking"}
             </p>
-            <h2 id="target-units-title" className="mt-1 text-xl font-bold text-text sm:text-2xl">
+            <h2 id="target-units-title" className="mt-1 text-xl font-medium text-text sm:text-2xl">
               {lang === "ar" ? "أداء الوحدات والتيمات" : "Units and team performance"}
             </h2>
             <p className="mt-1 max-w-2xl text-xs leading-6 text-text-muted">
@@ -2142,7 +2142,7 @@ function TargetUnitsDashboard({
             </p>
           </div>
           <label className="block min-w-[210px]">
-            <span className="mb-1.5 block text-xs font-semibold text-text-muted">
+            <span className="mb-1.5 block text-xs font-medium text-text-muted">
               {lang === "ar" ? "شهر التارجت" : "Target month"}
             </span>
             <select
@@ -2252,14 +2252,14 @@ function TargetHeadlineMetric({
       className={`min-w-0 px-3 py-4 text-center ${onOpen ? "group w-full cursor-pointer transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand" : "w-full"} sm:px-5`}
       aria-label={onOpen ? `${label} — عرض التفاصيل` : undefined}
     >
-      <p className="text-[12px] font-bold text-text-muted sm:text-xs">{label}</p>
+      <p className="text-[12px] font-medium text-text-muted sm:text-xs">{label}</p>
       <p
-        className={`mt-1 truncate text-lg font-black sm:text-xl ${accent ? "text-brand" : "text-text"}`}
+        className={`mt-1 truncate text-lg font-medium sm:text-xl ${accent ? "text-brand" : "text-text"}`}
       >
         {value}
       </p>
       {onOpen && (
-        <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-brand opacity-80 group-hover:opacity-100">
+        <span className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-brand opacity-80 group-hover:opacity-100">
           <Info size={11} aria-hidden="true" />
           اضغط للتوضيح
         </span>
@@ -2285,18 +2285,17 @@ function TargetUnitCard({
   onSelectEmployee: (key: string) => void;
 }) {
   const unitName = lang === "ar" ? unit.nameAr : unit.nameEn;
-  const accent = index % 2 === 0 ? "bg-brand" : "bg-[#d88724]";
-
   return (
     <Card padded={false} className="overflow-hidden">
+      {/* The bar here alternated cobalt and amber by row index, so the colour
+          said "this is the second one" rather than anything about the unit. */}
       <div className="relative overflow-hidden px-5 py-5">
-        <div className={`absolute inset-y-0 start-0 w-1.5 ${accent}`} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[12px] font-bold uppercase tracking-[.18em] text-text-subtle">
+            <p className="text-[12px] font-medium text-text-subtle">
               {lang === "ar" ? "وحدة مبيعات" : "Sales unit"}
             </p>
-            <h3 className="mt-1 text-xl font-black text-text">{unitName}</h3>
+            <h3 className="mt-1 text-xl font-medium text-text">{unitName}</h3>
             <p className="mt-1 text-xs text-text-muted">
               {fmtNum(unit.leaders.length)} {lang === "ar" ? "تيم" : "teams"} ·{" "}
               {fmtNum(unit.leaders.reduce((sum, leader) => sum + leader.members.length, 0))}{" "}
@@ -2304,10 +2303,10 @@ function TargetUnitCard({
             </p>
           </div>
           <div className="text-end">
-            <p className="text-xs font-semibold text-text-muted">
+            <p className="text-xs font-medium text-text-muted">
               {lang === "ar" ? "نسبة التحقيق" : "Achievement"}
             </p>
-            <p className="mt-0.5 text-3xl font-black text-brand">{fmtPct(unit.achievement, 1)}</p>
+            <p className="mt-0.5 text-3xl font-medium text-brand">{fmtPct(unit.achievement, 1)}</p>
           </div>
         </div>
 
@@ -2368,7 +2367,7 @@ function TargetLeaderCard({
           <Users size={17} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black text-text">
+          <p className="truncate text-sm font-medium text-text">
             {lang === "ar" ? leader.nameAr : leader.nameEn}
           </p>
           <p className="mt-0.5 text-[12px] text-text-muted">
@@ -2377,7 +2376,7 @@ function TargetLeaderCard({
           </p>
         </div>
         <div className="shrink-0 text-end">
-          <p className="text-sm font-black text-brand">{fmtPct(leader.achievement, 1)}</p>
+          <p className="text-sm font-medium text-brand">{fmtPct(leader.achievement, 1)}</p>
           <p className="text-[12px] text-text-subtle">{fmtUSDFull(leader.paidRevenue)}</p>
         </div>
         <ChevronDown
@@ -2410,13 +2409,13 @@ function TargetLeaderCard({
               className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-start transition-colors hover:border-brand/20 hover:bg-brand-soft"
             >
               <span className="min-w-0">
-                <span className="block truncate text-xs font-bold text-text">{member.name}</span>
+                <span className="block truncate text-xs font-medium text-text">{member.name}</span>
                 <span className="mt-0.5 block text-[12px] text-text-subtle">
                   {lang === "ar" ? "افتح أداء الموظف" : "Open employee performance"}
                 </span>
               </span>
               <span className="text-end">
-                <span className="block text-xs font-black text-text">
+                <span className="block text-xs font-medium text-text">
                   {fmtUSDFull(member.paidRevenue)}
                 </span>
                 <span className="block text-[12px] text-text-subtle">
@@ -2460,11 +2459,11 @@ function TargetMemberCard({
     <button
       type="button"
       onClick={onSelect}
-      className="rounded-2xl border border-border bg-surface p-4 text-start transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md"
+      className="rounded-2xl border border-border bg-surface p-4 text-start transition-colors hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-text">{member.name}</p>
+          <p className="truncate text-sm font-medium text-text">{member.name}</p>
           <p className="mt-1 text-[12px] text-text-muted">
             {lang === "ar" ? "تارجت فردي مستقل" : "Independent individual target"}
           </p>
@@ -2502,9 +2501,9 @@ function TargetCompactMetric({
 }) {
   return (
     <div className="min-w-0">
-      <p className="truncate text-[12px] font-semibold text-text-subtle">{label}</p>
+      <p className="truncate text-[12px] font-medium text-text-subtle">{label}</p>
       <p
-        className={`mt-0.5 truncate text-xs font-black sm:text-sm ${strong ? "text-brand" : "text-text"}`}
+        className={`mt-0.5 truncate text-xs font-medium sm:text-sm ${strong ? "text-brand" : "text-text"}`}
       >
         {value}
       </p>
@@ -2614,7 +2613,7 @@ function AgentTargetPanel({ target, row }: { target: AgentTarget; row: AgentRow 
       className="scroll-mt-24 rounded-2xl border border-brand/20 bg-brand-soft/40 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-brand">
+        <div className="flex items-center gap-2 text-xs font-medium text-brand">
           <Target size={16} />
           <span>{lang === "ar" ? "تارجت الفترة" : "Target for this period"}</span>
         </div>
@@ -2725,7 +2724,7 @@ function EvidenceLink({ href }: { href: string }) {
       <button
         type="button"
         onClick={() => evidence.openEvidence(kind)}
-        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[12px] font-semibold text-brand transition-colors hover:bg-brand-soft"
+        className="inline-flex items-center gap-1 rounded-lg border border-brand/20 bg-brand-soft/55 px-2.5 py-1.5 text-[12px] font-medium text-brand transition-colors hover:bg-brand-soft"
       >
         {labels[kind][lang]}
         <ArrowUpRight size={12} aria-hidden="true" />
@@ -2735,7 +2734,7 @@ function EvidenceLink({ href }: { href: string }) {
   return (
     <a
       href={href}
-      className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand underline-offset-4 hover:underline"
+      className="inline-flex items-center gap-1 text-[12px] font-medium text-brand underline-offset-4 hover:underline"
     >
       {lang === "ar" ? "عرض الدليل" : "View evidence"}
       <ArrowUpRight size={12} aria-hidden="true" />
@@ -2753,10 +2752,10 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold text-brand">
+          <div className="text-xs font-medium text-brand">
             {lang === "ar" ? "ملخص الأداء" : "Performance summary"}
           </div>
-          <h3 className="mt-0.5 text-lg font-bold text-text">
+          <h3 className="mt-0.5 text-lg font-medium text-text">
             {lang === "ar" ? "النتيجة أولًا، ثم الدليل" : "Score first, evidence next"}
           </h3>
           <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-text-muted">
@@ -2766,7 +2765,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
           </p>
         </div>
         <div className="rounded-2xl border border-brand/20 bg-surface px-5 py-3 text-center shadow-sm">
-          <div className="num text-3xl font-bold text-brand">{fmtQuality(score.overall)}</div>
+          <div className="num text-3xl font-medium text-brand">{fmtQuality(score.overall)}</div>
           <small className="block text-[12px] text-text-muted">
             {lang === "ar" ? "نقطة مكتسبة من 100" : "Earned points out of 100"}
           </small>
@@ -2785,7 +2784,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
                 ? `جودة المكالمات · ${score.weights.callQuality} نقطة`
                 : `Call quality · ${score.weights.callQuality} pts`}
             </b>
-            <span className="num font-bold text-brand">{fmtQuality(score.callQuality)}</span>
+            <span className="num font-medium text-brand">{fmtQuality(score.callQuality)}</span>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
@@ -2803,7 +2802,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
                 ? `التواصل والبيع · ${score.weights.salesExecution} نقطة`
                 : `Lead execution · ${score.weights.salesExecution} pts`}
             </b>
-            <span className="num font-bold text-brand">{fmtQuality(score.salesExecution)}</span>
+            <span className="num font-medium text-brand">{fmtQuality(score.salesExecution)}</span>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
@@ -2821,7 +2820,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
                 ? `متابعة Chatwoot · ${score.weights.chatFollowUp} نقطة`
                 : `Chatwoot follow-up · ${score.weights.chatFollowUp} pts`}
             </b>
-            <span className="num font-bold text-brand">{fmtQuality(score.chatFollowUp)}</span>
+            <span className="num font-medium text-brand">{fmtQuality(score.chatFollowUp)}</span>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {lang === "ar"
@@ -2839,7 +2838,7 @@ function EmployeeScoreSummary({ row }: { row: AgentRow }) {
                 ? `تحقيق التارجت · ${score.weights.targetAttainment} نقطة`
                 : `Target attainment · ${score.weights.targetAttainment} pts`}
             </b>
-            <span className="num font-bold text-brand">{fmtQuality(score.targetAttainment)}</span>
+            <span className="num font-medium text-brand">{fmtQuality(score.targetAttainment)}</span>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
             {score.evidence.targetBasis === "orders"
@@ -2902,10 +2901,10 @@ function EmployeeEvidencePanel({
   return (
     <section className="space-y-3">
       <div>
-        <div className="text-xs font-semibold text-brand">
+        <div className="text-xs font-medium text-brand">
           {lang === "ar" ? "السجلات الأصلية" : "Source records"}
         </div>
-        <h3 className="mt-0.5 text-lg font-bold text-text">
+        <h3 className="mt-0.5 text-lg font-medium text-text">
           {kind === "sales"
             ? lang === "ar"
               ? "التحصيل وأوامر البيع"
@@ -2971,7 +2970,7 @@ function EmployeeEvidencePanel({
                   {data.orders.rows.slice(0, 8).map((order) => (
                     <div key={order.orderRef} className="px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
-                        <bdi dir="ltr" className="num text-xs font-semibold text-text">
+                        <bdi dir="ltr" className="num text-xs font-medium text-text">
                           {order.orderRef}
                         </bdi>
                         <strong className="num text-xs text-brand">
@@ -2996,7 +2995,7 @@ function EmployeeEvidencePanel({
                         <span className="min-w-0">
                           <bdi
                             dir="ltr"
-                            className="num block truncate text-xs font-semibold text-text"
+                            className="num block truncate text-xs font-medium text-text"
                           >
                             {invoice.movement}
                           </bdi>
@@ -3098,7 +3097,7 @@ function EmployeeEvidencePanel({
                             href={lead.latestCallUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
+                            className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-medium text-brand hover:bg-brand-soft"
                           >
                             {lang === "ar" ? "فتح آخر مكالمة" : "Open latest call"}
                             <ExternalLink size={11} className="ms-1 inline" />
@@ -3109,7 +3108,7 @@ function EmployeeEvidencePanel({
                             href={lead.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
+                            className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-medium text-brand hover:bg-brand-soft"
                           >
                             {lang === "ar" ? "فتح الليد" : "Open lead"}
                             <ExternalLink size={11} className="ms-1 inline" />
@@ -3316,7 +3315,7 @@ function AgentCards({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-bold text-brand">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-medium text-brand">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
@@ -3478,7 +3477,7 @@ function AgentCards({
               </b>
             </span>
           </div>
-          <div className="mt-3 flex items-center justify-end gap-1 text-[12px] font-semibold text-brand">
+          <div className="mt-3 flex items-center justify-end gap-1 text-[12px] font-medium text-brand">
             {lang === "ar" ? "تحليل الكورسات والتخصصات" : "Course and specialization analysis"}
             <ArrowUpRight size={14} className="rtl:-rotate-90" />
           </div>
@@ -3508,7 +3507,7 @@ function AgentTable({
       <div className="max-h-[680px] overflow-auto">
         <table className="w-full min-w-[2380px] text-sm">
           <thead className="sticky top-0 z-10 bg-surface-2">
-            <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+            <tr className="text-[12px] text-text-muted">
               {[
                 lang === "ar" ? "الموظف" : "Employee",
                 lang === "ar" ? "التارجت" : "Target",
@@ -3801,13 +3800,13 @@ function AgentPerformanceSheet({
           <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,var(--brand),color-mix(in_srgb,var(--brand)_72%,#08142e))] px-5 py-6 text-white sm:px-7">
             <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[34px] border-white/8" />
             <SheetHeader className="relative pe-8 text-start sm:text-start">
-              <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-white/70">
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] font-medium text-white/70">
                 <span className="rounded-full bg-white/12 px-2.5 py-1">
                   {lang === "ar" ? "ملف أداء الموظف" : "Employee performance profile"}
                 </span>
                 <span>{row.team}</span>
               </div>
-              <SheetTitle className="text-2xl font-bold text-white sm:text-3xl">
+              <SheetTitle className="text-2xl font-medium text-white sm:text-3xl">
                 {row.displayName}
               </SheetTitle>
               <SheetDescription className="max-w-3xl text-xs leading-relaxed text-white/72 sm:text-sm">
@@ -3822,10 +3821,13 @@ function AgentPerformanceSheet({
             {/* 1 — Collections first: "الموظف حصّل كام؟" */}
             <section className="space-y-3" aria-labelledby="employee-collections-title">
               <div>
-                <div className="text-xs font-semibold text-brand">
+                <div className="text-xs font-medium text-brand">
                   {lang === "ar" ? "١ · التحصيلات" : "1 · Collections"}
                 </div>
-                <h3 id="employee-collections-title" className="mt-0.5 text-lg font-bold text-text">
+                <h3
+                  id="employee-collections-title"
+                  className="mt-0.5 text-lg font-medium text-text"
+                >
                   {lang === "ar" ? "الموظف حصّل كام؟" : "How much did the employee collect?"}
                 </h3>
               </div>
@@ -3884,10 +3886,10 @@ function AgentPerformanceSheet({
             {/* 2 — Leads: "دخل له كام ليد وعمل فيهم إيه؟" */}
             <section className="space-y-3" aria-labelledby="employee-leads-title">
               <div>
-                <div className="text-xs font-semibold text-brand">
+                <div className="text-xs font-medium text-brand">
                   {lang === "ar" ? "٢ · الليدز" : "2 · Leads"}
                 </div>
-                <h3 id="employee-leads-title" className="mt-0.5 text-lg font-bold text-text">
+                <h3 id="employee-leads-title" className="mt-0.5 text-lg font-medium text-text">
                   {lang === "ar"
                     ? "دخل له كام ليد وعمل فيهم إيه؟"
                     : "How many leads came in, and what happened?"}
@@ -3967,10 +3969,10 @@ function AgentPerformanceSheet({
             {/* 3 — Contact & QA: evidence of contact, then the manual verdicts. */}
             <section className="space-y-3" aria-labelledby="employee-contact-qa-title">
               <div>
-                <div className="text-xs font-semibold text-brand">
+                <div className="text-xs font-medium text-brand">
                   {lang === "ar" ? "٣ · التواصل والتحقق" : "3 · Contact & QA"}
                 </div>
-                <h3 id="employee-contact-qa-title" className="mt-0.5 text-lg font-bold text-text">
+                <h3 id="employee-contact-qa-title" className="mt-0.5 text-lg font-medium text-text">
                   {lang === "ar"
                     ? "تواصل مع ليدزه؟ وهل اتأكدنا؟"
                     : "Were the leads contacted, and verified?"}
@@ -4079,12 +4081,12 @@ function AgentPerformanceSheet({
             <section className="space-y-3" aria-labelledby="employee-lead-execution-title">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-brand">
+                  <div className="text-xs font-medium text-brand">
                     {lang === "ar" ? "التواصل والبيع" : "Lead execution"}
                   </div>
                   <h3
                     id="employee-lead-execution-title"
-                    className="mt-0.5 text-lg font-bold text-text"
+                    className="mt-0.5 text-lg font-medium text-text"
                   >
                     {lang === "ar"
                       ? "هل اتصل الموظف بالليدز التي وُزعت عليه؟"
@@ -4094,7 +4096,7 @@ function AgentPerformanceSheet({
                 <button
                   type="button"
                   onClick={() => setUncalledScope("owner")}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[12px] font-semibold text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/25 bg-brand-soft/30 px-3 text-[12px] font-medium text-brand transition-colors hover:bg-brand-soft/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
                 >
                   <PhoneCall size={13} />
                   {lang === "ar" ? "فلتر الليدز التي لم يتواصل معها" : "Filter leads not contacted"}
@@ -4229,10 +4231,10 @@ function AgentPerformanceSheet({
             <section className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-brand">
+                  <div className="text-xs font-medium text-brand">
                     {lang === "ar" ? "أداء المكالمات" : "Call performance"}
                   </div>
-                  <h3 className="mt-0.5 text-lg font-bold text-text">
+                  <h3 className="mt-0.5 text-lg font-medium text-text">
                     {lang === "ar"
                       ? "المكالمات ووقت الحديث والجودة"
                       : "Calls, talk time, and quality"}
@@ -4367,10 +4369,10 @@ function AgentPerformanceSheet({
             <section>
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-brand">
+                  <div className="text-xs font-medium text-brand">
                     {lang === "ar" ? "الخلاصة التنفيذية" : "Executive summary"}
                   </div>
-                  <h3 className="mt-0.5 text-lg font-bold text-text">
+                  <h3 className="mt-0.5 text-lg font-medium text-text">
                     {lang === "ar"
                       ? "قوي في إيه وضعيف في إيه — من الكورسات اللي بيبيعها"
                       : "Strongest and weakest — within the courses he sells"}
@@ -4579,7 +4581,7 @@ function AgentPerformanceSheet({
               <div className="max-h-[620px] overflow-auto">
                 <table className="w-full min-w-[1180px] text-sm">
                   <thead className="sticky top-0 z-10 bg-surface-2">
-                    <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+                    <tr className="text-[12px] text-text-muted">
                       {[
                         lang === "ar" ? "الكورس" : "Course",
                         lang === "ar" ? "التخصص" : "Specialization",
@@ -4669,7 +4671,7 @@ function AgentPerformanceSheet({
                     reader cannot tell whether a named course is most of his
                     volume or a rounding error. */}
                   <tfoot className="sticky bottom-0 bg-surface-2">
-                    <tr className="border-t-2 border-border text-[12px] font-semibold text-text">
+                    <tr className="border-t-2 border-border text-[12px] font-medium text-text">
                       <td className="px-3 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
                       <td className="px-3 py-3 text-text-muted">
                         {fmtNum(totals.courses)} {lang === "ar" ? "كورس" : "courses"}
@@ -4938,7 +4940,7 @@ function EmployeeCallsList({
                               {call.summary || call.recordingState}
                             </small>
                           </span>
-                          <span className="num text-xs font-semibold text-text">
+                          <span className="num text-xs font-medium text-text">
                             {formatCallDuration(call.durationSeconds, lang)}
                           </span>
                           <span>
@@ -5111,7 +5113,7 @@ function EmployeeCallDetail({
                       finding.criterion || (lang === "ar" ? "معيار جودة" : "Quality criterion"),
                     )}
                   </b>
-                  <span className="num text-[12px] font-semibold text-danger">
+                  <span className="num text-[12px] font-medium text-danger">
                     {String(finding.penalty || "")}
                   </span>
                 </div>
@@ -5249,12 +5251,12 @@ function ProfileMetric({
         </span>
         <span className="text-brand">{icon}</span>
       </div>
-      <div className="num mt-2 text-xl font-bold text-text sm:text-2xl">{value}</div>
+      <div className="num mt-2 text-xl font-medium text-text sm:text-2xl">{value}</div>
       <div className="mt-1 text-[12px] text-text-muted">{sub}</div>
       {evidenceHref && (
         <a
           href={evidenceHref}
-          className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-brand underline-offset-4 hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-brand underline-offset-4 hover:underline"
         >
           {lang === "ar" ? "عرض الدليل" : "View evidence"}
           <ArrowUpRight size={12} aria-hidden="true" />
@@ -5304,7 +5306,7 @@ function CourseInsight({
   }[tone];
   return (
     <article className={`rounded-2xl border p-4 ${styles}`}>
-      <div className="flex items-center gap-2 text-[12px] font-semibold">
+      <div className="flex items-center gap-2 text-[12px] font-medium">
         {icon}
         <span>{eyebrow}</span>
         {explain && <EmployeeMetricInfo metric={explain} align="end" />}
@@ -5316,7 +5318,7 @@ function CourseInsight({
               type="button"
               onClick={() => onOpenInvoices(course)}
               title={dimensionNote(course.label, lang) ?? course.label}
-              className="mt-3 flex w-full items-center gap-1.5 text-start text-base font-bold text-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="mt-3 flex w-full items-center gap-1.5 text-start text-base font-medium text-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <span className="truncate">{displayDimension(course.label, lang)}</span>
               <ReceiptText size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
@@ -5326,13 +5328,13 @@ function CourseInsight({
             </button>
           ) : (
             <div
-              className="mt-3 truncate text-base font-bold text-text"
+              className="mt-3 truncate text-base font-medium text-text"
               title={dimensionNote(course.label, lang) ?? course.label}
             >
               {displayDimension(course.label, lang)}
             </div>
           )}
-          <div className="num mt-1 text-lg font-bold text-text">{value(course)}</div>
+          <div className="num mt-1 text-lg font-medium text-text">{value(course)}</div>
           <div className="mt-1 text-[12px] text-text-muted">{sub(course)}</div>
           {foot && (
             <div className="num mt-2 border-t border-current/12 pt-2 text-[12px] text-text-muted">
@@ -5482,7 +5484,7 @@ function AgentPeriodLostByCourse({ row }: { row: AgentRow }) {
                 </td>
               </tr>
             )}
-            <tr className="border-t-2 border-border bg-surface-2 font-bold">
+            <tr className="border-t-2 border-border bg-surface-2 font-medium">
               <td className="px-4 py-3">{lang === "ar" ? "الإجمالي" : "Total"}</td>
               <td className="num px-4 py-3 text-end text-danger">
                 {fmtNum(row.closedLostInPeriod)}
@@ -5657,7 +5659,7 @@ function CourseInvoicesDialog({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">
                 <thead>
-                  <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+                  <tr className="text-[12px] text-text-muted">
                     <th className="px-3 py-2 text-start">{ar ? "رقم الفاتورة" : "Invoice no."}</th>
                     <th className="px-3 py-2 text-start">{ar ? "تاريخ الدفع" : "Payment date"}</th>
                     <th className="px-3 py-2 text-start">{ar ? "العميل" : "Customer"}</th>
@@ -6313,7 +6315,7 @@ export function AccountingProfitabilityView() {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="min-h-9 rounded-lg border border-border px-3 text-xs font-semibold text-brand hover:bg-surface-2"
+                  className="min-h-9 rounded-lg border border-border px-3 text-xs font-medium text-brand hover:bg-surface-2"
                 >
                   {lang === "ar" ? "إعادة المحاولة" : "Retry"}
                 </button>

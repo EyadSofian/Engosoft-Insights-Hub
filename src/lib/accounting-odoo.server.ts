@@ -537,9 +537,7 @@ export async function loadDirectAccounting(): Promise<DirectAccountingSnapshot> 
     const hasExplicitUsd = !!usdPaidReport && present(report[usdPaidReport]);
     const fx = FX_TO_USD[currency.toUpperCase()];
     if (!hasExplicitUsd && fx === undefined) missingCurrencyRate++;
-    const usdPaid = hasExplicitUsd
-      ? number(report[usdPaidReport])
-      : totalInCurrency * (fx ?? 0);
+    const usdPaid = hasExplicitUsd ? number(report[usdPaidReport]) : totalInCurrency * (fx ?? 0);
     const teamValue = reportTeam ? report[reportTeam] : moveTeam ? move[moveTeam] : move.team_id;
     const teamId = m2oId(teamValue as M2O);
     const team = teamById.get(teamId);
